@@ -1,3 +1,3 @@
 // Ferry's top bar module (the keys: config/topbar/modules.jsonc; its commands run in this folder). Its state: ./status;
 // a click opens FerryMenu.qml; files dropped on the icon go to the box.
-{ "interval": 5, "drop": "bin/ferry add", "after": "system", "size": 17, "label": "Ferry – Device mailbox", "glyph": "inbox" }
+{ "interval": 5, "drop": "~/.local/bin/ferry add", "after": "system", "size": 17, "label": "Ferry – Device mailbox", "glyph": "inbox" }

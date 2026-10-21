@@ -4,7 +4,7 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import qs
 
-// Ferry (bin/ferry): a mailbox between this computer and the owner's other devices (phones, other computers' Ferry). The
+// Ferry (the `ferry` command of Ferry's own install): a mailbox between this computer and the owner's other devices (phones, other computers' Ferry). The
 // menu lists what they sent here on one card: a click copies a text or opens a file, a file drags out into another app,
 // and Clear empties the list. Below it the three ways to send, as in the phone's app: Aa (a
 // text typed here), Send Clipboard and + (files from a dialog), to the device in the pill above them (the last one
@@ -18,9 +18,8 @@ Column {
     readonly property int preferredWidth: 360
     signal close()
 
-    // The plugin's own command, next to this file (a plugin's menu is loaded from its folder; `import qs` brings the
-    // shared parts: Theme, MenuRow, Sh…)
-    readonly property string ferry: decodeURIComponent(Qt.resolvedUrl("bin/ferry").toString().replace(/^file:\/\//, ""))
+    // Ferry's command, which its install script links into ~/.local/bin (install.sh): not on Quickshell's PATH for sure
+    readonly property string ferry: Quickshell.env("HOME") + "/.local/bin/ferry"
     property var st: null              // `ferry list --json`: { on, tailscale, url, serving, items, devices, target, sent }
     readonly property var items: st ? st.items : []
     readonly property var received: items.filter(i => i.to === "computer").reverse()

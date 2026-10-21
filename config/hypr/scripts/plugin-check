@@ -20,8 +20,8 @@ ICONS_QML = os.path.join(REPO, "config/quickshell/Icons.qml")     # the launcher
 BAR_ICONS = os.path.join(REPO, "config/topbar/icons")             # the bar's own SVGs, on top of Lucide (status)
 CORE_MODULES = os.path.join(REPO, "config/topbar/modules.jsonc")
 
-CONF_KEYS = ("name", "icon", "description", "default", "install", "installed", "packages", "group", "version", "author",
-             "order", "setup", "configured", "welcome", "bundled")
+CONF_KEYS = ("name", "icon", "description", "default", "install", "installed", "packages", "units", "group", "version",
+             "author", "order", "setup", "configured", "welcome", "bundled")
 CONF_NEEDED = ("name", "icon", "description", "installed", "version", "author")   # without installed it never counts
                                                              # as installed; version and author go in bug reports
 GROUPS = ("app", "recommended", "webapp", "plugin")

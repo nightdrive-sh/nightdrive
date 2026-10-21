@@ -74,9 +74,14 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
   change to a kit part reaches every app: compare each app's screenshots before and after. Its command in `bin/` (one,
   named for the app) is built on `kit/app.sh`.
 - *Plugin* (an optional feature: a bar icon and menu, keys, a service): a folder `plugins/<id>/` as `plugins/README.md`
-  explains (copy its Disk example, or `plugins/ferry`), then `nightdrive plugin check <id>`. After changing its
+  explains (copy its Disk example, or `plugins/localsend`), then `nightdrive plugin check <id>`. After changing its
   `module.jsonc` or adding a menu or launcher levels (`<Name>Levels.qml`), run `nightdrive plugins installed`; after
   changing its keys, `hyprctl reload`.
+- *Ferry* is an app of its own (github.com/nightdrive-sh/ferry): its server, `ferry` command and window change in its
+  repo, against its `docs/protocol.md`. `plugins/ferry` is only Nightdrive's side: the top bar module and menu, which
+  use `ferry list --json` and the other commands, the hook Ferry runs when its box changes (`~/.config/ferry/hook`), and
+  `install.sh`, which installs Ferry's latest release without its tray icon (`nightdrive update` runs it with
+  `--update`). `FERRY_FROM=<a Ferry checkout's linux/>` installs one that isn't released.
 - *Bar icon and menu* in the core (on every desktop): an entry in `topbar/modules.jsonc` (its place in the bar), a case
   in `topbar/scripts/status` (`emit ICON TEXT CLASS`), and `quickshell/<Name>Menu.qml` (copy an existing menu). Size it
   with `nightdrive topbar adjust`. Every menu follows the rules in `plugins/README.md` › The menu: `MenuHeader` first, rows

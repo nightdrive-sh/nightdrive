@@ -5,8 +5,9 @@ keys. Each one is a folder, `plugins/<id>/`, and the folder's name is its id. Us
 later in launcher › System › Install or with `nightdrive plugins`. A plugin that isn't installed, or is turned off,
 doesn't show anywhere: no bar icon, menu, keys or shortcut lines.
 
-This page is all you need to make one. [`ferry/`](ferry) is the full example (a bar module with a menu, a service, a
-command and a web page); [Disk](#a-small-example-disk), at the end, is a small one to copy.
+This page is all you need to make one. [`ferry/`](ferry) is the full example of a bar module with its menu, over an app
+that has its own repo and install script; [`localsend/`](localsend) has a service, a command and a Files extension of
+its own; [Disk](#a-small-example-disk), at the end, is a small one to copy.
 
 One-line parts (a web app, an app from dnf or Flathub, with no files of their own) stay lines in
 [`plugins.txt`](../plugins.txt), with their page in `docs/plugins/<id>.md`. Ids are unique across both.
@@ -30,10 +31,10 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | `SHORTCUTS.md` | Its lines in the key list (⌘⇧K, launcher › Keybindings) | — (Deck's [SHORTCUTS.md](deck/SHORTCUTS.md)) |
 | `hyprland.lua` | Hyprland settings: window rules, and programs that start with the session | — (Deck's [hyprland.lua](deck/hyprland.lua)) |
 | `quit-commands` | What ⌘Q runs on its window instead of closing it, e.g. to stop a player that plays on without one | — (Deck's [quit-commands](deck/quit-commands)) |
-| `systemd/` | User units, linked to `~/.config/systemd/user` | [nightdrive-ferry.service](ferry/systemd/nightdrive-ferry.service) |
-| `bin/` | Commands, linked to `~/.local/bin` | [ferry](ferry/bin/ferry) |
+| `systemd/` | User units, linked to `~/.config/systemd/user` | — (LocalSend's [nightdrive-localsend.service](localsend/systemd/nightdrive-localsend.service)) |
+| `bin/` | Commands, linked to `~/.local/bin` | — (LocalSend's [localsend](localsend/bin/localsend)) |
 | `nautilus-python/` | Files extensions, linked to `~/.local/share/nautilus-python/extensions` | — (LocalSend's [localsend.py](localsend/nautilus-python/localsend.py)) |
-| anything else | Whatever it needs, used by its own files | [web/](ferry/web) (the phone's page) |
+| anything else | Whatever it needs, used by its own files | [install.sh](ferry/install.sh) (installs Ferry from its repo), [hook](ferry/hook) (Ferry runs it when its box changes) |
 
 `link.sh` links `bin/`, `systemd/` and `nautilus-python/` whether the plugin is installed or not, so its installer can
 use them. The rest is picked up by `nightdrive plugins installed`, which installing and turning a plugin off or on run: it
@@ -53,10 +54,11 @@ name=Ferry
 icon=inbox
 description=Files and text both ways with your phone over Tailscale, no app (experimental)
 default=off
-install=sudo dnf install -y python3-cryptography qrencode && bin/ferry enable
-installed=systemctl --user -q is-enabled nightdrive-ferry.service
+install=install.sh
+installed=systemctl --user -q is-enabled ferry.service
+units=ferry.service
 group=plugin
-version=0.1.0
+version=0.3.0
 author=@jarilehtinen
 ```
 
@@ -69,6 +71,7 @@ author=@jarilehtinen
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
 | `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
+| `units` | User units the installer set up outside the folder, space-separated (Ferry's `ferry.service`, which Ferry's own install writes): `nightdrive plugins off` stops them with the folder's `systemd/` ones |
 | `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up), `webapp`, or `app`: one of Nightdrive's own apps (below) |
 | `bundled` | For an `app`: `yes` (default) comes with every install; `no` doesn't (below) |
 | `version` | `MAJOR.MINOR.PATCH`, e.g. `1.0.0` (`0.x` while it's experimental). It shows on the plugin's page in the launcher and on the website, so a bug report can name it. See [Versions](#versions) |
@@ -106,12 +109,12 @@ explains every key), with a few differences:
 - `size`: its icon size in px.
 - `label` (required) and `glyph` (a Lucide name): its row in launcher › Settings › Top bar › Items, where it can be
   hidden.
-- Its commands (`status`, `right`, `middle`, `drop`) run in the plugin's folder, so `bin/ferry add` finds Ferry's
-  command.
+- Its commands (`status`, `right`, `middle`, `drop`) run in the plugin's folder with bash, so `bin/<command>` finds
+  the plugin's own command (Ferry's is installed elsewhere: `~/.local/bin/ferry add`).
 
 ```jsonc
 // Ferry's top bar module; its state: ./status; a click opens FerryMenu.qml; files dropped on the icon go to the box.
-{ "interval": 5, "drop": "bin/ferry add", "after": "system", "size": 17, "label": "Ferry – Device mailbox", "glyph": "inbox" }
+{ "interval": 5, "drop": "~/.local/bin/ferry add", "after": "system", "size": 17, "label": "Ferry – Device mailbox", "glyph": "inbox" }
 ```
 
 `status` is an executable script in the folder (the module runs it without a `status` key). It prints one line of JSON,
@@ -122,8 +125,8 @@ of an SVG in the plugin's `icons/`, drawn in `currentColor`: Tailscale's logo), 
 ```bash
 #!/bin/bash
 . ~/.config/topbar/scripts/emit          # emit ICON TEXT [CLASS]
-systemctl --user -q is-active nightdrive-ferry.service || { emit inbox "" off; exit; }
-n=$(jq '[.items[]? | select(.to == "computer" and (.seen | not))] | length' ~/.local/share/nightdrive/ferry/items.json 2>/dev/null)
+systemctl --user -q is-active ferry.service || { emit inbox "" off; exit; }
+n=$(jq '[.items[]? | select(.to == "computer" and (.seen | not))] | length' ~/.local/share/ferry/items.json 2>/dev/null)
 if (( ${n:-0} > 0 )); then emit inbox "$n" active; else emit inbox ""; fi
 ```
 
@@ -154,7 +157,8 @@ calendar's grid, Ferry's drop zone and QR code are all fine).
   names: the themes change them.
 - **Commands with `Sh`** (`command: [...]` or `script: "…"`, the output in `onResult`), or
   `Quickshell.execDetached([...])` for one that just starts something. Your own command's path:
-  `Qt.resolvedUrl("bin/ferry")` without the `file://` (FerryMenu.qml's `ferry`).
+  `Qt.resolvedUrl("bin/<command>")` without the `file://`; one in `~/.local/bin`, `Quickshell.env("HOME") +
+  "/.local/bin/<command>"` (FerryMenu.qml's `ferry`), since Quickshell's PATH may not have that folder.
 - `Divider` is the separator line; `Slider`, `BusyDots` and `Plugins.has("tailscale")` (is another plugin on?) are there
   too.
 - **A text field** needs the keyboard, which a menu doesn't have by default: `readonly property bool wantsKeyboard`
@@ -300,9 +304,9 @@ window rule after the plugin, so it can't replace one of the core's. After editi
 Units in `systemd/` are linked to `~/.config/systemd/user`, files in `bin/` to `~/.local/bin` and Files extensions in
 `nautilus-python/` to `~/.local/share/nautilus-python/extensions`, by `link.sh` (and `nightdrive plugins add` for an
 external one). A name that something else already has is left alone, so an external plugin can't replace Nightdrive's
-commands or services. The installer enables the units (Ferry's `bin/ferry enable`), and `installed` usually tests for
-that. Enable a unit by its path in the folder (`systemctl --user enable --now …/systemd/nightdrive-ferry.service`, as
-`ferry enable` does): `systemctl --user disable` removes a linked unit's link too, and the path links it again. Name them
+commands or services. The installer enables the units (LocalSend's `bin/localsend enable`), and `installed` usually
+tests for that. Enable a unit by its path in the folder (`systemctl --user enable --now …/systemd/nightdrive-localsend.service`, as
+`localsend enable` does): `systemctl --user disable` removes a linked unit's link too, and the path links it again. Name them
 so they can't clash: `nightdrive-<id>.service`, a command named after the plugin. A Files extension runs whether the
 plugin is on or not, so it checks that itself (LocalSend's tests its unit and `~/.local/state/nightdrive/plugins-off/<id>`).
 

@@ -1,0 +1,9 @@
+#!/bin/bash
+# Ferry's hook (~/.config/ferry/hook links here: install.sh). Ferry runs it with what happened: changed, the box or a send
+# changed (the icon's count, the menu's Sent); picked, files went from `ferry pick`'s dialog, for which the menu closed:
+# it opens again to show them.
+case ${1:-} in
+  changed) qs ipc call bar refreshModule ferry ;;
+  picked) qs ipc call menu toggle ferry ;;
+esac >/dev/null 2>&1
+exit 0

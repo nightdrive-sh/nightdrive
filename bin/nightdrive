@@ -385,6 +385,14 @@ LIST
   (( deck )) && [[ -x $HOME/.local/bin/deck ]] && { echo "==> Deck (rebuild)"; "$repo/plugins/deck/install.sh" \
     || missed+=("Deck (rebuild): $repo/plugins/deck/install.sh"); }
 
+  # Ferry (plugins/ferry): its own app from its own repo, which the plugin installs, and Nightdrive's update brings its
+  # latest release along. A Ferry from before (the plugin's own server, until 10.2026; its state is still in Nightdrive's
+  # folder) is replaced by it here, with its phones and box: its old command and unit are gone from the plugin.
+  if systemctl --user -q is-enabled ferry.service 2>/dev/null || [[ -d $HOME/.local/share/nightdrive/ferry ]]; then
+    echo "==> Ferry"
+    as_root "Ferry" "$repo/plugins/ferry/install.sh" --update
+  fi
+
   plugins_installed >/dev/null     # the optional parts' list, before the reload reads it (hypr/bindings.lua)
   "$repo/config/fuzzel/sync-apps" >/dev/null 2>&1 || true   # the launcher's app list, as at the end of install.sh
   if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
@@ -584,8 +592,13 @@ plugin_packages() {
 plugin_find() {
   plugin_rows | awk -F'\x1f' -v n="$1" 'n != "" && (tolower($1) == tolower(n) || tolower($2) == tolower(n)) { print $1 "\t" $2 "\t" $9; exit }'
 }
-# A plugin folder's user units (systemd/), by name
-plugin_units() { local f; for f in "$1"/systemd/*; do [[ -f $f ]] && echo "${f##*/}"; done; }
+# A plugin folder's user units, by name: its systemd/ ones, and those its installer set up elsewhere (plugin.conf's units=,
+# Ferry's ferry.service)
+plugin_units() {
+  local f
+  for f in "$1"/systemd/*; do [[ -f $f ]] && echo "${f##*/}"; done
+  sed -n 's/^units=//p' "$1/plugin.conf" 2>/dev/null | tr ' ' '\n' | sed '/^$/d'
+}
 
 # plugins off|on NAME. Off: the desktop treats it as not installed (no bar module, menu, launcher rows, keys or shortcut
 # lines: plugins_installed leaves it out) and its folder's units are stopped. They stay enabled, so its installed test

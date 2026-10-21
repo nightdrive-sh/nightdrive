@@ -294,8 +294,9 @@ Singleton {
                 // A Lucide glyph asked for by name (lucide:<name>) wins over an icon named like the app ("Battery")
                 icon: own.startsWith("lucide:") ? own : appIcon || own,
                 image: (n.image && !named ? n.image : "") || (appIcon && s.ownIconNames.indexOf(n.appIcon || named) >= 0 ? own : ""),
-                // A picture to show under the text, not as a square (screenshots: hypr/scripts/screenshot)
-                preview: !!n.image && !named && hints.category === "x-nightdrive.preview",
+                // A picture to show under the text, not as a square (screenshots: hypr/scripts/screenshot; a photo
+                // Ferry received: the standard transfer.complete)
+                preview: !!n.image && !named && (hints.category === "x-nightdrive.preview" || hints.category === "transfer.complete"),
                 entry: n.desktopEntry || (e ? e.id : ""),
                 wmclass: e ? e.startupClass : "",
                 time: same ? prev.time : Date.now(),
