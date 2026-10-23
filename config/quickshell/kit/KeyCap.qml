@@ -9,7 +9,7 @@ Row {
     required property QtObject c
     property string keys: ""
     property color tint: c.dim
-    property bool or: false             // "or" between the alternatives (the key sheet); a pair of opposites ("← →") is one box
+    property bool or: false             // "/" between the alternatives (the key sheet), as the launcher's Keybindings show them; a pair of opposites ("← →") is one box
     readonly property var glyphs: ({ "⌘": "command", "⇧": "arrow-big-up", "⌥": "option", "⌃": "chevron-up", "⏎": "corner-down-left",
                                      "⌫": "delete", "↑": "arrow-up", "↓": "arrow-down", "←": "arrow-left", "→": "arrow-right" })
     // "⌘⇧C" → [{ glyph: "command" }, { glyph: "arrow-big-up" }, { text: "C" }]; spaces only separate
@@ -36,8 +36,7 @@ Row {
             Text {
                 visible: root.or && alt.index > 0
                 anchors.verticalCenter: parent.verticalCenter
-                rightPadding: 1
-                text: "or"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
+                text: "/"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
             }
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter

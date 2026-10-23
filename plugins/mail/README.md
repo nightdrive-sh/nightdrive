@@ -5,8 +5,9 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 ## Reading
 
 - Press `?` (or Ctrl+?) in Mail to see its keys. The ⌘ keys follow Mac Mail; on a PC keyboard they are Ctrl (Ctrl+R, Ctrl+N…), as in Thunderbird and Outlook.
-- `j` / `k` or ⌥↑ / ⌥↓ move in the list, the arrows scroll the message, `Space` and ⇧Space page through it. `/` or ⌘F searches (notmuch's query syntax), `Esc` clears the search.
+- ↑ / ↓ or `j` / `k` move in the list, as in Mac Mail, and `Space` and ⇧Space page through the message. `/` or ⌘F searches (notmuch's query syntax), `Esc` clears the search.
 - `1`–`6` or Ctrl+↑ / Ctrl+↓ pick a folder: Inbox, Sent, Drafts, Archive, Spam, Trash. ⌘B hides the folders.
+- In a narrow window the folders hide by themselves (⌘B shows them), and narrower still the list and the thread take turns: a click, `Enter` or → opens the thread, `Esc`, ← or the arrow above it goes back to the list. With the list alone, the arrows (and PgUp / PgDn) move in it without opening anything, so nothing is marked read on the way; with the thread alone, they scroll it and `j` / `k` (or ⌥↑ / ⌥↓) go to the next thread.
 - With more than one account, each has its own folders: `Tab` / ⇧Tab (or a click on an address under the folders) shows the next one. A notification's message opens in its own account.
 - In a thread of three messages or more, the read ones before the last show as one line each (who, the first line, when): a click opens one. The quote at the end of a message hides behind `•••` when all of it is in an earlier message of the thread; when any of it isn't, it shows.
 - `h` shows a message as text, as HTML on the dark page, or as HTML on light paper as it was sent; which one comes first is a setting (text by default). Remote images stay off.

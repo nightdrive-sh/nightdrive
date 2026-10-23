@@ -18,6 +18,9 @@ Flickable {
     // under the pointer, a button says what it does and its key (tip, keys).
     property var actions: []
     signal act(string id)
+    // In a window too narrow for the list beside it, the thread has the window to itself: a back button first in the bar
+    property bool back: false
+    signal goBack()
     // Light paper for HTML as sent: senders pick their colours for a white page, whatever the desktop's theme
     readonly property color paperBg: "#f4f1f6"
     readonly property color paperText: "#1d1a21"
@@ -112,7 +115,7 @@ Flickable {
     readonly property int barHeight: 54
     Rectangle {
         z: 1
-        visible: bar.visible || viewButton.visible
+        visible: bar.visible || viewButton.visible || root.back
         y: root.contentY
         width: root.width; height: root.barHeight
         color: c.solid
@@ -123,12 +126,15 @@ Flickable {
         id: bar
         z: 2                            // the tips lie over the thread
         visible: root.messages.length > 0 && root.actions.length > 0
-        readonly property real room: (viewButton.visible ? viewButton.x : page.x + page.width + 12) - x - 12
+        // Where it may start: after the back button, if there is one; in one pane the buttons are centred from there on
+        readonly property real start: root.back ? backButton.x + backButton.width + 6 : page.x - 10
+        readonly property real end: viewButton.visible ? viewButton.x - 12 : root.back ? root.width - 12 : page.x + page.width
+        readonly property real room: end - start
         readonly property bool full: fullBar.implicitWidth <= room
         readonly property bool compact: !full && shortBar.implicitWidth > room
         // Narrower still: the view button drops its key, then the last buttons give way (their keys still work)
         readonly property int fits: Math.floor((room + spacing) / (iconBar.implicitWidth / root.actions.length + spacing))
-        x: page.x - 10
+        x: root.back ? Math.max(start, Math.min((root.width - width) / 2, end - width)) : start
         y: root.contentY + 12
         spacing: 2
         Repeater {
@@ -142,6 +148,18 @@ Flickable {
                 onClicked: root.act(modelData.id)
             }
         }
+    }
+    // A finger's size, as the only way back to the list for the mouse
+    AppIconButton {
+        id: backButton
+        visible: root.back
+        z: 2
+        x: 9; y: root.contentY + 7
+        implicitWidth: 40; implicitHeight: 40; radius: 8
+        c: root.c
+        glyph: "arrow-left"; glyphSize: 17
+        tip: "Back to the list"; keys: "Esc"
+        onClicked: root.goBack()
     }
     // Plain text first; the HTML version is a press away when the message has one.
     Rectangle {
@@ -166,7 +184,7 @@ Flickable {
                 scale: 0.8
                 anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "h"; tint: c.dim
                 visible: iconBar.implicitWidth + 12 + implicitWidth + viewRow.spacing + viewText.implicitWidth + 24
-                         <= page.x + page.width + 12 - bar.x
+                         <= page.x + page.width + 12 - bar.start   // start, not x: x follows the width in one pane
             }
             Text { id: viewText; anchors.verticalCenter: parent.verticalCenter; text: ["Text", "HTML, dark", "HTML as sent"][root.htmlMode]; color: c.dim; font.family: c.font; font.pixelSize: 12 }
         }
@@ -175,7 +193,7 @@ Flickable {
         id: page
         width: Math.max(240, Math.min(640, root.width - 80))
         x: Math.max(24, (root.width - width) / 2)
-        y: bar.visible || viewButton.visible ? root.barHeight + 33 : 33
+        y: bar.visible || viewButton.visible || root.back ? root.barHeight + 33 : 33
         // The gaps are the messages' own, so folded ones lie close together
         spacing: 0
         Text {

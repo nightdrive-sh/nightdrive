@@ -121,6 +121,45 @@ ShellRoot {
             onFileChanged: reload()
             onLoaded: { try { win.curated = JSON.parse(text()).albums || [] } catch (e) { win.curated = [] } }
         }
+        // What Deck's config has: your own Spotify app (likes, search without the shared limits, and Curated, which finds
+        // its albums through it), and Curated's taste: Last.fm (your history there) or, without it, a few lines of your
+        // own (taste.md). Until both are there, Deck's setup with Claude is offered for what is missing.
+        property bool hasApp: false
+        property bool hasLastfm: false
+        property bool hasNotes: false
+        readonly property bool curatedReady: hasApp && (hasLastfm || hasNotes)
+        property bool configRead: false
+        FileView {
+            path: win.home + "/.config/deck/config.toml"
+            watchChanges: true
+            printErrors: false
+            onFileChanged: reload()
+            onLoaded: {
+                const t = text()
+                win.hasApp = /^\s*client_id\s*=\s*"[^"]+"/m.test(t)
+                win.hasLastfm = /^\s*lastfm_api_key\s*=\s*"[^"]+"/m.test(t) && /^\s*lastfm_user\s*=\s*"[^"]+"/m.test(t)
+                win.configRead = true
+            }
+            onLoadFailed: { win.hasApp = false; win.hasLastfm = false; win.configRead = true }
+        }
+        FileView {
+            path: win.home + "/.config/deck/taste.md"
+            watchChanges: true
+            printErrors: false
+            onFileChanged: reload()
+            onLoaded: win.hasNotes = text().trim() !== ""
+            onLoadFailed: win.hasNotes = false
+        }
+        // The window's own: whether its first start's offer to set up Deck was put aside
+        property var prefs: ({})
+        property bool prefsRead: false
+        FileView {
+            id: prefsFile
+            path: win.home + "/.config/deck/window.json"
+            printErrors: false
+            onLoaded: { try { win.prefs = JSON.parse(text()) } catch (e) { win.prefs = {} } win.prefsRead = true }
+            onLoadFailed: win.prefsRead = true
+        }
         // What you have listened to in Deck: a track halfway counts, an album with half its tracks is listened
         property var listened: ({})
         FileView {
@@ -212,6 +251,18 @@ ShellRoot {
             curating = true
             curateLine = "Starting Claude…"
         }
+        // Setting up Deck with Claude (`deck-window setup`, which asks only for what is missing): offered at the first start
+        // (setupPanel) until it is done or put aside, and by Curated's button until it is done
+        property bool setupStarted: false
+        readonly property bool setupOffer: configRead && prefsRead && !curatedReady && !prefs.setupDismissed
+        function startSetup() { setupStarted = true; Quickshell.execDetached([home + "/.local/bin/deck-window", "setup"]) }
+        function dismissSetup() {
+            prefs = Object.assign({}, prefs, { setupDismissed: true })
+            prefsFile.setText(JSON.stringify(prefs) + "\n")
+            list.forceActiveFocus()
+        }
+        // Set up while the window is open: Curated, for its New list
+        onCuratedReadyChanged: if (curatedReady && setupStarted) pickSection("curated")
         Process {
             id: curateCheck
             // A run (this one, or the weekly one) is going: its latest log line; then "done" and the last line
@@ -439,7 +490,8 @@ ShellRoot {
             const v = view
             if (v.error) return v.error
             if (v.kind === "shelf") return "Your shelf is empty: find an album in Search and press a"
-            if (v.kind === "curated") return "No Curated list yet: `deck curate` suggests albums based on what you play"
+            if (v.kind === "curated") return curatedReady ? "No Curated list yet: New list has Claude pick albums from what you play"
+                                           : "Albums picked for you, each with a reason: Claude sets it up with you: " + (hasApp ? "" : "your own Spotify app, then ") + "your taste, from Last.fm or in your own words"
             if (v.kind === "search") return results && results.error ? results.error : searching ? "Searching…" : searchField.text.trim().length < 2 ? "Artists, albums and songs on Spotify" : "Nothing found"
             if (v.kind === "queue") return "Nothing queued: e adds an album or a song"
             if (v.kind === "history") return "Nothing yet: the albums you play show up here"
@@ -728,6 +780,7 @@ ShellRoot {
                                 }
                                 Repeater {
                                     model: win.view.kind !== "curated" || win.curating ? []
+                                         : !win.curatedReady ? [{ label: win.setupStarted ? "Open Claude again" : "Set up with Claude", glyph: "sparkles", strong: true, act: () => win.startSetup() }]
                                          : win.curateAsk ? [{ label: "Make it", glyph: "sparkles", strong: true, act: () => win.curate() },
                                                             { label: "Cancel", glyph: "", strong: false, act: () => win.curateAsk = false }]
                                          : (win.curated.length ? [{ label: "Pick for me", glyph: "dices", strong: false, act: () => win.pick("curated") }] : [])
@@ -1166,6 +1219,48 @@ ShellRoot {
                                     ["l", "Like the playing track"], ["o", "Where the sound plays"], ["?  Ctrl ?", "These keys"]] }
         ]
         KeySheet { id: sheet; c: win.look; groups: win.keyHelp }
+
+        // The first start: Deck plays as it is; your own Spotify app and Last.fm make the rest work. Enter (or the button)
+        // opens Claude Code in a terminal to set up what is missing (`deck-window setup`); Esc or a click outside puts it
+        // aside, and Curated's own button offers it again.
+        AppPanel {
+            id: setupPanel
+            visible: win.setupOffer
+            c: win.look
+            onVisibleChanged: if (visible) forceActiveFocus()
+            onOutsideTapped: win.dismissSetup()
+            Keys.onPressed: e => {
+                if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) win.startSetup()
+                else if (e.key === Qt.Key_Escape) win.dismissSetup()
+                e.accepted = true
+            }
+            Text { text: win.hasApp ? "Curated: albums picked for you" : "Set up Deck"; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium }
+            Text {
+                width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.2; color: c.text; font.family: c.font; font.pixelSize: 12
+                text: win.setupStarted
+                    ? "Claude opens in a terminal and goes through it with you. When it's done, Curated's New list makes your first list here."
+                    : win.hasApp
+                    ? "Deck plays your Spotify as it is. Curated adds a list of albums you haven't heard, each with a reason why it is there for you, picked by Claude from your Last.fm listening history, or without it, from what you tell about your taste and play in Deck. Claude can set it up with you in a terminal, a step at a time."
+                    : "Deck plays your Spotify as it is. Two things make the rest work: your own Spotify app (free, a couple of minutes), for likes, search without Spotify's shared limits and Curated; and your taste, for Curated: a list of albums you haven't heard, each with a reason, picked by Claude from your Last.fm history or from what you tell it. Claude can set them up with you in a terminal, a step at a time. You sign in to Spotify only in your browser."
+            }
+            Row {
+                spacing: 28
+                AppKeyAction {
+                    c: win.look
+                    keys: "⏎"; label: win.setupStarted ? "Open Claude again" : "Set up with Claude"; color: c.primary; hoverColor: c.title
+                    onClicked: win.startSetup()
+                }
+                AppKeyAction {
+                    c: win.look
+                    keys: "esc"; label: win.setupStarted ? "Close" : "Not now"
+                    onClicked: win.dismissSetup()
+                }
+            }
+            Text {
+                width: parent.width; wrapMode: Text.Wrap; color: c.faint; font.family: c.font; font.pixelSize: 11
+                text: "Later: Curated (⌘2) has the same button. To do it yourself: Deck's README, " + (win.hasApp ? "" : "Create your own Spotify app and ") + "Setting up Curated."
+            }
+        }
 
         // The sound outputs, just above the speaker button. A click anywhere else, on the button too, or Esc closes them.
         Item {

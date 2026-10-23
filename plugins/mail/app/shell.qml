@@ -75,7 +75,19 @@ ShellRoot {
         readonly property int headerGap: 30     // from them to the first folder and the first message
         readonly property int undoDepth: 20     // steps ⌘Z can take back
         property int folder: 0
-        property bool showFolders: true
+        // Narrow windows: the folders hide below foldersMin (⌘B shows them all the same), and below twoPanes the list
+        // and the open thread take turns: a click or Enter opens the thread, Esc or ← goes back to the list
+        readonly property int foldersMin: 960
+        readonly property int twoPanes: 720
+        property var foldersChoice: null    // ⌘B's, over what the width says
+        readonly property bool showFolders: foldersChoice !== null ? foldersChoice : width >= foldersMin
+        readonly property bool onePane: width < twoPanes
+        property bool readerOpen: false     // in one pane: the thread shows instead of the list
+        // Only the list on show: moving in it points at a thread without opening it, so passing one by doesn't mark it
+        // read; Enter, → or a click opens it
+        readonly property bool listOnly: onePane && !readerOpen
+        function openReader() { if (onePane && current >= 0) { readerOpen = true; reader.contentY = 0; open(current) } }
+        onOnePaneChanged: readerOpen = false
         property int htmlMode: 0            // h cycles: 0 text, 1 HTML on the dark page, 2 HTML on light paper; each thread opens in settings.view
         // The accounts (compose.py accounts: { id, name, address, maildir, signature }), each with its own folders: Mail
         // shows one at a time, its mail being what lies under its folder in ~/Mail. Tab changes it.
@@ -144,8 +156,11 @@ ShellRoot {
 
         // again: the second try, after the list was read anew
         function open(i, then, again) {
+            // Something to do on the thread (a notification's Reply) needs it on show
+            if (then && onePane) readerOpen = true
             current = i
             picked = []; anchorId = ""
+            if (listOnly) return
             htmlMode = settings.view
             if (i < 0) { messages = []; return }
             const t = threads[i]
@@ -575,7 +590,7 @@ ShellRoot {
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
         Shortcut { sequences: ["Meta+,", "Ctrl+,"]; onActivated: win.showSettings = !win.showSettings }
         Shortcut { sequence: "Ctrl+Z"; onActivated: win.undo() }
-        Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.showFolders = !win.showFolders }
+        Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.foldersChoice = !win.showFolders }
 
         RowLayout {
             anchors.fill: parent
@@ -682,10 +697,13 @@ ShellRoot {
                 }
             }
 
-            // Thread list
+            // Thread list. In one pane it fills the window, and while the thread shows it is there at no width: it keeps
+            // the keyboard, so j k and the rest go on working from the thread
             Rectangle {
-                Layout.preferredWidth: Math.max(250, Math.min(370, win.width * 0.3 - 30))
+                Layout.preferredWidth: win.onePane ? (win.readerOpen ? 0 : -1) : Math.max(250, Math.min(370, win.width * 0.3 - 30))
+                Layout.fillWidth: win.onePane && !win.readerOpen
                 Layout.fillHeight: true
+                clip: true
                 color: "transparent"
                 ColumnLayout {
                     anchors.fill: parent
@@ -743,23 +761,31 @@ ShellRoot {
                             else if (shift && (k === Qt.Key_Up || k === Qt.Key_K)) win.pickRange(win.current - 1)
                             else if ((ctrl || e.modifiers & Qt.MetaModifier) && k === Qt.Key_A) win.pickAll()
                             else if (k === Qt.Key_Escape && win.picked.length) win.open(win.current)
+                            else if ((k === Qt.Key_Escape || k === Qt.Key_Left) && win.readerOpen) win.readerOpen = false
+                            else if (k === Qt.Key_Right && win.onePane && !win.readerOpen) win.openReader()
                             // Tab and ⇧Tab show the next and previous account's folders
                             else if (k === Qt.Key_Tab && win.accounts.length > 1) win.pickAccount((win.acct + 1) % win.accounts.length)
                             else if (k === Qt.Key_Backtab && win.accounts.length > 1) win.pickAccount((win.acct + win.accounts.length - 1) % win.accounts.length)
                             else if (ctrl && k === Qt.Key_Down && win.folder < win.folders.length - 1) win.pickFolder(win.folder + 1)
                             else if (ctrl && k === Qt.Key_Up && win.folder > 0) win.pickFolder(win.folder - 1)
                             else if (ctrl && (k === Qt.Key_Up || k === Qt.Key_Down)) {}
-                            // ⌥ arrows (and j k) move in the list; plain arrows scroll the message.
-                            else if ((k === Qt.Key_J || alt && k === Qt.Key_Down) && win.current < win.threads.length - 1) win.open(win.current + 1)
-                            else if ((k === Qt.Key_K || alt && k === Qt.Key_Up) && win.current > 0) win.open(win.current - 1)
-                            else if (alt && (k === Qt.Key_Up || k === Qt.Key_Down)) {}
+                            // The arrows move in the list, as in Mac Mail (Space pages through the message); with the thread
+                            // alone on show they scroll it, and j k or ⌥ arrows move on. Only the list on show: PgUp PgDn too
+                            else if (win.listOnly && (k === Qt.Key_Down || k === Qt.Key_J)) win.open(Math.min(win.current + 1, win.threads.length - 1))
+                            else if (win.listOnly && (k === Qt.Key_Up || k === Qt.Key_K)) win.open(Math.max(win.current - 1, 0))
+                            else if (win.listOnly && k === Qt.Key_PageDown) win.open(Math.min(win.current + 10, win.threads.length - 1))
+                            else if (win.listOnly && k === Qt.Key_PageUp) win.open(Math.max(win.current - 10, 0))
+                            else if ((k === Qt.Key_J || (alt || !win.readerOpen) && k === Qt.Key_Down) && win.current < win.threads.length - 1) win.open(win.current + 1)
+                            else if ((k === Qt.Key_K || (alt || !win.readerOpen) && k === Qt.Key_Up) && win.current > 0) win.open(win.current - 1)
+                            else if ((alt || !win.readerOpen) && (k === Qt.Key_Up || k === Qt.Key_Down)) {}
                             else if (k === Qt.Key_Down) win.scrollMessage(win.arrowStep)
                             else if (k === Qt.Key_Up) win.scrollMessage(-win.arrowStep)
                             else if (k === Qt.Key_Question) win.cheats = !win.cheats
                             else if (k === Qt.Key_H) win.htmlMode = (win.htmlMode + 1) % 3
                             else if (k === Qt.Key_C) win.compose("new")
                             else if (k === Qt.Key_F) win.compose("forward")
-                            else if (k === Qt.Key_Return || k === Qt.Key_Enter) { if (win.draft()) win.compose("resume"); else win.openWindow(win.current) }
+                            // Enter opens the thread in a window of its own; in one pane, first in the window
+                            else if (k === Qt.Key_Return || k === Qt.Key_Enter) { if (win.draft()) win.compose("resume"); else if (win.onePane && !win.readerOpen) win.openReader(); else win.openWindow(win.current) }
                             // r answers everyone, ⇧R only the sender; ⌘⇧C (Ctrl+Shift+C) has Claude write the reply.
                             else if (k === Qt.Key_R && !alt) win.compose(e.modifiers & Qt.ShiftModifier ? "reply" : "all")
                             else if (k === Qt.Key_A || k === Qt.Key_E) win.archive()
@@ -769,6 +795,7 @@ ShellRoot {
                             else if (k === Qt.Key_U && shift) win.markAllRead(win.folder)
                             else if (k === Qt.Key_U) win.toggleRead()
                             else if (k >= Qt.Key_1 && k < Qt.Key_1 + win.folders.length) win.pickFolder(k - Qt.Key_1)
+                            else if (k === Qt.Key_PageDown || k === Qt.Key_PageUp) win.scrollMessage((k === Qt.Key_PageUp ? -1 : 1) * (reader.height - 80))
                             else if (k === Qt.Key_Space) win.scrollMessage((e.modifiers & Qt.ShiftModifier ? -1 : 1) * (reader.height - 80))
                             else return
                             e.accepted = true
@@ -794,7 +821,7 @@ ShellRoot {
                             }
                             TapHandler {
                                 acceptedModifiers: Qt.NoModifier
-                                onTapped: { win.open(row.index); list.forceActiveFocus() }
+                                onTapped: { win.open(row.index); list.forceActiveFocus(); win.openReader() }   // in one pane: point, then open
                                 onDoubleTapped: if (win.draft()) win.compose("resume"); else win.openWindow(row.index)
                             }
                             // ⇧-click picks the threads from the open one to this; Ctrl-click picks this one or leaves it
@@ -865,17 +892,20 @@ ShellRoot {
                         text: win.note; color: c.dim; font.family: c.font; font.pixelSize: 11
                     }
                 }
-                Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: c.divider }
+                Rectangle { visible: !win.onePane; anchors.right: parent.right; width: 1; height: parent.height; color: c.divider }
             }
 
             // The open thread, or how many are picked and what can be done to them
             Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                visible: !win.onePane || win.readerOpen
                 Thread {
                     id: reader
                     anchors.fill: parent
                     visible: win.picked.length === 0
+                    back: win.onePane
+                    onGoBack: { win.readerOpen = false; list.forceActiveFocus() }
                     app: win; c: app.look; nm: app.mailer
                     messages: win.messages
                     htmlMode: win.htmlMode
@@ -1073,7 +1103,7 @@ ShellRoot {
         property alias cheats: sheet.shown
 
         readonly property var keyHelp: [
-            { title: "Read", keys: [["⌥↑ ⌥↓  j k", "Previous, next"], ["⏎", "Open in a window"], ["↑ ↓", "Scroll the message"], ["Space ⇧Space", "Page down, up"], ["h", "HTML or text"],
+            { title: "Read", keys: [["↑ ↓  j k", "Previous, next"], ["⏎", "Open in a window"], ["Esc  ←", "Back to the list (narrow window)"], ["PgUp PgDn", "In the list alone: a page in it"], ["↑ ↓", "In the thread alone: scroll it"], ["Space ⇧Space  PgDn PgUp", "Page down, up"], ["h", "HTML or text"],
                                     ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
             { title: "Act", keys: [["a", "Archive"], ["d  ⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Refresh"],
                                    ["⇧↑ ⇧↓  ⇧-click", "Select several"], ["Ctrl-click", "Select or leave out"], ["⌘A", "Select all"]] },

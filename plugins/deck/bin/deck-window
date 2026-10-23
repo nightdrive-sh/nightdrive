@@ -1,5 +1,5 @@
 #!/bin/bash
-# deck-window [search QUERY | player | restart | quit | log]: Deck's window (app/, a Quickshell config of its own) over
+# deck-window [search QUERY | player | setup | restart | quit | log]: Deck's window (app/, a Quickshell config of its own) over
 # the player, `deck serve`, which is started first if no Deck runs. The window only talks to the player, so closing it
 # leaves the music playing. `deck` opens it (Deck hands over to a deck-window on PATH; `deck tui` is Deck's own screen in
 # the terminal), and so do the launcher, the bar, Hyper+M and F8 (hypr/scripts/media-play), as ~/.local/bin/deck-window.
@@ -11,6 +11,8 @@ DECK=$HOME/.local/bin/deck
 RUNTIME=${XDG_RUNTIME_DIR:-/tmp}/deck
 SERVE_LOG=$HOME/.cache/deck/serve.log                   # what `deck serve` says before its own log (deck.log) opens
 START_WAIT=50                                           # × 0.2 s for the player to answer
+DECK_README=${DECK_SRC:-$HOME/.local/src/deck}/README.md  # the installer's clone (install.sh)
+DECK_README_URL=https://github.com/nightdrive-sh/deck/blob/main/README.md
 
 # The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
 APP_TITLE=Deck
@@ -38,7 +40,46 @@ start_player() {
   return 1
 }
 
-usage() { echo "usage: deck-window [search QUERY | player | restart | quit | log]" >&2; }
+# Setting up Deck with Claude (the window's first start offers it, and so does Curated until it is done): Claude Code
+# in a terminal goes through what Deck's config still lacks, by Deck's README: your own Spotify app (its Client ID, for
+# likes, search and Curated) and Curated's taste (Last.fm, or a few lines of your own in taste.md). The first list is then made by Curated's New list button, which the
+# window follows. Sign-ins happen in the browser only.
+setup() {
+  local claude=$HOME/.local/bin/claude readme=$DECK_README config=$HOME/.config/deck/config.toml steps="" n=1
+  [[ -x $claude ]] || claude=$(command -v claude) || { echo "Claude Code is not installed: Deck's README has the steps." >&2; return 1; }
+  [[ -f $readme ]] || readme=$DECK_README_URL
+  if ! grep -qE '^\s*client_id\s*=\s*"[^"]+"' "$config" 2>/dev/null; then
+    steps+="$n) My own Spotify app, by the README's \"2. Create your own Spotify app\" and \"3. Write the config file\": \
+guide me through the developer dashboard (it needs the same Spotify account I play with, with Premium). I paste the Client \
+ID here and you add client_id to ~/.config/deck/config.toml, keeping the lines already there. Then restart the player so it \
+signs in to the app: \`deck ctl quit\`, then \`deck-window player\`; my browser opens \"Sign in to the Deck Spotify app\", \
+and I accept it there. "
+    n=$((n + 1))
+  fi
+  if ! { grep -qE '^\s*lastfm_api_key\s*=\s*"[^"]+"' "$config" && grep -qE '^\s*lastfm_user\s*=\s*"[^"]+"' "$config"; } 2>/dev/null \
+     && ! grep -q '[^[:space:]]' "$HOME/.config/deck/taste.md" 2>/dev/null; then
+    steps+="$n) Curated's taste, by the README's \"Setting up Curated (optional, recommended)\". First ask whether I have a \
+Last.fm account that has been recording my listening for a while (Spotify can scrobble there: Settings › Applications). If \
+so, the API key: I paste it here, and you add lastfm_api_key and lastfm_user to the config, keeping the lines already there. \
+If not, don't send me to make one (a new account has no history yet; I can add it later): talk with me about the music I \
+like instead (artists and albums I love, eras, moods, what I want more of, what I don't), a few questions at a time, and \
+write it in my words to ~/.config/deck/taste.md; tell me that putting favourite albums on Deck's shelf (Search, then a) \
+helps too, and that the list gets better as I play in Deck. Either way, check it with \`deck taste\` and fix what its \
+error names. Skip that section's steps 2 and 3: don't run \`deck curate\` and don't install the weekly job (it is macOS's \
+launchd). "
+  fi
+  [[ -n $steps ]] || steps="Everything is in the config already: check it with \`deck taste\` and tell me what is wrong if it fails. "
+  for v in $(compgen -e | grep '^CLAUDE'); do unset "$v"; done   # so the new Claude isn't taken for a child session
+  local prompt="Set up Deck, my Spotify player, with me by its README ($readme). Read it first, then go through these one \
+step at a time, saying in plain words what each is for: I may not know Spotify's developer dashboard or Last.fm. Deck is \
+installed and already signed in to Spotify for playing, and Claude Code is this session. Never ask for a password: sign-ins \
+happen in my browser. $steps
+Finish by telling me to press New list in Deck's window, under Curated (⌘2): it makes the first list in a few minutes, on \
+my Claude plan."
+  setsid -f "$HOME/.config/hypr/scripts/terminal" --dir "$HOME" -- "$claude" -- "$prompt" >/dev/null 2>&1
+}
+
+usage() { echo "usage: deck-window [search QUERY | player | setup | restart | quit | log]" >&2; }
 
 case ${1:-open} in
   open)
@@ -47,6 +88,7 @@ case ${1:-open} in
     [[ -n ${LAUNCH_HIDDEN:-} ]] || open_window
     ;;
   player)   start_player ;;
+  setup)    setup ;;
   search)   start_player || exit 1; open_ready; ipc search "${*:2}" ;;
   quit)     stop; "$DECK" ctl quit 2>/dev/null ;;
   settings) usage; exit 2 ;;      # none yet
