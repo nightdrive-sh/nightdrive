@@ -10,11 +10,20 @@ FocusScope {
     property string placeholder: "Search"
     property alias text: input.text
     property int pixelSize: 14
+    property int reach: 14      // px around the line where a click still lands in the field, so the whole box takes it
     signal edited()
     signal returnPressed()
     signal downPressed()
     signal escapePressed()
     implicitHeight: 30
+    // A click beside the text (the glyph, the empty end, the space around) puts the cursor at the end of what's there;
+    // one on the text itself is the field's own, to place the cursor or select
+    MouseArea {
+        anchors.fill: parent
+        anchors.margins: -root.reach
+        cursorShape: Qt.IBeamCursor
+        onPressed: { input.forceActiveFocus(); input.cursorPosition = input.text.length }
+    }
     RowLayout {
         anchors.fill: parent
         spacing: 10
@@ -27,6 +36,7 @@ FocusScope {
             selectionColor: root.c.sel
             Text {
                 visible: !input.text
+                width: input.width; elide: Text.ElideRight      // a narrow window cuts it short instead of past the field
                 text: root.placeholder; color: root.c.faint; font: input.font
             }
             onTextEdited: root.edited()

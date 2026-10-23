@@ -30,12 +30,16 @@ Rectangle {
         text: Icons.g(root.glyph); font.family: Icons.family; font.pixelSize: 15
         color: root.selected ? root.c.accent : root.c.dim
     }
+    // A long name in a narrow sidebar gives way to the count (cut short with …), never under it
     Text {
         anchors.left: glyphText.right; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
+        anchors.right: countText.left; anchors.rightMargin: root.count === "" ? 0 : 8
+        elide: Text.ElideRight
         text: root.label; font.family: root.c.font; font.pixelSize: 13
         color: root.selected ? root.c.title : root.c.dim
     }
     Text {
+        id: countText
         anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter
         text: root.count
         font.family: root.c.font; font.pixelSize: 11; color: root.countColor
