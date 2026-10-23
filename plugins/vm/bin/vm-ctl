@@ -84,14 +84,15 @@ start() {
                        -drive "if=none,id=cd,media=cdrom,readonly=on,file=$ISO")
   rm -f "$d/qmp.sock"
   cd "$d"     # the socket by a short path (qmp)
-  # GTK on Wayland gives a black window (eglMakeCurrent failed); under XWayland qemu's own EGL works
-  GDK_BACKEND=x11 setsid -f taskset -c $PCORES qemu-system-aarch64 \
+  # SDL, not GTK: GTK's GL window is black on Wayland (eglMakeCurrent failed), and under XWayland qemu aborts when the
+  # guest resets the GPU at boot (virgl_renderer_reset: EGL_BAD_ACCESS, the context is GTK's). Needs qemu-ui-sdl.
+  setsid -f taskset -c $PCORES qemu-system-aarch64 \
     -name "$name" \
     -machine virt,gic-version=3 -accel kvm -cpu host -smp "$CPUS" -m "${MEM}M" \
     -drive "if=pflash,format=raw,unit=0,readonly=on,file=$FW/QEMU_EFI-silent-pflash.raw" \
     -drive "if=pflash,format=raw,unit=1,file=$d/vars.raw" \
     -drive "if=virtio,format=qcow2,file=$d/disk.qcow2,discard=unmap,cache=writeback" \
-    -device virtio-gpu-gl-pci,xres=1600,yres=1000 -display gtk,gl=on,zoom-to-fit=on \
+    -device virtio-gpu-gl-pci,xres=1600,yres=1000 -display sdl,gl=on \
     -device qemu-xhci -device usb-kbd -device usb-tablet \
     "${cd[@]}" \
     -nic user,model=virtio-net-pci \
@@ -102,7 +103,7 @@ start() {
   die "qemu didn't start: $(tail -3 "$d/qemu.log")"
 }
 
-# Its GTK window, found by qemu's pid
+# Its SDL window, found by qemu's pid
 display() {
   need "$1"; running "$1" || die "$1 isn't running"
   local addr; addr=$(hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \
