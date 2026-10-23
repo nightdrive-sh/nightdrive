@@ -9,7 +9,7 @@
 #   vm-ctl list                          JSON: [{ name, mem, cpus, disk, iso, running, snapshots: [{ tag, date }] }]
 #   vm-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   vm-ctl start|stop|kill|display|eject|delete NAME
-#   vm-ctl snapshot|restore|unsnap NAME TAG
+#   vm-ctl snapshot|restore|unsnap NAME TAG     take, go back to, delete one
 #   vm-ctl isos                          .iso files in ~/Downloads and ~/vm, newest first
 set -euo pipefail
 
@@ -24,6 +24,8 @@ dir() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]] || die "Bad name: $1"; echo "$ROOT/$1"; }
 need() { [[ -f $(dir "$1")/vm.conf ]] || die "No VM called $1"; }
 running() { local p; p=$(cat "$(dir "$1")/pid" 2>/dev/null) && kill -0 "$p" 2>/dev/null; }
 stopped() { running "$1" && die "$1 is running: shut it down first"; return 0; }
+# A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and a tag
+snap() { [[ -n ${3:-} ]] || die "$1 NAME TAG"; need "$2"; stopped "$2"; }
 
 # One QMP command: the greeting, capabilities, then the command. From the VM's folder, as a socket's path is short (108)
 qmp() {
@@ -119,8 +121,8 @@ case ${1:-} in
   display)  display "$2" ;;
   eject)    need "$2"; stopped "$2"; sed -i 's/^ISO=.*/ISO=""/' "$(dir "$2")/vm.conf" ;;
   delete)   need "$2"; stopped "$2"; rm -rf "$(dir "$2")" ;;
-  snapshot) need "$2"; stopped "$2"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2" ;;
-  restore)  need "$2"; stopped "$2"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
-  unsnap)   need "$2"; stopped "$2"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2" ;;
+  snapshot) snap "$@"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2" ;;
+  restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
+  unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2" ;;
   *)        sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

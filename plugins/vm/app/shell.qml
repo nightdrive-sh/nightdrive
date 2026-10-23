@@ -31,6 +31,11 @@ ShellRoot {
         function ask(title, initial, done) { askTitle = title; askDone = done; askField.text = initial; askField.input.forceActiveFocus(); askField.input.selectAll() }
         function answer(ok) { const d = askDone; askTitle = ""; askDone = null; if (ok && d) d(askField.text.trim()); page.forceActiveFocus() }
 
+        // The yes-or-no panel's question (deleting a snapshot) and what to do on yes
+        property var confirmDone: null
+        function confirm(question, detail, done) { confirmPanel.question = question; confirmPanel.detail = detail; confirmDone = done }
+        function confirmed(ok) { const d = confirmDone; confirmDone = null; if (ok && d) d(); page.forceActiveFocus() }
+
         IpcHandler {
             target: "vm"
             function newVm(): void { win.showNew = true }
@@ -71,6 +76,7 @@ ShellRoot {
                 vm: win.vm
                 focus: true
                 onAskName: (title, initial, done) => win.ask(title, initial, done)
+                onAskConfirm: (question, detail, done) => win.confirm(question, detail, done)
                 Keys.onPressed: e => {
                     const v = win.vm, n = ctl.vms.length
                     if (e.key === Qt.Key_Down && n) win.picked = ctl.vms[(win.index + 1) % n].name
@@ -79,6 +85,7 @@ ShellRoot {
                     else if (e.text === "s" && !v.running) ctl.run(["start", v.name])
                     else if (e.text === "d" && v.running) ctl.run(["display", v.name])
                     else if (e.text === "x" && v.running) ctl.run(["stop", v.name])
+                    else if (e.key === Qt.Key_Delete && page.snap >= 0) page.deleteSnap(page.snap)
                     else return
                     e.accepted = true
                 }
@@ -105,6 +112,13 @@ ShellRoot {
                 onAccepted: win.answer(true)
                 input.Keys.onEscapePressed: win.answer(false)
             }
+        }
+
+        ConfirmPanel {
+            id: confirmPanel
+            visible: win.confirmDone !== null
+            c: win.look
+            onAnswered: ok => win.confirmed(ok)
         }
     }
 }

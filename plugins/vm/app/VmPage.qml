@@ -4,7 +4,8 @@ import qs
 import qs.kit
 
 // One VM's page: its name and state, what it has (memory, CPUs, disk, the ISO in its drive), the buttons, and its
-// snapshots. Snapshots are taken and restored only while it is stopped (qemu-img works on the disk file then).
+// snapshots. Snapshots are taken, restored and deleted only while it is stopped (qemu-img works on the disk file then);
+// a snapshot row's bin asks first (askConfirm), as a deleted snapshot is gone.
 Item {
     id: root
     required property QtObject c
@@ -14,8 +15,15 @@ Item {
     readonly property var snaps: vm ? vm.snapshots : []
     onVmChanged: if (snap >= snaps.length) snap = snaps.length - 1
     signal askName(string title, string initial, var done)
+    signal askConfirm(string question, string detail, var done)
 
     function act(args) { root.ctl.run(args) }
+    function deleteSnap(i) {
+        if (!root.vm || root.vm.running || i < 0 || i >= root.snaps.length) return
+        const name = root.vm.name, tag = root.snaps[i].tag
+        root.askConfirm("Delete the snapshot " + tag + "?", name + "'s disk can no longer go back to it.",
+                        () => root.act(["unsnap", name, tag]))
+    }
 
     Text {
         visible: !root.vm
@@ -116,9 +124,18 @@ Item {
                     color: row.selected ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 12
                 }
                 Text {
-                    anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: bin.left; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                     text: row.modelData.date
                     color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
+                }
+                // Kept in its place while the VM runs (only hidden), so the dates don't shift
+                AppIconButton {
+                    id: bin
+                    anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
+                    c: root.c; glyph: "trash-2"; glyphSize: 12; tip: "Delete this snapshot"; keys: "Del"; tipSide: "above"
+                    opacity: root.vm && !root.vm.running ? 1 : 0
+                    enabled: opacity > 0
+                    onClicked: root.deleteSnap(row.index)
                 }
             }
         }
@@ -142,14 +159,9 @@ Item {
                 visible: parent.stopped && root.snap >= 0
                 onClicked: root.act(["restore", root.vm.name, root.snaps[root.snap].tag])
             }
-            AppButton {
-                c: root.c; glyph: "x"; label: "Delete snapshot"
-                visible: parent.stopped && root.snap >= 0
-                onClicked: root.act(["unsnap", root.vm.name, root.snaps[root.snap].tag])
-            }
             Text {
                 visible: root.vm && root.vm.running
-                text: "Shut it down to take or restore a snapshot."
+                text: "Shut it down to take, restore or delete a snapshot."
                 color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
             }
         }
