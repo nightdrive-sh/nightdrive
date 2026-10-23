@@ -13,9 +13,9 @@ Item {
 
     readonly property var choices: [
         { path: "claude", icon: "sparkles", name: "Yes, I have Claude",
-          about: "Claude sets each one up with you, in a terminal beside this window, and explains it as you go." },
-        { path: "manual", icon: "list-checks", name: "No, or not now",
-          about: "Set them up yourself here, one step at a time, in plain words." }
+          about: "Claude sets each one up with you, in a terminal over this window, and explains it as you go." },
+        { path: "manual", icon: "list-checks", name: "No, I don't have Claude",
+          about: "I'll set things up myself: step-by-step instructions here, in plain words." }
     ]
     // What waits, by name: "Tailscale, Mail and Deck"
     readonly property string waiting: {
@@ -44,8 +44,10 @@ Item {
         Text {
             width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.25
             color: root.c.text; font.family: root.c.font; font.pixelSize: 13
-            text: "Your new computer is almost ready. A few things still need your accounts"
-                + (root.waiting ? ": " + root.waiting + "." : ".")
+            // The user's own words (5226e6c), with what waits named
+            text: "Your new computer is almost ready. To get the most out of Nightdrive, we recommend setting up the "
+                + "rest with Claude Code" + (root.waiting ? ": " + root.waiting : "") + ". If you don't have Claude, or "
+                + "want to skip for now, you can come back later from the launcher › System › Set up Nightdrive."
         }
         Text {
             topPadding: 8
@@ -101,23 +103,22 @@ Item {
         }
     }
 
-    // Why it matters, and that the answer isn't for good
+    // What Claude needs, and that Nightdrive doesn't need Claude
     Text {
         x: 40; y: rows.y + rows.height + 20
         width: parent.width - 80
         wrapMode: Text.Wrap; lineHeight: 1.25
         color: root.c.dim; font.family: root.c.font; font.pixelSize: 12
-        text: "Claude Code needs a Pro or Max plan (or an API account). With it, Claude also writes your replies in Mail, "
-            + "answers in the launcher, explains a crash and picks albums for Deck; the rest of Nightdrive works without. "
-            + "You can change this later: c in the list."
+        text: "Claude Code needs a Pro or Max plan, or an API account. Nightdrive works without it too. With it, Claude "
+            + "also helps in Nightdrive's apps: it writes replies in Mail, answers in the launcher and picks albums for Deck."
     }
 
     Item {
         x: 40; y: parent.height - height - 28
         width: parent.width - 80
-        height: 22
+        height: 40
         KeyCap { c: root.c; keys: "↑  ↓"; tint: root.c.faint; anchors.verticalCenter: parent.verticalCenter }
-        AppKeyAction {
+        FootButton {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
             c: root.c
             keys: "esc"; label: "Skip for now"

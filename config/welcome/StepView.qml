@@ -6,7 +6,7 @@ import qs.kit
 
 // One thing set up by hand, a step at a time: the plugin's steps.md, read by `steps` (its format is there). A step is
 // a few plain words, maybe fields to fill in, a command or a file's template with their buttons, and a ✓ once its
-// test passes. h opens the README's section beside it (HelpPane), and the window widens for it (shell.qml).
+// test passes. h opens the README's section beside it (HelpPane), in the window: the step narrows for it.
 Item {
     id: root
     required property var app
@@ -102,36 +102,47 @@ Item {
 
     Item {
         id: left
-        width: root.helpShown ? root.app.narrow : root.width
+        width: root.helpShown ? root.width - root.app.helpWidth : root.width
         height: parent.height
 
-        // ‹ Mail                Step 2 of 9
-        Row {
+        // ‹ Back to the list   Mail          Step 2 of 9: the way back is a button you can't miss (Esc does it too)
+        Rectangle {
             id: head
-            x: 40; y: 40
-            spacing: 8
+            x: 28; y: 28
+            width: backRow.implicitWidth + 24; height: 36; radius: 8
+            color: back.hovered ? root.c.hover : "transparent"
             HoverHandler { id: back; cursorShape: Qt.PointingHandCursor }
             TapHandler { onTapped: root.app.closeSteps() }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: Icons.g("chevron-left"); font.family: Icons.family; font.pixelSize: 15
-                color: back.hovered ? root.c.title : root.c.dim
-            }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.sheet ? root.sheet.name : ""
-                color: root.c.text; font.family: root.c.font; font.pixelSize: 13
+            Row {
+                id: backRow
+                anchors.centerIn: parent
+                spacing: 8
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: Icons.g("chevron-left"); font.family: Icons.family; font.pixelSize: 18
+                    color: back.hovered ? root.c.title : root.c.text
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Back to the list"
+                    color: back.hovered ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 13
+                }
             }
         }
         Text {
-            x: parent.width - width - 40; y: head.y
+            x: head.x + head.width + 16; anchors.verticalCenter: head.verticalCenter
+            text: root.sheet ? root.sheet.name : ""
+            color: root.c.dim; font.family: root.c.font; font.pixelSize: 13
+        }
+        Text {
+            x: parent.width - width - 40; anchors.verticalCenter: head.verticalCenter
             text: root.steps.length ? "Step " + (root.index + 1) + " of " + root.steps.length : ""
             color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
         }
 
         Flickable {
             id: flick
-            x: 40; y: head.y + head.height + 24
+            x: 40; y: head.y + head.height + 20
             width: parent.width - 80
             height: foot.y - y - 16
             clip: true
@@ -215,17 +226,19 @@ Item {
                         }
                     }
                 }
+                // The step's own buttons, as big as the window's foot: the one Enter presses is strong until its
+                // step is done, then Next is
                 Row {
-                    spacing: 20
-                    AppKeyAction {
+                    spacing: 12
+                    FootButton {
                         visible: root.primary !== ""
                         c: root.c
                         keys: "⏎"; label: root.missing.length ? "Fill in " + root.missing[0].label.toLowerCase() + " first"
                                                                : root.primaryLabel
-                        color: root.missing.length ? root.c.dim : root.c.primary; hoverColor: root.c.title
+                        strong: !root.missing.length && !(root.step && root.step.done)
                         onClicked: root.act(root.primary, 0)
                     }
-                    AppKeyAction {
+                    FootButton {
                         visible: root.step !== null && root.step.code !== ""
                         c: root.c
                         keys: "y"; label: root.copied ? "Copied" : "Copy"
@@ -233,12 +246,12 @@ Item {
                     }
                     Repeater {
                         model: root.step ? root.step.actions.slice(root.primary === "action" ? 1 : 0) : []
-                        delegate: AppButton {
+                        delegate: FootButton {
                             required property var modelData
                             required property int index
                             c: root.c
-                            glyph: modelData.kind === "open" ? "external-link" : "terminal"
                             label: modelData.label
+                            glyph: modelData.kind === "open" ? "external-link" : "terminal"
                             onClicked: root.act("action", index + (root.primary === "action" ? 1 : 0))
                         }
                     }
@@ -246,34 +259,28 @@ Item {
             }
         }
 
-        // The keys, for the mouse too
+        // Back on the left, Next big on the right, where the VM test looked for it; More help between
         Item {
             id: foot
             x: 40; y: parent.height - height - 28
             width: parent.width - 80
-            height: 22
-            Row {
-                spacing: 20
+            height: 40
+            FootButton {
+                visible: root.index > 0
                 anchors.verticalCenter: parent.verticalCenter
-                AppKeyAction {
-                    visible: root.index > 0
-                    c: root.c; keys: "←"; label: "Back"
-                    onClicked: root.go(root.index - 1)
-                }
-                AppKeyAction {
-                    c: root.c; keys: "→"; label: root.last ? "Finish" : "Next"
-                    color: root.primary === "" || root.step && root.step.done ? root.c.primary : root.c.dim
-                    onClicked: root.next()
-                }
-                AppKeyAction {
-                    c: root.c; keys: "h"; label: root.helpShown ? "Hide help" : "Help"
-                    onClicked: root.helpShown = !root.helpShown
-                }
+                c: root.c; keys: "←"; label: "Back"
+                onClicked: root.go(root.index - 1)
             }
-            AppKeyAction {
+            FootButton {
+                anchors.centerIn: parent
+                c: root.c; keys: "h"; label: root.helpShown ? "Hide help" : "More help"
+                onClicked: root.helpShown = !root.helpShown
+            }
+            FootButton {
                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                c: root.c; keys: "esc"; label: "List"
-                onClicked: root.app.closeSteps()
+                c: root.c; keys: "→"; label: root.last ? "Finish" : "Next"; glyph: root.last ? "check" : "arrow-right"
+                strong: root.primary === "" || root.step !== null && root.step.done === true
+                onClicked: root.next()
             }
         }
     }
@@ -285,6 +292,8 @@ Item {
         width: root.width - left.width
         height: parent.height
         c: root.c
+        name: root.sheet ? root.sheet.name : ""
         help: root.step ? root.step.help : ({ title: "", markdown: "" })
+        onClose: root.helpShown = false
     }
 }

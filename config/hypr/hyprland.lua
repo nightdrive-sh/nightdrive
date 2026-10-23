@@ -455,7 +455,16 @@ hl.window_rule({
     name  = "float-welcome",
     match = { class = "^org\\.quickshell$", title = "^Welcome to Nightdrive$" },
     float = true,
-    size  = "640 690",
+    size  = "960 600",
+    center = true,
+})
+-- What Welcome starts in a terminal (a step's command, a Claude session: scripts/claude-setup): floating over it, in
+-- front, rather than tiled behind it
+hl.window_rule({
+    name  = "float-welcome-terminal",
+    match = { class = "^(sh\\.nightdrive\\.)?nightdrive-(setup-.*|welcome)$" },
+    float = true,
+    size  = "900 560",
     center = true,
 })
 hl.window_rule({

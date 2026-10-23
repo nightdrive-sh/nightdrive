@@ -13,19 +13,13 @@ ShellRoot {
     FloatingWindow {
         id: win
         title: "Welcome to Nightdrive"
-        readonly property int narrow: 640
-        readonly property int wide: 1160                // a step with the README's section beside it
-        implicitWidth: view === "steps" && stepView.helpShown ? wide : narrow
-        implicitHeight: 690
+        // Wide rather than tall (the VM test): a step's help opens inside it, beside the step (StepView), so it never
+        // grows past a small screen. hyprland.lua's float-welcome gives it the same size.
+        implicitWidth: 960
+        implicitHeight: 600
+        readonly property int helpWidth: 400
         color: c.bg
         onClosed: Qt.quit()
-        // Hyprland keeps the size its window rule gave (hyprland.lua's float-welcome): a new width goes to it, centred
-        onImplicitWidthChanged: {
-            const w = `window = "title:^${title}$"`
-            Quickshell.execDetached(["hyprctl", "--batch",
-                `dispatch hl.dsp.window.resize({ x = ${implicitWidth}, y = ${implicitHeight}, exact = true, ${w} }); `
-                + `dispatch hl.dsp.window.center({ ${w} })`])
-        }
 
         AppLook { id: c }
         readonly property QtObject look: c

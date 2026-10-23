@@ -16,9 +16,19 @@ files for you; you only check them.
 
 ## An app password
 
-Many providers don't let mail apps use your normal password: Gmail, iCloud, Outlook and Fastmail want an *app password*.
-Make one now in your account's security settings (search for "app password" there), and keep it at hand for the next
-steps. Other providers, Runbox for one, take your normal password.
+Gmail and iCloud don't let mail apps use your normal password: they want an *app password*, a separate one just for
+Mail. Runbox and many others take your normal password: then skip this step.
+
+**Gmail:** 2-Step Verification has to be on in your Google account. Open App passwords, name it Mail, and copy the 16
+letters Google shows, without the spaces.
+
+**iCloud:** at account.apple.com › Sign-In and Security › App-Specific Passwords, add one named Mail. Its servers are
+imap.mail.me.com and smtp.mail.me.com:587.
+
+Keep the password at hand: a later step asks for it.
+
+Open: Google's app passwords | https://myaccount.google.com/apppasswords
+Open: Apple account | https://account.apple.com
 
 ## Your account
 

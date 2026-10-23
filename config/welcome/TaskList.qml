@@ -32,10 +32,11 @@ Item {
             width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.25
             color: root.c.text; font.family: root.c.font; font.pixelSize: 13
             text: root.app.manual
-                ? "Your new computer is almost ready. Set each of these up here, one step at a time: Enter shows the "
-                  + "steps. Skip what you don't need; launcher › System › Set up Nightdrive brings you back here later."
-                : "Your new computer is almost ready. Sign in to Claude first, then Claude sets up each of these with "
-                  + "you. Skip what you don't need; launcher › System › Set up Nightdrive brings you back here later."
+                ? "Set these up here, one step at a time: pick one and press Enter for its steps. Skip what you don't "
+                  + "need. You can come back any time from the launcher › System › Set up Nightdrive."
+                : "Sign in to Claude first. Then pick one and press Enter: Claude sets it up with you in a terminal and "
+                  + "explains as it goes. Skip what you don't need. You can come back any time from the launcher › "
+                  + "System › Set up Nightdrive."
         }
     }
 
@@ -67,28 +68,28 @@ Item {
         id: foot
         x: 40; y: parent.height - height - 28
         width: parent.width - 80
-        height: 22
+        height: 40
         Row {
-            spacing: 20
+            spacing: 12
             anchors.verticalCenter: parent.verticalCenter
             KeyCap { c: root.c; keys: "↑  ↓"; tint: root.c.faint; anchors.verticalCenter: parent.verticalCenter }
-            AppKeyAction {
+            FootButton {
                 c: root.c
                 visible: !root.task.done && !root.task.running
                 keys: "s"; label: root.task.mark === "skipped" ? "Don't skip" : "Skip this"
                 onClicked: root.app.skip(root.app.current)
             }
-            AppKeyAction {
+            FootButton {
                 c: root.c
                 keys: "c"; label: root.app.manual ? "I have Claude now" : "Set up by hand"
                 onClicked: root.app.choose(root.app.manual ? "claude" : "manual")
             }
         }
-        AppKeyAction {
+        FootButton {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
             c: root.c
             keys: "esc"; label: root.app.finished ? "Finish" : "Skip for now"
-            color: root.app.finished ? root.c.primary : root.c.dim
+            strong: root.app.finished
             onClicked: root.app.close()
         }
     }
