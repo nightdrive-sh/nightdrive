@@ -1,0 +1,10 @@
+# Contacts' sync every 30 minutes (plugins/contacts; `contacts enable` turns it on, the plugin's installer runs that)
+[Unit]
+Description=Nightdrive Contacts: fetch contacts every 30 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+
+[Install]
+WantedBy=timers.target
