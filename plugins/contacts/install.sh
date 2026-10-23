@@ -1,6 +1,6 @@
 #!/bin/bash
-# Contacts' installer (plugin.conf): the packages and the sync. The accounts are set up after it, with Claude
-# (`contacts setup`, README.md › Setting up an account) or by hand. Safe to run again.
+# Contacts' installer (plugin.conf): the packages, Contacts among the apps and the sync. The accounts are set up after
+# it, with Claude (`contacts setup`, README.md › Setting up an account) or by hand. Safe to run again.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
@@ -14,6 +14,8 @@ Contacts needs your account first: Claude can set it up with you (contacts setup
 page). To do it yourself, the plugin's page has the steps (launcher › System › Install › Plugins › Contacts, or
 $PWD/README.md).
 MSG
+  # Only on the desktop (not over ssh): its first start offers the setup too
+  [[ -n ${WAYLAND_DISPLAY:-} ]] && bin/contacts
   exit 0
 fi
-echo "Contacts is ready: contacts accounts shows them."
+echo "Contacts is ready: contacts opens it (or the launcher: Contacts)."

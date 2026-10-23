@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Contacts' app icon: Lucide's contact as a neon sign, made like Mail's (near black, a glow under the line) in green
+       and yellow, so it doesn't mix up with Mail's cool colours or Ferry's sunset beside them -->
+  <defs>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2ff6b"/><stop offset=".5" stop-color="#6bff9e"/><stop offset="1" stop-color="#2fe0c8"/></linearGradient>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="#16141f"/>
+  <g transform="translate(76 76) scale(15)" fill="none" stroke="url(#neon)" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="2.2" filter="url(#glow)">
+      <path d="M16 2v2M8 2v2M7 22v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/>
+      <circle cx="12" cy="11" r="3"/>
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+    </g>
+    <g stroke-width="1.5">
+      <path d="M16 2v2M8 2v2M7 22v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/>
+      <circle cx="12" cy="11" r="3"/>
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+    </g>
+  </g>
+</svg>

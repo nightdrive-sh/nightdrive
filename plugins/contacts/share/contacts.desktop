@@ -1,0 +1,13 @@
+[Desktop Entry]
+# `contacts enable` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH
+# may not have ~/.local/bin), and the icon to ~/.local/share/icons/hicolor/scalable/apps.
+Type=Application
+Name=Contacts
+GenericName=Nightdrive Contacts
+Comment=Your contacts from iCloud and Google
+Keywords=contacts;address book;people;phone;
+Icon=nightdrive-contacts
+Exec=contacts
+Terminal=false
+Categories=Office;ContactManagement;
+StartupNotify=false
