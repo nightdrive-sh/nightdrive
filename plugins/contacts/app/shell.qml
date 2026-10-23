@@ -348,6 +348,9 @@ ShellRoot {
                     sheet.pressed(e)
                     if (k === Qt.Key_Question) {}
                     else if (k === Qt.Key_Escape || k === Qt.Key_Left || k === Qt.Key_Backspace) win.closeCard()
+                    else if (k === Qt.Key_J) { win.move(1); card.contentY = 0 }
+                    else if (k === Qt.Key_K) { win.move(-1); card.contentY = 0 }
+                    else if (k === Qt.Key_PageDown || k === Qt.Key_PageUp) win.scrollCard((k === Qt.Key_PageUp ? -1 : 1) * (card.height - 80))
                     else if (k === Qt.Key_Down) win.scrollCard(win.arrowStep)
                     else if (k === Qt.Key_Up) win.scrollCard(-win.arrowStep)
                     else if (k === Qt.Key_Space) win.scrollCard((e.modifiers & Qt.ShiftModifier ? -1 : 1) * (card.height - 80))
@@ -529,7 +532,7 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Contacts", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  →", "Open the card (a narrow window)"], ["Esc  ←", "Back to the list"], ["PgUp PgDn", "Ten up, down"], ["Space ⇧Space", "Scroll the card"],
+                { title: "Contacts", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  →", "Open the card (a narrow window)"], ["Esc  ←", "Back to the list (on the card: ↑ ↓ scroll, j k next)"], ["PgUp PgDn", "Ten up, down"], ["Space ⇧Space", "Scroll the card"],
                                            ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["⌘R", "Read the contacts again"], ["⌘B", "Hide or show the sidebar"],
                                          ["Click", "Copy a number, write to an address"]] }
