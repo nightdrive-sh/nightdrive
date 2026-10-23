@@ -1,0 +1,42 @@
+#!/bin/bash
+# vm [open | start|stop|kill|display [NAME] | list | restart | quit | log | VM-CTL-COMMAND …]: the VM window (app/, a
+# Quickshell config of its own) and its VMs from the terminal. Without a NAME, start, stop, kill and display take the
+# only VM there is. Anything else goes to vm-ctl as such (create, snapshot, restore, delete…: `vm help` lists them).
+set -u
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app
+VM_CTL=$APP_DIR/bin/vm-ctl
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+APP_TITLE=VM
+APP_IPC=vm
+. "$QS_DIR/kit/app.sh"
+
+# The VM a command means: the one named, or the only one there is
+vm_name() {
+  if [[ -n ${1:-} ]]; then echo "$1"; return; fi
+  local names
+  names=$("$VM_CTL" list | jq -r '.[].name') || return 1
+  case $(grep -c . <<<"$names") in
+    0) echo "No VMs yet: \`vm\` opens the window to make one." >&2; return 1 ;;
+    1) echo "$names" ;;
+    *) echo "Which VM? $(paste -sd ' ' <<<"$names")" >&2; return 1 ;;
+  esac
+}
+
+# One line each for the terminal (vm-ctl's list is JSON, for the window)
+list() {
+  "$VM_CTL" list | jq -r '.[] | [.name, (if .running then "running" else "stopped" end),
+    "\(.mem / 1024 | floor) GB", "\(.cpus) CPUs", "\(.disk) GB disk", "\(.snapshots | length) snapshots"] | @tsv' \
+    | column -t -s $'\t'
+}
+
+case ${1:-open} in
+  start|stop|kill|display)
+    name=$(vm_name "${2:-}") || exit 1
+    exec "$VM_CTL" "$1" "$name" ;;
+  list)     list ;;
+  help|-h|--help) sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//'; echo; "$VM_CTL" help || true ;;
+  *)        app_command "$@"; rc=$?; ((rc == 2)) && exec "$VM_CTL" "$@"; exit $rc ;;
+esac

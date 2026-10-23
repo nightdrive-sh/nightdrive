@@ -125,5 +125,5 @@ case ${1:-} in
   snapshot) snap "$@"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2" ;;
   restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
   unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2" ;;
-  *)        sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *)        sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
