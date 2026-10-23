@@ -18,6 +18,9 @@ FW=/usr/share/edk2/aarch64
 # The M2 Max's performance cluster: a vCPU must not move to an E-core (another MIDR, and KVM stops it)
 PCORES=4-11
 MAX_CPUS=8
+# The guest's sshd on the host's loopback (docs/vm.md: `ssh -p 2222 localhost`), as SDL shares no clipboard.
+# One port, so one VM with it at a time: a second one's qemu fails to start
+SSH_PORT=2222
 
 die() { echo "$*" >&2; exit 1; }
 dir() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]] || die "Bad name: $1"; echo "$ROOT/$1"; }
@@ -95,7 +98,7 @@ start() {
     -device virtio-gpu-gl-pci,xres=1600,yres=1000 -display sdl,gl=on \
     -device qemu-xhci -device usb-kbd -device usb-tablet \
     "${cd[@]}" \
-    -nic user,model=virtio-net-pci \
+    -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
     -qmp unix:qmp.sock,server,nowait \
     -pidfile "$d/pid" \
     -serial "file:$d/serial.log" > "$d/qemu.log" 2>&1
