@@ -26,7 +26,7 @@ the Mac's battery to the VM; without a display or keyboard backlight their slide
 ## On an Asahi Mac, with qemu
 
 Experimental: Fedora 44 runs under KVM on Fedora Asahi Remix itself, in qemu's own window with a virgl GPU (tested on an
-M2 Max: the live desktop with `+virgl`; Nightdrive inside it isn't tested yet). The 16k-page kernel is no obstacle: the
+M2 Max: Nightdrive's dev install, Hyprland on the virgl GPU). The 16k-page kernel is no obstacle: the
 guest runs Fedora's ordinary 4k one. No libvirt or virt-manager is needed:
 
 ```bash
@@ -54,4 +54,5 @@ Once Fedora is installed, leave out the `scsi-cd` line to boot from the disk; `s
   move the window or leave it.
 - Keys arrive by their place on the keyboard: pick the guest's layout to match the Mac's in Fedora's installer. Nothing
   is shared with the clipboard: copy commands in over `ssh -p 2222 localhost` (start `sshd` in the guest).
-- Pick scale 1.0 in the launcher's Settings › Display inside it (the installer's 2.0 is for Parallels).
+- The window gives the guest its size in real pixels, so the installer's scale 2.0 is right on a Mac's Retina display;
+  on a 1× external display, pick 1.0 in the launcher's Settings › Display.
