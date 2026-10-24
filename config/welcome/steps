@@ -7,14 +7,14 @@
 VALUES is a JSON object of the Ask: fields filled so far ({"email": "you@example.com"}): {key} in a command or a
 template becomes its value. The window keeps them only while it is open.
 
-steps.md (plugins/README.md › steps.md): `Help: README.md#section` before the first step names what the window shows
-beside a step (more Help: lines: the first file that is there; a step's own Help: lines go before them); each
-`## Title` is a step, its paragraphs in plain words, at most one fenced code block (a command, or the template of its
-`Edit:` file), and lines of their own:
+steps.md (plugins/README.md › steps.md): what comes before the first step is for its readers only; each `## Title` is
+a step, its paragraphs in plain words, at most one fenced code block (a command, or the template of its `Edit:` file),
+and lines of their own:
   Ask: key | Label | placeholder     a field the window asks for
   Edit: ~/path                       the code block is the file's template
   Run: Label | command               a button: the command, in the plugin's folder
-  Open: Label | https://…            a button: a page in the browser
+  Open: Label | https://…            a button: a page in the browser, or a file of the folder's (README.md) in
+                                     Apostrophe, as the "I'll do it myself" path opens it
   Done when: test                    a quick shell test, in the folder: the step shows as done while it succeeds"""
 import json, os, re, subprocess, sys, time
 
@@ -25,7 +25,7 @@ TERMINAL = os.path.join(HOME, ".config/hypr/scripts/terminal")
 TERMINAL_CLASS = "nightdrive-welcome"   # hyprland.lua's float-welcome-terminal: over the window, not tiled behind it
 FRONT_WAIT = 10                         # seconds to wait for the editor's window, to bring it over the Welcome window
 TEST_TIMEOUT = 5                    # seconds for a Done when test: the window reads the steps again every few seconds
-DIRECTIVE = re.compile(r"(Ask|Edit|Run|Open|Help|Done when):\s*(.*)$")
+DIRECTIVE = re.compile(r"(Ask|Edit|Run|Open|Done when):\s*(.*)$")
 
 
 def folder(pid):
@@ -45,8 +45,8 @@ def conf(f):
 
 
 def parse(text):
-    """([help], [step]): the file's Help: lines and its ## steps, each with its parts sorted out of the text"""
-    helps, steps, step, prose, code, fence = [], [], None, [], None, False
+    """[step]: the file's ## steps, each with its parts sorted out of the text"""
+    steps, step, prose, code, fence = [], None, [], None, False
     def close():
         if step is not None:
             step["text"] = "\n".join(prose).strip()
@@ -65,12 +65,9 @@ def parse(text):
             continue
         if line.startswith("## "):
             close()
-            step, prose = {"title": line[3:].strip(), "asks": [], "code": "", "edit": "", "actions": [], "test": "",
-                           "help": []}, []
+            step, prose = {"title": line[3:].strip(), "asks": [], "code": "", "edit": "", "actions": [], "test": ""}, []
             continue
         if step is None:
-            if line.startswith("Help:"):
-                helps.append(line[5:].strip())
             continue
         m = DIRECTIVE.match(line)
         if not m:
@@ -82,73 +79,12 @@ def parse(text):
                                  "placeholder": rest[2] if len(rest) > 2 else ""})
         elif kind == "Edit":
             step["edit"] = rest[0]
-        elif kind == "Help":
-            step["help"].append(rest[0])
         elif kind == "Done when":
             step["test"] = m.group(2).strip()
         elif len(rest) > 1:
             step["actions"].append({"kind": kind.lower(), "label": rest[0], "arg": "|".join(rest[1:]).strip()})
     close()
-    return helps, steps
-
-
-def slug(heading):
-    """GitHub's anchor for a heading: lower case, no punctuation, spaces as dashes"""
-    return re.sub(r"[^\w\- ]", "", heading.strip().lower()).replace(" ", "-")
-
-
-def section(f, refs):
-    """{title, markdown}: the first of refs (FILE#anchor, relative to the plugin's folder) whose file is there, cut to the
-    section by its anchor, down to the next heading as high as its own (the whole file without an anchor). Pictures are
-    left out: the pane shows text."""
-    for ref in refs:
-        path, _, anchor = ref.partition("#")
-        path = os.path.join(f, os.path.expanduser(path or "README.md"))
-        if os.path.isfile(path):
-            break
-    else:
-        return {"title": "", "markdown": ""}
-    lines = open(path, errors="replace").read().split("\n")
-    start, level, title = 0, 0, ""
-    if anchor:
-        for i, l in enumerate(lines):
-            m = re.match(r"(#+)\s+(.*)", l)
-            if m and slug(m.group(2)) == anchor:
-                start, level, title = i + 1, len(m.group(1)), m.group(2).strip()
-                break
-    end, fence = len(lines), False
-    for i in range(start, len(lines)):
-        if lines[i].startswith("```"):
-            fence = not fence
-        m = None if fence else re.match(r"(#+)\s", lines[i])
-        if level and m and len(m.group(1)) <= level:
-            end = i
-            break
-    return {"title": title, "markdown": readable(lines[start:end])}
-
-
-def readable(lines):
-    """The section as the pane's Markdown shows it well: Qt draws a link in the palette's dark blue whatever the pane's
-    colours, and a code block's long lines past its edge. So links are their words (an address stays as text, an @ or
-    :// no longer one), pictures are left out, and a code block's lines are a quote of code spans, which wrap."""
-    out, fence = [], False
-    for l in lines:
-        if l.lstrip().startswith("```"):
-            fence = not fence
-            continue
-        if fence:
-            out.append("> `" + l.replace("`", "'") + "`  " if l.strip() else ">")
-            continue
-        if re.match(r"\s*!\[", l):
-            continue
-        l = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", r"\1 (\2)", l)
-        l = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", l)
-        # Outside code spans only: inside one, an entity would show as it is
-        parts = l.split("`")
-        for i in range(0, len(parts), 2):
-            parts[i] = parts[i].replace("@", "&#64;").replace("://", "&#58;//").replace("www.", "www&#46;")
-        out.append("`".join(parts))
-    return "\n".join(out).strip()
+    return steps
 
 
 def passes(test, cwd):
@@ -166,21 +102,16 @@ def fill(text, values):
 def show(pid, vals):
     f = folder(pid)
     c = conf(f)
-    helps, steps = parse(open(os.path.join(f, "steps.md")).read())
-    sections = {}       # the same section once, however many steps show it
+    steps = parse(open(os.path.join(f, "steps.md")).read())
     for s in steps:
         s["done"] = passes(fill(s["test"], vals), f) if s["test"] else None
-        refs = tuple(s["help"] + (helps or ["README.md"]))
-        if refs not in sections:
-            sections[refs] = section(f, refs)
-        s["help"] = sections[refs]
         del s["test"]
     print(json.dumps({"id": pid, "name": c.get("name", pid), "icon": c.get("icon", "puzzle"), "steps": steps}))
 
 
 def step(pid, n):
     f = folder(pid)
-    steps = parse(open(os.path.join(f, "steps.md")).read())[1]
+    steps = parse(open(os.path.join(f, "steps.md")).read())
     if not 0 <= n < len(steps):
         sys.exit(f"steps: {pid} has no step {n}")
     return f, steps[n]
@@ -244,7 +175,10 @@ def run(pid, n, vals):
 def action(pid, n, i, vals):
     f, s = step(pid, n)
     a = s["actions"][i]
-    if a["kind"] == "open":
+    if a["kind"] == "open" and "://" not in a["arg"]:
+        detach([os.path.join(os.path.dirname(os.path.realpath(__file__)), "welcome"), "readme",
+                os.path.join(f, os.path.expanduser(a["arg"]))], f)
+    elif a["kind"] == "open":
         detach(["xdg-open", fill(a["arg"], vals)], f)
     else:
         detach(["bash", "-c", fill(a["arg"], vals)], f)

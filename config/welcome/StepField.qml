@@ -2,7 +2,8 @@ import QtQuick
 import qs
 
 // A field a step of StepView asks for (steps.md's Ask:): its label, and a line to type in, with the example greyed
-// while it's empty. Keys stay in it while it has them: Enter or Tab goes on to the next field, Esc back to the step.
+// while it's empty. Keys stay in it while it has them: Enter or Tab goes on to the next field, Shift+Tab to the one
+// before (from the first, back to the step), Esc back to the step.
 Column {
     id: root
     required property QtObject c
@@ -12,6 +13,7 @@ Column {
     readonly property alias input: input
     signal edited(string text)
     signal done()
+    signal previous()
     signal leave()
     spacing: 6
 
@@ -34,6 +36,7 @@ Column {
             Keys.priority: Keys.AfterItem
             Keys.onPressed: e => {
                 if (e.key === Qt.Key_Tab) root.done()
+                else if (e.key === Qt.Key_Backtab) root.previous()
                 else if (e.key === Qt.Key_Escape) root.leave()
                 e.accepted = true
             }

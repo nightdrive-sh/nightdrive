@@ -2,38 +2,27 @@
 
 Welcome to Nightdrive shows these steps one at a time when you set things up without Claude (plugins/README.md › steps.md).
 
-Help: README.md#setting-up-an-account
+## Why we recommend Mail
 
-## Why Mail
-
-Mail is Nightdrive's own email app: a quiet window with your folders, your messages and the one you're reading.
-New mail comes as a notification you can answer right from it, and your mail is kept on this computer, so it opens at
-once and works offline.
-
-It takes a few steps, because Mail uses two trusted tools underneath: mbsync fetches your mail, and notmuch finds
-anything in it in a moment. You tell each of them about your account once, in a small text file. These steps write the
-files for you; you only check them.
+Mail is Nightdrive's own email app, with a few unique features like Claude Writes. Setting up Mail takes a few steps,
+because Mail uses two trusted tools: mbsync and notmuch. mbsync fetches your mail and notmuch indexes your emails for
+fast viewing and searching.
 
 ## An app password
 
-Gmail and iCloud don't let mail apps use your normal password: they want an *app password*, a separate one just for
-Mail. Runbox and many others take your normal password: then skip this step.
+To connect to your email, depending on your email provider, you'll need an account password or an app password. For
+example, Gmail and iCloud require an "app password".
 
-**Gmail:** 2-Step Verification has to be on in your Google account. Open App passwords, name it Mail, and copy the 16
-letters Google shows, without the spaces.
+If you don't know which one to use, refer to your email provider's documentation.
 
-**iCloud:** at account.apple.com › Sign-In and Security › App-Specific Passwords, add one named Mail. Its servers are
-imap.mail.me.com and smtp.mail.me.com:587.
-
-Keep the password at hand: a later step asks for it.
+Get your password (or app password) ready, you'll need it in the next step.
 
 Open: Google's app passwords | https://myaccount.google.com/apppasswords
 Open: Apple account | https://account.apple.com
 
 ## Your account
 
-Mail needs to know whose mail to fetch, and from where. Your provider's help pages name their servers ("IMAP" and
-"SMTP"). A short name tells this account apart from others you may add later.
+Mail needs to know where to fetch email. Check your email provider's documentation.
 
 Ask: email | Your email address | you@example.com
 Ask: name | Your name, as people see it | Your Name
@@ -57,9 +46,10 @@ Done when: secret-tool lookup service {imap} user {email}
 mbsync fetches your mail into a folder on this computer. Its settings are one file: the button writes it with your
 account in it and opens it in the text editor. Check it, save it and close the editor.
 
-If the file was already there (another account), it opens as it is: add these lines at its end. Gmail, iCloud and
-Outlook name their folders differently from Mail: the help beside this step (h) shows the lines they need.
+If the file was already there (another account), it opens as it is: add these lines at its end. Gmail and iCloud name
+their folders differently from Mail: Mail's README shows the lines they need.
 
+Open: Mail's README | README.md
 Edit: ~/.config/isyncrc
 Done when: grep -q "^IMAPAccount {account}$" ~/.config/isyncrc
 
@@ -114,8 +104,10 @@ synchronize_flags=true
 ## Fetch your mail
 
 This fetches your mail for the first time and indexes it. With a big mailbox it takes a while: leave the terminal open
-until it's done. If it stops with an error, the help beside this step (h) has the details, and the error usually names
-what's wrong (a server name, the password).
+until it's done. If it stops with an error, Mail's README has the details, and the error usually names what's wrong (a
+server name, the password).
+
+Open: Mail's README | README.md
 
 ```
 mkdir -p ~/Mail/{account} && mbsync -a && notmuch new

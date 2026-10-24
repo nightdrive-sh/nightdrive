@@ -5,21 +5,22 @@ import qs
 import qs.kit
 
 // Welcome to Nightdrive: what a new install still needs from you (Tailscale, Mail, Deck…). First a question (Question):
-// Claude with a Pro or Max plan? Then the list (TaskList): with Claude, signing in first and each thing set up in a
-// Claude session of its own; without, each by hand here, a step at a time (StepView). The list is `tasks`, a plugin's
-// steps its steps.md (`steps`); `welcome` opens this at the first login and owns its state, the answer too (`path`).
+// Claude Code? Then the list (TaskList): with Claude, signing in first and each thing set up in a Claude session of its
+// own; without, each by hand here, a step at a time (StepView); or "I'll do it myself", each app's README in Apostrophe.
+// The list is `tasks`, a plugin's steps its steps.md (`steps`); `welcome` opens this at the first login and owns its
+// state, the answer too (`path`).
 ShellRoot {
     id: shell
     FloatingWindow {
         id: win
         title: "Welcome to Nightdrive"
-        // Wide rather than tall (the VM test): a step's help opens inside it, beside the step (StepView), so it never
-        // grows past a small screen. hyprland.lua's float-welcome gives it the same size.
+        // Wide rather than tall (the VM test), so it never grows past a small screen. hyprland.lua's float-welcome gives
+        // it the same size.
         implicitWidth: 960
         implicitHeight: 600
-        readonly property int helpWidth: 400
         color: c.bg
-        onClosed: Qt.quit()
+        // Closed by the window manager: on the self path that is its Finish, as Jari asked; else the next login reminds
+        onClosed: { if (selfPath) Quickshell.execDetached([dir + "/welcome", "off"]); Qt.quit() }
 
         AppLook { id: c }
         readonly property QtObject look: c
@@ -29,10 +30,11 @@ ShellRoot {
         // The list, read again every few seconds: a session that ends, or a setup done elsewhere, shows by itself
         property var tasks: []
         property int current: 0
-        // The first question's answer: "claude", "manual", "" while unanswered; null until read
+        // The first question's answer: "claude", "manual" (guided), "self", "" while unanswered; null until read
         property var path: null
         readonly property bool manual: path === "manual"
-        readonly property var rows: manual ? tasks.filter(t => t.id !== "claude") : tasks
+        readonly property bool selfPath: path === "self"
+        readonly property var rows: manual || selfPath ? tasks.filter(t => t.id !== "claude") : tasks
         readonly property bool claudeIn: tasks.length > 0 && tasks[0].id === "claude" && tasks[0].done
         readonly property bool finished: rows.length > 0 && rows.every(t => t.done || t.mark === "skipped")
         property string openId: ""                      // the task whose steps are on show
@@ -69,11 +71,12 @@ ShellRoot {
 
         function run(argv) { Quickshell.execDetached(argv); soon.restart() }
         function takeKeys() { keys.forceActiveFocus() }
+        // An answer to the first question, or "" to ask it again (the list's Back)
         function choose(p) {
             path = p
             openId = ""
             current = firstOpen()
-            Quickshell.execDetached([dir + "/welcome", "path", p])
+            Quickshell.execDetached([dir + "/welcome", "path", p || "none"])
         }
         // Enter on a row: its terminal to the front while it runs; by hand (the No path, or before signing in to
         // Claude), its steps, or its page without them; else its setup with Claude
@@ -82,7 +85,8 @@ ShellRoot {
             if (!t) return
             current = i
             if (t.id === "claude" && t.done) return
-            if (t.running) run([setupCmd, "focus", t.id])
+            if (selfPath) run(t.readme ? [dir + "/welcome", "readme", t.readme] : ["xdg-open", t.help])
+            else if (t.running) run([setupCmd, "focus", t.id])
             else if (t.id !== "claude" && (manual || !claudeIn)) {
                 if (t.steps) openId = t.id
                 else if (t.help) run(["xdg-open", t.help])
@@ -99,15 +103,10 @@ ShellRoot {
             if (t && !t.done) run([setupCmd, "mark", id, "started"])
             closeSteps()
         }
-        // s: put aside, or back
-        function skip(i) {
-            const t = rows[i]
-            if (!t || t.done || t.running) return
-            run(t.mark === "skipped" ? [setupCmd, "mark", t.id] : [setupCmd, "mark", t.id, "skipped"])
-        }
         // Esc: Skip for now (what isn't done is put aside) or, all done or skipped, Finish. Either way logins stop asking.
+        // On the self path it is Finish: nothing is marked, the READMEs were the help asked for.
         function close() {
-            Quickshell.execDetached([dir + "/welcome", "skip-rest"])
+            Quickshell.execDetached([dir + "/welcome", selfPath ? "off" : "skip-rest"])
             Qt.quit()
         }
 
@@ -117,8 +116,8 @@ ShellRoot {
             function rows(): string { return JSON.stringify(win.rows) }
             function view(): string { return win.view }
             function choose(path: string): void { win.choose(path) }
+            function back(): void { win.choose("") }
             function steps(id: string): void { win.openId = id }
-            function help(): void { stepView.helpShown = !stepView.helpShown }
             function go(n: int): void { stepView.go(n) }
             function fill(key: string, text: string): void { stepView.setValue(key, text) }
         }

@@ -219,9 +219,10 @@ column beside the commands (under the command when there isn't room), so keep th
 ## Setting up by hand: steps.md
 
 Welcome to Nightdrive asks first whether you have Claude. Without, Enter on a plugin's row shows its `steps.md` in the
-window, a step at a time, and h shows the README's setup section beside the step (without a `steps.md`, Enter opens the
-plugin's page). Write it for someone new to Linux: what the step is for, then what to do. The first step says why the
-plugin matters in Nightdrive. `config/welcome/steps` reads it; Tailscale's, Mail's and Deck's are examples.
+window, a step at a time (without a `steps.md`, Enter opens the plugin's page). Its third answer, *I'll do it myself*,
+opens the plugin's `README.md` in Apostrophe instead, so keep the README's setup section complete on its own. Write
+`steps.md` for someone new to Linux: what the step is for, then what to do. The first step says why the plugin matters
+in Nightdrive. `config/welcome/steps` reads it; Tailscale's, Mail's and Deck's are examples.
 
 - Each `## Title` is a step: its paragraphs (Markdown), at most one fenced code block, and lines of their own:
   - `Ask: key | Label | example`: a field to fill in. `{key}` in a later code block, button or test becomes its value,
@@ -229,12 +230,8 @@ plugin matters in Nightdrive. `config/welcome/steps` reads it; Tailscale's, Mail
   - `Edit: ~/path`: the code block is the file's template. Enter writes it, if the file isn't there yet, and opens it
     in the text editor. Without `Edit:`, the code block is a command: Enter runs it in a terminal, y copies it.
   - `Run: Label | command` and `Open: Label | https://…`: a button that runs a command in the plugin's folder, or opens
-    a page.
+    a page. `Open:` with a file of the folder's (`README.md`) opens it in Apostrophe, for the details a step leaves out.
   - `Done when: test`: a quick shell test, run in the folder every few seconds; the step shows Done while it succeeds.
-  - `Help: README.md#anchor`: this step's help, instead of the file's.
-- `Help:` lines before the first step name the help beside every step: a file in the folder (or `~/…`, an absolute
-  path) and a heading's anchor, as GitHub makes it. With more than one, the first file that is there wins (Deck's own
-  README, then the plugin's page).
 - The row counts as done by `configured` in plugin.conf, as with Claude; Finish on the last step marks it started.
 
 ## Keys: bindings.lua and SHORTCUTS.md

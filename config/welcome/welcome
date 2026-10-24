@@ -1,17 +1,19 @@
 #!/bin/bash
-# welcome [open | login | skip-rest | off | path [claude | manual]]: Welcome to Nightdrive, the window that sets up what a
-# new install still needs (Tailscale, Mail, Deck…). Its first question is the path: with Claude (signing in to Claude,
-# then each in a Claude session of its own, hypr/scripts/claude-setup) or by hand, a step at a time (each plugin's
-# steps.md). `path` prints the answer (empty: not asked yet), `path claude|manual` changes it.
+# welcome [open | login | skip-rest | off | path [claude | manual | self | none] | readme FILE]: Welcome to Nightdrive, the
+# window that sets up what a new install still needs (Tailscale, Mail, Deck…). Its first question is the path: with
+# Claude (signing in to Claude, then each in a Claude session of its own, hypr/scripts/claude-setup), guided by hand, a
+# step at a time (each plugin's steps.md), or self: the apps' READMEs, opened in Apostrophe (`readme`). `path` prints
+# the answer (empty: not asked yet), `path claude|manual|self` changes it and `path none` asks again.
 # `nightdrive welcome` and launcher › System › Set up Nightdrive open it. At login (hyprland.lua, once unlocked):
 #   - the first login after install.sh (setup.json's welcome: pending) opens it;
 #   - later ones, while something is neither done nor skipped, ask with a notification (Set up, Don't remind me);
-#   - after Skip for now, Finish or Don't remind me (welcome: off), nothing.
+#   - after Skip for now, Finish or Don't remind me (welcome: off), nothing; on the self path closing the window too.
 set -u
 
 QS_DIR=$(dirname "$(readlink -f "$0")")                 # this folder: the window's own Quickshell config
 STATE=$HOME/.local/state/nightdrive/setup.json          # { welcome: pending | shown | off, path: claude | manual,
                                                         #   tasks: { ID: started | skipped } }
+APOSTROPHE=org.gnome.gitlab.somas.Apostrophe            # the Markdown viewer that comes with Nightdrive (plugins/apostrophe)
 LOGIN_DELAY=3                                           # seconds after unlocking, so the window comes up over the login apps
 
 # The window: started, brought forward and stopped by the apps' kit (kit/app.sh)
@@ -68,6 +70,17 @@ skip_rest() {
   set_state off
 }
 
+# A README in Apostrophe; an install from before it came with Nightdrive (update doesn't add it) gets the default app
+readme() {
+  if flatpak info --user "$APOSTROPHE" >/dev/null 2>&1; then
+    setsid -f flatpak run --user "$APOSTROPHE" "$1" >/dev/null 2>&1
+  else
+    setsid -f xdg-open "$1" >/dev/null 2>&1
+  fi
+}
+
+USAGE="usage: welcome [open | login | skip-rest | off | path [claude | manual | self | none] | readme FILE | restart | quit | log]"
+
 case ${1:-open} in
   login) login ;;
   skip-rest) skip_rest ;;
@@ -75,14 +88,16 @@ case ${1:-open} in
   path)
     case ${2:-} in
       "") path || true ;;      # nothing: not asked yet
-      claude|manual) set_key path "$2" ;;
-      *) echo "usage: welcome path [claude | manual]" >&2; exit 2 ;;
+      claude|manual|self) set_key path "$2" ;;
+      none) set_key path "" ;;
+      *) echo "usage: welcome path [claude | manual | self | none]" >&2; exit 2 ;;
     esac
     ;;
-  settings) echo "usage: welcome [open | login | skip-rest | off | path [claude | manual] | restart | quit | log]" >&2; exit 2 ;;
+  readme) [[ -f ${2:-} ]] || { echo "usage: welcome readme FILE" >&2; exit 2; }; readme "$2" ;;
+  settings) echo "$USAGE" >&2; exit 2 ;;
   *)
     app_command "$@"; status=$?    # open, restart, quit, log
-    ((status == 2)) && { echo "usage: welcome [open | login | skip-rest | off | path [claude | manual] | restart | quit | log]" >&2; exit 2; }
+    ((status == 2)) && { echo "$USAGE" >&2; exit 2; }
     exit $status
     ;;
 esac

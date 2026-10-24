@@ -4,21 +4,23 @@ import qs.kit
 
 // One thing to set up in the Welcome window: its icon, name and why in plain words, and on the right where it stands
 // (With Claude, Done, Skipped, Not finished, Needs Claude), or on the picked row what Enter does there. Set up by hand
-// (the first question's No, or before signing in to Claude), Enter shows its steps (StepView).
+// (the first question's No, or before signing in to Claude), Enter shows its steps (StepView); on the "I'll do it
+// myself" path it opens the README, and the row shows only whether it is done.
 AppRow {
     id: root
     required property var task
     required property int index
     property bool claudeIn: true            // signed in to Claude: the other rows' setups need it
     property bool manual: false             // the first question's No: every row by hand, and no Claude row
+    property bool selfPath: false           // "I'll do it myself": every row a README
     readonly property int sideWidth: 180    // the right's room, the same on every row, so picking one doesn't rewrap its text
     signal activated()
 
     // Its state, from tasks' row: running and done come from the system, skipped and started from setup.json
     readonly property bool byHand: task.id !== "claude" && (manual || !claudeIn)
     readonly property string stage: task.running ? "running" : task.done ? "done" : task.mark === "skipped" ? "skipped"
-                                  : task.mark === "started" ? "started" : byHand ? "needs" : "todo"
-    readonly property string action: ({
+                                  : selfPath ? "todo" : task.mark === "started" ? "started" : byHand ? "needs" : "todo"
+    readonly property string action: selfPath ? "Read the README" : ({
         running: "Show",
         done: task.id === "claude" ? "" : byHand ? "Show the steps" : "Run again",    // signed in is as far as Claude's row goes
         needs: task.steps ? "Set up by hand" : "Open the steps",

@@ -3,8 +3,8 @@ import qs
 import qs.kit
 
 // A key at the bottom of the Welcome window, as a button big enough to hit with the mouse (the VM test found the kit's
-// AppKeyAction, a key and a word, too small for the window's few controls): its key in a box, its word, and a glyph
-// after it (Next's arrow). Strong, it is the one to press, filled as a picked row.
+// AppKeyAction, a key and a word, too small for the window's few controls): its key, its word, and a glyph after it
+// (Next's arrow). Strong, it is the one to press, filled as a picked row.
 Rectangle {
     id: root
     required property QtObject c
@@ -23,10 +23,15 @@ Rectangle {
         id: row
         anchors.centerIn: parent
         spacing: 10
-        KeyCap {
+        // The key bare, without the kit's box (KeyCap), in the accent colour: Jari's #1538 review. An arrow or ⏎ is
+        // its Lucide glyph, as in KeyCap; a word (esc) is text.
+        Text {
             visible: root.keys !== ""
             anchors.verticalCenter: parent.verticalCenter
-            c: root.c; keys: root.keys; tint: root.strong ? root.c.primary : root.c.faint
+            readonly property string glyph: ({ "←": "arrow-left", "→": "arrow-right", "⏎": "corner-down-left" })[root.keys] || ""
+            text: glyph ? Icons.g(glyph) : root.keys
+            font.family: glyph ? Icons.family : root.c.font; font.pixelSize: glyph ? 14 : 12
+            color: root.c.primary
         }
         Text {
             anchors.verticalCenter: parent.verticalCenter

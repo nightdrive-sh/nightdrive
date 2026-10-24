@@ -48,10 +48,9 @@ a name in the bar instead of its number, for as long as it has windows.
 
 ### Menus you want to click
 
-Click an icon and a small menu opens under it: sound and output devices, Wi-Fi (and Ethernet while a cable is in use),
-Bluetooth, battery and brightness, Tailscale, headphone EQ, system load and temperatures, the calendar, notifications,
-music, and **Claude**: your Claude Code sessions (a
-dot on the icon when one finished while you were elsewhere; a click goes to its window) and your usage limits. When a
+Click an icon and a small menu opens under it: sound and output devices, Wi-Fi (and Ethernet while a cable is in use,
+with your wired profiles to switch between), Bluetooth, battery and brightness, Tailscale, headphone EQ, system load
+and temperatures, the calendar, notifications, music, and **Claude**: your Claude Code sessions (a dot on the icon when one finished while you were elsewhere; a click goes to its window) and your usage limits. When a
 session waits for you, its notification says which one and what it wants, and a permission request can be answered
 right there (Allow, Deny). ⌘⇧Space lets you walk through the menus with the arrow keys.
 
@@ -256,12 +255,12 @@ after the password. KDE stays installed as a fallback. If the login screen fails
 | `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (YouTube); Tailscale, Mail and Deck come with each |
 | `--dry-run` | Shows the optional parts, what would be installed and what would be removed, then stops |
 
-At your first login, **Welcome to Nightdrive** opens and asks first whether you have Claude with a Pro or Max plan. With
-Claude, sign in there first, then it sets up Tailscale, Mail and Deck with you, each in a Claude session of its own that
-does only that one thing. Without, it shows each one's steps right there, one at a time in plain words, and the part's
-README beside them when you want the details (h). Skip any of them; c in its list changes your answer, launcher › System ›
-*Set up Nightdrive* (or `nightdrive welcome`) opens it again, and later logins ask with a notification until you finish
-it or say not to.
+At your first login, **Welcome to Nightdrive** opens and asks first whether you have Claude Code (a Pro or Max plan).
+With Claude, sign in there first, then it sets up Tailscale, Mail and Deck with you, each in a Claude session of its own
+that does only that one thing. Without, it shows each one's steps right there, one at a time in plain words. Or choose
+*I'll do it myself*: a list of the apps, each opening its README in Apostrophe, and Finish when you're done. Leave what
+you don't need; Back in the list asks the question again, Launcher › System › *Set up Nightdrive* (or
+`nightdrive welcome`) opens it again, and later logins ask with a notification until you finish it or say not to.
 
 A few things stay manual:
 - 1Password: in Settings › Developer, turn on *SSH agent* and *Integrate with 1Password CLI*. The launcher's Passwords level
@@ -319,7 +318,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the launcher) |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
 | `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the launcher; `--dir ~/dotfiles` starts it in that folder (`~/Projects` otherwise), `--name "Clock"` names the session (as `/rename`), `--effort high` sets its effort level (low to max) |
-| `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Deck… with Claude (signed in first), each on its own, or by hand a step at a time (launcher › System › *Set up Nightdrive*) |
+| `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Deck… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
 ## Keys
 

@@ -1,22 +1,16 @@
 # Setting up Deck by hand
 
 Welcome to Nightdrive shows these steps one at a time when you set things up without Claude (plugins/README.md › steps.md).
-Deck's own README has the details: a source build's, the package's, then this folder's page.
 
-Help: ~/.local/src/deck/README.md#2-create-your-own-spotify-app
-Help: /usr/share/doc/deck/README.md#2-create-your-own-spotify-app
-Help: README.md#setting-up
+## Why we recommend Deck
 
-## Why Deck
-
-Deck is Nightdrive's own Spotify player, made to stay out of your way: your albums are in the launcher, the player is
-in the top bar, and Hyper+M (Caps Lock + M) opens its window only when you want one. It plays your Spotify, so it needs
-Spotify Premium.
+Deck is Nightdrive's own music player for Spotify. It is one of a kind: it recommends albums for you, and tells you
+why. It has a shelf for your favorite albums. Deck requires a Spotify Premium subscription.
 
 Spotify lets a player like Deck search and like songs only through an "app" of your own on Spotify's developer site.
 It is free and takes a couple of minutes: the next steps make it.
 
-## Make your own Spotify app
+## Get your Spotify Client ID
 
 The button opens Spotify's developer dashboard. Log in with the Spotify account you play music with, accept the
 developer terms if asked, then:
@@ -54,9 +48,7 @@ or Max; the rest of Deck works without.
 
 To have it ready, write a few lines about the music you like: artists and albums you love, eras, moods, what you want
 more of. The button opens the file in the text editor. Putting favourite albums on Deck's shelf helps too (search,
-then a). Or skip this step: s in the list puts Deck aside, and you can come back later.
+then a). Or skip this step: Finish now, and come back to it later.
 
-Help: ~/.local/src/deck/README.md#setting-up-curated-optional-recommended
-Help: /usr/share/doc/deck/README.md#setting-up-curated-optional-recommended
 Edit: ~/.config/deck/taste.md
 Done when: grep -q '[^[:space:]]' ~/.config/deck/taste.md

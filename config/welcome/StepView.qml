@@ -6,7 +6,7 @@ import qs.kit
 
 // One thing set up by hand, a step at a time: the plugin's steps.md, read by `steps` (its format is there). A step is
 // a few plain words, maybe fields to fill in, a command or a file's template with their buttons, and a ✓ once its
-// test passes. h opens the README's section beside it (HelpPane), in the window: the step narrows for it.
+// test passes. (The README is the "I'll do it myself" path's: the VM test found it too much beside a step.)
 Item {
     id: root
     required property var app
@@ -14,7 +14,6 @@ Item {
     property string taskId: ""
     property var sheet: null      // `steps ID`: { id, name, icon, steps }
     property int index: 0
-    property bool helpShown: false
     property bool copied: false
     // The fields filled in, per task, kept while the window is open: {key} in a command or template becomes its value
     property var kept: ({})
@@ -39,7 +38,7 @@ Item {
         return out
     }
 
-    onTaskIdChanged: { sheet = null; index = 0; helpShown = false; Qt.callLater(load) }   // once the command has the id
+    onTaskIdChanged: { sheet = null; index = 0; Qt.callLater(load) }   // once the command has the id
     onIndexChanged: { copied = false; Qt.callLater(focusField, 0) }    // once the step's fields are there
     function load() { if (taskId !== "" && !loader.running) loader.running = true }
     Process {
@@ -92,9 +91,7 @@ Item {
         else if (k === Qt.Key_Right) next()
         else if (k === Qt.Key_Return || k === Qt.Key_Enter) { if (primary) act(primary, 0); else next() }
         else if (k === Qt.Key_Y) copy()
-        else if (k === Qt.Key_H) helpShown = !helpShown
         else if (k === Qt.Key_Tab) focusField(0)
-        else if (k === Qt.Key_PageDown || k === Qt.Key_PageUp) help.page(k === Qt.Key_PageDown ? 1 : -1)
         else if (k === Qt.Key_Escape) app.closeSteps()
         else return false
         return true
@@ -102,10 +99,25 @@ Item {
 
     Item {
         id: left
-        width: root.helpShown ? root.width - root.app.helpWidth : root.width
-        height: parent.height
+        anchors.fill: parent
 
-        // ‹ Back to the list   Mail          Step 2 of 9: the way back is a button you can't miss (Esc does it too)
+        // ‹ Back to the list ……… Set up Mail  1/9: the way back and where you are on the same line, apart from the
+        // step's own title under them (the VM test found the back button and the name too close together)
+        Row {
+            id: where
+            x: parent.width - width - 40; anchors.verticalCenter: head.verticalCenter
+            spacing: 10
+            Text {
+                text: root.sheet ? "Set up " + root.sheet.name : ""
+                color: root.c.text; font.family: root.c.font; font.pixelSize: 13; font.weight: Font.Medium
+                anchors.baseline: count.baseline
+            }
+            Text {
+                id: count
+                text: root.steps.length ? (root.index + 1) + "/" + root.steps.length : ""
+                color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
+            }
+        }
         Rectangle {
             id: head
             x: 28; y: 28
@@ -128,16 +140,6 @@ Item {
                     color: back.hovered ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 13
                 }
             }
-        }
-        Text {
-            x: head.x + head.width + 16; anchors.verticalCenter: head.verticalCenter
-            text: root.sheet ? root.sheet.name : ""
-            color: root.c.dim; font.family: root.c.font; font.pixelSize: 13
-        }
-        Text {
-            x: parent.width - width - 40; anchors.verticalCenter: head.verticalCenter
-            text: root.steps.length ? "Step " + (root.index + 1) + " of " + root.steps.length : ""
-            color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
         }
 
         Flickable {
@@ -198,6 +200,7 @@ Item {
                         value: root.values[modelData.key] || ""
                         onEdited: text => root.setValue(modelData.key, text)
                         onDone: root.focusField(index + 1)
+                        onPrevious: root.focusField(index - 1)
                         onLeave: root.app.takeKeys()
                     }
                 }
@@ -259,7 +262,7 @@ Item {
             }
         }
 
-        // Back on the left, Next big on the right, where the VM test looked for it; More help between
+        // Back on the left, Next big on the right, where the VM test looked for it
         Item {
             id: foot
             x: 40; y: parent.height - height - 28
@@ -272,28 +275,11 @@ Item {
                 onClicked: root.go(root.index - 1)
             }
             FootButton {
-                anchors.centerIn: parent
-                c: root.c; keys: "h"; label: root.helpShown ? "Hide help" : "More help"
-                onClicked: root.helpShown = !root.helpShown
-            }
-            FootButton {
                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                 c: root.c; keys: "→"; label: root.last ? "Finish" : "Next"; glyph: root.last ? "check" : "arrow-right"
                 strong: root.primary === "" || root.step !== null && root.step.done === true
                 onClicked: root.next()
             }
         }
-    }
-
-    HelpPane {
-        id: help
-        visible: root.helpShown
-        x: left.width
-        width: root.width - left.width
-        height: parent.height
-        c: root.c
-        name: root.sheet ? root.sheet.name : ""
-        help: root.step ? root.step.help : ({ title: "", markdown: "" })
-        onClose: root.helpShown = false
     }
 }
