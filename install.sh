@@ -6,9 +6,10 @@
 #   ./install.sh               asks nothing (sudo's password once at the start) and runs unattended: removes the apps
 #                              Nightdrive doesn't use (packages-remove.txt; only on a fresh system, installed under 3
 #                              days ago), updates the system, installs packages, fonts, the notch setting, links the
-#                              configs, installs Claude Code, Tailscale (ALWAYS), Nightdrive's apps (Mail, Deck), the login
-#                              screen and boot splash (active from the next boot: the splash, then the desktop under the
-#                              login screen as its lock) and the optional parts that are Default on in plugins.txt.
+#                              configs, installs Claude Code, Tailscale and Apostrophe (ALWAYS), Nightdrive's apps (Mail,
+#                              Deck), the login screen and boot splash (active from the next boot: the splash, then the
+#                              desktop under the login screen as its lock) and the optional parts that are Default on in
+#                              plugins.txt.
 #   ./install.sh --choose      first lists the optional parts (1Password, web apps…, plugins.txt) and the removals to tick
 #                              or untick. Home Assistant, if chosen, asks for its address at the end.
 #   ./install.sh --with 1password,slack   these parts on top of the defaults (ids: --dry-run lists them)
@@ -31,13 +32,14 @@
 set -euo pipefail
 repo=$(cd "$(dirname "$0")" && pwd)
 FRESH_DAYS=3                     # a system installed less than this many days ago gets the removals by default
-# Part of Nightdrive like Claude Code, so not asked: Tailscale is quiet until it's logged in. Nightdrive's own apps (group
-# app in plugin.conf: Mail, Deck) are too, Mail until its account is set up. Folders in plugins/, so their packages and
-# services stay out of the core.
-ALWAYS=(tailscale)
+# Part of Nightdrive like Claude Code, so not asked: Tailscale is quiet until it's logged in, Apostrophe opens the .md
+# files (Welcome's do-it-yourself path shows the apps' READMEs in it). Nightdrive's own apps (group app in plugin.conf:
+# Mail, Deck) are too, Mail until its account is set up. Folders in plugins/, so their packages and services stay out of
+# the core.
+ALWAYS=(tailscale apostrophe)
 debloat=""; machine=""; nvidia=1; secureboot=0; greeter=1; autologin=1; splash=1; nokde=0; dry=0; choose=0   # debloat: 1 | 0, "" = by the system's age; machine: "" = detected
 base=""; with=""; without=""     # base: all | none | defaults, "" = the defaults
-usage() { sed -n '6,29p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '6,30p' "$0" | sed 's/^# \{0,1\}//'; }
 while (( $# )); do
   case $1 in
     --debloat) debloat=1 ;;
