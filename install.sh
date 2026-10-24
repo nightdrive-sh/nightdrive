@@ -207,12 +207,18 @@ sudo dnf upgrade --refresh -y
 
 echo "==> Hyprland (Nightdrive's COPR @nightdrive/nightdrive, Hyprland's own packages only)"
 "$repo/setup-hyprland-repo.sh"
+# Before it: Fedora's nwg-panel supplements hyprland, and dnf would install that panel along (config/system/dnf-excludes.conf)
+sudo install -Dm644 "$repo/config/system/dnf-excludes.conf" /etc/dnf/libdnf5.conf.d/90-nightdrive.conf
 sudo dnf install -y $(pkgs "$repo/packages-hyprland.txt")
 
 echo "==> Fedora packages"
 sudo dnf install -y $(pkgs "$repo/packages.txt")
 # install leaves a package that KDE already pulled in marked as a dependency, and --no-kde's removal would take it along
 sudo dnf mark user -y $(pkgs "$repo/packages.txt") >/dev/null
+# One that came with Hyprland before the exclude above (a second run of install.sh); one installed on purpose stays
+if [[ $(dnf -q -C repoquery --installed --setopt=disable_excludes='*' --qf '%{reason}' nwg-panel 2>/dev/null) == *Dependency ]]; then
+  sudo dnf remove -y --setopt=disable_excludes='*' nwg-panel
+fi
 
 if (( nvidia )); then
   # RPM Fusion's driver, built for each kernel by akmods. With Secure Boot the module is signed with a key of this machine's

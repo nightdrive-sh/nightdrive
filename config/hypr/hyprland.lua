@@ -245,7 +245,9 @@ end)
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
-hl.env("QT_QPA_PLATFORMTHEME", "kde")  -- Qt apps (Dolphin) use KDE's dark theme
+-- Qt apps (EasyEffects) follow the GTK settings, which setup-user.sh makes dark. Not "kde": that needs plasma-integration,
+-- which --no-kde removes, and even with it the apps are light unless Plasma's own colour scheme was set dark
+hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
 hl.env("MOZ_ENABLE_WAYLAND", "1")
 -- NVIDIA's own driver (a PC, install.sh): video decoding and GLX through it (Hyprland wiki › NVIDIA). Checked at start
 -- rather than written by install.sh, so a driver added or removed later is followed.

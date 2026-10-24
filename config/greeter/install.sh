@@ -4,6 +4,8 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 
 sudo dnf install -y greetd greetd-selinux
+# Wanted for themselves, even if something had pulled them in already: removing KDE mustn't take the login screen along
+sudo dnf mark user -y greetd greetd-selinux >/dev/null
 [[ -f /etc/greetd/config.toml && ! -f /etc/greetd/config.toml.orig ]] && sudo cp /etc/greetd/config.toml /etc/greetd/config.toml.orig
 sudo install -d -m 0755 /etc/greetd /etc/greetd/greeter
 # An autologin set up with switch.sh autologin stays on (the fresh config.toml wouldn't have it)

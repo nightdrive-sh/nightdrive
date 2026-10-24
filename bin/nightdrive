@@ -278,6 +278,16 @@ update() {
   want=$(cat "$repo/packages.txt" "$repo/packages-hyprland.txt" 2>/dev/null | grep -vE '^\s*(#|$)')
   missing=$(for p in $want; do rpm -q --whatprovides "$p" >/dev/null 2>&1 || echo "$p"; done)
   if [[ -n $missing ]]; then echo "    $(echo $missing)"; as_root "New packages" sudo dnf install -y $missing; else echo "    none"; fi
+  # install.sh marks the list's packages as wanted, so removing KDE doesn't take them along. One added to it since may
+  # be here as KDE's dependency (pipewire-utils, 25.10.2026): marked too. -C: the installed ones only, no metadata download
+  deps=$(dnf -q -C repoquery --installed --qf '%{name} %{reason}\n' $want 2>/dev/null | awk '/Dependency$/ { print $1 }' | sort -u)
+  [[ -z $deps ]] || as_root "New packages" sudo dnf mark user -y $deps >/dev/null
+  # nwg-panel came with Hyprland (Fedora's package supplements it) until config/system/dnf-excludes.conf, put in place
+  # under System files below. One installed on purpose stays.
+  if [[ $(dnf -q -C repoquery --installed --setopt=disable_excludes='*' --qf '%{reason}' nwg-panel 2>/dev/null) == *Dependency ]]; then
+    echo "    removing nwg-panel (came with Hyprland; the top bar is Nightdrive's own)"
+    as_root "New packages" sudo dnf remove -y --setopt=disable_excludes='*' nwg-panel
+  fi
 
   # doubletake (Screen Mirroring, plugins/mirroring): built again when the tested commit in its install.sh changes.
   # Not installed when missing: it was left out at install time (or not added in Install › Plugins).
@@ -302,6 +312,7 @@ nightdrive-sleep /usr/lib/systemd/system-sleep/nightdrive-sleep 755
 logind-ignore-sleep-key.conf /etc/systemd/logind.conf.d/50-ignore-sleep-key.conf 644
 logind-power-key.conf /etc/systemd/logind.conf.d/50-power-key.conf 644
 nightdrive.actions /etc/dnf/libdnf5-plugins/actions.d/nightdrive.actions 644
+dnf-excludes.conf /etc/dnf/libdnf5.conf.d/90-nightdrive.conf 644
 LIST
   # Mac Keyboard Shortcuts (plugins/keyd): its /etc config follows the repo's, if the plugin is installed
   if [[ -f /etc/keyd/default.conf ]] && ! cmp -s "$repo/plugins/keyd/default.conf" /etc/keyd/default.conf; then

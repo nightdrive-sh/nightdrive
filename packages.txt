@@ -58,6 +58,15 @@ zenity
 flatpak
 unzip
 xdg-utils
+# Commands the scripts use that only KDE pulled in: pw-play, pw-dump, pw-cli, pw-record, pw-cat (sounds, the Volume menu,
+# dictation), pactl (sounds, Bluetooth audio; otherwise only nwg-panel's, which Nightdrive keeps out), xdg-user-dir
+# (screenshots, wallpapers), sensors (the System menu), tar (installers), lspci (hypr/scripts/platform)
+pipewire-utils
+pulseaudio-utils
+xdg-user-dirs
+lm_sensors
+tar
+pciutils
 # Kept explicitly for the same reason: ImageMagick's PDF/PostScript helpers, fallback fonts (fontconfig/conf.d), dnf's config
 ghostscript
 poppler-utils
