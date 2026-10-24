@@ -62,3 +62,4 @@ PasswordLevels 1.0 PasswordLevels.qml
 ThemeLevels 1.0 ThemeLevels.qml
 DetailCard 1.0 DetailCard.qml
 ClaudeWriteLevels 1.0 ClaudeWriteLevels.qml
+PolkitWatch 1.0 PolkitWatch.qml

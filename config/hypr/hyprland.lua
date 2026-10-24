@@ -502,6 +502,18 @@ hl.window_rule({
     float = true,
     size  = "900 750",
 })
+-- Polkit password prompt (hyprpolkitagent; its size: hyprpolkitagent/hyprpolkitagent.conf): centred over everything,
+-- on whatever workspace is shown, with the keyboard, since a prompt left unseen times out. Over the launcher and the
+-- bar's menus too: those are overlay layers no window gets above, so they hide while it is open (quickshell/PolkitWatch.qml).
+hl.window_rule({
+    name  = "polkit-prompt",
+    match = { class = "^hyprpolkitagent$" },
+    float = true,
+    size  = "600 window_h",   -- its own width (window_width) is only a preference: floating, it opened at its minimum, 460
+    center = true,
+    pin = true,
+    stay_focused = true,
+})
 -- 1Password: floating window centred on screen, hidden from screen sharing. Here rather than in plugins/1password: the app
 -- may run while the plugin is off (it starts at login), and it must stay out of a shared screen then too.
 hl.window_rule({

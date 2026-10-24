@@ -34,7 +34,7 @@ for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,keyd,alsa,voxtype,gtk-3
   fi
 done
 
-for d in hypr topbar fuzzel kitty ghostty alacritty foot quickshell screensaver greeter welcome; do   # greeter: the lock at startup (greeter/lock.qml) and the preview; welcome: Welcome to Nightdrive
+for d in hypr hyprpolkitagent topbar fuzzel kitty ghostty alacritty foot quickshell screensaver greeter welcome; do   # hyprpolkitagent: the polkit password prompt's size; greeter: the lock at startup (greeter/lock.qml) and the preview; welcome: Welcome to Nightdrive
   link "$repo/config/$d" "$HOME/.config/$d"
 done
 # foot's config includes your local.ini and won't start without one

@@ -54,6 +54,7 @@ PanelWindow {
     readonly property real topPosition: 0.189  // card top edge as a fraction of screen height (0 = top)
 
     property bool open: false
+    property bool stepAside: false            // a polkit password prompt is open (PolkitWatch): hidden, not closed
     property string level: "root"             // root | apps | keys
     property string query: ""
     property var syncHidden: []               // apps hidden by sync-apps: [{ path, name, icon, extra }]
@@ -924,7 +925,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         function back(): void { win.back() }
     }
 
-    visible: open
+    visible: open && !stepAside
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
