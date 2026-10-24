@@ -275,7 +275,8 @@ if command -v firefox >/dev/null && ! compgen -G "$ff_dir/*.default-release" >/d
   echo "==> Firefox profile"
   firefox --headless about:blank >/dev/null 2>&1 & ff=$!
   for _ in {1..60}; do compgen -G "$ff_dir/*.default-release/sessionCheckpoints.json" >/dev/null && break; sleep 0.5; done
-  kill "$ff" 2>/dev/null; wait "$ff" 2>/dev/null
+  # wait returns the killed Firefox's status (143), which set -e would end the whole install on
+  kill "$ff" 2>/dev/null; wait "$ff" 2>/dev/null || true
 fi
 echo "==> Configs (links into ~/.config, fonts)"
 "$repo/link.sh"
@@ -385,7 +386,7 @@ else
   next "Reboot and pick \"Hyprland\" (not \"Hyprland (uwsm-managed)\") at the login screen."
 fi
 next "Log in"
-next "Nightdrive helps you set up your computer in the Welcome to Nightdrive window."
+next "Nightdrive helps you set up your computer with Welcome to Nightdrive."
 if (( greeter )); then
   echo
   echo "If the login screen fails: press ctrl+alt+F3, log in and run"
