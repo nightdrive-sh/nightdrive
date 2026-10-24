@@ -124,9 +124,9 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Mouse**: the mouse wheel's scroll speed, from 0.5× to 3×, in the launcher (Settings › Mouse). It applies right away
   and leaves the trackpad's speed as it is.
 - **Remote login**: SSH into this computer from another one, off by default like on a Mac. Turn it on in the launcher
-  (Settings › Remote login); the page shows the address to use. It works over Tailscale from anywhere, and on the networks
-  you allow: the one you turn it on at, and each new one asks with a notification (safe at home or work, not at a café).
-  The page's second switch changes the answer for the network you are on.
+  (Settings › Remote login). It works over Tailscale from anywhere, and on the networks you allow: the one you turn it on
+  at, and each new one asks with a notification (safe at home or work, not at a café). The page's second switch changes
+  the answer for the network you are on.
 - **Login apps**: you choose what starts at login in the launcher (Settings › Apps › Startup, or ⌥Enter on an app). Background
   apps start hidden. Only 1Password (if installed) is on by default, because its SSH agent and the Passwords level need it.
 - **Login screen**: a password-only greeter that matches the theme (`--no-greeter` keeps the distribution's own).

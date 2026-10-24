@@ -309,6 +309,13 @@ sudo install -Dm644 "$repo/config/system/logind-ignore-sleep-key.conf" /etc/syst
 sudo install -Dm644 "$repo/config/system/logind-power-key.conf" /etc/systemd/logind.conf.d/50-power-key.conf
 sudo systemctl kill -s HUP systemd-logind
 
+# sshd already on before the install (as in a VM reached over ssh) would otherwise stay open on every network until
+# Remote login is turned off and on, or the next update runs this
+echo "==> Remote login: SSH only over Tailscale and on the networks you allow (config/hypr/scripts/remote-login)"
+if out=$(sudo "$repo/config/hypr/scripts/remote-login" setup); then echo "    $out"
+elif (( $? == 1 )); then echo "    nothing to do"
+else echo "    failed: nightdrive update tries it again"; fi
+
 if (( greeter )); then
   # Autologin: the desktop starts under the login screen as its lock, so the screen changes hands once at boot
   echo "==> Login screen (greetd + Quickshell); takes effect from the next boot"

@@ -315,7 +315,7 @@ LIST
   (( copied )) || echo "    up to date"
 
   # Remote login: SSH only over Tailscale and on the networks trusted, once (config/hypr/scripts/remote-login, 23.10.2026).
-  # firewalld lets the session's wheel user do it without a password; over ssh it needs sudo
+  # In the session firewalld lets a wheel user do it (on Fedora KDE without a password); over ssh it needs sudo (exit 2)
   echo "==> Remote login"
   "$scripts/remote-login" setup | sed 's/^/    /'
   case ${PIPESTATUS[0]} in 1) echo "    up to date" ;; 2) as_root "Remote login" sudo "$scripts/remote-login" setup ;; esac
