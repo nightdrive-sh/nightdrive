@@ -182,7 +182,6 @@ if (( dry )); then
 fi
 echo "Optional parts: ${chosen[*]:-none}"
 (( debloat && ${#removable[@]} )) && echo "Removing: ${#removable[@]} packages (packages-remove*.txt)"
-has() { [[ " ${chosen[*]} " == *" $1 "* ]]; }
 
 # sudo once: the system update and the compiling take long, and the password asked again halfway would stop the
 # install. Kept alive until the script exits.
@@ -352,8 +351,8 @@ if (( nokde )); then
     plasma-workspace-wallpapers kde-inotify-survey kde-settings-pulseaudio phonon-qt6-backend-vlc pinentry-qt xwaylandvideobridge
 fi
 
-# The end: what to do now, numbered (the reboot first), what can wait, and the way out of a broken login screen apart
-# from both, so it doesn't read as one more step
+# The end: what to do now, numbered (the reboot first; Welcome to Nightdrive asks about the rest), and the way out of a
+# broken login screen apart from it, so it doesn't read as one more step
 step=0
 next() { step=$((step + 1)); echo "  $step. $1"; shift; local l; for l in "$@"; do echo "     $l"; done; }
 echo
@@ -371,18 +370,13 @@ if (( nvidia )) && (( secureboot )); then
     "(choose a one-time password). At the reboot the blue MOK screen asks for it: Enroll MOK › Continue › Yes." \
     "Otherwise the NVIDIA driver doesn't load (docs/pc.md)."
 fi
-notch=""; [[ $machine == asahi ]] && notch="The notch setting takes effect then too."
 if (( greeter )); then
-  next "Reboot. The Nightdrive login screen starts Hyprland." ${notch:+"$notch"}
+  next "Reboot"
 else
-  next "Reboot and pick \"Hyprland\" (not \"Hyprland (uwsm-managed)\") at the login screen." ${notch:+"$notch"}
+  next "Reboot and pick \"Hyprland\" (not \"Hyprland (uwsm-managed)\") at the login screen."
 fi
-next "At your first login, Welcome to Nightdrive signs you in to Claude and sets up Tailscale, Mail and Deck" \
-  "with you (again later: launcher › System › Set up Nightdrive)."
-echo
-echo "Later, if you like:"
-has 1password && echo "  • Firefox: the 1Password extension from addons.mozilla.org."
-echo "  • Parts you skipped: launcher › System › Install, or \`nightdrive plugins\`."
+next "Log in"
+next "Nightdrive helps you set up your computer in the Welcome to Nightdrive window."
 if (( greeter )); then
   echo
   echo "If the login screen fails: press ctrl+alt+F3, log in and run"
