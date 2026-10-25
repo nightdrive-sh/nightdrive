@@ -15,18 +15,20 @@ QtObject {
 
     function refresh() { if (!lister.running) lister.running = true }
 
-    // A VM on its way up or down, by name: { what: "starting" | "stopping", since }, until the list shows it there, so the
-    // page can say so meanwhile. A shutdown the guest ignores (ACPI, with KDE logged in) gives up after stopWait.
+    // A VM on its way up or down, by name: { what: "starting" | "stopping", since, acpi }, until the list shows it there,
+    // so the page can say so meanwhile. A shutdown the guest ignores gives up after stopWait; acpi: it went to the power
+    // button, as the guest has no agent (vm-ctl stop), which says why.
     readonly property int stopWait: 90000
     property var pending: ({})
-    function setPending(name, what) {
+    function setPending(name, what, acpi) {
         const p = Object.assign({}, pending)
-        if (what) p[name] = { what: what, since: Date.now() }; else delete p[name]
+        if (what) p[name] = { what: what, since: Date.now(), acpi: !!acpi }; else delete p[name]
         pending = p
     }
     function power(action, name) {
-        setPending(name, action === "start" ? "starting" : "stopping")
-        run([action, name], null, () => setPending(name, ""))
+        const what = action === "start" ? "starting" : "stopping"
+        setPending(name, what)
+        run([action, name], out => { if (out.trim() === "acpi") setPending(name, what, true) }, () => setPending(name, ""))
     }
     function settle() {
         for (const name in pending) {
@@ -34,9 +36,21 @@ QtObject {
             if (!v || v.running === (p.what === "starting")) setPending(name, "")
             else if (p.what === "stopping" && Date.now() - p.since > stopWait) {
                 setPending(name, "")
-                error = name + " didn't shut down: Force off (⇧X) pulls the plug"
+                error = name + " didn't shut down" + (p.acpi ? " (no qemu-guest-agent in it, so it was its power button)" : "")
+                      + ": Force off (⇧X) pulls the plug"
             }
         }
+    }
+
+    // After the host has slept, the running VMs' clocks are behind by as long: a tick much later than the last one says
+    // so, and their guest agents set them (vm-ctl synctime: quiet without one)
+    property real lastTick: 0
+    function tick() {
+        const now = Date.now()
+        if (lastTick && now - lastTick > 30000)
+            for (const v of vms) if (v.running) run(["synctime", v.name])
+        lastTick = now
+        refresh()
     }
 
     // run(["start", "fedora"], out => …, () => …): queued behind a call still running, since the buttons rarely overlap
@@ -82,5 +96,5 @@ QtObject {
         }
     }
 
-    property Timer poll: Timer { interval: 3000; running: true; repeat: true; triggeredOnStart: true; onTriggered: root.refresh() }
+    property Timer poll: Timer { interval: 3000; running: true; repeat: true; triggeredOnStart: true; onTriggered: root.tick() }
 }

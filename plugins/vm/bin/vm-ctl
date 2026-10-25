@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# A rough prototype (task #1528): qemu/KVM VMs for the VM window, one folder each under ~/.local/share/nightdrive/vm/NAME:
-#   vm.conf      MEM (MB), CPUS, ISO (booted first while set)
+# qemu/KVM VMs for the VM window (app/) and the vm command, one folder each under ~/.local/share/nightdrive/vm/NAME:
+#   vm.conf      MEM (MB), CPUS, ISO (in its drive while set; it boots after the disk)
 #   disk.qcow2   the disk; snapshots are internal to it (qemu-img snapshot, only while the VM is stopped)
 #   vars.raw     the UEFI variables
 #   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
-#   qmp.sock, pid, serial.log while it runs
-# The qemu command line is the one #1527 got Fedora booting with on Asahi (an M2 Max).
+#   qmp.sock, qga.sock, pid, serial.log while it runs (qemu's monitor, the guest agent's channel)
+# qemu itself, its command line and its sockets, are lib/qemu.sh's.
 #
 #   vm-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date }] }]
 #   vm-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
-#   vm-ctl start|stop|kill|display|eject|delete NAME
+#   vm-ctl start|stop|kill|display|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power button
+#   vm-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
 #   vm-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
 #   vm-ctl restore|unsnap NAME TAG       go back to one, delete one
 #   vm-ctl rename NAME TAG LABEL         the name a snapshot shows (while it runs too: only names.json changes)
@@ -17,13 +18,7 @@
 set -euo pipefail
 
 ROOT=${VM_ROOT:-$HOME/.local/share/nightdrive/vm}
-FW=/usr/share/edk2/aarch64
-# The M2 Max's performance cluster: a vCPU must not move to an E-core (another MIDR, and KVM stops it)
-PCORES=4-11
 MAX_CPUS=8
-# The guest's sshd on the host's loopback (docs/vm.md: `ssh -p 2222 localhost`), as SDL shares no clipboard.
-# One port, so one VM with it at a time: a second one's qemu fails to start
-SSH_PORT=2222
 
 die() { echo "$*" >&2; exit 1; }
 dir() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]] || die "Bad name: $1"; echo "$ROOT/$1"; }
@@ -32,6 +27,9 @@ running() { local p; p=$(cat "$(dir "$1")/pid" 2>/dev/null) && kill -0 "$p" 2>/d
 stopped() { running "$1" && die "$1 is running: shut it down first"; return 0; }
 # A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and a tag
 snap() { [[ -n ${3:-} ]] || die "$1 NAME TAG"; need "$2"; stopped "$2"; }
+
+# shellcheck source=../lib/qemu.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/qemu.sh"
 
 # A snapshot's name in names.json (LABEL empty: its entry goes). Written to a new file, then renamed over the old one
 label() {
@@ -44,24 +42,6 @@ rename() {
   qemu-img info -U --output=json "$(dir "$2")/disk.qcow2" | jq -e --arg tag "$3" 'any(.snapshots[]?; .name == $tag)' >/dev/null \
     || die "$2 has no snapshot $3"
   label "$2" "$3" "$4"
-}
-
-# One QMP command: the greeting, capabilities, then the command. From the VM's folder, as a socket's path is short (108)
-qmp() {
-  cd "$(dir "$1")"
-  # A failure is a line the window can show (its error line), not a traceback
-  python3 -I - qmp.sock "$2" "$1" <<'EOF'
-import json, socket, sys
-try:
-    s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); f = s.makefile("rw")
-    f.readline()
-    for cmd in ({"execute": "qmp_capabilities"}, {"execute": sys.argv[2]}):
-        f.write(json.dumps(cmd) + "\n"); f.flush()
-        while "return" not in (r := json.loads(f.readline())) and "error" not in r: pass
-        if "error" in r: sys.exit(r["error"]["desc"])
-except (OSError, ValueError) as e:
-    sys.exit(f"{sys.argv[3]} doesn't answer ({getattr(e, 'strerror', None) or e}): Force off pulls the plug")
-EOF
 }
 
 list() {
@@ -99,54 +79,14 @@ create() {
   printf 'MEM=%s\nCPUS=%s\nISO=%q\n' $((mem * 1024)) "$cpus" "$(realpath "$iso")" > "$d/vm.conf"
 }
 
-start() {
-  need "$1"; running "$1" && return 0
-  local name=$1 d MEM CPUS ISO; d=$(dir "$1")
-  # shellcheck disable=SC1091
-  source "$d/vm.conf"
-  local cd=()
-  [[ -n $ISO ]] && cd=(-device virtio-scsi-pci -device scsi-cd,drive=cd,bootindex=0
-                       -drive "if=none,id=cd,media=cdrom,readonly=on,file=$ISO")
-  rm -f "$d/qmp.sock"
-  cd "$d"     # the socket by a short path (qmp)
-  # SDL, not GTK: GTK's GL window is black on Wayland (eglMakeCurrent failed), and under XWayland qemu aborts when the
-  # guest resets the GPU at boot (virgl_renderer_reset: EGL_BAD_ACCESS, the context is GTK's). Needs qemu-ui-sdl.
-  setsid -f taskset -c $PCORES qemu-system-aarch64 \
-    -name "$name" \
-    -machine virt,gic-version=3 -accel kvm -cpu host -smp "$CPUS" -m "${MEM}M" \
-    -drive "if=pflash,format=raw,unit=0,readonly=on,file=$FW/QEMU_EFI-silent-pflash.raw" \
-    -drive "if=pflash,format=raw,unit=1,file=$d/vars.raw" \
-    -drive "if=virtio,format=qcow2,file=$d/disk.qcow2,discard=unmap,cache=writeback" \
-    -device virtio-gpu-gl-pci,xres=1600,yres=1000 -display sdl,gl=on \
-    -device qemu-xhci -device usb-kbd -device usb-tablet \
-    "${cd[@]}" \
-    -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
-    -qmp unix:qmp.sock,server,nowait \
-    -pidfile "$d/pid" \
-    -serial "file:$d/serial.log" > "$d/qemu.log" 2>&1
-  for _ in $(seq 50); do running "$name" && return 0; sleep 0.1; done
-  # The one failure with a known cause: the ssh port another VM holds (one VM with it at a time)
-  grep -q "host forwarding" "$d/qemu.log" && die "Another VM has the ssh port ($SSH_PORT): shut it down first"
-  die "qemu didn't start: $(tail -3 "$d/qemu.log" | sed 's/^qemu-system-[a-z0-9_]*: //')"
-}
-
-# Its SDL window, found by qemu's pid
-display() {
-  need "$1"; running "$1" || die "$1 isn't running"
-  local addr; addr=$(hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \
-                      '[.[] | select(.pid == $pid)] | first | .address // empty')
-  [[ -n $addr ]] || die "No window for $1"
-  hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
-}
-
 case ${1:-} in
   list)     list ;;
   isos)     ls -t "$HOME"/Downloads/*.iso "$HOME"/vm/*.iso 2>/dev/null || true ;;
   create)   (($# >= 5)) || die "create NAME ISO MEM_GB DISK_GB [CPUS]"; create "${@:2}" ;;
   start)    start "$2" ;;
-  stop)     need "$2"; running "$2" || exit 0; qmp "$2" system_powerdown ;;
-  # Pulling the plug works without QMP too: qemu's own process, if its socket doesn't answer
-  kill)     need "$2"; running "$2" || exit 0; qmp "$2" quit 2>/dev/null || kill "$(cat "$(dir "$2")/pid")" ;;
+  stop)     stop "$2" ;;
+  kill)     force_off "$2" ;;
+  synctime) synctime "$2" ;;
   display)  display "$2" ;;
   eject)    need "$2"; stopped "$2"; sed -i 's/^ISO=.*/ISO=""/' "$(dir "$2")/vm.conf" ;;
   delete)   need "$2"; stopped "$2"; rm -rf "$(dir "$2")" ;;
@@ -154,5 +94,5 @@ case ${1:-} in
   restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
   unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2"; label "$2" "$3" "" ;;
   rename)   rename "$@" ;;
-  *)        sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *)        sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
