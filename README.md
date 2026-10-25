@@ -316,7 +316,10 @@ nightdrive minimal   # asks once; --keep kate,okular keeps KDE apps you still us
 
 It makes the Nightdrive login screen the one in use first, if KDE's still is (`--no-greeter`: greetd's text login), takes a
 read-only btrfs snapshot of the root, and then lets dnf work out what goes: what stays is marked as installed by you, the
-rest as a dependency, and `dnf autoremove` removes what nothing that stays needs. KDE's settings in `~/.config` move to
+rest as a dependency, and `dnf autoremove` removes what nothing that stays needs. The kernel, the boot loader and what
+the system needs to start, log in or repair itself (systemd, dnf, sudo, NetworkManager, SSH) always stay: if dnf would
+remove one of them, it stops before removing anything, and once done it checks that `/boot` still has what it had, and
+says so if not, before you reboot. KDE's settings in `~/.config` move to
 `~/.local/share/nightdrive/kde-config-<time>`, the config files you had changed in `/etc` are listed (`.rpmsave`), and
 Wi-Fi networks whose password was in KDE's wallet ask for it again.
 

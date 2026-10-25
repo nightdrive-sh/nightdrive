@@ -28,6 +28,14 @@ STATE=/usr/lib/sysimage/libdnf5
 # Fusion, dnf's copr command (setup-hyprland-repo.sh)
 EXTRAS=(plymouth plymouth-plugin-two-step plymouth-theme-spinner ImageMagick jetbrains-mono-fonts akmod-nvidia akmods
         mokutil openssl rpmfusion-free-release rpmfusion-nonfree-release dnf5-plugins)
+# The boot chain: what of it is installed always stays, and dnf is told to protect it. By pattern, as a kernel's files
+# aren't always in kernel-core (Fedora 44 on aarch64 has none: kernel-uki-dtbloader provides kernel-core-uname-r)
+BOOT=(kernel kernel-16k 'kernel*-core' 'kernel-uki-*' 'kernel*-modules' 'kernel*-modules-core' 'kernel*-modules-extra'
+      grub2-efi-x64 grub2-efi-aa64 grub2-pc grub2-common grub2-tools grub2-tools-minimal 'shim-*' grubby efibootmgr
+      dracut 'linux-firmware*' dracut-asahi update-m1n1 uboot-images-armv8 asahi-platform-metapackage)
+# What may never be in what goes, whatever dnf answers: without it the machine doesn't start, log in or reach the
+# network, or can't repair itself. The run stops before removing anything if it is (#1606)
+NEVER='^(kernel(-16k)?(-core|-modules|-modules-core)?|kernel-uki-.*|grub2-(efi-(x64|aa64)|pc|common|tools|tools-minimal)|shim-.*|grubby|dracut|linux-firmware|systemd|systemd-udev|systemd-boot-.*|glibc|bash|coreutils|util-linux|kmod|rpm|dnf5|sudo|pam|polkit|NetworkManager|NetworkManager-wifi|openssh-server|selinux-policy|selinux-policy-targeted|greetd|greetd-selinux|update-m1n1|uboot-images-armv8|asahi-platform-metapackage)$'
 # Nightdrive's lists, also as they were (git log): a package dropped from them isn't the user's own
 LISTS=(packages.txt packages-hyprland.txt packages-pc.txt packages-asahi.txt)
 UNDO=$HOME/.local/state/nightdrive/minimal-undo.txt
@@ -101,6 +109,12 @@ add_file() {
     esac
   done < <(lines "$@")
 }
+# installed GLOB…: the installed packages whose names match
+installed() { local p n; for p; do for n in "${!inst[@]}"; do [[ $n == $p ]] && echo "$n"; done; done | sort -u; }
+# essential NAME…: those of them in NEVER, on one line
+essential() { printf '%s\n' "$@" | grep -E "$NEVER" | tr '\n' ' ' || true; }
+# What's in /boot to start from: a kernel or an initramfs gone from it leaves a machine that doesn't start
+boot_files() { ls /boot 2>/dev/null | grep -E '^(vmlinuz|initramfs)-' | sort || true; }
 
 machine=$("$repo/config/hypr/scripts/platform" machine)
 kind=pc; [[ $machine == asahi ]] && kind=asahi
@@ -127,6 +141,8 @@ for f in /etc/dnf/protected.d/*.conf; do
   while read -r l; do protected+=("$l"); done < <(lines "$f")
 done
 add "${protected[@]}"
+mapfile -t boot < <(installed "${BOOT[@]}")
+add "${boot[@]}"; protected+=("${boot[@]}")
 
 # --- Yours: user-installed, not by the image, a group or Nightdrive ---
 declare -A notyours ever
@@ -165,6 +181,8 @@ printf '%s\n' "${!keep[@]}" > "$sim/keep"
 unneeded() { dnf_local --setopt=system_state_dir="$1" repoquery --unneeded --qf '%{name}\n' | sort -u; }
 mapfile -t goes < <(unneeded "$sim")
 (( ${#goes[@]} )) || { echo "Nothing to remove: this is already as Fedora Minimal + Nightdrive."; exit 0; }
+bad=$(essential "${goes[@]}")
+[[ -z $bad ]] || die "dnf would also remove what the system needs to start or repair itself: ${bad% }. Stopped, nothing changed: please report it, with this line"
 declare -A going; for n in "${goes[@]}"; do going[$n]=1; done
 dropped=(); for n in "${!ever[@]}"; do [[ -n ${going[$n]:-} && ${reason[$n]:-} == User ]] && dropped+=("$n"); done
 mapfile -t dropped < <(printf '%s\n' "${dropped[@]}" | sed '/^$/d' | sort)
@@ -266,6 +284,7 @@ fi
 # --ignore-extras for what dnf pulls in along, NetworkManager-libreswan-gnome on KDE), then dnf's own
 # list compared with the one shown
 before=$(dnf_local history list --json | jq -r 'map(.id) | max // 0')
+boot_before=$(boot_files); broken_before=$(dnf_local check 2>&1 || true)
 trap 'echo "Stopped halfway. What changed in dnf is undone with: sudo dnf history rollback --ignore-extras $before" >&2' ERR
 echo "==> Marking what stays as user-installed, the rest as dependencies"
 read_reasons   # the login screen's installer may have installed or marked some
@@ -304,6 +323,8 @@ more=()
 for _ in 1 2 3; do
   mapfile -t next < <(unneeded "$STATE")
   (( ${#next[@]} )) || break
+  bad=$(essential "${next[@]}")
+  [[ -z $bad ]] || die "dnf would next remove what the system needs to start or repair itself: ${bad% }. Stopped there; what changed is undone with: sudo dnf history rollback --ignore-extras $before"
   echo "==> ${#next[@]} more that only what went recommended: ${next[*]}"
   autoremove; more+=("${next[@]}")
 done
@@ -328,7 +349,8 @@ mkdir -p "${UNDO%/*}"
   (( ${#configs[@]} )) && echo "mv $BACKUP/* ~/.config/ && rmdir $BACKUP    # KDE's settings"
   if (( snapshot )); then
     echo
-    echo "# If dnf can't (an old version gone from the repos): the root as it was, from the snapshot. /home isn't in it"
+    echo "# If dnf can't (an old version gone from the repos): the root as it was, from the snapshot. /home isn't in it,"
+    echo "# nor /boot when it's a partition of its own"
     echo "sudo mount -o subvolid=5 $root_dev /mnt"
     echo "sudo mv /mnt${root_sub} /mnt${root_sub}.minimal"
     echo "sudo btrfs subvolume snapshot /mnt/$snap_name /mnt${root_sub}"
@@ -347,4 +369,15 @@ printf '\e[1m%s\e[0m\n' "Done: $(( ${#goes[@]} - ${#left[@]} + ${#more[@]} )) pa
 echo "The way back (also in ${UNDO/#$HOME/\~}):"
 sed 's/^/  /' "$UNDO"
 echo
+# Before the reboot: what it starts from is still there, and nothing that stays misses what it needs (dnf check's
+# findings from before the run aren't this run's)
+mapfile -t boot_gone < <(comm -23 <(echo "$boot_before") <(boot_files) | sed '/^$/d')
+broken=$(dnf_local check 2>&1 || true); [[ $broken != "$broken_before" ]] || broken=""
+if (( ${#boot_gone[@]} )) || [[ -n $broken ]]; then
+  printf '\e[1;31m%s\e[0m\n' "Don't reboot yet: the system may not start."
+  (( ${#boot_gone[@]} )) && { echo "Gone from /boot:"; fold_list "${boot_gone[@]}"; }
+  [[ -z $broken ]] || { echo "dnf check:"; echo "$broken" | sed 's/^/  /'; }
+  echo "Undo it first (sudo dnf history rollback --ignore-extras $before), and please report it with these lines."
+  exit 1
+fi
 echo "Reboot to start from the new login screen."
