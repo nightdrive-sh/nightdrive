@@ -59,6 +59,14 @@ gawk
 nautilus
 loupe
 sushi
+# Sushi's video previews (Files' Space): it plays them in gtkglsink/gtksink, which its package doesn't pull in
+gstreamer1-plugins-good-gtk
+# Video decoders for GStreamer (Sushi, other GStreamer apps) that Fedora KDE's @multimedia brought and Minimal lacks:
+# H.264 (openh264, from the fedora-cisco-openh264 repo fedora-repos enables), ffmpeg-free's decoders, AV1 faster than aom.
+# Firefox needs none of them: it decodes with libavcodec-free and openh264
+gstreamer1-plugin-openh264
+gstreamer1-plugin-libav
+gstreamer1-plugin-dav1d
 chromium
 gh
 # dnf's actions plugin: config/system/nightdrive.actions tells the desktop after each dnf transaction (Plugins.qml)

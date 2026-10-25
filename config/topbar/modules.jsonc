@@ -27,7 +27,7 @@
 [
   { "name": "camera",        "interval": 2,  "first": true },
   { "name": "microphone",    "interval": 2,  "first": true },
-  { "name": "claude",        "interval": 60, "middle": "xdg-open https://claude.ai/settings/usage" },
+  { "name": "claude",        "interval": 15, "right": "~/.config/topbar/scripts/claude-bar next", "middle": "xdg-open https://claude.ai/settings/usage" },
   { "name": "system",        "interval": 3 },
   { "name": "bluetooth",     "interval": 5,  "right": "blueman-manager" },
   { "name": "wifi",          "interval": 5,  "right": "nm-connection-editor" },

@@ -171,6 +171,7 @@ Usage: nightmail [command]
   show ID        open Mail on a message (notmuch message id)
   reply ID       open Mail on a message and reply to it
   claude ID      the same, with Claude writing the reply
+  archive ID     archive a message, as Mail's a does
   delete ID      move a message to Trash
   notify         notify of new mail (notmuch's post-new hook runs it)
   keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
@@ -202,9 +203,11 @@ case ${1:-open} in
     case $1 in show) fn=openMessage ;; reply) fn=replyTo ;; claude) fn=claudeReply ;; esac
     ipc "$fn" "$2"
     ;;
-  delete)
+  archive|delete)
+    # The same move as Mail's a and d: from the inbox to Archive or Trash (move.py keeps Gmail's All Mail as it is)
     [[ -n ${2:-} ]] || { usage >&2; exit 2; }
-    python3 "$APP_DIR/lib/move.py" Trash "id:\"$2\"" INBOX >/dev/null && notmuch tag -inbox -- "id:\"$2\""
+    [[ $1 == archive ]] && to=Archive || to=Trash
+    python3 "$APP_DIR/lib/move.py" "$to" "id:\"$2\"" INBOX >/dev/null && notmuch tag -inbox -- "id:\"$2\""
     running && ipc refresh
     ;;
   notify)    python3 "$APP_DIR/lib/notify.py" ;;

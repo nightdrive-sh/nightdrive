@@ -12,14 +12,27 @@ Item {
     readonly property var parents: ({ about: "system" })
     readonly property string repoUrl: "https://github.com/nightdrive-sh/nightdrive"
 
-    // nightdrive version's line ("Nightdrive 0.5.0, and 3 changes since (dev channel, 2249eb6)"), the OS and the machine
+    // nightdrive version's line ("Nightdrive 0.5.0, and 3 changes since (dev channel, 2249eb6)"), the OS and the machine.
+    // Sh merges stderr into the output, so the OS and machine lines keep theirs out: an error there would be read as the
+    // line (and `< file 2>/dev/null` doesn't do it, the < fails before the 2> is set up).
+    // The machine: the device tree's model on Arm boards and Macs (Asahi), else DMI on PCs and VMs ("QEMU Virtual
+    // Machine", not "QEMU QEMU Virtual Machine"), with a self-built PC's placeholders swapped for its board's name.
     property var info: null
     Sh {
         id: infoProc
-        script: '"$HOME/.local/bin/nightdrive" version; . /etc/os-release; echo "$NAME $VERSION_ID"
-                 m=$(tr -d "\\0" < /sys/firmware/devicetree/base/model 2>/dev/null)
-                 [ -n "$m" ] || m="$(cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name 2>/dev/null | tr "\\n" " ")"
-                 echo "$m"'
+        script: '"$HOME/.local/bin/nightdrive" version
+                 ( . /etc/os-release && echo "$NAME $VERSION_ID" ) 2>/dev/null || echo
+                 {
+                     m=$(tr -d "\\0" < /sys/firmware/devicetree/base/model)
+                     if [ -z "$m" ]; then
+                         d=/sys/class/dmi/id; v=$(cat $d/sys_vendor); p=$(cat $d/product_name)
+                         case "$v$p" in *"To Be Filled"*|*"Default string"*|*"System manufacturer"*|*"System Product Name"*)
+                             v=$(cat $d/board_vendor); p=$(cat $d/board_name) ;; esac
+                         case "$p" in "$v"*) m=$p ;; *) m="$v $p" ;; esac
+                     fi
+                     m=$(echo $m)
+                     echo "${m:-Unknown}"
+                 } 2>/dev/null'
         onResult: text => {
             const f = text.split("\n")
             const m = (f[0] || "").match(/^Nightdrive(?: (\S+?))?,?(?: and (\d+) changes? since| no release yet)? \((\S+) channel(?:, (\w+))?\)/)

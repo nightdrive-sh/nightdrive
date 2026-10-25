@@ -39,7 +39,7 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 
 ## Notifications
 
-- New unread mail in the inbox gets a notification with Reply, Reply with Claude and Delete; a click opens the message in Mail. More than three at once come as one notification that counts them.
+- New unread mail in the inbox gets a notification with Reply, Reply with Claude, Archive and Delete (as `a` and `d` in Mail); a click opens the message in Mail. More than three at once come as one notification that counts them.
 - They come after each sync even when Mail is closed: notmuch's post-new hook runs `nightmail notify`. A hook of your own is left alone; add `nightmail notify` to it yourself.
 - Mail in an inbox comes within seconds: a connection to each account waits for the server to say a message has arrived (IMAP IDLE, `nightmail push`), and then fetches that inbox alone. The other folders, and an account whose server can't do that, sync every 5 minutes. Gmail can tell of new mail up to a minute late.
 
@@ -166,7 +166,7 @@ SyncState *
 | `nightmail setup` | Sets up an email account with Claude, in a terminal |
 | `nightmail settings` | Opens Mail's settings |
 | `nightmail sync` | Fetches new mail now and shows it |
-| `nightmail show ID`, `reply ID`, `claude ID`, `delete ID` | A message by its notmuch id, as the notifications use them |
+| `nightmail show ID`, `reply ID`, `claude ID`, `archive ID`, `delete ID` | A message by its notmuch id, as the notifications use them |
 | `nightmail enable`, `disable` | Mail among the apps, its notifications and the sync, on or off (your mail and settings stay). Run `enable` again after changing `isyncrc`. |
 | `nightmail restart`, `quit`, `log` | After a change to Mail, and its QML errors |
 
