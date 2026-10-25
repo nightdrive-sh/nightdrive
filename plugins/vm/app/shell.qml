@@ -5,8 +5,9 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// A rough prototype (task #1528, branch vm): qemu/KVM VMs in a window. The VMs in the sidebar, the picked one's page
-// beside it; bin/vm-ctl does the work.
+// Nightdrive's VM window (task #1530, branch vm): qemu/KVM VMs, the VMs in the sidebar, the picked one's page beside it;
+// bin/vm-ctl does the work. This file holds the window together: which VM shows, the narrow window's turns, the panels
+// that ask, and the keys (their sheet: KeyHelp.qml).
 ShellRoot {
     FloatingWindow {
         id: win
@@ -18,12 +19,14 @@ ShellRoot {
 
         AppLook { id: c }
         VmCtl { id: ctl }
+        KeyHelp { id: keyHelp }
         readonly property QtObject look: c
 
         property string picked: ""
         readonly property int index: Math.max(0, ctl.vms.findIndex(v => v.name === picked))
         readonly property var vm: ctl.vms.length ? ctl.vms[index] : null
         property bool showNew: false
+        function step(d) { const n = ctl.vms.length; if (n) picked = ctl.vms[(index + d + n) % n].name }
 
         // Narrow windows: below onePaneMax the list and the page take turns, as in Deck: Esc on the page shows the list,
         // a click or Enter on a VM its page. ⌘B shows and hides the sidebar, in a wide window too.
@@ -36,16 +39,14 @@ ShellRoot {
         function toggleSidebar() { if (onePane) listOpen = !listOpen; else sidebarChoice = !sidebarShown }
         function pick(name) { picked = name; listOpen = false }
 
-        // The name panel's question and what to do with its answer (a snapshot's name, a delete's confirmation)
-        property string askTitle: ""
-        property var askDone: null
-        function ask(title, initial, done) { askTitle = title; askDone = done; askField.text = initial; askField.input.forceActiveFocus(); askField.input.selectAll() }
-        function answer(ok) { const d = askDone; askTitle = ""; askDone = null; if (ok && d) d(askField.text.trim()); page.forceActiveFocus() }
-
-        // The yes-or-no panel's question (deleting a snapshot) and what to do on yes
+        // The yes-or-no panel's question (restoring or deleting a snapshot) and what to do on yes
         property var confirmDone: null
-        function confirm(question, detail, done) { confirmPanel.question = question; confirmPanel.detail = detail; confirmDone = done }
-        function confirmed(ok) { const d = confirmDone; confirmDone = null; if (ok && d) d(); page.forceActiveFocus() }
+        function confirm(question, detail, action, glyph, done) {
+            confirmPanel.question = question; confirmPanel.detail = detail
+            confirmPanel.action = action; confirmPanel.glyph = glyph
+            confirmDone = done
+        }
+        function confirmed(ok) { const d = confirmDone; confirmDone = null; if (ok && d) d(); page.refocus() }
 
         IpcHandler {
             target: "vm"
@@ -55,10 +56,15 @@ ShellRoot {
 
         Shortcut { sequences: ["Ctrl+N", "Meta+N"]; onActivated: win.showNew = true }
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
+        Shortcut { sequences: ["Ctrl+Backspace", "Meta+Backspace"]; onActivated: page.deleteVm() }
+        Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
 
         RowLayout {
             anchors.fill: parent
             spacing: 0
+            // ? and Ctrl+? show the keys, as in Mail and Deck: what the page and the snapshot list leave alone comes here
+            Keys.onPressed: e => sheet.pressed(e)
+
             VmSidebar {
                 visible: win.sidebarShown
                 Layout.preferredWidth: win.onePane ? -1 : 200
@@ -84,8 +90,8 @@ ShellRoot {
                 focus: true
                 onBack: win.listOpen = true
                 bottomInset: note.visible ? note.height + 16 : 0
-                onAskName: (title, initial, done) => win.ask(title, initial, done)
-                onAskConfirm: (question, detail, done) => win.confirm(question, detail, done)
+                onAskName: (title, initial, done) => namePanel.ask(title, initial, done)
+                onAskConfirm: (question, detail, action, glyph, done) => win.confirm(question, detail, action, glyph, done)
 
                 EmptyState {
                     visible: ctl.loaded && ctl.vms.length === 0
@@ -104,18 +110,21 @@ ShellRoot {
                     onDismissed: ctl.error = ""
                 }
 
+                // The page's keys (KeyHelp.qml lists them); the snapshot list takes its own first, while it has focus
                 Keys.onPressed: e => {
-                    const v = win.vm, n = ctl.vms.length
-                    if (e.key === Qt.Key_Down && n) win.picked = ctl.vms[(win.index + 1) % n].name
-                    else if (e.key === Qt.Key_Up && n) win.picked = ctl.vms[(win.index + n - 1) % n].name
-                    else if (win.onePane && win.listOpen && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) win.listOpen = false
-                    else if (win.onePane && !win.listOpen && e.key === Qt.Key_Escape && n) win.listOpen = true
+                    const k = e.key, v = win.vm
+                    if (sheet.shown) { sheet.shown = false; e.accepted = true; return }
+                    if (k === Qt.Key_Down || k === Qt.Key_J) win.step(1)
+                    else if (k === Qt.Key_Up || k === Qt.Key_K) win.step(-1)
+                    else if (win.onePane && win.listOpen && (k === Qt.Key_Return || k === Qt.Key_Enter)) win.listOpen = false
+                    else if (win.onePane && !win.listOpen && k === Qt.Key_Escape && ctl.vms.length) win.listOpen = true
                     else if (!v) return
                     else if (e.text === "s") page.start()
                     else if (e.text === "d") page.display()
                     else if (e.text === "x") page.shutDown()
                     else if (e.text === "X") page.forceOff()
-                    else if (e.key === Qt.Key_Delete && page.snap >= 0) page.deleteSnap(page.snap)
+                    else if (e.text === "t") page.takeSnapshot()
+                    else if (k === Qt.Key_Tab) page.focusSnapshots()
                     else return
                     e.accepted = true
                 }
@@ -129,19 +138,10 @@ ShellRoot {
             onDone: { win.showNew = false; page.forceActiveFocus() }
         }
 
-        AppPanel {
-            visible: win.askTitle !== ""
+        NamePanel {
+            id: namePanel
             c: win.look
-            cardWidth: 440
-            onOutsideTapped: win.answer(false)
-            Field {
-                id: askField
-                c: win.look
-                width: parent.width
-                label: win.askTitle
-                onAccepted: win.answer(true)
-                input.Keys.onEscapePressed: win.answer(false)
-            }
+            onClosed: page.refocus()
         }
 
         ConfirmPanel {
@@ -150,5 +150,7 @@ ShellRoot {
             c: win.look
             onAnswered: ok => win.confirmed(ok)
         }
+
+        KeySheet { id: sheet; c: win.look; groups: keyHelp.groups }
     }
 }

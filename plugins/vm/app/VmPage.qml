@@ -4,9 +4,8 @@ import qs
 import qs.kit
 
 // One VM's page: a header level with the sidebar's title (its name and state), the buttons for what it can do now, what
-// it has (memory, CPUs, disk, the ISO in its drive, ssh while it runs), and its snapshots. Snapshots are taken, restored
-// and deleted only while it is stopped (qemu-img works on the disk file then); a snapshot row's bin asks first
-// (askConfirm), as a deleted snapshot is gone.
+// it has (memory, CPUs, disk, the ISO in its drive, ssh while it runs), and its snapshots (SnapshotList.qml). The
+// questions it asks go to the window's panels (askName, askConfirm).
 Item {
     id: root
     required property QtObject c
@@ -15,11 +14,8 @@ Item {
     property bool onePane: false        // a narrow window: the header's arrow goes back to the list
     property int headerHeight: 62       // as AppSidebar's, so the name lines up with the app's
     property int bottomInset: 0         // room kept at the foot (shell.qml's error line)
-    property int snap: -1               // the picked snapshot
-    readonly property var snaps: vm ? vm.snapshots : []
-    onVmChanged: if (snap >= snaps.length) snap = snaps.length - 1
     signal askName(string title, string initial, var done)
-    signal askConfirm(string question, string detail, var done)
+    signal askConfirm(string question, string detail, string action, string glyph, var done)
     signal back()
 
     // Its state, with what the window has asked of it and the list doesn't show yet (VmCtl's pending)
@@ -35,11 +31,16 @@ Item {
     function display() { if (root.running) root.act(["display", root.vm.name]) }
     function shutDown() { if (root.running && !root.stopping) root.ctl.power("stop", root.vm.name) }
     function forceOff() { if (root.running) root.ctl.power("kill", root.vm.name) }
-    function deleteSnap(i) {
-        if (!root.stopped || i < 0 || i >= root.snaps.length) return
-        const name = root.vm.name, tag = root.snaps[i].tag
-        root.askConfirm("Delete the snapshot " + tag + "?", name + "'s disk can no longer go back to it.",
-                        () => root.act(["unsnap", name, tag]))
+    function takeSnapshot() { snapshots.take() }
+    function focusSnapshots() { snapshots.focusList() }
+    // After a panel: the keys go back where they were, the snapshot list or the page
+    function refocus() {
+        if (snapshots.returnHere) { snapshots.returnHere = false; snapshots.focusList() } else root.forceActiveFocus()
+    }
+    function deleteVm() {
+        if (!root.stopped) return
+        const name = root.vm.name
+        root.askName("Type " + name + " to delete it, its disk and its snapshots", "", n => { if (n === name) root.act(["delete", name]) })
     }
 
     ColumnLayout {
@@ -111,7 +112,7 @@ Item {
                 AppButton {
                     c: root.c; glyph: "trash-2"; label: "Delete VM"; tip: "Delete it and its disk"
                     visible: root.stopped
-                    onClicked: root.askName("Type the name to delete " + root.vm.name, "", n => { if (n === root.vm.name) root.act(["delete", n]) })
+                    onClicked: root.deleteVm()
                 }
             }
 
@@ -156,77 +157,18 @@ Item {
                 }
             }
 
-            Text {
+            SnapshotList {
+                id: snapshots
                 Layout.topMargin: 6
-                text: "Snapshots"
-                color: root.c.title; font.family: root.c.font; font.pixelSize: 13; font.weight: Font.Medium
-            }
-
-            ListView {
-                id: list
-                visible: root.snaps.length > 0
                 Layout.fillWidth: true
-                Layout.topMargin: -12
-                Layout.preferredHeight: Math.min(contentHeight, 260)
-                clip: true
-                model: root.snaps
-                spacing: 2
-                delegate: AppRow {
-                    id: row
-                    required property var modelData
-                    required property int index
-                    c: root.c
-                    height: 32
-                    selected: index === root.snap
-                    TapHandler { onTapped: root.snap = row.index }
-                    Text {
-                        x: 14; anchors.verticalCenter: parent.verticalCenter
-                        text: row.modelData.tag
-                        color: row.selected ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 12
-                    }
-                    Text {
-                        anchors.right: bin.left; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                        text: row.modelData.date
-                        color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
-                    }
-                    // Kept in its place while the VM runs (only hidden), so the dates don't shift
-                    AppIconButton {
-                        id: bin
-                        anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
-                        c: root.c; glyph: "trash-2"; glyphSize: 12; tip: "Delete this snapshot"; keys: "Del"; tipSide: "above"
-                        opacity: root.stopped ? 1 : 0
-                        enabled: opacity > 0
-                        onClicked: root.deleteSnap(row.index)
-                    }
-                }
+                c: root.c
+                ctl: root.ctl
+                vm: root.vm
+                stopped: root.stopped
+                onAskName: (title, initial, done) => root.askName(title, initial, done)
+                onAskConfirm: (question, detail, action, glyph, done) => root.askConfirm(question, detail, action, glyph, done)
+                onLeave: root.forceActiveFocus()
             }
-            Text {
-                visible: root.snaps.length === 0
-                Layout.topMargin: -12
-                text: "None yet."
-                color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
-            }
-
-            Row {
-                spacing: 8
-                AppButton {
-                    c: root.c; glyph: "camera"; label: "Take snapshot"; tip: "Only while it is stopped"
-                    visible: root.stopped
-                    onClicked: root.askName("Name the snapshot", Qt.formatDateTime(new Date(), "yyyy-MM-dd-hhmm"),
-                                            n => { if (n) root.act(["snapshot", root.vm.name, n]) })
-                }
-                AppButton {
-                    c: root.c; glyph: "rotate-ccw"; label: "Restore"; tip: "The disk goes back to this snapshot"
-                    visible: root.stopped && root.snap >= 0
-                    onClicked: root.act(["restore", root.vm.name, root.snaps[root.snap].tag])
-                }
-                Text {
-                    visible: !root.stopped
-                    text: "Shut it down to take, restore or delete a snapshot."
-                    color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
-                }
-            }
-
             Item { Layout.fillHeight: true }
         }
     }

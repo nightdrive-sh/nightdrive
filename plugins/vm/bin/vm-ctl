@@ -3,13 +3,16 @@
 #   vm.conf      MEM (MB), CPUS, ISO (booted first while set)
 #   disk.qcow2   the disk; snapshots are internal to it (qemu-img snapshot, only while the VM is stopped)
 #   vars.raw     the UEFI variables
+#   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
 #   qmp.sock, pid, serial.log while it runs
 # The qemu command line is the one #1527 got Fedora booting with on Asahi (an M2 Max).
 #
-#   vm-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, date }] }]
+#   vm-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date }] }]
 #   vm-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   vm-ctl start|stop|kill|display|eject|delete NAME
-#   vm-ctl snapshot|restore|unsnap NAME TAG     take, go back to, delete one
+#   vm-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
+#   vm-ctl restore|unsnap NAME TAG       go back to one, delete one
+#   vm-ctl rename NAME TAG LABEL         the name a snapshot shows (while it runs too: only names.json changes)
 #   vm-ctl isos                          .iso files in ~/Downloads and ~/vm, newest first
 set -euo pipefail
 
@@ -29,6 +32,19 @@ running() { local p; p=$(cat "$(dir "$1")/pid" 2>/dev/null) && kill -0 "$p" 2>/d
 stopped() { running "$1" && die "$1 is running: shut it down first"; return 0; }
 # A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and a tag
 snap() { [[ -n ${3:-} ]] || die "$1 NAME TAG"; need "$2"; stopped "$2"; }
+
+# A snapshot's name in names.json (LABEL empty: its entry goes). Written to a new file, then renamed over the old one
+label() {
+  local f; f=$(dir "$1")/names.json
+  jq --arg tag "$2" --arg label "$3" 'if $label == "" then del(.[$tag]) else .[$tag] = $label end' \
+     <(cat "$f" 2>/dev/null || echo '{}') > "$f.new" && mv "$f.new" "$f"
+}
+rename() {
+  [[ -n ${3:-} && -n ${4:-} ]] || die "rename NAME TAG LABEL"; need "$2"
+  qemu-img info -U --output=json "$(dir "$2")/disk.qcow2" | jq -e --arg tag "$3" 'any(.snapshots[]?; .name == $tag)' >/dev/null \
+    || die "$2 has no snapshot $3"
+  label "$2" "$3" "$4"
+}
 
 # One QMP command: the greeting, capabilities, then the command. From the VM's folder, as a socket's path is short (108)
 qmp() {
@@ -62,11 +78,11 @@ list() {
     local info; info=$(qemu-img info -U --output=json "$d/disk.qcow2")
     ((first)) || echo -n ","; first=0
     jq -nc --arg name "$name" --argjson mem "$MEM" --argjson cpus "$CPUS" --arg iso "$ISO" --argjson run "$run" \
-       --argjson info "$info" --argjson ssh "$SSH_PORT" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run,
+       --argjson info "$info" --argjson ssh "$SSH_PORT" --argjson names "$(cat "$d/names.json" 2>/dev/null || echo '{}')" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run,
          ssh: $ssh,
          disk: ($info["virtual-size"] / 1073741824 | floor),
          used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
-         snapshots: [($info.snapshots // [])[] | { tag: .name, date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")) }] }'
+         snapshots: [($info.snapshots // [])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")) }] }'
   done
   echo "]"
 }
@@ -134,8 +150,9 @@ case ${1:-} in
   display)  display "$2" ;;
   eject)    need "$2"; stopped "$2"; sed -i 's/^ISO=.*/ISO=""/' "$(dir "$2")/vm.conf" ;;
   delete)   need "$2"; stopped "$2"; rm -rf "$(dir "$2")" ;;
-  snapshot) snap "$@"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2" ;;
+  snapshot) snap "$@"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2"; [[ -z ${4:-} ]] || label "$2" "$3" "$4" ;;
   restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
-  unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2" ;;
-  *)        sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2"; label "$2" "$3" "" ;;
+  rename)   rename "$@" ;;
+  *)        sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
