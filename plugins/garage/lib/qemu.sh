@@ -125,11 +125,23 @@ synctime() {
   ((rc == 0 || rc == 3)) || [[ ! -S $(dir "$1")/qga.sock ]] || die "$1: its clock wasn't set"
 }
 
-# Its SDL window, found by qemu's pid
+# Its SDL window, found by qemu's pid. On a workspace it is focused where it is, tiled or floating; in a special one
+# (special:bg, the drawer) it comes to the current workspace, tiled: focused there it would only float on top of
+# everything, with nothing but Open Garage or a move to put it away again
 display() {
   need "$1"; running "$1" || die "$1 isn't running"
-  local addr; addr=$(hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \
-                      '[.[] | select(.pid == $pid)] | first | .address // empty')
+  local addr ws ws_id
+  read -r addr ws < <(hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \
+                        '[.[] | select(.pid == $pid)] | first | "\(.address // "") \(.workspace.name // "")"')
   [[ -n $addr ]] || die "No window for $1"
-  hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+  local cmds=()
+  if [[ $ws == special:* ]]; then
+    ws_id=$(hyprctl -j monitors | jq -r '[.[] | select(.focused)] | first | .activeWorkspace.id')
+    cmds+=("dispatch hl.dsp.window.move({ workspace = $ws_id, window = \"address:$addr\" })"
+           "dispatch hl.dsp.window.float({ action = \"disable\", window = \"address:$addr\" })")
+  fi
+  cmds+=("dispatch hl.dsp.focus({ window = \"address:$addr\" })")
+  # One batch, so the window doesn't show floating at its old spot before it is tiled
+  local IFS=';'
+  hyprctl --batch "${cmds[*]}" >/dev/null
 }
