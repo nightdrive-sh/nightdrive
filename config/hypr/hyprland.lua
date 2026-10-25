@@ -452,23 +452,8 @@ hl.window_rule({
     size  = "460 monitor_h-57",             -- the screen's height under the bar; it scrolls
     move  = "monitor_w-470 47",
 })
--- Welcome to Nightdrive (config/welcome): a card in the middle, over whatever the first login opened
-hl.window_rule({
-    name  = "float-welcome",
-    match = { class = "^org\\.quickshell$", title = "^Welcome to Nightdrive$" },
-    float = true,
-    size  = "960 600",
-    center = true,
-})
--- What Welcome starts in a terminal (a step's command, a Claude session: scripts/claude-setup): floating over it, in
--- front, rather than tiled behind it
-hl.window_rule({
-    name  = "float-welcome-terminal",
-    match = { class = "^(sh\\.nightdrive\\.)?nightdrive-(setup-.*|welcome)$" },
-    float = true,
-    size  = "900 560",
-    center = true,
-})
+-- Welcome to Nightdrive (config/welcome): its window rules, and what it opens comes over it
+require("welcome")
 hl.window_rule({
     name  = "float-preview",
     match = { class = "^org\\.gnome\\.Loupe$" },

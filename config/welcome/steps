@@ -1,7 +1,8 @@
 #!/usr/bin/python3 -I
 """A plugin's steps to set it up by hand, for the Welcome window's manual path: its steps.md, read for the window.
   steps ID [VALUES]                 the steps as JSON on stdout, their Done when tests run with VALUES
-  steps edit ID N VALUES            step N's template written to its Edit: file if that is missing, then opened in the editor, over the window
+  steps edit ID N VALUES            step N's template written to its Edit: file if that is missing, then opened in the editor
+                                    (over the window: hypr/welcome.lua)
   steps run ID N VALUES             step N's code block in a terminal, which stays open afterwards
   steps action ID N I VALUES        step N's I-th Run: or Open: button
 VALUES is a JSON object of the Ask: fields filled so far ({"email": "you@example.com"}): {key} in a command or a
@@ -16,14 +17,13 @@ and lines of their own:
   Open: Label | https://…            a button: a page in the browser, or a file of the folder's (README.md) in
                                      Apostrophe, as the "I'll do it myself" path opens it
   Done when: test                    a quick shell test, in the folder: the step shows as done while it succeeds"""
-import json, os, re, subprocess, sys, time
+import json, os, re, subprocess, sys
 
 REPO = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../.."))
 HOME = os.path.expanduser("~")
 EXTERNAL = os.path.join(HOME, ".local/share/nightdrive/plugins")
 TERMINAL = os.path.join(HOME, ".config/hypr/scripts/terminal")
-TERMINAL_CLASS = "nightdrive-welcome"   # hyprland.lua's float-welcome-terminal: over the window, not tiled behind it
-FRONT_WAIT = 10                         # seconds to wait for the editor's window, to bring it over the Welcome window
+TERMINAL_CLASS = "nightdrive-welcome"   # hypr/welcome.lua's float-welcome-terminal: over the window, not tiled behind it
 TEST_TIMEOUT = 5                    # seconds for a Done when test: the window reads the steps again every few seconds
 DIRECTIVE = re.compile(r"(Ask|Edit|Run|Open|Done when):\s*(.*)$")
 
@@ -130,30 +130,6 @@ def detach(argv, cwd):
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def clients():
-    try:
-        out = subprocess.run(["hyprctl", "-j", "clients"], capture_output=True, text=True, timeout=2).stdout
-        return {c["address"] for c in json.loads(out)}
-    except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
-        return set()
-
-
-def to_front(before):
-    """The editor's new window, floating and centred over the Welcome window: a tiled one would open behind it. An
-    editor that was already open (no new window) is left where it is."""
-    for _ in range(FRONT_WAIT * 4):
-        time.sleep(0.25)
-        new = clients() - before
-        if new:
-            w = f'window = "address:{new.pop()}"'
-            subprocess.run(["hyprctl", "--batch",
-                            f'dispatch hl.dsp.window.float({{ action = "enable", {w} }}); '
-                            f'dispatch hl.dsp.window.resize({{ x = 900, y = 560, exact = true, {w} }}); '
-                            f'dispatch hl.dsp.window.center({{ {w} }}); dispatch hl.dsp.focus({{ {w} }})'],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return
-
-
 def edit(pid, n, vals):
     """The file is written only when it isn't there yet: one the user already has is opened as it is, never replaced"""
     f, s = step(pid, n)
@@ -162,9 +138,7 @@ def edit(pid, n, vals):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as out:
             out.write(fill(s["code"], vals).rstrip("\n") + "\n")
-    before = clients()
     detach(["xdg-open", path], f)
-    to_front(before)
 
 
 def run(pid, n, vals):

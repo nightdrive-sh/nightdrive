@@ -14,7 +14,7 @@ ShellRoot {
     FloatingWindow {
         id: win
         title: "Welcome to Nightdrive"
-        // Wide rather than tall (the VM test), so it never grows past a small screen. hyprland.lua's float-welcome gives
+        // Wide rather than tall (the VM test), so it never grows past a small screen. hypr/welcome.lua's float-welcome gives
         // it the same size.
         implicitWidth: 960
         implicitHeight: 600
@@ -103,8 +103,9 @@ ShellRoot {
             if (t && !t.done) run([setupCmd, "mark", id, "started"])
             closeSteps()
         }
-        // Esc: Skip for now (what isn't done is put aside) or, all done or skipped, Finish. Either way logins stop asking.
-        // On the self path it is Finish: nothing is marked, the READMEs were the help asked for.
+        // Ctrl+Enter (and Esc on the first question): Skip for now (what isn't done is put aside) or, all done or
+        // skipped, Finish. Either way logins stop asking. On the self path it is Finish: nothing is marked, the READMEs
+        // were the help asked for.
         function close() {
             Quickshell.execDetached([dir + "/welcome", selfPath ? "off" : "skip-rest"])
             Qt.quit()
@@ -127,7 +128,8 @@ ShellRoot {
             anchors.fill: parent
             focus: true
             Keys.onPressed: e => {
-                if (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier | Qt.AltModifier)) {
+                const finish = (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && e.modifiers === Qt.ControlModifier
+                if (!finish && e.modifiers & (Qt.ControlModifier | Qt.MetaModifier | Qt.AltModifier)) {
                     if (e.key === Qt.Key_Q || e.key === Qt.Key_W) Qt.quit()     // later: the next login reminds
                     return
                 }

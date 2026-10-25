@@ -22,12 +22,14 @@ Item {
     ]
 
     function key(e) {
-        const k = e.key
-        if (k === Qt.Key_Down || k === Qt.Key_J) current = Math.min(current + 1, choices.length - 1)
+        const k = e.key, enter = k === Qt.Key_Return || k === Qt.Key_Enter
+        if (enter && e.modifiers & Qt.ControlModifier) app.close()     // as the list's Skip for now
+        else if (e.modifiers & Qt.ControlModifier) return false
+        else if (k === Qt.Key_Down || k === Qt.Key_J) current = Math.min(current + 1, choices.length - 1)
         else if (k === Qt.Key_Up || k === Qt.Key_K) current = Math.max(current - 1, 0)
-        else if (k === Qt.Key_Return || k === Qt.Key_Enter) chosen(choices[current].path)
+        else if (enter) chosen(choices[current].path)
         else if (k >= Qt.Key_1 && k < Qt.Key_1 + choices.length) chosen(choices[k - Qt.Key_1].path)
-        else if (k === Qt.Key_Escape) app.close()
+        else if (k === Qt.Key_Escape) app.close()       // nowhere to go back to: Esc is the way out here
         else return false
         return true
     }

@@ -3,8 +3,8 @@ import qs
 import qs.kit
 
 // Welcome's list: what is still to set up, one row each (TaskRow). Enter sets the picked one up, with Claude, by hand
-// or from its README, as the first question was answered (shell.qml's activate); Back asks that question again. A row
-// you don't want is just left: Skip for now puts aside what isn't done.
+// or from its README, as the first question was answered (shell.qml's activate); Back (Esc) asks that question again. A
+// row you don't want is just left: Skip for now (Ctrl+Enter, as Finish) puts aside what isn't done.
 Item {
     id: root
     required property var app
@@ -12,12 +12,13 @@ Item {
     readonly property var task: app.rows[app.current] || {}
 
     function key(e) {
-        const k = e.key
-        if (k === Qt.Key_Down || k === Qt.Key_J) app.current = Math.min(app.current + 1, app.rows.length - 1)
+        const k = e.key, enter = k === Qt.Key_Return || k === Qt.Key_Enter
+        if (enter && e.modifiers & Qt.ControlModifier) app.close()
+        else if (e.modifiers & Qt.ControlModifier) return false
+        else if (k === Qt.Key_Down || k === Qt.Key_J) app.current = Math.min(app.current + 1, app.rows.length - 1)
         else if (k === Qt.Key_Up || k === Qt.Key_K) app.current = Math.max(app.current - 1, 0)
-        else if (k === Qt.Key_Return || k === Qt.Key_Enter) app.activate(app.current)
-        else if (k === Qt.Key_Left || k === Qt.Key_Backspace) app.choose("")
-        else if (k === Qt.Key_Escape) app.close()
+        else if (enter) app.activate(app.current)
+        else if (k === Qt.Key_Escape || k === Qt.Key_Left || k === Qt.Key_Backspace) app.choose("")
         else return false
         return true
     }
@@ -72,13 +73,13 @@ Item {
         FootButton {
             anchors.verticalCenter: parent.verticalCenter
             c: root.c
-            keys: "←"; label: "Back"
+            keys: "esc"; label: "Back"
             onClicked: root.app.choose("")
         }
         FootButton {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
             c: root.c
-            keys: "esc"; label: root.app.finished || root.app.selfPath ? "Finish" : "Skip for now"
+            keys: "ctrl+⏎"; label: root.app.finished || root.app.selfPath ? "Finish" : "Skip for now"
             strong: root.app.finished
             onClicked: root.app.close()
         }

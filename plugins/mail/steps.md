@@ -4,9 +4,9 @@ Welcome to Nightdrive shows these steps one at a time when you set things up wit
 
 ## Why we recommend Mail
 
-Mail is Nightdrive's own email app, with a few unique features like Claude Writes. Setting up Mail takes a few steps,
-because Mail uses two trusted tools: mbsync and notmuch. mbsync fetches your mail and notmuch indexes your emails for
-fast viewing and searching.
+Mail is Nightdrive's own email app, with a few unique features like Claude writes (⌘⇧C). Setting up Mail takes a few
+steps, because Mail uses two trusted tools: mbsync and notmuch. mbsync fetches your mail and notmuch indexes your emails
+for fast viewing and searching.
 
 ## An app password
 

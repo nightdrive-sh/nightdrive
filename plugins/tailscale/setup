@@ -10,7 +10,7 @@ Assistant) from my phone or laptop wherever I am, and it costs nothing for perso
 Tailscale account; if not, the login page makes one (with Google, Microsoft, GitHub or Apple), so I only pick one there.
 Then run $dir/login: it opens the login page in my browser, and I finish there. Check with \`tailscale status\` until
 this computer shows as connected; if login says "Permission denied", give me \`! sudo tailscale set --operator=\$USER\`
-to run myself, then run login again. Finish by telling me where it lives now: the shield in the top bar (a right click
-turns it on or off, its menu lists my devices and copies their addresses), and that my phone needs the Tailscale app,
-signed in to the same account.
+to run myself, then run login again. Finish by telling me where it lives now: the Tailscale icon in the top bar (a
+right click turns it on or off, its menu lists my devices and copies their addresses), and that my phone needs the
+Tailscale app, signed in to the same account.
 EOF

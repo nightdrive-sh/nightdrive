@@ -66,6 +66,8 @@ Item {
     }
     function go(i) { index = Math.max(0, Math.min(i, steps.length - 1)) }
     function next() { if (last) app.finishSteps(taskId); else go(index + 1) }
+    // Esc, ← and Back: a step back, and from the first to the list, as Esc goes back a level everywhere in the window
+    function back() { if (index > 0) go(index - 1); else app.closeSteps() }
     function act(kind, i) {
         if (missing.length) { go(missing[0].step); return }      // Enter takes you to the field instead
         const v = JSON.stringify(values), n = String(index)
@@ -86,13 +88,14 @@ Item {
     }
 
     function key(e) {
-        const k = e.key
-        if (k === Qt.Key_Left) go(index - 1)
+        const k = e.key, enter = k === Qt.Key_Return || k === Qt.Key_Enter
+        if (enter && e.modifiers & Qt.ControlModifier) { if (last) next() }
+        else if (e.modifiers & Qt.ControlModifier) return false
+        else if (k === Qt.Key_Left || k === Qt.Key_Escape) back()
         else if (k === Qt.Key_Right) next()
-        else if (k === Qt.Key_Return || k === Qt.Key_Enter) { if (primary) act(primary, 0); else next() }
+        else if (enter) { if (primary) act(primary, 0); else next() }
         else if (k === Qt.Key_Y) copy()
         else if (k === Qt.Key_Tab) focusField(0)
-        else if (k === Qt.Key_Escape) app.closeSteps()
         else return false
         return true
     }
@@ -101,44 +104,22 @@ Item {
         id: left
         anchors.fill: parent
 
-        // ‹ Back to the list ……… Set up Mail  1/9: the way back and where you are on the same line, apart from the
-        // step's own title under them (the VM test found the back button and the name too close together)
+        // Set up Mail  1/9 at the top right, apart from the step's own title under it. The way back is Back at the
+        // bottom (Jari's round 3: "Back to the list" up here is gone).
         Row {
-            id: where
-            x: parent.width - width - 40; anchors.verticalCenter: head.verticalCenter
+            id: head
+            x: parent.width - width - 40; y: 28
+            height: 36
             spacing: 10
             Text {
                 text: root.sheet ? "Set up " + root.sheet.name : ""
                 color: root.c.text; font.family: root.c.font; font.pixelSize: 13; font.weight: Font.Medium
-                anchors.baseline: count.baseline
+                anchors.verticalCenter: parent.verticalCenter
             }
             Text {
-                id: count
                 text: root.steps.length ? (root.index + 1) + "/" + root.steps.length : ""
                 color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
-            }
-        }
-        Rectangle {
-            id: head
-            x: 28; y: 28
-            width: backRow.implicitWidth + 24; height: 36; radius: 8
-            color: back.hovered ? root.c.hover : "transparent"
-            HoverHandler { id: back; cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: root.app.closeSteps() }
-            Row {
-                id: backRow
-                anchors.centerIn: parent
-                spacing: 8
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: Icons.g("chevron-left"); font.family: Icons.family; font.pixelSize: 18
-                    color: back.hovered ? root.c.title : root.c.text
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Back to the list"
-                    color: back.hovered ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 13
-                }
+                anchors.verticalCenter: parent.verticalCenter
             }
         }
 
@@ -262,21 +243,20 @@ Item {
             }
         }
 
-        // Back on the left, Next big on the right, where the VM test looked for it
+        // Back on the left, Next big on the right, where the VM test looked for it; on the last step Finish (Ctrl+Enter)
         Item {
             id: foot
             x: 40; y: parent.height - height - 28
             width: parent.width - 80
             height: 40
             FootButton {
-                visible: root.index > 0
                 anchors.verticalCenter: parent.verticalCenter
-                c: root.c; keys: "←"; label: "Back"
-                onClicked: root.go(root.index - 1)
+                c: root.c; keys: "esc"; label: "Back"
+                onClicked: root.back()
             }
             FootButton {
                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                c: root.c; keys: "→"; label: root.last ? "Finish" : "Next"; glyph: root.last ? "check" : "arrow-right"
+                c: root.c; keys: root.last ? "ctrl+⏎" : "→"; label: root.last ? "Finish" : "Next"
                 strong: root.primary === "" || root.step !== null && root.step.done === true
                 onClicked: root.next()
             }
