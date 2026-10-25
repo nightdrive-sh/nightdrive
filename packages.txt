@@ -32,6 +32,8 @@ quickshell
 fuzzel
 swaybg
 wl-clipboard
+# The launcher's calculator (qalc: maths, units, currencies; Calculator.qml)
+qalculate
 cliphist
 grim
 slurp

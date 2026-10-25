@@ -44,6 +44,10 @@ power actions. Search from the top level finds all of these. While music plays, 
 question and press ⌘⌥Enter to send it straight to Claude Code. Search "Rename current space" to give the workspace you're on
 a name in the bar instead of its number, for as long as it has windows.
 
+It is a calculator too: type `3*8`, `(12+4)/3`, `15% of 80`, `5 km in miles` or `100 eur in usd` and the answer is the
+first row; Enter copies it. [qalc](https://qalculate.github.io) does the maths, units and currencies (exchange rates
+refreshed once a day). Settings › Launcher › *Decimal comma in results* answers `3,5` instead of `3.5`; you can type either.
+
 ![The launcher](docs/screenshots/launcher.jpg)
 
 ### Menus you want to click
