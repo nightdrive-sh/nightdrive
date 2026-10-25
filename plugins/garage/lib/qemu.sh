@@ -1,10 +1,7 @@
-# A VM's qemu, for bin/garage-ctl (sourced after its helpers: die, dir, need, running): the command line that starts it,
-# its monitor (QMP) and the guest agent inside it (QGA), both through monitor.py. The command line is the one #1527 got
-# Fedora booting with on Asahi (an M2 Max); x86_64 comes with task #1572.
+# A VM's qemu, for bin/garage-ctl (sourced after its helpers: die, dir, need, running, and lib/arch.sh): the command
+# line that starts it, its monitor (QMP) and the guest agent inside it (QGA), both through monitor.py. The command line
+# is the one #1527 got Fedora booting with on Asahi (an M2 Max); what differs on a PC (#1572) comes from lib/arch.sh.
 
-FW=/usr/share/edk2/aarch64
-# The M2 Max's performance cluster: a vCPU must not move to an E-core (another MIDR, and KVM stops it)
-PCORES=4-11
 # The guest's sshd on the host's loopback (docs/vm.md: `ssh -p 2222 localhost`), as SDL shares no clipboard. One
 # port, so one VM with it at a time: a second one's qemu fails to start. VM_SSH_PORT moves it (a test VM beside yours)
 SSH_PORT=${VM_SSH_PORT:-2222}
@@ -15,8 +12,9 @@ MONITOR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitor.py
 qmp() { (cd "$(dir "$1")" && python3 -I "$MONITOR" qmp qmp.sock "$2" "$1" ${3:+"$3"}); }
 qga() { (cd "$(dir "$1")" && python3 -I "$MONITOR" qga qga.sock "$2" "$1" ${3:+"$3"}); }
 
-start() {
-  need "$1"; running "$1" && return 0
+# qemu_cmd NAME: its command line, into QEMU_CMD (start runs it, garage-ctl cmdline prints it). Run from the VM's
+# folder: the sockets go there by a short path (qmp, qga)
+qemu_cmd() {
   local name=$1 d MEM CPUS ISO; d=$(dir "$1")
   # shellcheck disable=SC1091
   source "$d/vm.conf"
@@ -28,30 +26,53 @@ start() {
   # SDL, not GTK: GTK's GL window is black on Wayland (eglMakeCurrent failed), and under XWayland qemu aborts when the
   # guest resets the GPU at boot (virgl_renderer_reset: EGL_BAD_ACCESS, the context is GTK's). Needs qemu-ui-sdl.
   # VM_HEADLESS=1: no window at all, for a test VM that mustn't come up on the desktop
-  local screen=(-device virtio-gpu-gl-pci,xres=1600,yres=1000 -display sdl,gl=on)
+  local screen=(-device "$GPU,xres=1600,yres=1000" -display sdl,gl=on)
   [[ -n ${VM_HEADLESS:-} ]] && screen=(-device virtio-gpu-pci -display none)
   # A disk image's first boot: its user and the rest, until they have run (lib/firstboot.sh)
   local firstboot=(); mapfile -t firstboot < <(firstboot_args "$name")
+  local pin=(); [[ -n $PIN ]] && pin=(taskset -c "$PIN")
+  QEMU_CMD=("${pin[@]}" "$QEMU"
+    -name "$name"
+    -machine "$MACHINE" -accel kvm -cpu host -smp "$CPUS" -m "${MEM}M"
+    -drive "if=pflash,format=raw,unit=0,readonly=on,file=$FW_CODE"
+    -drive "if=pflash,format=raw,unit=1,file=$d/vars.raw"
+    -drive "if=none,id=disk,format=qcow2,file=$d/disk.qcow2,discard=unmap,cache=writeback"
+    -device virtio-blk-pci,drive=disk,bootindex=0
+    "${screen[@]}"
+    -device qemu-xhci -device usb-kbd -device usb-tablet
+    "${cd[@]}"
+    -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22"
+    -device virtio-serial-pci
+    -chardev socket,id=qga,path=qga.sock,server=on,wait=off
+    -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0
+    "${firstboot[@]}"
+    -qmp unix:qmp.sock,server,nowait
+    -pidfile "$d/pid"
+    -serial "file:$d/serial.log")
+}
+
+# cmdline NAME: the command start would run, for a test (GARAGE_ARCH=x86_64 shows a PC's): one option a line, those
+# before qemu's binary (taskset's) on its first
+cmdline() {
+  need "$1"; qemu_cmd "$1"
+  local a out="" seen=0
+  for a in "${QEMU_CMD[@]}"; do
+    ((seen)) && [[ $a == -* ]] && out+=$' \\\n '
+    [[ $a == "$QEMU" ]] && seen=1
+    # Quoted only where the shell needs it (printf %q would escape every comma)
+    if [[ $a =~ ^[][A-Za-z0-9_./:,=@+-]+$ ]]; then out+=" $a"; else out+=" $(printf %q "$a")"; fi
+  done
+  echo "${out# }"
+}
+
+start() {
+  need "$1"; running "$1" && return 0
+  need_qemu
+  local name=$1 d; d=$(dir "$1")
+  qemu_cmd "$name"
   rm -f "$d/qmp.sock" "$d/qga.sock"
   cd "$d"     # the sockets by a short path (qmp, qga)
-  setsid -f taskset -c $PCORES qemu-system-aarch64 \
-    -name "$name" \
-    -machine virt,gic-version=3 -accel kvm -cpu host -smp "$CPUS" -m "${MEM}M" \
-    -drive "if=pflash,format=raw,unit=0,readonly=on,file=$FW/QEMU_EFI-silent-pflash.raw" \
-    -drive "if=pflash,format=raw,unit=1,file=$d/vars.raw" \
-    -drive "if=none,id=disk,format=qcow2,file=$d/disk.qcow2,discard=unmap,cache=writeback" \
-    -device virtio-blk-pci,drive=disk,bootindex=0 \
-    "${screen[@]}" \
-    -device qemu-xhci -device usb-kbd -device usb-tablet \
-    "${cd[@]}" \
-    -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" \
-    -device virtio-serial-pci \
-    -chardev socket,id=qga,path=qga.sock,server=on,wait=off \
-    -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 \
-    "${firstboot[@]}" \
-    -qmp unix:qmp.sock,server,nowait \
-    -pidfile "$d/pid" \
-    -serial "file:$d/serial.log" > "$d/qemu.log" 2>&1
+  setsid -f "${QEMU_CMD[@]}" > "$d/qemu.log" 2>&1
   for _ in $(seq 50); do running "$name" && return 0; sleep 0.1; done
   # The one failure with a known cause: the ssh port another VM holds (one VM with it at a time)
   grep -q "host forwarding" "$d/qemu.log" && die "Another VM has the ssh port ($SSH_PORT): shut it down first"

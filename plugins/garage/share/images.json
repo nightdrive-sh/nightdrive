@@ -10,5 +10,15 @@
       "minDisk": 6
     }
   ],
-  "x86_64": []
+  "x86_64": [
+    {
+      "id": "fedora-44-cloud",
+      "name": "Fedora 44 Cloud Base",
+      "about": "No installer: ready at its first boot, with your user, ssh and the guest agent",
+      "url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2",
+      "checksum": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-44-1.7-x86_64-CHECKSUM",
+      "size": 583729152,
+      "minDisk": 6
+    }
+  ]
 }

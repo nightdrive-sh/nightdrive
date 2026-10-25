@@ -1,14 +1,14 @@
-# Ready-made disk images for new VMs (share/images.json, by the host's architecture), for bin/garage-ctl (sourced after
-# its helpers and lib/firstboot.sh). One is downloaded once, in the background, and checked against its distribution's
-# CHECKSUM file; each new VM's disk is then made from it: unpacked, converted to qcow2 and grown to its size, with its
-# first boot's user (lib/firstboot.sh). In images/ beside the VMs:
+# Ready-made disk images for new VMs (share/images.json, by the host's architecture: lib/arch.sh's ARCH), for
+# bin/garage-ctl (sourced after its helpers and lib/firstboot.sh). Fedora makes a Minimal image (raw.xz) for aarch64
+# only, so x86_64's is Cloud Base (qcow2): both boot without an installer. One is downloaded once, in the background,
+# and checked against its distribution's CHECKSUM file; each new VM's disk is then made from it: unpacked, converted to
+# qcow2 and grown to its size, with its first boot's user (lib/firstboot.sh). In images/ beside the VMs:
 #   FILE                 a checked image
 #   FILE.part, FILE.pid  one on its way (curl, resumed where it stopped), and its download's process
 #   FILE.error           why the last try failed
 
 IMAGES_JSON=$(cd "$(dirname "${BASH_SOURCE[0]}")/../share" && pwd)/images.json
 IMG_DIR=$ROOT/images
-ARCH=$(uname -m)
 
 image() { jq -ce --arg id "$1" --arg a "$ARCH" '.[$a][]? | select(.id == $id)' "$IMAGES_JSON" || die "No image $1 for $ARCH"; }
 image_file() { echo "$IMG_DIR/$(basename "$(jq -r .url <<<"$1")")"; }
@@ -48,6 +48,17 @@ fetch_run() {
   mv "$f.part" "$f"; rm -f "$f.pid"
 }
 
+# unpack IMAGE DISK: the image as the VM's own qcow2. A raw.xz unpacked sparse (dd), as it is mostly empty, then
+# converted; a qcow2 converted as it is (its own copy, compacted)
+unpack() {
+  case $1 in
+    *.raw.xz) xz -dcT0 "$1" | dd of="$2.raw" conv=sparse bs=1M status=none &&
+              qemu-img convert -O qcow2 "$2.raw" "$2" && rm "$2.raw" ;;
+    *.qcow2)  qemu-img convert -O qcow2 "$1" "$2" ;;
+    *)        echo "Unknown image format: ${1##*/}" >&2; return 1 ;;
+  esac
+}
+
 # create-image NAME ID MEM_GB DISK_GB CPUS USER, the password on stdin (not in ps)
 create_image() {
   (($# >= 6)) || die "create-image NAME ID MEM_GB DISK_GB CPUS USER (the password on stdin)"
@@ -56,15 +67,15 @@ create_image() {
   [[ -e $d ]] && die "$name exists already"
   [[ -f $f ]] || die "$(jq -r .name <<<"$e") isn't downloaded yet"
   sizes "$mem" "$disk" "$cpus"
+  need_qemu
   local min; min=$(jq -r '.minDisk // 0' <<<"$e")
   ((disk >= min)) || die "Disk: at least $min GB for $(jq -r .name <<<"$e")"
   IFS= read -r pass || true
   mkdir -p "$d"
-  # Unpacked sparse (dd), as the image is mostly empty, then qcow2; the folder goes if any of it fails
-  if ! { xz -dcT0 "$f" | dd of="$d/image.raw" conv=sparse bs=1M status=none &&
-         qemu-img convert -O qcow2 "$d/image.raw" "$d/disk.qcow2" && rm "$d/image.raw" &&
+  # The folder goes if any of it fails
+  if ! { unpack "$f" "$d/disk.qcow2" &&
          qemu-img resize -q "$d/disk.qcow2" "${disk}G" &&
-         cp "$FW/vars-template-pflash.raw" "$d/vars.raw" &&
+         cp "$FW_VARS" "$d/vars.raw" &&
          printf 'MEM=%s\nCPUS=%s\nISO=""\n' $((mem * 1024)) "$cpus" > "$d/vm.conf"; }; then
     rm -rf "$d"; die "$name couldn't be made from $(jq -r .name <<<"$e")"
   fi

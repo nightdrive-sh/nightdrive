@@ -1,6 +1,7 @@
-# A ready-made disk image's first boot (Fedora Minimal: no installer, no user), for bin/garage-ctl (sourced after its
-# helpers): systemd credentials that qemu hands the guest through SMBIOS (type 11). Its systemd (256+) makes two units
-# of them (systemd-debug-generator), which run two scripts that come the same way (ImportCredential):
+# A ready-made disk image's first boot (Fedora Minimal or Cloud Base: no installer, no user), for bin/garage-ctl
+# (sourced after its helpers and lib/arch.sh): systemd credentials that qemu hands the guest through SMBIOS (type 11). Its
+# systemd (256+) makes two units of them (systemd-debug-generator), which run two scripts that come the same way
+# (ImportCredential):
 #   nightdrive-vm-user    before the login prompt: the user (wheel, so sudo), the VM's name as its hostname, the host's
 #                         keymap and timezone, and the host's ssh key, so `ssh -p 2222 localhost` just works
 #   nightdrive-vm-agent   once the network is up: sshd and qemu-guest-agent (Shut down, the clock), with dnf
@@ -57,8 +58,8 @@ touch /var/lib/nightdrive-vm/agent'
     cred nightdrive-vm.user "$user_script"
     cred nightdrive-vm.agent "$agent_script"
     cred systemd.extra-unit.nightdrive-vm-user.service "$(unit user "the first boot's user" \
-      'After=systemd-sysusers.service systemd-tmpfiles-setup.service
-Before=getty@tty1.service serial-getty@ttyAMA0.service systemd-user-sessions.service')"
+      "After=systemd-sysusers.service systemd-tmpfiles-setup.service
+Before=getty@tty1.service serial-getty@$TTY.service systemd-user-sessions.service")"
     cred systemd.extra-unit.nightdrive-vm-agent.service "$(unit agent "sshd and the guest agent, at the first boot" \
       'Wants=network-online.target
 After=network-online.target nightdrive-vm-user.service')"
