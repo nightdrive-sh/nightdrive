@@ -2,9 +2,10 @@
 # line that starts it, its monitor (QMP) and the guest agent inside it (QGA), both through monitor.py. The command line
 # is the one #1527 got Fedora booting with on Asahi (an M2 Max); what differs on a PC (#1572) comes from lib/arch.sh.
 
-# The guest's sshd on the host's loopback (docs/vm.md: `ssh -p 2222 localhost`), as SDL shares no clipboard. One
-# port, so one VM with it at a time: a second one's qemu fails to start. VM_SSH_PORT moves it (a test VM beside yours)
-SSH_PORT=${VM_SSH_PORT:-2222}
+# The guest's sshd on the host's loopback (README.md: `ssh -p 2222 localhost`), as SDL shares no clipboard. One
+# port, so one VM with it at a time: a second one's qemu fails to start. GARAGE_SSH_PORT moves it (a test VM
+# beside yours)
+SSH_PORT=${GARAGE_SSH_PORT:-2222}
 MONITOR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitor.py
 
 # One command to its QMP or guest agent socket: monitor.py's exit codes (1 failed, 3 no guest agent). From the VM's
@@ -25,9 +26,9 @@ qemu_cmd() {
                        -drive "if=none,id=cd,media=cdrom,readonly=on,file=$ISO")
   # SDL, not GTK: GTK's GL window is black on Wayland (eglMakeCurrent failed), and under XWayland qemu aborts when the
   # guest resets the GPU at boot (virgl_renderer_reset: EGL_BAD_ACCESS, the context is GTK's). Needs qemu-ui-sdl.
-  # VM_HEADLESS=1: no window at all, for a test VM that mustn't come up on the desktop
+  # GARAGE_HEADLESS=1: no window at all, for a test VM that mustn't come up on the desktop
   local screen=(-device "$GPU,xres=1600,yres=1000" -display sdl,gl=on)
-  [[ -n ${VM_HEADLESS:-} ]] && screen=(-device virtio-gpu-pci -display none)
+  [[ -n ${GARAGE_HEADLESS:-} ]] && screen=(-device virtio-gpu-pci -display none)
   # A disk image's first boot: its user and the rest, until they have run (lib/firstboot.sh)
   local firstboot=(); mapfile -t firstboot < <(firstboot_args "$name")
   local pin=(); [[ -n $PIN ]] && pin=(taskset -c "$PIN")

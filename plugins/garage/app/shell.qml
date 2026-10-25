@@ -5,9 +5,9 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// Garage, Nightdrive's window of virtual machines (task #1530, branch vm): qemu/KVM VMs in the sidebar, the picked one's
-// page beside it; bin/garage-ctl does the work. This file holds the window together: which VM shows, the narrow window's
-// turns, the panels that ask, and the keys (their sheet: KeyHelp.qml).
+// Garage, Nightdrive's window of virtual machines: qemu/KVM VMs in the sidebar, the picked one's page beside it;
+// bin/garage-ctl does the work. This file holds the window together: which VM shows, the narrow window's turns, the
+// panels that ask, and the keys (their sheet: KeyHelp.qml).
 ShellRoot {
     FloatingWindow {
         id: win
