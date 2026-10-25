@@ -792,6 +792,8 @@ ShellRoot {
                             else if (k === Qt.Key_Question) win.cheats = !win.cheats
                             else if (k === Qt.Key_H && shift) win.openBrowser()
                             else if (k === Qt.Key_H) win.htmlMode = (win.htmlMode + 1) % 3
+                            // ⌘C copies the text selected in the message (Thread.copy), and never starts a new message
+                            else if ((ctrl || e.modifiers & Qt.MetaModifier) && k === Qt.Key_C) reader.copy()
                             else if (k === Qt.Key_C) win.compose("new")
                             else if (k === Qt.Key_F) win.compose("forward")
                             // Enter opens the thread in a window of its own; in one pane, first in the window
@@ -1198,6 +1200,7 @@ ShellRoot {
                     const k = e.key
                     keys.pressed(e)             // ? and Ctrl+? show and hide the keys
                     if (k === Qt.Key_Question) {}
+                    else if ((e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)) && k === Qt.Key_C) thread.copy()
                     else if (k === Qt.Key_Escape) mw.visible = false
                     else if (k === Qt.Key_Down) mw.scroll(win.arrowStep)
                     else if (k === Qt.Key_Up) mw.scroll(-win.arrowStep)

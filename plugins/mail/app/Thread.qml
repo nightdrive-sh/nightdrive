@@ -22,6 +22,17 @@ Flickable {
     // In a window too narrow for the list beside it, the thread has the window to itself: a back button first in the bar
     property bool back: false
     signal goBack()
+    // The message's text is selected with the mouse but never takes the keyboard (activeFocusOnPress: false): with the
+    // focus in a TextEdit the window's keys (the list's arrows, shortcuts, Esc) stopped working until a click on the list.
+    // So the window's key handler copies the selection on ⌘C (copy()), persistentSelection shows it without the focus,
+    // and one selection shows at a time.
+    property var selecting: null
+    function selected(t) {
+        if (t.selectedText === "") return
+        if (selecting && selecting !== t) selecting.deselect()
+        selecting = t
+    }
+    function copy() { if (selecting && selecting.selectedText) selecting.copy() }
     // Light paper for HTML as sent: senders pick their colours for a white page, whatever the desktop's theme
     readonly property color paperBg: "#f4f1f6"
     readonly property color paperText: "#1d1a21"
@@ -311,6 +322,9 @@ Flickable {
                     width: parent.width
                     readOnly: true
                     selectByMouse: true
+                    activeFocusOnPress: false
+                    persistentSelection: true
+                    onSelectedTextChanged: root.selected(this)
                     wrapMode: TextEdit.Wrap
                     textFormat: TextEdit.RichText
                     text: !visible ? "" : app.rich(msgCol.cut && !root.quotesShown[modelData.id] ? msgCol.cut.own : modelData.body)
@@ -346,6 +360,9 @@ Flickable {
                         width: parent.width - 2 * x
                         readOnly: true
                         selectByMouse: true
+                        activeFocusOnPress: false
+                        persistentSelection: true
+                        onSelectedTextChanged: root.selected(this)
                         wrapMode: TextEdit.Wrap
                         textFormat: TextEdit.RichText
                         text: !parent.visible ? "" : parent.paper ? modelData.html : nm.darken(modelData.html, c.accent)
