@@ -5,12 +5,13 @@
 #   disk.qcow2   the disk; snapshots are internal to it (qemu-img snapshot, only while the VM is stopped)
 #   vars.raw     the UEFI variables
 #   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
+#   snapsizes.json  what each snapshot keeps on its own, in bytes, as of the disk's mtime (lib/snapsize.py)
 #   qmp.sock, qga.sock, pid, serial.log while it runs (qemu's monitor, the guest agent's channel)
 #   firstboot/   a disk image's first boot: its user, until it has run (lib/firstboot.sh)
 # What differs between an Asahi Mac and a PC is lib/arch.sh's; qemu itself, its command line and its sockets, are
 # lib/qemu.sh's; the ready-made images are lib/images.sh's.
 #
-#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date }], newest first }]
+#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date, size }], newest first }]
 #   garage-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   garage-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
 #   garage-ctl fetch ID                      download one in the background (images shows how far)
@@ -41,10 +42,19 @@ dir() { good_name "$1" || die "Bad name: $1 (letters, digits, - . _, starting wi
 need() { local d; d=$(dir "$1"); [[ -f $d/vm.conf ]] || die "No VM called $1"; }
 running() { local p; p=$(cat "$(dir "$1")/pid" 2>/dev/null) && kill -0 "$p" 2>/dev/null; }
 stopped() { running "$1" && die "$1 is running: shut it down first"; return 0; }
-# A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and a tag as the window makes them
-# (s and the time), or one as plain as a VM's name
+# A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and its tag. A new one is as the window makes
+# them (s and the time) or as plain as a VM's name; one there already only has to be on the disk, as snapshots taken
+# before that rule have spaces in theirs ("Clean Fedora"). Neither passes for one of qemu-img's options.
 good_tag() { [[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "Bad snapshot tag: $1"; }
-snap() { [[ -n ${3:-} ]] || die "$1 NAME TAG"; good_tag "$3"; need "$2"; stopped "$2"; }
+has_snap() {
+  [[ $2 != -* ]] && qemu-img info -U --output=json "$(dir "$1")/disk.qcow2" \
+    | jq -e --arg tag "$2" 'any(.snapshots[]?; .name == $tag)' >/dev/null || die "$1 has no snapshot $2"
+}
+snap() {
+  [[ -n ${3:-} ]] || die "$1 NAME TAG"; need "$2"
+  if [[ $1 == snapshot ]]; then good_tag "$3"; else has_snap "$2" "$3"; fi
+  stopped "$2"
+}
 # A new VM's memory, disk and CPUs: whole numbers, the memory what the host can spare
 max_mem() { echo $(( $(awk '/^MemTotal/ { print int($2 / 1048576) }' /proc/meminfo) - HOST_SPARE_GB )); }
 sizes() {
@@ -84,10 +94,20 @@ label() {
      <(cat "$f" 2>/dev/null || echo '{}') > "$f.new" && mv "$f.new" "$f"
 }
 rename() {
-  [[ -n ${3:-} && -n ${4:-} ]] || die "rename NAME TAG LABEL"; good_tag "$3"; need "$2"
-  qemu-img info -U --output=json "$(dir "$2")/disk.qcow2" | jq -e --arg tag "$3" 'any(.snapshots[]?; .name == $tag)' >/dev/null \
-    || die "$2 has no snapshot $3"
+  [[ -n ${3:-} && -n ${4:-} ]] || die "rename NAME TAG LABEL"; need "$2"; has_snap "$2" "$3"
   label "$2" "$3" "$4"
+}
+
+# What each snapshot keeps on its own (lib/snapsize.py), cached in snapsizes.json by the disk's mtime: read again only
+# while the VM is stopped, as qemu changes the disk's tables under it, and the cache stands for it meanwhile
+snap_sizes() {
+  local d=$1 f=$1/snapsizes.json mtime sizes LIB; LIB=$(dirname "$(readlink -f "$0")")/../lib
+  mtime=$(stat -c %Y "$d/disk.qcow2")
+  if ! running "$(basename "$d")" && [[ $(jq -r .mtime "$f" 2>/dev/null) != "$mtime" ]] \
+     && sizes=$(python3 -I "$LIB/snapsize.py" "$d/disk.qcow2" 2>/dev/null); then
+    jq -nc --argjson mtime "$mtime" --argjson sizes "$sizes" '{ mtime: $mtime, sizes: $sizes }' > "$f.new" && mv "$f.new" "$f"
+  fi
+  jq -c '.sizes' "$f" 2>/dev/null || echo '{}'
 }
 
 list() {
@@ -105,11 +125,12 @@ list() {
     local info; info=$(qemu-img info -U --output=json "$d/disk.qcow2")
     ((first)) || echo -n ","; first=0
     jq -nc --arg name "$name" --argjson mem "$MEM" --argjson cpus "$CPUS" --arg iso "$ISO" --argjson run "$run" \
-       --argjson info "$info" --argjson ssh "$SSH_PORT" --argjson names "$(cat "$d/names.json" 2>/dev/null || echo '{}')" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run,
+       --argjson info "$info" --argjson ssh "$SSH_PORT" --argjson names "$(cat "$d/names.json" 2>/dev/null || echo '{}')" \
+       --argjson sizes "$(snap_sizes "${d%/}")" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run,
          ssh: $ssh,
          disk: ($info["virtual-size"] / 1073741824 | floor),
          used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
-         snapshots: [($info.snapshots // []) | sort_by(-.["date-sec"])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")) }] }'
+         snapshots: [($info.snapshots // []) | sort_by(-.["date-sec"])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")), size: $sizes[.name] }] }'
   done
   echo "]"
 }

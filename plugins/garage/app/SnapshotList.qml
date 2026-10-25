@@ -2,10 +2,10 @@ import QtQuick
 import QtQuick.Layouts
 import qs.kit
 
-// A VM's snapshots: its title with Take, the list (a name and when), and what the keys do under it. Tab from the page
-// comes here (focusList), Tab or Esc goes back (leave). Taking, restoring and deleting need the VM stopped, as qemu-img
-// writes the disk then; a name changes any time (garage-ctl rename: names.json only). Restoring and deleting ask first:
-// what changed since, or the snapshot, is gone.
+// A VM's snapshots: its title with Take snapshot, the list (a name, when, and the space it alone keeps), and what the
+// keys do under it. Tab from the page comes here (focusList), Tab or Esc goes back (leave). Taking, restoring and
+// deleting need the VM stopped, as qemu-img writes the disk then; a name changes any time (garage-ctl rename:
+// names.json only). Restoring and deleting ask first: what changed since, or the snapshot, is gone.
 ColumnLayout {
     id: root
     required property QtObject c
@@ -26,6 +26,10 @@ ColumnLayout {
     onSnapsChanged: if (current >= snaps.length) current = Math.max(0, snaps.length - 1)
     function focusList() { if (snaps.length) list.forceActiveFocus() }
     function ask(f) { returnHere = list.activeFocus; f() }
+    // 7286358016 → "6.8 GB", 434438144 → "414 MB"
+    function bytes(n) {
+        return n >= 1073741824 ? (n / 1073741824).toFixed(1) + " GB" : Math.round(n / 1048576) + " MB"
+    }
 
     function take() {
         if (!stopped) return
@@ -60,7 +64,7 @@ ColumnLayout {
         }
         Item { Layout.fillWidth: true; Layout.preferredHeight: 28 }
         AppButton {
-            c: root.c; glyph: "camera"; label: "Take"; keys: "t"; tip: "Its disk as it is now"
+            c: root.c; glyph: "camera"; label: "Take snapshot"; keys: "t"; tip: "Its disk as it is now"
             visible: root.stopped
             onClicked: root.take()
         }
@@ -95,20 +99,25 @@ ColumnLayout {
             selected: list.activeFocus && index === root.current
             marked: !list.activeFocus && index === root.current && root.snaps.length > 1
             TapHandler { onTapped: { root.current = row.index; list.forceActiveFocus() } }
-            Text {
+            // Its name, then when it was taken and the space it alone keeps (garage-ctl list's size), close after it
+            Row {
                 x: 14; anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, date.x - 24)
-                elide: Text.ElideRight
-                text: row.modelData.name
-                color: row.selected ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 12
+                spacing: 12
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, tools.x - 40 - about.implicitWidth)
+                    elide: Text.ElideRight
+                    text: row.modelData.name
+                    color: row.selected ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 12
+                }
+                Text {
+                    id: about
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: row.modelData.date + (row.modelData.size != null ? "  ·  " + root.bytes(row.modelData.size) : "")
+                    color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
+                }
             }
-            Text {
-                id: date
-                anchors.right: tools.left; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                text: row.modelData.date
-                color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
-            }
-            // Under the pointer or picked; kept in place while hidden, so the dates don't shift
+            // Under the pointer or picked; kept in place while hidden
             Row {
                 id: tools
                 anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
