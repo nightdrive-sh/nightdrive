@@ -49,12 +49,15 @@ fetch_run() {
 }
 
 # unpack IMAGE DISK: the image as the VM's own qcow2. A raw.xz unpacked sparse (dd), as it is mostly empty, then
-# converted; a qcow2 converted as it is (its own copy, compacted)
+# converted; a qcow2 converted as it is (its own copy, compacted). Each with its format named (-f), not guessed from
+# what the file says, and a qcow2 without a backing file: either could make the copy read another file of the host's
 unpack() {
   case $1 in
     *.raw.xz) xz -dcT0 "$1" | dd of="$2.raw" conv=sparse bs=1M status=none &&
-              qemu-img convert -O qcow2 "$2.raw" "$2" && rm "$2.raw" ;;
-    *.qcow2)  qemu-img convert -O qcow2 "$1" "$2" ;;
+              qemu-img convert -f raw -O qcow2 "$2.raw" "$2" && rm "$2.raw" ;;
+    *.qcow2)  [[ $(qemu-img info -f qcow2 --output=json "$1" | jq -r '.["backing-filename"] // ""') == "" ]] ||
+                { echo "${1##*/} has a backing file" >&2; return 1; }
+              qemu-img convert -f qcow2 -O qcow2 "$1" "$2" ;;
     *)        echo "Unknown image format: ${1##*/}" >&2; return 1 ;;
   esac
 }

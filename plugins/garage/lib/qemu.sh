@@ -13,6 +13,10 @@ MONITOR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitor.py
 qmp() { (cd "$(dir "$1")" && python3 -I "$MONITOR" qmp qmp.sock "$2" "$1" ${3:+"$3"}); }
 qga() { (cd "$(dir "$1")" && python3 -I "$MONITOR" qga qga.sock "$2" "$1" ${3:+"$3"}); }
 
+# A path as one value in qemu's option syntax, where a comma separates options: doubled, it is a comma of the path's
+# (an ISO named "a,b.iso" mustn't add an option b to its drive)
+qv() { echo "${1//,/,,}"; }
+
 # qemu_cmd NAME: its command line, into QEMU_CMD (start runs it, garage-ctl cmdline prints it). Run from the VM's
 # folder: the sockets go there by a short path (qmp, qga)
 qemu_cmd() {
@@ -21,9 +25,11 @@ qemu_cmd() {
   source "$d/vm.conf"
   # The disk boots first and the ISO second: an empty disk falls through to the installer, and once it is installed
   # the VM boots from its disk, ISO or not (#1552: with the ISO first, an installed VM went back into the installer)
+  # format=raw, as qemu would otherwise go by what the file says it is: a "downloaded ISO" that is a qcow2 with a
+  # backing file could hand the guest any file of the host's (~/.ssh/id_ed25519)
   local cd=()
   [[ -n $ISO ]] && cd=(-device virtio-scsi-pci -device scsi-cd,drive=cd,bootindex=1
-                       -drive "if=none,id=cd,media=cdrom,readonly=on,file=$ISO")
+                       -drive "if=none,id=cd,media=cdrom,readonly=on,format=raw,file=$(qv "$ISO")")
   # SDL, not GTK: GTK's GL window is black on Wayland (eglMakeCurrent failed), and under XWayland qemu aborts when the
   # guest resets the GPU at boot (virgl_renderer_reset: EGL_BAD_ACCESS, the context is GTK's). Needs qemu-ui-sdl.
   # GARAGE_HEADLESS=1: no window at all, for a test VM that mustn't come up on the desktop
@@ -35,9 +41,9 @@ qemu_cmd() {
   QEMU_CMD=("${pin[@]}" "$QEMU"
     -name "$name"
     -machine "$MACHINE" -accel kvm -cpu host -smp "$CPUS" -m "${MEM}M"
-    -drive "if=pflash,format=raw,unit=0,readonly=on,file=$FW_CODE"
-    -drive "if=pflash,format=raw,unit=1,file=$d/vars.raw"
-    -drive "if=none,id=disk,format=qcow2,file=$d/disk.qcow2,discard=unmap,cache=writeback"
+    -drive "if=pflash,format=raw,unit=0,readonly=on,file=$(qv "$FW_CODE")"
+    -drive "if=pflash,format=raw,unit=1,file=$(qv "$d/vars.raw")"
+    -drive "if=none,id=disk,format=qcow2,file=$(qv "$d/disk.qcow2"),discard=unmap,cache=writeback"
     -device virtio-blk-pci,drive=disk,bootindex=0
     "${screen[@]}"
     -device qemu-xhci -device usb-kbd -device usb-tablet
