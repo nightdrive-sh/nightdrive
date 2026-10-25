@@ -165,18 +165,24 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 
 ## Requirements
 
-One of these, with the KDE edition of Fedora 44. The installer tells which machine it's on and sets it up to match.
+One of these, with a minimal Fedora 44: Nightdrive adds what the desktop needs, nothing else. The installer tells which
+machine it's on and sets it up to match.
 
-- An **Apple Silicon Mac** (M1 or M2 series) with **[Fedora Asahi Remix](https://asahilinux.org/fedora/) 44**. Used daily
-  on a MacBook Pro 14″ with an M2 Max; other models should work, but you may need to adjust a few values (see
-  [Make it yours](#make-it-yours)).
-- A **PC** (x86_64) with **[Fedora 44 KDE](https://fedoraproject.org/kde/download)** and NVIDIA, AMD or Intel graphics.
-  Experimental, see [docs/pc.md](docs/pc.md) for what differs from the MacBook.
-- A Fedora 44 **virtual machine**, e.g. in Parallels on a Mac ([docs/vm.md](docs/vm.md)).
+- An **Apple Silicon Mac** (M1 or M2 series) with **[Fedora Asahi Remix](https://asahilinux.org/fedora/) 44**, its
+  **Minimal** image (one of the choices in the Asahi installer). Used daily on a MacBook Pro 14″ with an M2 Max; other
+  models should work, but you may need to adjust a few values (see [Make it yours](#make-it-yours)).
+- A **PC** (x86_64) with **Fedora 44** from the [Everything netinstall image](https://fedoraproject.org/misc/), with
+  *Fedora Custom Operating System* picked in its Software Selection, and NVIDIA, AMD or Intel graphics. Experimental, see
+  [docs/pc.md](docs/pc.md) for the install and what differs from the MacBook.
+- A Fedora 44 **virtual machine**, e.g. in Parallels on a Mac or with qemu on an Asahi Mac ([docs/vm.md](docs/vm.md)).
+
+The KDE edition of either (Fedora Asahi Remix with KDE Plasma, Fedora 44 KDE) works too, as Nightdrive was first built on
+it: KDE stays, as a fallback session.
 
 ## Install
 
-On a fresh Fedora Asahi Remix 44 or Fedora 44 KDE, with a network connection:
+On a fresh Fedora 44 (above), logged in as your user on its text console, with a network connection (Wi-Fi:
+`nmcli device wifi connect "Network name" --ask`):
 
 ```sh
 curl -fsSL https://nightdrive.sh/install | bash
@@ -190,21 +196,24 @@ after `--` too (`bash -s -- --choose`). The same by hand:
 sudo dnf install -y git   # not in a fresh install
 git clone https://github.com/nightdrive-sh/nightdrive.git ~/dotfiles
 cd ~/dotfiles
-./install.sh              # asks nothing: removes the KDE apps and services Nightdrive doesn't use
-                          # (packages-remove.txt), system update, packages, fonts, the notch setting, config links,
-                          # Claude Code, Tailscale, Mail, Deck, login screen and the default optional parts
+./install.sh              # asks nothing: system update, packages, fonts, the notch setting, config links, Claude
+                          # Code, Tailscale, Mail, Deck, login screen and the default optional parts
 ```
 
-It tells which machine it's on and then runs unattended (sudo asks for the password once at the start); the system update
-takes a while. Claude Code, Tailscale, Mail and Deck come with every install, like the rest of the
-desktop: each stays quiet until you set it up. The optional parts that are on by default (YouTube) come too, and the rest
-can be added later from the launcher (System › Install) or with `nightdrive plugins install ID`.
+It tells which machine it's on and then runs unattended (sudo asks for the password once at the start); the system
+update takes a while. On a Mac it first asks for the keyboard layout, if it's still the Minimal image's `us`: the login
+screen's password is typed with it (`--keyboard "fi mac"` answers in advance). A minimal Fedora gets what a desktop
+edition would have: it boots to the login screen, the firewall has the desktop's settings as on Fedora KDE (so LocalSend
+and AirPlay are reached), and SSH is off until you turn on Remote login (launcher › Settings), unless you install over
+ssh. Claude Code, Tailscale, Mail and Deck come with every install, like the rest of the desktop: each stays quiet until
+you set it up. The optional parts that are on by default (YouTube) come too, and the rest can be added later from the
+launcher (System › Install) or with `nightdrive plugins install ID`.
 
 To pick the optional parts yourself, run `./install.sh --choose`: it lists them first (a number toggles one, Enter
 continues):
 
 ```
-Machine: PC (x86_64, graphics: amd, keyboard: us)
+Machine: Apple Silicon Mac (Fedora Asahi Remix, keyboard: fi mac)
 
   Nightdrive apps
    1 [x] Deck              Spotify player (needs Premium), launcher and top bar
@@ -227,35 +236,37 @@ Machine: PC (x86_64, graphics: amd, keyboard: us)
 
   19 [ ] Install all       every optional part above
 
-  20 [x] Remove apps       112 installed packages Nightdrive doesn't use: akregator dolphin konsole kmail …
+  20 [x] Remove services   28 installed packages a Mac doesn't use: realmd sssd-common sssd-kcm nfs-utils …
 ```
 
-**Trying it on the system you already use?** The removals are on by default only on a fresh install (one installed less
-than three days ago). On an older system nothing is removed (`--choose` shows the *Remove apps* row unticked): your configs
-in `~/.config` are moved aside to `<name>.bak-<time>`, and `config/greeter/switch.sh off` brings back the KDE login screen.
+The last row is a Mac's only: the Minimal image's server services (network logins and shares, system logs, crash
+reports) and other Wi-Fi chips' firmware, listed in `packages-remove-asahi.txt`.
+
+**Trying it on the system you already use?** Nightdrive doesn't remove your apps: on a Mac only the services above go
+(`--choose` unticks them). Your configs in `~/.config` are moved aside to `<name>.bak-<time>`, and on Fedora KDE
+`config/greeter/switch.sh off` brings back KDE's login screen.
 
 Home Assistant, if chosen, asks for its address and token at the very end.
 
 Then **reboot**. The Nightdrive boot splash goes straight over to the Nightdrive login screen (greetd + Quickshell): the
 desktop starts behind it as its lock, so the screen changes hands only once and doesn't flash black. The login apps start
-after the password. KDE stays installed as a fallback. If the login screen fails, press Ctrl+Alt+F3, log in and run
-`config/greeter/switch.sh off`. `switch.sh on` gives the plain login screen that starts the desktop after the password.
+after the password. If the login screen fails, press Ctrl+Alt+F3 and log in there: `start-hyprland` starts the desktop
+from it. On Fedora KDE, KDE stays installed as a fallback and `config/greeter/switch.sh off` brings back its login
+screen. `switch.sh on` gives the plain login screen that starts the desktop after the password.
 
 | Option | What it changes |
 |---|---|
-| `--no-greeter` | Keeps the KDE login screen; pick **Hyprland** there (not *Hyprland (uwsm-managed)*) |
+| `--no-greeter` | On Fedora KDE, keeps KDE's login screen; pick **Hyprland** there (not *Hyprland (uwsm-managed)*). A minimal Fedora has no login screen of its own |
 | `--no-autologin` | The Nightdrive login screen starts the desktop after the password, instead of being its lock (black flashes at boot) |
 | `--no-splash` | Keeps Fedora's boot splash and the GRUB menu (`config/splash/install.sh off` later) |
-| `--keep-apps` | Keeps the KDE apps, printing, network shares, accessibility tools and other packages listed in `packages-remove.txt` (comment a line out to keep just that one) |
-| `--debloat` | Removes them also on a system that isn't fresh |
-| `--choose` | Lists the optional parts and the removals first, to tick or untick |
-| `--no-kde` | Removes Plasma completely (experimental) |
+| `--choose` | Lists the optional parts (and on a Mac the removals) first, to tick or untick |
+| `--keyboard "fi mac"` | The keyboard layout and variant for the login screen, the desktop and the text console, without asking (xkb names: `localectl list-x11-keymap-layouts`) |
 | `--vm` | The virtual machine settings, if the VM isn't detected as one ([docs/vm.md](docs/vm.md)) |
 | `--no-nvidia` | On a PC, leaves an NVIDIA card's driver alone instead of installing RPM Fusion's ([docs/pc.md](docs/pc.md)) |
 | `--with 1password,slack` | These optional parts on top of the defaults (`--dry-run` lists the ids) |
 | `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail or Deck too |
 | `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (YouTube); Tailscale, Mail and Deck come with each |
-| `--dry-run` | Shows the optional parts, what would be installed and what would be removed, then stops |
+| `--dry-run` | Shows the optional parts, the packages and system settings it would add and what it would remove, then stops |
 
 At your first login, **Welcome to Nightdrive** opens and asks first whether you have Claude Code (a Pro or Max plan).
 With Claude, sign in there first, then it sets up Tailscale, Mail and Deck with you, each in a Claude session of its own

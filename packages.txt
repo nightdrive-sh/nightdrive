@@ -1,5 +1,29 @@
 # Fedora packages (from the official repos). Hyprland packages come from a COPR repo, see install.sh. Optional apps
-# (Tailscale, Thunderbird…) are plugins: plugins.txt and plugins/.
+# (Tailscale, Thunderbird…) are plugins: plugins.txt and plugins/. A machine's own come from packages-pc.txt or
+# packages-asahi.txt.
+# The base a desktop needs on top of Fedora Minimal (Asahi's Minimal image, the netinstall's "Fedora Custom Operating
+# System"), which Fedora KDE brought along: Wi-Fi (regdb for the 5 and 6 GHz channels), Bluetooth, sound, graphics,
+# battery, polkit, portals, the clock, low memory handling, USB devices, git for nightdrive update.
+# pipewire and wireplumber are listed (install.sh marks them user-installed) also because on Asahi Minimal the sound
+# only came with initial-setup, and the speakers' own packages (asahi-audio, speakersafetyd) follow pipewire
+NetworkManager-wifi
+wireless-regdb
+NetworkManager-bluetooth
+pipewire
+wireplumber
+pipewire-pulseaudio
+alsa-ucm
+mesa-dri-drivers
+mesa-vulkan-drivers
+upower
+polkit
+xdg-desktop-portal
+chrony
+systemd-oomd-defaults
+usbutils
+git-core
+# The serif fallback font (the sans and mono ones are below)
+google-noto-serif-fonts
 kitty
 # Opens the terminal chosen in Default apps (hypr/scripts/terminal)
 xdg-terminal-exec
@@ -51,7 +75,7 @@ gnome-keyring-pam
 vulkan-tools
 tuned-ppd
 # Used by the scripts (wallpaper previews, the file picker) but only pulled in by KDE: listed (install.sh marks them
-# user-installed) so the removals keep them
+# user-installed) so they stay when KDE goes
 ImageMagick
 zenity
 # install.sh and setup-user.sh: Flathub apps, the Nerd Fonts zip, default apps (xdg-mime)

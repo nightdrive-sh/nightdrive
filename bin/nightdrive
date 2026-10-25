@@ -275,9 +275,12 @@ update() {
   fi
 
   echo "==> New packages"
-  want=$(cat "$repo/packages.txt" "$repo/packages-hyprland.txt" 2>/dev/null | grep -vE '^\s*(#|$)')
+  # With the machine's own list (packages-pc.txt, packages-asahi.txt), its groups (@hardware-support) left to install.sh.
+  # --skip-unavailable: one this architecture lacks (microcode_ctl is x86 only)
+  want=$(cat "$repo/packages.txt" "$repo/packages-hyprland.txt" "$repo/packages-$("$scripts/platform" machine).txt" 2>/dev/null \
+    | grep -vE '^\s*(#|$|@)')
   missing=$(for p in $want; do rpm -q --whatprovides "$p" >/dev/null 2>&1 || echo "$p"; done)
-  if [[ -n $missing ]]; then echo "    $(echo $missing)"; as_root "New packages" sudo dnf install -y $missing; else echo "    none"; fi
+  if [[ -n $missing ]]; then echo "    $(echo $missing)"; as_root "New packages" sudo dnf install -y --skip-unavailable $missing; else echo "    none"; fi
   # install.sh marks the list's packages as wanted, so removing KDE doesn't take them along. One added to it since may
   # be here as KDE's dependency (pipewire-utils, 25.10.2026): marked too. -C: the installed ones only, no metadata download
   deps=$(dnf -q -C repoquery --installed --qf '%{name} %{reason}\n' $want 2>/dev/null | awk '/Dependency$/ { print $1 }' | sort -u)

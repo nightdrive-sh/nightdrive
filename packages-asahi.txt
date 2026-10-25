@@ -1,0 +1,4 @@
+# An Apple Silicon Mac's own packages (install.sh, `nightdrive platform machine` = asahi), on top of packages.txt.
+# Fedora Asahi Remix's desktop images bring them along, its Minimal image doesn't.
+# Keeps the battery's charge limit across boots
+asahi-battery

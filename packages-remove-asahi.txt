@@ -1,4 +1,30 @@
-# Removed on the MacBook only (not with --vm or --keep-apps): useless on Apple Silicon, but other hardware may need them.
+# Removed by install.sh on an Apple Silicon Mac: what Fedora Asahi Remix's Minimal image has (its @standard group,
+# other hardware's firmware) that a Mac laptop doesn't use. A stable list: it follows the image's groups, not a
+# desktop's apps.
+# --choose unticks the removal; comment a line out (#) to keep just that package.
+
+# Network logins and shares, server and system services
+realmd
+sssd-common
+sssd-kcm
+sssd-proxy
+nfs-utils
+cifs-utils
+opensc
+fprintd-pam
+psacct
+sos
+abrt-cli
+rsyslog
+quota
+at
+iptstate
+words
+
+# Mobile broadband (Qualcomm modems)
+qrtr
+rmtfs
+qcom-wwan-firmware
 
 # Firmware for other Wi-Fi chips (Apple Silicon has Broadcom, brcmfmac)
 atheros-firmware
@@ -10,10 +36,3 @@ nxpwireless-firmware
 iwlegacy-firmware
 b43-fwcutter
 b43-openfwwf
-
-# Guest tools for virtual machines
-hyperv-daemons
-open-vm-tools-desktop
-qemu-guest-agent
-spice-vdagent
-spice-webdavd
