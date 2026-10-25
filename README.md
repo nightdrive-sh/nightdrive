@@ -66,7 +66,8 @@ Browse has Popular (top 100) and categories: Flathub's most installed apps that 
 Terminals Fedora's terminals first (Ghostty, kitty, Alacritty, foot, Ptyxis). System ›
 Remove has Software (both) and Webapps, and its search looks in both.
 
-Nightdrive's own apps (Mail, Deck) and Tailscale come with every install. Everything else is an optional part: the
+Nightdrive's own apps (Mail, Deck) and Tailscale come with every install; Garage, Nightdrive's app for virtual machines,
+waits in System › Install › Recommended. Everything else is an optional part: the
 installer adds the ones on by default (or the ones you tick with `./install.sh --choose`), and the rest are under System ›
 Install: apps Nightdrive sets up (1Password, Home Assistant…), ready-made web apps with a keybinding, and plugins for
 desktop features. A part that isn't installed doesn't show anywhere: no launcher level, bar icon or keybinding.
@@ -148,6 +149,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Mail | [Mail](plugins/mail/README.md) (Nightdrive's own, over notmuch and mbsync) | quiet reading, notifications you can answer from, replies written by Claude for you to read first |
 | Mail, alternative (optional) | Thunderbird | themed, with a minimal toolbar ([details](docs/thunderbird.md)) |
 | Music | [Deck](plugins/deck/README.md) (Nightdrive's own Spotify player, needs Spotify Premium) | bar icon, music menu, player row in the launcher, media keys |
+| Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, over qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
 | Passwords (optional) | [1Password](plugins/1password/README.md) + `op` CLI | Passwords level in the launcher, SSH agent |
 | AI | [Claude Code](https://claude.com/claude-code) (the installer sets it up; log in once with `claude`) | ⌘⌥Enter in `~/Projects`, ask from the launcher, sessions and usage limits in the bar |
 | Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet) | F5 / Fn push-to-talk, recording card on screen |
@@ -220,15 +222,16 @@ Machine: Apple Silicon Mac (Fedora Asahi Remix, keyboard: fi mac)
 
   Nightdrive apps
    1 [x] Deck              Spotify player (needs Premium), launcher and top bar
-   2 [x] Mail              Mail over notmuch: quiet reading, notifications, Claude's replies
+   2 [ ] Garage            Virtual machines: start, snapshot and restore them
+   3 [x] Mail              Mail over notmuch: quiet reading, notifications, Claude's replies
 
   Recommended apps
-   3 [ ] 1Password         Password manager: launcher › Passwords, op CLI, SSH agent
-   4 [x] Tailscale         VPN, in the top bar (log in from Settings › Tailscale)
+   4 [ ] 1Password         Password manager: launcher › Passwords, op CLI, SSH agent
+   5 [x] Tailscale         VPN, in the top bar (log in from Settings › Tailscale)
    …
 
   Web apps
-  10 [ ] Slack             Slack as a web app (Hyper+S)
+  11 [ ] Slack             Slack as a web app (Hyper+S)
    …
 
   Plugins
