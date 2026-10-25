@@ -28,8 +28,15 @@ ShellRoot {
 
     function tick() {
         const now = Date.now()
-        const mons = {}
-        for (const m of Hyprland.monitors.values) mons[m.name] = m
+        const mons = {}, showing = {}
+        // The workspaces that show: each monitor's, and the special one open over it. Not a hidden special one: a VM's
+        // window hidden in special:bg (garage-ctl hide) changes size there unseen, and isn't polled for
+        for (const m of Hyprland.monitors.values) {
+            mons[m.name] = m
+            const o = m.lastIpcObject
+            if (o && o.activeWorkspace) showing[o.activeWorkspace.name] = true
+            if (o && o.specialWorkspace && o.specialWorkspace.name) showing[o.specialWorkspace.name] = true
+        }
         const next = {}, list = []
         let shown = false
         for (const t of Hyprland.toplevels.values) {
@@ -40,7 +47,7 @@ ShellRoot {
             if (prev && (prev.w !== o.size[0] || prev.h !== o.size[1])) until = now + holdMs
             next[t.address] = { w: o.size[0], h: o.size[1], until: until }
             const ws = t.workspace
-            const visible = ws && (ws.active || ws.name.startsWith("special:"))
+            const visible = ws && (ws.active || !!showing[ws.name])
             shown = shown || visible
             const m = t.monitor && mons[t.monitor.name]
             if (visible && m && until > now)
@@ -53,6 +60,7 @@ ShellRoot {
         else if (now - lastVm > quitMs) Qt.quit()
         // For the next tick: the answer comes back asynchronously
         Hyprland.refreshToplevels()
+        Hyprland.refreshMonitors()
     }
 
     Timer {

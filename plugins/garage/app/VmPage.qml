@@ -31,7 +31,9 @@ Item {
     // What the buttons and the keys do (shell.qml's s, d, x, ⇧X)
     function act(args) { root.ctl.run(args) }
     function start() { if (root.stopped) root.ctl.power("start", root.vm.name) }
-    function display() { if (root.running) root.act(["display", root.vm.name]) }
+    // d toggles: a window that shows goes out of sight with the VM running on (garage-ctl hide), else it comes forward
+    readonly property bool shown: running && !!vm.shown
+    function display() { if (root.running) root.act([root.shown ? "hide" : "display", root.vm.name]) }
     function shutDown() { if (root.running && !root.stopping) root.ctl.power("stop", root.vm.name) }
     function forceOff() { if (root.running) root.ctl.power("kill", root.vm.name) }
     function takeSnapshot() { snapshots.take() }
@@ -124,7 +126,9 @@ Item {
                     onClicked: root.start()
                 }
                 AppButton {
-                    c: root.c; glyph: "monitor"; label: "Display"; strong: !root.stopping; keys: "d"; tip: "Bring its window forward"; tipAlign: "left"
+                    c: root.c; glyph: root.shown ? "monitor-off" : "monitor"; label: root.shown ? "Hide display" : "Show display"
+                    strong: !root.stopping; keys: "d"; tipAlign: "left"
+                    tip: root.shown ? "Out of sight, the VM running on" : "Bring its window forward"
                     visible: root.running
                     onClicked: root.display()
                 }

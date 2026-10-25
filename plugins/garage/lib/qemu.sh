@@ -134,14 +134,28 @@ synctime() {
   ((rc == 0 || rc == 3)) || [[ ! -S $(dir "$1")/qga.sock ]] || die "$1: its clock wasn't set"
 }
 
+# Its SDL window's address and workspace, found by qemu's pid ("" while it has none)
+window_of() {
+  hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \
+    '[.[] | select(.pid == $pid)] | first | "\(.address // "") \(.workspace.name // "")"'
+}
+
+# Which running VMs' windows show now, for list: { pid: true|false }, a window on a workspace a monitor shows (its own or
+# the special one open over it). {} without Hyprland (a container, a tty): the window then says Display, as before
+shown_windows() {
+  { hyprctl -j monitors && hyprctl -j clients; } 2>/dev/null | jq -sc '
+    ([.[0][] | .activeWorkspace.name, .specialWorkspace.name] | map(select(. != ""))) as $seen
+    | [.[1][] | select(.class | startswith("qemu-system-")) | { key: (.pid | tostring), value: (.workspace.name | IN($seen[])) }]
+    | from_entries' 2>/dev/null || echo '{}'
+}
+
 # Its SDL window, found by qemu's pid. On a workspace it is focused where it is, tiled or floating; in a special one
 # (special:bg, the drawer) it comes to the current workspace, tiled: focused there it would only float on top of
 # everything, with nothing but Open Garage or a move to put it away again
 display() {
   need "$1"; running "$1" || die "$1 isn't running"
   local addr ws ws_id
-  read -r addr ws < <(hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \
-                        '[.[] | select(.pid == $pid)] | first | "\(.address // "") \(.workspace.name // "")"')
+  read -r addr ws < <(window_of "$1")
   [[ -n $addr ]] || die "No window for $1"
   local cmds=()
   if [[ $ws == special:* ]]; then
@@ -153,4 +167,16 @@ display() {
   # One batch, so the window doesn't show floating at its old spot before it is tiled
   local IFS=';'
   hyprctl --batch "${cmds[*]}" >/dev/null
+}
+
+# Its window out of sight while the VM runs on: qemu's SDL window can't close without qemu quitting, so it goes to
+# special:bg, where ⌘W hides the background apps, without showing it (follow = false). display brings it back into the
+# current workspace's grid
+hide() {
+  need "$1"; running "$1" || die "$1 isn't running"
+  local addr ws
+  read -r addr ws < <(window_of "$1")
+  [[ -n $addr ]] || die "No window for $1"
+  [[ $ws == special:bg ]] && return 0
+  hyprctl dispatch "hl.dsp.window.move({ workspace = \"special:bg\", follow = false, window = \"address:$addr\" })" >/dev/null
 }

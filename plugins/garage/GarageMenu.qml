@@ -4,8 +4,9 @@ import Quickshell.Io
 import qs
 
 // Garage: the VMs and their state (bin/garage-ctl list, refreshed while the menu is open). A click on a stopped VM starts
-// it, on a running one brings its display forward; a running VM has a Shut down row under it. Open Garage opens the
-// window, for the rest (new VMs, snapshots, settings).
+// it, on a running one brings its display forward; a running VM's row ends in two icons, its display shown or hidden
+// (garage-ctl hide: the VM runs on) and Shut down. Open Garage opens the window, for the rest (new VMs, snapshots,
+// settings).
 Column {
     id: m
     width: parent ? parent.width : 320
@@ -81,35 +82,62 @@ Column {
         spacing: 2
         Repeater {
             model: m.vms
-            delegate: Column {
+            delegate: Item {
                 id: vm
                 required property var modelData
                 readonly property var p: m.pending[modelData.name] || null
+                readonly property bool on: modelData.running && !p     // its icons show
                 width: m.width
-                spacing: 2
+                height: row.height
                 MenuRow {
+                    id: row
                     width: parent.width
                     icon: vm.modelData.running ? "monitor-play" : "monitor"
                     label: vm.modelData.name
-                    detail: vm.p ? "" : vm.modelData.running ? "Running" : "Stopped"
+                    detail: vm.p || vm.modelData.running ? "" : "Stopped"
                     busy: vm.p !== null
                     active: vm.modelData.running
-                    // what a click does: start it, or its display to the front
-                    hoverCheckIcon: vm.p ? "" : vm.modelData.running ? "app-window" : "play"
+                    // what a click does: start it; a running one's is its display to the front, shown or hidden
+                    hoverCheckIcon: vm.p || vm.modelData.running ? "" : "play"
                     onClicked: {
                         if (vm.p) return
                         if (vm.modelData.running) { m.act("display", vm.modelData.name); m.close() }
                         else m.act("start", vm.modelData.name)
                     }
                 }
-                // Indented under its VM, so with several VMs it's clear which one goes
-                MenuRow {
-                    x: 24
-                    width: parent.width - 24
-                    visible: vm.modelData.running && !vm.p
-                    icon: "power"
-                    label: "Shut down"
-                    onClicked: m.act("stop", vm.modelData.name)
+                // Over the row's right end, where its detail would be: each takes its own click
+                Row {
+                    visible: vm.on
+                    anchors { right: parent.right; rightMargin: 4; verticalCenter: parent.verticalCenter }
+                    spacing: 2
+                    Repeater {
+                        model: [
+                            { glyph: vm.modelData.shown ? "monitor-off" : "app-window",
+                              action: vm.modelData.shown ? "hide" : "display" },
+                            { glyph: "power", action: "stop" }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: 26; height: 26; radius: 5
+                            color: hit.containsMouse ? Theme.hover : "transparent"
+                            Text {
+                                anchors.centerIn: parent
+                                text: Icons.g(parent.modelData.glyph)
+                                color: hit.containsMouse ? Theme.text : Theme.dim
+                                font { family: Icons.family; pixelSize: 15 }
+                            }
+                            MouseArea {
+                                id: hit
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    m.act(parent.modelData.action, vm.modelData.name)
+                                    if (parent.modelData.action === "display") m.close()
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

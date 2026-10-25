@@ -12,12 +12,13 @@
 # What differs between an Asahi Mac and a PC is lib/arch.sh's; qemu itself, its command line and its sockets, are
 # lib/qemu.sh's; the ready-made images are lib/images.sh's.
 #
-#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
+#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, shown (its window on a workspace that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
 #   garage-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   garage-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
 #   garage-ctl fetch ID                      download one in the background (images shows how far)
 #   garage-ctl create-image NAME ID MEM_GB DISK_GB CPUS USER     a VM from one, with USER (the password on stdin)
-#   garage-ctl start|stop|kill|display|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power button
+#   garage-ctl start|stop|kill|display|hide|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power
+#                                            button; hide: its window out of sight (special:bg), the VM running on
 #   garage-ctl set NAME mem GB | cpus N | disk GB | iso PATH | port N | user USER     while it is stopped (user: any
 #                                            time, "" for none); the disk only grows, iso "" ejects
 #   garage-ctl rename-vm NAME NEWNAME        while it is stopped: its folder, and its ssh name (lib/ssh.sh)
@@ -140,22 +141,24 @@ duplicate() {
 }
 
 list() {
-  local first=1
+  local first=1 shown='{}'
+  # One look at Hyprland for all the VMs, and none while none runs
+  for d in "$ROOT"/*/; do [[ -f $d/pid ]] && { shown=$(shown_windows); break; }; done
   echo -n "["
   for d in "$ROOT"/*/; do
     [[ -f $d/vm.conf ]] || continue
-    local name MEM CPUS ISO SSH_PORT SSH_USER run=false
+    local name MEM CPUS ISO SSH_PORT SSH_USER run=false pid=""
     name=$(basename "$d")
     # A folder made by hand with a name garage-ctl wouldn't take: the window and the menu would pass it back to it
     good_name "$name" || continue
     read_conf "$name"
-    running "$name" && run=true
+    running "$name" && { run=true; pid=$(cat "$d/pid"); }
     # -U reads the disk while qemu holds its lock
     local info; info=$(qemu-img info -U --output=json "$d/disk.qcow2")
     ((first)) || echo -n ","; first=0
     jq -nc --arg name "$name" --argjson mem "$MEM" --argjson cpus "$CPUS" --arg iso "$ISO" --argjson run "$run" \
-       --argjson info "$info" --arg ssh "$SSH_PORT" --arg user "$SSH_USER" --argjson names "$(cat "$d/names.json" 2>/dev/null || echo '{}')" \
-       --argjson sizes "$(snap_sizes "${d%/}")" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run,
+       --argjson shown "$shown" --arg pid "$pid" --argjson info "$info" --arg ssh "$SSH_PORT" --arg user "$SSH_USER" --argjson names "$(cat "$d/names.json" 2>/dev/null || echo '{}')" \
+       --argjson sizes "$(snap_sizes "${d%/}")" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run, shown: ($run and ($shown[$pid] // false)),
          ssh: (if $ssh == "" then null else ($ssh | tonumber) end), user: $user,
          disk: ($info["virtual-size"] / 1073741824 | floor),
          used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
@@ -259,6 +262,7 @@ case ${1:-} in
   kill)     force_off "$2" ;;
   synctime) synctime "$2" ;;
   display)  display "$2" ;;
+  hide)     hide "$2" ;;
   cmdline)  cmdline "$2" ;;
   eject)    settings "$2" iso "" ;;
   set)      settings "${@:2}" ;;
