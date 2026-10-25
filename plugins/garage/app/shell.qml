@@ -59,7 +59,7 @@ ShellRoot {
         Shortcut { sequences: ["Ctrl+N", "Meta+N"]; onActivated: win.showNew = true }
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
         Shortcut { sequences: ["Ctrl+,", "Meta+,"]; onActivated: if (win.vm) win.showSettings = !win.showSettings }
-        Shortcut { sequences: ["Ctrl+Backspace", "Meta+Backspace"]; onActivated: page.deleteVm() }
+        Shortcut { sequences: ["Ctrl+Backspace", "Meta+Backspace"]; onActivated: page.deleteKey() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
 
         RowLayout {

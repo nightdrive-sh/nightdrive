@@ -38,6 +38,8 @@ Item {
     function refocus() {
         if (snapshots.returnHere) { snapshots.returnHere = false; snapshots.focusList() } else root.forceActiveFocus()
     }
+    // ⌘⌫: in the snapshot list the snapshot, as Del there; else the VM
+    function deleteKey() { if (snapshots.focused) snapshots.removeCurrent(); else deleteVm() }
     function deleteVm() {
         if (!root.stopped) return
         const name = root.vm.name
@@ -86,32 +88,34 @@ Item {
             Layout.bottomMargin: 28 + root.bottomInset
             spacing: 22
 
-            // What it can do now: the likeliest first and strong
+            // What it can do now: the likeliest first and strong. Over what follows, which would draw over their tips, and
+            // the tips start at the buttons' left edge, as they sit at the page's left (the page clips)
             Flow {
                 Layout.fillWidth: true
+                z: 1
                 spacing: 8
                 AppButton {
-                    c: root.c; glyph: "play"; label: "Start"; strong: true; keys: "s"; tip: "Start it, its display in a window"
+                    c: root.c; glyph: "play"; label: "Start"; strong: true; keys: "s"; tip: "Start it in a window"; tipAlign: "left"
                     visible: root.stopped
                     onClicked: root.start()
                 }
                 AppButton {
-                    c: root.c; glyph: "monitor"; label: "Display"; strong: !root.stopping; keys: "d"; tip: "Bring its window forward"
+                    c: root.c; glyph: "monitor"; label: "Display"; strong: !root.stopping; keys: "d"; tip: "Bring its window forward"; tipAlign: "left"
                     visible: root.running
                     onClicked: root.display()
                 }
                 AppButton {
-                    c: root.c; glyph: "power"; label: "Shut down"; keys: "x"; tip: "Ask it to power off"
+                    c: root.c; glyph: "power"; label: "Shut down"; keys: "x"; tip: "Ask it to power off"; tipAlign: "left"
                     visible: root.running && !root.stopping
                     onClicked: root.shutDown()
                 }
                 AppButton {
-                    c: root.c; glyph: "square"; label: "Force off"; strong: root.stopping; keys: "⇧X"; tip: "Pull the plug"
+                    c: root.c; glyph: "square"; label: "Force off"; strong: root.stopping; keys: "⇧X"; tip: "Pull the plug"; tipAlign: "left"
                     visible: root.running
                     onClicked: root.forceOff()
                 }
                 AppButton {
-                    c: root.c; glyph: "settings"; label: "Settings"; keys: "⌘,"; tip: "Memory, CPUs, disk, ISO; deleting it"
+                    c: root.c; glyph: "settings"; label: "Settings"; keys: "⌘,"; tip: "Memory, CPUs, disk, ISO"; tipAlign: "left"
                     onClicked: root.settings()
                 }
             }

@@ -2,10 +2,10 @@ import QtQuick
 import QtQuick.Layouts
 import qs.kit
 
-// A VM's snapshots: its title with Take snapshot, the list (a name, when, and the space it alone keeps), and what the
-// keys do under it. Tab from the page comes here (focusList), Tab or Esc goes back (leave). Taking, restoring and
-// deleting need the VM stopped, as qemu-img writes the disk then; a name changes any time (garage-ctl rename:
-// names.json only). Restoring and deleting ask first: what changed since, or the snapshot, is gone.
+// A VM's snapshots: its title with Take snapshot, and the list (a name, when, and the space it alone keeps), each row's
+// buttons telling their keys in their tips (KeyHelp.qml has them all). Tab from the page comes here (focusList), Tab or Esc goes back (leave). Taking, restoring,
+// duplicating and deleting need the VM stopped, as qemu-img writes the disk then; a name changes any time (garage-ctl
+// rename: names.json only). Restoring and deleting ask first: what changed since, or the snapshot, is gone.
 ColumnLayout {
     id: root
     required property QtObject c
@@ -15,6 +15,7 @@ ColumnLayout {
     readonly property var snaps: vm ? vm.snapshots : []
     readonly property string vmName: vm ? vm.name : ""
     property int current: 0
+    property string copying: ""         // the snapshot being duplicated, while garage-ctl is at it
     readonly property bool focused: list.activeFocus
     property bool returnHere: false     // the list had the keys when it asked: they come back here after (VmPage.refocus)
     signal askName(string title, string initial, var done)
@@ -49,6 +50,19 @@ ColumnLayout {
         const name = vmName, s = snaps[i]
         ask(() => askName("Rename the snapshot", s.name, n => { if (n && n !== s.name) ctl.run(["rename", name, s.tag, n]) }))
     }
+    // A copy under a name of its own, in the same disk (garage-ctl duplicate: it shares the original's clusters, so it
+    // takes no space of its own). Its tag is the time, as a new one's
+    function duplicate(i) {
+        if (!stopped || copying || i < 0 || i >= snaps.length) return
+        const name = vmName, s = snaps[i]
+        ask(() => askName("Name the copy of " + s.name, s.name + " (copy)", n => {
+            if (!n) return
+            root.copying = s.name
+            ctl.run(["duplicate", name, s.tag, "s" + Math.floor(Date.now() / 1000), n],
+                    () => root.copying = "", () => root.copying = "")
+        }))
+    }
+    function removeCurrent() { remove(current) }
     function remove(i) {
         if (!stopped || i < 0 || i >= snaps.length) return
         const name = vmName, s = snaps[i]
@@ -56,15 +70,18 @@ ColumnLayout {
                    "Delete", "trash-2", () => ctl.run(["unsnap", name, s.tag])))
     }
 
+    // Over the list while Take snapshot's tip shows on it; else under it, as the first row's tips may reach up here
     RowLayout {
         Layout.fillWidth: true
+        z: take.hovered ? 3 : 0
         Text {
             text: "Snapshots"
             color: root.c.title; font.family: root.c.font; font.pixelSize: 13; font.weight: Font.Medium
         }
         Item { Layout.fillWidth: true; Layout.preferredHeight: 28 }
         AppButton {
-            c: root.c; glyph: "camera"; label: "Take snapshot"; keys: "t"; tip: "Its disk as it is now"
+            id: take
+            c: root.c; glyph: "camera"; label: "Take snapshot"; keys: "t"; tip: "Save the disk's current state"
             visible: root.stopped
             onClicked: root.take()
         }
@@ -75,7 +92,9 @@ ColumnLayout {
         visible: root.snaps.length > 0
         Layout.fillWidth: true
         Layout.preferredHeight: Math.min(contentHeight, 260)
-        clip: true
+        // Only while it scrolls: clipped, the rows' tips would be cut off at its edges
+        clip: contentHeight > height
+        z: 2
         model: root.snaps
         currentIndex: root.current
         spacing: 2
@@ -85,6 +104,7 @@ ColumnLayout {
             else if (k === Qt.Key_Up || k === Qt.Key_K) root.current = Math.max(0, root.current - 1)
             else if (k === Qt.Key_Return || k === Qt.Key_Enter) root.restore(root.current)
             else if (k === Qt.Key_E || k === Qt.Key_F2) root.rename(root.current)
+            else if (k === Qt.Key_C) root.duplicate(root.current)
             else if (k === Qt.Key_Delete) root.remove(root.current)
             else if (k === Qt.Key_Escape || k === Qt.Key_Tab || k === Qt.Key_Backtab) root.leave()
             else return
@@ -96,6 +116,9 @@ ColumnLayout {
             required property int index
             c: root.c
             height: 32
+            // Over the next row, which its tips reach (below it; the last row's above it, into the one before)
+            z: hovered || selected ? 1 : 0
+            readonly property string tipSide: index === root.snaps.length - 1 && index > 0 ? "above" : "below"
             selected: list.activeFocus && index === root.current
             marked: !list.activeFocus && index === root.current && root.snaps.length > 1
             TapHandler { onTapped: { root.current = row.index; list.forceActiveFocus() } }
@@ -123,12 +146,24 @@ ColumnLayout {
                 anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
                 opacity: row.hovered || row.selected ? 1 : 0
                 AppIconButton {
-                    c: root.c; glyph: "pencil"; glyphSize: 12; tip: "Rename"; keys: "e"; tipSide: "above"
+                    c: root.c; glyph: "rotate-ccw"; glyphSize: 12; tip: "Restore"; keys: "⏎"; tipSide: row.tipSide; tipAlign: "right"
+                    opacity: root.stopped ? 1 : 0
+                    enabled: parent.opacity > 0 && root.stopped
+                    onClicked: root.restore(row.index)
+                }
+                AppIconButton {
+                    c: root.c; glyph: "pencil"; glyphSize: 12; tip: "Rename"; keys: "e"; tipSide: row.tipSide; tipAlign: "right"
                     enabled: parent.opacity > 0
                     onClicked: root.rename(row.index)
                 }
                 AppIconButton {
-                    c: root.c; glyph: "trash-2"; glyphSize: 12; tip: "Delete"; keys: "Del"; tipSide: "above"
+                    c: root.c; glyph: "copy"; glyphSize: 12; tip: "Duplicate"; keys: "c"; tipSide: row.tipSide; tipAlign: "right"
+                    opacity: root.stopped ? 1 : 0
+                    enabled: parent.opacity > 0 && root.stopped
+                    onClicked: root.duplicate(row.index)
+                }
+                AppIconButton {
+                    c: root.c; glyph: "trash-2"; glyphSize: 12; tip: "Delete"; keys: "Del"; tipSide: row.tipSide; tipAlign: "right"
                     opacity: root.stopped ? 1 : 0
                     enabled: parent.opacity > 0 && root.stopped
                     onClicked: root.remove(row.index)
@@ -139,23 +174,19 @@ ColumnLayout {
 
     Text {
         visible: root.snaps.length === 0
-        text: root.stopped ? "None yet: t takes one, its disk as it is now." : "None yet."
+        text: root.stopped ? "None yet: t saves the disk's current state." : "None yet."
         color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
     }
 
-    // What the keys do: in the list its keys, else how to get there; while it runs, why the rest waits
-    Row {
-        Layout.topMargin: 2
-        spacing: 18
-        visible: root.snaps.length > 0
-        AppKeyAction { c: root.c; keys: "Tab"; label: "To the list"; visible: !root.focused; onClicked: root.focusList() }
-        AppKeyAction { c: root.c; keys: "⏎"; label: "Restore"; visible: root.focused && root.stopped; onClicked: root.restore(root.current) }
-        AppKeyAction { c: root.c; keys: "e"; label: "Rename"; visible: root.focused; onClicked: root.rename(root.current) }
-        AppKeyAction { c: root.c; keys: "Del"; label: "Delete"; visible: root.focused && root.stopped; onClicked: root.remove(root.current) }
+    // While it runs, why the rest waits
+    Text {
+        visible: !!root.copying
+        text: "Duplicating " + root.copying + "…"
+        color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
     }
     Text {
         visible: !!root.vm && !root.stopped
-        text: "Shut it down to take, restore or delete a snapshot."
+        text: "Shut it down to take, restore, duplicate or delete a snapshot."
         color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
     }
 }

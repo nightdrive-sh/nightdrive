@@ -21,6 +21,7 @@
 #   garage-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
 #   garage-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
 #   garage-ctl restore|unsnap NAME TAG       go back to one, delete one
+#   garage-ctl duplicate NAME TAG NEWTAG [LABEL]   a copy of one in the same disk, under NEWTAG (shown as LABEL)
 #   garage-ctl rename NAME TAG LABEL         the name a snapshot shows (while it runs too: only names.json changes)
 #   garage-ctl isos                          .iso files in ~/Downloads and ~/vm, newest first, not another arch's
 #   garage-ctl cmdline NAME                  the qemu command start runs (GARAGE_ARCH=x86_64|aarch64: another host's)
@@ -108,6 +109,25 @@ snap_sizes() {
     jq -nc --argjson mtime "$mtime" --argjson sizes "$sizes" '{ mtime: $mtime, sizes: $sizes }' > "$f.new" && mv "$f.new" "$f"
   fi
   jq -c '.sizes' "$f" 2>/dev/null || echo '{}'
+}
+
+# A copy of snapshot TAG as NEWTAG. qemu-img can't copy one, but a snapshot only counts references to the disk's
+# clusters, so the disk's state now is kept as a snapshot of its own, TAG's is applied and taken again as NEWTAG, and
+# the state now comes back: no data is copied, it takes a moment and no space. If going back fails, the state now
+# stays in that snapshot, under its name, for a restore by hand
+duplicate() {
+  [[ -n ${4:-} ]] || die "duplicate NAME TAG NEWTAG [LABEL]"
+  snap "$@"; good_tag "$4"
+  local f now; f=$(dir "$2")/disk.qcow2; now="garage-now-$(date +%s)"
+  qemu-img info -U --output=json "$f" | jq -e --arg tag "$4" 'any(.snapshots[]?; .name == $tag)' >/dev/null \
+    && die "$2 has a snapshot $4 already"
+  qemu-img snapshot -c "$now" "$f"
+  local ok=1
+  qemu-img snapshot -a "$3" "$f" && qemu-img snapshot -c "$4" "$f" || ok=0
+  qemu-img snapshot -a "$now" "$f" || die "$2's disk is as $3 left it: its state before is the snapshot $now"
+  qemu-img snapshot -d "$now" "$f"
+  ((ok)) || die "Couldn't copy the snapshot $3"
+  [[ -z ${5:-} ]] || label "$2" "$4" "$5"
 }
 
 list() {
@@ -213,6 +233,7 @@ case ${1:-} in
   snapshot) snap "$@"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2"; [[ -z ${4:-} ]] || label "$2" "$3" "$4" ;;
   restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
   unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2"; label "$2" "$3" "" ;;
+  duplicate) duplicate "$@" ;;
   rename)   rename "$@" ;;
-  *)        sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *)        sed -n '2,/^set /{/^#/p}' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

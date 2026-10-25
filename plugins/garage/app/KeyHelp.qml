@@ -8,7 +8,7 @@ QtObject {
             ["↑ ↓  j k", "Move"],
             ["⌘N", "New machine"],
             ["⌘,", "Settings: memory, CPUs, disk, ISO"],
-            ["⌘⌫", "Delete the VM, while it is stopped"],
+            ["⌘⌫", "Delete the VM, while it is stopped (in the snapshots: the snapshot)"],
             ["⌘B", "Show or hide the VMs"],
             ["Esc", "Narrow window: the VMs"]] },
         { title: "Power", keys: [
@@ -21,7 +21,8 @@ QtObject {
             ["Tab", "To the list, and back"],
             ["⏎", "Restore, while it is stopped"],
             ["e  F2", "Rename"],
-            ["Del", "Delete, while it is stopped"]] },
+            ["c", "Duplicate, while it is stopped"],
+            ["Del  ⌘⌫", "Delete, while it is stopped"]] },
         { title: "Window", keys: [
             ["?", "These keys"],
             ["⌘Q", "Quit"]] }
