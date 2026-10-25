@@ -425,15 +425,17 @@ LIST
 # app removed earlier: what the app leaves behind tells (Mail's settings after `nightmail disable`, Deck's source), and
 # it is marked without installing. Without sudo (can_sudo, update) it waits, unmarked, for a run in a terminal. A
 # failed install is marked too, so a build that fails doesn't run again on every update: missed has the command.
-# Only the repo's plugins: an external one can't install itself by naming the group.
+# Only the repo's plugins: an external one can't install itself by naming the group. An app with bundled=no in its
+# plugin.conf (Garage) isn't offered at all: it waits in Install › Recommended for the user to pick it.
 offer_apps() {
-  local a id name inst trace apps did=0
+  local a id name inst dir trace apps did=0
   mkdir -p "${offered%/*}"; touch "$offered"
-  mapfile -t apps < <(plugins | awk -F'\t' '$8 == "app" && $11 == "repo" { print $1 "\t" $2 "\t" $7 }')
+  mapfile -t apps < <(plugins | awk -F'\t' '$8 == "app" && $11 == "repo" { print $1 "\t" $2 "\t" $7 "\t" $9 }')
   echo "==> Nightdrive apps"
   for a in "${apps[@]}"; do
-    IFS=$'\t' read -r id name inst <<<"$a"
+    IFS=$'\t' read -r id name inst dir <<<"$a"
     grep -qxF "$id" "$offered" && continue
+    [[ $(conf_value "$dir/plugin.conf" bundled) == no ]] && continue
     case $id in
       mail) trace=$HOME/.config/nightmail ;;
       deck) trace=${DECK_SRC:-$HOME/.local/src/deck} ;;

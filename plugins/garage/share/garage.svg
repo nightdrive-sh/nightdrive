@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Garage's app icon: Lucide's warehouse (a garage and its door) as a neon sign, made like Mail's, Deck's and
+       Ferry's but in white and steel on graphite, so the four don't mix up side by side. The gradient is in user space:
+       the door's slats are flat lines, and a bounding-box gradient over a box of no height paints nothing -->
+  <defs>
+    <linearGradient id="neon" gradientUnits="userSpaceOnUse" x1="2" y1="2" x2="22" y2="22"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#c9d4e0"/><stop offset="1" stop-color="#8a9bb0"/></linearGradient>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="#1a1c20"/>
+  <g transform="translate(76 76) scale(15)" fill="none" stroke="url(#neon)" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="2.2" filter="url(#glow)">
+      <path d="M18 21V10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v11"/>
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 1.132-1.803l7.95-3.974a2 2 0 0 1 1.837 0l7.948 3.974A2 2 0 0 1 22 8z"/>
+      <path d="M6 13h12"/>
+      <path d="M6 17h12"/>
+    </g>
+    <g stroke-width="1.5">
+      <path d="M18 21V10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v11"/>
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 1.132-1.803l7.95-3.974a2 2 0 0 1 1.837 0l7.948 3.974A2 2 0 0 1 22 8z"/>
+      <path d="M6 13h12"/>
+      <path d="M6 17h12"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,13 @@
+[Desktop Entry]
+# `garage install` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH
+# may not have ~/.local/bin). Keywords: the launcher's search finds Garage by what it is, too.
+Type=Application
+Name=Garage
+GenericName=Virtual machines
+Comment=Virtual machines: start, snapshot and restore them
+Keywords=vm;virtual machine;virtual machines;qemu;kvm;
+Icon=garage
+Exec=garage
+Terminal=false
+Categories=System;Emulator;
+StartupNotify=false

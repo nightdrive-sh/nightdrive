@@ -1,0 +1,121 @@
+# A VM's qemu, for bin/garage-ctl (sourced after its helpers: die, dir, need, running, and lib/arch.sh): the command
+# line that starts it, its monitor (QMP) and the guest agent inside it (QGA), both through monitor.py. The command line
+# is the one #1527 got Fedora booting with on Asahi (an M2 Max); what differs on a PC (#1572) comes from lib/arch.sh.
+
+# The guest's sshd on the host's loopback (README.md: `ssh -p 2222 localhost`), as SDL shares no clipboard. One
+# port, so one VM with it at a time: a second one's qemu fails to start. GARAGE_SSH_PORT moves it (a test VM
+# beside yours)
+SSH_PORT=${GARAGE_SSH_PORT:-2222}
+MONITOR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitor.py
+
+# One command to its QMP or guest agent socket: monitor.py's exit codes (1 failed, 3 no guest agent). From the VM's
+# folder, as a socket's path is short (108)
+qmp() { (cd "$(dir "$1")" && python3 -I "$MONITOR" qmp qmp.sock "$2" "$1" ${3:+"$3"}); }
+qga() { (cd "$(dir "$1")" && python3 -I "$MONITOR" qga qga.sock "$2" "$1" ${3:+"$3"}); }
+
+# A path as one value in qemu's option syntax, where a comma separates options: doubled, it is a comma of the path's
+# (an ISO named "a,b.iso" mustn't add an option b to its drive)
+qv() { echo "${1//,/,,}"; }
+
+# qemu_cmd NAME: its command line, into QEMU_CMD (start runs it, garage-ctl cmdline prints it). Run from the VM's
+# folder: the sockets go there by a short path (qmp, qga)
+qemu_cmd() {
+  local name=$1 d MEM CPUS ISO; d=$(dir "$1")
+  read_conf "$name"
+  # The disk boots first and the ISO second: an empty disk falls through to the installer, and once it is installed
+  # the VM boots from its disk, ISO or not (#1552: with the ISO first, an installed VM went back into the installer)
+  # format=raw, as qemu would otherwise go by what the file says it is: a "downloaded ISO" that is a qcow2 with a
+  # backing file could hand the guest any file of the host's (~/.ssh/id_ed25519)
+  local cd=()
+  [[ -n $ISO ]] && cd=(-device virtio-scsi-pci -device scsi-cd,drive=cd,bootindex=1
+                       -drive "if=none,id=cd,media=cdrom,readonly=on,format=raw,file=$(qv "$ISO")")
+  # SDL, not GTK: GTK's GL window is black on Wayland (eglMakeCurrent failed), and under XWayland qemu aborts when the
+  # guest resets the GPU at boot (virgl_renderer_reset: EGL_BAD_ACCESS, the context is GTK's). Needs qemu-ui-sdl.
+  # GARAGE_HEADLESS=1: no window at all, for a test VM that mustn't come up on the desktop
+  local screen=(-device "$GPU,xres=1600,yres=1000" -display sdl,gl=on)
+  [[ -n ${GARAGE_HEADLESS:-} ]] && screen=(-device virtio-gpu-pci -display none)
+  # A disk image's first boot: its user and the rest, until they have run (lib/firstboot.sh)
+  local firstboot=(); mapfile -t firstboot < <(firstboot_args "$name")
+  local pin=(); [[ -n $PIN ]] && pin=(taskset -c "$PIN")
+  QEMU_CMD=("${pin[@]}" "$QEMU"
+    -name "$name"
+    -machine "$MACHINE" -accel kvm -cpu host -smp "$CPUS" -m "${MEM}M"
+    -drive "if=pflash,format=raw,unit=0,readonly=on,file=$(qv "$FW_CODE")"
+    -drive "if=pflash,format=raw,unit=1,file=$(qv "$d/vars.raw")"
+    -drive "if=none,id=disk,format=qcow2,file=$(qv "$d/disk.qcow2"),discard=unmap,cache=writeback"
+    -device virtio-blk-pci,drive=disk,bootindex=0
+    "${screen[@]}"
+    -device qemu-xhci -device usb-kbd -device usb-tablet
+    "${cd[@]}"
+    -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22"
+    -device virtio-serial-pci
+    -chardev socket,id=qga,path=qga.sock,server=on,wait=off
+    -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0
+    "${firstboot[@]}"
+    -qmp unix:qmp.sock,server,nowait
+    -pidfile "$d/pid"
+    -serial "file:$d/serial.log")
+}
+
+# cmdline NAME: the command start would run, for a test (GARAGE_ARCH=x86_64 shows a PC's): one option a line, those
+# before qemu's binary (taskset's) on its first
+cmdline() {
+  need "$1"; qemu_cmd "$1"
+  local a out="" seen=0
+  for a in "${QEMU_CMD[@]}"; do
+    ((seen)) && [[ $a == -* ]] && out+=$' \\\n '
+    [[ $a == "$QEMU" ]] && seen=1
+    # Quoted only where the shell needs it (printf %q would escape every comma)
+    if [[ $a =~ ^[][A-Za-z0-9_./:,=@+-]+$ ]]; then out+=" $a"; else out+=" $(printf %q "$a")"; fi
+  done
+  echo "${out# }"
+}
+
+start() {
+  need "$1"; running "$1" && return 0
+  need_qemu
+  local name=$1 d; d=$(dir "$1")
+  qemu_cmd "$name"
+  rm -f "$d/qmp.sock" "$d/qga.sock"
+  cd "$d"     # the sockets by a short path (qmp, qga)
+  setsid -f "${QEMU_CMD[@]}" > "$d/qemu.log" 2>&1
+  for _ in $(seq 50); do running "$name" && return 0; sleep 0.1; done
+  # The one failure with a known cause: the ssh port another VM holds (one VM with it at a time)
+  grep -q "host forwarding" "$d/qemu.log" && die "Another VM has the ssh port ($SSH_PORT): shut it down first"
+  die "qemu didn't start: $(tail -3 "$d/qemu.log" | sed 's/^qemu-system-[a-z0-9_]*: //')"
+}
+
+# Shut down: the guest agent's, which works whatever the desktop in it does with the power button, else ACPI's power
+# button (with KDE logged in nothing happens, and Nightdrive shows its power menu). Prints "acpi" then, so the window
+# can say why, if it doesn't go down
+stop() {
+  need "$1"; running "$1" || return 0
+  # The agent answering means the first boot's scripts have run (lib/firstboot.sh): their credentials can go
+  qga "$1" guest-shutdown '{"mode": "powerdown"}' >/dev/null 2>&1 && { rm -rf "$(dir "$1")/firstboot"; return 0; }
+  qmp "$1" system_powerdown >/dev/null
+  echo acpi
+}
+
+# Pulling the plug works without QMP too: qemu's own process, if its socket doesn't answer
+force_off() {
+  need "$1"; running "$1" || return 0
+  qmp "$1" quit >/dev/null 2>&1 || kill "$(cat "$(dir "$1")/pid")"
+}
+
+# The guest's clock to the host's, through its agent: after the host has slept, the guest's clock is behind by as
+# long. Quiet without an agent (nothing to do then), as the window asks for it on its own
+synctime() {
+  need "$1"; running "$1" || return 0
+  local rc=0
+  qga "$1" guest-set-time "{\"time\": $(date +%s%N)}" >/dev/null 2>&1 || rc=$?
+  ((rc == 0 || rc == 3)) || [[ ! -S $(dir "$1")/qga.sock ]] || die "$1: its clock wasn't set"
+}
+
+# Its SDL window, found by qemu's pid
+display() {
+  need "$1"; running "$1" || die "$1 isn't running"
+  local addr; addr=$(hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \
+                      '[.[] | select(.pid == $pid)] | first | .address // empty')
+  [[ -n $addr ]] || die "No window for $1"
+  hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+}

@@ -151,9 +151,11 @@ removable=()
 [[ $machine != asahi ]] || read -ra removable <<<"$(installed $(pkgs "$repo/packages-remove-asahi.txt"))"
 
 # --- Optional parts (plugins.txt and the plugin folders, plugins/<id>/): chosen now, installed at the end ---
-ids=(); names=(); descs=(); groups=(); on=()
-while IFS=$'\t' read -r id name _ desc def _ _ group _; do
+ids=(); names=(); descs=(); groups=(); bundled=(); on=()
+while IFS=$'\t' read -r id name _ desc def _ _ group dir _; do
   ids+=("$id"); names+=("$name"); descs+=("$desc"); groups+=("$group"); on+=("$([[ $def == on ]] && echo 1 || echo 0)")
+  # An app with bundled=no (Garage) is listed with the apps but not ticked: one to pick, not one every install gets
+  bundled+=("$([[ $group == app ]] && ! grep -qx 'bundled=no' "$dir/plugin.conf" 2>/dev/null && echo 1 || echo 0)")
 done < <("$repo/bin/nightdrive" plugins)
 # Shown by group like the launcher's Install menu; installed in the file's order. order: row number - 1 → index
 order=()
@@ -165,7 +167,7 @@ case $base in
   all) on=("${on[@]/*/1}") ;;
   none) on=("${on[@]/*/0}") ;;
 esac
-for i in "${!ids[@]}"; do [[ " ${ALWAYS[*]} " == *" ${ids[i]} "* || ${groups[i]} == app ]] && on[i]=1; done
+for i in "${!ids[@]}"; do [[ " ${ALWAYS[*]} " == *" ${ids[i]} "* || ${bundled[i]} == 1 ]] && on[i]=1; done
 # --with/--without: ids (or names) separated by commas
 toggle_listed() {  # toggle_listed LIST 0|1
   local list w i found
@@ -453,7 +455,7 @@ done
 # install that has never had it (bin/nightdrive, offer_apps)
 offered=$HOME/.local/state/nightdrive/apps-offered
 mkdir -p "${offered%/*}"
-{ cat "$offered" 2>/dev/null || true; for i in "${!ids[@]}"; do if [[ ${groups[i]} == app ]]; then echo "${ids[i]}"; fi; done; } \
+{ cat "$offered" 2>/dev/null || true; for i in "${!ids[@]}"; do if [[ ${bundled[i]} == 1 ]]; then echo "${ids[i]}"; fi; done; } \
   | sort -u > "$offered.tmp" && mv "$offered.tmp" "$offered"
 "$repo/bin/nightdrive" plugins installed >/dev/null
 "$repo/config/fuzzel/sync-apps"

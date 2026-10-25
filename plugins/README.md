@@ -70,6 +70,7 @@ author=@jarilehtinen
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
 | `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
 | `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up), `webapp`, or `app`: one of Nightdrive's own apps (below) |
+| `bundled` | For an `app`: `yes` (default) comes with every install; `no` doesn't (below) |
 | `version` | `MAJOR.MINOR.PATCH`, e.g. `1.0.0` (`0.x` while it's experimental). It shows on the plugin's page in the launcher and on the website, so a bug report can name it. See [Versions](#versions) |
 | `author` | Who made it: a GitHub user (`@name`) or a name |
 | `setup` | A shell command, run in the folder, that sets the installed plugin up with Claude: Claude Code in a terminal, going through the README's steps with the user. The plugin's page gets a button Set up with Claude (and the key C) for it. For a plugin whose use needs more than its installer can ask, such as Mail's account (`bin/nightmail setup`). Start Claude through `~/.config/hypr/scripts/claude-setup ID NAME`, with your steps on its stdin: it holds the session to them, and Welcome to Nightdrive sees it running. Installed plugins with a `setup` are rows in Welcome to Nightdrive (launcher › System › Set up Nightdrive) |
@@ -84,7 +85,9 @@ turns one off or on). One the user removed is back in Install › Recommended, t
 the ids it has offered are kept in
 `~/.local/state/nightdrive/apps-offered` (`install.sh` writes the ones it offered, left out or not), and an app the
 user removed afterwards is never installed again. Whether a new app comes with Nightdrive or would be bloat there (then
-it is `recommended`) is decided for each app. Only the repo's own plugins can be apps: `nightdrive update` doesn't
+it is `recommended`) is decided for each app. An app that most users wouldn't want on every install, but that is still
+one of Nightdrive's own (built on the apps' kit, Settings › Apps once installed), has `bundled=no`: `install.sh` lists
+it unticked, `nightdrive update` never installs it, and it waits in Install › Recommended (Garage). Only the repo's own plugins can be apps: `nightdrive update` doesn't
 install an external plugin by its group.
 
 Pick `installed` so it follows what the installer did: a unit that is enabled, a command that exists. A plugin with
