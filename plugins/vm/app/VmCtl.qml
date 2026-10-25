@@ -53,10 +53,11 @@ QtObject {
         refresh()
     }
 
-    // run(["start", "fedora"], out => …, () => …): queued behind a call still running, since the buttons rarely overlap
+    // run(["start", "fedora"], out => …, () => …): queued behind a call still running, since the buttons rarely overlap.
+    // input goes to its stdin (a new VM's password, kept out of ps), which then closes
     property var queue: []
-    function run(args, done, failed) {
-        queue = queue.concat([{ args: args, done: done, failed: failed }])
+    function run(args, done, failed, input) {
+        queue = queue.concat([{ args: args, done: done, failed: failed, input: input }])
         next()
     }
     function next() {
@@ -66,6 +67,8 @@ QtObject {
         caller.done = job.done || null
         caller.failed = job.failed || null
         caller.command = [ctl].concat(job.args)
+        caller.input = job.input === undefined ? null : job.input
+        caller.stdinEnabled = caller.input !== null
         busy = true
         error = ""
         caller.running = true
@@ -83,6 +86,8 @@ QtObject {
     property Process caller: Process {
         property var done: null
         property var failed: null
+        property var input: null
+        onStarted: if (input !== null) { write(input); input = null; stdinEnabled = false }
         stdout: StdioCollector { id: out }
         stderr: StdioCollector { id: err }
         onExited: code => {

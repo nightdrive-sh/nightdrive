@@ -19,6 +19,7 @@ ShellRoot {
 
         AppLook { id: c }
         VmCtl { id: ctl }
+        Images { id: images; ctl: ctl; onMade: name => win.pick(name) }
         KeyHelp { id: keyHelp }
         readonly property QtObject look: c
 
@@ -73,6 +74,7 @@ ShellRoot {
                 Layout.fillWidth: win.onePane
                 c: win.look
                 ctl: ctl
+                images: images
                 current: win.vm ? win.vm.name : ""
                 onPicked: name => win.pick(name)
                 onNewVm: win.showNew = true
@@ -138,6 +140,7 @@ ShellRoot {
             visible: win.showNew
             c: win.look
             ctl: ctl
+            images: images
             onDone: { win.showNew = false; page.forceActiveFocus() }
         }
 
