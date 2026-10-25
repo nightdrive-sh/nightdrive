@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import qs.kit
 
 // The sidebar: the VMs, a running one with a dot in the theme's colour, then a disk image on its way ("Fedora 44 Minimal
-// 43 %") and the new VMs waiting for it, and New VM at the foot. In a narrow window it
+// 43 %") and the new VMs waiting for it, and New machine at the foot. In a narrow window it
 // takes the whole width while it shows (shell.qml's onePane), and picking a VM shows its page.
 AppSidebar {
     id: root
@@ -48,5 +48,5 @@ AppSidebar {
         }
     }
     Item { Layout.fillHeight: true }
-    AppNavRow { c: root.c; glyph: "plus"; label: "New VM"; count: "⌘N"; onClicked: root.newVm() }
+    AppNavRow { c: root.c; glyph: "plus"; label: "New machine"; count: "⌘N"; onClicked: root.newVm() }
 }

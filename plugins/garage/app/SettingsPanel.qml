@@ -48,9 +48,9 @@ AppPanel {
 
     Row {
         spacing: 16
-        Field { id: mem; c: root.c; width: 130; label: "Memory, GB"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
-        Field { id: cpus; c: root.c; width: 130; label: "CPUs, 1 to 8"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
-        Field { id: disk; c: root.c; width: 130; label: "Disk, GB"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
+        Field { id: mem; c: root.c; width: 130; label: "Memory"; hint: "GB"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
+        Field { id: cpus; c: root.c; width: 130; label: "CPUs"; hint: "1 to 8"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
+        Field { id: disk; c: root.c; width: 130; label: "Disk"; hint: "GB"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
     }
     Text {
         width: parent.width
@@ -68,7 +68,7 @@ AppPanel {
             id: iso
             c: root.c
             width: root.cardWidth - 80 - choose.width - eject.width - 16
-            label: "ISO in its drive (boots when the disk has nothing to boot)"
+            label: "ISO in its drive"; hint: "boots when the disk has nothing to boot"
             input.readOnly: !root.stopped
             onAccepted: root.save(); onEscaped: root.done()
         }
@@ -98,19 +98,10 @@ AppPanel {
 
     Row {
         spacing: 8
-        AppButton { c: root.c; glyph: "check"; label: "Save"; strong: true; keys: "⏎"; visible: root.stopped; onClicked: root.save() }
-        AppButton { c: root.c; label: root.stopped ? "Cancel" : "Close"; keys: "Esc"; onClicked: root.done() }
+        PanelButton { c: root.c; label: "Save"; strong: true; keys: ["Enter"]; visible: root.stopped; onClicked: root.save() }
+        PanelButton { c: root.c; label: root.stopped ? "Cancel" : "Close"; keys: ["Esc"]; onClicked: root.done() }
     }
 
     Rectangle { width: parent.width; height: 1; color: root.c.divider; visible: root.stopped }
-    Row {
-        visible: root.stopped
-        spacing: 12
-        AppButton { c: root.c; glyph: "trash-2"; label: "Delete VM…"; keys: "⌘⌫"; onClicked: root.deleteVm() }
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Its disk and snapshots go with it."
-            color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
-        }
-    }
+    AppButton { c: root.c; glyph: "trash-2"; label: "Delete machine…"; keys: "⌘⌫"; visible: root.stopped; onClicked: root.deleteVm() }
 }

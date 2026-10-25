@@ -30,16 +30,6 @@ AppPanel {
     // An image's disk needs only room to grow from its own; an installer wants more
     function pick(id) { source = id; problem = ""; disk.text = id === "iso" ? "40" : "20" }
 
-    // Its download's state, in a line under the choice
-    function state(i) {
-        if (!i) return ""
-        const mb = Math.round(i.size / 1048576) + " MB"
-        return i.state === "ready" ? "Downloaded"
-             : i.state === "downloading" ? "Downloading: " + images.percent(i) + " % of " + mb
-             : i.state === "failed" ? "The last download failed: " + i.error
-             : "A " + mb + " download, once: Create waits for it"
-    }
-
     function check() {
         const whole = t => /^[0-9]+$/.test(t.trim())
         // garage-ctl's rule (good_name): the name is its folder's
@@ -68,7 +58,7 @@ AppPanel {
 
     IsoPicker { id: picker }
 
-    Text { text: "New VM"; color: root.c.title; font.family: root.c.font; font.pixelSize: 15; font.weight: Font.Medium }
+    Text { text: "New machine"; color: root.c.title; font.family: root.c.font; font.pixelSize: 15; font.weight: Font.Medium }
 
     // Where it comes from: each ready-made image, or an ISO. The picked one has the picked row's ground, as AppButton's
     // on lights only its glyph
@@ -87,15 +77,17 @@ AppPanel {
         AppButton { c: root.c; glyph: "disc"; label: "ISO file"; on: root.source === "iso"
             color: on ? root.c.sel : hovered ? root.c.hover : "transparent"; onClicked: root.pick("iso") }
     }
+    // Only a failed download says anything here: one to come shows in the button (Download and create), one under way in
+    // the sidebar
     Text {
-        visible: root.fromImage
+        visible: root.fromImage && root.image.state === "failed"
         width: parent.width
         wrapMode: Text.Wrap
-        text: root.fromImage ? root.image.about + ".\n" + root.state(root.image) : ""
-        color: root.c.dim; font.family: root.c.font; font.pixelSize: 12; lineHeight: 1.3
+        text: visible ? "The last download failed: " + root.image.error : ""
+        color: root.c.danger; font.family: root.c.font; font.pixelSize: 12
     }
 
-    Field { id: name; c: root.c; width: parent.width; label: "Name (letters, digits, - . _)"; onAccepted: root.create(); onEscaped: root.done() }
+    Field { id: name; c: root.c; width: parent.width; label: "Name"; hint: "letters, digits, - . _"; onAccepted: root.create(); onEscaped: root.done() }
     Row {
         visible: root.fromImage
         spacing: 16
@@ -123,9 +115,9 @@ AppPanel {
     }
     Row {
         spacing: 16
-        Field { id: mem; c: root.c; width: 120; label: "Memory, GB"; onAccepted: root.create(); onEscaped: root.done() }
-        Field { id: cpus; c: root.c; width: 120; label: "CPUs, 1 to 8"; onAccepted: root.create(); onEscaped: root.done() }
-        Field { id: disk; c: root.c; width: 120; label: "Disk, GB"; onAccepted: root.create(); onEscaped: root.done() }
+        Field { id: mem; c: root.c; width: 120; label: "Memory"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
+        Field { id: cpus; c: root.c; width: 120; label: "CPUs"; hint: "1 to 8"; onAccepted: root.create(); onEscaped: root.done() }
+        Field { id: disk; c: root.c; width: 120; label: "Disk"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
     }
 
     Text {
@@ -137,11 +129,11 @@ AppPanel {
     }
     Row {
         spacing: 8
-        AppButton {
-            c: root.c; glyph: "plus"; strong: true; keys: "⏎"
+        PanelButton {
+            c: root.c; strong: true; keys: ["Ctrl", "Enter"]
             label: root.fromImage && root.image.state !== "ready" ? "Download and create" : "Create and start"
             onClicked: root.create()
         }
-        AppButton { c: root.c; label: "Cancel"; keys: "Esc"; onClicked: root.done() }
+        PanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.done() }
     }
 }

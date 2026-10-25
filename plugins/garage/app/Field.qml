@@ -6,12 +6,21 @@ Column {
     id: root
     required property QtObject c
     property string label
+    property string hint: ""            // after the label, smaller and grey: what goes in ("GB", "1 to 8")
     property alias text: input.text
     property alias input: input
     signal accepted()
     signal escaped()
     spacing: 6
-    Text { text: root.label; color: root.c.dim; font.family: root.c.font; font.pixelSize: 12 }
+    Row {
+        spacing: 8
+        Text { id: title; text: root.label; color: root.c.title; font.family: root.c.font; font.pixelSize: 13 }
+        Text {
+            visible: root.hint !== ""
+            anchors.baseline: title.baseline
+            text: root.hint; color: root.c.dim; font.family: root.c.font; font.pixelSize: 11
+        }
+    }
     Rectangle {
         width: root.width; height: 32; radius: 7
         color: "transparent"

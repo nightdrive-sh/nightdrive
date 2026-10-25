@@ -6,7 +6,7 @@ QtObject {
     readonly property var groups: [
         { title: "VMs", keys: [
             ["↑ ↓  j k", "Move"],
-            ["⌘N", "New VM"],
+            ["⌘N", "New machine"],
             ["⌘,", "Settings: memory, CPUs, disk, ISO"],
             ["⌘⌫", "Delete the VM, while it is stopped"],
             ["⌘B", "Show or hide the VMs"],

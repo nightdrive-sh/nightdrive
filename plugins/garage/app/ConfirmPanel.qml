@@ -32,7 +32,7 @@ AppPanel {
     }
     Row {
         spacing: 8
-        AppButton { c: root.c; glyph: root.glyph; label: root.action; strong: true; keys: "⏎"; onClicked: root.answered(true) }
-        AppButton { c: root.c; label: "Cancel"; keys: "Esc"; onClicked: root.answered(false) }
+        PanelButton { c: root.c; label: root.action; strong: true; keys: ["Enter"]; onClicked: root.answered(true) }
+        PanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.answered(false) }
     }
 }
