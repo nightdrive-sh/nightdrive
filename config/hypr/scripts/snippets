@@ -2,7 +2,8 @@
 """Snippets: typed abbreviations that expand into text in any app (like macOS's Text Replacements).
 
     snippets list                   the snippets as JSON ([{"trigger", "text"}]), launcher › Tools › Snippets
-    snippets set TRIGGER TEXT       add one, or change the text of an existing trigger
+    snippets set TRIGGER TEXT       add one, or change the text of an existing trigger (TEXT - reads it from stdin:
+                                    several lines, e.g. an email signature from a file)
     snippets remove TRIGGER
     snippets status                 on | off | no-access (auto-expand)
     snippets enable | disable       auto-expand on/off: asks for sudo, run it in a terminal
@@ -28,6 +29,7 @@ FILE = os.path.expanduser("~/.config/nightdrive/snippets.json")
 UDEV_RULE = "/etc/udev/rules.d/70-nightdrive-snippets.rules"
 RULE_SRC = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../system/snippets-uaccess.rules")
 SERVICE = "nightdrive-snippets.service"
+SERVICE_SRC = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../systemd/user/" + SERVICE)
 BUFFER = 32          # characters kept: enough for the longest trigger
 RESCAN = 3.0         # seconds between looks for a newly plugged keyboard
 
@@ -92,7 +94,9 @@ def enable():
     subprocess.run(["sudo", "udevadm", "control", "--reload"], check=True)
     subprocess.run(["sudo", "udevadm", "trigger", "--subsystem-match=input", "--action=change"], check=True)
     subprocess.run(["udevadm", "settle"])
-    subprocess.run(["systemctl", "--user", "enable", "--now", SERVICE], check=True)
+    # The repo's path, not the name: the unit is linked from the repo (link.sh), and disable removes such a link, so by
+    # name a second enable wouldn't find it. By path systemd links it again.
+    subprocess.run(["systemctl", "--user", "enable", "--now", os.path.realpath(SERVICE_SRC)], check=True)
     time.sleep(1)
     if readable_keyboards():
         print("\nAuto-expand is on. Add snippets in launcher › Tools › Snippets.")
@@ -321,7 +325,8 @@ def main():
         print(json.dumps(load(), ensure_ascii=False))
     elif cmd == "set" and len(a) == 3 and a[1].strip():
         trig = a[1].strip()
-        save([s for s in load() if s["trigger"] != trig] + [{"trigger": trig, "text": a[2]}])
+        text = sys.stdin.read().rstrip("\n") if a[2] == "-" else a[2]
+        save([s for s in load() if s["trigger"] != trig] + [{"trigger": trig, "text": text}])
     elif cmd == "remove" and len(a) == 2:
         save([s for s in load() if s["trigger"] != a[1]])
     elif cmd == "status":

@@ -33,6 +33,7 @@ BarText 1.0 BarText.qml
 MenuSection 1.0 MenuSection.qml
 MenuNote 1.0 MenuNote.qml
 MenuButton 1.0 MenuButton.qml
+WiredProfiles 1.0 WiredProfiles.qml
 Toggle 1.0 Toggle.qml
 TouchScroll 1.0 TouchScroll.qml
 AppIcon 1.0 AppIcon.qml
@@ -54,6 +55,7 @@ BehaviourLevels 1.0 BehaviourLevels.qml
 AboutLevels 1.0 AboutLevels.qml
 InstallLevels 1.0 InstallLevels.qml
 ToolsLevels 1.0 ToolsLevels.qml
+ClipPicker 1.0 ClipPicker.qml
 AppearanceLevels 1.0 AppearanceLevels.qml
 DisplayLevels 1.0 DisplayLevels.qml
 RemoveLevels 1.0 RemoveLevels.qml
@@ -61,3 +63,4 @@ PasswordLevels 1.0 PasswordLevels.qml
 ThemeLevels 1.0 ThemeLevels.qml
 DetailCard 1.0 DetailCard.qml
 ClaudeWriteLevels 1.0 ClaudeWriteLevels.qml
+PolkitWatch 1.0 PolkitWatch.qml

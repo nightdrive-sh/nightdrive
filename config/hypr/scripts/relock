@@ -9,14 +9,15 @@
 # (lockdead_screen_delay = 0 there: with a delay, Hyprland draws the desktop under it meanwhile).
 # Steps go to the journal (journalctl -t relock).
 lock='[q]s -p .*/greeter/lock\.qml'
-pgrep -u "$USER" -f "$lock" >/dev/null || exit 0
+mine=(--ns $$ --nslist pid -u "$UID")   # not a container's lock (nightdrive sandbox): same user, other PID namespace
+pgrep "${mine[@]}" -f "$lock" >/dev/null || exit 0
 sleep 1   # the keyboards come back a moment after the resume
-old=$(pgrep -u "$USER" -f "$lock") || { logger -t relock "unlocked meanwhile"; exit 0; }
+old=$(pgrep "${mine[@]}" -f "$lock") || { logger -t relock "unlocked meanwhile"; exit 0; }
 logger -t relock "starting a new lock"
 setsid -f "$HOME/.config/hypr/scripts/lock" --replace >/dev/null 2>&1
 # Loaded = it has asked for the lock; give it a moment more to draw. If it doesn't come up, the old one stays.
 for _ in $(seq 50); do
-  new=$(pgrep -u "$USER" -f "$lock" | grep -vxF "$old" | head -1)
+  new=$(pgrep "${mine[@]}" -f "$lock" | grep -vxF "$old" | head -1)
   [[ -n $new ]] && grep -q 'Configuration Loaded' "${XDG_RUNTIME_DIR:-/run/user/$UID}/quickshell/by-pid/$new/log.log" 2>/dev/null && break
   new=
   sleep 0.1

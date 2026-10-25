@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 
-// The launcher's Settings › Top bar (opacity, icon colors, highlight, the clock's date format, which items it shows and
+// The launcher's Settings › Top bar (opacity, icon colors, highlight, the clock's date format, the N█ logo, which items it shows and
 // in what order) and Screensaver (style, start after, screen off after). The values apply as they are chosen, so they
 // can be tried one after another. Theme stays in Launcher.qml: Background's wallpapers are a grid of the launcher's own.
 // The root search finds both pages' rows too (topbarItems, screensaverItems).
@@ -63,6 +63,7 @@ Item {
     }
     // Top bar: sub-items with their current values
     function topbarItems() {
+        const logoOn = TopBar.hidden.indexOf("logo") < 0
         return [
             { kind: "nav", name: "Opacity", glyph: "panel-top", target: "baropacity", summary: barOpacity >= 0 ? barOpacity + "%" : undefined },
             { kind: "nav", name: "Icon colors", glyph: "contrast", target: "baricons",
@@ -71,6 +72,8 @@ Item {
               summary: barHl === "theme" ? "theme color" : (barHl || undefined) },
             { kind: "nav", name: "Date format", glyph: "calendar", target: "bardate",
               summary: (dateStyles.find(d => d[0] === barDate) || [])[1] },
+            { kind: "barlogo", name: "Logo", glyph: "square", summary: "opens the launcher",
+              trailGlyph: logoOn ? "check" : "minus", dimmed: !logoOn },
             { kind: "nav", name: "Items", glyph: "layout-list", target: "baritems",
               summary: TopBar.modules.length + " of " + TopBar.allModules.length + " shown" }
         ]
@@ -130,6 +133,8 @@ Item {
 
     // Stays open: values can be tried one after another
     function activate(it) {
+        // The bar's N█ logo: kept in the same hidden list as the modules (no module is named "logo")
+        if (it.kind === "barlogo") { launcher.keepSelection(); TopBar.setHidden("logo", TopBar.hidden.indexOf("logo") < 0); return true }
         if (it.kind === "baritem") { launcher.keepSelection(); TopBar.setHidden(it.value, TopBar.hidden.indexOf(it.value) < 0); return true }
         if (it.kind === "bardate") {   // the clock refreshes the bar itself
             launcher.keepSelection()

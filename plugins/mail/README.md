@@ -51,7 +51,7 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 
 Mail reads the mail that mbsync has fetched into `~/Mail` and notmuch has indexed, and sends through your provider's SMTP server. These steps set up one account; each command can be run as it is, after putting your own values in place of the examples (you@example.com, mail.example.com, the account name `example`). Claude can do them with you: Mail's first start, before an account, offers Set up with Claude, which opens Claude Code in a terminal to go through them a step at a time and then offers to add more accounts (`nightmail setup` does the same, and so do Welcome to Nightdrive, launcher › System › Set up Nightdrive, and asking Claude to set up Nightdrive Mail by this page). Your password goes only into the login keyring, by a command you run yourself.
 
-1. Mail comes with Nightdrive; on an install without it, `nightdrive plugins install mail` installs it: notmuch, isync (mbsync), libsecret (secret-tool) and zenity, and it says what is still missing. Many providers want an app password for mail apps (Gmail, iCloud, Outlook, Fastmail): make one in the provider's account settings first.
+1. Mail comes with Nightdrive; on an install without it, `nightdrive plugins install mail` installs it: notmuch, isync (mbsync), libsecret (secret-tool) and zenity, and it says what is still missing. Many providers want an app password for mail apps (Gmail, iCloud, Fastmail): make one in the provider's account settings first.
 
 2. Put the password in the login keyring, so it is never in a file (it asks for the password):
 

@@ -240,7 +240,7 @@ hl.bind(mod .. " + Q",           hl.dsp.exec_cmd(scripts .. "/quit-app"))   -- q
 hl.bind(mod .. " + SHIFT + U",   hl.dsp.exec_cmd(scripts .. "/reopen"))   -- opens the window last closed with ⌘W again, where it was; again: the one before it
 -- The window's own keys are ⌘⇧: fullscreen, floating, split direction and the arrows that move it. ⌘F / ⌘T / ⌘J are the
 -- apps' (find, new tab, downloads: the list below the copy keys)
-hl.bind(mod .. " + SHIFT + F",   hl.dsp.window.fullscreen())
+hl.bind(mod .. " + SHIFT + F",   hl.dsp.window.fullscreen(), { dont_inhibit = true })   -- also over a VM window (dont_inhibit: see Workspaces)
 -- ⌘⇧T: toggle floating. For Deck: tiled -> floating at its default size, centred; floating but moved/resized ->
 -- back to default size, centred; floating already at default position -> tiled. (Size: DECK_SIZE, which the Deck plugin's
 -- hyprland.lua sets after this file has run, so it's read at the key press)
@@ -339,16 +339,17 @@ local function move_all_windows(i)
 end
 
 -- Workspaces ⌘1–⌘0, move window ⌘⇧1–⌘⇧0, move all windows ⌘⌥1–⌘⌥0. With the drawer open ⌘1–⌘0 closes it first,
--- otherwise it stays over the new workspace
+-- otherwise it stays over the new workspace. dont_inhibit: they work over a window that takes the keyboard (a VM's qemu
+-- window, a remote desktop) too, so it can be left with them; the desktop inside a VM doesn't get them.
 for i = 1, 10 do
     local key = i % 10
     hl.bind(mod .. " + " .. key, function()
         local special = hl.get_active_special_workspace()
         if special and special.name == "special:drawer" then hl.dispatch(hl.dsp.workspace.toggle_special("drawer")) end
         hl.dispatch(hl.dsp.focus({ workspace = i }))
-    end)
-    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
-    hl.bind(mod .. " + ALT + " .. key, function() move_all_windows(i) end)
+    end, { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), { dont_inhibit = true })
+    hl.bind(mod .. " + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
 end
 hl.bind(mod .. " + TAB",         hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mod .. " + SHIFT + TAB", hl.dsp.focus({ workspace = "e-1" }))

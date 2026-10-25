@@ -2,12 +2,14 @@
 """The Welcome window's list, as JSON on stdout: signing in to Claude first, then every installed plugin whose plugin.conf
 has a `setup` (Tailscale, Mail, Deck…): FIRST's, then the others in plugins' order.
   tasks
-Each row: { id, name, icon, about, done, running, mark, setup, help }
+Each row: { id, name, icon, about, done, running, mark, setup, help, steps, readme }
   done     the thing works: Claude is signed in, or the plugin's `configured` test succeeds (its `setup` ran to the end)
   running  its Claude session is open (claude-setup's pid file)
   mark     setup.json's word for it: "started", "skipped" or ""
   setup    the command line that starts its setup (claude-setup, through the plugin's own command)
   help     where its steps are without Claude: the plugin's page on the website, or its README for an external one
+  steps    it has a steps.md: the window shows those steps by hand, one at a time (`steps`)
+  readme   its README.md, which the "I'll do it myself" path opens in Apostrophe, or ""
 The list is read again every few seconds while the window is open, so the tests are quick ones."""
 import json, os, re, subprocess
 
@@ -25,7 +27,7 @@ TEST_TIMEOUT = 5                                                     # seconds f
 FIRST = ("tailscale", "mail", "deck")
 
 CLAUDE_ABOUT = ("Sign in first: the rest are set up with Claude. "
-                "Claude Code needs a paid Claude plan or an API account.")
+                "Claude Code needs a Pro or Max plan, or an API account.")
 
 
 def running(tid):
@@ -90,7 +92,7 @@ def main():
         marks = {}
     rows = [{ "id": "claude", "name": "Claude", "icon": "sparkles", "about": CLAUDE_ABOUT, "done": signed_in(),
               "running": running("claude"), "mark": marks.get("claude", ""),
-              "setup": [os.path.join(SCRIPTS, "claude-setup"), "signin"], "help": "" }]
+              "setup": [os.path.join(SCRIPTS, "claude-setup"), "signin"], "help": "", "steps": False, "readme": "" }]
     for _, _, pid, folder, c, external in plugins():
         rows.append({
             "id": pid, "name": c.get("name", pid), "icon": c.get("icon", "puzzle"),
@@ -99,7 +101,9 @@ def main():
             "done": succeeds(c["configured"], folder) if c.get("configured") else marks.get(pid) == "started" and not running(pid),
             "running": running(pid), "mark": marks.get(pid, ""),
             "setup": ["bash", "-c", 'cd "$1" && ' + c["setup"], "setup", folder],
-            "help": os.path.join(folder, "README.md") if external else SITE + pid + "/" })
+            "help": os.path.join(folder, "README.md") if external else SITE + pid + "/",
+            "steps": os.path.isfile(os.path.join(folder, "steps.md")),
+            "readme": readme if os.path.isfile(readme := os.path.join(folder, "README.md")) else "" })
     print(json.dumps(rows))
 
 

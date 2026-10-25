@@ -6,7 +6,7 @@ import Quickshell.Hyprland
 // ⌘⌫). Enter pastes the row into the window that had the focus, Shift+Enter only copies it. Tools and Screenshot
 // themselves are static lists in Launcher.qml (the root search finds their rows).
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered), and also
-// ctrlActivate (Ctrl+Enter) and deleteSelected (⌘⌫, Delete).
+// ctrlActivate (Ctrl+Enter) and deleteSelected (⌘⌫, Delete). ⌘⇧V over a text field opens Clipboard as its picker (ClipPicker).
 Item {
     id: t
     property var launcher: null
@@ -23,23 +23,25 @@ Item {
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
     readonly property var levels: ["clipboard", "emoji", "snippets", "snipkey", "sniptext", "wsname"]
-    readonly property var titles: ({ clipboard: "Clipboard", emoji: "Tools › Emoji", snippets: "Tools › Snippets", snipkey: "Snippets › Trigger",
+    readonly property var inputs: ["snipkey", "sniptext", "wsname"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
+    readonly property var titles: ({ clipboard: picker.active ? "Paste into the field" : "Clipboard", emoji: "Tools › Emoji", snippets: "Tools › Snippets", snipkey: "Snippets › Trigger",
                                      sniptext: "Snippets › “" + snipTrigger + "”", wsname: "Rename space " + wsId })
     readonly property var parents: ({ emoji: "tools", snippets: "tools", snipkey: "snippets", sniptext: "snippets" })
     readonly property bool armsItself: true   // a snippet's armKey is for ⌘⌫ (deleteSelected), not for Shift+Enter
 
     function footer(level, query) {
         const cur = launcher.results[launcher.selIndex] || {}
+        if (level === "clipboard" && picker.active) return "Enter: paste into the field  ·  Esc: back to it"
         if (level === "clipboard") return "Enter: paste  ·  Shift+Enter: copy only"
         if (level === "emoji") return "Enter: paste  ·  Shift+Enter: copy only  ·  search in English or Finnish"
         if (level === "snippets" && cur.kind === "snippet") return "Enter: paste  ·  Shift+Enter: copy only  ·  Ctrl+Enter: edit  ·  Cmd+Backspace: remove"
         if (level === "snippets" && cur.kind === "snipauto") return snipAuto === "off" ? "Enter: turn on in a terminal (asks for your password once)" : "Enter: turn off in a terminal"
         if (level === "snipkey" && query.trim() !== "") return "Enter: continue to the text"
-        if (level === "sniptext" && query !== "") return "Enter: save"
+        if (level === "sniptext") return query !== "" ? "Enter: save  ·  Shift+Enter: new line" : "Shift+Enter: new line"
         if (level === "wsname") return "Enter: rename  ·  Esc: back"
         return ""
     }
-    function opened() {}
+    function opened() { picker.reset() }
     function entered(level) {
         if (level === "emoji" && !emojiLoaded) emojiProc.running = true
         if (level === "clipboard") { clipLoaded = false; clipProc.running = true }
@@ -67,7 +69,9 @@ Item {
             const auto = { kind: "snipauto", name: "Auto-expand", glyph: "zap",
                            summary: snipAuto === "on" ? "on" : snipAuto === "no-access" ? "no keyboard access: log out and in" : "off" }
             const add = { kind: "nav", name: "Add snippet", glyph: "plus", target: "snipkey" }
-            const rows = snipList.map(s => ({ kind: "snippet", name: s.text.split("\n")[0], summary: s.trigger, glyph: "text-cursor-input",
+            // A text of several lines: the first is the name, the rest under it as they are, in the same font (up to subMax)
+            const rows = snipList.map(s => ({ kind: "snippet", name: s.text.split("\n")[0], sub: s.text.split("\n").slice(1).join("\n"),
+                                               subMax: 8, subPlain: true, summary: s.trigger, glyph: "text-cursor-input",
                                                trigger: s.trigger, text: s.text, armKey: "snipdel:" + s.trigger,
                                                armHint: "⌘⌫ again to remove" }))
             if (q === "") return [auto, { kind: "header", name: "Snippets" }, add].concat(rows)
@@ -77,12 +81,13 @@ Item {
             const typed = l.query.trim()
             if (typed === "") return l.hint("Type the trigger, e.g. @@ or f#")
             const old = snipList.find(s => s.trigger === typed)
-            return [{ kind: "snipk", name: "Trigger: " + typed, summary: old ? "replaces “" + old.text.split("\n")[0] + "”" : "next: text",
+            return [{ kind: "snipk", name: "Trigger: " + typed, summary: old ? "replaces “" + oneLine(old.text) + "”" : "next: text",
                       glyph: "arrow-right", value: typed }]
         }
         if (level === "sniptext") {
             if (l.query === "") return l.hint("Type the text that “" + snipTrigger + "” expands to")
-            return [{ kind: "snipadd", name: "Save “" + snipTrigger + "”", summary: l.query, glyph: "text-cursor-input", value: l.query }]
+            return [{ kind: "snipadd", name: "Save “" + snipTrigger + "”", summary: oneLine(l.query), glyph: "text-cursor-input",
+                      value: l.query.replace(/↵/g, "\n") }]
         }
         // Experimental: Hyprland's own name, so it's gone when the workspace empties (the bar shows the number again)
         if (level === "wsname") {
@@ -95,7 +100,7 @@ Item {
 
     function activate(it) {
         const l = launcher
-        if (it.kind === "clip") { clipPick(it, true); return true }
+        if (it.kind === "clip") { picker.active ? picker.pick(it) : clipPick(it, true); return true }
         if (it.kind === "emoji") { emojiPick(it, true); return true }
         if (it.kind === "snippet") { snipPick(it, true); return true }
         if (it.kind === "snipauto") {
@@ -122,7 +127,9 @@ Item {
         return false
     }
     function shiftActivate(it) {
-        if (it.kind === "clip") clipPick(it, false)
+        if (launcher.level === "sniptext") { launcher.insertText("↵"); return }   // a new line in the text
+        if (it.kind === "clip" && picker.active) picker.pick(it)   // the field's picker: as Enter
+        else if (it.kind === "clip") clipPick(it, false)
         else if (it.kind === "emoji") emojiPick(it, false)
         else if (it.kind === "snippet") snipPick(it, false)
         else launcher.activate(it)    // other rows (Add snippet, Auto-expand): as Enter
@@ -131,7 +138,7 @@ Item {
     function ctrlActivate(it) {
         if (it.kind !== "snippet") return false
         snipTrigger = it.trigger
-        launcher.search("sniptext", it.text)
+        launcher.search("sniptext", oneLine(it.text))
         return true
     }
     // ⌘⌫ (IPC deleteSelected) or Delete in Snippets with an empty search: a second press removes the selected snippet
@@ -146,11 +153,15 @@ Item {
         Quickshell.execDetached([scripts + "/snippets", "remove", it.trigger])
         return true
     }
+    // The search field has one line, so a snippet's line breaks show (and are typed with Shift+Enter) as ↵
+    function oneLine(text) { return text.replace(/\r?\n/g, "↵") }
     function arm(key) {
         if (launcher.armed !== key) { launcher.armed = key; disarmTimer.restart(); return false }
         launcher.armed = ""
         return true
     }
+    ClipPicker { id: picker; launcher: t.launcher }
+    property alias picker: picker
     Timer { id: disarmTimer; interval: 4000; onTriggered: if (t.launcher) t.launcher.armed = "" }
 
     // Pastes into the active window by sending Shift+Insert (same as ⌘V; kitty etc. treat it as a clipboard paste).

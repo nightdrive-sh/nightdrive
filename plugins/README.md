@@ -20,6 +20,7 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | --- | --- | --- |
 | `plugin.conf` | Name, icon, description, how to install it and how to tell it's installed | [plugin.conf](ferry/plugin.conf) |
 | `README.md` | Its page: the launcher shows it, and GitHub (and later the website) the same file. Pictures go in the folder | [README.md](ferry/README.md), [ferry.jpg](ferry/ferry.jpg) |
+| `steps.md` | Its setup by hand, a step at a time, for Welcome to Nightdrive without Claude (see [below](#setting-up-by-hand-stepsmd)) | — (Mail's [steps.md](mail/steps.md)) |
 | `module.jsonc` | A top bar module | [module.jsonc](ferry/module.jsonc) |
 | `status` | The module's state, one line of JSON | [status](ferry/status) |
 | `icons/` | The module's own SVG icons, for a logo Lucide hasn't got | — (Tailscale's [icons/](tailscale/icons)) |
@@ -67,12 +68,13 @@ author=@jarilehtinen
 | `default` | `on`: ticked in `install.sh`'s list; `off` (default): not |
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
+| `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
 | `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up), `webapp`, or `app`: one of Nightdrive's own apps (below) |
 | `version` | `MAJOR.MINOR.PATCH`, e.g. `1.0.0` (`0.x` while it's experimental). It shows on the plugin's page in the launcher and on the website, so a bug report can name it. See [Versions](#versions) |
 | `author` | Who made it: a GitHub user (`@name`) or a name |
 | `setup` | A shell command, run in the folder, that sets the installed plugin up with Claude: Claude Code in a terminal, going through the README's steps with the user. The plugin's page gets a button Set up with Claude (and the key C) for it. For a plugin whose use needs more than its installer can ask, such as Mail's account (`bin/nightmail setup`). Start Claude through `~/.config/hypr/scripts/claude-setup ID NAME`, with your steps on its stdin: it holds the session to them, and Welcome to Nightdrive sees it running. Installed plugins with a `setup` are rows in Welcome to Nightdrive (launcher › System › Set up Nightdrive) |
 | `configured` | A shell test, run in the folder, like `installed`: the setup is done while it succeeds (an account written, a login made). Welcome shows the plugin's row as Done by it. Quick, as `installed`. Without it, a setup counts as done once its Claude session has closed |
-| `welcome` | The plugin's row in Welcome to Nightdrive: one line, in plain words, of what setting it up gives you. Default: `description` |
+| `welcome` | The plugin's row in Welcome to Nightdrive: one line, in plain words, of what setting it up gives you (with Claude or without). Default: `description` |
 | `order` | A number, default 50: `install.sh` installs the plugins in this order, and the lists show them in it. Lower goes first; the same order keeps the folders' (alphabetical) order, then `plugins.txt`'s lines. Home Assistant has 90: its installer asks for addresses, so it runs last |
 
 An `app` (Mail, Deck) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
@@ -187,9 +189,12 @@ it (`qs kill; setsid -f qs`).
 
 **Pages in the launcher.** A `<Name>Levels.qml` is a launcher level file like the core's (`config/quickshell/*Levels.qml`;
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also
-have `rootItems` (rows at the launcher's root: Deck's Music), `rootRows()` (rows for the root search: Deck's albums) and
-`topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
-Deck's [MusicLevels.qml](deck/MusicLevels.qml) has all of them. The same restart applies.
+have `rootItems` (rows at the launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `rootRows()`
+(rows for the root search: Deck's albums) and `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
+`inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
+into the field.
+Deck's [MusicLevels.qml](deck/MusicLevels.qml) has most of them, Keep Awake's [KeepAwakeLevels.qml](keep-awake/KeepAwakeLevels.qml)
+is a small one to copy. The same restart applies.
 
 ## The page: README.md
 
@@ -214,6 +219,24 @@ rest of it would be a paragraph of its own (`nightdrive plugin check` points out
 Commands go in a code block, indented by 4 spaces after a blank line (or in ``` fences), one command a line. The
 launcher shows it in a box with its lines as they are, and a `command   # comment` line with the comment dimmed in a
 column beside the commands (under the command when there isn't room), so keep the comments short, as Ferry's are.
+
+## Setting up by hand: steps.md
+
+Welcome to Nightdrive asks first whether you have Claude. Without, Enter on a plugin's row shows its `steps.md` in the
+window, a step at a time (without a `steps.md`, Enter opens the plugin's page). Its third answer, *I'll do it myself*,
+opens the plugin's `README.md` in Apostrophe instead, so keep the README's setup section complete on its own. Write
+`steps.md` for someone new to Linux: what the step is for, then what to do. The first step says why the plugin matters
+in Nightdrive. `config/welcome/steps` reads it; Tailscale's, Mail's and Deck's are examples.
+
+- Each `## Title` is a step: its paragraphs (Markdown), at most one fenced code block, and lines of their own:
+  - `Ask: key | Label | example`: a field to fill in. `{key}` in a later code block, button or test becomes its value,
+    kept only while the window is open; a command that needs one waits until it is filled in.
+  - `Edit: ~/path`: the code block is the file's template. Enter writes it, if the file isn't there yet, and opens it
+    in the text editor. Without `Edit:`, the code block is a command: Enter runs it in a terminal, y copies it.
+  - `Run: Label | command` and `Open: Label | https://…`: a button that runs a command in the plugin's folder, or opens
+    a page. `Open:` with a file of the folder's (`README.md`) opens it in Apostrophe, for the details a step leaves out.
+  - `Done when: test`: a quick shell test, run in the folder every few seconds; the step shows Done while it succeeds.
+- The row counts as done by `configured` in plugin.conf, as with Claude; Finish on the last step marks it started.
 
 ## Keys: bindings.lua and SHORTCUTS.md
 

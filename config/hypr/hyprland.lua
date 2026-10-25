@@ -245,7 +245,9 @@ end)
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
-hl.env("QT_QPA_PLATFORMTHEME", "kde")  -- Qt apps (Dolphin) use KDE's dark theme
+-- Qt apps (EasyEffects) follow the GTK settings, which setup-user.sh makes dark. Not "kde": that needs plasma-integration,
+-- which --no-kde removes, and even with it the apps are light unless Plasma's own colour scheme was set dark
+hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
 hl.env("MOZ_ENABLE_WAYLAND", "1")
 -- NVIDIA's own driver (a PC, install.sh): video decoding and GLX through it (Hyprland wiki › NVIDIA). Checked at start
 -- rather than written by install.sh, so a driver added or removed later is followed.
@@ -408,6 +410,7 @@ hl.gesture({ fingers = 3, direction = "down", action = function() drawer_gesture
 ------------------------
 require("bindings")
 require("scroll")
+require("float-link")   -- ⌃⌘ + click on a link: the window it opens floats
 
 -----------------------
 ---- WINDOW RULES ----
@@ -450,14 +453,8 @@ hl.window_rule({
     size  = "460 monitor_h-57",             -- the screen's height under the bar; it scrolls
     move  = "monitor_w-470 47",
 })
--- Welcome to Nightdrive (config/welcome): a card in the middle, over whatever the first login opened
-hl.window_rule({
-    name  = "float-welcome",
-    match = { class = "^org\\.quickshell$", title = "^Welcome to Nightdrive$" },
-    float = true,
-    size  = "640 690",
-    center = true,
-})
+-- Welcome to Nightdrive (config/welcome): its window rules, and what it opens comes over it
+require("welcome")
 hl.window_rule({
     name  = "float-preview",
     match = { class = "^org\\.gnome\\.Loupe$" },
@@ -492,6 +489,18 @@ hl.window_rule({
     match = { class = "^(sh\\.nightdrive\\.)?floating-help$" },
     float = true,
     size  = "900 750",
+})
+-- Polkit password prompt (hyprpolkitagent; its size: hyprpolkitagent/hyprpolkitagent.conf): centred over everything,
+-- on whatever workspace is shown, with the keyboard, since a prompt left unseen times out. Over the launcher and the
+-- bar's menus too: those are overlay layers no window gets above, so they hide while it is open (quickshell/PolkitWatch.qml).
+hl.window_rule({
+    name  = "polkit-prompt",
+    match = { class = "^hyprpolkitagent$" },
+    float = true,
+    size  = "600 window_h",   -- its own width (window_width) is only a preference: floating, it opened at its minimum, 460
+    center = true,
+    pin = true,
+    stay_focused = true,
 })
 -- 1Password: floating window centred on screen, hidden from screen sharing. Here rather than in plugins/1password: the app
 -- may run while the plugin is off (it starts at login), and it must stay out of a shared screen then too.

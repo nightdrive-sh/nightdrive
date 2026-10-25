@@ -216,14 +216,17 @@ ShellRoot {
 
     Shelf {}
 
+    PolkitWatch { id: polkit }
+
     Launcher {
         id: launcher
+        stepAside: polkit.asking
         extSource: root.localLauncher ? "local/LauncherExtension.qml" : ""
         onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.current = name }   // below its bar icon (-1 = none: right edge)
     }
 
     PanelWindow {
-        visible: root.current !== ""
+        visible: root.current !== "" && !polkit.asking   // the password prompt is a window: it can't get above an overlay
         screen: root.menuScreen || Quickshell.screens[0]
         anchors { top: true; bottom: true; left: true; right: true }
         margins { top: Theme.barHeight }   // the top bar stays clickable

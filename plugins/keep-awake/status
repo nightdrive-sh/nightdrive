@@ -1,0 +1,4 @@
+#!/bin/bash
+# Keep Awake's top bar module (module.jsonc): the cup lit while bin/keep-awake keeps the computer awake, dimmed otherwise
+. ~/.config/topbar/scripts/emit
+if systemctl --user -q is-active nightdrive-keep-awake.service; then emit coffee "" active; else emit coffee "" off; fi

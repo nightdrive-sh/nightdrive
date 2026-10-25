@@ -1,0 +1,5 @@
+// Keep Awake's top bar module: a coffee cup, lit while it keeps the computer awake (./status); a click opens
+// KeepAwakeMenu.qml, a right click turns it on (until turned off) or off. First in the icon row: before the plugins at
+// the left end (Home Assistant, Deck), which come earlier in the folders' order, or before Claude's without them.
+{ "interval": 10, "right": "bin/keep-awake toggle", "menu": "keepAwake", "before": ["home", "deck", "claude"],
+  "size": 16, "label": "Keep Awake", "glyph": "coffee" }

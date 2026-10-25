@@ -20,6 +20,9 @@ ShellRoot {
     // A lock later in the session (hypr/scripts/lock): straight to the prompt, the intro is for the boot
     readonly property bool quick: Quickshell.env("NIGHTDRIVE_LOCK_QUICK") === "1"
     readonly property string pamService: Quickshell.env("NIGHTDRIVE_LOCK_PAM") || "login"
+    // A screensaver never sees the input that would close it while locked, so the lock ends it: once up, and at the
+    // unlock for one that started in between (screensaver/start also won't start under the lock)
+    readonly property string saverStop: Quickshell.env("HOME") + "/.config/screensaver/stop"
 
     // The screen with the prompt: the focused monitor, where the keyboard goes; the first screen before Hyprland's state has
     // arrived or if it names none of them, so there's always one. By name: monitorFor() gave another object than
@@ -42,6 +45,7 @@ ShellRoot {
     function unlock() {
         if (preview) { root.endPreview(); return }
         lock.locked = false
+        Quickshell.execDetached([root.saverStop])
         Quickshell.execDetached(["hyprctl", "eval", "NightdriveCornersHidden(false)"])
         Quickshell.execDetached(["hyprctl", "eval", "NightdriveUnlocked()"])
         quit.start()
@@ -66,6 +70,7 @@ ShellRoot {
         locked: !root.preview
         // NightdriveLocked starts the session once, at boot; a later lock only hides the corners
         onSecureChanged: if (secure) {
+            Quickshell.execDetached([root.saverStop])
             Quickshell.execDetached(["hyprctl", "eval", "NightdriveCornersHidden(true)"])
             Quickshell.execDetached(["hyprctl", "eval", "NightdriveLocked()"])
         }

@@ -1,0 +1,172 @@
+#!/usr/bin/python3 -I
+"""A plugin's steps to set it up by hand, for the Welcome window's manual path: its steps.md, read for the window.
+  steps ID [VALUES]                 the steps as JSON on stdout, their Done when tests run with VALUES
+  steps edit ID N VALUES            step N's template written to its Edit: file if that is missing, then opened in the editor
+                                    (over the window: hypr/welcome.lua)
+  steps run ID N VALUES             step N's code block in a terminal, which stays open afterwards
+  steps action ID N I VALUES        step N's I-th Run: or Open: button
+VALUES is a JSON object of the Ask: fields filled so far ({"email": "you@example.com"}): {key} in a command or a
+template becomes its value. The window keeps them only while it is open.
+
+steps.md (plugins/README.md › steps.md): what comes before the first step is for its readers only; each `## Title` is
+a step, its paragraphs in plain words, at most one fenced code block (a command, or the template of its `Edit:` file),
+and lines of their own:
+  Ask: key | Label | placeholder     a field the window asks for
+  Edit: ~/path                       the code block is the file's template
+  Run: Label | command               a button: the command, in the plugin's folder
+  Open: Label | https://…            a button: a page in the browser, or a file of the folder's (README.md) in
+                                     Apostrophe, as the "I'll do it myself" path opens it
+  Done when: test                    a quick shell test, in the folder: the step shows as done while it succeeds"""
+import json, os, re, subprocess, sys
+
+REPO = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../.."))
+HOME = os.path.expanduser("~")
+EXTERNAL = os.path.join(HOME, ".local/share/nightdrive/plugins")
+TERMINAL = os.path.join(HOME, ".config/hypr/scripts/terminal")
+TERMINAL_CLASS = "nightdrive-welcome"   # hypr/welcome.lua's float-welcome-terminal: over the window, not tiled behind it
+TEST_TIMEOUT = 5                    # seconds for a Done when test: the window reads the steps again every few seconds
+DIRECTIVE = re.compile(r"(Ask|Edit|Run|Open|Done when):\s*(.*)$")
+
+
+def folder(pid):
+    for base in (os.path.join(REPO, "plugins"), EXTERNAL):
+        f = os.path.join(base, pid)
+        if os.path.isfile(os.path.join(f, "steps.md")):
+            return f
+    sys.exit(f"steps: {pid} has no steps.md")
+
+
+def conf(f):
+    try:
+        lines = open(os.path.join(f, "plugin.conf")).read().split("\n")
+    except OSError:
+        return {}
+    return dict(l.split("=", 1) for l in lines if re.match(r"[a-z]+=", l))
+
+
+def parse(text):
+    """[step]: the file's ## steps, each with its parts sorted out of the text"""
+    steps, step, prose, code, fence = [], None, [], None, False
+    def close():
+        if step is not None:
+            step["text"] = "\n".join(prose).strip()
+            steps.append(step)
+    for line in text.split("\n"):
+        if fence:
+            if line.startswith("```"):
+                fence = False
+                if step is not None and step["code"] == "":
+                    step["code"] = "\n".join(code)
+            else:
+                code.append(line)
+            continue
+        if line.startswith("```"):
+            fence, code = True, []
+            continue
+        if line.startswith("## "):
+            close()
+            step, prose = {"title": line[3:].strip(), "asks": [], "code": "", "edit": "", "actions": [], "test": ""}, []
+            continue
+        if step is None:
+            continue
+        m = DIRECTIVE.match(line)
+        if not m:
+            prose.append(line)
+            continue
+        kind, rest = m.group(1), [p.strip() for p in m.group(2).split("|")]
+        if kind == "Ask":
+            step["asks"].append({"key": rest[0], "label": rest[1] if len(rest) > 1 else rest[0],
+                                 "placeholder": rest[2] if len(rest) > 2 else ""})
+        elif kind == "Edit":
+            step["edit"] = rest[0]
+        elif kind == "Done when":
+            step["test"] = m.group(2).strip()
+        elif len(rest) > 1:
+            step["actions"].append({"kind": kind.lower(), "label": rest[0], "arg": "|".join(rest[1:]).strip()})
+    close()
+    return steps
+
+
+def passes(test, cwd):
+    try:
+        return subprocess.run(["bash", "-c", test], cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              timeout=TEST_TIMEOUT).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def fill(text, values):
+    return re.sub(r"\{(\w+)\}", lambda m: values.get(m.group(1)) or m.group(0), text)
+
+
+def show(pid, vals):
+    f = folder(pid)
+    c = conf(f)
+    steps = parse(open(os.path.join(f, "steps.md")).read())
+    for s in steps:
+        s["done"] = passes(fill(s["test"], vals), f) if s["test"] else None
+        del s["test"]
+    print(json.dumps({"id": pid, "name": c.get("name", pid), "icon": c.get("icon", "puzzle"), "steps": steps}))
+
+
+def step(pid, n):
+    f = folder(pid)
+    steps = parse(open(os.path.join(f, "steps.md")).read())
+    if not 0 <= n < len(steps):
+        sys.exit(f"steps: {pid} has no step {n}")
+    return f, steps[n]
+
+
+def values(arg):
+    try:
+        v = json.loads(arg)
+        return {k: str(x) for k, x in v.items()} if isinstance(v, dict) else {}
+    except ValueError:
+        return {}
+
+
+def detach(argv, cwd):
+    subprocess.Popen(argv, cwd=cwd, start_new_session=True, stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def edit(pid, n, vals):
+    """The file is written only when it isn't there yet: one the user already has is opened as it is, never replaced"""
+    f, s = step(pid, n)
+    path = os.path.expanduser(s["edit"])
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as out:
+            out.write(fill(s["code"], vals).rstrip("\n") + "\n")
+    detach(["xdg-open", path], f)
+
+
+def run(pid, n, vals):
+    f, s = step(pid, n)
+    detach([TERMINAL, "--hold", "--dir", HOME, "--class", TERMINAL_CLASS, "--", "bash", "-c", fill(s["code"], vals)], f)
+
+
+def action(pid, n, i, vals):
+    f, s = step(pid, n)
+    a = s["actions"][i]
+    if a["kind"] == "open" and "://" not in a["arg"]:
+        detach([os.path.join(os.path.dirname(os.path.realpath(__file__)), "welcome"), "readme",
+                os.path.join(f, os.path.expanduser(a["arg"]))], f)
+    elif a["kind"] == "open":
+        detach(["xdg-open", fill(a["arg"], vals)], f)
+    else:
+        detach(["bash", "-c", fill(a["arg"], vals)], f)
+
+
+def main(argv):
+    if len(argv) in (1, 2) and argv[0] not in ("edit", "run", "action"):
+        show(argv[0], values(argv[1]) if len(argv) == 2 else {})
+    elif len(argv) == 4 and argv[0] in ("edit", "run"):
+        (edit if argv[0] == "edit" else run)(argv[1], int(argv[2]), values(argv[3]))
+    elif len(argv) == 5 and argv[0] == "action":
+        action(argv[1], int(argv[2]), int(argv[3]), values(argv[4]))
+    else:
+        sys.exit("usage: steps ID [VALUES] | edit ID N VALUES | run ID N VALUES | action ID N I VALUES")
+
+
+main(sys.argv[1:])

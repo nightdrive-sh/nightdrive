@@ -1,0 +1,350 @@
+#!/bin/bash
+# nightdrive minimal: turns a Nightdrive installed on Fedora KDE (an install from before 25.10.2026, or on Fedora Asahi
+# Remix's KDE image) into what a fresh install on Fedora Minimal has. No list of KDE's packages: what stays is marked
+# user-installed, everything else a dependency, and dnf's autoremove takes what nothing that stays needs.
+# What stays (only what is installed: nothing is added):
+#   - Fedora Minimal's own packages (base-pc.txt or base-asahi.txt here)
+#   - Nightdrive's package lists (packages*.txt) and what install.sh's steps add (the boot splash, an NVIDIA driver)
+#   - the installed plugins' packages (plugin.conf's packages=, `nightdrive plugins packages`)
+#   - the packages dnf protects, and the ones given with --keep
+#   - yours: user-installed, but not by the system's image (its kiwi transactions in dnf history), not by KDE's groups,
+#     and never in Nightdrive's lists (their git history: one dropped from them goes, and is listed apart)
+#   nightdrive minimal --dry-run    what would go and what stays as yours; changes nothing and needs no sudo
+#   nightdrive minimal              shows the same and asks, then: the login screen to Nightdrive's if KDE's is in use, a
+#                                   read-only btrfs snapshot of the root, the conversion, and KDE's settings in ~/.config
+#                                   moved to ~/.local/share/nightdrive/kde-config-<time>
+#   --keep kate,okular   these stay too, with what they need
+#   --no-greeter         greetd's text login instead of the Nightdrive login screen, where KDE's is in use now
+#   --no-snapshot        no snapshot (needed when the root isn't btrfs)
+#   --yes                doesn't ask
+# The way back: README › Install (Installed on Fedora KDE?), and the commands the run prints at the end and keeps in
+# ~/.local/state/nightdrive/minimal-undo.txt
+set -euo pipefail
+here=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+repo=$(cd "$here/../.." && pwd)
+# libdnf5's record of why each package is installed and which groups are (its system_state_dir)
+STATE=/usr/lib/sysimage/libdnf5
+# install.sh's steps outside the package lists: the boot splash (config/splash/install.sh), the NVIDIA driver and RPM
+# Fusion, dnf's copr command (setup-hyprland-repo.sh)
+EXTRAS=(plymouth plymouth-plugin-two-step plymouth-theme-spinner ImageMagick jetbrains-mono-fonts akmod-nvidia akmods
+        mokutil openssl rpmfusion-free-release rpmfusion-nonfree-release dnf5-plugins)
+# Nightdrive's lists, also as they were (git log): a package dropped from them isn't the user's own
+LISTS=(packages.txt packages-hyprland.txt packages-pc.txt packages-asahi.txt)
+UNDO=$HOME/.local/state/nightdrive/minimal-undo.txt
+stamp=$(date +%Y%m%d-%H%M)
+BACKUP=$HOME/.local/share/nightdrive/kde-config-$stamp
+
+dry=0; yes=0; snapshot=1; greeter=1; keep_opt=""
+usage() { sed -n '/^#   nightdrive minimal --dry-run/,/^#   --yes/p' "$0" | sed 's/^# \{0,1\}//'; }
+die() { echo "nightdrive minimal: $*" >&2; exit 1; }
+while (( $# )); do
+  case $1 in
+    --dry-run) dry=1 ;;
+    --yes|-y) yes=1 ;;
+    --no-snapshot) snapshot=0 ;;
+    --no-greeter) greeter=0 ;;
+    --keep=*) keep_opt+=,${1#*=} ;;
+    --keep) [[ -n ${2:-} ]] || { echo "--keep needs package names, e.g. --keep kate,okular" >&2; exit 2; }
+            keep_opt+=,$2; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown option: $1 (see nightdrive minimal --help)" >&2; exit 2 ;;
+  esac
+  shift
+done
+(( EUID )) || die "run it as your user: it asks for sudo itself"
+command -v dnf5 >/dev/null || die "needs Fedora's dnf5"
+(( yes || dry )) || [[ -t 0 ]] || die "asks before it changes anything: run it in a terminal, or with --yes"
+# Plasma removed from under its own session would leave a broken screen halfway
+[[ ${XDG_CURRENT_DESKTOP:-} != *KDE* ]] || (( dry )) \
+  || die "Plasma is running: run this from Nightdrive's desktop or a text console (ctrl+alt+F3)"
+
+# --- What is installed, and why (dnf's reasons: User, Dependency, Weak Dependency, Group, External User) ---
+# -C and no repos: only the installed packages, nothing downloaded
+dnf_local() { LC_ALL=C dnf -q -C --disablerepo='*' "$@"; }
+declare -A inst reason keep
+read_reasons() {
+  inst=(); reason=()
+  while read -r n r; do inst[$n]=1; reason[$n]=$r; done < <(dnf_local repoquery --installed --qf '%{name} %{reason}\n' | grep -v '^gpg-pubkey ')
+  (( ${#inst[@]} )) || die "dnf listed no installed packages"
+}
+read_reasons
+lines() { grep -vhE '^\s*(#|$)' "$@" | sed 's/[[:space:]]*#.*//; s/[[:space:]]*$//'; }
+# group_members ID: a group's mandatory, default and conditional packages, from Fedora's comps (the repos' metadata)
+group_members() {
+  LC_ALL=C dnf -q group info "$1" 2>/dev/null | awk '/^[^ ]/ { on = /^(Mandatory|Default|Conditional) packages/ }
+    on && /:/ { sub(/^[^:]*:[ \t]*/, ""); if ($1 != "") print $1 }'
+}
+# add NAME|GLOB…: the installed ones stay (a GLOB, unquoted on purpose, matches their names). A name not installed as
+# such may be another's capability (rpm --whatprovides)
+add() {
+  local p n
+  for p; do
+    if [[ $p == *[*?]* ]]; then for n in "${!inst[@]}"; do [[ $n == $p ]] && keep[$n]=1; done
+    elif [[ -n ${inst[$p]:-} ]]; then keep[$p]=1
+    else while read -r n; do [[ -n ${inst[$n]:-} ]] && keep[$n]=1; done < <(rpm -q --whatprovides --qf '%{NAME}\n' "$p" 2>/dev/null | grep -v ' ')
+    fi
+  done
+  return 0
+}
+# add_file FILE…: its names and globs, its @groups expanded; a -name line (base files) leaves that one out afterwards
+leave=()
+add_file() {
+  local l g
+  while read -r l; do
+    case $l in
+      -*) leave+=("${l#-}") ;;
+      @*) g=$(group_members "${l#@}") || true
+          # Without the group (no network, a renamed group) Fedora's own packages would all count as KDE's
+          [[ -n $g ]] || die "couldn't read the group ${l#@} from Fedora's repos (no network?)"
+          add $g ;;
+      *) add "$l" ;;
+    esac
+  done < <(lines "$@")
+}
+
+machine=$("$repo/config/hypr/scripts/platform" machine)
+kind=pc; [[ $machine == asahi ]] && kind=asahi
+echo "Reading what is installed and what Fedora Minimal has (base-$kind.txt)…"
+add_file "$here/base-$kind.txt"
+# install.sh removes these from Asahi's Minimal image (a Mac doesn't use them)
+[[ $kind == asahi ]] && while read -r l; do leave+=("$l"); done < <(lines "$repo/packages-remove-asahi.txt")
+for l in "${leave[@]}"; do unset "keep[$l]"; done
+lists=()
+for l in "${LISTS[@]}"; do [[ $l == packages-pc.txt && $kind != pc || $l == packages-asahi.txt && $kind != asahi ]] || lists+=("$repo/$l"); done
+add_file "${lists[@]}"
+add "${EXTRAS[@]}"
+read -ra plugin_pkgs <<<"$("$repo/bin/nightdrive" plugins packages | tr '\n' ' ')"
+add "${plugin_pkgs[@]}"
+# The edition's release packages (fedora-release-kde-desktop, fedora-release-identity-kde-desktop: the name in
+# /etc/os-release, presets, and a protected.d file that keeps plasma-desktop) give way to Minimal's (fedora-release, its
+# identity-basic) once KDE is gone. Until then they stay, as fedora-release-common needs an identity
+ident=$(rpm -qa --qf '%{NAME}\n' '*-release-identity-*' | grep -v -- '-identity-basic$' | head -1 || true)
+edition=${ident/-identity-/-}; release=${ident%%-identity-*}
+# dnf refuses to remove these (protected_packages): dnf5, setup, sudo and protected.d's, but not the edition's
+protected=(dnf5 setup sudo)
+for f in /etc/dnf/protected.d/*.conf; do
+  [[ -f $f && ( -z $ident || $(rpm -qf --qf '%{NAME}' "$f" 2>/dev/null) != "$ident" ) ]] || continue
+  while read -r l; do protected+=("$l"); done < <(lines "$f")
+done
+add "${protected[@]}"
+
+# --- Yours: user-installed, not by the image, a group or Nightdrive ---
+declare -A notyours ever
+# The installed groups' packages (KDE's, the image's @core…), as dnf recorded them
+while read -r n; do notyours[$n]=1; done < <(sed -nE 's/^ *"([^"]+)",?$/\1/p' "$STATE/groups.toml" 2>/dev/null)
+# The image's: the system was built by kiwi (Fedora's and Asahi's image builder), whose transactions dnf history keeps
+image_ids=$(dnf_local history list --json 2>/dev/null | jq -r '.[] | select(.command_line | test("kiwi")) | .id' || true)
+if [[ -n $image_ids ]]; then
+  while read -r n; do notyours[$n]=1; done < <(dnf_local history info $image_ids --json 2>/dev/null \
+    | jq -r '.[].packages[]? | select(.action == "Install") | .nevra | capture("^(?<n>.+)-[0-9]+:[^-]+-[^-]+$").n' || true)
+fi
+while read -r n; do notyours[$n]=1; ever[$n]=1; done < <(git -C "$repo" log -p --format= -- "${LISTS[@]}" 2>/dev/null \
+  | sed -nE 's/^[-+]([A-Za-z0-9][^[:space:]#]*).*/\1/p' | grep -v '^@' || true)
+yours=()
+for n in "${!inst[@]}"; do
+  [[ ${reason[$n]} == User || ${reason[$n]} == "External User" ]] || continue
+  [[ -z ${keep[$n]:-} && -z ${notyours[$n]:-} ]] && yours+=("$n")
+done
+add "${yours[@]}"
+IFS=, read -ra kept_opt <<<"${keep_opt#,}"
+for n in "${kept_opt[@]}"; do [[ -n $n && -n ${inst[$n]:-} ]] || die "--keep: ${n:-(empty)} isn't installed"; done
+add "${kept_opt[@]}"
+
+# --- What would go: dnf's own answer, from a copy of its records with the new reasons ---
+# No groups in the copy: a package in an installed group counts as the group's, and `dnf mark dependency` takes it out
+# of the group's list, which the copy can't do package by package
+sim=$(mktemp -d); trap 'rm -rf "$sim"' EXIT
+for f in system.toml nevras.toml modules.toml; do [[ -r $STATE/$f ]] && cp "$STATE/$f" "$sim/"; done
+printf 'version = "1.0"\n\n[groups]\n' > "$sim/groups.toml"
+printf 'version = "1.0"\n\n[environments]\n' > "$sim/environments.toml"
+printf '%s\n' "${!keep[@]}" > "$sim/keep"
+{ printf 'version = "1.0"\n\n[packages]\n'
+  rpm -qa --qf '%{NAME} %{ARCH}\n' | sort -u | awk 'NR == FNR { k[$1]; next } $1 != "gpg-pubkey" {
+    printf "\"%s.%s\" = {reason = \"%s\"}\n", $1, $2, ($1 in k) ? "User" : "Dependency" }' "$sim/keep" -
+} > "$sim/packages.toml"
+unneeded() { dnf_local --setopt=system_state_dir="$1" repoquery --unneeded --qf '%{name}\n' | sort -u; }
+mapfile -t goes < <(unneeded "$sim")
+(( ${#goes[@]} )) || { echo "Nothing to remove: this is already as Fedora Minimal + Nightdrive."; exit 0; }
+declare -A going; for n in "${goes[@]}"; do going[$n]=1; done
+dropped=(); for n in "${!ever[@]}"; do [[ -n ${going[$n]:-} && ${reason[$n]:-} == User ]] && dropped+=("$n"); done
+mapfile -t dropped < <(printf '%s\n' "${dropped[@]}" | sed '/^$/d' | sort)
+mapfile -t yours < <(printf '%s\n' "${yours[@]}" | sed '/^$/d' | sort)
+
+# --- The rest: the login screen, the snapshot, KDE's wallet, KDE's settings ---
+dm=$(basename "$(readlink /etc/systemd/system/display-manager.service 2>/dev/null)" .service)
+root_fs=$(findmnt -no FSTYPE / || true); root_sub=$(findmnt -no FSROOT / || true); root_dev=$(findmnt -no SOURCE / | sed "s/\[.*//" || true)
+snap_name="${root_sub#/}.pre-minimal-$stamp"
+# Wi-Fi passwords NetworkManager asks the user's agent for: on KDE that's its wallet, which goes
+wallet_wifi() {
+  local n
+  nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$NF == "802-11-wireless" { sub(/:[^:]*$/, ""); print }' |
+    while read -r n; do
+      [[ $(nmcli -g 802-11-wireless-security.psk-flags connection show "$n" 2>/dev/null) == 1* ]] && echo "$n"
+    done || true
+}
+mapfile -t wifi < <(wallet_wifi)
+# KDE's own files in ~/.config: not Nightdrive's links, and not the settings of a KDE app that stays (konsolerc while
+# konsole is there)
+kde_configs() {
+  local f n
+  for f in "$HOME"/.config/k* "$HOME"/.config/plasma*; do
+    [[ -e $f && ! -L $f ]] || continue
+    n=${f##*/}
+    case $n in
+      kdeconnect*) command -v kdeconnect-cli >/dev/null && continue ;;
+      kde*|kwin*|kscreen*|kactivitymanagerd*|kconf_update*|kglobalshortcuts*|khotkeys*|kxkb*|ktimezoned*|kwallet*|plasma*) ;;
+      k*rc) command -v "${n%rc}" >/dev/null && continue ;;
+      *) continue ;;
+    esac
+    echo "$f"
+  done
+}
+
+fold_list() { echo "$*" | fold -s -w 100 | sed 's/^/  /'; }
+summary() {
+  echo
+  echo "Machine: $machine. Stays: $(( ${#inst[@]} - ${#goes[@]} )) packages (Fedora Minimal's, Nightdrive's, the plugins')"
+  if (( ${#yours[@]} )); then echo "Yours, they stay (installed by you, not by KDE or Nightdrive):"; fold_list "${yours[@]}"
+  else echo "Yours: none found (installed by you, not by KDE or Nightdrive)"; fi
+  echo "Goes: ${#goes[@]} packages, KDE and what only it needed (and a few that only these recommended, found afterwards):"
+  fold_list "${goes[@]}"
+  if (( ${#dropped[@]} )); then
+    echo "Among them, once Nightdrive's but no longer in its lists (--keep NAME keeps one):"; fold_list "${dropped[@]}"
+  fi
+  [[ -z $ident ]] || echo "Fedora's edition: $edition gives way to Minimal's $release (the system's name, e.g. in /etc/os-release)"
+  case $dm in
+    greetd) echo "Login screen: greetd (Nightdrive's), stays" ;;
+    "") echo "Login screen: none enabled; Nightdrive's is turned on first" ;;
+    *) echo "Login screen: $dm (KDE's) goes; first $( (( greeter )) && echo "Nightdrive's login screen" || echo "greetd's text login") takes its place" ;;
+  esac
+  if (( snapshot )) && [[ $root_fs != btrfs ]]; then
+    echo "Snapshot: can't, the root isn't btrfs (${root_fs:-unknown}); --no-snapshot goes on without one (the way back is dnf history only)"
+  elif (( snapshot )); then echo "Snapshot: the root ($root_sub on $root_dev) as $snap_name, read-only, before anything changes"
+  else echo "Snapshot: none (--no-snapshot); the way back is dnf history only"; fi
+  (( ${#wifi[@]} )) && { echo "Wi-Fi passwords kept in KDE's wallet, asked again when you next join:"; fold_list "${wifi[@]}"; }
+  local n; n=$(kde_configs | wc -l)
+  (( n )) && echo "KDE's settings in ~/.config ($n files and folders) move to ${BACKUP/#$HOME/\~}"
+  return 0
+}
+summary
+if (( dry )); then
+  echo; echo "Nothing changed (--dry-run). Without it: the above, then how to go back."; exit 0
+fi
+(( !snapshot )) || [[ $root_fs == btrfs ]] || die "the root isn't btrfs: --no-snapshot goes on without a snapshot"
+if (( !yes )); then
+  echo; read -rp "Remove the ${#goes[@]} packages? Type yes to go on: " ans
+  [[ $ans == yes ]] || { echo "Nothing changed."; exit 1; }
+fi
+
+# --- The conversion ---
+sudo -v
+while sleep 50; do kill -0 $$ 2>/dev/null || exit; sudo -n -v 2>/dev/null; done &
+keepalive=$!
+trap 'kill $keepalive 2>/dev/null; rm -rf "$sim"' EXIT
+
+# 1. The login screen first: KDE's goes with KDE, and the machine would boot to nothing
+if [[ $dm != greetd ]]; then
+  if (( greeter )); then
+    echo "==> Login screen: Nightdrive's (greetd), from the next boot"
+    "$repo/config/greeter/install.sh"
+    "$repo/config/greeter/switch.sh" autologin
+  else
+    echo "==> Login screen: greetd's text login, from the next boot"
+    "$repo/config/greeter/switch.sh" text
+  fi
+  [[ $(readlink /etc/systemd/system/display-manager.service) == */greetd.service ]] || die "greetd isn't the login screen: stopped before removing anything"
+fi
+# 2. The snapshot: the root subvolume, beside it at the top of the btrfs (subvolid 5), read-only
+if (( snapshot )); then
+  echo "==> Snapshot of the root: $snap_name"
+  top=$(mktemp -d)
+  sudo mount -o subvolid=5 "$root_dev" "$top"
+  sudo btrfs subvolume snapshot -r "$top$root_sub" "$top/$snap_name" || { sudo umount "$top"; die "the snapshot failed: nothing removed"; }
+  sudo umount "$top"; rmdir "$top"
+fi
+# 3. The new reasons (the transactions after $before: `dnf history rollback --ignore-extras $before` undoes them all;
+# --ignore-extras for what dnf pulls in along, NetworkManager-libreswan-gnome on KDE), then dnf's own
+# list compared with the one shown
+before=$(dnf_local history list --json | jq -r 'map(.id) | max // 0')
+trap 'echo "Stopped halfway. What changed in dnf is undone with: sudo dnf history rollback --ignore-extras $before" >&2' ERR
+echo "==> Marking what stays as user-installed, the rest as dependencies"
+read_reasons   # the login screen's installer may have installed or marked some
+add greetd greetd-selinux
+mark_user=(); mark_dep=()
+for n in "${!inst[@]}"; do
+  if [[ -n ${keep[$n]:-} ]]; then [[ ${reason[$n]} == User ]] || mark_user+=("$n")
+  else [[ ${reason[$n]} == *Dependency ]] || mark_dep+=("$n"); fi
+done
+(( ${#mark_user[@]} )) && sudo dnf -q mark user -y "${mark_user[@]}" >/dev/null
+(( ${#mark_dep[@]} )) && sudo dnf -q mark dependency -y "${mark_dep[@]}" >/dev/null
+# KDE's groups stay recorded: they don't keep their packages from autoremove, and `group remove --no-packages` would
+# break the way back (dnf history rollback over it stops at "Group state not found", 25.10.2026)
+mapfile -t real < <(unneeded "$STATE")
+if [[ ${real[*]} != "${goes[*]}" ]]; then
+  echo "dnf would now remove ${#real[@]} packages, not the ${#goes[@]} shown: stopped before removing anything." >&2
+  echo "The new reasons are undone with: sudo dnf history rollback --ignore-extras $before" >&2
+  exit 1
+fi
+echo "==> Removing ${#goes[@]} packages (dnf autoremove)"
+marker=$(mktemp)
+# The empty setopt clears the list (protected.d included), the next sets it: one alone would only add to it
+autoremove() { sudo dnf autoremove -y --setopt=protected_packages= --setopt=protected_packages="$(IFS=,; echo "${protected[*]}")"; }
+autoremove
+mapfile -t left < <(rpm -q --qf '%{NAME}\n' "${goes[@]}" 2>/dev/null | grep -v ' ' | sort -u || true)
+(( ${#left[@]} )) && { echo "    dnf kept ${#left[@]} of them:"; fold_list "${left[@]}"; }
+# 4. Minimal's release packages for the edition's (the swap also takes what only they needed)
+if [[ -n $ident ]]; then
+  echo "==> Fedora's edition: $release in place of $edition"
+  sudo dnf swap -y --allowerasing "$edition" "$release" || echo "    didn't work: the system still names itself by $edition (sudo dnf swap $edition $release)"
+  sudo dnf -q mark user -y "$release" >/dev/null 2>&1 || true
+fi
+# What only a weak dependency of something gone held: gtk3 recommends ibus-gtk3 while ibus is there, and ibus went just
+# now. The list above couldn't tell (what goes is still installed when it's worked out)
+more=()
+for _ in 1 2 3; do
+  mapfile -t next < <(unneeded "$STATE")
+  (( ${#next[@]} )) || break
+  echo "==> ${#next[@]} more that only what went recommended: ${next[*]}"
+  autoremove; more+=("${next[@]}")
+done
+after=$(dnf_local history list --json | jq -r 'map(.id) | max')
+
+# 5. What's left of KDE: changed config files rpm kept (.rpmsave), the settings in ~/.config
+mapfile -t rpmsave < <(sudo find /etc -name '*.rpmsave' -cnewer "$marker" 2>/dev/null | sort)
+rm -f "$marker"
+mapfile -t configs < <(kde_configs)
+if (( ${#configs[@]} )); then
+  mkdir -p "$BACKUP" && mv "${configs[@]}" "$BACKUP/"
+fi
+
+# 6. The way back, kept for later
+mkdir -p "${UNDO%/*}"
+{
+  echo "# nightdrive minimal, $(date '+%Y-%m-%d %H:%M'): $(( ${#goes[@]} - ${#left[@]} + ${#more[@]} )) packages removed (dnf history $((before + 1))–$after)"
+  echo "# Back to how it was, KDE included: dnf puts back the same versions, while the repos still have them. It may end"
+  echo "# with \"Group state for \"\" not found\" (dnf5 putting back KDE's group reasons): the packages are back all the same"
+  echo "sudo dnf history rollback --ignore-extras $before"
+  echo "$repo/config/greeter/switch.sh off    # KDE's login screen again"
+  (( ${#configs[@]} )) && echo "mv $BACKUP/* ~/.config/ && rmdir $BACKUP    # KDE's settings"
+  if (( snapshot )); then
+    echo
+    echo "# If dnf can't (an old version gone from the repos): the root as it was, from the snapshot. /home isn't in it"
+    echo "sudo mount -o subvolid=5 $root_dev /mnt"
+    echo "sudo mv /mnt${root_sub} /mnt${root_sub}.minimal"
+    echo "sudo btrfs subvolume snapshot /mnt/$snap_name /mnt${root_sub}"
+    echo "sudo umount /mnt && sudo reboot    # afterwards: sudo btrfs subvolume delete /mnt${root_sub}.minimal (mounted as above)"
+    echo
+    echo "# Happy with Minimal: the snapshot holds on to the old files, so delete it to free the space"
+    echo "sudo mount -o subvolid=5 $root_dev /mnt && sudo btrfs subvolume delete /mnt/$snap_name && sudo umount /mnt"
+  fi
+} > "$UNDO"
+
+echo
+printf '\e[1m%s\e[0m\n' "Done: $(( ${#goes[@]} - ${#left[@]} + ${#more[@]} )) packages removed, this is now Fedora Minimal + Nightdrive."
+(( ${#rpmsave[@]} )) && { echo "Config files you had changed, kept by rpm as .rpmsave (delete them when you don't need them):"; fold_list "${rpmsave[@]}"; }
+(( ${#configs[@]} )) && echo "KDE's settings from ~/.config are in ${BACKUP/#$HOME/\~}."
+(( ${#wifi[@]} )) && echo "Wi-Fi networks whose password was in KDE's wallet ask for it again: ${wifi[*]}"
+echo "The way back (also in ${UNDO/#$HOME/\~}):"
+sed 's/^/  /' "$UNDO"
+echo
+echo "Reboot to start from the new login screen."

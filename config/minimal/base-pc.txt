@@ -1,0 +1,30 @@
+# Fedora Minimal on a PC or in a virtual machine: what the netinstall's "Fedora Custom Operating System" installs.
+# `nightdrive minimal` keeps what of it is installed (config/minimal/minimal). Group names (@core) are expanded from
+# Fedora's comps, * matches the installed packages' names, and a line starting with - is left out.
+@core
+fedora-release
+# The kernel, and its extra drivers if KDE had them: hardware may be using one
+kernel
+kernel-core
+kernel-modules
+kernel-modules-core
+kernel-modules-extra
+# The boot loader Anaconda installs (UEFI or BIOS, x86_64 or aarch64)
+grub2-efi-x64
+grub2-efi-aa64
+grub2-pc
+shim-x64
+shim-aa64
+efibootmgr
+grubby
+# The file systems' tools Anaconda adds for the disk layout it made (Fedora's: btrfs, an ext4 /boot, a FAT EFI partition)
+btrfs-progs
+e2fsprogs
+xfsprogs
+dosfstools
+lvm2
+cryptsetup
+mdadm
+# The system's languages: the netinstall installs the one picked there, install.sh the locale's (localectl)
+glibc-langpack-*
+glibc-all-langpacks

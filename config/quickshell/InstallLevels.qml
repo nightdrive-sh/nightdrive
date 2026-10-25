@@ -23,6 +23,7 @@ Item {
     property var pluginList: null             // Recommended, Plugins and Webapp's ready-made ones: [{ id, name, icon, desc, installed, group, off, external }] (nightdrive plugins), null = loading
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
+    readonly property var inputs: ["webname", "webaddr"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
     readonly property var levels: ["software", "swcat", "swsearch", "webapp", "webname", "webaddr", "recommended", "plugins", "ndapps"]
     readonly property var titles: ({ software: "Install › Software", swcat: "Software › " + swCat.name, swsearch: "Software › Search", webapp: "Install › Webapp",
                                      recommended: "Install › Recommended", plugins: "Install › Plugins", webname: "Install › Webapp › Name",

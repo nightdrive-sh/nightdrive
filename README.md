@@ -38,7 +38,7 @@ Nightdrive puts all of that together into one opinionated desktop.
 
 ### A launcher for everything
 
-**⌘Space**, or the N█ logo at the top left of the bar, opens the launcher. It holds apps, 1Password items (copy a password, username or one-time code), clipboard history,
+**⌘Space**, or the N█ logo at the top left of the bar (Settings › Top bar › Logo hides it), opens the launcher. It holds apps, 1Password items (copy a password, username or one-time code), clipboard history,
 an emoji picker, screenshots, a colour picker, every keybinding, settings, `dnf` install / remove, one-click updates, and
 power actions. Search from the top level finds all of these. While music plays, a player row sits above the list. Type a
 question and press ⌘⌥Enter to send it straight to Claude Code. Search "Rename current space" to give the workspace you're on
@@ -48,10 +48,10 @@ a name in the bar instead of its number, for as long as it has windows.
 
 ### Menus you want to click
 
-Click an icon and a small menu opens under it: sound and output devices, Wi-Fi (and Ethernet while a cable is in use),
-Bluetooth, battery and brightness, Tailscale, headphone EQ, system load and temperatures, the calendar, notifications,
-music, and **Claude**: your Claude Code sessions (a
-dot on the icon when one finished while you were elsewhere; a click goes to its window) and your usage limits. When a
+Click an icon and a small menu opens under it: sound and output devices, Wi-Fi (and Ethernet while a cable is in use,
+with your wired profiles to switch between), Bluetooth, battery and brightness, Tailscale, headphone EQ, system load
+and temperatures, the calendar, notifications, music, and **Claude**: your Claude Code sessions (a dot on the icon
+when one finished while you were elsewhere; a click goes to its window) and your usage limits. When a
 session waits for you, its notification says which one and what it wants, and a permission request can be answered
 right there (Allow, Deny). ⌘⇧Space lets you walk through the menus with the arrow keys.
 
@@ -94,7 +94,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   the model (Sonnet by default) and your own instructions, sent with every request ("a relaxed tone", "end emails with
   my name"): type one there, or turn on an example. Apps of your own can be left out there too.
 - **Snippets**: text snippets in launcher › Tools › Snippets; Enter pastes one. Turn on auto-expand and typing a trigger
-  anywhere replaces it with the text.
+  anywhere replaces it with the text. A text can have several lines (an email signature): Shift+Enter adds a line break,
+  shown as ↵, or `nightdrive snippets set s# - < signature.txt` reads one from a file.
 - **From your phone** (experimental plugins): [LocalSend](plugins/localsend/README.md) receives files from a phone after
   you accept them in a notification, and [AirPlay Receiver](plugins/airplay-receiver/README.md) mirrors an iPhone, iPad or
   Mac into a window. [Ferry](plugins/ferry/README.md) is a
@@ -124,12 +125,14 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Mouse**: the mouse wheel's scroll speed, from 0.5× to 3×, in the launcher (Settings › Mouse). It applies right away
   and leaves the trackpad's speed as it is.
 - **Remote login**: SSH into this computer from another one, off by default like on a Mac. Turn it on in the launcher
-  (Settings › Remote login); the page shows the address to use. It works over Tailscale from anywhere, and on the networks
-  you allow: the one you turn it on at, and each new one asks with a notification (safe at home or work, not at a café).
-  The page's second switch changes the answer for the network you are on.
+  (Settings › Remote login). It works over Tailscale from anywhere, and on the networks you allow: the one you turn it on
+  at, and each new one asks with a notification (safe at home or work, not at a café). The page's second switch changes
+  the answer for the network you are on.
 - **Login apps**: you choose what starts at login in the launcher (Settings › Apps › Startup, or ⌥Enter on an app). Background
   apps start hidden. Only 1Password (if installed) is on by default, because its SSH agent and the Passwords level need it.
-- **Login screen**: a password-only greeter that matches the theme (`--no-greeter` keeps the distribution's own).
+- **Login screen**: a password-only greeter that matches the theme, for the user who installed Nightdrive (`--no-greeter`
+  keeps the distribution's own, or gives a text login where there's none). Another user logs in from the text console
+  (Ctrl+Alt+F3) or with the text login (`config/greeter/switch.sh text`).
 
 ![Screensavers: synthwave sunset and rain](docs/screenshots/screensavers.jpg)
 
@@ -139,7 +142,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 |---|---|---|
 | Window manager | [Hyprland](https://hypr.land) | Lua config, Mac-style keybindings |
 | Bar, menus, launcher | [Quickshell](https://quickshell.org) | one themed shell for the top bar, its menus, launcher, OSD and shelf; an orange microphone and camera in the bar while an app uses them (MacBooks have no microphone light), the microphone filling up with the input level, their menus name the apps |
-| Terminal | [kitty](https://sw.kovidgoyal.net/kitty/) | ⌘Enter, opens in `~/Projects`; Mac copy and paste. Another terminal (Ghostty, foot, Alacritty, WezTerm) in Settings › Apps › Default apps: it opens everywhere kitty did, with its own settings and colours |
+| Terminal | [kitty](https://sw.kovidgoyal.net/kitty/) | ⌘Enter, opens in `~/Projects`; Mac copy and paste; Ctrl+click opens a link, or a file or folder path in the output (Claude Code's too): a folder in Files, a file in the code editor at its line (`file.py:42`). Another terminal (Ghostty, foot, Alacritty, WezTerm) in Settings › Apps › Default apps: it opens everywhere kitty did, with its own settings and colours |
 | Browser | Firefox | tabs below the address bar, no tab bar while a window has one tab, links from other apps in a new window, starts with an empty window rather than the last session's tabs (all three in launcher › Settings › Apps › Firefox), themed UI |
 | Mail | [Mail](plugins/mail/README.md) (Nightdrive's own, over notmuch and mbsync) | quiet reading, notifications you can answer from, replies written by Claude for you to read first |
 | Mail, alternative (optional) | Thunderbird | themed, with a minimal toolbar ([details](docs/thunderbird.md)) |
@@ -152,7 +155,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Screen Mirroring (optional) | [doubletake](https://github.com/omarroth/doubletake) (AirPlay, built by `plugins/mirroring/install.sh`) | Settings › Display; experimental, picture limited to 1080p (no hardware encoder on Asahi) |
 | Notifications | Quickshell | app icon and time on every notification, its app's buttons in the popup and in the history (until the app closes it), history and do not disturb in the bar; a warning with the charge left when the battery drops to 10 % and 5 % (gone once the charger is in); how long they show and their sounds in launcher › Settings › Notifications; with Settings › Crash reports on, a crashed app's notification has Ask Claude, which finds out why, and Mute for 15 minutes (a crash loop while you test) or for good |
 | Files and images | Nautilus, Loupe | images open in Loupe, a simple viewer like Preview |
-| Markdown (optional) | [Apostrophe](https://apps.gnome.org/Apostrophe/) (Flatpak) | `.md` files open in it, themed editor |
+| Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) (Flatpak) | `.md` files open in it, themed editor |
 | Messaging | [Telegram Desktop](https://desktop.telegram.org) (Flatpak, install it from Install › Software) | native Wayland app, keeps running in the background like 1Password |
 | Web apps | Chromium app windows | add your own, or a ready-made one with a keybinding: WhatsApp, Slack, Teams, YouTube (Install › Webapp) |
 | External display | Hyprland | workspaces 1–9 on the external display, one on the laptop's screen (⌘0, a laptop icon in the bar); with the lid closed only the external display is used, and the login screen shows on the screen you're on; where the laptop's screen is (below, above, left or right of the display, for the pointer to cross where they meet) in launcher › Settings › Display |
@@ -164,18 +167,24 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 
 ## Requirements
 
-One of these, with the KDE edition of Fedora 44. The installer tells which machine it's on and sets it up to match.
+One of these, with a minimal Fedora 44: Nightdrive adds what the desktop needs, nothing else. The installer tells which
+machine it's on and sets it up to match.
 
-- An **Apple Silicon Mac** (M1 or M2 series) with **[Fedora Asahi Remix](https://asahilinux.org/fedora/) 44**. Used daily
-  on a MacBook Pro 14″ with an M2 Max; other models should work, but you may need to adjust a few values (see
-  [Make it yours](#make-it-yours)).
-- A **PC** (x86_64) with **[Fedora 44 KDE](https://fedoraproject.org/kde/download)** and NVIDIA, AMD or Intel graphics.
-  Experimental, see [docs/pc.md](docs/pc.md) for what differs from the MacBook.
-- A Fedora 44 **virtual machine**, e.g. in Parallels on a Mac ([docs/vm.md](docs/vm.md)).
+- An **Apple Silicon Mac** (M1 or M2 series) with **[Fedora Asahi Remix](https://asahilinux.org/fedora/) 44**, its
+  **Minimal** image (one of the choices in the Asahi installer). Used daily on a MacBook Pro 14″ with an M2 Max; other
+  models should work, but you may need to adjust a few values (see [Make it yours](#make-it-yours)).
+- A **PC** (x86_64) with **Fedora 44** from the [Everything netinstall image](https://fedoraproject.org/misc/), with
+  *Fedora Custom Operating System* picked in its Software Selection, and NVIDIA, AMD or Intel graphics. Experimental, see
+  [docs/pc.md](docs/pc.md) for the install and what differs from the MacBook.
+- A Fedora 44 **virtual machine**, e.g. in Parallels on a Mac or with qemu on an Asahi Mac ([docs/vm.md](docs/vm.md)).
+
+The KDE edition of either (Fedora Asahi Remix with KDE Plasma, Fedora 44 KDE) works too, as Nightdrive was first built on
+it: KDE stays, as a fallback session, until `nightdrive minimal` takes it away ([Install](#install)).
 
 ## Install
 
-On a fresh Fedora Asahi Remix 44 or Fedora 44 KDE, with a network connection:
+On a fresh Fedora 44 (above), logged in as your user on its text console, with a network connection (Wi-Fi:
+`nmcli device wifi connect "Network name" --ask`):
 
 ```sh
 curl -fsSL https://nightdrive.sh/install | bash
@@ -189,21 +198,24 @@ after `--` too (`bash -s -- --choose`). The same by hand:
 sudo dnf install -y git   # not in a fresh install
 git clone https://github.com/nightdrive-sh/nightdrive.git ~/dotfiles
 cd ~/dotfiles
-./install.sh              # asks nothing: removes the KDE apps and services Nightdrive doesn't use
-                          # (packages-remove.txt), system update, packages, fonts, the notch setting, config links,
-                          # Claude Code, Tailscale, Mail, Deck, login screen and the default optional parts
+./install.sh              # asks nothing: system update, packages, fonts, the notch setting, config links, Claude
+                          # Code, Tailscale, Mail, Deck, login screen and the default optional parts
 ```
 
-It tells which machine it's on and then runs unattended (sudo asks for the password once at the start); the system update
-takes a while. Claude Code, Tailscale, Mail and Deck come with every install, like the rest of the
-desktop: each stays quiet until you set it up. The optional parts that are on by default (YouTube) come too, and the rest
-can be added later from the launcher (System › Install) or with `nightdrive plugins install ID`.
+It tells which machine it's on and then runs unattended (sudo asks for the password once at the start); the system
+update takes a while. On a Mac it first asks for the keyboard layout, if it's still the Minimal image's `us`: the login
+screen's password is typed with it (`--keyboard "fi mac"` answers in advance). A minimal Fedora gets what a desktop
+edition would have: it boots to the login screen, the firewall has the desktop's settings as on Fedora KDE (so LocalSend
+and AirPlay are reached), and SSH is off until you turn on Remote login (launcher › Settings), unless you install over
+ssh. Claude Code, Tailscale, Mail and Deck come with every install, like the rest of the desktop: each stays quiet until
+you set it up. The optional parts that are on by default (YouTube) come too, and the rest can be added later from the
+launcher (System › Install) or with `nightdrive plugins install ID`.
 
 To pick the optional parts yourself, run `./install.sh --choose`: it lists them first (a number toggles one, Enter
 continues):
 
 ```
-Machine: PC (x86_64, graphics: amd, keyboard: us)
+Machine: Apple Silicon Mac (Fedora Asahi Remix, keyboard: fi mac)
 
   Nightdrive apps
    1 [x] Deck              Spotify player (needs Premium), launcher and top bar
@@ -226,40 +238,48 @@ Machine: PC (x86_64, graphics: amd, keyboard: us)
 
   19 [ ] Install all       every optional part above
 
-  20 [x] Remove apps       112 installed packages Nightdrive doesn't use: akregator dolphin konsole kmail …
+  20 [x] Remove services   28 installed packages a Mac doesn't use: realmd sssd-common sssd-kcm nfs-utils …
 ```
 
-**Trying it on the system you already use?** The removals are on by default only on a fresh install (one installed less
-than three days ago). On an older system nothing is removed (`--choose` shows the *Remove apps* row unticked): your configs
-in `~/.config` are moved aside to `<name>.bak-<time>`, and `config/greeter/switch.sh off` brings back the KDE login screen.
+The last row is a Mac's only: the Minimal image's server services (network logins and shares, system logs, crash
+reports) and other Wi-Fi chips' firmware, listed in `packages-remove-asahi.txt`.
+
+**Trying it on the system you already use?** Nightdrive doesn't remove your apps: on a Mac only the services above go
+(`--choose` unticks them). Your configs in `~/.config` are moved aside to `<name>.bak-<time>`, and on Fedora KDE
+`config/greeter/switch.sh off` brings back KDE's login screen.
 
 Home Assistant, if chosen, asks for its address and token at the very end.
 
 Then **reboot**. The Nightdrive boot splash goes straight over to the Nightdrive login screen (greetd + Quickshell): the
 desktop starts behind it as its lock, so the screen changes hands only once and doesn't flash black. The login apps start
-after the password. KDE stays installed as a fallback. If the login screen fails, press Ctrl+Alt+F3, log in and run
-`config/greeter/switch.sh off`. `switch.sh on` gives the plain login screen that starts the desktop after the password.
+after the password. If the login screen doesn't start (Hyprland can't, say for a missing graphics driver), a text login
+comes up in its place: log in, and `start-hyprland` starts the desktop or shows why it can't. Ctrl+Alt+F3 gives one too.
+Until it's fixed, `config/greeter/switch.sh text` makes that text login the login screen, starting the desktop after the
+password (type `!bash` at its prompt for a text console instead). On Fedora KDE, KDE stays installed as a fallback and
+`switch.sh off` brings back its login screen; on Fedora Minimal, which has none, `off` is the text login. `switch.sh on`
+gives the plain login screen that starts the desktop after the password, `switch.sh autologin` the default back (the
+desktop behind the login screen).
 
 | Option | What it changes |
 |---|---|
-| `--no-greeter` | Keeps the KDE login screen; pick **Hyprland** there (not *Hyprland (uwsm-managed)*) |
+| `--no-greeter` | No Nightdrive login screen. On Fedora KDE, keeps KDE's; pick **Hyprland** there (not *Hyprland (uwsm-managed)*). On Fedora Minimal, which has none, a text login (greetd's agreety) that starts the desktop after the password |
 | `--no-autologin` | The Nightdrive login screen starts the desktop after the password, instead of being its lock (black flashes at boot) |
 | `--no-splash` | Keeps Fedora's boot splash and the GRUB menu (`config/splash/install.sh off` later) |
-| `--keep-apps` | Keeps the KDE apps, printing, network shares, accessibility tools and other packages listed in `packages-remove.txt` (comment a line out to keep just that one) |
-| `--debloat` | Removes them also on a system that isn't fresh |
-| `--choose` | Lists the optional parts and the removals first, to tick or untick |
-| `--no-kde` | Removes Plasma completely (experimental) |
+| `--choose` | Lists the optional parts (and on a Mac the removals) first, to tick or untick |
+| `--keyboard "fi mac"` | The keyboard layout and variant for the login screen, the desktop and the text console, without asking (xkb names: `localectl list-x11-keymap-layouts`) |
 | `--vm` | The virtual machine settings, if the VM isn't detected as one ([docs/vm.md](docs/vm.md)) |
 | `--no-nvidia` | On a PC, leaves an NVIDIA card's driver alone instead of installing RPM Fusion's ([docs/pc.md](docs/pc.md)) |
 | `--with 1password,slack` | These optional parts on top of the defaults (`--dry-run` lists the ids) |
 | `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail or Deck too |
 | `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (YouTube); Tailscale, Mail and Deck come with each |
-| `--dry-run` | Shows the optional parts, what would be installed and what would be removed, then stops |
+| `--dry-run` | Shows the optional parts, the packages and system settings it would add and what it would remove, then stops |
 
-At your first login, **Welcome to Nightdrive** opens: sign in to Claude there first, then it sets up Tailscale, Mail and Deck
-with you, each in a Claude session of its own that does only that one thing (Claude Code needs a paid Claude plan or an
-API account). Skip any of them; launcher › System › *Set up Nightdrive* (or `nightdrive welcome`) opens it again, and later
-logins ask with a notification until you finish it or say not to. Without Claude, each part's README has the steps.
+At your first login, **Welcome to Nightdrive** opens and asks first whether you have Claude Code (a Pro or Max plan).
+With Claude, sign in there first, then it sets up Tailscale, Mail and Deck with you, each in a Claude session of its own
+that does only that one thing. Without, it shows each one's steps right there, one at a time in plain words. Or choose
+*I'll do it myself*: a list of the apps, each opening its README in Apostrophe, and Finish when you're done. Leave what
+you don't need; Back in the list asks the question again, Launcher › System › *Set up Nightdrive* (or
+`nightdrive welcome`) opens it again, and later logins ask with a notification until you finish it or say not to.
 
 A few things stay manual:
 - 1Password: in Settings › Developer, turn on *SSH agent* and *Integrate with 1Password CLI*. The launcher's Passwords level
@@ -271,6 +291,36 @@ A few things stay manual:
 
 `./link.sh` on its own just (re)links the config files and is safe to run again. The repo can live anywhere; `~/dotfiles` is
 only a convention.
+
+**Installed on Fedora KDE?** Installs from before Nightdrive moved to Fedora Minimal go on as they are, KDE as a
+fallback session. To make one what a fresh install on Minimal is, run `nightdrive minimal --dry-run` first: it lists what
+would go (KDE and what only it needed, some 600 packages) and what stays as yours (what you installed yourself), and
+changes nothing. Then, from Nightdrive's desktop or a text console (not from Plasma):
+
+```sh
+nightdrive minimal   # asks once; --keep kate,okular keeps KDE apps you still use
+```
+
+It makes the Nightdrive login screen the one in use first, if KDE's still is (`--no-greeter`: greetd's text login), takes a
+read-only btrfs snapshot of the root, and then lets dnf work out what goes: what stays is marked as installed by you, the
+rest as a dependency, and `dnf autoremove` removes what nothing that stays needs. KDE's settings in `~/.config` move to
+`~/.local/share/nightdrive/kde-config-<time>`, the config files you had changed in `/etc` are listed (`.rpmsave`), and
+Wi-Fi networks whose password was in KDE's wallet ask for it again.
+
+The way back is printed at the end and kept in `~/.local/state/nightdrive/minimal-undo.txt`. `sudo dnf history rollback
+--ignore-extras ID` puts KDE back with the same versions while the repos still have them (then `config/greeter/switch.sh
+off` for its login screen); it may end with *Group state for "" not found*, but the packages are back all the same.
+Otherwise the snapshot takes the root's place, `root` here being the root's subvolume (`findmnt -no FSROOT /`):
+
+```sh
+sudo mount -o subvolid=5 /dev/<the root's partition> /mnt
+sudo mv /mnt/root /mnt/root.minimal
+sudo btrfs subvolume snapshot /mnt/root.pre-minimal-<time> /mnt/root
+sudo umount /mnt && sudo reboot
+```
+
+Once you're happy with Minimal, delete the snapshot, as it holds on to KDE's files: `sudo btrfs subvolume delete
+/mnt/root.pre-minimal-<time>`, mounted as above.
 
 ### Updating
 
@@ -305,6 +355,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive update check` | Only looks for new changes (what the six-hourly check runs) |
 | `nightdrive channel` | The update channel, stable or dev; `nightdrive channel dev` switches to it |
 | `nightdrive version` | The release you have, and the channel |
+| `nightdrive minimal --dry-run` | On an install on Fedora KDE: what turning it into Fedora Minimal would remove, and what stays as yours; without `--dry-run` it does it ([Install](#install)) |
 | `nightdrive theme color teal` | Theme colour: violet, blue, teal, green, amber, rose or graphite; aerc (if you use it) gets it too, unless you have picked a styleset of your own |
 | `nightdrive theme set background '#181722'` | The look: the background and opacity of the terminals, the launcher, Firefox and Thunderbird, and the window borders and shadows (`inactive-border off`, `shadow-size 8`…); `nightdrive theme look` lists the settings, `default` puts one back; the same with sliders in Theme Editor (launcher › Settings › Theme) |
 | `nightdrive theme save "My theme"` | Saves the theme colour and the look as a theme of your own (in `~/.config/nightdrive/themes`); `nightdrive theme themes` lists them with Nightdrive's Default, `use ID` switches, `delete ID` removes one of yours, `reset` goes back to Default; also launcher › Settings › Theme › Themes and Theme Editor's Save as theme |
@@ -317,7 +368,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the launcher) |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
 | `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the launcher; `--dir ~/dotfiles` starts it in that folder (`~/Projects` otherwise), `--name "Clock"` names the session (as `/rename`), `--effort high` sets its effort level (low to max) |
-| `nightdrive welcome` | Opens Welcome to Nightdrive: signing in to Claude, then setting up Tailscale, Mail, Deck… with Claude, each on its own (launcher › System › *Set up Nightdrive*) |
+| `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Deck… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
 ## Keys
 

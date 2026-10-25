@@ -10,6 +10,7 @@ Item {
     property var launcher: null
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
+    readonly property var inputs: ["compname"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
     readonly property var levels: ["launcherprefs", "compname", "remotelogin", "sounds", "notiftime", "soundregular", "soundurgent", "channel", "browser", "mousescroll", "crashreports"]
     readonly property var titles: ({ launcherprefs: "Settings › Launcher", compname: "Settings › Computer name", remotelogin: "Settings › Remote login", channel: "Settings › Update channel",
                                      browser: "Apps › Firefox", mousescroll: "Settings › Mouse", crashreports: "Settings › Crash reports",
@@ -30,7 +31,6 @@ Item {
     // café's. on | off | none (no openssh-server), "" = not read yet. remoteNet: the network the traffic goes out on
     // ({uuid, name, allowed: yes | no | ""}), empty off Wi-Fi and cable or without firewalld
     property string remoteLogin: ""
-    property string sshAddress: ""
     property var remoteNet: ({})
     readonly property var remoteLoginItems: remoteLogin === "on" || remoteLogin === "off"
         ? [{ kind: "nav", name: "Remote login", glyph: "terminal", target: "remotelogin", summary: remoteLogin }] : []
@@ -40,15 +40,15 @@ Item {
         onResult: text => {
             const f = text.replace(/\n$/, "").split("\n")
             b.remoteLogin = f[0] || ""
-            b.sshAddress = f[1] || ""
-            b.remoteNet = f[2] ? { uuid: f[2], name: f[3] || "", allowed: f[4] || "" } : {}
+            b.remoteNet = f[1] ? { uuid: f[1], name: f[2] || "", allowed: f[3] || "" } : {}
         }
     }
-    // systemd's polkit asks for the password; cancelling it leaves the switch as it was
+    // firewalld's and systemd's polkit ask for the password; cancelling either leaves the switch as it was, without a
+    // notification (firewall-cmd says "Authorization failed", systemctl "Access denied")
     Sh {
         id: remoteLoginSetProc
         onResult: text => {
-            if (exitCode !== 0 && !/not authorized|cancel/i.test(text))
+            if (exitCode !== 0 && !/not authorized|authorization failed|access denied|cancel/i.test(text))
                 Quickshell.execDetached(["notify-send", "-u", "critical", "-a", "Settings", "Remote login failed", text.trim()])
             remoteLoginProc.running = true
         }
@@ -243,10 +243,7 @@ Item {
                       sub: "Log in to this computer from another one with SSH" }]
                 .concat(on && remoteNet.uuid ? [{ kind: "remotenet", name: "Allow from “" + remoteNet.name + "”", glyph: "house",
                       switchOn: remoteNet.allowed === "yes", sub: "Safe at home or work, not on a café’s or hotel’s network" }] : [])
-                .concat(on ? [{ kind: "note", name: "ssh " + sshAddress },
-                              { kind: "note", name: remoteNet.allowed === "yes" ? "On this network, and over Tailscale from anywhere"
-                                                                                : "Over Tailscale from anywhere" + (remoteNet.uuid ? ", not on this network" : "") }]
-                           : [{ kind: "note", name: "Off by default. Turning it on asks for your password" }])
+                .concat(on ? [] : [{ kind: "note", name: "Off by default. Turning it on asks for your password" }])
         }
         if (level === "crashreports") {
             return [{ kind: "crashreports", name: "Crash reports to Claude", glyph: "bug", switchOn: crashReports === "on",

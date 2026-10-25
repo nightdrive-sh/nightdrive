@@ -2,6 +2,11 @@
 # The lock at startup (lock.qml, greetd's autologin): the login password, and the keyring opens with it, as greetd's own
 # PAM does at a normal login (there, autologin starts the keyring daemon locked). Installed as /etc/pam.d/nightdrive-lock
 # by switch.sh autologin.
+# A wrong password doesn't stop the stack after "include login", and with the daemon already running pam_gnome_keyring
+# would create a missing login keyring with that wrong password (a typo at the first lock after install), which the
+# right one then never opens. So the keyring only gets a password pam_unix accepts; a failure skips it, and the result
+# is still login's.
 auth       include      login
+auth       [success=ok default=1]  pam_unix.so use_first_pass nodelay
 -auth      optional     pam_gnome_keyring.so
 account    include      login

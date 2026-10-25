@@ -1,22 +1,32 @@
 # Nightdrive on a PC (experimental)
 
-Nightdrive is built on a MacBook, but runs on an x86_64 PC with **Fedora 44 KDE**. The installer recognises the machine
-(`nightdrive platform machine`: `asahi`, `pc` or `vm`) and prints it first, e.g.
+Nightdrive is built on a MacBook, but runs on an x86_64 PC with a minimal **Fedora 44**. The installer recognises the
+machine (`nightdrive platform machine`: `asahi`, `pc` or `vm`) and prints it first, e.g.
 `Machine: PC (x86_64, graphics: nvidia, keyboard: fi)`. Not yet tested on real PC hardware: a report helps (Discussions).
 
-1. Install **Fedora 44 KDE Plasma Desktop** from [fedoraproject.org/kde](https://fedoraproject.org/kde/download) (the KDE
-   edition: the package removals and `--no-kde` expect it; Fedora 44, because the Hyprland COPR builds for that release).
-   The keyboard layout you pick in Fedora's installer is the one Nightdrive uses.
-2. Install as in the [README](../README.md#install) and reboot.
+1. Download Fedora 44's **Everything netinstall** image for x86_64 from [fedoraproject.org/misc](https://fedoraproject.org/misc/)
+   (Fedora 44, because the Hyprland COPR builds for that release) and write it to a USB stick (Fedora Media Writer, or
+   `dd`).
+2. Boot it and, in the installer:
+   - **Keyboard** and **Language**: the layout you pick is the one Nightdrive uses, also on its login screen; the
+     language's formats come along.
+   - **Software Selection**: *Fedora Custom Operating System*, and on the right **Common NetworkManager Submodules**.
+     Without them a computer with only Wi-Fi has no network before Nightdrive installs it (a cable works either way).
+   - **User Creation**: your user, with *Make this user administrator* ticked.
+3. Reboot, log in on the text console (Wi-Fi: `nmcli device wifi connect "Network name" --ask`), install as in the
+   [README](../README.md#install) and reboot.
+
+Nightdrive adds what the desktop needs: `packages.txt`, and a PC's own `packages-pc.txt` (the `@hardware-support`
+firmware, the processor's microcode, laptops' sound firmware). Fedora 44 KDE works too, KDE staying as a fallback.
 
 ## What differs from the MacBook
 
 | | MacBook | PC |
 |---|---|---|
 | Display | scale 2.0 for the built-in display, the notch area for the top bar | scale picked by Hyprland from the display's size and resolution (`scale = "auto"`); change it, and the refresh rate (a TV's preferred mode is often 60 Hz, though it does 120), in launcher › Settings › Display |
-| Keyboard | the layout Fedora's installer set (`localectl`); a Finnish one is the Finnish Mac layout (`fi`, `mac`) | the layout Fedora's installer set, also on the login screen |
+| Keyboard | the layout install.sh asks for (Asahi Minimal's first boot doesn't; `localectl`); a Finnish one is the Finnish Mac layout (`fi`, `mac`) | the layout Fedora's installer set, also on the login screen |
 | ⌘ | the Command key | the Windows key: ⌘C / ⌘V / ⌘X copy, paste and cut in every app, and the rest of the shortcuts work as they are |
-| Wi-Fi firmware | other chips' firmware removed | kept |
+| Wi-Fi firmware | other chips' firmware removed | all of it (`@hardware-support`) |
 | Dictation mic | the MacBook's own mic, always | the default mic |
 | Temperatures (system menu) | SSD, Wi-Fi, charger, speakers | CPU (Intel `coretemp`, AMD `k10temp`), AMD graphics, SSD |
 

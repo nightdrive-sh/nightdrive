@@ -54,8 +54,10 @@ Variants {
         Row {
             x: 10; anchors.verticalCenter: parent.verticalCenter
             spacing: 4
-            // The logo (N█) opens the launcher, for those who don't know ⌘Space yet
+            // The logo (N█) opens the launcher, for those who don't know ⌘Space yet. Settings › Top bar › Logo hides it
+            // ("logo" in bar-items.json's hidden list); the Row then starts with the workspaces at the edge.
             Rectangle {
+                visible: TopBar.hidden.indexOf("logo") < 0
                 width: logo.width + 20; height: 27; radius: 8
                 // Bright like the bar's text (a grey N looked disabled), highlighted while the launcher is open on this screen
                 readonly property bool open: bar.launcherOpen && win.focused
