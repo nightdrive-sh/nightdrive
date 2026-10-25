@@ -3,6 +3,8 @@
 # is the one #1527 got Fedora booting with on Asahi (an M2 Max); what differs on a PC (#1572) comes from lib/arch.sh.
 
 MONITOR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitor.py
+# "Resizing…" over a VM's window while its screen catches up (overlay/shell.qml): one for all VMs, it quits after the last
+OVERLAY=$(cd "$(dirname "${BASH_SOURCE[0]}")/../overlay" && pwd)
 
 # One command to its QMP or guest agent socket: monitor.py's exit codes (1 failed, 3 no guest agent). From the VM's
 # folder, as a socket's path is short (108)
@@ -91,7 +93,14 @@ start() {
   rm -f "$d/qmp.sock" "$d/qga.sock"
   cd "$d"     # the sockets by a short path (qmp, qga)
   setsid -f "${QEMU_CMD[@]}" > "$d/qemu.log" 2>&1
-  for _ in $(seq 50); do running "$name" && return 0; sleep 0.1; done
+  for _ in $(seq 50); do
+    if running "$name"; then
+      [[ -n ${GARAGE_HEADLESS:-} ]] || setsid -f flock -n "${XDG_RUNTIME_DIR:-/tmp}/nightdrive-garage-resizing.lock" \
+        qs -p "$OVERLAY" >/dev/null 2>&1 || true
+      return 0
+    fi
+    sleep 0.1
+  done
   # The one failure with a known cause: its ssh port, which something else on the host listens on now
   local SSH_PORT MEM CPUS ISO SSH_USER; read_conf "$name"
   grep -q "host forwarding" "$d/qemu.log" \
