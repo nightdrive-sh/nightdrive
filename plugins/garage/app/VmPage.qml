@@ -42,16 +42,21 @@ Item {
     }
     // ⌘⌫: in the snapshot list the snapshot, as Del there; else the VM
     function deleteKey() { if (snapshots.focused) snapshots.removeCurrent(); else deleteVm() }
+    // What changes the machine itself shows while it runs too: a click then says why it can't, at the page's foot
+    function whenStopped(what) {
+        if (!root.stopped) root.ctl.error = "Shut " + root.vm.name + " down first to " + what
+        return root.stopped
+    }
     // A new name, while it is stopped: its ssh name follows (garage-ctl rename-vm)
     function renameVm() {
-        if (!root.stopped) return
+        if (!root.whenStopped("rename it")) return
         const name = root.vm.name
         root.askName("Rename the machine", name, n => {
             if (n && n !== name) root.ctl.run(["rename-vm", name, n], () => root.picked(n))
         })
     }
     function deleteVm() {
-        if (!root.stopped) return
+        if (!root.whenStopped("delete it")) return
         const name = root.vm.name
         root.askName("Type " + name + " to delete it, its disk and its snapshots", "", n => { if (n === name) root.act(["delete", name]) })
     }
@@ -82,9 +87,9 @@ Item {
                 text: root.vm ? root.vm.name : ""
                 color: root.c.title; font.family: root.c.font; font.pixelSize: 15; font.weight: Font.DemiBold
             }
-            // Renaming, beside the name it changes, while it is stopped
+            // Renaming, beside the name it changes
             AppIconButton {
-                visible: root.stopped
+                visible: !!root.vm
                 implicitWidth: 30; implicitHeight: 30; radius: 6
                 c: root.c; glyph: "pencil"; glyphSize: 13; tip: "Rename"; keys: "F2"
                 onClicked: root.renameVm()
@@ -172,10 +177,10 @@ Item {
                         }
                         // The ISO comes out while it is stopped, so it boots from its disk from then on
                         AppIconButton {
-                            visible: !!info.modelData.eject && root.stopped
+                            visible: !!info.modelData.eject
                             anchors.verticalCenter: parent.verticalCenter
                             c: root.c; glyph: "eject"; glyphSize: 12; tip: "Eject: boot from the disk from now on"
-                            onClicked: root.act(["eject", root.vm.name])
+                            onClicked: if (root.whenStopped("eject the ISO")) root.act(["eject", root.vm.name])
                         }
                         // The ssh command to the clipboard: ~/.ssh/config.d/garage knows its port and user
                         AppIconButton {

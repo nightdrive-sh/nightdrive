@@ -4,8 +4,8 @@ import qs.kit
 
 // A VM's snapshots: its title with Take snapshot, and the list (a name, when, and the space it alone keeps), each row's
 // buttons telling their keys in their tips (KeyHelp.qml has them all). Tab from the page comes here (focusList), Tab or Esc goes back (leave). Taking, restoring,
-// duplicating and deleting need the VM stopped, as qemu-img writes the disk then; a name changes any time (garage-ctl
-// rename: names.json only). Restoring and deleting ask first: what changed since, or the snapshot, is gone.
+// duplicating and deleting need the VM stopped, as qemu-img writes the disk then: their buttons show while it runs too,
+// and say so at the page's foot when clicked. A name changes any time (garage-ctl rename: names.json only). Restoring and deleting ask first: what changed since, or the snapshot, is gone.
 ColumnLayout {
     id: root
     required property QtObject c
@@ -32,15 +32,20 @@ ColumnLayout {
         return n >= 1073741824 ? (n / 1073741824).toFixed(1) + " GB" : Math.round(n / 1048576) + " MB"
     }
 
+    function whenStopped(what) {
+        if (!stopped) ctl.error = "Shut " + vmName + " down first to " + what
+        return stopped
+    }
+
     function take() {
-        if (!stopped) return
+        if (!whenStopped("take a snapshot")) return
         const name = vmName
         // The tag is the time (unique, no spaces); the name is what shows, and can change
         ask(() => askName("Name the snapshot", "Snapshot " + Qt.formatDateTime(new Date(), "d.M. hh:mm"),
                 n => { if (n) ctl.run(["snapshot", name, "s" + Math.floor(Date.now() / 1000), n]) }))
     }
     function restore(i) {
-        if (!stopped || i < 0 || i >= snaps.length) return
+        if (i < 0 || i >= snaps.length || !whenStopped("restore a snapshot")) return
         const name = vmName, s = snaps[i]
         ask(() => askConfirm("Go back to " + s.name + "?", name + "'s disk returns to " + s.date + ": what changed since is lost.",
                    "Restore", "rotate-ccw", () => ctl.run(["restore", name, s.tag])))
@@ -53,7 +58,7 @@ ColumnLayout {
     // A copy under a name of its own, in the same disk (garage-ctl duplicate: it shares the original's clusters, so it
     // takes no space of its own). Its tag is the time, as a new one's
     function duplicate(i) {
-        if (!stopped || copying || i < 0 || i >= snaps.length) return
+        if (copying || i < 0 || i >= snaps.length || !whenStopped("duplicate a snapshot")) return
         const name = vmName, s = snaps[i]
         ask(() => askName("Name the copy of " + s.name, s.name + " (copy)", n => {
             if (!n) return
@@ -64,7 +69,7 @@ ColumnLayout {
     }
     function removeCurrent() { remove(current) }
     function remove(i) {
-        if (!stopped || i < 0 || i >= snaps.length) return
+        if (i < 0 || i >= snaps.length || !whenStopped("delete a snapshot")) return
         const name = vmName, s = snaps[i]
         ask(() => askConfirm("Delete the snapshot " + s.name + "?", name + "'s disk can no longer go back to it.",
                    "Delete", "trash-2", () => ctl.run(["unsnap", name, s.tag])))
@@ -82,7 +87,6 @@ ColumnLayout {
         AppButton {
             id: take
             c: root.c; glyph: "camera"; label: "Take snapshot"; keys: "t"; tip: "Save the disk's current state"
-            visible: root.stopped
             onClicked: root.take()
         }
     }
@@ -147,8 +151,7 @@ ColumnLayout {
                 opacity: row.hovered || row.selected ? 1 : 0
                 AppIconButton {
                     c: root.c; glyph: "rotate-ccw"; glyphSize: 12; tip: "Restore"; keys: "⏎"; tipSide: row.tipSide; tipAlign: "right"
-                    opacity: root.stopped ? 1 : 0
-                    enabled: parent.opacity > 0 && root.stopped
+                    enabled: parent.opacity > 0
                     onClicked: root.restore(row.index)
                 }
                 AppIconButton {
@@ -158,14 +161,12 @@ ColumnLayout {
                 }
                 AppIconButton {
                     c: root.c; glyph: "copy"; glyphSize: 12; tip: "Duplicate"; keys: "c"; tipSide: row.tipSide; tipAlign: "right"
-                    opacity: root.stopped ? 1 : 0
-                    enabled: parent.opacity > 0 && root.stopped
+                    enabled: parent.opacity > 0
                     onClicked: root.duplicate(row.index)
                 }
                 AppIconButton {
                     c: root.c; glyph: "trash-2"; glyphSize: 12; tip: "Delete"; keys: "Del"; tipSide: row.tipSide; tipAlign: "right"
-                    opacity: root.stopped ? 1 : 0
-                    enabled: parent.opacity > 0 && root.stopped
+                    enabled: parent.opacity > 0
                     onClicked: root.remove(row.index)
                 }
             }
@@ -174,19 +175,13 @@ ColumnLayout {
 
     Text {
         visible: root.snaps.length === 0
-        text: root.stopped ? "None yet: t saves the disk's current state." : "None yet."
+        text: "None yet: t saves the disk's current state."
         color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
     }
 
-    // While it runs, why the rest waits
     Text {
         visible: !!root.copying
         text: "Duplicating " + root.copying + "…"
-        color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
-    }
-    Text {
-        visible: !!root.vm && !root.stopped
-        text: "Shut it down to take, restore, duplicate or delete a snapshot."
         color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
     }
 }

@@ -1,7 +1,8 @@
 import QtQuick
 
 // A labelled one-line text field in a frame, for the panels (a new VM's name, its ISO, a snapshot's name). Return comes
-// out as accepted, Esc as escaped (the panel closes).
+// out as accepted, Esc as escaped (the panel closes). Typing into one that is read-only comes out as refused, so the
+// panel can say why.
 Column {
     id: root
     required property QtObject c
@@ -11,6 +12,7 @@ Column {
     property alias input: input
     signal accepted()
     signal escaped()
+    signal refused()
     spacing: 6
     Row {
         spacing: 8
@@ -35,6 +37,11 @@ Column {
             clip: true
             onAccepted: root.accepted()
             Keys.onEscapePressed: root.escaped()
+            Keys.onPressed: e => {
+                if (readOnly && (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete || (e.text.length && e.text.charCodeAt(0) >= 32)))
+                    root.refused()
+                e.accepted = false
+            }
         }
     }
 }

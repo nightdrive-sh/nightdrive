@@ -3,7 +3,7 @@ import qs.kit
 
 // A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, its ssh user, and deleting it.
 // They change while it is stopped (garage-ctl set, one call each for what changed), but for the user, which only ssh's
-// config reads; while it runs the rest show, with a line on why they can't change. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
+// config reads; while it runs the rest show, and a click on what would change them says why it can't. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
 // The display has no setting: SDL gives the guest its window's size, and its scale is the guest's own.
 AppPanel {
     id: root
@@ -25,6 +25,11 @@ AppPanel {
         mem.input.forceActiveFocus(); mem.input.selectAll()
     }
     onVisibleChanged: if (visible) load()
+
+    function whenStopped(what) {
+        if (!stopped) problem = "Shut " + vm.name + " down first to " + what
+        return stopped
+    }
 
     function save() {
         const u = user.text.trim()
@@ -52,9 +57,9 @@ AppPanel {
 
     Row {
         spacing: 16
-        Field { id: mem; c: root.c; width: 130; label: "Memory"; hint: "GB"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
-        Field { id: cpus; c: root.c; width: 130; label: "CPUs"; hint: "1 to 8"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
-        Field { id: disk; c: root.c; width: 130; label: "Disk"; hint: "GB"; input.readOnly: !root.stopped; onAccepted: root.save(); onEscaped: root.done() }
+        Field { id: mem; c: root.c; width: 130; label: "Memory"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
+        Field { id: cpus; c: root.c; width: 130; label: "CPUs"; hint: "1 to 8"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
+        Field { id: disk; c: root.c; width: 130; label: "Disk"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
     }
     Text {
         width: parent.width
@@ -74,21 +79,21 @@ AppPanel {
             width: root.cardWidth - 80 - choose.width - eject.width - 16
             label: "ISO in its drive"; hint: "boots when the disk has nothing to boot"
             input.readOnly: !root.stopped
+            onRefused: root.whenStopped("change the ISO")
             onAccepted: root.save(); onEscaped: root.done()
         }
         AppButton {
             id: choose
             anchors.bottom: parent.bottom; anchors.bottomMargin: 2
             c: root.c; glyph: "folder-open"; label: "Choose…"
-            visible: root.stopped
-            onClicked: picker.pick(iso.text, p => iso.text = p)
+            onClicked: if (root.whenStopped("change the ISO")) picker.pick(iso.text, p => iso.text = p)
         }
         AppButton {
             id: eject
             anchors.bottom: parent.bottom; anchors.bottomMargin: 2
             c: root.c; glyph: "eject"; label: "Eject"
-            visible: root.stopped && iso.text !== ""
-            onClicked: iso.text = ""
+            visible: iso.text !== ""
+            onClicked: if (root.whenStopped("eject the ISO")) iso.text = ""
         }
     }
 
@@ -102,11 +107,11 @@ AppPanel {
     }
 
     Text {
-        visible: !root.stopped || root.problem !== ""
+        visible: root.problem !== ""
         width: parent.width
         wrapMode: Text.Wrap
-        text: root.problem !== "" ? root.problem : "Shut " + (root.vm ? root.vm.name : "it") + " down to change the rest."
-        color: root.problem !== "" ? root.c.danger : root.c.dim; font.family: root.c.font; font.pixelSize: 12
+        text: root.problem
+        color: root.c.danger; font.family: root.c.font; font.pixelSize: 12
     }
 
     // Save and Cancel on the left, deleting the machine on the right
@@ -121,9 +126,8 @@ AppPanel {
         }
         AppButton {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-            visible: root.stopped
             c: root.c; glyph: "trash-2"; label: "Delete machine…"; keys: "⌘⌫"
-            onClicked: root.deleteVm()
+            onClicked: if (root.whenStopped("delete it")) root.deleteVm()
         }
     }
 }
