@@ -42,7 +42,9 @@ AppPanel {
 
     function check() {
         const whole = t => /^[0-9]+$/.test(t.trim())
-        if (!/^[A-Za-z0-9._-]+$/.test(name.text)) return "A name: letters, digits, - . _"
+        // garage-ctl's rule (good_name): the name is its folder's
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name.text) || name.text === "images")
+            return "A name: letters, digits, - . _, starting with a letter or digit"
         if (ctl.vms.some(v => v.name === name.text) || images.waiting.some(v => v.name === name.text))
             return "There is a VM called " + name.text + " already"
         if (fromImage && !/^[a-z_][a-z0-9_-]*$/.test(user.text)) return "A user name: small letters, digits, - _"

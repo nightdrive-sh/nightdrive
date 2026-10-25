@@ -35,13 +35,16 @@ umask 077
 mkdir -p "$ROOT" && chmod 700 "$ROOT"
 
 die() { echo "$*" >&2; exit 1; }
-good_name() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]]; }
-dir() { good_name "$1" || die "Bad name: $1"; echo "$ROOT/$1"; }
-need() { [[ -f $(dir "$1")/vm.conf ]] || die "No VM called $1"; }
+# A VM's name is its folder's: not . or .. (nor a hidden one), not an option (-x), and not images/, the images' folder
+good_name() { [[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && $1 != images ]]; }
+dir() { good_name "$1" || die "Bad name: $1 (letters, digits, - . _, starting with a letter or digit)"; echo "$ROOT/$1"; }
+need() { local d; d=$(dir "$1"); [[ -f $d/vm.conf ]] || die "No VM called $1"; }
 running() { local p; p=$(cat "$(dir "$1")/pid" 2>/dev/null) && kill -0 "$p" 2>/dev/null; }
 stopped() { running "$1" && die "$1 is running: shut it down first"; return 0; }
-# A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and a tag
-snap() { [[ -n ${3:-} ]] || die "$1 NAME TAG"; need "$2"; stopped "$2"; }
+# A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and a tag as the window makes them
+# (s and the time), or one as plain as a VM's name
+good_tag() { [[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "Bad snapshot tag: $1"; }
+snap() { [[ -n ${3:-} ]] || die "$1 NAME TAG"; good_tag "$3"; need "$2"; stopped "$2"; }
 # A new VM's memory, disk and CPUs: whole numbers, the memory what the host can spare
 max_mem() { echo $(( $(awk '/^MemTotal/ { print int($2 / 1048576) }' /proc/meminfo) - HOST_SPARE_GB )); }
 sizes() {
@@ -67,7 +70,7 @@ label() {
      <(cat "$f" 2>/dev/null || echo '{}') > "$f.new" && mv "$f.new" "$f"
 }
 rename() {
-  [[ -n ${3:-} && -n ${4:-} ]] || die "rename NAME TAG LABEL"; need "$2"
+  [[ -n ${3:-} && -n ${4:-} ]] || die "rename NAME TAG LABEL"; good_tag "$3"; need "$2"
   qemu-img info -U --output=json "$(dir "$2")/disk.qcow2" | jq -e --arg tag "$3" 'any(.snapshots[]?; .name == $tag)' >/dev/null \
     || die "$2 has no snapshot $3"
   label "$2" "$3" "$4"
