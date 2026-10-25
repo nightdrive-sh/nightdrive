@@ -8,7 +8,11 @@ import Quickshell.Wayland
 // window). Claude's text shows here first, and goes in place of the selection only with Enter: Esc or a click outside
 // cancels, ⌘⇧C again writes another version; the card's buttons do the same with the mouse (ClaudeWriteButton.qml).
 // In a terminal it is the command for what the selection asked, with a warning when it deletes, overwrites or needs
-// root; Enter puts it on the command line, it doesn't run it.
+// root; Enter puts it on the command line, it doesn't run it. In a Claude Code session (meta.claude) it is text, and
+// Enter inserts it at the prompt's cursor: a terminal can't replace a selection.
+// With nothing selected just now (an empty document) the card asks what to write instead, and Enter inserts it at the
+// cursor: a selection stays on offer long after it's gone from the screen, so only one made in the last minute, in
+// the window the key was pressed in, counts (the watcher below; the text itself isn't kept).
 //   qs ipc call write open <dir>   (dir: the script's selection and meta.json)
 //   qs ipc call write again
 //   qs ipc call write close         as Esc (for testing: the card takes the keyboard)
@@ -22,13 +26,17 @@ PanelWindow {
     id: win
     readonly property string script: Quickshell.env("HOME") + "/.config/hypr/scripts/claude-write"
     readonly property int maxChars: 8000   // a longer selection is sent only after an Enter: it may be more than meant
+    readonly property int freshMs: 60000   // a selection older than this is an old one: the card asks instead
 
     property bool open: false
     property string dir: ""
-    property var meta: ({})                // { addr, class, title, terminal, x, y, chars }
+    property var meta: ({})                // { addr, class, title, terminal, claude, x, y, chars }
     property string selection: ""
     property string sent: ""               // what goes to Claude, in a line: the selection, or an app's own words
-    property string phase: ""              // confirm | working | done | error
+    property string phase: ""              // ask | confirm | working | done | error
+    property bool typed: false             // nothing was selected just now: what to write is asked, and inserted
+    property real primaryAt: 0             // when the primary selection last changed, and in which window
+    property string primaryAddr: ""
     property string result: ""
     property string warning: ""
     property string error: ""
@@ -39,22 +47,30 @@ PanelWindow {
         metaFile.path = ""; metaFile.path = d + "/meta.json"
         selFile.path = ""; selFile.path = d + "/selection"
         try { meta = JSON.parse(metaFile.text()) } catch (e) { return }
-        selection = meta.draft ? "" : selFile.text()
+        const fresh = selFile.text().trim() !== "" && Date.now() - primaryAt < freshMs && primaryAddr === addr(meta.addr)
+        typed = !meta.draft && !fresh
+        selection = meta.draft || typed ? "" : selFile.text()
         sent = meta.draft ? meta.sent || "" : selection
         const f = Hyprland.focusedMonitor
         screen = (f && Quickshell.screens.find(s => s.name === f.name)) || Quickshell.screens[0]
         result = ""; warning = ""; error = ""
         open = true
         keys.forceActiveFocus()
-        if (meta.chars > maxChars) phase = "confirm"
+        if (typed) { request.text = ""; phase = "ask"; request.forceActiveFocus() }
+        else if (meta.chars > maxChars) phase = "confirm"
         else write()
     }
     function write() {
         gen++
         phase = "working"
+        keys.forceActiveFocus()
         draft.running = false
         draft.myGen = gen
-        draft.command = meta.draft || [script, "draft", dir]
+        // What was typed goes to the script's folder (only you can read it) as the request, in place of the old selection
+        draft.command = meta.draft
+            || (typed ? ["sh", "-c", 'umask 077; printf "%s" "$1" > "$2/request" && rm -f "$2/selection" && exec "$3" draft "$2"',
+                         "_", sent, dir, script]
+                      : [script, "draft", dir])
         draft.running = true
     }
     function cancel() {
@@ -63,6 +79,10 @@ PanelWindow {
     }
     function accept() {
         if (phase === "confirm") { write(); return }
+        if (phase === "ask") {
+            if (request.text.trim() === "") return
+            sent = request.text.trim(); write(); return
+        }
         if (phase !== "done" || result === "") return
         open = false
         // The text to the script's folder (only you can read it), then the script puts it in place, or the app that
@@ -70,6 +90,38 @@ PanelWindow {
         const then = meta.reply || [script, "replace", dir]
         Quickshell.execDetached(["sh", "-c", 'umask 077; printf "%s" "$1" > "$2/result" && shift 2 && exec "$@"',
                                  "_", result, dir].concat(then))
+    }
+
+    // Hyprland's addresses with or without 0x
+    function addr(a) { return String(a || "").replace(/^0x/, "") }
+
+    // Every change of the primary selection, as a line: when, and the window that had the keyboard. The text is read
+    // only so the app isn't left writing into a closed pipe, and goes nowhere
+    Process {
+        id: primaryWatch
+        property real started: 0
+        command: ["wl-paste", "--primary", "--watch", "sh", "-c", "cat >/dev/null; echo"]
+        running: true
+        onStarted: started = Date.now()
+        onExited: rewatch.start()
+        stdout: SplitParser {
+            onRead: {
+                // wl-paste reports the selection that's already there when it starts: that one is old
+                if (Date.now() - primaryWatch.started < 1000) return
+                win.primaryAt = Date.now()
+                win.primaryAddr = Hyprland.activeToplevel ? win.addr(Hyprland.activeToplevel.address) : ""
+            }
+        }
+    }
+    Timer { id: rewatch; interval: 5000; onTriggered: primaryWatch.running = true }
+
+    // Another workspace, or the drawer (a special workspace) opening or closing, takes you away from the window the
+    // text was for: the card closes as with Esc, instead of staying over a place it no longer belongs to
+    Connections {
+        target: Hyprland
+        function onRawEvent(e) {
+            if (win.open && (e.name === "workspacev2" || e.name === "activespecial")) win.cancel()
+        }
     }
 
     FileView { id: metaFile; blockLoading: true; printErrors: false }
@@ -90,7 +142,10 @@ PanelWindow {
     IpcHandler {
         target: "write"
         function open(dir: string): void { win.show(dir) }
-        function again(): void { if (win.open && win.phase !== "confirm") win.write() }
+        function again(): void {
+            if (win.open && win.phase === "ask") win.accept()
+            else if (win.open && win.phase !== "confirm") win.write()
+        }
         function ask(dir: string): void { win.show(dir) }
         function close(): void { win.cancel() }
     }
@@ -120,9 +175,9 @@ PanelWindow {
     // the same as the key
     readonly property var buttons: phase === "done" ? [{ keys: ["Esc"], text: "Cancel", act: "cancel" },
                                                        { keys: ["Cmd", "Shift", "C"], text: "Write new", act: "write" },
-                                                       { keys: ["Enter"], text: meta.accept || (meta.terminal ? "Put on command line" : "Replace selection"),
+                                                       { keys: ["Enter"], text: meta.accept || (meta.terminal ? "Put on command line" : typed || meta.claude ? "Insert" : "Replace selection"),
                                                          act: "accept", strong: true }]
-        : phase === "confirm" ? [{ keys: ["Esc"], text: "Cancel", act: "cancel" }, { keys: ["Enter"], text: "Send", act: "accept", strong: true }]
+        : phase === "confirm" || phase === "ask" ? [{ keys: ["Esc"], text: "Cancel", act: "cancel" }, { keys: ["Enter"], text: "Send", act: "accept", strong: true }]
         : phase === "error" ? [{ keys: ["Esc"], text: "Close", act: "cancel" }, { keys: ["Cmd", "Shift", "C"], text: "Try again", act: "write" }]
         : [{ keys: ["Esc"], text: "Cancel", act: "cancel" }]
     function act(a) {
@@ -175,8 +230,18 @@ PanelWindow {
                         color: Theme.title
                         font { family: Theme.font; pixelSize: 14; bold: true }
                     }
+                    Text {
+                        visible: win.phase === "ask"
+                        width: parent.width
+                        text: win.meta.terminal ? "Nothing is selected, tell Claude what the command should do"
+                                                : "Nothing is selected, tell Claude what to write"
+                        color: Theme.dim
+                        elide: Text.ElideRight
+                        font { family: Theme.font; pixelSize: 11 }
+                    }
                     // The closing quote in a Text of its own, so a long line keeps it after the "…"
                     Row {
+                        visible: win.phase !== "ask"
                         width: parent.width
                         Text {
                             width: Math.min(implicitWidth, parent.width - closeQuote.width)
@@ -200,12 +265,37 @@ PanelWindow {
             Rectangle {
                 width: parent.width
                 height: win.phase === "done" ? Math.min(resultText.implicitHeight, 320) + 28
+                      : win.phase === "ask" ? Math.min(request.implicitHeight, 160) + 28
                       : win.phase === "working" ? 52 : note.implicitHeight + 28
                 radius: 10
                 color: Theme.card
                 BusyDots {
                     anchors.centerIn: parent
                     visible: win.phase === "working"
+                }
+                // What to write, when nothing was selected: Enter sends, Shift+Enter starts a new line
+                TextEdit {
+                    id: request
+                    visible: win.phase === "ask"
+                    x: 16; y: 14
+                    width: parent.width - 32; height: parent.height - 28
+                    wrapMode: TextEdit.Wrap
+                    clip: true
+                    color: Qt.lighter(Theme.text, 1.12)
+                    selectionColor: Theme.sel
+                    font { family: win.meta.terminal ? "monospace" : Theme.font; pixelSize: 13 }
+                    Text {
+                        visible: !request.text
+                        text: win.meta.terminal ? "What should the command do?" : "What should Claude write?"
+                        color: Theme.dim
+                        font: request.font
+                    }
+                    Keys.onPressed: e => {
+                        if (e.key === Qt.Key_Escape) win.cancel()
+                        else if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && !(e.modifiers & Qt.ShiftModifier)) win.accept()
+                        else return
+                        e.accepted = true
+                    }
                 }
                 Text {
                     id: note

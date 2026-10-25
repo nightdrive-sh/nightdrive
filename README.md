@@ -94,9 +94,11 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Dictation**: hold F5 (or Fn on a Mac), speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Claude writes**: select your notes or a rough draft in any app (a chat, a form, a mail) and press ⌘⇧C. Claude writes
   it out in a tone that fits the place, in the same language, and shows it next to the mouse: Enter puts it in place of
-  the selection, ⌘⇧C again writes another version, Esc cancels (the card's buttons do the same). Only
-  the selection and the window's name and title are
-  sent, never from password managers or private browser windows. In a terminal (turn it on in Claude writes' settings) you
+  the selection, ⌘⇧C again writes another version, Esc cancels (the card's buttons do the same). With nothing
+  selected (an empty document), the card asks what to write ("a thank-you note to the team"), and Enter inserts it at
+  the cursor. Only the selection, or what you typed, and the window's name and title are sent, never from password
+  managers or private browser windows. In a Claude Code session it writes your prompt, and Enter inserts it at the
+  cursor. In a terminal (turn it on in Claude writes' settings) you
   select what you want done, like "find the text files that mention jari", and get the command on the command line,
   with a warning if it deletes, overwrites or needs root; it runs only when you press Enter. To give it context, select
   the message you're answering together with your draft. launcher › Settings › Claude writes (or the Claude menu's button) sets
@@ -398,7 +400,7 @@ which app is yours to choose (launcher › Settings › Apps › App shortcuts).
 | ⌘ 1…0 · ⌘ ⇧ 1…0 | Go to workspace · move the window there |
 | ⌘ D · ⌘ ⇧ D | Drawer: show / hide · put the window in it, or take it back out |
 | ⌘ ⇧ V · ⌘ ⇧ E | Clipboard history · emoji |
-| ⌘ ⇧ C | Claude writes the selected text out, in any app (Claude writes, under [Little things](#little-things-that-add-up)) |
+| ⌘ ⇧ C | Claude writes the selected text out, or what you ask for at the cursor, in any app (Claude writes, under [Little things](#little-things-that-add-up)) |
 | ⌘ R · ⌘ ⇧ R | Reload · without the cache (browsers) |
 | ⌘ ⇧ S · ⌘ ⌥ S · ⌘ ⌥ ⇧ S | Screenshot of a region · of a window · of the screen, to the clipboard (Save in the notification keeps a copy in Downloads) |
 | Hyper B / F / P / M / E | Browser / Files / 1Password / Music / Email |
@@ -474,10 +476,10 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
 - **Asahi specifics.** The notch area needs the `appledrm.show_notch=1` kernel argument, which the installer sets. The 16 KiB memory
   pages break a few Electron apps, but 1Password works.
 - **The Claude menu** reads your plan's limits with Claude Code's own sign-in, so Claude Code must have been run once.
-- **Claude writes (⌘⇧C)** sends the selected text, and the window's class and title, to Anthropic through Claude Code,
-  and only when you press the key. Claude has no tools there, not even your MCP servers or claude.ai connectors, and
-  nothing is saved as a session. Its text goes in only after you've seen it, the clipboard gets its own content back,
-  and the text isn't kept in the clipboard history.
+- **Claude writes (⌘⇧C)** sends the selected text (or what you type in its card), and the window's class and title, to
+  Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers
+  or claude.ai connectors, and nothing is saved as a session. Its text goes in only after you've seen it, the clipboard
+  gets its own content back, and the text isn't kept in the clipboard history.
 - **No credentials are stored in this repo.** Tokens stay with each app (Deck, Claude Code) or in 1Password.
 
 ## Want to participate?

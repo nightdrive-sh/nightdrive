@@ -28,7 +28,7 @@
   ⌘ ⌫                Move file to trash (in Files) {!keyd}
   ⌘ ⇧ V              Clipboard history (Enter pastes into the active window, ⇧ Enter copies only; over a launcher text field it pastes there)
   ⌘ ⇧ E              Emoji picker (Enter pastes, ⇧ Enter copies only)
-  ⌘ ⇧ C              Claude writes the selected text out (a preview first: Enter replaces, ⌘ ⇧ C writes a new one, Esc cancels; in terminals, if turned on: the command)
+  ⌘ ⇧ C              Claude writes the selected text out (a preview first: Enter replaces, ⌘ ⇧ C writes a new one, Esc cancels; nothing selected: it asks what to write and inserts it; in terminals, if turned on: the command)
 
 ## Windows
   ⌘ W                Close window; background apps (Deck, WhatsApp, Slack, 1Password…) are only hidden and keep running, with a green dot in the launcher (their shortcut brings them back)
