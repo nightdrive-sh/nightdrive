@@ -10,7 +10,6 @@ QtObject {
     readonly property string ctl: Quickshell.shellDir + "/../bin/garage-ctl"
     property var vms: []
     property bool loaded: false     // the first list has come: until then no VMs doesn't mean there are none
-    property bool busy: false
     property string error: ""
 
     function refresh() { if (!lister.running) lister.running = true }
@@ -69,7 +68,6 @@ QtObject {
         caller.command = [ctl].concat(job.args)
         caller.input = job.input === undefined ? null : job.input
         caller.stdinEnabled = caller.input !== null
-        busy = true
         error = ""
         caller.running = true
     }
@@ -91,7 +89,6 @@ QtObject {
         stdout: StdioCollector { id: out }
         stderr: StdioCollector { id: err }
         onExited: code => {
-            root.busy = false
             if (code !== 0) {
                 root.error = err.text.trim() || ("garage-ctl failed (" + code + ")")
                 if (failed) failed()

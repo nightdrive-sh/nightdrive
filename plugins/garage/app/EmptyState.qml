@@ -32,7 +32,7 @@ Column {
     Item { width: 1; height: 6 }
     AppButton {
         anchors.horizontalCenter: parent.horizontalCenter
-        c: root.c; glyph: "plus"; label: "New VM"; strong: true; keys: "⌘N"; tip: "Install one from an ISO"
+        c: root.c; glyph: "plus"; label: "New VM"; strong: true; keys: "⌘N"; tip: "From a ready-made image or an ISO"
         onClicked: root.newVm()
     }
 }
