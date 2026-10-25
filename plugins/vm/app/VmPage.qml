@@ -14,6 +14,7 @@ Item {
     property var vm: null
     property bool onePane: false        // a narrow window: the header's arrow goes back to the list
     property int headerHeight: 62       // as AppSidebar's, so the name lines up with the app's
+    property int bottomInset: 0         // room kept at the foot (shell.qml's error line)
     property int snap: -1               // the picked snapshot
     readonly property var snaps: vm ? vm.snapshots : []
     onVmChanged: if (snap >= snaps.length) snap = snaps.length - 1
@@ -80,6 +81,7 @@ Item {
             Layout.fillHeight: true
             Layout.margins: 28
             Layout.topMargin: 22
+            Layout.bottomMargin: 28 + root.bottomInset
             spacing: 22
 
             // What it can do now: the likeliest first and strong
@@ -223,14 +225,6 @@ Item {
                     text: "Shut it down to take, restore or delete a snapshot."
                     color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
                 }
-            }
-
-            Text {
-                visible: root.ctl.error !== ""
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-                text: root.ctl.error
-                color: root.c.danger; font.family: root.c.font; font.pixelSize: 12
             }
 
             Item { Layout.fillHeight: true }

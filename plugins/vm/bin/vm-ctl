@@ -33,14 +33,18 @@ snap() { [[ -n ${3:-} ]] || die "$1 NAME TAG"; need "$2"; stopped "$2"; }
 # One QMP command: the greeting, capabilities, then the command. From the VM's folder, as a socket's path is short (108)
 qmp() {
   cd "$(dir "$1")"
-  python3 -I - qmp.sock "$2" <<'EOF'
+  # A failure is a line the window can show (its error line), not a traceback
+  python3 -I - qmp.sock "$2" "$1" <<'EOF'
 import json, socket, sys
-s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); f = s.makefile("rw")
-f.readline()
-for cmd in ({"execute": "qmp_capabilities"}, {"execute": sys.argv[2]}):
-    f.write(json.dumps(cmd) + "\n"); f.flush()
-    while "return" not in (r := json.loads(f.readline())) and "error" not in r: pass
-    if "error" in r: sys.exit(r["error"]["desc"])
+try:
+    s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); f = s.makefile("rw")
+    f.readline()
+    for cmd in ({"execute": "qmp_capabilities"}, {"execute": sys.argv[2]}):
+        f.write(json.dumps(cmd) + "\n"); f.flush()
+        while "return" not in (r := json.loads(f.readline())) and "error" not in r: pass
+        if "error" in r: sys.exit(r["error"]["desc"])
+except (OSError, ValueError) as e:
+    sys.exit(f"{sys.argv[3]} doesn't answer ({getattr(e, 'strerror', None) or e}): Force off pulls the plug")
 EOF
 }
 
@@ -105,7 +109,9 @@ start() {
     -pidfile "$d/pid" \
     -serial "file:$d/serial.log" > "$d/qemu.log" 2>&1
   for _ in $(seq 50); do running "$name" && return 0; sleep 0.1; done
-  die "qemu didn't start: $(tail -3 "$d/qemu.log")"
+  # The one failure with a known cause: the ssh port another VM holds (one VM with it at a time)
+  grep -q "host forwarding" "$d/qemu.log" && die "Another VM has the ssh port ($SSH_PORT): shut it down first"
+  die "qemu didn't start: $(tail -3 "$d/qemu.log" | sed 's/^qemu-system-[a-z0-9_]*: //')"
 }
 
 # Its SDL window, found by qemu's pid
@@ -123,7 +129,8 @@ case ${1:-} in
   create)   (($# >= 5)) || die "create NAME ISO MEM_GB DISK_GB [CPUS]"; create "${@:2}" ;;
   start)    start "$2" ;;
   stop)     need "$2"; running "$2" || exit 0; qmp "$2" system_powerdown ;;
-  kill)     need "$2"; running "$2" || exit 0; qmp "$2" quit ;;
+  # Pulling the plug works without QMP too: qemu's own process, if its socket doesn't answer
+  kill)     need "$2"; running "$2" || exit 0; qmp "$2" quit 2>/dev/null || kill "$(cat "$(dir "$2")/pid")" ;;
   display)  display "$2" ;;
   eject)    need "$2"; stopped "$2"; sed -i 's/^ISO=.*/ISO=""/' "$(dir "$2")/vm.conf" ;;
   delete)   need "$2"; stopped "$2"; rm -rf "$(dir "$2")" ;;

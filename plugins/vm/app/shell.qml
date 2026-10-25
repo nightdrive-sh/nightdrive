@@ -83,6 +83,7 @@ ShellRoot {
                 onePane: win.onePane
                 focus: true
                 onBack: win.listOpen = true
+                bottomInset: note.visible ? note.height + 16 : 0
                 onAskName: (title, initial, done) => win.ask(title, initial, done)
                 onAskConfirm: (question, detail, done) => win.confirm(question, detail, done)
 
@@ -92,6 +93,15 @@ ShellRoot {
                     width: Math.min(parent.width - 48, 420)
                     c: win.look
                     onNewVm: win.showNew = true
+                }
+
+                NoteLine {
+                    id: note
+                    anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                    anchors.margins: 20
+                    c: win.look
+                    text: ctl.error
+                    onDismissed: ctl.error = ""
                 }
 
                 Keys.onPressed: e => {
