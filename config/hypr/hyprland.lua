@@ -11,7 +11,7 @@
 local MONITOR_SCALE = 2.0
 local KB_LAYOUT     = "fi"
 local KB_VARIANT    = "mac"
-local BUILTIN_DISPLAY = "eDP-1"   -- a laptop's own screen (a desktop has none: the rule below then does nothing)
+local BUILTIN_DISPLAY = "eDP-1"   -- a laptop's own screen (a desktop has none)
 local BAR_HEIGHT    = 37      -- the top bar in logical px (Theme.barHeight in quickshell/Theme.qml): the top corners start under it
 
 local HOME = os.getenv("HOME")
@@ -123,8 +123,10 @@ do
     if builtin and ext then
         hl.workspace_rule({ workspace = tostring(LAPTOP_WORKSPACE), monitor = BUILTIN_DISPLAY, default = true })
         for i = 1, 9 do hl.workspace_rule({ workspace = tostring(i), monitor = ext.name, default = i == 1 }) end
-    else
-        hl.workspace_rule({ workspace = "1", monitor = BUILTIN_DISPLAY, default = true })
+    elseif builtin or ext then
+        -- 1 on the one screen there is. Never on a screen that isn't there (a VM's or a desktop's built-in one, or any at
+        -- the first parse, before Hyprland has its screens): 1 was kept for it and the real screen opened on 2
+        hl.workspace_rule({ workspace = "1", monitor = (builtin or ext).name, default = true })
     end
 end
 function NightdriveArrangeWorkspaces()
