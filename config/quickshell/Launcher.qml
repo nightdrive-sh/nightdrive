@@ -109,6 +109,7 @@ PanelWindow {
     function shakeNow() { shake.restart() }
     function search(target, text) { go(target); input.text = text }   // a level with its query typed (Default apps › Find more)
     function insertText(text) { input.insert(input.cursorPosition, text) }   // at the cursor (Snippets: Shift+Enter → ↵)
+    property alias field: input                                         // the search / text field (ClipPicker keeps its text and cursor)
     readonly property var swCats: inst.swCats                          // Install › Software's categories (Default apps › Find more)
     function openCategory(key, name) { inst.openCategory(key, name) }
     readonly property var parents: Object.assign({ install: "system", screenshot: "tools", startup: "appsettings", appsettings: "settings" }, ...exts.map(e => e.parents))
@@ -715,6 +716,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     function selectWhere(pred) { const i = results.findIndex(pred); if (i >= 0) list.currentIndex = i }
     function back() {
         if (detail !== null) { details.close(); return }
+        if (tools.picker.back()) return      // Clipboard as a text field's picker: back to the field, its text kept
         if (level === "root") { win.open = false; return }
         go(parents[level] || "root")
         const sel = lastSel[level]
@@ -885,7 +887,8 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         function toggle(): void { win.open = !win.open }
         function close(): void { win.open = false }
         // openLevel apps | keys | root: opens a sublevel directly
-        function openLevel(level: string): void { win.open = true; win.go(level) }
+        // ⌘⇧V (clipboard) over a text field (a level in a Levels file's `inputs`) opens Clipboard as a picker for it
+        function openLevel(level: string): void { if (level === "clipboard" && tools.picker.begin()) return; win.open = true; win.go(level) }
         function setQuery(text: string): void { input.text = text }
         // askClaude: ⌘⌥Enter with the launcher open and a non-empty query → sends the text to Claude Code (hypr/scripts/terminal-or-claude). Returns "ok" or "".
         function askClaude(): string {

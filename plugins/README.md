@@ -190,6 +190,8 @@ it (`qs kill; setsid -f qs`).
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also
 have `rootItems` (rows at the launcher's root: Deck's Music), `rootRows()` (rows for the root search: Deck's albums) and
 `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
+`inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
+into the field.
 Deck's [MusicLevels.qml](deck/MusicLevels.qml) has all of them. The same restart applies.
 
 ## The page: README.md

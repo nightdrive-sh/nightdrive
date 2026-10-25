@@ -10,6 +10,7 @@ Item {
     property var launcher: null
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
+    readonly property var inputs: ["compname"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
     readonly property var levels: ["launcherprefs", "compname", "remotelogin", "sounds", "notiftime", "soundregular", "soundurgent", "channel", "browser", "mousescroll", "crashreports"]
     readonly property var titles: ({ launcherprefs: "Settings › Launcher", compname: "Settings › Computer name", remotelogin: "Settings › Remote login", channel: "Settings › Update channel",
                                      browser: "Apps › Firefox", mousescroll: "Settings › Mouse", crashreports: "Settings › Crash reports",

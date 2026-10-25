@@ -11,6 +11,7 @@ Item {
     id: s
     property var launcher: null
 
+    readonly property var inputs: ["wifipw", "mirrorpin"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
     readonly property var levels: ["wifi", "wifipw", "bluetooth", "sound", "headphones", "tailscale", "status", "mirrorpin"]
     readonly property var titles: ({ status: "System › Status", mirrorpin: "Screen Mirroring › Code", wifi: "Settings › Wi-Fi", wifipw: "Wi-Fi › Password", bluetooth: "Settings › Bluetooth",
                                      sound: "Settings › Sound", headphones: "Sound › Headphones", tailscale: "Settings › Tailscale" })

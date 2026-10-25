@@ -14,6 +14,7 @@ Item {
     property var launcher: null
 
     readonly property string script: Quickshell.env("HOME") + "/.config/hypr/scripts/claude-write"
+    readonly property var inputs: ["claudewriteinstr"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
     readonly property var levels: ["claudewrite", "claudewritemodel", "claudewriteinstr", "claudewriteapps"]
     readonly property var titles: ({ claudewrite: "Settings › Claude writes", claudewritemodel: "Claude writes › Model",
                                      claudewriteinstr: "Claude writes › Your instructions", claudewriteapps: "Claude writes › Not in these apps" })
