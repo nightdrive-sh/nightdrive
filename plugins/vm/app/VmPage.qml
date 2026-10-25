@@ -25,13 +25,6 @@ Item {
                         () => root.act(["unsnap", name, tag]))
     }
 
-    Text {
-        visible: !root.vm
-        anchors.centerIn: parent
-        text: "No VMs yet: + New VM (⌘N)"
-        color: root.c.faint; font.family: root.c.font; font.pixelSize: 13
-    }
-
     ColumnLayout {
         visible: !!root.vm
         anchors.fill: parent

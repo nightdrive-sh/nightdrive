@@ -9,6 +9,7 @@ QtObject {
     id: root
     readonly property string ctl: Quickshell.shellDir + "/../bin/vm-ctl"
     property var vms: []
+    property bool loaded: false     // the first list has come: until then no VMs doesn't mean there are none
     property bool busy: false
     property string error: ""
 
@@ -34,7 +35,9 @@ QtObject {
     property Process lister: Process {
         command: [root.ctl, "list"]
         stdout: StdioCollector {
-            onStreamFinished: { try { root.vms = JSON.parse(text) } catch (e) { root.error = "vm-ctl list: " + text } }
+            onStreamFinished: {
+                try { root.vms = JSON.parse(text); root.loaded = true } catch (e) { root.error = "vm-ctl list: " + text }
+            }
         }
     }
 
