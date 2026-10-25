@@ -6,7 +6,7 @@
 #   vars.raw     the UEFI variables
 #   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
 #   qmp.sock, qga.sock, pid, serial.log while it runs (qemu's monitor, the guest agent's channel)
-#   firstboot.creds  a disk image's first boot: its user, until it has run (lib/firstboot.sh)
+#   firstboot/   a disk image's first boot: its user, until it has run (lib/firstboot.sh)
 # What differs between an Asahi Mac and a PC is lib/arch.sh's; qemu itself, its command line and its sockets, are
 # lib/qemu.sh's; the ready-made images are lib/images.sh's.
 #

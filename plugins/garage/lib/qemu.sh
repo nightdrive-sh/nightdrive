@@ -92,7 +92,7 @@ start() {
 stop() {
   need "$1"; running "$1" || return 0
   # The agent answering means the first boot's scripts have run (lib/firstboot.sh): their credentials can go
-  qga "$1" guest-shutdown '{"mode": "powerdown"}' >/dev/null 2>&1 && { rm -f "$(dir "$1")/firstboot.creds"; return 0; }
+  qga "$1" guest-shutdown '{"mode": "powerdown"}' >/dev/null 2>&1 && { rm -rf "$(dir "$1")/firstboot"; return 0; }
   qmp "$1" system_powerdown >/dev/null
   echo acpi
 }

@@ -6,8 +6,9 @@
 #                         keymap and timezone, and the host's ssh key, so `ssh -p 2222 localhost` just works
 #   nightdrive-vm-agent   once the network is up: sshd and qemu-guest-agent (Shut down, the clock), with dnf
 # and Fedora's initial-setup is skipped, as the user is made already (it would ask for one in the VM's window).
-# They are written to the VM's folder (firstboot.creds: NAME BASE64 a line, the password only as a hash) and passed at
-# each start until the guest agent has shut the VM down once, i.e. both scripts have run (lib/qemu.sh: stop).
+# They are written to the VM's folder (firstboot/, a file each, the password only as a hash) and passed at each start
+# until the guest agent has shut the VM down once, i.e. both scripts have run (lib/qemu.sh: stop). qemu reads each from
+# its file (-smbios path=): given as a value they were in its command line, which any process on the host can read.
 
 # The image's root is 3 GB whatever the disk's size: its partition (the disk's last) and filesystem grow to the disk,
 # online. Nice to have too: a layout this doesn't know (LVM) keeps its size
@@ -19,7 +20,7 @@ partx -u "$dev"
 case $(findmnt -no FSTYPE /) in ext4) resize2fs "$src" ;; xfs) xfs_growfs / ;; btrfs) btrfs filesystem resize max / ;; esac
 ) || true'
 
-# firstboot_creds NAME USER PASSWORD: firstboot.creds in its folder
+# firstboot_creds NAME USER PASSWORD: firstboot/ in its folder
 firstboot_creds() {
   local name=$1 user=$2 pass=$3 d; d=$(dir "$1")
   [[ $user =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "User: lower-case letters, digits, - and _, starting with a letter"
@@ -54,6 +55,8 @@ systemctl enable --now sshd qemu-guest-agent
 mkdir -p /var/lib/nightdrive-vm
 touch /var/lib/nightdrive-vm/agent'
 
+  local c=$d/firstboot
+  mkdir -m 700 "$c"
   {
     cred nightdrive-vm.user "$user_script"
     cred nightdrive-vm.agent "$agent_script"
@@ -65,19 +68,22 @@ Before=getty@tty1.service serial-getty@$TTY.service systemd-user-sessions.servic
 After=network-online.target nightdrive-vm-user.service')"
     cred systemd.unit-dropin.multi-user.target $'[Unit]\nWants=nightdrive-vm-user.service nightdrive-vm-agent.service'
     cred systemd.unit-dropin.initial-setup.service $'[Unit]\nConditionPathExists=/var/lib/nightdrive-vm/initial-setup'
-  } > "$d/firstboot.creds"
-  chmod 600 "$d/firstboot.creds"
+  }
 }
-cred() { printf '%s %s\n' "$1" "$(printf '%s' "$2" | base64 -w0)"; }
+# cred NAME VALUE: its file in $c (firstboot_creds'), as SMBIOS type 11 carries it: base64 has no commas or newlines,
+# which an OEM string would choke on
+cred() { printf 'io.systemd.credential.binary:%s=%s' "$1" "$(printf '%s' "$2" | base64 -w0)" > "$c/$1"; }
 # unit ID DESCRIPTION ORDERING: a oneshot running its script once
 unit() {
   printf '[Unit]\nDescription=Nightdrive VM: %s\nConditionPathExists=!/var/lib/nightdrive-vm/%s\n%s\n\n' "$2" "$1" "$3"
   printf '[Service]\nType=oneshot\nImportCredential=nightdrive-vm.%s\nExecStart=/bin/bash ${CREDENTIALS_DIRECTORY}/nightdrive-vm.%s\n' "$1" "$1"
 }
 
-# qemu's options for them (base64 has no commas, which qemu's option syntax would need doubled); none once they're gone
+# qemu's options for them, a file each; none once they're gone
 firstboot_args() {
-  local f n v; f=$(dir "$1")/firstboot.creds
-  [[ -f $f ]] || return 0
-  while read -r n v; do printf '%s\n' -smbios "type=11,value=io.systemd.credential.binary:$n=$v"; done < "$f"
+  local f
+  for f in "$(dir "$1")"/firstboot/*; do
+    [[ -f $f ]] && printf '%s\n' -smbios "type=11,path=$(qv "$f")"
+  done
+  return 0
 }
