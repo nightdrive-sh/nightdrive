@@ -6,10 +6,12 @@ import Quickshell.Wayland
 
 // Claude writes: the preview next to the mouse after ⌘⇧C (hypr/scripts/claude-write, which reads the selection and the
 // window). Claude's text shows here first, and goes in place of the selection only with Enter: Esc or a click outside
-// cancels, ⌘⇧C again writes another version. In a terminal it is the command for what the selection asked, with a
-// warning when it deletes, overwrites or needs root; Enter puts it on the command line, it doesn't run it.
+// cancels, ⌘⇧C again writes another version; the card's buttons do the same with the mouse (ClaudeWriteButton.qml).
+// In a terminal it is the command for what the selection asked, with a warning when it deletes, overwrites or needs
+// root; Enter puts it on the command line, it doesn't run it.
 //   qs ipc call write open <dir>   (dir: the script's selection and meta.json)
 //   qs ipc call write again
+//   qs ipc call write close         as Esc (for testing: the card takes the keyboard)
 //   qs ipc call write ask <dir>    another app's request (Mail's reply, plugins/mail): dir/meta.json { x, y (the
 //                                  desktop's coordinates), sent (the line saying what goes to Claude), accept (Enter's
 //                                  hint), draft, reply, cancel (commands, as lists) }. draft prints {text, sent} or
@@ -90,6 +92,7 @@ PanelWindow {
         function open(dir: string): void { win.show(dir) }
         function again(): void { if (win.open && win.phase !== "confirm") win.write() }
         function ask(dir: string): void { win.show(dir) }
+        function close(): void { win.cancel() }
     }
 
     visible: open
@@ -113,12 +116,20 @@ PanelWindow {
         }
     }
 
-    readonly property var keyGlyphs: ({ Enter: "corner-down-left", Cmd: "command", Shift: "arrow-big-up" })
-    readonly property var hints: phase === "done" ? [{ keys: ["Enter"], text: meta.accept || (meta.terminal ? "Put on command line" : "Replace selection") },
-                                                     { keys: ["Cmd", "Shift", "C"], text: "Write new" }, { keys: ["Esc"], text: "Cancel" }]
-        : phase === "confirm" ? [{ keys: ["Enter"], text: "Send" }, { keys: ["Esc"], text: "Cancel" }]
-        : phase === "error" ? [{ keys: ["Cmd", "Shift", "C"], text: "Try again" }, { keys: ["Esc"], text: "Close" }]
-        : [{ keys: ["Esc"], text: "Cancel" }]
+    // The card's buttons: Esc's on the left, the rest on the right with Enter's last (strong). act: what a click does,
+    // the same as the key
+    readonly property var buttons: phase === "done" ? [{ keys: ["Esc"], text: "Cancel", act: "cancel" },
+                                                       { keys: ["Cmd", "Shift", "C"], text: "Write new", act: "write" },
+                                                       { keys: ["Enter"], text: meta.accept || (meta.terminal ? "Put on command line" : "Replace selection"),
+                                                         act: "accept", strong: true }]
+        : phase === "confirm" ? [{ keys: ["Esc"], text: "Cancel", act: "cancel" }, { keys: ["Enter"], text: "Send", act: "accept", strong: true }]
+        : phase === "error" ? [{ keys: ["Esc"], text: "Close", act: "cancel" }, { keys: ["Cmd", "Shift", "C"], text: "Try again", act: "write" }]
+        : [{ keys: ["Esc"], text: "Cancel", act: "cancel" }]
+    function act(a) {
+        if (a === "cancel") cancel()
+        else if (a === "accept") accept()
+        else if (a === "write") write()
+    }
 
     // Below the mouse, kept on the screen
     readonly property real mx: (meta.x || 0) - (screen ? screen.x : 0)
@@ -127,71 +138,91 @@ PanelWindow {
     Rectangle {
         id: card
         width: Math.min(480, win.width - 32)
-        height: body.implicitHeight + 32
+        height: body.implicitHeight + 36
         x: Math.max(16, Math.min(win.mx - 24, win.width - width - 16))
         y: win.my + 24 + height < win.height - 16 ? win.my + 24 : Math.max(16, win.my - 24 - height)
-        radius: 12
+        radius: 14
         color: Theme.launcherBg
-        border { color: Theme.primary; width: 2 }
+        border { color: Theme.primary; width: 1 }
         MouseArea { anchors.fill: parent }
 
         Column {
             id: body
-            x: 16; y: 16
-            width: parent.width - 32
-            spacing: 10
+            x: 18; y: 18
+            width: parent.width - 36
+            spacing: 12
 
+            // The title, and under it what was sent in quotes, so it's clear what left the machine; the glyph is as
+            // tall as the two lines
             Row {
-                spacing: 8
+                width: parent.width
+                spacing: 10
                 Text {
+                    id: glyph
+                    width: 36
                     anchors.verticalCenter: parent.verticalCenter
+                    horizontalAlignment: Text.AlignHCenter
                     text: Icons.g(win.meta.terminal ? "terminal" : "sparkles")
                     color: Theme.accent
-                    font { family: Icons.family; pixelSize: 16 }
+                    font { family: Icons.familyThin; pixelSize: 30 }   // the thin stroke: at this size the regular one is heavy
+                }
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - glyph.width - 10
+                    spacing: 2
+                    Text {
+                        text: win.meta.terminal ? "Claude writes the command" : "Claude writes"
+                        color: Theme.title
+                        font { family: Theme.font; pixelSize: 14; bold: true }
+                    }
+                    // The closing quote in a Text of its own, so a long line keeps it after the "…"
+                    Row {
+                        width: parent.width
+                        Text {
+                            width: Math.min(implicitWidth, parent.width - closeQuote.width)
+                            text: "“" + win.sent.replace(/\s+/g, " ").trim()
+                            color: Theme.dim
+                            elide: Text.ElideRight
+                            font { family: Theme.font; pixelSize: 11 }
+                        }
+                        Text {
+                            id: closeQuote
+                            text: "”"
+                            color: Theme.dim
+                            font { family: Theme.font; pixelSize: 11 }
+                        }
+                    }
+                }
+            }
+
+            // Where the text comes: there from the start, with the dots in its middle while Claude writes, and the
+            // question or the error in it when there is one
+            Rectangle {
+                width: parent.width
+                height: win.phase === "done" ? Math.min(resultText.implicitHeight, 320) + 28
+                      : win.phase === "working" ? 52 : note.implicitHeight + 28
+                radius: 10
+                color: Theme.card
+                BusyDots {
+                    anchors.centerIn: parent
+                    visible: win.phase === "working"
                 }
                 Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: win.meta.terminal ? "Claude writes the command" : "Claude writes"
-                    color: Theme.title
-                    font { family: Theme.font; pixelSize: 14; bold: true }
+                    id: note
+                    visible: win.phase === "confirm" || win.phase === "error"
+                    x: 16; y: 14
+                    width: parent.width - 32
+                    wrapMode: Text.Wrap
+                    text: win.phase === "error" ? win.error
+                        : (win.meta.chars || 0).toLocaleString() + " characters are selected. Enter sends them to Claude."
+                    color: win.phase === "error" ? Theme.danger : Theme.warning
+                    font { family: Theme.font; pixelSize: 13 }
                 }
-            }
-
-            // What was sent, so it's clear what left the machine
-            Text {
-                width: parent.width
-                text: "Sent: " + win.sent.replace(/\s+/g, " ").trim()
-                color: Theme.dim
-                elide: Text.ElideRight
-                font { family: Theme.font; pixelSize: 12 }
-            }
-
-            Text {
-                visible: win.phase === "confirm"
-                width: parent.width
-                wrapMode: Text.Wrap
-                text: (win.meta.chars || 0).toLocaleString() + " characters are selected. Enter sends them to Claude."
-                color: Theme.warning
-                font { family: Theme.font; pixelSize: 13 }
-            }
-            BusyDots { visible: win.phase === "working" }
-            Text {
-                visible: win.phase === "error"
-                width: parent.width
-                wrapMode: Text.Wrap
-                text: win.error
-                color: Theme.danger
-                font { family: Theme.font; pixelSize: 13 }
-            }
-            Rectangle {
-                visible: win.phase === "done"
-                width: parent.width
-                height: Math.min(resultText.implicitHeight, 320) + 20
-                radius: 8
-                color: Theme.card
                 Flickable {
-                    x: 10; y: 10
-                    width: parent.width - 20; height: parent.height - 20
+                    id: flick
+                    visible: win.phase === "done"
+                    x: 16; y: 14
+                    width: parent.width - 32; height: parent.height - 28
                     contentHeight: resultText.implicitHeight
                     clip: true
                     Text {
@@ -200,8 +231,19 @@ PanelWindow {
                         wrapMode: Text.Wrap
                         text: win.result
                         textFormat: Text.PlainText
-                        color: Theme.text
+                        color: Qt.lighter(Theme.text, 1.12)
+                        lineHeight: 1.15
                         font { family: win.meta.terminal ? "monospace" : Theme.font; pixelSize: 13 }
+                    }
+                }
+                // A longer text fades out at the bottom while there is more of it to scroll to
+                Rectangle {
+                    visible: flick.visible && flick.contentY + flick.height < flick.contentHeight - 1
+                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 1 }
+                    height: 36; radius: 10
+                    gradient: Gradient {
+                        GradientStop { position: 0; color: "transparent" }
+                        GradientStop { position: 1; color: Theme.card }
                     }
                 }
             }
@@ -223,44 +265,24 @@ PanelWindow {
                 }
             }
 
-            // The keys, framed like the launcher's footer: Lucide glyphs for Enter, ⌘ and ⇧ (the font's ⇧ is faint)
-            Flow {
+            Item {
                 width: parent.width
-                topPadding: 2
-                spacing: 14
-                Repeater {
-                    model: win.hints
-                    Row {
-                        required property var modelData
-                        spacing: 6
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: caps.implicitWidth + 14; height: 22; radius: 6
-                            color: "transparent"
-                            border { width: 1; color: Theme.dim }
-                            Row {
-                                id: caps
-                                anchors.centerIn: parent
-                                spacing: 4
-                                Repeater {
-                                    model: modelData.keys
-                                    Text {
-                                        required property string modelData
-                                        readonly property string glyph: win.keyGlyphs[modelData] || ""
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: glyph !== "" ? Icons.g(glyph) : modelData.length === 1 ? modelData : modelData.toLowerCase()
-                                        color: Theme.dim
-                                        font { family: glyph !== "" ? Icons.family : Theme.font
-                                               pixelSize: glyph !== "" ? 12 : modelData.length === 1 ? 13 : 11 }
-                                    }
-                                }
-                            }
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.text
-                            color: Theme.dim
-                            font { family: Theme.font; pixelSize: 12 }
+                height: 38
+                ClaudeWriteButton {
+                    readonly property var b: win.buttons[0]
+                    anchors.bottom: parent.bottom
+                    keys: b.keys; label: b.text
+                    onClicked: win.act(b.act)
+                }
+                Row {
+                    anchors { right: parent.right; bottom: parent.bottom }
+                    spacing: 8
+                    Repeater {
+                        model: win.buttons.slice(1)
+                        ClaudeWriteButton {
+                            required property var modelData
+                            keys: modelData.keys; label: modelData.text; strong: modelData.strong === true
+                            onClicked: win.act(modelData.act)
                         }
                     }
                 }

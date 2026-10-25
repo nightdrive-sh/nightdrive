@@ -87,7 +87,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Dictation**: hold F5 (or Fn on a Mac), speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Claude writes**: select your notes or a rough draft in any app (a chat, a form, a mail) and press ⌘⇧C. Claude writes
   it out in a tone that fits the place, in the same language, and shows it next to the mouse: Enter puts it in place of
-  the selection, ⌘⇧C again writes another version, Esc cancels. Only the selection and the window's name and title are
+  the selection, ⌘⇧C again writes another version, Esc cancels (the card's buttons do the same). Only
+  the selection and the window's name and title are
   sent, never from password managers or private browser windows. In a terminal (turn it on in Claude writes' settings) you
   select what you want done, like "find the text files that mention jari", and get the command on the command line,
   with a warning if it deletes, overwrites or needs root; it runs only when you press Enter. To give it context, select
