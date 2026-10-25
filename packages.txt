@@ -77,6 +77,8 @@ breeze-cursor-theme
 google-noto-sans-fonts
 google-noto-sans-mono-fonts
 google-noto-color-emoji-fonts
+# Chinese, Japanese and Korean, which Fedora Minimal has no font for
+google-noto-sans-cjk-vf-fonts
 xdg-desktop-portal-gtk
 # The login screen (config/greeter) and its text login, agreety: the way in when the login screen doesn't start, and the
 # login screen with --no-greeter on Fedora Minimal, which has none of its own

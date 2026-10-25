@@ -25,17 +25,20 @@ repo=$(cd "$here/../.." && pwd)
 # libdnf5's record of why each package is installed and which groups are (its system_state_dir)
 STATE=/usr/lib/sysimage/libdnf5
 # install.sh's steps outside the package lists: the boot splash (config/splash/install.sh), the NVIDIA driver and RPM
-# Fusion, dnf's copr command (setup-hyprland-repo.sh)
+# Fusion, dnf's copr command (setup-hyprland-repo.sh). And Podman, where it's installed: `nightdrive sandbox` runs in it
 EXTRAS=(plymouth plymouth-plugin-two-step plymouth-theme-spinner ImageMagick jetbrains-mono-fonts akmod-nvidia akmods
-        mokutil openssl rpmfusion-free-release rpmfusion-nonfree-release dnf5-plugins)
+        mokutil openssl rpmfusion-free-release rpmfusion-nonfree-release dnf5-plugins podman)
 # The boot chain: what of it is installed always stays, and dnf is told to protect it. By pattern, as a kernel's files
-# aren't always in kernel-core (Fedora 44 on aarch64 has none: kernel-uki-dtbloader provides kernel-core-uname-r)
+# aren't always in kernel-core (Fedora 44 on aarch64 has none: kernel-uki-dtbloader provides kernel-core-uname-r).
+# On a Mac also Asahi's: the repos its kernel, Mesa and boot chain update from (and the vendor change that lets their
+# packages replace Fedora's), the Wi-Fi firmware, and the fix that keeps it bootable next to macOS 27
 BOOT=(kernel kernel-16k 'kernel*-core' 'kernel-uki-*' 'kernel*-modules' 'kernel*-modules-core' 'kernel*-modules-extra'
       grub2-efi-x64 grub2-efi-aa64 grub2-pc grub2-common grub2-tools grub2-tools-minimal 'shim-*' grubby efibootmgr
-      dracut 'linux-firmware*' dracut-asahi update-m1n1 uboot-images-armv8 asahi-platform-metapackage)
+      dracut 'linux-firmware*' dracut-asahi update-m1n1 m1n1 uboot-images-armv8 'asahi-platform-metapackage*'
+      'asahi-repos*' asahi-fwupdate asahi-fix27 fedora-asahi-remix-scripts)
 # What may never be in what goes, whatever dnf answers: without it the machine doesn't start, log in or reach the
 # network, or can't repair itself. The run stops before removing anything if it is (#1606)
-NEVER='^(kernel(-16k)?(-core|-modules|-modules-core)?|kernel-uki-.*|grub2-(efi-(x64|aa64)|pc|common|tools|tools-minimal)|shim-.*|grubby|dracut|linux-firmware|systemd|systemd-udev|systemd-boot-.*|glibc|bash|coreutils|util-linux|kmod|rpm|dnf5|sudo|pam|polkit|NetworkManager|NetworkManager-wifi|openssh-server|selinux-policy|selinux-policy-targeted|greetd|greetd-selinux|update-m1n1|uboot-images-armv8|asahi-platform-metapackage)$'
+NEVER='^(kernel(-16k)?(-core|-modules|-modules-core)?|kernel-uki-.*|grub2-(efi-(x64|aa64)|pc|common|tools|tools-minimal)|shim-.*|grubby|dracut|linux-firmware|systemd|systemd-udev|systemd-boot-.*|glibc|bash|coreutils|util-linux|kmod|rpm|dnf5|sudo|pam|polkit|NetworkManager|NetworkManager-wifi|openssh-server|selinux-policy|selinux-policy-targeted|greetd|greetd-selinux|dracut-asahi|update-m1n1|m1n1|uboot-images-armv8|asahi-platform-metapackage(-core)?|asahi-repos|asahi-repos-dnf5-vendorchange-config|asahi-fwupdate|asahi-fix27|fedora-asahi-remix-scripts)$'
 # Nightdrive's lists, also as they were (git log): a package dropped from them isn't the user's own
 LISTS=(packages.txt packages-hyprland.txt packages-pc.txt packages-asahi.txt)
 UNDO=$HOME/.local/state/nightdrive/minimal-undo.txt
@@ -79,7 +82,7 @@ read_reasons
 lines() { grep -vhE '^\s*(#|$)' "$@" | sed 's/[[:space:]]*#.*//; s/[[:space:]]*$//'; }
 # group_members ID: a group's mandatory, default and conditional packages, from Fedora's comps (the repos' metadata)
 group_members() {
-  LC_ALL=C dnf -q group info "$1" 2>/dev/null | awk '/^[^ ]/ { on = /^(Mandatory|Default|Conditional) packages/ }
+  LC_ALL=C dnf -q group info "$1" </dev/null 2>/dev/null | awk '/^[^ ]/ { on = /^(Mandatory|Default|Conditional) packages/ }
     on && /:/ { sub(/^[^:]*:[ \t]*/, ""); if ($1 != "") print $1 }'
 }
 # add NAME|GLOB…: the installed ones stay (a GLOB, unquoted on purpose, matches their names). A name not installed as
@@ -94,11 +97,13 @@ add() {
   done
   return 0
 }
-# add_file FILE…: its names and globs, its @groups expanded; a -name line (base files) leaves that one out afterwards
+# add_file FILE…: its names and globs, its @groups expanded; a -name line (base files) leaves that one out afterwards.
+# The file comes on fd 3: dnf and rpm in the loop read stdin, and took the rest of the file with them (only base-*.txt's
+# @core was read, so asahi-repos and the Mac's packages went, #1608)
 leave=()
 add_file() {
   local l g
-  while read -r l; do
+  while read -r -u 3 l; do
     case $l in
       -*) leave+=("${l#-}") ;;
       @*) g=$(group_members "${l#@}") || true
@@ -107,7 +112,7 @@ add_file() {
           add $g ;;
       *) add "$l" ;;
     esac
-  done < <(lines "$@")
+  done 3< <(lines "$@")
 }
 # installed GLOB…: the installed packages whose names match
 installed() { local p n; for p; do for n in "${!inst[@]}"; do [[ $n == $p ]] && echo "$n"; done; done | sort -u; }
@@ -118,6 +123,8 @@ boot_files() { ls /boot 2>/dev/null | grep -E '^(vmlinuz|initramfs)-' | sort || 
 
 machine=$("$repo/config/hypr/scripts/platform" machine)
 kind=pc; [[ $machine == asahi ]] && kind=asahi
+# Not yet run for real on a Mac: until it has been, it only shows what it would do there (#1608)
+[[ $kind == pc ]] || (( dry )) || die "not yet on Apple Silicon Macs: --dry-run shows what it would do"
 echo "Reading what is installed and what Fedora Minimal has (base-$kind.txt)…"
 add_file "$here/base-$kind.txt"
 # install.sh removes these from Asahi's Minimal image (a Mac doesn't use them)
