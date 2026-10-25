@@ -61,13 +61,7 @@ case $kind in
     fi
     emit "$icon" "$pct%" "$cls" ;;
   claude)
-    u=$(~/.config/topbar/scripts/claude-usage)
-    sess=$(jq -r '(.windows // [] | map(select(.key == "session")) | first // {}).percent // -1' <<<"$u")
-    if (( sess < 0 )); then emit gauge "" off; exit; fi
-    # gauge@N: the needle points at the usage (TopBar.qml draws it)
-    # The colour follows the 5 h window only, not the week
-    if (( sess > 95 )); then cls=critical; elif (( sess > 90 )); then cls=warning; else cls=; fi
-    emit "gauge@$sess" "$sess%" "$cls" ;;
+    exec ~/.config/topbar/scripts/claude-bar status ;;   # its right click cycles what it shows
   system)
     IFS=$'\t' read -r _ _ cls < <(~/.config/topbar/scripts/sysinfo bar)
     [[ $cls == high ]] && cls=critical

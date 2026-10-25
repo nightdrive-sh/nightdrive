@@ -1,0 +1,27 @@
+#!/bin/bash
+# The bar's Claude module (scripts/status runs it). Right click cycles what it shows, remembered across restarts:
+#   0  gauge + 5-hour usage %    1  gauge + weekly usage %    2  gauge, 5-hour    3  gauge, weekly
+#   4  spark + number of Claude Code sessions                 5  spark alone
+# The spark (icons/spark.svg) is our own, not Anthropic's logo: Nightdrive is a third-party project.
+# Usage: claude-bar [status|next]
+state=${XDG_STATE_HOME:-$HOME/.local/state}/nightdrive
+mode=$(cat "$state/claude-bar-mode" 2>/dev/null); [[ $mode =~ ^[0-5]$ ]] || mode=0
+dir=$(dirname "$0")
+
+case ${1:-status} in
+  next)
+    mkdir -p "$state" && echo $(( (mode + 1) % 6 )) > "$state/claude-bar-mode" ;;
+  status)
+    . "$dir/emit"
+    if (( mode >= 4 )); then
+      text=; (( mode == 4 )) && text=$("$dir/claude-sessions" | jq length)
+      emit spark "$text"; exit
+    fi
+    key=$( (( mode % 2 )) && echo weekly || echo session )
+    pct=$("$dir/claude-usage" | jq -r --arg k "$key" '(.windows // [] | map(select(.key == $k)) | first // {}).percent // -1')
+    if (( pct < 0 )); then emit gauge "" off; exit; fi
+    # gauge@N: the needle points at the usage (TopBar.qml draws it); the colour follows the window shown
+    if (( pct > 95 )); then cls=critical; elif (( pct > 90 )); then cls=warning; else cls=; fi
+    text=; (( mode < 2 )) && text="$pct%"
+    emit "gauge@$pct" "$text" "$cls" ;;
+esac
