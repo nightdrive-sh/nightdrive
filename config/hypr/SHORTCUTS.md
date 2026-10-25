@@ -42,6 +42,7 @@
   ⌘ ⇧ arrows         Move window
   ⌘ + mouse drag     Move window / right button: resize
   ⌘ + drag           A top bar icon: move it (the order is kept; also launcher › Settings › Top bar › Items)
+  ⌃ ⌘ + click       A link: the window it opens floats in the centre (not a link that opens in a tab)
   ⌘ ⌥ ← / →         Previous / next tab (any app: sends Ctrl+PageUp/PageDown)
   ⌃ ⌘ ← / →         Back / forward (browsers, web apps, Nautilus)
   ⌥ ← / →           Move by word (⇧ selects)
