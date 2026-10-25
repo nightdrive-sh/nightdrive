@@ -26,11 +26,13 @@ vm_name() {
   esac
 }
 
-# Puts Garage among the desktop's apps (share/garage.desktop, its Keywords for the launcher's search), with Exec's
-# full path filled in: the compositor's PATH may not have ~/.local/bin.
+# Puts Garage among the desktop's apps (share/garage.desktop, its Keywords for the launcher's search, and its icon
+# share/garage.svg), with Exec's full path filled in: the compositor's PATH may not have ~/.local/bin.
 install_app() {
-  local apps=${XDG_DATA_HOME:-$HOME/.local/share}/applications
-  mkdir -p "$apps"
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/garage.svg" "$icons/garage.svg"
   sed "s|^Exec=garage|Exec=$HOME/.local/bin/garage|" "$APP_DIR/share/garage.desktop" > "$apps/garage.desktop"
   command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
   echo "Installed: $apps/garage.desktop"
