@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import qs
 
 // Garage: the VMs and their state (bin/garage-ctl list, refreshed while the menu is open). A click on a stopped VM starts
@@ -33,13 +34,14 @@ Column {
             if (!v || v.running === (p.what === "starting") || Date.now() - p.since > pendingWait) setPending(name, "")
         }
     }
-    // garage-ctl's error, if it fails, shows under the header (names are [A-Za-z0-9._-], safe in the script as such)
+    // garage-ctl's error, if it fails, shows under the header. Its arguments as such, no shell between: a VM's name is a
+    // folder's, which garage-ctl checks, but only once it runs
     function act(action, name) {
         if (action === "start" || action === "stop") setPending(name, action === "start" ? "starting" : "stopping")
         m.error = ""
-        const job = runner.createObject(m, { script: "'" + m.ctl + "' " + action + " " + name })
-        job.result.connect(text => {
-            if (job.exitCode !== 0) { m.error = text.trim() || (action + " failed"); m.setPending(name, "") }
+        const job = runner.createObject(m, { command: [m.ctl, action, name] })
+        job.exited.connect(code => {
+            if (code !== 0) { m.error = job.stderr.text.trim() || (action + " failed"); m.setPending(name, "") }
             m.refresh()
             job.destroy()
         })
@@ -56,7 +58,7 @@ Column {
             try { m.vms = JSON.parse(text); m.loaded = true; m.settle() } catch (e) { m.error = "garage-ctl list: " + text }
         }
     }
-    Component { id: runner; Sh {} }
+    Component { id: runner; Process { stdout: StdioCollector {} stderr: StdioCollector {} } }
 
     MenuHeader {
         width: parent.width

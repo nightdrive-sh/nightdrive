@@ -35,7 +35,8 @@ umask 077
 mkdir -p "$ROOT" && chmod 700 "$ROOT"
 
 die() { echo "$*" >&2; exit 1; }
-dir() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]] || die "Bad name: $1"; echo "$ROOT/$1"; }
+good_name() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]]; }
+dir() { good_name "$1" || die "Bad name: $1"; echo "$ROOT/$1"; }
 need() { [[ -f $(dir "$1")/vm.conf ]] || die "No VM called $1"; }
 running() { local p; p=$(cat "$(dir "$1")/pid" 2>/dev/null) && kill -0 "$p" 2>/dev/null; }
 stopped() { running "$1" && die "$1 is running: shut it down first"; return 0; }
@@ -79,6 +80,8 @@ list() {
     [[ -f $d/vm.conf ]] || continue
     local name MEM CPUS ISO run=false
     name=$(basename "$d"); MEM=0; CPUS=0; ISO=""
+    # A folder made by hand with a name garage-ctl wouldn't take: the window and the menu would pass it back to it
+    good_name "$name" || continue
     # shellcheck disable=SC1091
     source "$d/vm.conf"
     running "$name" && run=true
