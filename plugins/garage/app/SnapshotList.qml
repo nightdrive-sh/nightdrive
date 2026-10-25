@@ -4,7 +4,7 @@ import qs.kit
 
 // A VM's snapshots: its title with Take, the list (a name and when), and what the keys do under it. Tab from the page
 // comes here (focusList), Tab or Esc goes back (leave). Taking, restoring and deleting need the VM stopped, as qemu-img
-// writes the disk then; a name changes any time (vm-ctl rename: names.json only). Restoring and deleting ask first:
+// writes the disk then; a name changes any time (garage-ctl rename: names.json only). Restoring and deleting ask first:
 // what changed since, or the snapshot, is gone.
 ColumnLayout {
     id: root

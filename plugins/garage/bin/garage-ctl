@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# qemu/KVM VMs for the VM window (app/) and the vm command, one folder each under ~/.local/share/nightdrive/vm/NAME:
+# qemu/KVM VMs for the Garage window (app/) and the garage command, one folder each under
+# ~/.local/share/nightdrive/garage/NAME:
 #   vm.conf      MEM (MB), CPUS, ISO (in its drive while set; it boots after the disk)
 #   disk.qcow2   the disk; snapshots are internal to it (qemu-img snapshot, only while the VM is stopped)
 #   vars.raw     the UEFI variables
@@ -8,21 +9,21 @@
 #   firstboot.creds  a disk image's first boot: its user, until it has run (lib/firstboot.sh)
 # qemu itself, its command line and its sockets, are lib/qemu.sh's; the ready-made images are lib/images.sh's.
 #
-#   vm-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date }], newest first }]
-#   vm-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
-#   vm-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
-#   vm-ctl fetch ID                      download one in the background (images shows how far)
-#   vm-ctl create-image NAME ID MEM_GB DISK_GB CPUS USER     a VM from one, with USER (the password on stdin)
-#   vm-ctl start|stop|kill|display|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power button
-#   vm-ctl set NAME mem GB | cpus N | disk GB | iso PATH     while it is stopped; the disk only grows, iso "" ejects
-#   vm-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
-#   vm-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
-#   vm-ctl restore|unsnap NAME TAG       go back to one, delete one
-#   vm-ctl rename NAME TAG LABEL         the name a snapshot shows (while it runs too: only names.json changes)
-#   vm-ctl isos                          .iso files in ~/Downloads and ~/vm, newest first
+#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date }], newest first }]
+#   garage-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
+#   garage-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
+#   garage-ctl fetch ID                      download one in the background (images shows how far)
+#   garage-ctl create-image NAME ID MEM_GB DISK_GB CPUS USER     a VM from one, with USER (the password on stdin)
+#   garage-ctl start|stop|kill|display|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power button
+#   garage-ctl set NAME mem GB | cpus N | disk GB | iso PATH     while it is stopped; the disk only grows, iso "" ejects
+#   garage-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
+#   garage-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
+#   garage-ctl restore|unsnap NAME TAG       go back to one, delete one
+#   garage-ctl rename NAME TAG LABEL         the name a snapshot shows (while it runs too: only names.json changes)
+#   garage-ctl isos                          .iso files in ~/Downloads and ~/vm, newest first
 set -euo pipefail
 
-ROOT=${VM_ROOT:-$HOME/.local/share/nightdrive/vm}
+ROOT=${GARAGE_ROOT:-$HOME/.local/share/nightdrive/garage}
 MAX_CPUS=8
 HOST_SPARE_GB=2     # memory the host keeps: a VM gets at most the rest
 

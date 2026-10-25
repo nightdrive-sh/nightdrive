@@ -2,12 +2,12 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// The window's side of bin/vm-ctl: the list of VMs (refreshed every few seconds, so a VM shut down from inside shows as
+// The window's side of bin/garage-ctl: the list of VMs (refreshed every few seconds, so a VM shut down from inside shows as
 // stopped) and one call at a time for the buttons. Each call's output comes back to its callback; a failure's text is
 // kept in `error` for the page to show.
 QtObject {
     id: root
-    readonly property string ctl: Quickshell.shellDir + "/../bin/vm-ctl"
+    readonly property string ctl: Quickshell.shellDir + "/../bin/garage-ctl"
     property var vms: []
     property bool loaded: false     // the first list has come: until then no VMs doesn't mean there are none
     property bool busy: false
@@ -17,7 +17,7 @@ QtObject {
 
     // A VM on its way up or down, by name: { what: "starting" | "stopping", since, acpi }, until the list shows it there,
     // so the page can say so meanwhile. A shutdown the guest ignores gives up after stopWait; acpi: it went to the power
-    // button, as the guest has no agent (vm-ctl stop), which says why.
+    // button, as the guest has no agent (garage-ctl stop), which says why.
     readonly property int stopWait: 90000
     property var pending: ({})
     function setPending(name, what, acpi) {
@@ -43,7 +43,7 @@ QtObject {
     }
 
     // After the host has slept, the running VMs' clocks are behind by as long: a tick much later than the last one says
-    // so, and their guest agents set them (vm-ctl synctime: quiet without one)
+    // so, and their guest agents set them (garage-ctl synctime: quiet without one)
     property real lastTick: 0
     function tick() {
         const now = Date.now()
@@ -78,7 +78,7 @@ QtObject {
         command: [root.ctl, "list"]
         stdout: StdioCollector {
             onStreamFinished: {
-                try { root.vms = JSON.parse(text); root.loaded = true; root.settle() } catch (e) { root.error = "vm-ctl list: " + text }
+                try { root.vms = JSON.parse(text); root.loaded = true; root.settle() } catch (e) { root.error = "garage-ctl list: " + text }
             }
         }
     }
@@ -93,7 +93,7 @@ QtObject {
         onExited: code => {
             root.busy = false
             if (code !== 0) {
-                root.error = err.text.trim() || ("vm-ctl failed (" + code + ")")
+                root.error = err.text.trim() || ("garage-ctl failed (" + code + ")")
                 if (failed) failed()
             } else if (done) done(out.text)
             root.refresh()

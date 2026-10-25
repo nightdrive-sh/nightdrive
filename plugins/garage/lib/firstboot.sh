@@ -1,4 +1,4 @@
-# A ready-made disk image's first boot (Fedora Minimal: no installer, no user), for bin/vm-ctl (sourced after its
+# A ready-made disk image's first boot (Fedora Minimal: no installer, no user), for bin/garage-ctl (sourced after its
 # helpers): systemd credentials that qemu hands the guest through SMBIOS (type 11). Its systemd (256+) makes two units
 # of them (systemd-debug-generator), which run two scripts that come the same way (ImportCredential):
 #   nightdrive-vm-user    before the login prompt: the user (wheel, so sudo), the VM's name as its hostname, the host's

@@ -1,4 +1,4 @@
-# A VM's qemu, for bin/vm-ctl (sourced after its helpers: die, dir, need, running): the command line that starts it,
+# A VM's qemu, for bin/garage-ctl (sourced after its helpers: die, dir, need, running): the command line that starts it,
 # its monitor (QMP) and the guest agent inside it (QGA), both through monitor.py. The command line is the one #1527 got
 # Fedora booting with on Asahi (an M2 Max); x86_64 comes with task #1572.
 

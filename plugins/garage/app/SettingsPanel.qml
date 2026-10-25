@@ -2,7 +2,7 @@ import QtQuick
 import qs.kit
 
 // A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, and deleting it. They change while it is
-// stopped (vm-ctl set, one call each for what changed); while it runs they show, with a line on why they can't
+// stopped (garage-ctl set, one call each for what changed); while it runs they show, with a line on why they can't
 // change. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
 // The display has no setting: SDL gives the guest its window's size, and its scale is the guest's own.
 AppPanel {

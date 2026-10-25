@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One command to a running VM, for vm-ctl (lib/qemu.sh):
+"""One command to a running VM, for garage-ctl (lib/qemu.sh):
 
     monitor.py qmp SOCKET COMMAND VM [ARGS-JSON]   qemu's own monitor (power button, quit)
     monitor.py qga SOCKET COMMAND VM [ARGS-JSON]   the guest agent inside it (shutdown, set the clock)

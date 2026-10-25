@@ -5,13 +5,13 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// Nightdrive's VM window (task #1530, branch vm): qemu/KVM VMs, the VMs in the sidebar, the picked one's page beside it;
-// bin/vm-ctl does the work. This file holds the window together: which VM shows, the narrow window's turns, the panels
-// that ask, and the keys (their sheet: KeyHelp.qml).
+// Garage, Nightdrive's window of virtual machines (task #1530, branch vm): qemu/KVM VMs in the sidebar, the picked one's
+// page beside it; bin/garage-ctl does the work. This file holds the window together: which VM shows, the narrow window's
+// turns, the panels that ask, and the keys (their sheet: KeyHelp.qml).
 ShellRoot {
     FloatingWindow {
         id: win
-        title: "VM"
+        title: "Garage"
         implicitWidth: 880
         implicitHeight: 600
         color: c.bg
@@ -51,7 +51,7 @@ ShellRoot {
         function confirmed(ok) { const d = confirmDone; confirmDone = null; if (ok && d) d(); page.refocus() }
 
         IpcHandler {
-            target: "vm"
+            target: "garage"
             function newVm(): void { win.showNew = true }
             function pick(name: string): void { win.picked = name }
         }

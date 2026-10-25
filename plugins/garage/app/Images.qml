@@ -1,14 +1,14 @@
 import QtQuick
 import Quickshell.Io
 
-// The ready-made disk images (vm-ctl images): those for this host and how far each one's download has come, and the
-// new VMs waiting for one. New VM on an image that isn't here yet starts its download (vm-ctl fetch) and leaves the VM
+// The ready-made disk images (garage-ctl images): those for this host and how far each one's download has come, and the
+// new VMs waiting for one. New VM on an image that isn't here yet starts its download (garage-ctl fetch) and leaves the VM
 // here, in the window's memory, to be made (create-image) and started once the image is ready; the sidebar shows both.
 // Closing the window forgets a waiting VM, but the download goes on by itself, and shows again when the window opens.
 QtObject {
     id: root
     required property QtObject ctl
-    property var list: []       // vm-ctl images: [{ id, name, about, size, minDisk, state, done, error }]
+    property var list: []       // garage-ctl images: [{ id, name, about, size, minDisk, state, done, error }]
     property var waiting: []    // [{ name, id, mem, disk, cpus, user, pass }]
     signal made(string name)
 
@@ -45,7 +45,7 @@ QtObject {
         command: [root.ctl.ctl, "images"]
         stdout: StdioCollector {
             onStreamFinished: {
-                try { root.list = JSON.parse(text); root.settle() } catch (e) { root.ctl.error = "vm-ctl images: " + text }
+                try { root.list = JSON.parse(text); root.settle() } catch (e) { root.ctl.error = "garage-ctl images: " + text }
             }
         }
     }

@@ -3,9 +3,9 @@ import Quickshell
 import qs.kit
 
 // A new VM, from a ready-made disk image (images.json: Fedora 44 Minimal) or an ISO. From an image it needs no
-// installer: it is ready at its first boot with the user asked for here (vm-ctl create-image), and an image not yet
+// installer: it is ready at its first boot with the user asked for here (garage-ctl create-image), and an image not yet
 // downloaded is fetched first, the VM waiting in the sidebar meanwhile (Images.qml). From an ISO it gets an empty
-// disk and boots the installer (vm-ctl create); the ISO field starts with the newest .iso in ~/Downloads (vm-ctl isos).
+// disk and boots the installer (garage-ctl create); the ISO field starts with the newest .iso in ~/Downloads (garage-ctl isos).
 // What is wrong with what was typed shows under the fields, and the panel stays open.
 AppPanel {
     id: root

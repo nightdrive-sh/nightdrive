@@ -1,4 +1,4 @@
-# Ready-made disk images for new VMs (share/images.json, by the host's architecture), for bin/vm-ctl (sourced after
+# Ready-made disk images for new VMs (share/images.json, by the host's architecture), for bin/garage-ctl (sourced after
 # its helpers and lib/firstboot.sh). One is downloaded once, in the background, and checked against its distribution's
 # CHECKSUM file; each new VM's disk is then made from it: unpacked, converted to qcow2 and grown to its size, with its
 # first boot's user (lib/firstboot.sh). In images/ beside the VMs:
@@ -29,7 +29,7 @@ images() {
   done | jq -sc .
 }
 
-# Its download, started in the background (vm-ctl fetch-run), unless it is there or on its way
+# Its download, started in the background (garage-ctl fetch-run), unless it is there or on its way
 fetch() {
   local e f; e=$(image "$1"); f=$(image_file "$e")
   [[ -f $f ]] || fetching "$f" && return 0

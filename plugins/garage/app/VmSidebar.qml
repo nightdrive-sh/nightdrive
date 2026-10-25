@@ -12,7 +12,7 @@ AppSidebar {
     property string current: ""          // the VM whose page shows
     signal picked(string name)
     signal newVm()
-    title: "VM"
+    title: "Garage"
 
     Repeater {
         model: root.ctl.vms
