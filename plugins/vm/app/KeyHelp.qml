@@ -7,6 +7,7 @@ QtObject {
         { title: "VMs", keys: [
             ["↑ ↓  j k", "Move"],
             ["⌘N", "New VM"],
+            ["⌘,", "Settings: memory, CPUs, disk, ISO"],
             ["⌘⌫", "Delete the VM, while it is stopped"],
             ["⌘B", "Show or hide the VMs"],
             ["Esc", "Narrow window: the VMs"]] },

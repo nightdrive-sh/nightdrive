@@ -30,6 +30,6 @@ AppPanel {
         c: root.c
         width: parent.width
         onAccepted: root.answer(true)
-        input.Keys.onEscapePressed: root.answer(false)
+        onEscaped: root.answer(false)
     }
 }

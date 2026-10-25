@@ -17,6 +17,7 @@ Item {
     signal askName(string title, string initial, var done)
     signal askConfirm(string question, string detail, string action, string glyph, var done)
     signal back()
+    signal settings()
 
     // Its state, with what the window has asked of it and the list doesn't show yet (VmCtl's pending)
     readonly property var pend: vm ? ctl.pending[vm.name] : undefined
@@ -110,9 +111,8 @@ Item {
                     onClicked: root.forceOff()
                 }
                 AppButton {
-                    c: root.c; glyph: "trash-2"; label: "Delete VM"; tip: "Delete it and its disk"
-                    visible: root.stopped
-                    onClicked: root.deleteVm()
+                    c: root.c; glyph: "settings"; label: "Settings"; keys: "⌘,"; tip: "Memory, CPUs, disk, ISO; deleting it"
+                    onClicked: root.settings()
                 }
             }
 

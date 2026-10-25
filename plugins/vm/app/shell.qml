@@ -26,6 +26,7 @@ ShellRoot {
         readonly property int index: Math.max(0, ctl.vms.findIndex(v => v.name === picked))
         readonly property var vm: ctl.vms.length ? ctl.vms[index] : null
         property bool showNew: false
+        property bool showSettings: false
         function step(d) { const n = ctl.vms.length; if (n) picked = ctl.vms[(index + d + n) % n].name }
 
         // Narrow windows: below onePaneMax the list and the page take turns, as in Deck: Esc on the page shows the list,
@@ -56,6 +57,7 @@ ShellRoot {
 
         Shortcut { sequences: ["Ctrl+N", "Meta+N"]; onActivated: win.showNew = true }
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
+        Shortcut { sequences: ["Ctrl+,", "Meta+,"]; onActivated: if (win.vm) win.showSettings = !win.showSettings }
         Shortcut { sequences: ["Ctrl+Backspace", "Meta+Backspace"]; onActivated: page.deleteVm() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
 
@@ -89,6 +91,7 @@ ShellRoot {
                 onePane: win.onePane
                 focus: true
                 onBack: win.listOpen = true
+                onSettings: win.showSettings = true
                 bottomInset: note.visible ? note.height + 16 : 0
                 onAskName: (title, initial, done) => namePanel.ask(title, initial, done)
                 onAskConfirm: (question, detail, action, glyph, done) => win.confirm(question, detail, action, glyph, done)
@@ -136,6 +139,16 @@ ShellRoot {
             c: win.look
             ctl: ctl
             onDone: { win.showNew = false; page.forceActiveFocus() }
+        }
+
+        SettingsPanel {
+            visible: win.showSettings && !!win.vm
+            c: win.look
+            ctl: ctl
+            vm: win.vm
+            stopped: page.stopped
+            onDone: { win.showSettings = false; page.forceActiveFocus() }
+            onDeleteVm: { win.showSettings = false; page.deleteVm() }
         }
 
         NamePanel {

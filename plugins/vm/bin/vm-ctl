@@ -7,9 +7,10 @@
 #   qmp.sock, qga.sock, pid, serial.log while it runs (qemu's monitor, the guest agent's channel)
 # qemu itself, its command line and its sockets, are lib/qemu.sh's.
 #
-#   vm-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date }] }]
+#   vm-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date }], newest first }]
 #   vm-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   vm-ctl start|stop|kill|display|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power button
+#   vm-ctl set NAME mem GB | cpus N | disk GB | iso PATH     while it is stopped; the disk only grows, iso "" ejects
 #   vm-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
 #   vm-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
 #   vm-ctl restore|unsnap NAME TAG       go back to one, delete one
@@ -19,6 +20,7 @@ set -euo pipefail
 
 ROOT=${VM_ROOT:-$HOME/.local/share/nightdrive/vm}
 MAX_CPUS=8
+HOST_SPARE_GB=2     # memory the host keeps: a VM gets at most the rest
 
 die() { echo "$*" >&2; exit 1; }
 dir() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]] || die "Bad name: $1"; echo "$ROOT/$1"; }
@@ -62,7 +64,7 @@ list() {
          ssh: $ssh,
          disk: ($info["virtual-size"] / 1073741824 | floor),
          used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
-         snapshots: [($info.snapshots // [])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")) }] }'
+         snapshots: [($info.snapshots // []) | sort_by(-.["date-sec"])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")) }] }'
   done
   echo "]"
 }
@@ -79,6 +81,39 @@ create() {
   printf 'MEM=%s\nCPUS=%s\nISO=%q\n' $((mem * 1024)) "$cpus" "$(realpath "$iso")" > "$d/vm.conf"
 }
 
+# One line of vm.conf: the others kept, KEY's replaced (VALUE as it is written there: a path quoted with printf %q)
+conf() {
+  local f; f=$(dir "$1")/vm.conf
+  { grep -v "^$2=" "$f" || true; printf '%s=%s\n' "$2" "$3"; } > "$f.new" && mv "$f.new" "$f"
+}
+
+# What the window's Settings change, one at a time, while the VM is stopped. The disk grows only (qemu-img won't
+# shrink one without losing what is past its new end); the guest then sees the new space unpartitioned
+settings() {
+  [[ $# -ge 3 ]] || die "set NAME mem GB | cpus N | disk GB | iso PATH"
+  need "$1"; stopped "$1"
+  local name=$1 key=$2 v=$3 d; d=$(dir "$1")
+  case $key in
+    mem)
+      local max=$(( $(awk '/^MemTotal/ { print int($2 / 1048576) }' /proc/meminfo) - HOST_SPARE_GB ))
+      [[ $v =~ ^[0-9]+$ ]] && ((v >= 1 && v <= max)) || die "Memory: 1 to $max GB"
+      conf "$name" MEM $((v * 1024)) ;;
+    cpus)
+      [[ $v =~ ^[0-9]+$ ]] && ((v >= 1 && v <= MAX_CPUS)) || die "CPUs: 1 to $MAX_CPUS"
+      conf "$name" CPUS "$v" ;;
+    disk)
+      local now; now=$(qemu-img info --output=json "$d/disk.qcow2" | jq '.["virtual-size"] / 1073741824 | floor')
+      [[ $v =~ ^[0-9]+$ ]] || die "Disk: a size in GB"
+      ((v == now)) && return 0
+      ((v > now)) || die "The disk only grows: more than $now GB"
+      qemu-img resize -q "$d/disk.qcow2" "${v}G" ;;
+    iso)
+      [[ -z $v || -f $v ]] || die "No such ISO: $v"
+      conf "$name" ISO "$( [[ -z $v ]] && echo '""' || printf %q "$(realpath "$v")")" ;;
+    *) die "set: mem, cpus, disk or iso" ;;
+  esac
+}
+
 case ${1:-} in
   list)     list ;;
   isos)     ls -t "$HOME"/Downloads/*.iso "$HOME"/vm/*.iso 2>/dev/null || true ;;
@@ -88,11 +123,12 @@ case ${1:-} in
   kill)     force_off "$2" ;;
   synctime) synctime "$2" ;;
   display)  display "$2" ;;
-  eject)    need "$2"; stopped "$2"; sed -i 's/^ISO=.*/ISO=""/' "$(dir "$2")/vm.conf" ;;
+  eject)    settings "$2" iso "" ;;
+  set)      settings "${@:2}" ;;
   delete)   need "$2"; stopped "$2"; rm -rf "$(dir "$2")" ;;
   snapshot) snap "$@"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2"; [[ -z ${4:-} ]] || label "$2" "$3" "$4" ;;
   restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
   unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2"; label "$2" "$3" "" ;;
   rename)   rename "$@" ;;
-  *)        sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *)        sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

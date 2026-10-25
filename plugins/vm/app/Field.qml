@@ -1,6 +1,7 @@
 import QtQuick
 
-// A labelled one-line text field in a frame, for the panels (a new VM's name, its ISO, a snapshot's name).
+// A labelled one-line text field in a frame, for the panels (a new VM's name, its ISO, a snapshot's name). Return comes
+// out as accepted, Esc as escaped (the panel closes).
 Column {
     id: root
     required property QtObject c
@@ -8,6 +9,7 @@ Column {
     property alias text: input.text
     property alias input: input
     signal accepted()
+    signal escaped()
     spacing: 6
     Text { text: root.label; color: root.c.dim; font.family: root.c.font; font.pixelSize: 12 }
     Rectangle {
@@ -23,6 +25,7 @@ Column {
             activeFocusOnTab: true
             clip: true
             onAccepted: root.accepted()
+            Keys.onEscapePressed: root.escaped()
         }
     }
 }
