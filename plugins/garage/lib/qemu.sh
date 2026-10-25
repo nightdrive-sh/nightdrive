@@ -14,7 +14,8 @@ qga() { (cd "$(dir "$1")" && python3 -I "$MONITOR" qga qga.sock "$2" "$1" ${3:+"
 qv() { echo "${1//,/,,}"; }
 
 # The guest's screen, all of it here: the GPU (lib/arch.sh's, virgl) and qemu's window for it. Each time the window
-# changes size (tiled, dragged), SDL tells the GPU, and with edid=on (qemu's default, written out as this rests on it) the
+# changes size (tiled, dragged), SDL tells the GPU (a second after its last change: qemu waits for a drag to settle,
+# and the picture is stretched till then), and with edid=on (qemu's default, written out as this rests on it) the
 # guest gets a new preferred mode, the window's size in real pixels: a Nightdrive guest takes it at once
 # (config/hypr/vm-display.lua). SDL draws the picture over the whole window, aspect or not, so a guest that keeps its
 # old mode looks stretched. SCREEN is the size it boots with, until the window opens.
