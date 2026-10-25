@@ -29,7 +29,11 @@ Item {
     readonly property string label: st && st.text ? st.text : ""
     readonly property string cls: st && st.class ? st.class : ""
     readonly property bool active: cls === "active"
-    visible: icon !== "" || label !== ""
+    // present: it has something to show; tucked: it didn't fit and is in the "…" menu instead (Bar.qml lays out by
+    // present, so tucking it away doesn't change the layout it came from)
+    readonly property bool present: icon !== "" || label !== ""
+    property bool tucked: false
+    visible: present && !tucked
 
     readonly property bool isMic: name === "microphone" && icon !== ""
     MicLevel { id: micLevel; active: mod.isMic; steps: Math.round(mod.isz.size * mod.dpr) }
@@ -45,7 +49,7 @@ Item {
     function snap(v) { return Math.round(v * dpr) / dpr }
 
     height: 27
-    width: visible ? Math.max(icon && !label ? 34 : 0, pad + (icon ? isz.size : 0) + (icon && label ? gap : 0) + (label ? txt.implicitWidth : 0) + pad) : 0
+    width: present ? Math.max(icon && !label ? 34 : 0, pad + (icon ? isz.size : 0) + (icon && label ? gap : 0) + (label ? txt.implicitWidth : 0) + pad) : 0
 
     Rectangle {
         anchors.fill: parent

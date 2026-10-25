@@ -30,6 +30,7 @@ NotificationCard 1.0 NotificationCard.qml
 Bar 1.0 Bar.qml
 BarModule 1.0 BarModule.qml
 BarText 1.0 BarText.qml
+BarOverflow 1.0 BarOverflow.qml
 MenuSection 1.0 MenuSection.qml
 MenuNote 1.0 MenuNote.qml
 MenuButton 1.0 MenuButton.qml

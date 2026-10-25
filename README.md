@@ -58,7 +58,9 @@ and temperatures, the calendar, notifications, music, and **Claude**: your Claud
 when one finished while you were elsewhere; a click goes to its window) and your usage limits. A right click on its
 icon changes what it shows: the 5-hour or the weekly usage, with or without the percentage, or the number of sessions.
 When a session waits for you, its notification says which one and what it wants, and a permission request can be
-answered right there (Allow, Deny). ⌘⇧Space lets you walk through the menus with the arrow keys.
+answered right there (Allow, Deny). ⌘⇧Space lets you walk through the menus with the arrow keys. On a narrow screen (a
+portrait display, a VM's window) the icons that don't fit beside the workspaces go into a **…** menu, the ones farthest
+from the clock first, so your order (⌘+drag) decides what stays; the clock and ≡ always do.
 
 ![The music, home and headphones menus in the top bar](docs/screenshots/menus.jpg)
 

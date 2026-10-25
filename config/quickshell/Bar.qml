@@ -19,16 +19,29 @@ Variants {
         return menus.indexOf(m) >= 0 ? m : ""
     }
     // Visible modules with a menu, left to right (keyboard navigation), and an icon's centre on a screen's bar (the
-    // first screen's without one)
+    // first screen's without one). The "…" (modules that don't fit) is the first, and its modules' menus open below it.
     function navOrder() {
         const w = instances[0]
-        return w ? w.modules().filter(m => m.visible && m.hasMenu).map(m => menuOf(m.def)) : []
+        return w ? (w.moreX >= 0 ? ["overflow"] : []).concat(w.modules().filter(m => m.visible && m.hasMenu).map(m => menuOf(m.def))) : []
+    }
+    // A menu's place in navOrder: a menu opened from the "…" counts as the "…" (←/→ go on from there)
+    function navIndex(menu) {
+        const w = instances[0]
+        return navOrder().indexOf(w && w.tucked.some(d => menuOf(d) === menu) ? "overflow" : menu)
     }
     function xOf(menu, screen) {
         let w = instances[0]
         for (let i = 0; i < instances.length; i++) if (screen && instances[i].modelData === screen) w = instances[i]
+        if (w && w.moreX >= 0 && (menu === "overflow" || w.tucked.some(d => menuOf(d) === menu))) return w.moreX + w.moreWidth / 2
         const m = w ? w.modules().find(m => m.visible && menuOf(m.def) === menu) : null
         return m ? m.mapToItem(null, m.width / 2, 0).x : -1
+    }
+    // The modules in a screen's "…" and their menus, [{ def, menu }] (TopBar.overflow for its menu, shell.qml). The menus
+    // are looked up here, not by layout(): the list of menus comes in after the bar's first layout.
+    function tuckedOf(screen) {
+        let w = instances[0]
+        for (let i = 0; i < instances.length; i++) if (instances[i].modelData === screen) w = instances[i]
+        return w ? w.tucked.map(d => ({ def: d, menu: menuOf(d) })) : []
     }
 
     delegate: PanelWindow {
@@ -52,8 +65,10 @@ Variants {
         // What exists is read from the windows and the screens, not Hyprland.workspaces: a workspace given a new id
         // (⌘⌥1–0, hypr/bindings.lua) stays there under its old id with its windows, as Hyprland sends no event for it.
         Row {
+            id: leftSide
             x: 10; anchors.verticalCenter: parent.verticalCenter
             spacing: 4
+            onWidthChanged: Qt.callLater(win.layout)   // the modules give way to the workspaces (layout)
             // The logo (N█) opens the launcher, for those who don't know ⌘Space yet. Settings › Top bar › Logo hides it
             // ("logo" in bar-items.json's hidden list); the Row then starts with the workspaces at the edge.
             Rectangle {
@@ -174,22 +189,50 @@ Variants {
             const phys = Math.round(modelData.width * dpr) + "x" + Math.round(modelData.height * dpr)
             return known[phys] ? known[phys] / dpr : 0
         }
+        // A narrow screen: modules that would reach over the workspaces are tucked into a "…" left of the rest
+        // (BarOverflow, OverflowMenu), the leftmost first: your order puts the ones you look at most near the clock.
+        // The clock and ≡ always stay. With room for all, there's no "…" and the layout is the same as without it.
+        readonly property var pinned: ["calendar", "notifications"]
         property var xs: []
-        function layout() {
+        property var tucked: []         // the modules' defs in the "…", in the bar's order
+        property real moreX: -1         // the "…"'s left edge; -1 = none
+        readonly property real moreWidth: more.width
+        // The modules' x from the right edge leftwards, without the ones in drop (rep's indices) and with a "…" left of
+        // the rest if withMore; left = the leftmost edge used
+        function place(order, drop, withMore) {
             const nl = (width - notchWidth) / 2, nr = (width + notchWidth) / 2
             let cursor = width - 10, jumped = notchWidth <= 0
             const out = []
-            const order = dragOrder.length === rep.count ? dragOrder : Array.from({ length: rep.count }, (_, i) => i)
+            const put = w => {
+                let x = cursor - w
+                if (!jumped && x < nr) { jumped = true; cursor = nl - 6; x = cursor - w }
+                cursor = x - 3
+                return Math.round(x * dpr) / dpr
+            }
             for (let k = order.length - 1; k >= 0; k--) {
                 const i = order[k]
                 const m = rep.itemAt(i)
-                if (!m || !m.visible) { out[i] = 0; continue }
-                let x = cursor - m.width
-                if (!jumped && x < nr) { jumped = true; cursor = nl - 6; x = cursor - m.width }
-                out[i] = Math.round(x * dpr) / dpr
-                cursor = x - 3
+                out[i] = !m || !m.present || drop.indexOf(i) >= 0 ? 0 : put(m.width)
             }
-            xs = out
+            const mx = withMore ? put(moreWidth) : -1
+            return { xs: out, more: mx, left: cursor + 3 }
+        }
+        function layout() {
+            const order = dragOrder.length === rep.count ? dragOrder : Array.from({ length: rep.count }, (_, i) => i)
+            const limit = leftSide.x + leftSide.width + 12
+            const drop = []
+            let p = place(order, drop, false)
+            for (const i of order) {
+                if (p.left >= limit) break
+                const m = rep.itemAt(i)
+                if (!m || !m.present || pinned.indexOf(m.name) >= 0) continue
+                drop.push(i)
+                p = place(order, drop, true)
+            }
+            xs = p.xs
+            moreX = p.more
+            const t = drop.map(i => rep.itemAt(i).def)
+            if (JSON.stringify(t) !== JSON.stringify(tucked)) tucked = t
         }
         onWidthChanged: Qt.callLater(layout)
         onNotchWidthChanged: Qt.callLater(layout)
@@ -266,8 +309,18 @@ Variants {
                     onMoveEnded: win.moveEnd()
                     onDragOver: x => { if (hasMenu && !open) bar.menuClicked(bar.menuOf(modelData), x, win.modelData) }
                     onWidthChanged: Qt.callLater(win.layout)
-                    onVisibleChanged: Qt.callLater(win.layout)
+                    onPresentChanged: Qt.callLater(win.layout)
+                    tucked: win.tucked.some(d => d.name === modelData.name)
                 }
+            }
+            BarOverflow {
+                id: more
+                visible: win.moreX >= 0
+                x: win.moreX
+                anchors.verticalCenter: parent.verticalCenter
+                dpr: win.dpr
+                open: bar.current === "overflow" || (bar.current !== "" && win.tucked.some(d => bar.menuOf(d) === bar.current))
+                onClicked: x => bar.menuClicked("overflow", x, win.modelData)
             }
         }
     }
