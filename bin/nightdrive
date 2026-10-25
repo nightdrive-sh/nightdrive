@@ -22,6 +22,7 @@ usage() {
   row "update check"             "Look for new changes (runs every 6 h and notifies)"
   row "channel [stable|dev]"     "Which branch updates follow: stable (main) or dev, the bigger changes first"
   row "version"                  "The release this desktop is at, and its channel"
+  row "minimal [--dry-run]"      "An install on Fedora KDE to Fedora Minimal: KDE goes, your own apps stay"
   section "Desktop"
   row "theme COMMAND"            "The theme colour, e.g. nightdrive theme color teal"
   row "wallpaper COMMAND"        "The background: list, set, add, remove"
@@ -41,6 +42,7 @@ usage() {
   row "plugins add GIT-URL [ID]" "Add one from elsewhere (an external plugin; install it afterwards)"
   row "plugins remove NAME"      "Turn an external one off and delete its folder"
   row "plugins installed"        "The installed ones' ids (those that are on)"
+  row "plugins packages"         "The packages the installed ones need (plugin.conf's packages=)"
   row "plugins bump [NAME…]"     "Before a release: raise the version of every plugin that changed since its last (--dry-run lists)"
   row "plugin check [NAME]"       "Check plugins against the rules (plugins/README.md): file:line findings, exit 1"
   section "Preview"
@@ -283,7 +285,8 @@ update() {
   if [[ -n $missing ]]; then echo "    $(echo $missing)"; as_root "New packages" sudo dnf install -y --skip-unavailable $missing; else echo "    none"; fi
   # install.sh marks the list's packages as wanted, so removing KDE doesn't take them along. One added to it since may
   # be here as KDE's dependency (pipewire-utils, 25.10.2026): marked too. -C: the installed ones only, no metadata download
-  deps=$(dnf -q -C repoquery --installed --qf '%{name} %{reason}\n' $want 2>/dev/null | awk '/Dependency$/ { print $1 }' | sort -u)
+  # The installed plugins' packages likewise (plugin.conf's packages=, marked by plugins install since 25.10.2026)
+  deps=$(dnf -q -C repoquery --installed --qf '%{name} %{reason}\n' $want $(plugin_packages) 2>/dev/null | awk '/Dependency$/ { print $1 }' | sort -u)
   [[ -z $deps ]] || as_root "New packages" sudo dnf mark user -y $deps >/dev/null
   # nwg-panel came with Hyprland (Fedora's package supplements it) until config/system/dnf-excludes.conf, put in place
   # under System files below. One installed on purpose stays.
@@ -535,7 +538,7 @@ plugins_installed() {
 # Runs a plugin's installer (by id or name) in its folder (the repo for plugins.txt), then refreshes the list. One that
 # is off is turned on first: installing it again means it's wanted (and its unit could not start while off).
 plugin_install() {
-  local id name inst dir rc
+  local id name inst dir rc pk
   IFS=$'\t' read -r id name inst dir < <(plugins | awk -F'\t' -v n="$1" 'tolower($1) == tolower(n) || tolower($2) == tolower(n) { print $1 "\t" $2 "\t" $6 "\t" ($9 == "" ? "-" : $9); exit }')
   [[ -n ${id:-} ]] || { echo "Unknown plugin: ${1:-} (see: nightdrive plugins)" >&2; exit 1; }
   [[ $dir == - ]] && dir=$repo
@@ -552,9 +555,27 @@ plugin_install() {
       (cd "$dir" && bash -c "$inst") ;;
   esac
   rc=$?
+  # Its packages= as wanted: one KDE (or another plugin) had already pulled in stays a dependency otherwise, and removing
+  # KDE (nightdrive minimal) would take it along
+  if (( rc == 0 )) && [[ $dir != "$repo" ]]; then
+    pk=$(installed_names $(conf_value "$dir/plugin.conf" packages))
+    [[ -z $pk ]] || sudo dnf mark user -y $pk >/dev/null || true
+  fi
   plugins_installed >/dev/null
   qs ipc call bar refresh >/dev/null 2>&1 || true
   return $rc
+}
+
+# A plugin.conf's value (conf_value FILE KEY), empty when it has none
+conf_value() { sed -n "s/^$2=//p" "$1" 2>/dev/null | tail -1; }
+# The names of these packages that are installed
+installed_names() { (( $# )) && rpm -q --qf '%{NAME}\n' "$@" 2>/dev/null | grep -v ' ' | sort -u | tr '\n' ' ' || true; }
+# The installed plugins' packages (plugin.conf's packages=), one a line: also those that are off, which stay installed
+plugin_packages() {
+  local dir
+  plugins | awk -F'\t' '$7 == 1 && $9 != "" { print $9 }' | while read -r dir; do
+    conf_value "$dir/plugin.conf" packages | tr ' ' '\n'
+  done | sed '/^$/d' | sort -u
 }
 
 # A plugin by id or name (any case): its id, name and folder ("-" for a plugins.txt line), tab-separated; nothing if unknown
@@ -705,6 +726,7 @@ case ${1:-} in
   plugins) case ${2:-list} in
              list) if [[ -t 1 ]]; then plugins_table; else plugins; fi ;;
              installed) plugins_installed ;;
+             packages) plugin_packages ;;
              install) plugin_install "${3:-}" ;;
              off|on) plugin_switch "$2" "${3:-}" ;;
              add) plugin_add "${3:-}" "${4:-}" ;;
@@ -723,6 +745,7 @@ case ${1:-} in
            esac ;;
   agent-warn) exec "$scripts/agent-warn" "${@:2}" ;;                  # AGENTS.md
   sandbox) exec "$repo/config/sandbox/sandbox" "${@:2}" ;;             # docs/sandbox.md
+  minimal) exec "$repo/config/minimal/minimal" "${@:2}" ;;             # README › Install (Installed on Fedora KDE?)
   # topbar adjust: config/topbar/adjust.conf; software-catalog: config/quickshell/data/software.json
   platform|software-catalog|snippets) exec "$scripts/$1" "${@:2}" ;;
   theme|display|wallpaper|bar-style) exec "$scripts/$1" "${@:2}" ;;    # the desktop's own scripts (hypr/scripts)

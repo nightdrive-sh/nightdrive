@@ -179,7 +179,7 @@ machine it's on and sets it up to match.
 - A Fedora 44 **virtual machine**, e.g. in Parallels on a Mac or with qemu on an Asahi Mac ([docs/vm.md](docs/vm.md)).
 
 The KDE edition of either (Fedora Asahi Remix with KDE Plasma, Fedora 44 KDE) works too, as Nightdrive was first built on
-it: KDE stays, as a fallback session.
+it: KDE stays, as a fallback session, until `nightdrive minimal` takes it away ([Install](#install)).
 
 ## Install
 
@@ -292,6 +292,36 @@ A few things stay manual:
 `./link.sh` on its own just (re)links the config files and is safe to run again. The repo can live anywhere; `~/dotfiles` is
 only a convention.
 
+**Installed on Fedora KDE?** Installs from before Nightdrive moved to Fedora Minimal go on as they are, KDE as a
+fallback session. To make one what a fresh install on Minimal is, run `nightdrive minimal --dry-run` first: it lists what
+would go (KDE and what only it needed, some 600 packages) and what stays as yours (what you installed yourself), and
+changes nothing. Then, from Nightdrive's desktop or a text console (not from Plasma):
+
+```sh
+nightdrive minimal   # asks once; --keep kate,okular keeps KDE apps you still use
+```
+
+It makes the Nightdrive login screen the one in use first, if KDE's still is (`--no-greeter`: greetd's text login), takes a
+read-only btrfs snapshot of the root, and then lets dnf work out what goes: what stays is marked as installed by you, the
+rest as a dependency, and `dnf autoremove` removes what nothing that stays needs. KDE's settings in `~/.config` move to
+`~/.local/share/nightdrive/kde-config-<time>`, the config files you had changed in `/etc` are listed (`.rpmsave`), and
+Wi-Fi networks whose password was in KDE's wallet ask for it again.
+
+The way back is printed at the end and kept in `~/.local/state/nightdrive/minimal-undo.txt`. `sudo dnf history rollback
+--ignore-extras ID` puts KDE back with the same versions while the repos still have them (then `config/greeter/switch.sh
+off` for its login screen); it may end with *Group state for "" not found*, but the packages are back all the same.
+Otherwise the snapshot takes the root's place, `root` here being the root's subvolume (`findmnt -no FSROOT /`):
+
+```sh
+sudo mount -o subvolid=5 /dev/<the root's partition> /mnt
+sudo mv /mnt/root /mnt/root.minimal
+sudo btrfs subvolume snapshot /mnt/root.pre-minimal-<time> /mnt/root
+sudo umount /mnt && sudo reboot
+```
+
+Once you're happy with Minimal, delete the snapshot, as it holds on to KDE's files: `sudo btrfs subvolume delete
+/mnt/root.pre-minimal-<time>`, mounted as above.
+
 ### Updating
 
 Nightdrive checks for new changes every six hours and shows a notification with an **Update** button when there are some.
@@ -325,6 +355,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive update check` | Only looks for new changes (what the six-hourly check runs) |
 | `nightdrive channel` | The update channel, stable or dev; `nightdrive channel dev` switches to it |
 | `nightdrive version` | The release you have, and the channel |
+| `nightdrive minimal --dry-run` | On an install on Fedora KDE: what turning it into Fedora Minimal would remove, and what stays as yours; without `--dry-run` it does it ([Install](#install)) |
 | `nightdrive theme color teal` | Theme colour: violet, blue, teal, green, amber, rose or graphite; aerc (if you use it) gets it too, unless you have picked a styleset of your own |
 | `nightdrive theme set background '#181722'` | The look: the background and opacity of the terminals, the launcher, Firefox and Thunderbird, and the window borders and shadows (`inactive-border off`, `shadow-size 8`…); `nightdrive theme look` lists the settings, `default` puts one back; the same with sliders in Theme Editor (launcher › Settings › Theme) |
 | `nightdrive theme save "My theme"` | Saves the theme colour and the look as a theme of your own (in `~/.config/nightdrive/themes`); `nightdrive theme themes` lists them with Nightdrive's Default, `use ID` switches, `delete ID` removes one of yours, `reset` goes back to Default; also launcher › Settings › Theme › Themes and Theme Editor's Save as theme |

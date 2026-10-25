@@ -68,6 +68,7 @@ author=@jarilehtinen
 | `default` | `on`: ticked in `install.sh`'s list; `off` (default): not |
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
+| `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
 | `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up), `webapp`, or `app`: one of Nightdrive's own apps (below) |
 | `version` | `MAJOR.MINOR.PATCH`, e.g. `1.0.0` (`0.x` while it's experimental). It shows on the plugin's page in the launcher and on the website, so a bug report can name it. See [Versions](#versions) |
 | `author` | Who made it: a GitHub user (`@name`) or a name |
