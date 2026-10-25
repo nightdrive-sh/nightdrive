@@ -77,12 +77,16 @@ create_image() {
   ((disk >= min)) || die "Disk: at least $min GB for $(jq -r .name <<<"$e")"
   IFS= read -r pass || true
   mkdir -p "$d"
-  # The folder goes if any of it fails
+  # The folder goes if any of it fails. The tools' own lines ("cp: error writing '…/vars.raw': No space left on device")
+  # are kept from the window's error line: it gets ours, with only why from the last of theirs
+  local log; log=$(mktemp)
   if ! { unpack "$f" "$d/disk.qcow2" &&
          qemu-img resize -q "$d/disk.qcow2" "${disk}G" &&
          cp "$FW_VARS" "$d/vars.raw" &&
-         printf 'MEM=%s\nCPUS=%s\nISO=""\n' $((mem * 1024)) "$cpus" > "$d/vm.conf"; }; then
-    rm -rf "$d"; die "$name couldn't be made from $(jq -r .name <<<"$e")"
+         printf 'MEM=%s\nCPUS=%s\nISO=""\n' $((mem * 1024)) "$cpus" > "$d/vm.conf"; } 2>"$log"; then
+    local why; why=$(grep . "$log" | tail -1 | sed 's/.*: //')
+    rm -rf "$d" "$log"; die "$name couldn't be made from $(jq -r .name <<<"$e")${why:+: $why}"
   fi
+  rm -f "$log"
   ( firstboot_creds "$name" "$user" "$pass" ) || { rm -rf "$d"; exit 1; }
 }

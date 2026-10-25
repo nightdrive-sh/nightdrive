@@ -1,4 +1,4 @@
 // Garage's top bar module: dimmed while no VM runs, highlighted while one does (./status); a click opens GarageMenu.qml,
-// a right click brings up Garage's window. Beside Deck: both are apps' icons, left of Claude's.
-{ "interval": 3, "right": "bin/garage", "before": ["deck", "claude"], "size": 16, "label": "Garage – Virtual machines",
+// a right click brings up Garage's window. Left of Tailscale's, else beside Deck, left of Claude's.
+{ "interval": 3, "right": "bin/garage", "before": ["tailscale", "deck", "claude"], "size": 16, "label": "Garage – Virtual machines",
   "glyph": "warehouse" }
