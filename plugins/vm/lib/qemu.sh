@@ -30,6 +30,8 @@ start() {
   # VM_HEADLESS=1: no window at all, for a test VM that mustn't come up on the desktop
   local screen=(-device virtio-gpu-gl-pci,xres=1600,yres=1000 -display sdl,gl=on)
   [[ -n ${VM_HEADLESS:-} ]] && screen=(-device virtio-gpu-pci -display none)
+  # A disk image's first boot: its user and the rest, until they have run (lib/firstboot.sh)
+  local firstboot=(); mapfile -t firstboot < <(firstboot_args "$name")
   rm -f "$d/qmp.sock" "$d/qga.sock"
   cd "$d"     # the sockets by a short path (qmp, qga)
   setsid -f taskset -c $PCORES qemu-system-aarch64 \
@@ -46,6 +48,7 @@ start() {
     -device virtio-serial-pci \
     -chardev socket,id=qga,path=qga.sock,server=on,wait=off \
     -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 \
+    "${firstboot[@]}" \
     -qmp unix:qmp.sock,server,nowait \
     -pidfile "$d/pid" \
     -serial "file:$d/serial.log" > "$d/qemu.log" 2>&1
@@ -60,7 +63,8 @@ start() {
 # can say why, if it doesn't go down
 stop() {
   need "$1"; running "$1" || return 0
-  qga "$1" guest-shutdown '{"mode": "powerdown"}' >/dev/null 2>&1 && return 0
+  # The agent answering means the first boot's scripts have run (lib/firstboot.sh): their credentials can go
+  qga "$1" guest-shutdown '{"mode": "powerdown"}' >/dev/null 2>&1 && { rm -f "$(dir "$1")/firstboot.creds"; return 0; }
   qmp "$1" system_powerdown >/dev/null
   echo acpi
 }

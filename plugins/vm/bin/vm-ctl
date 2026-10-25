@@ -5,10 +5,14 @@
 #   vars.raw     the UEFI variables
 #   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
 #   qmp.sock, qga.sock, pid, serial.log while it runs (qemu's monitor, the guest agent's channel)
-# qemu itself, its command line and its sockets, are lib/qemu.sh's.
+#   firstboot.creds  a disk image's first boot: its user, until it has run (lib/firstboot.sh)
+# qemu itself, its command line and its sockets, are lib/qemu.sh's; the ready-made images are lib/images.sh's.
 #
 #   vm-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, name, date }], newest first }]
 #   vm-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
+#   vm-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
+#   vm-ctl fetch ID                      download one in the background (images shows how far)
+#   vm-ctl create-image NAME ID MEM_GB DISK_GB CPUS USER     a VM from one, with USER (the password on stdin)
 #   vm-ctl start|stop|kill|display|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power button
 #   vm-ctl set NAME mem GB | cpus N | disk GB | iso PATH     while it is stopped; the disk only grows, iso "" ejects
 #   vm-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
@@ -29,9 +33,21 @@ running() { local p; p=$(cat "$(dir "$1")/pid" 2>/dev/null) && kill -0 "$p" 2>/d
 stopped() { running "$1" && die "$1 is running: shut it down first"; return 0; }
 # A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and a tag
 snap() { [[ -n ${3:-} ]] || die "$1 NAME TAG"; need "$2"; stopped "$2"; }
+# A new VM's memory, disk and CPUs: whole numbers, the memory what the host can spare
+max_mem() { echo $(( $(awk '/^MemTotal/ { print int($2 / 1048576) }' /proc/meminfo) - HOST_SPARE_GB )); }
+sizes() {
+  [[ $1 =~ ^[0-9]+$ && $2 =~ ^[0-9]+$ && $3 =~ ^[0-9]+$ ]] || die "Memory, disk and CPUs are whole numbers"
+  local max; max=$(max_mem)
+  (($1 >= 1 && $1 <= max)) || die "Memory: 1 to $max GB"
+  (($3 >= 1 && $3 <= MAX_CPUS)) || die "CPUs: 1 to $MAX_CPUS"
+}
 
 # shellcheck source=../lib/qemu.sh
 . "$(dirname "$(readlink -f "$0")")/../lib/qemu.sh"
+# shellcheck source=../lib/firstboot.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/firstboot.sh"
+# shellcheck source=../lib/images.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/images.sh"
 
 # A snapshot's name in names.json (LABEL empty: its entry goes). Written to a new file, then renamed over the old one
 label() {
@@ -73,8 +89,7 @@ create() {
   local name=$1 iso=$2 mem=$3 disk=$4 cpus=${5:-4} d; d=$(dir "$1")
   [[ -e $d ]] && die "$name exists already"
   [[ -f $iso ]] || die "No such ISO: $iso"
-  [[ $mem =~ ^[0-9]+$ && $disk =~ ^[0-9]+$ && $cpus =~ ^[0-9]+$ ]] || die "Memory, disk and CPUs are numbers"
-  ((cpus >= 1 && cpus <= MAX_CPUS)) || die "CPUs: 1 to $MAX_CPUS"
+  sizes "$mem" "$disk" "$cpus"
   mkdir -p "$d"
   cp "$FW/vars-template-pflash.raw" "$d/vars.raw"
   qemu-img create -q -f qcow2 "$d/disk.qcow2" "${disk}G"
@@ -95,7 +110,7 @@ settings() {
   local name=$1 key=$2 v=$3 d; d=$(dir "$1")
   case $key in
     mem)
-      local max=$(( $(awk '/^MemTotal/ { print int($2 / 1048576) }' /proc/meminfo) - HOST_SPARE_GB ))
+      local max; max=$(max_mem)
       [[ $v =~ ^[0-9]+$ ]] && ((v >= 1 && v <= max)) || die "Memory: 1 to $max GB"
       conf "$name" MEM $((v * 1024)) ;;
     cpus)
@@ -118,6 +133,10 @@ case ${1:-} in
   list)     list ;;
   isos)     ls -t "$HOME"/Downloads/*.iso "$HOME"/vm/*.iso 2>/dev/null || true ;;
   create)   (($# >= 5)) || die "create NAME ISO MEM_GB DISK_GB [CPUS]"; create "${@:2}" ;;
+  images)   images ;;
+  fetch)    fetch "$2" ;;
+  fetch-run) fetch_run "$2" ;;   # fetch's own, in the background
+  create-image) create_image "${@:2}" ;;
   start)    start "$2" ;;
   stop)     stop "$2" ;;
   kill)     force_off "$2" ;;
@@ -130,5 +149,5 @@ case ${1:-} in
   restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
   unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2"; label "$2" "$3" "" ;;
   rename)   rename "$@" ;;
-  *)        sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *)        sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

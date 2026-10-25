@@ -1,0 +1,72 @@
+# Ready-made disk images for new VMs (share/images.json, by the host's architecture), for bin/vm-ctl (sourced after
+# its helpers and lib/firstboot.sh). One is downloaded once, in the background, and checked against its distribution's
+# CHECKSUM file; each new VM's disk is then made from it: unpacked, converted to qcow2 and grown to its size, with its
+# first boot's user (lib/firstboot.sh). In images/ beside the VMs:
+#   FILE                 a checked image
+#   FILE.part, FILE.pid  one on its way (curl, resumed where it stopped), and its download's process
+#   FILE.error           why the last try failed
+
+IMAGES_JSON=$(cd "$(dirname "${BASH_SOURCE[0]}")/../share" && pwd)/images.json
+IMG_DIR=$ROOT/images
+ARCH=$(uname -m)
+
+image() { jq -ce --arg id "$1" --arg a "$ARCH" '.[$a][]? | select(.id == $id)' "$IMAGES_JSON" || die "No image $1 for $ARCH"; }
+image_file() { echo "$IMG_DIR/$(basename "$(jq -r .url <<<"$1")")"; }
+fetching() { local p; p=$(cat "$1.pid" 2>/dev/null) && kill -0 "$p" 2>/dev/null; }
+
+# JSON: [{ id, name, about, size, minDisk (GB, the image's own), state: ready | downloading | failed | none,
+#         done: bytes so far, error }]
+images() {
+  local e f state got err
+  jq -c --arg a "$ARCH" '.[$a][]?' "$IMAGES_JSON" | while read -r e; do
+    f=$(image_file "$e"); state=none; got=0; err=""
+    if [[ -f $f ]]; then state=ready
+    elif fetching "$f"; then state=downloading; got=$(stat -c %s "$f.part" 2>/dev/null || echo 0)
+    elif [[ -f $f.error ]]; then state=failed; err=$(cat "$f.error")
+    fi
+    jq -c --arg state "$state" --argjson got "$got" --arg err "$err" \
+       '{ id, name, about, size, minDisk, state: $state, done: $got, error: $err }' <<<"$e"
+  done | jq -sc .
+}
+
+# Its download, started in the background (vm-ctl fetch-run), unless it is there or on its way
+fetch() {
+  local e f; e=$(image "$1"); f=$(image_file "$e")
+  [[ -f $f ]] || fetching "$f" && return 0
+  mkdir -p "$IMG_DIR"; rm -f "$f.error"
+  setsid -f "$0" fetch-run "$1" </dev/null >/dev/null 2>&1
+}
+fetch_run() {
+  local e f url sum; e=$(image "$1"); f=$(image_file "$e"); url=$(jq -r .url <<<"$e")
+  echo $$ > "$f.pid"
+  failed() { echo "$*" > "$f.error"; rm -f "$f.pid"; exit 1; }
+  curl -fsSL --retry 3 -C - -o "$f.part" "$url" || failed "The download stopped: try again, it goes on from there"
+  # The CHECKSUM file's line for it: "SHA256 (FILE) = HASH"
+  sum=$(curl -fsSL --retry 3 "$(jq -r .checksum <<<"$e")" | awk -v n="(${f##*/})" '$1 == "SHA256" && $2 == n { print $4 }')
+  [[ -n $sum ]] || failed "Its checksum couldn't be fetched: try again"
+  [[ $(sha256sum "$f.part" | cut -d' ' -f1) == "$sum" ]] || { rm -f "$f.part"; failed "It didn't match its checksum, so it was deleted: try again"; }
+  mv "$f.part" "$f"; rm -f "$f.pid"
+}
+
+# create-image NAME ID MEM_GB DISK_GB CPUS USER, the password on stdin (not in ps)
+create_image() {
+  (($# >= 6)) || die "create-image NAME ID MEM_GB DISK_GB CPUS USER (the password on stdin)"
+  local name=$1 id=$2 mem=$3 disk=$4 cpus=$5 user=$6 pass e f d
+  e=$(image "$id"); f=$(image_file "$e"); d=$(dir "$name")
+  [[ -e $d ]] && die "$name exists already"
+  [[ -f $f ]] || die "$(jq -r .name <<<"$e") isn't downloaded yet"
+  sizes "$mem" "$disk" "$cpus"
+  local min; min=$(jq -r '.minDisk // 0' <<<"$e")
+  ((disk >= min)) || die "Disk: at least $min GB for $(jq -r .name <<<"$e")"
+  IFS= read -r pass || true
+  mkdir -p "$d"
+  # Unpacked sparse (dd), as the image is mostly empty, then qcow2; the folder goes if any of it fails
+  if ! { xz -dcT0 "$f" | dd of="$d/image.raw" conv=sparse bs=1M status=none &&
+         qemu-img convert -O qcow2 "$d/image.raw" "$d/disk.qcow2" && rm "$d/image.raw" &&
+         qemu-img resize -q "$d/disk.qcow2" "${disk}G" &&
+         cp "$FW/vars-template-pflash.raw" "$d/vars.raw" &&
+         printf 'MEM=%s\nCPUS=%s\nISO=""\n' $((mem * 1024)) "$cpus" > "$d/vm.conf"; }; then
+    rm -rf "$d"; die "$name couldn't be made from $(jq -r .name <<<"$e")"
+  fi
+  ( firstboot_creds "$name" "$user" "$pass" ) || { rm -rf "$d"; exit 1; }
+}
