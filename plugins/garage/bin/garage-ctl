@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # qemu/KVM VMs for the Garage window (app/) and the garage command, one folder each under
 # ~/.local/share/nightdrive/garage/NAME:
-#   vm.conf      MEM (MB), CPUS, ISO (in its drive while set; it boots after the disk)
+#   vm.conf      MEM (MB), CPUS, ISO (in its drive while set; it boots after the disk): KEY=VALUE lines, read by read_conf
 #   disk.qcow2   the disk; snapshots are internal to it (qemu-img snapshot, only while the VM is stopped)
 #   vars.raw     the UEFI variables
 #   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
@@ -54,6 +54,20 @@ sizes() {
   (($3 >= 1 && $3 <= MAX_CPUS)) || die "CPUs: 1 to $MAX_CPUS"
 }
 
+# read_conf NAME: its vm.conf into MEM, CPUS and ISO (the caller's locals). Read a line at a time, not sourced: the
+# file is data, and a line that isn't (a command) mustn't run. ISO is the path as such, "" while there is none
+read_conf() {
+  local f k v; f=$(dir "$1")/vm.conf
+  MEM=0; CPUS=0; ISO=""
+  while IFS= read -r v || [[ -n $v ]]; do
+    k=${v%%=*}; v=${v#*=}
+    case $k in
+      MEM|CPUS) [[ $v =~ ^[0-9]+$ ]] || die "$f: $k isn't a number"; printf -v "$k" %s "$v" ;;
+      ISO)      [[ $v == '""' ]] && v=""; ISO=$v ;;
+    esac
+  done < "$f"
+}
+
 # shellcheck source=../lib/arch.sh
 . "$(dirname "$(readlink -f "$0")")/../lib/arch.sh"
 # shellcheck source=../lib/qemu.sh
@@ -82,11 +96,10 @@ list() {
   for d in "$ROOT"/*/; do
     [[ -f $d/vm.conf ]] || continue
     local name MEM CPUS ISO run=false
-    name=$(basename "$d"); MEM=0; CPUS=0; ISO=""
+    name=$(basename "$d")
     # A folder made by hand with a name garage-ctl wouldn't take: the window and the menu would pass it back to it
     good_name "$name" || continue
-    # shellcheck disable=SC1091
-    source "$d/vm.conf"
+    read_conf "$name"
     running "$name" && run=true
     # -U reads the disk while qemu holds its lock
     local info; info=$(qemu-img info -U --output=json "$d/disk.qcow2")
@@ -110,10 +123,18 @@ create() {
   mkdir -p "$d"
   cp "$FW_VARS" "$d/vars.raw"
   qemu-img create -q -f qcow2 "$d/disk.qcow2" "${disk}G"
-  printf 'MEM=%s\nCPUS=%s\nISO=%q\n' $((mem * 1024)) "$cpus" "$(realpath "$iso")" > "$d/vm.conf"
+  iso=$(iso_path "$iso")
+  printf 'MEM=%s\nCPUS=%s\nISO=%s\n' $((mem * 1024)) "$cpus" "$iso" > "$d/vm.conf"
 }
 
-# One line of vm.conf: the others kept, KEY's replaced (VALUE as it is written there: a path quoted with printf %q)
+# An ISO's full path, as vm.conf keeps it: on one line
+iso_path() {
+  local p; p=$(realpath "$1")
+  [[ $p != *$'\n'* ]] || die "An ISO's path can't have a line break in it"
+  echo "$p"
+}
+
+# One line of vm.conf: the others kept, KEY's replaced
 conf() {
   local f; f=$(dir "$1")/vm.conf
   { grep -v "^$2=" "$f" || true; printf '%s=%s\n' "$2" "$3"; } > "$f.new" && mv "$f.new" "$f"
@@ -141,7 +162,7 @@ settings() {
       qemu-img resize -q "$d/disk.qcow2" "${v}G" ;;
     iso)
       [[ -z $v || -f $v ]] || die "No such ISO: $v"
-      conf "$name" ISO "$( [[ -z $v ]] && echo '""' || printf %q "$(realpath "$v")")" ;;
+      if [[ -z $v ]]; then conf "$name" ISO '""'; else v=$(iso_path "$v"); conf "$name" ISO "$v"; fi ;;
     *) die "set: mem, cpus, disk or iso" ;;
   esac
 }

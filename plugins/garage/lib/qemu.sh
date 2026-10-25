@@ -21,8 +21,7 @@ qv() { echo "${1//,/,,}"; }
 # folder: the sockets go there by a short path (qmp, qga)
 qemu_cmd() {
   local name=$1 d MEM CPUS ISO; d=$(dir "$1")
-  # shellcheck disable=SC1091
-  source "$d/vm.conf"
+  read_conf "$name"
   # The disk boots first and the ISO second: an empty disk falls through to the installer, and once it is installed
   # the VM boots from its disk, ISO or not (#1552: with the ISO first, an installed VM went back into the installer)
   # format=raw, as qemu would otherwise go by what the file says it is: a "downloaded ISO" that is a qcow2 with a
