@@ -71,3 +71,4 @@
   F4                 App launcher (like ⌘Space)
   ⌘ F5              Mic on/off (toast)
   F6                 Do not disturb (hides notifications, toast shows state)
+  ⌃ + click          In the terminal: a link, or a file or folder path in the output (Claude Code's too): a folder in Files, a file in the code editor at its line (file.py:42)
