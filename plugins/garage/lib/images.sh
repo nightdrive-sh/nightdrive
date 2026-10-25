@@ -1,8 +1,8 @@
 # Ready-made disk images for new VMs (share/images.json, by the host's architecture: lib/arch.sh's ARCH), for
 # bin/garage-ctl (sourced after its helpers and lib/firstboot.sh). Fedora makes a Minimal image (raw.xz) for aarch64
 # only, so x86_64's is Cloud Base (qcow2): both boot without an installer. One is downloaded once, in the background,
-# and checked against its distribution's CHECKSUM file; each new VM's disk is then made from it: unpacked, converted to
-# qcow2 and grown to its size, with its first boot's user (lib/firstboot.sh). In images/ beside the VMs:
+# over HTTPS only, and checked against its sha256 in images.json; each new VM's disk is then made from it: unpacked,
+# converted to qcow2 and grown to its size, with its first boot's user (lib/firstboot.sh). In images/ beside the VMs:
 #   FILE                 a checked image
 #   FILE.part, FILE.pid  one on its way (curl, resumed where it stopped), and its download's process
 #   FILE.error           why the last try failed
@@ -40,10 +40,12 @@ fetch_run() {
   local e f url sum; e=$(image "$1"); f=$(image_file "$e"); url=$(jq -r .url <<<"$e")
   echo $$ > "$f.pid"
   failed() { echo "$*" > "$f.error"; rm -f "$f.pid"; exit 1; }
-  curl -fsSL --retry 3 -C - -o "$f.part" "$url" || failed "The download stopped: try again, it goes on from there"
-  # The CHECKSUM file's line for it: "SHA256 (FILE) = HASH"
-  sum=$(curl -fsSL --retry 3 "$(jq -r .checksum <<<"$e")" | awk -v n="(${f##*/})" '$1 == "SHA256" && $2 == n { print $4 }')
-  [[ -n $sum ]] || failed "Its checksum couldn't be fetched: try again"
+  # HTTPS all the way, redirects to a mirror too
+  curl -fsSL --proto =https --proto-redir =https --retry 3 -C - -o "$f.part" "$url" \
+    || failed "The download stopped: try again, it goes on from there"
+  # The hash is images.json's, taken from the release's CHECKSUM file once its Fedora signature checked out (gpgv): a
+  # CHECKSUM fetched now would come from the same mirror as the image, and a bad mirror would serve a matching one
+  sum=$(jq -r .sha256 <<<"$e")
   [[ $(sha256sum "$f.part" | cut -d' ' -f1) == "$sum" ]] || { rm -f "$f.part"; failed "It didn't match its checksum, so it was deleted: try again"; }
   mv "$f.part" "$f"; rm -f "$f.pid"
 }

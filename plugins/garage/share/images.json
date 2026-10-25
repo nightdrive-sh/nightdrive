@@ -5,7 +5,7 @@
       "name": "Fedora 44 Minimal",
       "about": "No installer: ready at its first boot, with your user, ssh and the guest agent",
       "url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Spins/aarch64/images/Fedora-Minimal-44-1.7.aarch64.raw.xz",
-      "checksum": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Spins/aarch64/images/Fedora-Spins-44-1.7-aarch64-CHECKSUM",
+      "sha256": "aebf1cb693fbdbd45837980b3be6becbd34c321ff937c49e582244eaa2f48aaf",
       "size": 666886576,
       "minDisk": 6
     }
@@ -16,7 +16,7 @@
       "name": "Fedora 44 Cloud Base",
       "about": "No installer: ready at its first boot, with your user, ssh and the guest agent",
       "url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2",
-      "checksum": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-44-1.7-x86_64-CHECKSUM",
+      "sha256": "28680fe5b371a5a82ebf43a31926e086a168e59949d03969c5093e7071f90b7f",
       "size": 583729152,
       "minDisk": 6
     }
