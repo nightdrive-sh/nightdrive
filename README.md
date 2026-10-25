@@ -130,7 +130,9 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   the answer for the network you are on.
 - **Login apps**: you choose what starts at login in the launcher (Settings › Apps › Startup, or ⌥Enter on an app). Background
   apps start hidden. Only 1Password (if installed) is on by default, because its SSH agent and the Passwords level need it.
-- **Login screen**: a password-only greeter that matches the theme (`--no-greeter` keeps the distribution's own).
+- **Login screen**: a password-only greeter that matches the theme, for the user who installed Nightdrive (`--no-greeter`
+  keeps the distribution's own, or gives a text login where there's none). Another user logs in from the text console
+  (Ctrl+Alt+F3) or with the text login (`config/greeter/switch.sh text`).
 
 ![Screensavers: synthwave sunset and rain](docs/screenshots/screensavers.jpg)
 
@@ -250,13 +252,17 @@ Home Assistant, if chosen, asks for its address and token at the very end.
 
 Then **reboot**. The Nightdrive boot splash goes straight over to the Nightdrive login screen (greetd + Quickshell): the
 desktop starts behind it as its lock, so the screen changes hands only once and doesn't flash black. The login apps start
-after the password. If the login screen fails, press Ctrl+Alt+F3 and log in there: `start-hyprland` starts the desktop
-from it. On Fedora KDE, KDE stays installed as a fallback and `config/greeter/switch.sh off` brings back its login
-screen. `switch.sh on` gives the plain login screen that starts the desktop after the password.
+after the password. If the login screen doesn't start (Hyprland can't, say for a missing graphics driver), a text login
+comes up in its place: log in, and `start-hyprland` starts the desktop or shows why it can't. Ctrl+Alt+F3 gives one too.
+Until it's fixed, `config/greeter/switch.sh text` makes that text login the login screen, starting the desktop after the
+password (type `!bash` at its prompt for a text console instead). On Fedora KDE, KDE stays installed as a fallback and
+`switch.sh off` brings back its login screen; on Fedora Minimal, which has none, `off` is the text login. `switch.sh on`
+gives the plain login screen that starts the desktop after the password, `switch.sh autologin` the default back (the
+desktop behind the login screen).
 
 | Option | What it changes |
 |---|---|
-| `--no-greeter` | On Fedora KDE, keeps KDE's login screen; pick **Hyprland** there (not *Hyprland (uwsm-managed)*). A minimal Fedora has no login screen of its own |
+| `--no-greeter` | No Nightdrive login screen. On Fedora KDE, keeps KDE's; pick **Hyprland** there (not *Hyprland (uwsm-managed)*). On Fedora Minimal, which has none, a text login (greetd's agreety) that starts the desktop after the password |
 | `--no-autologin` | The Nightdrive login screen starts the desktop after the password, instead of being its lock (black flashes at boot) |
 | `--no-splash` | Keeps Fedora's boot splash and the GRUB menu (`config/splash/install.sh off` later) |
 | `--choose` | Lists the optional parts (and on a Mac the removals) first, to tick or untick |

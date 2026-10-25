@@ -13,6 +13,7 @@ hl.config({
 })
 
 hl.on("hyprland.start", function ()
+    -- The marker tells greeter.sh that Hyprland started (no text login in its place once it exits)
     -- Quickshell login screen; once login is done (or the screen closes), this Hyprland exits
-    hl.exec_cmd("qs -p /etc/greetd/greeter; hyprctl dispatch 'hl.dsp.exit()'")
+    hl.exec_cmd("touch \"$XDG_RUNTIME_DIR/nightdrive-greeter-up\"; qs -p /etc/greetd/greeter; hyprctl dispatch 'hl.dsp.exit()'")
 end)

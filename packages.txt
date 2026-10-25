@@ -68,6 +68,10 @@ google-noto-sans-fonts
 google-noto-sans-mono-fonts
 google-noto-color-emoji-fonts
 xdg-desktop-portal-gtk
+# The login screen (config/greeter) and its text login, agreety: the way in when the login screen doesn't start, and the
+# login screen with --no-greeter on Fedora Minimal, which has none of its own
+greetd
+greetd-selinux
 # Secret Service for apps that store passwords (Tuba, VS Code, ...). greetd's PAM unlocks the "login" keyring at login,
 # but only with gnome-keyring-pam: /etc/pam.d/greetd skips the missing module silently and every boot asks for a password
 gnome-keyring

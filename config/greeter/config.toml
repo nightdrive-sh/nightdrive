@@ -2,7 +2,7 @@
 vt = 1
 
 [default_session]
-# Hyprland's output off the text console: its ASCII logo and first log lines showed on tty1 between the boot splash and
-# the login screen (the log is in $XDG_RUNTIME_DIR/hypr all the same)
-command = "sh -c 'exec start-hyprland -- -c /etc/greetd/hyprland-greeter.lua >/dev/null 2>&1'"
+# Hyprland with the login screen, and a text login when Hyprland doesn't start (greeter.sh). Read by greetd's own parser,
+# not TOML's: one line per value, so the script is a file of its own
+command = "sh /etc/greetd/greeter.sh"
 user = "greetd"

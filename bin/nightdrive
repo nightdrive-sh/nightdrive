@@ -340,7 +340,9 @@ LIST
   echo "==> Login screen and boot splash"
   local asked=$HOME/.local/state/nightdrive/boot-asked did=0 a
   if systemctl -q is-enabled greetd.service 2>/dev/null; then
-    if ! grep -q '^\[initial_session\]' /etc/greetd/config.toml 2>/dev/null && [[ ! -e $asked && -t 0 ]]; then
+    # Not asked with the text login (switch.sh text), chosen in place of the login screen
+    if ! grep -q -e '^\[initial_session\]' -e '^# Text login (switch.sh text)' /etc/greetd/config.toml 2>/dev/null &&
+       [[ ! -e $asked && -t 0 ]]; then
       echo "    New: the boot splash goes straight over to the login screen, with the desktop starting behind it as its lock"
       echo "    (no black flashes at boot). Turning it on rebuilds the initramfs, which takes a minute or two."
       read -rp "    Turn it on? [Y/n] " a

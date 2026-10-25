@@ -26,7 +26,8 @@
 #                              screen, the desktop and the text console, without asking
 #   ./install.sh --dry-run     shows the optional parts, the packages and system settings it would add, what it would
 #                              remove, and stops
-#   ./install.sh --no-greeter  keeps the distribution's own login screen (Fedora KDE's; pick "Hyprland" there)
+#   ./install.sh --no-greeter  no Nightdrive login screen: the distribution's own where there's one (Fedora KDE's; pick
+#                              "Hyprland" there), otherwise greetd's text login, which starts the desktop after it
 #   ./install.sh --no-autologin  the Nightdrive login screen before the desktop starts, instead of as its lock
 #   ./install.sh --no-splash   keeps Fedora's boot splash and the GRUB menu
 #   ./install.sh --vm          the virtual machine settings even if it isn't detected as one (docs/vm.md)
@@ -70,10 +71,10 @@ while (( $# )); do
   shift
 done
 (( choose )) && [[ ! -t 0 ]] && { echo "--choose needs a terminal to ask in" >&2; exit 2; }
-# Fedora Minimal has no login screen of its own to keep (Fedora KDE's is plasmalogin, an older one's sddm)
+# Fedora Minimal has no login screen of its own to keep (Fedora KDE's is plasmalogin, an older one's sddm): with
+# --no-greeter it gets greetd's text login (config/greeter/switch.sh: OTHER_DMS, text)
 # (|| true: systemctl fails when there are none, and pipefail with set -e would end the script silently)
 other_dm=$(systemctl list-unit-files --no-legend plasmalogin.service sddm.service gdm.service lightdm.service 2>/dev/null | wc -l || true)
-(( greeter || other_dm )) || { echo "--no-greeter keeps the distribution's login screen, and this system has none (Fedora Minimal): Nightdrive's is its login screen" >&2; exit 2; }
 pkgs() { grep -vE '^\s*(#|$)' "$1" | tr '\n' ' '; }
 # The names of these that are installed (rpm prints "package X is not installed" for the rest)
 installed() { (( $# )) && rpm -q --qf '%{NAME}\n' "$@" 2>/dev/null | grep -v ' ' | sort -u | tr '\n' ' ' || true; }
@@ -233,6 +234,7 @@ if (( dry )); then
   (( kb_ask )) && echo "Would ask for the keyboard layout (still Asahi Minimal's us)"
   [[ -z $kb_set ]] || echo "Would set the keyboard layout: $kb_set"
   (( to_graphical )) && echo "Would boot to the login screen: systemctl set-default graphical.target"
+  (( greeter || other_dm )) || echo "Would make greetd's text login the login screen (--no-greeter, no other login screen here)"
   (( fw_desktop )) && echo "Would give the firewall the desktop's settings: the FedoraWorkstation zone, firewalld's desktop polkit rule"
   (( ssh_preset )) && echo "Would turn SSH off (on by Fedora Minimal's preset) unless Remote login looks after it already"
   exit 0
@@ -430,6 +432,10 @@ if (( greeter )); then
   echo "==> Login screen (greetd + Quickshell); takes effect from the next boot"
   "$repo/config/greeter/install.sh"
   if (( autologin )); then "$repo/config/greeter/switch.sh" autologin; else "$repo/config/greeter/switch.sh" on; fi
+elif (( ! other_dm )); then
+  # --no-greeter on Fedora Minimal: no login screen to keep, so greetd's text login (greetd is in packages.txt)
+  echo "==> Text login (greetd's agreety); takes effect from the next boot"
+  "$repo/config/greeter/switch.sh" text
 fi
 if (( splash )); then
   echo "==> Boot splash (Plymouth, GRUB menu hidden); takes effect from the next boot"
@@ -479,18 +485,24 @@ if (( nvidia )) && (( secureboot )); then
 fi
 if (( greeter )); then
   next "Reboot"
-else
+  next "Log in"
+elif (( other_dm )); then
   next "Reboot and pick \"Hyprland\" (not \"Hyprland (uwsm-managed)\") at the login screen."
+  next "Log in"
+else
+  next "Reboot"
+  next "Log in at the text login: the desktop starts after it."
 fi
-next "Log in"
 next "Nightdrive helps you set up your computer with Welcome to Nightdrive."
 if (( greeter )); then
+  # Hyprland not starting is the likely failure (a graphics driver): config/greeter/greeter.sh puts a text login in its place
   echo
+  echo "If the login screen doesn't start, a text login comes up in its place (or press ctrl+alt+F3): log in, and"
   if (( other_dm )); then
-    echo "If the login screen fails: press ctrl+alt+F3, log in and run"
+    echo "start-hyprland starts the desktop. Until it's fixed, KDE's login screen can take its place:"
     echo "  ${repo/#$HOME/\~}/config/greeter/switch.sh off"
   else
-    # Fedora Minimal: no other login screen to go back to, the text console is the way in
-    echo "If the login screen fails: press ctrl+alt+F3 and log in there; start-hyprland starts the desktop from it."
+    echo "start-hyprland starts the desktop. Until it's fixed, the text login can take its place (the desktop starts after it):"
+    echo "  ${repo/#$HOME/\~}/config/greeter/switch.sh text"
   fi
 fi

@@ -6,6 +6,7 @@ import Quickshell.Services.Greetd
 
 // Login screen (greetd + Quickshell, runs in its own Hyprland session, see hyprland-greeter.lua).
 // Password only; user here, the look in LoginView.qml (shared with the lock at startup, lock.qml).
+// One user, the one who installed Nightdrive: another logs in at the text login (switch.sh text) or on Ctrl+Alt+F3.
 // Preview in the current session: `qs -p ~/.config/greeter` (Esc closes, no login is performed).
 ShellRoot {
     id: root
