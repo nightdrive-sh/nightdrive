@@ -3,6 +3,7 @@
 # before sleep, ⌃⌘L through loginctl lock-session), so the lock looks like the login screen. After sleep relock starts it
 # again (the keyboard doesn't come back to the old one on some machines).
 # A lock already up stays (idle and sleep both ask for one), unless --replace (relock: it closes the old one itself).
-[[ $1 == --replace ]] || ! pgrep -u "$USER" -f '[q]s -p .*/greeter/lock\.qml' >/dev/null || exit 0
+# Only this session's: a container's (nightdrive sandbox) runs as the same user, and a locked one kept this from locking.
+[[ $1 == --replace ]] || ! pgrep --ns $$ --nslist pid -u "$UID" -f '[q]s -p .*/greeter/lock\.qml' >/dev/null || exit 0
 pam=login; [[ -e /etc/pam.d/nightdrive-lock ]] && pam=nightdrive-lock   # as hyprland.lua: it also opens the keyring
 NIGHTDRIVE_LOCK_PAM=$pam NIGHTDRIVE_LOCK_QUICK=1 exec qs -p "$HOME/.config/greeter/lock.qml"
