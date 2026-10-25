@@ -12,9 +12,14 @@ import json
 import random
 import socket
 import sys
+import time
 
 TIMEOUT = 3     # seconds for an answer: a guest agent answers at once, or isn't there
+DEADLINE = 10   # seconds for the whole command: the guest writes the agent's side, and one that keeps on talking
+                # mustn't hold garage-ctl (and the window's queue behind it) for ever
+MAX_LINE = 1 << 20
 NO_AGENT = 3
+deadline = 0.0
 
 
 def send(f, cmd, args):
@@ -28,11 +33,13 @@ def send(f, cmd, args):
 def answer(f):
     """The next return or error, past QMP's events"""
     while True:
-        line = f.readline()
+        if time.monotonic() > deadline:
+            raise socket.timeout()
+        line = f.readline(MAX_LINE)
         if not line:
             raise ConnectionError("closed")
         r = json.loads(line)
-        if "return" in r or "error" in r:
+        if isinstance(r, dict) and ("return" in r or "error" in r):
             return r
 
 
@@ -62,6 +69,8 @@ def main():
         sys.exit(__doc__)
     kind, path, cmd, vm = sys.argv[1:5]
     args = json.loads(sys.argv[5]) if len(sys.argv) > 5 else None
+    global deadline
+    deadline = time.monotonic() + DEADLINE
     try:
         s = socket.socket(socket.AF_UNIX)
         s.settimeout(TIMEOUT)
@@ -74,7 +83,8 @@ def main():
     except (OSError, ValueError) as e:
         sys.exit(f"{vm} doesn't answer ({getattr(e, 'strerror', None) or e}): Force off pulls the plug")
     if "error" in r:
-        sys.exit(f"{vm}: {r['error'].get('desc', r['error'])}")
+        e = r["error"]
+        sys.exit(f"{vm}: {e.get('desc', e) if isinstance(e, dict) else e}")
     print(json.dumps(r["return"]))
 
 

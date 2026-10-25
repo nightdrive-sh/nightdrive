@@ -11,7 +11,8 @@ Virtual machines in a window of their own: make one from a ready-made Fedora ima
 - `t` takes a snapshot while the VM is stopped, `Enter` on one goes back to it, `e` renames it and Delete deletes it.
 - ⌘, changes the memory, CPUs, disk (it only grows) and ISO of a stopped VM; ⌘⌫ deletes the VM.
 - A VM made from an image answers `ssh -p 2222 localhost` with your own key.
-- Your VMs live in ~/.local/share/nightdrive/garage, one folder each: removing Garage leaves them there.
+- Your VMs live in ~/.local/share/nightdrive/garage, one folder each, readable by you alone: removing Garage leaves them there.
+- A VM reaches the internet through qemu's own network, and your computer's local services too: 10.0.2.2 in it is the host's 127.0.0.1. Keep that in mind before running something you don't trust in one.
 
 ## In a terminal
 
