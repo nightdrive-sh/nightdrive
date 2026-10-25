@@ -72,6 +72,8 @@ create_image() {
   [[ -e $d ]] && die "$name exists already"
   [[ -f $f ]] || die "$(jq -r .name <<<"$e") isn't downloaded yet"
   sizes "$mem" "$disk" "$cpus"
+  # Before vm.conf has it: a line break in it would be a line of its own there
+  good_user "$user" || die "User: lower-case letters, digits, - and _, starting with a letter"
   need_qemu
   local min; min=$(jq -r '.minDisk // 0' <<<"$e")
   ((disk >= min)) || die "Disk: at least $min GB for $(jq -r .name <<<"$e")"
@@ -83,10 +85,12 @@ create_image() {
   if ! { unpack "$f" "$d/disk.qcow2" &&
          qemu-img resize -q "$d/disk.qcow2" "${disk}G" &&
          cp "$FW_VARS" "$d/vars.raw" &&
-         printf 'MEM=%s\nCPUS=%s\nISO=""\n' $((mem * 1024)) "$cpus" > "$d/vm.conf"; } 2>"$log"; then
+         printf 'MEM=%s\nCPUS=%s\nISO=""\nSSH_PORT=%s\nUSER=%s\n' $((mem * 1024)) "$cpus" "$(free_port)" "$user" \
+           > "$d/vm.conf"; } 2>"$log"; then
     local why; why=$(grep . "$log" | tail -1 | sed 's/.*: //')
     rm -rf "$d" "$log"; die "$name couldn't be made from $(jq -r .name <<<"$e")${why:+: $why}"
   fi
   rm -f "$log"
   ( firstboot_creds "$name" "$user" "$pass" ) || { rm -rf "$d"; exit 1; }
+  ssh_sync
 }

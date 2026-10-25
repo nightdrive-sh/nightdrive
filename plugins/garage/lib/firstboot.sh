@@ -3,7 +3,7 @@
 # systemd (256+) makes two units of them (systemd-debug-generator), which run two scripts that come the same way
 # (ImportCredential):
 #   nightdrive-vm-user    before the login prompt: the user (wheel, so sudo), the VM's name as its hostname, the host's
-#                         keymap and timezone, and the host's ssh key, so `ssh -p 2222 localhost` just works
+#                         keymap and timezone, and the host's ssh key, so `ssh NAME` just works (lib/ssh.sh)
 #   nightdrive-vm-agent   once the network is up: sshd and qemu-guest-agent (Shut down, the clock), with dnf
 # and Fedora's initial-setup is skipped, as the user is made already (it would ask for one in the VM's window).
 # They are written to the VM's folder (firstboot/, a file each, the password only as a hash) and passed at each start
@@ -23,7 +23,7 @@ case $(findmnt -no FSTYPE /) in ext4) resize2fs "$src" ;; xfs) xfs_growfs / ;; b
 # firstboot_creds NAME USER PASSWORD: firstboot/ in its folder
 firstboot_creds() {
   local name=$1 user=$2 pass=$3 d; d=$(dir "$1")
-  [[ $user =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "User: lower-case letters, digits, - and _, starting with a letter"
+  good_user "$user" || die "User: lower-case letters, digits, - and _, starting with a letter"
   [[ -n $pass ]] || die "A password for $user"
   local hash keymap tz key="" k
   hash=$(printf '%s' "$pass" | openssl passwd -6 -stdin) || die "openssl couldn't hash the password"
@@ -77,6 +77,17 @@ cred() { printf 'io.systemd.credential.binary:%s=%s' "$1" "$(printf '%s' "$2" | 
 unit() {
   printf '[Unit]\nDescription=Nightdrive VM: %s\nConditionPathExists=!/var/lib/nightdrive-vm/%s\n%s\n\n' "$2" "$1" "$3"
   printf '[Service]\nType=oneshot\nImportCredential=nightdrive-vm.%s\nExecStart=/bin/bash ${CREDENTIALS_DIRECTORY}/nightdrive-vm.%s\n' "$1" "$1"
+}
+
+# firstboot_rename NAME: a renamed VM's first boot, still to come, gives it its new name as its hostname: the user
+# script's hostname line again, with the rest of it as it was (the password is only there as a hash)
+firstboot_rename() {
+  local c; c=$(dir "$1")/firstboot
+  local f=$c/nightdrive-vm.user script
+  [[ -f $f ]] || return 0
+  script=$(cut -d= -f2- "$f" | base64 -d) || die "$1: its first boot's script couldn't be read"
+  script=$(sed "s/^hostnamectl set-hostname .* || true$/hostnamectl set-hostname $(printf %q "$1") || true/" <<<"$script")
+  cred nightdrive-vm.user "$script"
 }
 
 # qemu's options for them, a file each; none once they're gone

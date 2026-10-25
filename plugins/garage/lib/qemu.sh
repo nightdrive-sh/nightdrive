@@ -2,10 +2,6 @@
 # line that starts it, its monitor (QMP) and the guest agent inside it (QGA), both through monitor.py. The command line
 # is the one #1527 got Fedora booting with on Asahi (an M2 Max); what differs on a PC (#1572) comes from lib/arch.sh.
 
-# The guest's sshd on the host's loopback (README.md: `ssh -p 2222 localhost`), as SDL shares no clipboard. One
-# port, so one VM with it at a time: a second one's qemu fails to start. GARAGE_SSH_PORT moves it (a test VM
-# beside yours)
-SSH_PORT=${GARAGE_SSH_PORT:-2222}
 MONITOR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitor.py
 
 # One command to its QMP or guest agent socket: monitor.py's exit codes (1 failed, 3 no guest agent). From the VM's
@@ -20,7 +16,7 @@ qv() { echo "${1//,/,,}"; }
 # qemu_cmd NAME: its command line, into QEMU_CMD (start runs it, garage-ctl cmdline prints it). Run from the VM's
 # folder: the sockets go there by a short path (qmp, qga)
 qemu_cmd() {
-  local name=$1 d MEM CPUS ISO; d=$(dir "$1")
+  local name=$1 d MEM CPUS ISO SSH_PORT SSH_USER; d=$(dir "$1")
   read_conf "$name"
   # The disk boots first and the ISO second: an empty disk falls through to the installer, and once it is installed
   # the VM boots from its disk, ISO or not (#1552: with the ISO first, an installed VM went back into the installer)
@@ -47,6 +43,7 @@ qemu_cmd() {
     "${screen[@]}"
     -device qemu-xhci -device usb-kbd -device usb-tablet
     "${cd[@]}"
+    # The guest's sshd on the host's loopback, at its own port (lib/ssh.sh: `ssh NAME`), as SDL shares no clipboard
     -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22"
     -device virtio-serial-pci
     -chardev socket,id=qga,path=qga.sock,server=on,wait=off
@@ -74,14 +71,17 @@ cmdline() {
 start() {
   need "$1"; running "$1" && return 0
   need_qemu
+  ensure_port "$1"
   local name=$1 d; d=$(dir "$1")
   qemu_cmd "$name"
   rm -f "$d/qmp.sock" "$d/qga.sock"
   cd "$d"     # the sockets by a short path (qmp, qga)
   setsid -f "${QEMU_CMD[@]}" > "$d/qemu.log" 2>&1
   for _ in $(seq 50); do running "$name" && return 0; sleep 0.1; done
-  # The one failure with a known cause: the ssh port another VM holds (one VM with it at a time)
-  grep -q "host forwarding" "$d/qemu.log" && die "Another VM has the ssh port ($SSH_PORT): shut it down first"
+  # The one failure with a known cause: its ssh port, which something else on the host listens on now
+  local SSH_PORT MEM CPUS ISO SSH_USER; read_conf "$name"
+  grep -q "host forwarding" "$d/qemu.log" \
+    && die "Port $SSH_PORT, $name's ssh, is taken: \`garage set $name port N\` gives it another"
   die "qemu didn't start: $(tail -3 "$d/qemu.log" | sed 's/^qemu-system-[a-z0-9_]*: //')"
 }
 

@@ -1,7 +1,8 @@
 #!/bin/bash
-# garage [open | start|stop|kill|display [NAME] | list | install | uninstall | restart | quit | log | GARAGE-CTL-COMMAND …]:
-# Garage, the window of virtual machines (app/, a Quickshell config of its own), and its VMs from the terminal. Without a
-# NAME, start, stop, kill and display take the only VM there is. install puts Garage among the desktop's apps, uninstall
+# garage [open | start|stop|kill|display [NAME] | ssh [NAME [COMMAND…]] | list | install | uninstall | restart | quit | log |
+# GARAGE-CTL-COMMAND …]: Garage, the window of virtual machines (app/, a Quickshell config of its own), and its VMs from
+# the terminal. Without a NAME, start, stop, kill, display and ssh take the only VM there is. ssh is `ssh NAME`, through
+# the Host block garage-ctl keeps in ~/.ssh/config.d/garage. install puts Garage among the desktop's apps, uninstall
 # takes it out (the VMs and qemu stay). Anything else goes to garage-ctl as such (create, snapshot, restore, delete…:
 # `garage help` lists them).
 set -u
@@ -63,9 +64,15 @@ case ${1:-open} in
   start|stop|kill|display)
     name=$(vm_name "${2:-}") || exit 1
     exec "$GARAGE_CTL" "$1" "$name" ;;
+  ssh)
+    name=$(vm_name "${2:-}") || exit 1
+    # A VM's name as garage-ctl takes one, so it can't be one of ssh's options (-oProxyCommand=…)
+    [[ $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "Bad name: $name" >&2; exit 1; }
+    "$GARAGE_CTL" ssh-sync || exit 1      # its block there, if it hasn't had one yet
+    exec ssh -- "$name" "${@:3}" ;;
   list)     list ;;
   install)  install_app ;;
   uninstall) uninstall_app ;;
-  help|-h|--help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; echo; "$GARAGE_CTL" help || true ;;
+  help|-h|--help) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; echo; "$GARAGE_CTL" help || true ;;
   *)        app_command "$@"; rc=$?; ((rc == 2)) && exec "$GARAGE_CTL" "$@"; exit $rc ;;
 esac

@@ -7,7 +7,8 @@ QtObject {
         { title: "VMs", keys: [
             ["↑ ↓  j k", "Move"],
             ["⌘N", "New machine"],
-            ["⌘,", "Settings: memory, CPUs, disk, ISO"],
+            ["⌘,", "Settings: memory, CPUs, disk, ISO, ssh user"],
+            ["F2", "Rename the VM, while it is stopped"],
             ["⌘⌫", "Delete the VM, while it is stopped (in the snapshots: the snapshot)"],
             ["⌘B", "Show or hide the VMs"],
             ["Esc", "Narrow window: the VMs"]] },

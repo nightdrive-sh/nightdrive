@@ -1,10 +1,11 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import qs
 import qs.kit
 
 // One VM's page: a header level with the sidebar's title (its name and state), the buttons for what it can do now, what
-// it has (memory, CPUs, disk, the ISO in its drive, ssh while it runs), and its snapshots (SnapshotList.qml). The
+// it has (memory, CPUs, disk, the ISO in its drive, `ssh NAME` to copy), and its snapshots (SnapshotList.qml). The
 // questions it asks go to the window's panels (askName, askConfirm).
 Item {
     id: root
@@ -17,6 +18,7 @@ Item {
     signal askName(string title, string initial, var done)
     signal askConfirm(string question, string detail, string action, string glyph, var done)
     signal back()
+    signal picked(string name)          // renamed: the window follows it to its new name
     signal settings()
 
     // Its state, with what the window has asked of it and the list doesn't show yet (VmCtl's pending)
@@ -40,6 +42,14 @@ Item {
     }
     // ⌘⌫: in the snapshot list the snapshot, as Del there; else the VM
     function deleteKey() { if (snapshots.focused) snapshots.removeCurrent(); else deleteVm() }
+    // A new name, while it is stopped: its ssh name follows (garage-ctl rename-vm)
+    function renameVm() {
+        if (!root.stopped) return
+        const name = root.vm.name
+        root.askName("Rename the machine", name, n => {
+            if (n && n !== name) root.ctl.run(["rename-vm", name, n], () => root.picked(n))
+        })
+    }
     function deleteVm() {
         if (!root.stopped) return
         const name = root.vm.name
@@ -66,11 +76,20 @@ Item {
                 onClicked: root.back()
             }
             Text {
+                Layout.maximumWidth: implicitWidth
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 text: root.vm ? root.vm.name : ""
                 color: root.c.title; font.family: root.c.font; font.pixelSize: 15; font.weight: Font.DemiBold
             }
+            // Renaming, beside the name it changes, while it is stopped
+            AppIconButton {
+                visible: root.stopped
+                implicitWidth: 30; implicitHeight: 30; radius: 6
+                c: root.c; glyph: "pencil"; glyphSize: 13; tip: "Rename"; keys: "F2"
+                onClicked: root.renameVm()
+            }
+            Item { Layout.fillWidth: true }
             Text {
                 text: root.stopping ? "◌  Shutting down…" : root.starting ? "◌  Starting…"
                     : root.running ? "●  Running" : "○  Stopped"
@@ -130,7 +149,8 @@ Item {
                         { k: "CPUs", v: String(root.vm.cpus) },
                         { k: "Disk", v: root.vm.disk + " GB" + (root.vm.used !== undefined ? "  ·  " + root.vm.used + " GB in use" : "") },
                         { k: "ISO", v: root.vm.iso ? root.vm.iso.split("/").pop() : "", eject: true },
-                        { k: "SSH", v: root.running && root.vm.ssh ? "ssh -p " + root.vm.ssh + " localhost" : "" }
+                        { k: "SSH", v: root.vm.ssh ? "ssh " + root.vm.name : "", copy: true,
+                          note: "port " + root.vm.ssh + (root.vm.user ? "  ·  user " + root.vm.user : "") }
                     ].filter(r => r.v !== "")
                     delegate: Row {
                         id: info
@@ -146,7 +166,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             width: Math.min(implicitWidth, root.width - 56 - 96 - 34)
                             elide: Text.ElideMiddle
-                            rightPadding: info.modelData.eject ? 6 : 0
+                            rightPadding: info.modelData.eject || info.modelData.copy ? 6 : 0
                             text: info.modelData.v
                             color: root.c.text; font.family: root.c.font; font.pixelSize: 12
                         }
@@ -156,6 +176,23 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             c: root.c; glyph: "eject"; glyphSize: 12; tip: "Eject: boot from the disk from now on"
                             onClicked: root.act(["eject", root.vm.name])
+                        }
+                        // The ssh command to the clipboard: ~/.ssh/config.d/garage knows its port and user
+                        AppIconButton {
+                            id: copyBtn
+                            property bool copied: false
+                            visible: !!info.modelData.copy
+                            anchors.verticalCenter: parent.verticalCenter
+                            c: root.c; glyph: copied ? "check" : "copy"; glyphSize: 12; tip: "Copy"
+                            onClicked: { Quickshell.execDetached(["wl-copy", "--", info.modelData.v]); copied = true; copiedTimer.restart() }
+                            Timer { id: copiedTimer; interval: 1500; onTriggered: copyBtn.copied = false }
+                        }
+                        Text {
+                            visible: !!info.modelData.note
+                            anchors.verticalCenter: parent.verticalCenter
+                            leftPadding: 8
+                            text: info.modelData.note || ""
+                            color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
                         }
                     }
                 }

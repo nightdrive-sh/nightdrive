@@ -94,6 +94,7 @@ ShellRoot {
                 focus: true
                 onBack: win.listOpen = true
                 onSettings: win.showSettings = true
+                onPicked: name => win.pick(name)
                 bottomInset: note.visible ? note.height + 16 : 0
                 onAskName: (title, initial, done) => namePanel.ask(title, initial, done)
                 onAskConfirm: (question, detail, action, glyph, done) => win.confirm(question, detail, action, glyph, done)
@@ -130,6 +131,7 @@ ShellRoot {
                     else if (e.text === "X") page.forceOff()
                     else if (e.text === "t") page.takeSnapshot()
                     else if (k === Qt.Key_Tab) page.focusSnapshots()
+                    else if (k === Qt.Key_F2) page.renameVm()
                     else return
                     e.accepted = true
                 }

@@ -1,9 +1,9 @@
 import QtQuick
 import qs.kit
 
-// A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, and deleting it. They change while it is
-// stopped (garage-ctl set, one call each for what changed); while it runs they show, with a line on why they can't
-// change. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
+// A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, its ssh user, and deleting it.
+// They change while it is stopped (garage-ctl set, one call each for what changed), but for the user, which only ssh's
+// config reads; while it runs the rest show, with a line on why they can't change. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
 // The display has no setting: SDL gives the guest its window's size, and its scale is the guest's own.
 AppPanel {
     id: root
@@ -20,12 +20,16 @@ AppPanel {
         if (!vm) return
         mem.text = String(vm.mem / 1024); cpus.text = String(vm.cpus); disk.text = String(vm.disk)
         iso.text = vm.iso
+        user.text = vm.user || ""
         problem = ""
         mem.input.forceActiveFocus(); mem.input.selectAll()
     }
     onVisibleChanged: if (visible) load()
 
     function save() {
+        const u = user.text.trim()
+        if (u !== "" && !/^[a-z_][a-z0-9_-]{0,31}$/.test(u)) { problem = "User: lower-case letters, digits, - and _"; return }
+        if (u !== (vm.user || "")) ctl.run(["set", vm.name, "user", u])
         if (!stopped) { done(); return }
         const whole = t => /^[0-9]+$/.test(t.trim())
         if (!whole(mem.text) || !whole(cpus.text) || !whole(disk.text)) { problem = "Memory, CPUs and disk are whole numbers"; return }
@@ -88,20 +92,38 @@ AppPanel {
         }
     }
 
+    // Who `ssh NAME` logs in as: an image's VM has its first boot's, an installed one the user typed in its installer
+    Field {
+        id: user
+        c: root.c
+        width: 200
+        label: "SSH user"; hint: "ssh " + (root.vm ? root.vm.name : "NAME") + " logs in as"
+        onAccepted: root.save(); onEscaped: root.done()
+    }
+
     Text {
         visible: !root.stopped || root.problem !== ""
         width: parent.width
         wrapMode: Text.Wrap
-        text: root.problem !== "" ? root.problem : "Shut " + (root.vm ? root.vm.name : "it") + " down to change these."
+        text: root.problem !== "" ? root.problem : "Shut " + (root.vm ? root.vm.name : "it") + " down to change the rest."
         color: root.problem !== "" ? root.c.danger : root.c.dim; font.family: root.c.font; font.pixelSize: 12
     }
 
-    Row {
-        spacing: 8
-        PanelButton { c: root.c; label: "Save"; strong: true; keys: ["Enter"]; visible: root.stopped; onClicked: root.save() }
-        PanelButton { c: root.c; label: root.stopped ? "Cancel" : "Close"; keys: ["Esc"]; onClicked: root.done() }
+    // Save and Cancel on the left, deleting the machine on the right
+    Item {
+        width: parent.width
+        height: answers.height
+        Row {
+            id: answers
+            spacing: 8
+            PanelButton { c: root.c; label: "Save"; strong: true; keys: ["Enter"]; onClicked: root.save() }
+            PanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.done() }
+        }
+        AppButton {
+            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+            visible: root.stopped
+            c: root.c; glyph: "trash-2"; label: "Delete machine…"; keys: "⌘⌫"
+            onClicked: root.deleteVm()
+        }
     }
-
-    Rectangle { width: parent.width; height: 1; color: root.c.divider; visible: root.stopped }
-    AppButton { c: root.c; glyph: "trash-2"; label: "Delete machine…"; keys: "⌘⌫"; visible: root.stopped; onClicked: root.deleteVm() }
 }
