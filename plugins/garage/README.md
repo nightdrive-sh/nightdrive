@@ -5,6 +5,7 @@ Virtual machines in a window of their own: make one from a ready-made Fedora ima
 ## Using it
 
 - Hyper G (Caps Lock + G) or the launcher opens Garage. Press `?` in it to see its keys.
+- The top bar's garage icon lights up while a VM runs. A click on it lists your VMs: click one to start it, or to bring a running one's display forward, and Shut down under it stops it. A right click opens Garage.
 - ⌘N makes a new VM. A ready-made image (Fedora 44 Minimal on a Mac, Fedora 44 Cloud Base on a PC) needs no installer: Garage downloads it once (the sidebar shows how far), and its first boot makes your user, with sudo, and lets you in over ssh. Or pick an ISO from Downloads (or ~/vm) and install as on any computer.
 - `s` starts the selected VM, its display opens in a window of its own (`d` brings it forward), `x` shuts it down and ⇧X pulls the plug.
 - `t` takes a snapshot while the VM is stopped, `Enter` on one goes back to it, `e` renames it and Delete deletes it.

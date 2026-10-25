@@ -1,0 +1,9 @@
+#!/bin/bash
+# Garage's top bar module (module.jsonc): highlighted while a VM runs, dimmed otherwise. Reads the VMs' pid files
+# (bin/garage-ctl's folder layout) rather than `garage-ctl list`, which runs qemu-img on every disk: this runs every 3 s.
+. ~/.config/topbar/scripts/emit
+ROOT=${GARAGE_ROOT:-$HOME/.local/share/nightdrive/garage}
+for f in "$ROOT"/*/pid; do
+  p=$(cat "$f" 2>/dev/null) && [[ -n $p ]] && kill -0 "$p" 2>/dev/null && { emit warehouse "" active; exit; }
+done
+emit warehouse "" off
