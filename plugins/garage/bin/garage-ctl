@@ -29,6 +29,11 @@ ROOT=${GARAGE_ROOT:-$HOME/.local/share/nightdrive/garage}
 MAX_CPUS=8
 HOST_SPARE_GB=2     # memory the host keeps: a VM gets at most the rest
 
+# The VMs are the user's alone: their disks, logs, first boot's credentials and qemu's sockets (qemu inherits the
+# umask), whatever the session's umask. The folder itself too, which covers what was made before with 644 and 755
+umask 077
+mkdir -p "$ROOT" && chmod 700 "$ROOT"
+
 die() { echo "$*" >&2; exit 1; }
 dir() { [[ $1 =~ ^[A-Za-z0-9._-]+$ ]] || die "Bad name: $1"; echo "$ROOT/$1"; }
 need() { [[ -f $(dir "$1")/vm.conf ]] || die "No VM called $1"; }
