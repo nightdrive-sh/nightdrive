@@ -44,6 +44,10 @@ power actions. Search from the top level finds all of these. While music plays, 
 question and press ⌘⌥Enter to send it straight to Claude Code. Search "Rename current space" to give the workspace you're on
 a name in the bar instead of its number, for as long as it has windows.
 
+It is a calculator too: type `3*8`, `(12+4)/3`, `15% of 80`, `5 km in miles` or `100 eur in usd` and the answer is the
+first row; Enter copies it. [qalc](https://qalculate.github.io) does the maths, units and currencies (exchange rates
+refreshed once a day). Settings › Launcher › *Decimal comma in results* answers `3,5` instead of `3.5`; you can type either.
+
 ![The launcher](docs/screenshots/launcher.jpg)
 
 ### Menus you want to click
@@ -88,7 +92,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Dictation**: hold F5 (or Fn on a Mac), speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Claude writes**: select your notes or a rough draft in any app (a chat, a form, a mail) and press ⌘⇧C. Claude writes
   it out in a tone that fits the place, in the same language, and shows it next to the mouse: Enter puts it in place of
-  the selection, ⌘⇧C again writes another version, Esc cancels. Only the selection and the window's name and title are
+  the selection, ⌘⇧C again writes another version, Esc cancels (the card's buttons do the same). Only
+  the selection and the window's name and title are
   sent, never from password managers or private browser windows. In a terminal (turn it on in Claude writes' settings) you
   select what you want done, like "find the text files that mention jari", and get the command on the command line,
   with a warning if it deletes, overwrites or needs root; it runs only when you press Enter. To give it context, select

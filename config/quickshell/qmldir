@@ -45,6 +45,7 @@ singleton Home 1.0 Home.qml
 singleton Plugins 1.0 Plugins.qml
 SharePicker 1.0 SharePicker.qml
 ClaudeWrite 1.0 ClaudeWrite.qml
+ClaudeWriteButton 1.0 ClaudeWriteButton.qml
 LevelRing 1.0 LevelRing.qml
 BatteryBar 1.0 BatteryBar.qml
 BatteryShape 1.0 BatteryShape.qml
@@ -53,6 +54,7 @@ AirPodsSettings 1.0 AirPodsSettings.qml
 ThemeEditor 1.0 ThemeEditor.qml
 BehaviourLevels 1.0 BehaviourLevels.qml
 AboutLevels 1.0 AboutLevels.qml
+Calculator 1.0 Calculator.qml
 InstallLevels 1.0 InstallLevels.qml
 ToolsLevels 1.0 ToolsLevels.qml
 ClipPicker 1.0 ClipPicker.qml

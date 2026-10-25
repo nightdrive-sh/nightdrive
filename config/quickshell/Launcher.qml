@@ -63,16 +63,16 @@ PanelWindow {
     property string armed: ""                 // action awaiting confirmation
     readonly property var detail: details.item   // Install / Remove: the row whose details are shown (DetailCard.qml), null = none
     readonly property int detailWidth: 860    // the card's width while showing them
-    // Settings › Launcher: { fuzzy, shortcuts, deck } in ~/.local/state/nightdrive/launcher.json (missing = on; deck, the
-    // music player's albums and artists in the search, only when asked for)
-    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false })
+    // Settings › Launcher: { fuzzy, shortcuts, deck, comma } in ~/.local/state/nightdrive/launcher.json (missing = on; deck, the
+    // music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for)
+    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false })
     readonly property string prefsFile: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
     FileView {
         path: win.prefsFile; watchChanges: true; onFileChanged: reload(); printErrors: false
         onLoaded: {
             let v = {}
             try { v = JSON.parse(text()) || {} } catch (e) {}
-            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true }
+            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true }
             if (JSON.stringify(n) !== JSON.stringify(win.prefs)) win.prefs = n
         }
     }
@@ -126,6 +126,7 @@ PanelWindow {
         : (results[list.currentIndex] || {}).kind === "mirrordev" ? sys.footer(level, query)
         : (results[list.currentIndex] || {}).kind === "haent" ? home.footer(level, query)
         : (results[list.currentIndex] || {}).kind === "nightlight" ? "Enter: night light on/off"
+        : (results[list.currentIndex] || {}).kind === "calc" ? "Enter: copy the result"
         : extOf(level) ? extOf(level).footer(level, query)   // not extLevel: it can lag a level change by one update
         : ""
     // The footer as key caps: "Ctrl+Enter: show in Apps  ·  Esc: back" → [{ keys: ["Ctrl", "Enter"], text: "show in Apps" }, ...].
@@ -519,6 +520,9 @@ PanelWindow {
         })
         scored.sort((a, b) => (a.s - b.s) || (level === "apps" ? a.x.text.localeCompare(b.x.text) : short ? (a.x.text.length - b.x.text.length) || (a.i - b.i) : a.i - b.i))
         const res = scored.map(o => o.x.item).concat(tail)
+        // The calculator's answer ("3*8" → "= 24") first, unless a name starts with what was typed: "7-zip" stays an app
+        const sum = level === "root" ? calc.row(query) : null
+        if (sum) res.splice(scored.filter(o => o.s <= 0.5).length, 0, sum)
         return level === "keys" ? grouped(res) : res
     }
     readonly property var results: items()
@@ -656,6 +660,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         }
         else if (item.kind === "stat" && item.copy !== undefined) sys.copyText(item.copy)   // Public IP, Local IP, Router: as ⌘C
         else if (item.kind === "stat") shake.restart()   // information only
+        else if (item.kind === "calc") { sys.copyText(item.copy); win.open = false }   // ready to paste
         else if (exts.some(e => e.activate(item))) {}
         else if (item.kind === "menu") { win.open = false; win.openMenu(item.target) }
         else if (item.src && detail === null) details.show(item)
@@ -750,6 +755,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     PasswordLevels { id: pw; launcher: win }
     ThemeLevels { id: themes; launcher: win }
     AboutLevels { id: about; launcher: win }
+    Calculator { id: calc; launcher: win }
     Instantiator {
         id: pluginLevels
         model: TopBar.plugin.levels
