@@ -194,7 +194,7 @@ PanelWindow {
               extra: "phone iphone share airdrop text link" },
             { kind: "action", name: "Send files with LocalSend", glyph: "smartphone", cmd: [Quickshell.env("HOME") + "/.local/bin/localsend", "send-pick"],
               extra: "phone iphone share airdrop" }
-        ] : []),
+        ] : [], ...pluginExts.map(e => e.toolItems || [])),   // the plugins' level files add theirs (toolItems: Keep Awake)
         screenshot: [
             { kind: "action", name: "Region", glyph: "crop", cmd: shot("region") },
             { kind: "action", name: "Window", glyph: "app-window", cmd: shot("window") },

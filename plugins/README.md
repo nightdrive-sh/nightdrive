@@ -189,11 +189,12 @@ it (`qs kill; setsid -f qs`).
 
 **Pages in the launcher.** A `<Name>Levels.qml` is a launcher level file like the core's (`config/quickshell/*Levels.qml`;
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also
-have `rootItems` (rows at the launcher's root: Deck's Music), `rootRows()` (rows for the root search: Deck's albums) and
-`topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
+have `rootItems` (rows at the launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `rootRows()`
+(rows for the root search: Deck's albums) and `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
 `inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
 into the field.
-Deck's [MusicLevels.qml](deck/MusicLevels.qml) has all of them. The same restart applies.
+Deck's [MusicLevels.qml](deck/MusicLevels.qml) has most of them, Keep Awake's [KeepAwakeLevels.qml](keep-awake/KeepAwakeLevels.qml)
+is a small one to copy. The same restart applies.
 
 ## The page: README.md
 
