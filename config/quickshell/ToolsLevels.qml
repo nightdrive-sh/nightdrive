@@ -35,7 +35,7 @@ Item {
         if (level === "snippets" && cur.kind === "snippet") return "Enter: paste  ·  Shift+Enter: copy only  ·  Ctrl+Enter: edit  ·  Cmd+Backspace: remove"
         if (level === "snippets" && cur.kind === "snipauto") return snipAuto === "off" ? "Enter: turn on in a terminal (asks for your password once)" : "Enter: turn off in a terminal"
         if (level === "snipkey" && query.trim() !== "") return "Enter: continue to the text"
-        if (level === "sniptext" && query !== "") return "Enter: save"
+        if (level === "sniptext") return query !== "" ? "Enter: save  ·  Shift+Enter: new line" : "Shift+Enter: new line"
         if (level === "wsname") return "Enter: rename  ·  Esc: back"
         return ""
     }
@@ -67,7 +67,9 @@ Item {
             const auto = { kind: "snipauto", name: "Auto-expand", glyph: "zap",
                            summary: snipAuto === "on" ? "on" : snipAuto === "no-access" ? "no keyboard access: log out and in" : "off" }
             const add = { kind: "nav", name: "Add snippet", glyph: "plus", target: "snipkey" }
-            const rows = snipList.map(s => ({ kind: "snippet", name: s.text.split("\n")[0], summary: s.trigger, glyph: "text-cursor-input",
+            // A text of several lines: the first is the name, the rest under it as they are, in the same font (up to subMax)
+            const rows = snipList.map(s => ({ kind: "snippet", name: s.text.split("\n")[0], sub: s.text.split("\n").slice(1).join("\n"),
+                                               subMax: 8, subPlain: true, summary: s.trigger, glyph: "text-cursor-input",
                                                trigger: s.trigger, text: s.text, armKey: "snipdel:" + s.trigger,
                                                armHint: "⌘⌫ again to remove" }))
             if (q === "") return [auto, { kind: "header", name: "Snippets" }, add].concat(rows)
@@ -77,12 +79,13 @@ Item {
             const typed = l.query.trim()
             if (typed === "") return l.hint("Type the trigger, e.g. @@ or f#")
             const old = snipList.find(s => s.trigger === typed)
-            return [{ kind: "snipk", name: "Trigger: " + typed, summary: old ? "replaces “" + old.text.split("\n")[0] + "”" : "next: text",
+            return [{ kind: "snipk", name: "Trigger: " + typed, summary: old ? "replaces “" + oneLine(old.text) + "”" : "next: text",
                       glyph: "arrow-right", value: typed }]
         }
         if (level === "sniptext") {
             if (l.query === "") return l.hint("Type the text that “" + snipTrigger + "” expands to")
-            return [{ kind: "snipadd", name: "Save “" + snipTrigger + "”", summary: l.query, glyph: "text-cursor-input", value: l.query }]
+            return [{ kind: "snipadd", name: "Save “" + snipTrigger + "”", summary: oneLine(l.query), glyph: "text-cursor-input",
+                      value: l.query.replace(/↵/g, "\n") }]
         }
         // Experimental: Hyprland's own name, so it's gone when the workspace empties (the bar shows the number again)
         if (level === "wsname") {
@@ -122,6 +125,7 @@ Item {
         return false
     }
     function shiftActivate(it) {
+        if (launcher.level === "sniptext") { launcher.insertText("↵"); return }   // a new line in the text
         if (it.kind === "clip") clipPick(it, false)
         else if (it.kind === "emoji") emojiPick(it, false)
         else if (it.kind === "snippet") snipPick(it, false)
@@ -131,7 +135,7 @@ Item {
     function ctrlActivate(it) {
         if (it.kind !== "snippet") return false
         snipTrigger = it.trigger
-        launcher.search("sniptext", it.text)
+        launcher.search("sniptext", oneLine(it.text))
         return true
     }
     // ⌘⌫ (IPC deleteSelected) or Delete in Snippets with an empty search: a second press removes the selected snippet
@@ -146,6 +150,8 @@ Item {
         Quickshell.execDetached([scripts + "/snippets", "remove", it.trigger])
         return true
     }
+    // The search field has one line, so a snippet's line breaks show (and are typed with Shift+Enter) as ↵
+    function oneLine(text) { return text.replace(/\r?\n/g, "↵") }
     function arm(key) {
         if (launcher.armed !== key) { launcher.armed = key; disarmTimer.restart(); return false }
         launcher.armed = ""

@@ -108,6 +108,7 @@ PanelWindow {
     readonly property int selIndex: list.currentIndex
     function shakeNow() { shake.restart() }
     function search(target, text) { go(target); input.text = text }   // a level with its query typed (Default apps › Find more)
+    function insertText(text) { input.insert(input.cursorPosition, text) }   // at the cursor (Snippets: Shift+Enter → ↵)
     readonly property var swCats: inst.swCats                          // Install › Software's categories (Default apps › Find more)
     function openCategory(key, name) { inst.openCategory(key, name) }
     readonly property var parents: Object.assign({ install: "system", screenshot: "tools", startup: "appsettings", appsettings: "settings" }, ...exts.map(e => e.parents))
@@ -360,21 +361,26 @@ PanelWindow {
         }
     }
     readonly property int headerHeight: 40
-    // A row's description (sub) wraps, up to subMaxLines: each line after the first makes the row this much taller
+    // A row's description (sub) wraps, up to subMaxLines (or the row's own subMax: a snippet's lines): each line after
+    // the first makes the row this much taller. subPlain: in the name's font instead (a snippet's text, all of it alike)
     readonly property int subMaxLines: 3
     readonly property int subLineHeight: Math.ceil(subMetrics.height)
+    readonly property int plainLineHeight: Math.ceil(plainMetrics.height)
     FontMetrics { id: subMetrics; font { family: Theme.font; pixelSize: win.fontSize - 5; weight: win.fontWeight } }
+    FontMetrics { id: plainMetrics; font { family: Theme.font; pixelSize: win.fontSize; weight: win.fontWeight } }
     // The lines a row's description takes (an estimate from its width, for the list's height; the row measures its own)
     function subLines(it) {
         if (!it.sub || fixedRow(it)) return 1
         const room = Math.max(1, list.width - iconSize - 70)
-        return Math.min(subMaxLines, Math.max(1, Math.ceil(subMetrics.advanceWidth(keySpaced(it.sub)) / room)))
+        const m = it.subPlain ? plainMetrics : subMetrics
+        const lines = keySpaced(it.sub).split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(m.advanceWidth(l) / room)), 0)
+        return Math.min(it.subMax || subMaxLines, lines)
     }
     function listHeight() {
         const cap = maxRows * (rowHeight + rowGap)
         let h = 0
         for (const it of results) {
-            h += (fixedRow(it) ? headerHeight : rowHeight + (subLines(it) - 1) * subLineHeight) + rowGap
+            h += (fixedRow(it) ? headerHeight : rowHeight + (subLines(it) - 1) * (it.subPlain ? plainLineHeight : subLineHeight)) + rowGap
             if (h >= cap) return cap
         }
         return h
@@ -1096,8 +1102,10 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                     width: list.width
                     readonly property int extraLines: subText.visible ? Math.max(0, subText.lineCount - 1) : 0
                     // A taller row keeps its icon and right side at the name and the first line, not in the middle
-                    readonly property real topShift: -extraLines * win.subLineHeight / 2
-                    height: isHeader || isNote ? win.headerHeight : win.rowHeight + extraLines * win.subLineHeight
+                    readonly property bool plain: modelData.subPlain === true
+                    readonly property int lineH: plain ? win.plainLineHeight : win.subLineHeight
+                    readonly property real topShift: -extraLines * lineH / 2
+                    height: isHeader || isNote ? win.headerHeight : win.rowHeight + extraLines * lineH
                     radius: 10
                     color: current ? Theme.sel : "transparent"
 
@@ -1155,7 +1163,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                             left: row.noIcon ? parent.left : slot.right; leftMargin: 16
                             right: keyFrames.visible ? keyFrames.left : shortcut.visible ? shortcut.left : trailing.left; rightMargin: (row.modelData.kind === "key" ? 24 : 12) + (dot.visible ? 19 : 0) + (badge.visible ? badge.implicitWidth + 10 : 0) + (note.visible ? note.implicitWidth + 10 : 0)   // keybindings get more room before the keys (description is elided with …)
                             verticalCenter: parent.verticalCenter
-                            verticalCenterOffset: twoLines ? (subLine ? -9 - row.extraLines * win.subLineHeight / 2 : -7) : 0
+                            verticalCenterOffset: twoLines ? (subLine ? (row.plain ? -row.lineH / 2 : -9) - row.extraLines * row.lineH / 2 : -7) : 0
                         }
                         elide: Text.ElideRight
                         // liveName: a name that changes often (Status' processes), bound here instead of rebuilding the rows
@@ -1163,7 +1171,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                             : row.isHeader ? row.modelData.name.toUpperCase()
                             : row.modelData.name
                         color: row.armedNow ? Theme.primary : (row.isHeader ? Theme.primary : row.modelData.kind === "hint" || row.isNote || row.modelData.dimmed ? Theme.dim : (row.current ? Theme.accent : Theme.text))
-                        font { family: Theme.font; pixelSize: row.isHeader ? win.fontSize - 5 : row.isNote ? win.fontSize - 4 : nameText.subLine ? win.fontSize - 2 : win.fontSize; weight: row.isHeader ? Font.Bold : win.fontWeight; letterSpacing: row.isHeader ? 1.5 : 0 }
+                        font { family: Theme.font; pixelSize: row.isHeader ? win.fontSize - 5 : row.isNote ? win.fontSize - 4 : nameText.subLine && !row.plain ? win.fontSize - 2 : win.fontSize; weight: row.isHeader ? Font.Bold : win.fontWeight; letterSpacing: row.isHeader ? 1.5 : 0 }
                         topPadding: row.isHeader ? 10 : 0
                     }
                     Text {      // a row that asks first, asked: what a second Enter does (armHint), after the name in smaller text
@@ -1206,14 +1214,14 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         visible: nameText.twoLines
                         anchors { left: nameText.left; right: nameText.right; top: nameText.bottom; topMargin: nameText.subLine ? 0 : -1 }
                         wrapMode: nameText.subLine ? Text.Wrap : Text.NoWrap
-                        maximumLineCount: win.subMaxLines
+                        maximumLineCount: row.modelData.subMax || win.subMaxLines
                         lineHeightMode: Text.FixedHeight
-                        lineHeight: win.subLineHeight
+                        lineHeight: row.lineH
                         elide: Text.ElideRight
                         textFormat: Text.PlainText
                         text: win.keySpaced(row.modelData.sub || (row.modelData.artist || "").toUpperCase())
-                        color: row.modelData.sub ? Theme.dim : Theme.primary
-                        font { family: Theme.font; pixelSize: nameText.subLine ? win.fontSize - 5 : win.fontSize - 6; weight: nameText.subLine ? win.fontWeight : Font.Normal
+                        color: row.plain ? nameText.color : row.modelData.sub ? Theme.dim : Theme.primary
+                        font { family: Theme.font; pixelSize: row.plain ? win.fontSize : nameText.subLine ? win.fontSize - 5 : win.fontSize - 6; weight: nameText.subLine ? win.fontWeight : Font.Normal
                                letterSpacing: nameText.subLine ? 0 : 1 }
                     }
                     Rectangle {      // the row's shortcut (shortcutFor) in a key frame like the footer's, before the › of a submenu;

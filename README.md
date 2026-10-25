@@ -94,7 +94,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   the model (Sonnet by default) and your own instructions, sent with every request ("a relaxed tone", "end emails with
   my name"): type one there, or turn on an example. Apps of your own can be left out there too.
 - **Snippets**: text snippets in launcher › Tools › Snippets; Enter pastes one. Turn on auto-expand and typing a trigger
-  anywhere replaces it with the text.
+  anywhere replaces it with the text. A text can have several lines (an email signature): Shift+Enter adds a line break,
+  shown as ↵, or `nightdrive snippets set s# - < signature.txt` reads one from a file.
 - **From your phone** (experimental plugins): [LocalSend](plugins/localsend/README.md) receives files from a phone after
   you accept them in a notification, and [AirPlay Receiver](plugins/airplay-receiver/README.md) mirrors an iPhone, iPad or
   Mac into a window. [Ferry](plugins/ferry/README.md) is a
