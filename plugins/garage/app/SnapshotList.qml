@@ -16,6 +16,9 @@ ColumnLayout {
     readonly property string vmName: vm ? vm.name : ""
     property int current: 0
     property string copying: ""         // the snapshot being duplicated, while garage-ctl is at it
+    // The one being taken, { vm, tag, name }: a row of its own at the top until the list has it (qemu-img takes a moment)
+    property var saving: null
+    readonly property bool savingHere: !!saving && saving.vm === vmName
     readonly property bool focused: list.activeFocus
     property bool returnHere: false     // the list had the keys when it asked: they come back here after (VmPage.refocus)
     signal askName(string title, string initial, var done)
@@ -24,7 +27,10 @@ ColumnLayout {
     spacing: 10
 
     onVmNameChanged: current = 0
-    onSnapsChanged: if (current >= snaps.length) current = Math.max(0, snaps.length - 1)
+    onSnapsChanged: {
+        if (current >= snaps.length) current = Math.max(0, snaps.length - 1)
+        if (savingHere && snaps.some(s => s.tag === saving.tag)) saving = null
+    }
     function focusList() { if (snaps.length) list.forceActiveFocus() }
     function ask(f) { returnHere = list.activeFocus; f() }
     // 7286358016 → "6.8 GB", 434438144 → "414 MB"
@@ -40,9 +46,14 @@ ColumnLayout {
     function take() {
         if (!whenStopped("take a snapshot")) return
         const name = vmName
-        // The tag is the time (unique, no spaces); the name is what shows, and can change
-        ask(() => askName("Name the snapshot", "Snapshot " + Qt.formatDateTime(new Date(), "d.M. hh:mm"),
-                n => { if (n) ctl.run(["snapshot", name, "s" + Math.floor(Date.now() / 1000), n]) }))
+        // The tag is the time (unique, no spaces); the name is what shows, and can change. Its row stays until the list
+        // shows it (onSnapsChanged), so it doesn't blink out between garage-ctl's exit and the next list; a failure takes it
+        ask(() => askName("Name the snapshot", "Snapshot " + Qt.formatDateTime(new Date(), "d.M. hh:mm"), n => {
+            if (!n) return
+            const tag = "s" + Math.floor(Date.now() / 1000)
+            root.saving = { vm: name, tag: tag, name: n }
+            ctl.run(["snapshot", name, tag, n], null, () => root.saving = null)
+        }))
     }
     function restore(i) {
         if (i < 0 || i >= snaps.length || !whenStopped("restore a snapshot")) return
@@ -88,6 +99,28 @@ ColumnLayout {
             id: take
             c: root.c; glyph: "camera"; label: "Take snapshot"; keys: "t"; tip: "Save the disk's current state"
             onClicked: root.take()
+        }
+    }
+
+    // The one being taken, where the list will show it (newest first): a row's place, but nothing to click yet
+    Item {
+        visible: root.savingHere
+        Layout.fillWidth: true
+        Layout.preferredHeight: 32
+        Layout.bottomMargin: 2 - root.spacing   // as close to the rows under it as they are to each other
+        Row {
+            x: 14; anchors.verticalCenter: parent.verticalCenter
+            spacing: 12
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.saving ? root.saving.name : ""
+                color: root.c.text; font.family: root.c.font; font.pixelSize: 12
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Saving snapshot…"
+                color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
+            }
         }
     }
 
@@ -174,7 +207,7 @@ ColumnLayout {
     }
 
     Text {
-        visible: root.snaps.length === 0
+        visible: root.snaps.length === 0 && !root.savingHere
         text: "None yet: t saves the disk's current state."
         color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
     }
