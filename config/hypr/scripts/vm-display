@@ -1,0 +1,29 @@
+#!/bin/bash
+# A VM's screen follows its window (hypr/vm-display.lua has why).
+#   vm-display watch     follows the virtual GPU's hotplug events (started with the session); quits at once on a
+#                        machine without one
+#   vm-display apply     sets the size its window has now, by hand (testing)
+# A window being dragged to a new size sends an event for each step: the size is set once they have stopped for SETTLE
+# seconds, so the guest isn't asked for a new mode many times a second. Each change goes to the journal
+# (journalctl -t nightdrive-vm-display).
+SETTLE=0.3
+
+apply() {
+  hyprctl eval 'NightdriveVmDisplay(true)' >/dev/null
+  logger -t nightdrive-vm-display "$(hyprctl monitors | sed -n 2p | tr -d '\t')"
+}
+
+case $1 in
+  apply) apply ;;
+  watch)
+    compgen -G '/sys/class/drm/card*-Virtual-*' >/dev/null || exit 0
+    exec 9>"$XDG_RUNTIME_DIR/nightdrive-vm-display.lock"
+    flock -n 9 || exit 0   # one watcher per session
+    udevadm monitor --udev --subsystem-match=drm \
+      | grep --line-buffered ' change ' \
+      | while read -r _; do
+          while read -r -t "$SETTLE" _; do :; done
+          apply
+        done ;;
+  *) echo "usage: vm-display watch | apply" >&2; exit 1 ;;
+esac

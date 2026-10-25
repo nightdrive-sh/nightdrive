@@ -89,6 +89,8 @@ end
 for output, p in pairs(positions) do
     hl.monitor({ output = output, mode = modes[output] or "preferred", position = p.pos, scale = scales[output] or p.m.scale })
 end
+-- In a VM, its screen follows its window (vm-display.lua, scripts/vm-display)
+require("vm-display")(scales, modes)
 -- Lid closed with an external display (logind: docked, so it doesn't suspend): the built-in screen is turned off, so the
 -- windows, workspaces and the pointer move to the external one instead of staying under the lid. scripts/lid follows
 -- logind's LidClosed and reloads the config, which reads the state again.
@@ -196,6 +198,7 @@ function NightdriveLocked()
     -- graphical-session.target for xdg-desktop-portal (config/systemd/user); restart: fresh environment after a re-login
     hl.exec_cmd("systemctl --user restart nightdrive-session.target")
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/lid watch")   -- the lid with an external display (DISPLAY above)
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/vm-display watch")   -- in a VM, its screen follows its window (DISPLAY above)
     -- Theme colours (~/.cache/nightdrive, hypr/scripts/theme) first: Quickshell (the top bar, its menus and the notifications)
     -- reads them on startup
     hl.exec_cmd("sh -c '\"$HOME/.config/hypr/scripts/theme\" apply; exec qs'")

@@ -3,7 +3,7 @@
 # GARAGE_ARCH pretends another one: `GARAGE_ARCH=x86_64 garage-ctl cmdline NAME` shows a PC's command line on the Mac.
 #   QEMU, MACHINE   qemu's binary and its machine
 #   FW_CODE, FW_VARS  the UEFI firmware (read-only) and the template each new VM's vars.raw is copied from
-#   GPU             the virgl GPU behind SDL's GL window
+#   GPU             the virgl GPU behind SDL's GL window (the rest of the screen: lib/qemu.sh, screen_args)
 #   PIN             the host CPUs a VM runs on (taskset), empty for any
 #   TTY             the guest's serial console (lib/firstboot.sh: its user is made before the login prompt there)
 #   OTHER_ISO       a regex for ISO names that are another architecture's (garage-ctl isos leaves them out)

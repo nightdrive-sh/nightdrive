@@ -13,6 +13,23 @@ qga() { (cd "$(dir "$1")" && python3 -I "$MONITOR" qga qga.sock "$2" "$1" ${3:+"
 # (an ISO named "a,b.iso" mustn't add an option b to its drive)
 qv() { echo "${1//,/,,}"; }
 
+# The guest's screen, all of it here: the GPU (lib/arch.sh's, virgl) and qemu's window for it. Each time the window
+# changes size (tiled, dragged), SDL tells the GPU, and with edid=on (qemu's default, written out as this rests on it) the
+# guest gets a new preferred mode, the window's size in real pixels: a Nightdrive guest takes it at once
+# (config/hypr/vm-display.lua). SDL draws the picture over the whole window, aspect or not, so a guest that keeps its
+# old mode looks stretched. SCREEN is the size it boots with, until the window opens.
+# SDL, not GTK: GTK's GL window is black on Wayland (eglMakeCurrent failed), and under XWayland qemu aborts when the
+# guest resets the GPU at boot (virgl_renderer_reset: EGL_BAD_ACCESS, the context is GTK's). Needs qemu-ui-sdl.
+# GARAGE_HEADLESS=1: no window at all, for a test VM that mustn't come up on the desktop
+SCREEN=1600x1000
+screen_args() {
+  if [[ -n ${GARAGE_HEADLESS:-} ]]; then
+    echo -device; echo virtio-gpu-pci; echo -display; echo none
+  else
+    echo -device; echo "$GPU,xres=${SCREEN%x*},yres=${SCREEN#*x},edid=on"; echo -display; echo sdl,gl=on
+  fi
+}
+
 # qemu_cmd NAME: its command line, into QEMU_CMD (start runs it, garage-ctl cmdline prints it). Run from the VM's
 # folder: the sockets go there by a short path (qmp, qga)
 qemu_cmd() {
@@ -25,11 +42,7 @@ qemu_cmd() {
   local cd=()
   [[ -n $ISO ]] && cd=(-device virtio-scsi-pci -device scsi-cd,drive=cd,bootindex=1
                        -drive "if=none,id=cd,media=cdrom,readonly=on,format=raw,file=$(qv "$ISO")")
-  # SDL, not GTK: GTK's GL window is black on Wayland (eglMakeCurrent failed), and under XWayland qemu aborts when the
-  # guest resets the GPU at boot (virgl_renderer_reset: EGL_BAD_ACCESS, the context is GTK's). Needs qemu-ui-sdl.
-  # GARAGE_HEADLESS=1: no window at all, for a test VM that mustn't come up on the desktop
-  local screen=(-device "$GPU,xres=1600,yres=1000" -display sdl,gl=on)
-  [[ -n ${GARAGE_HEADLESS:-} ]] && screen=(-device virtio-gpu-pci -display none)
+  local screen=(); mapfile -t screen < <(screen_args)
   # A disk image's first boot: its user and the rest, until they have run (lib/firstboot.sh)
   local firstboot=(); mapfile -t firstboot < <(firstboot_args "$name")
   local pin=(); [[ -n $PIN ]] && pin=(taskset -c "$PIN")
