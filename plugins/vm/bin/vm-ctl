@@ -6,7 +6,7 @@
 #   qmp.sock, pid, serial.log while it runs
 # The qemu command line is the one #1527 got Fedora booting with on Asahi (an M2 Max).
 #
-#   vm-ctl list                          JSON: [{ name, mem, cpus, disk, iso, running, snapshots: [{ tag, date }] }]
+#   vm-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, ssh, snapshots: [{ tag, date }] }]
 #   vm-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   vm-ctl start|stop|kill|display|eject|delete NAME
 #   vm-ctl snapshot|restore|unsnap NAME TAG     take, go back to, delete one
@@ -58,8 +58,10 @@ list() {
     local info; info=$(qemu-img info -U --output=json "$d/disk.qcow2")
     ((first)) || echo -n ","; first=0
     jq -nc --arg name "$name" --argjson mem "$MEM" --argjson cpus "$CPUS" --arg iso "$ISO" --argjson run "$run" \
-       --argjson info "$info" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run,
+       --argjson info "$info" --argjson ssh "$SSH_PORT" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run,
+         ssh: $ssh,
          disk: ($info["virtual-size"] / 1073741824 | floor),
+         used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
          snapshots: [($info.snapshots // [])[] | { tag: .name, date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")) }] }'
   done
   echo "]"

@@ -80,7 +80,9 @@ ShellRoot {
                 c: win.look
                 ctl: ctl
                 vm: win.vm
+                onePane: win.onePane
                 focus: true
+                onBack: win.listOpen = true
                 onAskName: (title, initial, done) => win.ask(title, initial, done)
                 onAskConfirm: (question, detail, done) => win.confirm(question, detail, done)
 
@@ -99,9 +101,10 @@ ShellRoot {
                     else if (win.onePane && win.listOpen && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) win.listOpen = false
                     else if (win.onePane && !win.listOpen && e.key === Qt.Key_Escape && n) win.listOpen = true
                     else if (!v) return
-                    else if (e.text === "s" && !v.running) ctl.run(["start", v.name])
-                    else if (e.text === "d" && v.running) ctl.run(["display", v.name])
-                    else if (e.text === "x" && v.running) ctl.run(["stop", v.name])
+                    else if (e.text === "s") page.start()
+                    else if (e.text === "d") page.display()
+                    else if (e.text === "x") page.shutDown()
+                    else if (e.text === "X") page.forceOff()
                     else if (e.key === Qt.Key_Delete && page.snap >= 0) page.deleteSnap(page.snap)
                     else return
                     e.accepted = true
