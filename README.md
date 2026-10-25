@@ -38,7 +38,7 @@ Nightdrive puts all of that together into one opinionated desktop.
 
 ### A launcher for everything
 
-**⌘Space**, or the N█ logo at the top left of the bar, opens the launcher. It holds apps, 1Password items (copy a password, username or one-time code), clipboard history,
+**⌘Space**, or the N█ logo at the top left of the bar (Settings › Top bar › Logo hides it), opens the launcher. It holds apps, 1Password items (copy a password, username or one-time code), clipboard history,
 an emoji picker, screenshots, a colour picker, every keybinding, settings, `dnf` install / remove, one-click updates, and
 power actions. Search from the top level finds all of these. While music plays, a player row sits above the list. Type a
 question and press ⌘⌥Enter to send it straight to Claude Code. Search "Rename current space" to give the workspace you're on
