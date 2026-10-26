@@ -153,6 +153,11 @@ claude_cancel() {
   running && ipc claudeCancel "$(jq -r .gen "$1/request.json")"
 }
 
+# Started for a new message (new, mailto:), Mail shows only the writing window (app/shell.qml, visible). The commands that
+# open the main window show it over IPC then: the kit's focus() wouldn't find it, and would start Mail again.
+compose_only() { NIGHTMAIL_COMPOSE_ONLY=1 start; }
+reveal() { running && [[ $(qs ipc -p "$QS_DIR" call "$APP_IPC" reveal 2>/dev/null) == shown ]]; }
+
 usage() {
   cat <<USAGE
 Usage: nightmail [command]
@@ -183,8 +188,10 @@ USAGE
 }
 
 case ${1:-open} in
-  new)     running || { start; ready; }; ipc compose ;;
-  mailto:*) running || { start; ready; }; ipc mailto "$1" ;;
+  new)     running || { compose_only; ready; }; ipc compose ;;
+  mailto:*) running || { compose_only; ready; }; ipc mailto "$1" ;;
+  open)     reveal || open_window ;;
+  settings) reveal || open_ready; ipc openSettings ;;
   sync)
     if (($# > 1)); then
       fetch "${@:2}"
@@ -199,7 +206,7 @@ case ${1:-open} in
     ;;
   show|reply|claude)
     [[ -n ${2:-} ]] || { usage >&2; exit 2; }
-    open_ready
+    reveal || open_ready
     case $1 in show) fn=openMessage ;; reply) fn=replyTo ;; claude) fn=claudeReply ;; esac
     ipc "$fn" "$2"
     ;;

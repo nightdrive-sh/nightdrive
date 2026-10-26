@@ -16,6 +16,9 @@ ShellRoot {
         color: c.bg
         // Closing the window (⌘W) quits Mail: a process left without its window would only look open to `nightmail`.
         onClosed: Qt.quit()
+        // Started for a new message alone (`nightmail new` or a mailto: link with Mail closed), only the writing window
+        // shows, and Mail quits when it closes (composeEnded); `nightmail open` shows this one over IPC (reveal).
+        visible: Quickshell.env("NIGHTMAIL_COMPOSE_ONLY") !== "1"
 
         // The look, as Deck's: the apps' kit (kit/AppLook.qml)
         AppLook { id: c }
@@ -49,6 +52,9 @@ ShellRoot {
             function compose(): void { win.compose("new") }
             // Settings › Apps › Mail (`nightmail settings`)
             function openSettings(): void { win.showSettings = true }
+            // "shown" when the window was hidden (see visible), for `nightmail`: the kit's focus() wouldn't find it and
+            // would start Mail again, losing the message being written.
+            function reveal(): string { if (win.visible) return ""; win.visible = true; return "shown" }
             // A mailto: link (`nightmail mailto:…`, when Mail is the email app: launcher › Settings › Apps › Default apps)
             function mailto(url: string): void { win.compose("new", null, win.mailtoFields(url)) }
             // A notification's click and Reply button (lib/notify.py, through `nightmail show` and `reply`).
@@ -278,6 +284,7 @@ ShellRoot {
                 if (composer.replyId) nm.tag(["+replied"], "id:\"" + composer.replyId + "\"")
                 if (composer.forwardId) nm.tag(["+passed"], "id:\"" + composer.forwardId + "\"")
                 reload(true)
+                composeEnded()
             })
         }
 
@@ -288,9 +295,12 @@ ShellRoot {
                 if (r.error) { composer.failed = true; composer.status = r.error; if (close) composeWin.visible = true; return }
                 if (!close) { composer.draftId = r.id; composer.failed = false; composer.status = "Saved in Drafts" }
                 reload(true)
+                if (close) composeEnded()
             })
         }
-        function dismissCompose() { composeWin.done = true; composeWin.visible = false }
+        function dismissCompose() { composeWin.done = true; composeWin.visible = false; composeEnded() }
+        // The writing window is closed, and its draft saved: Mail started for it alone quits with it.
+        function composeEnded() { if (!win.visible) Qt.quit() }
 
         // An attachment opens in the app the desktop picks for it, or is saved in the downloads folder.
         function openPart(msg, f) {
@@ -1153,6 +1163,7 @@ ShellRoot {
             if (visible) { done = false; release.restart() }
             // Closed by the compositor (⌘W): nothing written is lost, so anything written goes to Drafts.
             else if (!done && (composer.draftId !== "" || !composer.untouched())) win.saveDraft(composer.fields(), true)
+            else if (!done) win.composeEnded()
         }
         Compose {
             id: composer
