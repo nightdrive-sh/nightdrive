@@ -4,7 +4,7 @@ A mailbox between your computers and your phone. Leave photos, files, text or a 
 
 ![Ferry's menu in the top bar](ferry.jpg)
 
-Ferry is an app of its own, for Linux, the Mac and the iPhone. This plugin installs its latest release, with its window and Files' "Open With → Ferry", and puts its menu in Nightdrive's top bar, where other desktops have Ferry's tray icon. `nightdrive update` updates Ferry too. A Ferry from before, when the plugin had its own server, moves over with its phones and its box.
+Ferry is an app of its own, for Linux, the Mac and the iPhone. This plugin installs its latest release, with its window and Files' "Open With → Ferry", and puts its menu in Nightdrive's top bar, where other desktops have Ferry's tray icon. Its window floats in the middle in Nightdrive's colours, and ⌘⇧T tiles it. `nightdrive update` updates Ferry too. A Ferry from before, when the plugin had its own server, moves over with its phones and its box.
 
 ## On the computer
 
