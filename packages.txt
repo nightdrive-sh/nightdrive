@@ -94,9 +94,11 @@ tuned-ppd
 # user-installed) so they stay when KDE goes
 ImageMagick
 zenity
-# install.sh and setup-user.sh: Flathub apps, the Nerd Fonts zip, default apps (xdg-mime)
+# install.sh and setup-user.sh: Flathub apps, the Nerd Fonts zip, default apps (xdg-mime). link.sh: Thunderbird's
+# add-on, zipped (Fedora Minimal has no zip, and link.sh stopped there)
 flatpak
 unzip
+zip
 xdg-utils
 # Commands the scripts use that only KDE pulled in: pw-play, pw-dump, pw-cli, pw-record, pw-cat (sounds, the Volume menu,
 # dictation), pactl (sounds, Bluetooth audio; otherwise only nwg-panel's, which Nightdrive keeps out), xdg-user-dir
