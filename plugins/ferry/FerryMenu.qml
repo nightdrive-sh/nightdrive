@@ -89,7 +89,10 @@ Column {
         m.adding = true
         if (m.qr === "") qrProc.running = true
     }
-    Component.onCompleted: refresh()
+    // The pictures' small copies (the list's rows): the menu is made anew at each opening, and Qt forgets a picture
+    // soon after, so each opening read every photo again. Gone at logout.
+    readonly property string thumbDir: Quickshell.env("XDG_RUNTIME_DIR") + "/ferry-menu"
+    Component.onCompleted: { refresh(); Quickshell.execDetached(["mkdir", "-p", m.thumbDir]) }
     onStChanged: {
         if (m.picked && st && st.target === m.picked) m.picked = ""
         if (st && st.sent && st.sent.time !== m.shownSent && (!m.sendingSince || st.sent.time >= m.sendingSince)) {
@@ -413,6 +416,8 @@ Column {
                                     readonly property bool isImage: isFile && /^image\//.test(modelData.type || "")
                                     // A picture only for what Qt reads (HEIC from an iPhone keeps the icon)
                                     readonly property bool hasThumb: /^image\/(png|jpeg|gif|webp|bmp)$/.test(modelData.type || "")
+                                    readonly property string thumbFile: m.thumbDir + "/" + modelData.id + ".png"
+                                    property bool fromCopy: true   // the small copy, until it turns out there's none yet
                                     readonly property bool lit: rowArea.containsMouse || navSelected
                                     property bool navSelected: false
                                     function navActivate() { m.act(r.modelData) }
@@ -471,10 +476,16 @@ Column {
                                                 // A phone's photo is stored sideways, its turn in EXIF: Qt applies it only when asked
                                                 autoTransform: true
                                                 anchors.fill: parent
-                                                source: r.hasThumb && r.modelData.path ? "file://" + r.modelData.path : ""
+                                                source: !r.hasThumb || !r.modelData.path ? ""
+                                                    : "file://" + (r.fromCopy ? r.thumbFile : r.modelData.path)
                                                 sourceSize: Qt.size(80, 80)
                                                 fillMode: Image.PreserveAspectCrop
                                                 asynchronous: true
+                                                onStatusChanged: {
+                                                    if (status === Image.Error && r.fromCopy) r.fromCopy = false
+                                                    else if (status === Image.Ready && !r.fromCopy)
+                                                        grabToImage(g => g.saveToFile(r.thumbFile), Qt.size(80, 80))
+                                                }
                                             }
                                         }
                                     }
