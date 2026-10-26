@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -I
-"""Makes the notification sounds (regular/*.wav, urgent/*.wav), agent-warn's (agent/*.wav) and the login screen's
-sounds (keys/*.wav) from scratch: no samples, so no licences to track.
+"""Makes the notification sounds (regular/*.wav, urgent/*.wav), agent-warn's (agent/*.wav), Mail's (mail/*.wav) and
+the login screen's sounds (keys/*.wav) from scratch: no samples, so no licences to track.
 
   python3 sounds/generate.py      rewrites the .wav files next to this script
 
@@ -97,6 +97,25 @@ AGENT = {
     "go": (lambda: reverb(mix(note(C6, .3, start=0, decay=.08), note(G6, .3, start=.07, decay=.1))), -16),
 }
 
+
+def swoosh(f0, ratio, dur, q=1.4, decay=.5, shape=2.0, seed=3):
+    """Air: noise through a band-pass whose centre glides f0 -> f0*ratio, swelling and fading over dur."""
+    rnd = random.Random(seed)
+    out, low, band = [], 0.0, 0.0
+    for i in range(int(dur * SR)):
+        t = i / SR
+        f = 2 * math.sin(math.pi * min(f0 * ratio ** (t / dur), 9000) / SR)
+        low += f * band
+        band += f * (rnd.uniform(-1, 1) - low - band / q)
+        out.append(band * math.sin(math.pi * t / dur) ** shape * math.exp(-t / decay))
+    return out
+
+
+# plugins/mail: a message has gone (Mail plays it after sending, in the background). A soft, deep swoosh rising away.
+# Name → (sound, peak dBFS)
+MAIL = {
+    "sent": (lambda: reverb(swoosh(350, 6, .6), wet=.12, tail=.07), -18),
+}
 
 
 def beep(freq, dur, harmonics=12):
@@ -227,6 +246,9 @@ if __name__ == "__main__":
     for name, (make, peak) in AGENT.items():
         write(os.path.join(HERE, "agent", name + ".wav"), make(), peak)
         print(f"agent/{name}.wav")
+    for name, (make, peak) in MAIL.items():
+        write(os.path.join(HERE, "mail", name + ".wav"), make(), peak)
+        print(f"mail/{name}.wav")
     for name, (make, peak) in KEYS.items():
         write(os.path.join(HERE, "keys", name + ".wav"), make(), peak)
         print(f"keys/{name}.wav")

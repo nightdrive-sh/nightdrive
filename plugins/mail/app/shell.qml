@@ -15,7 +15,8 @@ ShellRoot {
         implicitHeight: 900
         color: c.bg
         // Closing the window (⌘W) quits Mail: a process left without its window would only look open to `nightmail`.
-        onClosed: Qt.quit()
+        // A message still going is let finish first, and one that failed waits in Drafts.
+        onClosed: { outbox.jobs = outbox.jobs.filter(j => j.state === "sending"); composeEnded() }
         // Started for a new message alone (`nightmail new` or a mailto: link with Mail closed), only the writing window
         // shows, and Mail quits when it closes (composeEnded); `nightmail open` shows this one over IPC (reveal).
         visible: Quickshell.env("NIGHTMAIL_COMPOSE_ONLY") !== "1"
@@ -24,6 +25,25 @@ ShellRoot {
         AppLook { id: c }
 
         Notmuch { id: nm }
+        Outbox {
+            id: outbox
+            nm: nm
+            notifyFailures: !win.visible
+            // The answered or forwarded message gets the flag phones and webmail show too (after the next sync).
+            onSent: job => {
+                if (job.replyId) nm.tag(["+replied"], "id:\"" + job.replyId + "\"")
+                if (job.forwardId) nm.tag(["+passed"], "id:\"" + job.forwardId + "\"")
+                win.reload(true)
+            }
+            onReopen: job => {
+                if (composeWin.visible) { win.say("Not sent: it is in Drafts"); return }
+                composer.start(job.heading, job.f)
+                composer.replyId = job.replyId; composer.forwardId = job.forwardId
+                composer.failed = true; composer.status = job.error
+                win.showCompose()
+            }
+            onIdle: win.composeEnded()
+        }
         // Nightdrive Contacts' people, when it is installed: addresses to complete, a sender's card (ContactBook.qml)
         readonly property ContactBook book: ContactBook {}
         // For components in their own files, which don't see this file's ids.
@@ -274,18 +294,10 @@ ShellRoot {
                          t => { if (t.trim()) { try { composer.failed = true; composer.status = JSON.parse(t).error } catch (e) {} } })
         }
 
+        // Send closes the writing window at once; the message goes in the background (Outbox.qml).
         function sendMail(f) {
-            composer.busy = true; composer.failed = false; composer.status = "Sending…"
-            nm.compose(["send", JSON.stringify(f)], r => {
-                composer.busy = false
-                if (r.error) { composer.failed = true; composer.status = r.error; return }
-                composeWin.done = true; composeWin.visible = false
-                // The answered or forwarded message gets the flag phones and webmail show too (after the next sync).
-                if (composer.replyId) nm.tag(["+replied"], "id:\"" + composer.replyId + "\"")
-                if (composer.forwardId) nm.tag(["+passed"], "id:\"" + composer.forwardId + "\"")
-                reload(true)
-                composeEnded()
-            })
+            outbox.send(f, composer.heading, composer.replyId, composer.forwardId)
+            composeWin.done = true; composeWin.visible = false
         }
 
         // ⌘S, or closing a message saved before: the copy in Drafts is replaced with this one.
@@ -299,8 +311,9 @@ ShellRoot {
             })
         }
         function dismissCompose() { composeWin.done = true; composeWin.visible = false; composeEnded() }
-        // The writing window is closed, and its draft saved: Mail started for it alone quits with it.
-        function composeEnded() { if (!win.visible) Qt.quit() }
+        // The writing window is closed, and its draft saved: Mail started for it alone quits with it, once what it
+        // sends has gone (or failed and waits in Drafts).
+        function composeEnded() { if (!win.visible && !composeWin.visible && !outbox.jobs.length) Qt.quit() }
 
         // An attachment opens in the app the desktop picks for it, or is saved in the downloads folder.
         function openPart(msg, f) {
@@ -700,7 +713,7 @@ ShellRoot {
                         }
                     }
                 }
-                // The foot: Settings (its key in the tip) and the account, when there is only one
+                // The foot: Settings (its key in the tip) and the account, when there is only one, or a message being sent
                 Item {
                     Layout.fillWidth: true
                     Layout.topMargin: win.accounts.length > 1 ? 12 : 0
@@ -717,9 +730,15 @@ ShellRoot {
                     Text {
                         anchors.left: gear.right; anchors.leftMargin: 4; anchors.right: parent.right; anchors.rightMargin: 28
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: win.accounts.length < 2
+                        visible: win.accounts.length < 2 && !sendStatus.visible
                         elide: Text.ElideRight
                         text: win.account.address; color: c.faint; font.family: c.font; font.pixelSize: 11
+                    }
+                    SendStatus {
+                        id: sendStatus
+                        anchors.left: gear.right; anchors.leftMargin: 4; anchors.right: parent.right; anchors.rightMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        c: win.look; outbox: outbox
                     }
                 }
             }
