@@ -47,3 +47,5 @@ echo "==> Default apps: images open in Loupe (instead of the browser); Markdown 
 
 echo "==> Webapps: the window class Chromium gives them (their notifications, the launcher and Share find the window)"
 "$repo/config/hypr/scripts/webapp-add" --fix-classes
+# and their links to other sites to the default browser
+"$repo/config/hypr/scripts/webapp-links" setup

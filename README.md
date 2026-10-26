@@ -127,6 +127,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   windows are kept. If it runs out, the next login asks whether to open them again, each on its workspace.
 - **Web apps**: turn any site into an app window from the launcher (System › Install › Webapp), and remove one in System ›
   Remove › Webapps (its logins go with it). Their notifications come with the web app's own name and icon, not Chromium's.
+  A link to another site opens in your default browser (Firefox), not in Chromium; the web app's own pages stay in it.
 - **Default apps**: which app opens links, mail, folders, text, code, images, video, music, PDFs and calendar files, and
   which terminal ⌘Enter opens, in the launcher (Settings › Apps › Default apps, or `nightdrive defaults`). Hyper B, F and E open
   the browser, Files and Email you chose.

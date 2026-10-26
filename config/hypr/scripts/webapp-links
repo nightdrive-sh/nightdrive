@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Usage: webapp-links setup     sets up every web app's links to other sites to open in the default browser
+#                               (webapp-add, and setup-user.sh at each update)
+# A web app (webapp-add) is a Chromium app window, and Chromium has no setting to send its links elsewhere: they open
+# in Chromium even when Firefox is the default browser. So each web app's profile loads a small extension of ours
+# (hypr/webapp-links), which gives a link to another site to webapp-links-host, and that to xdg-open. A web app that was
+# running during setup picks the extension up at its next start.
+set -euo pipefail
+
+apps="$HOME/.local/share/applications"
+ext="$HOME/.config/hypr/webapp-links"
+host="$HOME/.config/hypr/scripts/webapp-links-host"
+host_name="sh.nightdrive.webapp_links"
+ext_id="mloopcljlbndalpmknikpbkahhkngcmh"   # from the "key" in the extension's manifest.json, so it is the same everywhere
+
+[[ ${1:-} == setup ]] || { sed -n '2,3p' "$0" >&2; exit 1; }
+
+for f in "$apps"/webapp-*.desktop; do
+  [[ -f $f ]] && grep -q '^Exec=chromium-browser .*--app=' "$f" || continue
+  if ! grep -q -- '--load-extension=' "$f"; then
+    sed -i "/^Exec=/s#--app=#--load-extension=$ext --app=#" "$f" && echo "Fixed: $(basename "$f") (links)"
+  fi
+  # Chromium looks for a profile's native hosts in its own folder (--user-data-dir), not in ~/.config/chromium
+  profile=$(sed -nE 's/^Exec=.*--user-data-dir=([^ ]+).*/\1/p' "$f")
+  [[ -n $profile ]] || continue
+  mkdir -p "$profile/NativeMessagingHosts"
+  cat > "$profile/NativeMessagingHosts/$host_name.json" <<JSON
+{
+  "name": "$host_name",
+  "description": "Nightdrive: web apps' links to the default browser",
+  "path": "$host",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://$ext_id/"]
+}
+JSON
+done
