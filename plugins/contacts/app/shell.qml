@@ -131,10 +131,14 @@ ShellRoot {
             filter(p.id)
             if (onePane) openCard(); else { card.contentY = 0; list.forceActiveFocus() }
         }
-        function pickSource(i) {
+        // stay: picked from the keyboard in the sidebar (Panes.qml), which keeps it; a click goes back to the list
+        function pickSource(i, stay) {
             if (i < 0 || i >= sources.length) return
-            source = i; searchField.text = ""; filter(""); list.forceActiveFocus()
+            source = i; searchField.text = ""; filter("")
+            if (!stay) panes.pane = "list"
+            list.forceActiveFocus()
         }
+        readonly property QtObject panes: Panes { win: win; list: list; card: card }
         function move(d) {
             if (!shown.length) return
             current = Math.max(0, Math.min(shown.length - 1, current + d))
@@ -261,6 +265,7 @@ ShellRoot {
         RowLayout {
             anchors.fill: parent
             Keys.onPressed: e => sheet.pressed(e)
+            AppPointer { c: win.look }      // the pointer hides the keys' frame
             spacing: 0
 
             AppSidebar {
@@ -283,6 +288,7 @@ ShellRoot {
                         label: modelData.name
                         count: modelData.count
                         selected: index === win.source
+                        active: win.panes.at === "sources" && list.activeFocus     // Tab's (Panes.qml)
                         onClicked: win.pickSource(index)
                     }
                 }
@@ -339,7 +345,9 @@ ShellRoot {
                         Layout.fillHeight: true
                         Keys.onPressed: e => {
                             const k = e.key
+                            win.look.keyboard = true        // the keys' frame shows (AppPointer)
                             if (win.cheats && k !== Qt.Key_Question && sheet.modifierKeys.indexOf(k) < 0) win.cheats = false
+                            if (win.panes.pressed(e)) { e.accepted = true; return }
                             const ctrl = e.modifiers & Qt.ControlModifier
                             if (ctrl && k === Qt.Key_Down) win.pickSource(win.source + 1)
                             else if (ctrl && k === Qt.Key_Up) win.pickSource(win.source - 1)
@@ -388,7 +396,8 @@ ShellRoot {
                                 implicitHeight: 48
                                 c: win.look
                                 selected: index === win.current
-                                TapHandler { onTapped: { win.current = row.index; card.contentY = 0; list.forceActiveFocus(); win.openCard() } }
+                                active: list.activeFocus && win.panes.at === "list"     // the kit's frame while the keys are here
+                                TapHandler { onTapped: { win.current = row.index; card.contentY = 0; win.panes.toList(); win.openCard() } }
                                 Avatar {
                                     id: face
                                     anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
@@ -513,7 +522,7 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Contacts", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  →", "Open the card (a narrow window)"], ["Esc  ←", "Back to the list (on the card: ↑ ↓ scroll, j k next)"], ["PgUp PgDn", "Ten up, down"], ["Space ⇧Space", "Scroll the card"],
+                { title: "Contacts", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  →", "Open the card (a narrow window)"], ["Esc  ←", "Back to the list (on the card: ↑ ↓ scroll, j k next)"], ["PgUp PgDn", "Ten up, down"], ["Space ⇧Space", "Scroll the card"], ["Tab ⇧Tab", "Sidebar, list, card"], ["↑ ↓", "On the card after Tab: a line"], ["⏎", "…write, open or copy"], ["c  ⌘C", "…copy it"],
                                            ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
                 { title: "Editing", keys: [["⌘N", "New contact"], ["⌘E  e", "Edit the contact"], ["w", "Send email (a menu if they have more addresses)"], ["⌘S  ⌘⏎", "Save"], ["Esc", "Leave the editor"],
                                           ["Tab", "Next field"], ["Delete", "Delete the contact"]] },

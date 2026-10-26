@@ -38,6 +38,7 @@ Item {
     function forceOff() { if (root.running) root.ctl.power("kill", root.vm.name) }
     function takeSnapshot() { snapshots.take() }
     function focusSnapshots() { snapshots.focusList() }
+    readonly property bool snapshotsFocused: snapshots.focused
     // After a panel: the keys go back where they were, the snapshot list or the page
     function refocus() {
         if (snapshots.returnHere) { snapshots.returnHere = false; snapshots.focusList() } else root.forceActiveFocus()

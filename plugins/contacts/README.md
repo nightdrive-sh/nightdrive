@@ -8,6 +8,7 @@ Your contacts from iCloud, Google or another CardDAV server, on this computer an
 - All contacts shows each person once: the cards of one person in iCloud and Google (the same name, and a number or address in common) are one, with every line of them. Under it each account has its own, as it is there, and the groups (Apple's, or a card's categories) theirs.
 - `↑` / `↓` or `j` / `k` move in the list, `Space` and ⇧Space scroll the card. `/` or ⌘F searches names, companies, email addresses and numbers (040 123 finds +358 40 123 too), `Esc` clears the search.
 - Ctrl+↑ / Ctrl+↓ or `1`–`9` pick a row of the sidebar, ⌘B hides it, ⌘R reads the contacts again.
+- `Tab` / ⇧Tab move the keys round the sidebar, the list and the card. On the card ↑ / ↓ go from line to line, `Enter` writes to an address, opens a link or copies the rest, `c` copies any line, `Esc` goes back to the list.
 - A click on an email address writes to it (in the email app: launcher › Settings › Apps › Default apps), on a link opens it, and on a number or an address copies it. `w` (or Send email above the card) starts a new email to them, and asks which address when they have more than one.
 - ⌘, opens the settings: your accounts and how many contacts each has, when they last synced, Sync now (`S`) and Add an account with Claude (`A`). launcher › Settings › Apps › Contacts opens them too.
 - ⌘N (or the button by the search) adds a contact, ⌘E or `e` (or Edit) edits the open one, and `Delete` deletes it, after asking. More under Editing.

@@ -17,8 +17,9 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppLook` | The colours: the desktop's theme, with the terminal's background behind the window and a few shades from it |
 | `AppSidebar` | The sidebar: the app's name (`AppTitle`) level with the view's header, a column of rows, a line on its right |
 | `AppTitle` | The app's name with the wordmark's block cursor: "Mail█" |
-| `AppNavRow` | A row of the sidebar: glyph, name, count; `selected`, `dropTarget` |
-| `AppRow` | A list row's ground, for a `ListView` delegate: `selected`, `marked` (the keyboard's place, list not focused) |
+| `AppNavRow` | A row of the sidebar: glyph, name, count; `selected`, `dropTarget`, `active` (the keyboard is in the sidebar) |
+| `AppPointer` | In the window's RowLayout: the pointer moving hides the keys' frame (`c.keyboard`, set in the app's key handlers) |
+| `AppRow` | A list row's ground, for a `ListView` delegate: `selected`, `marked` (the keyboard's place, list not focused), `active` (the keys are here: a frame) |
 | `AppButton` | A framed button with a glyph and a label (Play, New list); `strong`, `on`, a tip with its key (`tipAlign`) |
 | `AppIconButton` | A glyph-only button (Back, Settings) with a tip (`tipSide`, `tipAlign`) |
 | `AppSearchField` | The search glyph and a field; Return, ↓ and Esc come out as signals |

@@ -13,6 +13,7 @@ Rectangle {
     property color countColor: c.faint
     property bool selected: false
     property bool dropTarget: false     // something dragged over it would land here
+    property bool active: false         // the keyboard is in the sidebar (Tab): the picked row has a frame of the accent
     readonly property alias hovered: hover.hovered
     signal clicked()
     Layout.fillWidth: true
@@ -21,7 +22,9 @@ Rectangle {
     implicitHeight: 34
     radius: 8
     color: selected ? c.sel : hovered || dropTarget ? c.hover : "transparent"
-    border.color: dropTarget ? c.primary : "transparent"
+    // Tab's frame, as AppRow's: the list beside it shows its row only marked meanwhile
+    border.color: dropTarget ? c.primary : selected && active ? c.frame : "transparent"
+    border.width: selected && active && !dropTarget ? 2 : 1
     HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
     TapHandler { onTapped: root.clicked() }
     Text {

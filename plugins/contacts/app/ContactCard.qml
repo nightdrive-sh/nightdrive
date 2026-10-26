@@ -13,11 +13,47 @@ Flickable {
     contentHeight: body.y + body.implicitHeight + 64
     readonly property int margin: width < 520 ? 24 : 40
     readonly property bool narrow: body.width < 420
+    // The line the keys are on, after Tab (Panes.qml): ↑ ↓ move, ⏎ does its first button's (write, open, copy), c copies
+    property int line: -1
+    onActiveFocusChanged: if (!activeFocus) line = -1
+    onLinesChanged: if (line >= lines.length) line = lines.length - 1
+    onLineChanged: if (line >= 0) Qt.callLater(showLine)
+    // The line in sight, scrolled no further than needed
+    function showLine() {
+        const f = fields.itemAt(line)
+        if (!f) return
+        const y = f.mapToItem(card.contentItem, 0, 0).y
+        if (y < card.contentY + 16) card.contentY = Math.max(0, y - 16)
+        else if (y + f.height > card.contentY + card.height - 16) card.contentY = Math.min(card.contentHeight - card.height, y + f.height - card.height + 16)
+    }
+    // A line's button, by key or click: a copied line says so on itself for a moment (the window's note is far off)
+    property int copied: -1
+    Timer { id: copiedTimer; interval: 1500; onTriggered: card.copied = -1 }
+    function act(i, id) {
+        app.use(id, lines[i].value)
+        if (id === "copy") { copied = i; copiedTimer.restart() }
+    }
+    readonly property var lines: card.p ? card.p.phones.map(x => ({ kind: "phone", glyph: "phone", label: x.label || "phone", value: x.value }))
+        .concat(card.p.emails.map(x => ({ kind: "email", glyph: "mail", label: x.label || "email", value: x.value })))
+        .concat(card.p.addresses.map(x => ({ kind: "address", glyph: "map-pin", label: x.label || "address", value: x.lines.join("\n") })))
+        .concat(card.p.urls.map(x => ({ kind: "url", glyph: "link", label: x.label || "web", value: x.value })))
+        .concat(card.p.birthday ? [{ kind: "birthday", glyph: "cake", label: "birthday", value: app.when(card.p.birthday) }] : [])
+        : []
     // Its keys in one pane, where the list is away: back, scrolling, editing
     Keys.onPressed: e => {
         const k = e.key
+        const l = card.lines[card.line]
+        card.c.keyboard = true
         app.sheetKey(e)
         if (k === Qt.Key_Question) {}
+        else if (k === Qt.Key_Tab && card.line < 0 && app.onePane && card.lines.length) card.line = 0
+        else if (k === Qt.Key_Tab || k === Qt.Key_Backtab) app.panes.fromCard(k === Qt.Key_Backtab)
+        else if (l && (k === Qt.Key_Down || k === Qt.Key_J)) card.line = Math.min(card.line + 1, card.lines.length - 1)
+        else if (l && (k === Qt.Key_Up || k === Qt.Key_K)) card.line = Math.max(card.line - 1, 0)
+        else if (l && (k === Qt.Key_Return || k === Qt.Key_Enter)) { const a = app.lineActions(l.kind); card.act(card.line, a.length ? a[0].id : "copy") }
+        else if (l && k === Qt.Key_C) card.act(card.line, "copy")
+        else if (l && (k === Qt.Key_Escape || k === Qt.Key_Left) && !app.onePane) app.panes.toList()
+        else if (l && k === Qt.Key_Escape) card.line = -1
         else if (k === Qt.Key_Escape || k === Qt.Key_Left || k === Qt.Key_Backspace) app.closeCard()
         else if (k === Qt.Key_E && !(e.modifiers & Qt.ControlModifier)) card.edit()
         else if (k === Qt.Key_W && !(e.modifiers & Qt.ControlModifier)) app.write()
@@ -123,23 +159,23 @@ Flickable {
             width: parent.width
             spacing: 4
             Repeater {
-                model: card.p ? card.p.phones.map(x => ({ kind: "phone", glyph: "phone", label: x.label || "phone", value: x.value }))
-                    .concat(card.p.emails.map(x => ({ kind: "email", glyph: "mail", label: x.label || "email", value: x.value })))
-                    .concat(card.p.addresses.map(x => ({ kind: "address", glyph: "map-pin", label: x.label || "address", value: x.lines.join("\n") })))
-                    .concat(card.p.urls.map(x => ({ kind: "url", glyph: "link", label: x.label || "web", value: x.value })))
-                    .concat(card.p.birthday ? [{ kind: "birthday", glyph: "cake", label: "birthday", value: app.when(card.p.birthday) }] : [])
-                    : []
+                id: fields
+                model: card.lines
                 delegate: Rectangle {
                     id: field
                     required property var modelData
+                    required property int index
+                    readonly property bool keyed: index === card.line && card.activeFocus     // the keys' line, framed as the kit's rows
                     width: parent.width
                     implicitHeight: card.narrow ? valueText.y + valueText.implicitHeight + 12 : Math.max(40, valueText.implicitHeight + 20)
                     radius: 8
-                    color: fh.hovered ? c.hover : "transparent"
+                    color: keyed ? c.sel : fh.hovered ? c.hover : "transparent"
+                    border.color: keyed ? c.frame : "transparent"
+                    border.width: 2
                     HoverHandler { id: fh; cursorShape: Qt.PointingHandCursor }
                     readonly property var actions: app.lineActions(modelData.kind)
                     // A click on one of its buttons is the button's alone
-                    TapHandler { onTapped: if (field.actions.length && !buttons.hovered) app.use(field.actions[0].id, field.modelData.value) }
+                    TapHandler { onTapped: if (field.actions.length && !buttons.hovered) card.act(field.index, field.actions[0].id) }
                     Text {
                         id: glyph
                         x: 12; y: 12
@@ -159,9 +195,16 @@ Flickable {
                         text: field.modelData.value; color: c.text; font.family: c.font; font.pixelSize: 13
                     }
                     Row {
+                        visible: card.copied === field.index
+                        anchors.right: parent.right; anchors.rightMargin: 14; y: 12
+                        spacing: 6
+                        Text { text: Icons.g("check"); font.family: Icons.family; font.pixelSize: 13; color: c.primary }
+                        Text { text: "Copied"; color: c.dim; font.family: c.font; font.pixelSize: 12 }
+                    }
+                    Row {
                         id: buttons
                         readonly property bool hovered: bh.hovered
-                        visible: fh.hovered
+                        visible: fh.hovered && card.copied !== field.index
                         anchors.right: parent.right; anchors.rightMargin: 7; y: 7
                         spacing: 2
                         HoverHandler { id: bh }
@@ -172,7 +215,7 @@ Flickable {
                                 c: card.c
                                 glyph: modelData.glyph; glyphColor: c.faint; hoverColor: c.sel
                                 tip: modelData.tip
-                                onClicked: app.use(modelData.id, field.modelData.value)
+                                onClicked: card.act(field.index, modelData.id)
                             }
                         }
                     }

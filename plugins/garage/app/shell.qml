@@ -67,6 +67,7 @@ ShellRoot {
             spacing: 0
             // ? and Ctrl+? show the keys, as in Mail and Deck: what the page and the snapshot list leave alone comes here
             Keys.onPressed: e => sheet.pressed(e)
+            AppPointer { c: win.look }      // the pointer hides the keys' frame
 
             VmSidebar {
                 visible: win.sidebarShown
@@ -76,6 +77,7 @@ ShellRoot {
                 ctl: ctl
                 images: images
                 current: win.vm ? win.vm.name : ""
+                active: page.activeFocus && !page.snapshotsFocused
                 onPicked: name => win.pick(name)
                 onNewVm: win.showNew = true
             }
@@ -119,6 +121,7 @@ ShellRoot {
                 // The page's keys (KeyHelp.qml lists them); the snapshot list takes its own first, while it has focus
                 Keys.onPressed: e => {
                     const k = e.key, v = win.vm
+                    win.look.keyboard = true        // the keys' frame shows (AppPointer)
                     if (sheet.shown) { sheet.shown = false; e.accepted = true; return }
                     if (k === Qt.Key_Down || k === Qt.Key_J) win.step(1)
                     else if (k === Qt.Key_Up || k === Qt.Key_K) win.step(-1)

@@ -7,9 +7,12 @@ Rectangle {
     required property QtObject c
     property bool selected: false
     property bool marked: false
+    property bool active: false         // the keys are in this list (Tab moves them between it and the sidebar): a frame
     readonly property alias hovered: hover.hovered
     width: ListView.view ? ListView.view.width : implicitWidth
     radius: 8
     color: selected ? c.sel : marked || hovered ? c.hover : "transparent"
+    border.color: selected && active ? c.frame : "transparent"
+    border.width: selected && active ? 2 : 1
     HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
 }

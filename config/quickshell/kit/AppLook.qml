@@ -11,6 +11,9 @@ QtObject {
     readonly property color divider: Qt.lighter(line, 1.2)     // the lines between the panes
     // Under the pointer: the selected row's colour, fainter, so a row you point at never looks picked
     readonly property color hover: Qt.rgba(sel.r, sel.g, sel.b, 0.5)
+    // The picked row where the keys are (active), framed only while the keys are in use (AppPointer.qml)
+    property bool keyboard: false
+    readonly property color frame: keyboard ? Qt.rgba(primary.r, primary.g, primary.b, 0.5) : "transparent"
     readonly property color sel: Theme.sel
     readonly property color text: Theme.text
     readonly property color body: Qt.lighter(text, 1.06)        // long text to read (a message), a touch brighter

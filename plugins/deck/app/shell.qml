@@ -358,6 +358,13 @@ ShellRoot {
         property var sidebarChoice: null            // ⌘B's, in a wide window
         property bool sectionsOpen: false           // in one pane: the sections show instead of the view
         property string sectionCursor: "shelf"      // the section the keys point at while they show
+        // Two panes: Tab takes the keys to the sections beside the view, as in one pane (sectionKey), and back
+        property bool sectionsKeyed: false
+        function tabSections() {
+            if (onePane) toggleSidebar()
+            else if (sectionsKeyed) sectionsKeyed = false
+            else if (sidebarShown) { sectionCursor = section; sectionsKeyed = true }
+        }
         readonly property bool sidebarShown: onePane ? sectionsOpen : sidebarChoice !== null ? sidebarChoice : true
         onOnePaneChanged: sectionsOpen = false
         function openSections() { sectionCursor = section; sectionsOpen = true; list.forceActiveFocus() }
@@ -377,13 +384,15 @@ ShellRoot {
             else if (k === Qt.Key_Home) sectionCursor = sections[0].id
             else if (k === Qt.Key_End) sectionCursor = sections[sections.length - 1].id
             else if (k === Qt.Key_Return || k === Qt.Key_Enter) pickSection(sectionCursor)
-            else if (k === Qt.Key_Escape || k === Qt.Key_Backspace) sectionsOpen = false
-            else return [Qt.Key_P, Qt.Key_E, Qt.Key_A, Qt.Key_D, Qt.Key_Delete, Qt.Key_F].indexOf(k) >= 0
+            else if (k === Qt.Key_Escape || k === Qt.Key_Backspace) { sectionsOpen = false; sectionsKeyed = false }
+            // Out of sight in one pane, the view's row isn't acted on; beside the sections (Tab) it is
+            else return sectionsOpen && [Qt.Key_P, Qt.Key_E, Qt.Key_A, Qt.Key_D, Qt.Key_Delete, Qt.Key_F].indexOf(k) >= 0
             return true
         }
         function moveTo(i) { cursor = Math.max(0, Math.min(i, rows.length - 1)); list.currentIndex = cursor }
         function pickSection(id) {
             sectionsOpen = false
+            sectionsKeyed = false
             section = id
             cursor = 0
             stack = [{ kind: id }]
@@ -681,6 +690,7 @@ ShellRoot {
             spacing: 0
             // ? and Ctrl+? show the keys, as in Mail (KeySheet.qml)
             Keys.onPressed: e => sheet.pressed(e)
+            AppPointer { c: win.look }      // the pointer hides the keys' frame
 
             RowLayout {
                 Layout.fillWidth: true
@@ -704,7 +714,8 @@ ShellRoot {
                             c: win.look
                             glyph: modelData.glyph
                             label: modelData.name
-                            selected: (win.sectionsOpen ? win.sectionCursor : win.section) === modelData.id
+                            selected: (win.sectionsOpen || win.sectionsKeyed ? win.sectionCursor : win.section) === modelData.id
+                            active: win.sectionsOpen || win.sectionsKeyed      // the kit's frame: the keys are here
                             count: modelData.id === "queue" && win.queue.length ? win.queue.length
                                  : modelData.id === "curated" && win.curated.length ? win.curated.length : ""
                             onClicked: win.pickSection(modelData.id)
@@ -881,6 +892,7 @@ ShellRoot {
 
                     ListView {
                         id: list
+                        onActiveFocusChanged: if (!activeFocus) win.sectionsKeyed = false
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.leftMargin: 12
@@ -903,12 +915,14 @@ ShellRoot {
                         readonly property real leadWidth: Math.max(Math.ceil(numberMetrics.advanceWidth), 14)
                         Keys.onPressed: e => {
                             const k = e.key
+                            win.look.keyboard = true        // the keys' frame shows (AppPointer)
                             if (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier | Qt.AltModifier)) return
                             // The list takes most keys before they reach the sheet: any but ? closes it here
                             if (sheet.shown && k !== Qt.Key_Question && sheet.modifierKeys.indexOf(k) < 0) sheet.shown = false
                             // The sections on show (one pane): the keys move in them and Enter opens one; the player's keys
                             // work as ever, and what acts on a row of the view out of sight does nothing
-                            if (win.sectionsOpen && win.sectionKey(k)) { e.accepted = true; return }
+                            if (k === Qt.Key_Tab || k === Qt.Key_Backtab) { win.tabSections(); e.accepted = true; return }
+                            if ((win.sectionsOpen || win.sectionsKeyed) && win.sectionKey(k)) { e.accepted = true; return }
                             if (k === Qt.Key_Down || k === Qt.Key_J) win.moveTo(currentIndex + 1)
                             else if (k === Qt.Key_Up || k === Qt.Key_K) {
                                 if (currentIndex > 0) win.moveTo(currentIndex - 1)
@@ -953,8 +967,9 @@ ShellRoot {
                             readonly property bool tall: !!modelData.cover && !!modelData.note
                             implicitHeight: Math.max(body.implicitHeight, art.visible ? art.height : 0) + 20
                             c: win.look
-                            selected: current && list.activeFocus
+                            selected: current && list.activeFocus && !win.sectionsKeyed
                             marked: current
+                            active: true        // selected only while the keys are here: the kit's frame
                             TapHandler {
                                 // An artist, an album or a genre opens with one click (only browsing: Esc comes back); a song plays
                                 // with two, so picking one doesn't stop the music
@@ -1294,7 +1309,7 @@ ShellRoot {
 
         readonly property QtObject look: c
         readonly property var keyHelp: [
-            { title: "Browse", keys: [["↑ ↓  j k", "Move"], ["⏎", "Open, or play a song"], ["Esc  ⌫", "Back; at a section, narrow: the sections"], ["⌘1 … ⌘6", "Shelf, Curated, Radio, Search, Queue, History"], ["Ctrl ↑ ↓", "Previous, next section"], ["⌘B", "Show or hide the sections"], ["⌘F  /", "Search Spotify"], ["n", "What plays: its album or radio"], ["r", "Pick for me: an album you haven't played lately"],
+            { title: "Browse", keys: [["↑ ↓  j k", "Move"], ["⏎", "Open, or play a song"], ["Esc  ⌫", "Back; at a section, narrow: the sections"], ["⌘1 … ⌘6", "Shelf, Curated, Radio, Search, Queue, History"], ["Ctrl ↑ ↓", "Previous, next section"], ["Tab ⇧Tab", "To the sections, and back"], ["⌘B", "Show or hide the sections"], ["⌘F  /", "Search Spotify"], ["n", "What plays: its album or radio"], ["r", "Pick for me: an album you haven't played lately"],
                                       ["f", "A favourite genre, or not"], ["d", "Out of the queue; Not for me in Curated"]] },
             { title: "Play", keys: [["Space", "Play, pause"], ["← →", "Previous, next track"], [", .", "Back, ahead 10 seconds"], ["p", "Play the album, song or radio"], ["e", "Queue the album or song"], ["a", "On the shelf, or off it"],
                                     ["l", "Like the playing track"], ["o", "Where the sound plays"], ["?  Ctrl ?", "These keys"]] }

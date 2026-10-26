@@ -103,11 +103,11 @@ ShellRoot {
         property int acct: 0
         readonly property var account: accounts[acct] || { id: "", address: "", maildir: "", signature: "" }
         property var inboxUnread: ({})      // unread threads in each account's inbox, by id
-        function pickAccount(i) {
+        function pickAccount(i, stay) {
             if (i === acct || i < 0 || i >= accounts.length) return
             acct = i
             setting("account", accounts[i].id)
-            pickFolder(0)
+            pickFolder(0, stay)
         }
         // A folder's query in the account shown (or another one). The account and the folder are one path term: notmuch
         // matches each term against any of a message's files, so "path:account/** and folder:INBOX" would also take a
@@ -556,7 +556,9 @@ ShellRoot {
             })
         }
 
-        function pickFolder(i) { folder = i; search.text = ""; reload(false); list.forceActiveFocus() }
+        // stay: picked from the keyboard in the folders (Panes.qml), which keep it; a click goes back to the list
+        function pickFolder(i, stay) { folder = i; search.text = ""; reload(false); if (!stay) panes.pane = "list"; list.forceActiveFocus() }
+        Panes { id: panes; win: win }
 
         function when(ts) {
             const d = new Date(ts * 1000), now = new Date()
@@ -619,6 +621,7 @@ ShellRoot {
             anchors.fill: parent
             // ? and Ctrl+? show the keys (KeySheet.qml)
             Keys.onPressed: e => sheet.pressed(e)
+            AppPointer { c: win.look }      // the pointer hides the keys' frame
             spacing: 0
 
             // Folders. The title's line and the search's are as high (headerHeight) and as far from the top, so the first
@@ -647,6 +650,7 @@ ShellRoot {
                         dropTarget: index === win.dropFolder
                         count: !readButton.visible && win.unreadCounts[index] > 0 ? win.unreadCounts[index] : ""
                         countColor: c.dim
+                        active: panes.at === "folders"     // Tab's (Panes.qml)
                         onClicked: win.pickFolder(index)
                         // Under the pointer, the unread count gives way to ✓: mark all read
                         AppIconButton {
@@ -662,7 +666,7 @@ ShellRoot {
                     }
                 }
                 Item { Layout.fillHeight: true }
-                // More than one account: each with its inbox's unread count; a click or Tab shows another one's folders
+                // More than one account: each with its inbox's unread count; a click or Ctrl+Tab shows another one's folders
                 Repeater {
                     model: win.accounts.length > 1 ? win.accounts : []
                     delegate: Rectangle {
@@ -774,8 +778,10 @@ ShellRoot {
                         focus: true
                         Keys.onPressed: e => {
                             const k = e.key
+                            win.look.keyboard = true        // the keys' frame shows (AppPointer)
                             // The list takes most keys before they reach the sheet: any but ? closes it here.
                             if (win.cheats && k !== Qt.Key_Question && sheet.modifierKeys.indexOf(k) < 0) win.cheats = false
+                            if (panes.pressed(e)) { e.accepted = true; return }
                             const ctrl = e.modifiers & Qt.ControlModifier
                             const alt = e.modifiers & Qt.AltModifier
                             const shift = e.modifiers & Qt.ShiftModifier
@@ -786,9 +792,6 @@ ShellRoot {
                             else if (k === Qt.Key_Escape && win.picked.length) win.open(win.current)
                             else if ((k === Qt.Key_Escape || k === Qt.Key_Left) && win.readerOpen) win.readerOpen = false
                             else if (k === Qt.Key_Right && win.onePane && !win.readerOpen) win.openReader()
-                            // Tab and ⇧Tab show the next and previous account's folders
-                            else if (k === Qt.Key_Tab && win.accounts.length > 1) win.pickAccount((win.acct + 1) % win.accounts.length)
-                            else if (k === Qt.Key_Backtab && win.accounts.length > 1) win.pickAccount((win.acct + win.accounts.length - 1) % win.accounts.length)
                             else if (ctrl && k === Qt.Key_Down && win.folder < win.folders.length - 1) win.pickFolder(win.folder + 1)
                             else if (ctrl && k === Qt.Key_Up && win.folder > 0) win.pickFolder(win.folder - 1)
                             else if (ctrl && (k === Qt.Key_Up || k === Qt.Key_Down)) {}
@@ -834,9 +837,12 @@ ShellRoot {
                             readonly property bool picked: win.picked.indexOf(modelData.thread) >= 0
                             implicitHeight: col.implicitHeight + 28
                             c: win.look
-                            selected: picked || index === win.current && !win.picked.length
+                            // With Tab in the folders (Panes.qml), the open one is only marked
+                            selected: picked || index === win.current && !win.picked.length && panes.at === "list"
+                            marked: index === win.current
+                            active: panes.at === "list" && !win.picked.length
                             // With threads picked, the keyboard's place among them
-                            border.color: index === win.current && win.picked.length ? c.line : "transparent"
+                            border.color: index === win.current && win.picked.length ? c.line : selected && active ? c.frame : "transparent"
                             // Dragged sideways (towards the folders) it moves; up and down the list scrolls as before.
                             DragHandler {
                                 target: null
@@ -847,7 +853,7 @@ ShellRoot {
                             }
                             TapHandler {
                                 acceptedModifiers: Qt.NoModifier
-                                onTapped: { win.open(row.index); list.forceActiveFocus(); win.openReader() }   // in one pane: point, then open
+                                onTapped: { win.open(row.index); panes.pane = "list"; list.forceActiveFocus(); win.openReader() }   // in one pane: point, then open
                                 onDoubleTapped: if (win.draft()) win.compose("resume"); else win.openWindow(row.index)
                             }
                             // ⇧-click picks the threads from the open one to this; Ctrl-click picks this one or leaves it
@@ -1137,7 +1143,7 @@ ShellRoot {
             { title: "Write", keys: [["⌘N  c", "New message"], ["r", "Reply to all"], ["⇧R", "Reply to the sender only"], ["f", "Forward"],
                                      ["⏎", "Continue a draft (in Drafts)"], ["⌘⇧C", "Claude writes the reply"], ["⌘⇧C", "…from the selected text"],
                                      ["⌘⇧A", "Attach files"], ["Ctrl ⏎", "Send"], ["⌘S", "Save in Drafts"], ["Esc", "Close (Esc Esc: throw away)"]] },
-            { title: "Folders", keys: [["Ctrl ↑ ↓", "Previous, next"], ["1 – 6", "Go to a folder"], ["Tab ⇧Tab", "Next, previous account"], ["⌘⇧⌫", "Empty Trash"], ["⌘B", "Hide or show"], ["⌘,", "Settings"]] }
+            { title: "Folders", keys: [["Ctrl ↑ ↓", "Previous, next"], ["1 – 6", "Go to a folder"], ["↑ ↓", "In the folders: previous, next"], ["Tab ⇧Tab", "To the folders, and back"], ["Ctrl Tab  Ctrl ⇧Tab", "Next, previous account"], ["⌘⇧⌫", "Empty Trash"], ["⌘B", "Hide or show"], ["⌘,", "Settings"]] }
         ]
 
         KeySheet { id: sheet; c: win.look; groups: win.keyHelp }

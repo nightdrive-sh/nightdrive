@@ -10,6 +10,7 @@ AppSidebar {
     required property QtObject ctl
     required property QtObject images
     property string current: ""          // the VM whose page shows
+    property bool active: false          // the arrows move between the VMs (the page has the keys, not the snapshots)
     signal picked(string name)
     signal newVm()
     title: "Garage"
@@ -24,6 +25,7 @@ AppSidebar {
             count: modelData.running ? "●" : ""
             countColor: root.c.primary
             selected: root.current === modelData.name
+            active: root.active
             onClicked: root.picked(modelData.name)
         }
     }
