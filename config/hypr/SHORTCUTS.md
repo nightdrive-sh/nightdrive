@@ -14,6 +14,7 @@
   Hyper Y            YouTube {youtube}
   ⌘ Esc / F3         Notifications (history, do not disturb)
   ⌘ Ctrl L           Lock screen
+  ⌃ ⌥ F3             Lock screen, and brings back a lock that died (Hyprland's "lockscreen app died" screen)
   ⌘ ⇧ Space          Top bar by keyboard (←/→ menu, ↑/↓ row, Enter select, Esc close)
   ⌘ ⇧ K              This help
 

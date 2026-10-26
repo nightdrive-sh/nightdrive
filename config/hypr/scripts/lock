@@ -1,9 +1,33 @@
 #!/bin/bash
 # Locks the session with the login screen (greeter/lock.qml), the same lock as at boot: hypridle's lock_cmd (idle,
 # before sleep, ⌃⌘L through loginctl lock-session), so the lock looks like the login screen. After sleep relock starts it
-# again (the keyboard doesn't come back to the old one on some machines).
+# again (the keyboard doesn't come back to the old one on some machines). hyprland.lua starts it at an autologin boot
+# (--boot: with the login screen's intro).
 # A lock already up stays (idle and sleep both ask for one), unless --replace (relock: it closes the old one itself).
 # Only this session's: a container's (nightdrive sandbox) runs as the same user, and a locked one kept this from locking.
-[[ $1 == --replace ]] || ! pgrep --ns $$ --nslist pid -u "$UID" -f '[q]s -p .*/greeter/lock\.qml' >/dev/null || exit 0
-pam=login; [[ -e /etc/pam.d/nightdrive-lock ]] && pam=nightdrive-lock   # as hyprland.lua: it also opens the keyring
-NIGHTDRIVE_LOCK_PAM=$pam NIGHTDRIVE_LOCK_QUICK=1 exec qs -p "$HOME/.config/greeter/lock.qml"
+#
+# If the lock dies while locked, it is started again: Hyprland keeps the session locked but shows only its "lockscreen
+# app died" screen, whose way out (a text console) a Mac keyboard doesn't reach without Fn. It died at boot when a screen
+# went away as it was starting (Quickshell asked for a lock surface on the gone screen: a Wayland protocol error).
+# With allow_session_lock_restore (hyprland.lua) the new one takes the lock over. Steps go to the journal (journalctl -t lock).
+RESTARTS=5        # at most this many restarts within WINDOW seconds; then the "lock died" screen stays (still locked)
+WINDOW=60
+lock='[q]s -p .*/greeter/lock\.qml'
+mine=(--ns $$ --nslist pid -u "$UID")
+[[ $1 == --replace ]] || ! pgrep "${mine[@]}" -f "$lock" >/dev/null || exit 0
+pam=login; [[ -e /etc/pam.d/nightdrive-lock ]] && pam=nightdrive-lock   # it also opens the keyring (switch.sh autologin)
+quick=1; [[ $1 == --boot ]] && quick=
+starts=()
+while :; do
+  NIGHTDRIVE_LOCK_PAM=$pam NIGHTDRIVE_LOCK_QUICK=$quick qs -p "$HOME/.config/greeter/lock.qml"
+  status=$?
+  (( status == 0 )) && exit 0                                    # unlocked: lock.qml quits once the compositor has it
+  pgrep "${mine[@]}" -f "$lock" >/dev/null && exit 0             # another lock took over (relock killed this one)
+  hyprctl -j version >/dev/null 2>&1 || exit 0                   # Hyprland is gone (logout)
+  now=$(date +%s); starts=("${starts[@]}" "$now")
+  starts=($(for t in "${starts[@]}"; do (( now - t < WINDOW )) && echo "$t"; done))
+  (( ${#starts[@]} > RESTARTS )) && { logger -t lock "the lock keeps dying (exit $status), giving up: ⌃⌥F3 starts it again"; exit 1; }
+  logger -t lock "the lock died (exit $status), starting it again"
+  quick=1
+  sleep 0.5
+done

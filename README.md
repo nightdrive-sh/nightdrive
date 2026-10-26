@@ -144,7 +144,9 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   apps start hidden. Only 1Password (if installed) is on by default, because its SSH agent and the Passwords level need it.
 - **Login screen**: a password-only greeter that matches the theme, for the user who installed Nightdrive (`--no-greeter`
   keeps the distribution's own, or gives a text login where there's none). Another user logs in from the text console
-  (Ctrl+Alt+F3) or with the text login (`config/greeter/switch.sh text`).
+  (Ctrl+Alt+F3, with Fn on a Mac keyboard) or with the text login (`config/greeter/switch.sh text`). The same screen is the
+  lock. If it ever dies (Hyprland's "lockscreen app died" screen), it comes back by itself, still locked; if it doesn't,
+  ⌃⌥F3 starts it again.
 
 ![Screensavers: synthwave sunset and rain](docs/screenshots/screensavers.jpg)
 

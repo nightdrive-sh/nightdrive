@@ -9,7 +9,8 @@ import Quickshell.Services.Pam
 // ext-session-lock, so the screen changes hands only once at boot (Plymouth → Hyprland). hyprland.lua starts it first;
 // once the lock is secure it starts the session (NightdriveLocked), and the login apps after the password
 // (NightdriveUnlocked: they may ask the keyring, which the password opens). Both run once per login.
-// If this process dies while locked, Hyprland keeps the session locked (the "lockdead" screen).
+// If this process dies while locked, Hyprland keeps the session locked (the "lockdead" screen) and hypr/scripts/lock,
+// which runs it, starts it again: it quits with 0 only after the unlock.
 // Preview without locking: `nightdrive preview login` (checks the password, Esc closes).
 ShellRoot {
     id: root

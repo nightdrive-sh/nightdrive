@@ -266,9 +266,8 @@ hl.on("hyprland.start", function ()
         NightdriveLocked(); NightdriveUnlocked()
         return
     end
-    local pam = io.open("/etc/pam.d/nightdrive-lock")
-    if pam then pam:close() end
-    hl.exec_cmd("env NIGHTDRIVE_LOCK_PAM=" .. (pam and "nightdrive-lock" or "login") .. " qs -p " .. HOME .. "/.config/greeter/lock.qml")
+    -- Through the lock script, which starts the lock again if it dies (a screen going away as it starts)
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/lock --boot")
     hl.exec_cmd("sh -c 'sleep " .. LOCK_TIMEOUT .. "; [ -e \"" .. LOCKED_FLAG .. "\" ] || hyprctl dispatch \"hl.dsp.exit()\"'")
 end)
 
