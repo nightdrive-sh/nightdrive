@@ -33,6 +33,9 @@ Flickable {
         selecting = t
     }
     function copy() { if (selecting && selecting.selectedText) selecting.copy() }
+    // The copy key, for the key handlers: Hyprland sends ⌘C as Ctrl+Insert (bindings.lua, copy in every app), which a
+    // TextEdit with the focus took as its own, so the window has to hear it too (StandardKey.Copy); Ctrl+C and Meta+C as well
+    function isCopy(e) { return e.matches(StandardKey.Copy) || (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)) && e.key === Qt.Key_C }
     // Light paper for HTML as sent: senders pick their colours for a white page, whatever the desktop's theme
     readonly property color paperBg: "#f4f1f6"
     readonly property color paperText: "#1d1a21"

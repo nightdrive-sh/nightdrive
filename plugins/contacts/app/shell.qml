@@ -345,7 +345,7 @@ ShellRoot {
                         Layout.fillHeight: true
                         Keys.onPressed: e => {
                             const k = e.key
-                            win.look.keyboard = true        // the keys' frame shows (AppPointer)
+                            win.look.moved(e)              // Tab and the arrows show the keys' frame (AppPointer)
                             if (win.cheats && k !== Qt.Key_Question && sheet.modifierKeys.indexOf(k) < 0) win.cheats = false
                             if (win.panes.pressed(e)) { e.accepted = true; return }
                             const ctrl = e.modifiers & Qt.ControlModifier

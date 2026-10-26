@@ -13,6 +13,14 @@ QtObject {
     readonly property color hover: Qt.rgba(sel.r, sel.g, sel.b, 0.5)
     // The picked row where the keys are (active), framed only while the keys are in use (AppPointer.qml)
     property bool keyboard: false
+    // From the apps' key handlers: only the keys that move in the window (Tab, the arrows, j k) show the frame. Any key did,
+    // so ⌘ alone or ⌘C over a message's selected text framed a list row, as if the keys had gone there.
+    function moved(e) {
+        const k = e.key
+        if (k === Qt.Key_Tab || k === Qt.Key_Backtab || k === Qt.Key_Up || k === Qt.Key_Down || k === Qt.Key_Left
+            || k === Qt.Key_Right || (k === Qt.Key_J || k === Qt.Key_K) && !(e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)))
+            keyboard = true
+    }
     readonly property color frame: keyboard ? Qt.rgba(primary.r, primary.g, primary.b, 0.5) : "transparent"
     readonly property color sel: Theme.sel
     readonly property color text: Theme.text

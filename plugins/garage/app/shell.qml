@@ -121,7 +121,7 @@ ShellRoot {
                 // The page's keys (KeyHelp.qml lists them); the snapshot list takes its own first, while it has focus
                 Keys.onPressed: e => {
                     const k = e.key, v = win.vm
-                    win.look.keyboard = true        // the keys' frame shows (AppPointer)
+                    win.look.moved(e)              // Tab and the arrows show the keys' frame (AppPointer)
                     if (sheet.shown) { sheet.shown = false; e.accepted = true; return }
                     if (k === Qt.Key_Down || k === Qt.Key_J) win.step(1)
                     else if (k === Qt.Key_Up || k === Qt.Key_K) win.step(-1)

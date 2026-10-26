@@ -43,7 +43,7 @@ Flickable {
     Keys.onPressed: e => {
         const k = e.key
         const l = card.lines[card.line]
-        card.c.keyboard = true
+        card.c.moved(e)
         app.sheetKey(e)
         if (k === Qt.Key_Question) {}
         else if (k === Qt.Key_Tab && card.line < 0 && app.onePane && card.lines.length) card.line = 0

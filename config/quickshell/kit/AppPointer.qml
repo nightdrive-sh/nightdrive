@@ -3,7 +3,7 @@ import QtQuick
 // The frame of the row the keys are on (AppLook's frame) shows only after a key, as a browser's :focus-visible: the
 // pointer moving in the window hides it until the next key. Put it in the item that holds the window's content (its
 // RowLayout): a handler there hears the pointer over every part without taking it from them, as an item over them
-// would. Set c.keyboard in the app's key handlers.
+// would. The app's key handlers call c.moved(e) (AppLook.qml).
 HoverHandler {
     id: root
     required property QtObject c

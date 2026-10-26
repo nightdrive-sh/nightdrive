@@ -137,7 +137,7 @@ ColumnLayout {
         spacing: 2
         Keys.onPressed: e => {
             const k = e.key, n = root.snaps.length
-            root.c.keyboard = true
+            root.c.moved(e)
             if (k === Qt.Key_Down || k === Qt.Key_J) root.current = Math.min(n - 1, root.current + 1)
             else if (k === Qt.Key_Up || k === Qt.Key_K) root.current = Math.max(0, root.current - 1)
             else if (k === Qt.Key_Return || k === Qt.Key_Enter) root.restore(root.current)

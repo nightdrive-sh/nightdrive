@@ -915,7 +915,7 @@ ShellRoot {
                         readonly property real leadWidth: Math.max(Math.ceil(numberMetrics.advanceWidth), 14)
                         Keys.onPressed: e => {
                             const k = e.key
-                            win.look.keyboard = true        // the keys' frame shows (AppPointer)
+                            win.look.moved(e)              // Tab and the arrows show the keys' frame (AppPointer)
                             if (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier | Qt.AltModifier)) return
                             // The list takes most keys before they reach the sheet: any but ? closes it here
                             if (sheet.shown && k !== Qt.Key_Question && sheet.modifierKeys.indexOf(k) < 0) sheet.shown = false
