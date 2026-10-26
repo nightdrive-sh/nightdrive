@@ -8,7 +8,8 @@
 A contact is {id, account, name, sort, org, title, nickname, initials, photo, emails, phones, addresses, urls, birthday,
 note}: emails, phones and urls are [{label, value, ref}], addresses [{label, lines, ref, street, code, city, region,
 country}]; ref is what edit.py finds the line by. id is the file's path under the folder.
-photo is a picture to show: a file in the cache for one inside the card, the address of one on the web, or "".
+photo is a picture to show: a file in the cache for one inside the card or one of iCloud's (photos.py), the address of
+one on the web, or "".
 people are the contacts of every account with one person's cards as one (people() says when), each with ids and accounts.
 Apple's groups are cards of their own (X-ADDRESSBOOKSERVER-KIND:group); the others come from CATEGORIES.
 """
@@ -23,6 +24,8 @@ import sys
 from pathlib import Path
 
 import vobject
+
+import photos as photos_lib
 
 HOME = Path.home()
 DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "contacts"
@@ -111,8 +114,11 @@ def photo(card, photos=True):
     if isinstance(p.value, bytes):
         data = p.value
     elif isinstance(p.value, str) and p.value.startswith(("http://", "https://")):
-        # iCloud's need its sign-in, so they are left out: the initials show instead
-        return "" if "icloud.com" in p.value else p.value
+        if not photos_lib.signed_in(p.value):
+            return p.value
+        # iCloud's need its sign-in: photos.py fetches them after a sync; till then the initials show
+        cached = photos_lib.cached(p)
+        return str(cached) if cached.exists() else ""
     elif isinstance(p.value, str) and p.value.startswith("data:"):
         try:
             data = base64.b64decode(p.value.split(",", 1)[1])

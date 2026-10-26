@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-sudo dnf install -y vdirsyncer python3-vobject libsecret python3
+sudo dnf install -y vdirsyncer python3-vobject libsecret python3 ImageMagick
 
 bin/contacts enable
 if [[ ! -f ${XDG_CONFIG_HOME:-$HOME/.config}/contacts/accounts.conf ]]; then

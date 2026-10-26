@@ -39,6 +39,8 @@ sync_now() {
   # discover finds an account's address books (and new ones later); it asks before making their folders, so say yes
   yes | vds discover "${names[@]}" >/dev/null || return 1
   vds sync "${force[@]}" "${names[@]}" || return 1
+  # iCloud's photos are apart from the cards, behind the sign-in: the new ones into the cache (a failure is only a photo)
+  python3 "$APP_DIR/lib/photos.py" fetch "${names[@]}" || echo "Some photos didn't come: they show at the next sync." >&2
   # The edits are on the server now: what they were made over is no longer needed to merge
   local name
   for name in "${names[@]}"; do rm -rf "${BASE_DIR:?}/$name"; done

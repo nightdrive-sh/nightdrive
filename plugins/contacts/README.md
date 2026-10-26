@@ -1,6 +1,6 @@
 # Contacts
 
-Your contacts from iCloud, Google or another CardDAV server, on this computer and kept in sync: a quiet window with the accounts, the list and the open card. They are kept as vCard files in `~/.local/share/contacts`, one folder per account, synced by vdirsyncer both ways every 30 minutes, so they open at once and are there offline too. A contact you add, edit or delete here goes to the server at once, and on to your phone. Mail completes addresses from them, and the launcher finds them (Mail and the launcher, below).
+Your contacts from iCloud, Google or another CardDAV server, on this computer and kept in sync: a quiet window with the accounts, the list and the open card. They are kept as vCard files in `~/.local/share/contacts`, one folder per account, synced by vdirsyncer both ways every 30 minutes, so they open at once and are there offline too. iCloud keeps a contact's photo apart from the card, behind your sign-in: the sync fetches the new ones into `~/.cache/contacts/photos`, cut to the part chosen on the iPhone, and until then the initials show. A contact you add, edit or delete here goes to the server at once, and on to your phone. Mail completes addresses from them, and the launcher finds them (Mail and the launcher, below).
 
 ## Using it
 
@@ -30,7 +30,7 @@ If the same contact was changed on the phone too before the change here reached 
 
 Contacts reads your accounts from `~/.config/contacts/accounts.conf`, one section each, and signs in with an app password kept in the login keyring. Claude can do these steps with you: the plugin's page has Set up with Claude (`contacts setup` does the same), which opens Claude Code in a terminal and goes through them a step at a time. Your password goes only into the login keyring, by a command you run yourself.
 
-1. Install the plugin (launcher › System › Install › Plugins › Contacts): it installs vdirsyncer, python3-vobject and libsecret (secret-tool).
+1. Install the plugin (launcher › System › Install › Plugins › Contacts): it installs vdirsyncer, python3-vobject, libsecret (secret-tool) and ImageMagick (for iCloud's photos).
 
 2. Make an app password for Contacts in your account's settings, as mail apps need:
    - iCloud: [account.apple.com](https://account.apple.com) › Sign-In and Security › App-Specific Passwords.
@@ -77,10 +77,10 @@ Google's CardDAV with an app password works, but Google's own documentation asks
 | `contacts settings` | Opens the settings: the accounts, Sync now, Add an account |
 | `contacts people` | Everyone as JSON (names, numbers, email and street addresses), as Mail and the launcher read them |
 | `contacts setup` | Sets up an account with Claude, in a terminal |
-| `contacts sync [NAME…]` | Syncs every account's contacts both ways now (or these accounts') |
+| `contacts sync [NAME…]` | Syncs every account's contacts both ways now (or these accounts'), then fetches iCloud's new photos |
 | `contacts accounts` | The accounts and how many contacts each has here |
 | `contacts enable`, `disable` | Contacts among the apps and the sync every 30 minutes, on or off (your contacts and accounts stay) |
 | `contacts restart`, `quit`, `log` | After a change to Contacts, and its QML errors |
 | `contacts vdirsyncer …` | vdirsyncer with Contacts' config, for a closer look |
 
-Needs: vdirsyncer, an iCloud, Google or CardDAV account
+Needs: vdirsyncer, ImageMagick, an iCloud, Google or CardDAV account
