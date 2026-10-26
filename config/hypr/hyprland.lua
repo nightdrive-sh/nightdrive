@@ -113,9 +113,28 @@ if lidClosed and login1("Docked") then hl.monitor({ output = BUILTIN_DISPLAY, di
 -- laptop's screen has them all, from 1 (an HDMI display that dropped out for a moment at boot left the MacBook on 3).
 -- The rules follow the screens at each reload; NightdriveArrangeWorkspaces moves the workspaces that already exist.
 LAPTOP_WORKSPACE = 10
+-- The first parse comes before Hyprland has its screens, so then they are read from the kernel's connectors: each screen
+-- has to come up on its own workspace at once. Without rules a laptop with an external display came up with 1 on its
+-- own screen and 2 on the external one, and moving 1 over afterwards left the external one showing 2.
+-- Only on the DRM backend: a nested Hyprland (the sandbox, in KWin) has WAYLAND_DISPLAY from its host already, and the
+-- connectors it would see are the host's, not its own window.
+local function connectedScreens()
+    local list = {}
+    if os.getenv("WAYLAND_DISPLAY") then return list end
+    local p = io.popen("grep -lx connected /sys/class/drm/card*-*/status 2>/dev/null")
+    if not p then return list end
+    for path in p:lines() do
+        local name = path:match("/card%d+%-(.+)/status$")
+        if name then list[#list + 1] = { name = name } end
+    end
+    p:close()
+    return list
+end
 local function screens()
     local builtin, ext
-    for _, m in ipairs(hl.get_monitors()) do
+    local list = hl.get_monitors() or {}
+    if #list == 0 then list = connectedScreens() end   -- none in a headless sandbox either: then no rules at all
+    for _, m in ipairs(list) do
         if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext then ext = m end
     end
     return builtin, ext
@@ -126,8 +145,8 @@ do
         hl.workspace_rule({ workspace = tostring(LAPTOP_WORKSPACE), monitor = BUILTIN_DISPLAY, default = true })
         for i = 1, 9 do hl.workspace_rule({ workspace = tostring(i), monitor = ext.name, default = i == 1 }) end
     elseif builtin or ext then
-        -- 1 on the one screen there is. Never on a screen that isn't there (a VM's or a desktop's built-in one, or any at
-        -- the first parse, before Hyprland has its screens): 1 was kept for it and the real screen opened on 2
+        -- 1 on the one screen there is. Never on a screen that isn't there (a VM's or a desktop's built-in one): 1 was
+        -- kept for it and the real screen opened on 2
         hl.workspace_rule({ workspace = "1", monitor = (builtin or ext).name, default = true })
     end
 end
@@ -135,6 +154,7 @@ function NightdriveArrangeWorkspaces()
     local builtin, ext = screens()
     if not (builtin and ext) then return end
     local was = hl.get_active_workspace()
+    local shown = builtin.active_workspace and builtin.active_workspace.id
     -- The laptop's workspace on its screen first, so moving the others away leaves no gap there to fill
     local lw = hl.get_workspace(LAPTOP_WORKSPACE)
     if lw and lw.monitor and lw.monitor.name ~= BUILTIN_DISPLAY then
@@ -148,7 +168,15 @@ function NightdriveArrangeWorkspaces()
             hl.dispatch(hl.dsp.workspace.move({ workspace = w.id, monitor = ext.name }))
         end
     end
-    if was and was.id >= 1 and was.id <= 9 then hl.dispatch(hl.dsp.focus({ workspace = was.id })) end
+    -- The external screen shows what the laptop's screen showed (it moved there), else what had the focus. Never an empty
+    -- workspace Hyprland opened for the screen as it came, while 1 was bound elsewhere: 1 instead. That left it on 2 when
+    -- plugged in at the login screen, and when it dropped out for a moment at boot (then 1, empty, was gone)
+    local target = shown and shown >= 1 and shown <= 9 and shown or nil
+    if not target and was and was.id >= 1 and was.id <= 9 then target = was.id end
+    local showing = target or (ext.active_workspace and ext.active_workspace.id)   -- the focus stays on the laptop's
+    local tw = showing and hl.get_workspace(showing)
+    if not (tw and tw.windows > 0) then target = 1 end
+    if target then hl.dispatch(hl.dsp.focus({ workspace = target })) end
 end
 -- A screen that comes or goes: the rules again (reload), then the workspaces
 hl.on("monitor.added",   function () hl.exec_cmd("hyprctl reload && hyprctl eval 'NightdriveArrangeWorkspaces()'") end)
