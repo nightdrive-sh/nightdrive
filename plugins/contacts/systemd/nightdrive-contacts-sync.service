@@ -1,7 +1,7 @@
-# Contacts' sync (plugins/contacts): fetches every account in ~/.config/contacts/accounts.conf into
-# ~/.local/share/contacts with vdirsyncer. Run by nightdrive-contacts-sync.timer and `contacts sync`.
+# Contacts' sync (plugins/contacts): syncs every account in ~/.config/contacts/accounts.conf with
+# ~/.local/share/contacts, by vdirsyncer. Run by nightdrive-contacts-sync.timer and `contacts sync`.
 [Unit]
-Description=Nightdrive Contacts: fetch contacts (vdirsyncer)
+Description=Nightdrive Contacts: sync contacts both ways (vdirsyncer)
 After=network-online.target
 # Contacts is installed before its account is set up: nothing to fetch until then
 ConditionPathExists=%h/.config/contacts/accounts.conf

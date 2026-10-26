@@ -27,6 +27,8 @@ ShellRoot {
             function refresh(): void { win.load() }
             function openSettings(): void {}
             // All contacts, searched (`contacts search TEXT`; the launcher's later)
+            function create(): void { win.newContact() }
+            function edit(): void { win.edit() }
             function search(text: string): void { win.source = 0; searchField.text = text; win.filter(""); list.forceActiveFocus() }
         }
 
@@ -64,7 +66,8 @@ ShellRoot {
                 onStreamFinished: {
                     let d
                     try { d = JSON.parse(text) } catch (e) { console.warn("cards.py list: " + e); return }
-                    const keep = win.contact ? win.contact.id : ""
+                    const keep = win.keepNext || (win.contact ? win.contact.id : "")
+                    win.keepNext = ""
                     win.accounts = d.accounts
                     win.groups = d.groups
                     const add = x => Object.assign(x, { letter: win.letter(x.name), haystack: win.haystack(x) })
@@ -145,7 +148,8 @@ ShellRoot {
 
         // A quiet line under the list for what just happened
         property string note: ""
-        function say(t) { note = t; noteTimer.restart() }
+        // sticky: it stays until the next one (a sync, which tells when it's done)
+        function say(t, sticky) { note = t; if (sticky) noteTimer.stop(); else noteTimer.restart() }
         Timer { id: noteTimer; interval: 4000; onTriggered: win.note = "" }
 
         // Without an account yet, Contacts offers to set one up (setupPanel), and looks again now and then, so the
@@ -156,6 +160,52 @@ ShellRoot {
         property bool setupStarted: false
         Process { id: setupRun; command: [win.command, "setup"] }
         function startSetup() { setupStarted = true; setupRun.running = true }
+
+        // Editing (ContactEditor, saved by Store): ⌘E or e edits the open contact, ⌘N makes a new one, Delete deletes it
+        property bool editing: false
+        property string keepNext: ""        // the contact to open once the list is read again: the one just saved
+        readonly property alias store: store
+        readonly property alias confirm: confirm
+        // The open contact's cards: one, or one per account for a person in All contacts
+        function cardsOf(x) {
+            if (!x) return []
+            return (x.ids || [x.id]).map(i => everyone.find(y => y.id === i)).filter(y => y)
+        }
+        function edit() {
+            const cards = cardsOf(contact)
+            if (editing || !cards.length) return
+            editing = true
+            editor.openCards(cards)
+        }
+        function newContact() {
+            if (editing || !accounts.length) return
+            // In the account (or its group) the sidebar is on, else the first one
+            const s = sources[source] || {}
+            editing = true
+            editor.openNew(s.kind === "account" ? s.id : s.kind === "group" ? s.account : accounts[0].id)
+        }
+        function endEdit() {
+            editing = false
+            if (onePane && contact) openCard(); else list.forceActiveFocus()
+        }
+        function saved(id) { keepNext = id; load(); endEdit() }
+        function failed(message) { editor.error = message }
+        function askDelete() {
+            const cards = cardsOf(contact)
+            if (!cards.length) return
+            const names = cards.map(x => store.accountName(x.account))
+            confirm.ask("Delete " + contact.name + "?",
+                        "From " + names.join(" and ") + ", and from the phones and computers that share " + (names.length > 1 ? "them." : "it."),
+                        "Delete", () => {
+                            // The list stays where it was: on the next one (or the one before, at the end)
+                            const next = win.shown[win.current + 1] || win.shown[win.current - 1]
+                            win.keepNext = next ? next.id : ""
+                            win.editing = false
+                            win.store.remove(cards.map(x => x.id))
+                        })
+        }
+        Shortcut { sequences: ["Ctrl+N", "Meta+N"]; onActivated: win.newContact() }
+        Shortcut { sequences: ["Ctrl+E", "Meta+E"]; onActivated: win.edit() }
 
         Shortcut { sequences: ["/", "Ctrl+F"]; onActivated: searchField.forceActiveFocus() }
         Shortcut { sequence: "Ctrl+R"; onActivated: win.load() }
@@ -210,25 +260,38 @@ ShellRoot {
                 Layout.preferredWidth: Math.max(250, Math.min(340, win.width * 0.3 - 30))
                 Layout.fillWidth: win.onePane
                 Layout.fillHeight: true
-                visible: !(win.onePane && win.cardOpen)
+                visible: !(win.onePane && (win.cardOpen || win.editing))
                 color: "transparent"
                 ColumnLayout {
                     anchors.fill: parent
                     spacing: 0
-                    AppSearchField {
-                        id: searchField
+                    // The search, and the new contact's button at its end
+                    RowLayout {
                         Layout.fillWidth: true
-                        Layout.margins: 28
+                        Layout.leftMargin: 28
+                        Layout.rightMargin: 14
                         Layout.topMargin: 16
                         Layout.preferredHeight: win.headerHeight
-                        Layout.bottomMargin: 0
-                        c: win.look
-                        pixelSize: 13
-                        placeholder: "Search names, numbers, addresses"
-                        onEdited: win.filter(win.contact ? win.contact.id : "")
-                        onEscapePressed: { text = ""; win.filter(win.contact ? win.contact.id : ""); list.forceActiveFocus() }
-                        onReturnPressed: list.forceActiveFocus()
-                        onDownPressed: list.forceActiveFocus()
+                        spacing: 8
+                        AppSearchField {
+                            id: searchField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: win.headerHeight
+                            c: win.look
+                            pixelSize: 13
+                            placeholder: "Search names, numbers, addresses"
+                            onEdited: win.filter(win.contact ? win.contact.id : "")
+                            onEscapePressed: { text = ""; win.filter(win.contact ? win.contact.id : ""); list.forceActiveFocus() }
+                            onReturnPressed: list.forceActiveFocus()
+                            onDownPressed: list.forceActiveFocus()
+                        }
+                        AppIconButton {
+                            visible: win.accounts.length > 0
+                            c: win.look
+                            glyph: "user-plus"; glyphColor: c.dim; hoverColor: c.sel
+                            tip: "New contact"; keys: "⌘N"
+                            onClicked: win.newContact()
+                        }
                     }
                     Rectangle {
                         Layout.fillWidth: true
@@ -256,6 +319,8 @@ ShellRoot {
                             else if (k === Qt.Key_Space) win.scrollCard((e.modifiers & Qt.ShiftModifier ? -1 : 1) * (card.height - 80))
                             else if (k === Qt.Key_Escape && searchField.text !== "") { searchField.text = ""; win.filter(win.contact ? win.contact.id : "") }
                             else if (k === Qt.Key_Question) win.cheats = !win.cheats
+                            else if (k === Qt.Key_E && !ctrl) win.edit()
+                            else if (k === Qt.Key_Delete || k === Qt.Key_Backspace) win.askDelete()
                             else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
                             else return
                             e.accepted = true
@@ -332,161 +397,24 @@ ShellRoot {
                 Rectangle { visible: !win.onePane; anchors.right: parent.right; width: 1; height: parent.height; color: c.divider }
             }
 
-            // The open card. Narrow, its picture goes above the name and each line's label above its value
-            Flickable {
+            // The open card, or the editor in its place
+            ContactCard {
                 id: card
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: !win.onePane || win.cardOpen
-                clip: true
-                contentHeight: body.y + body.implicitHeight + 64
-                readonly property int margin: width < 520 ? 24 : 40
-                readonly property bool narrow: body.width < 420
-                // Its keys in one pane, where the list is away: back, and scrolling
-                Keys.onPressed: e => {
-                    const k = e.key
-                    sheet.pressed(e)
-                    if (k === Qt.Key_Question) {}
-                    else if (k === Qt.Key_Escape || k === Qt.Key_Left || k === Qt.Key_Backspace) win.closeCard()
-                    else if (k === Qt.Key_J) { win.move(1); card.contentY = 0 }
-                    else if (k === Qt.Key_K) { win.move(-1); card.contentY = 0 }
-                    else if (k === Qt.Key_PageDown || k === Qt.Key_PageUp) win.scrollCard((k === Qt.Key_PageUp ? -1 : 1) * (card.height - 80))
-                    else if (k === Qt.Key_Down) win.scrollCard(win.arrowStep)
-                    else if (k === Qt.Key_Up) win.scrollCard(-win.arrowStep)
-                    else if (k === Qt.Key_Space) win.scrollCard((e.modifiers & Qt.ShiftModifier ? -1 : 1) * (card.height - 80))
-                    else return
-                    e.accepted = true
-                }
-                // A finger's size, as the only way back for the mouse
-                AppIconButton {
-                    visible: win.onePane
-                    x: 10; y: 10; z: 1
-                    implicitWidth: 40; implicitHeight: 40; radius: 8
-                    c: win.look
-                    glyph: "arrow-left"; glyphSize: 17
-                    tip: "All of them"; keys: "Esc"
-                    onClicked: win.closeCard()
-                }
-                boundsBehavior: Flickable.StopAtBounds
-                TouchScroll { view: card }
-                readonly property var p: win.contact
-                Column {
-                    id: body
-                    visible: card.p !== null
-                    x: Math.max(card.margin, (card.width - width) / 2)
-                    y: win.onePane ? 64 : 56
-                    width: Math.min(560, card.width - 2 * card.margin)
-                    spacing: 28
-                    Grid {
-                        columns: card.narrow ? 1 : 2
-                        spacing: card.narrow ? 16 : 22
-                        verticalItemAlignment: Grid.AlignVCenter
-                        Avatar { c: win.look; size: card.narrow ? 72 : 84; person: card.p || {}; pixelSize: card.narrow ? 24 : 28 }
-                        Column {
-                            width: card.narrow ? body.width : body.width - 84 - 22
-                            spacing: 6
-                            Text {
-                                width: parent.width; wrapMode: Text.Wrap
-                                text: card.p ? card.p.name : ""
-                                color: c.title; font.family: c.font; font.pixelSize: 22; font.weight: Font.Medium
-                            }
-                            Text {
-                                visible: text !== ""
-                                width: parent.width; wrapMode: Text.Wrap
-                                text: card.p ? [card.p.title, card.p.org].filter(x => x).join(" · ") : ""
-                                color: c.dim; font.family: c.font; font.pixelSize: 13
-                            }
-                            Text {
-                                visible: text !== ""
-                                text: card.p && card.p.nickname ? "“" + card.p.nickname + "”" : ""
-                                color: c.faint; font.family: c.font; font.pixelSize: 12
-                            }
-                            // Where the card is from, with more than one account: one person's cards in several show as one
-                            Text {
-                                visible: win.accounts.length > 1 && card.p !== null
-                                text: !card.p ? "" : (card.p.accounts || [card.p.account])
-                                    .map(a => (win.accounts.find(x => x.id === a) || { name: a }).name).join(" · ")
-                                color: c.faint; font.family: c.font; font.pixelSize: 11
-                            }
-                        }
-                    }
-                    Rectangle { width: parent.width; height: 1; color: c.divider }
-                    // One line each: phones, emails, addresses, links, the birthday; the note under them
-                    Column {
-                        width: parent.width
-                        spacing: 4
-                        Repeater {
-                            model: card.p ? card.p.phones.map(x => ({ kind: "phone", glyph: "phone", label: x.label || "phone", value: x.value }))
-                                .concat(card.p.emails.map(x => ({ kind: "email", glyph: "mail", label: x.label || "email", value: x.value })))
-                                .concat(card.p.addresses.map(x => ({ kind: "address", glyph: "map-pin", label: x.label || "address", value: x.lines.join("\n") })))
-                                .concat(card.p.urls.map(x => ({ kind: "url", glyph: "link", label: x.label || "web", value: x.value })))
-                                .concat(card.p.birthday ? [{ kind: "birthday", glyph: "cake", label: "birthday", value: win.when(card.p.birthday) }] : [])
-                                : []
-                            delegate: Rectangle {
-                                id: field
-                                required property var modelData
-                                width: parent.width
-                                implicitHeight: card.narrow ? valueText.y + valueText.implicitHeight + 12 : Math.max(40, valueText.implicitHeight + 20)
-                                radius: 8
-                                color: fh.hovered ? c.hover : "transparent"
-                                HoverHandler { id: fh; cursorShape: Qt.PointingHandCursor }
-                                readonly property var actions: win.lineActions(modelData.kind)
-                                // A click on one of its buttons is the button's alone
-                                TapHandler { onTapped: if (field.actions.length && !buttons.hovered) win.use(field.actions[0].id, field.modelData.value) }
-                                Text {
-                                    id: glyph
-                                    x: 12; y: 12
-                                    text: Icons.g(field.modelData.glyph); font.family: Icons.family; font.pixelSize: 15; color: c.dim
-                                }
-                                Text {
-                                    id: labelText
-                                    x: 44; y: 12; width: card.narrow ? parent.width - x - 12 : 96
-                                    elide: Text.ElideRight
-                                    text: field.modelData.label; color: c.faint; font.family: c.font; font.pixelSize: 12
-                                }
-                                Text {
-                                    id: valueText
-                                    x: card.narrow ? 44 : 148; y: card.narrow ? 32 : 11
-                                    width: parent.width - x - 64        // room for its buttons
-                                    wrapMode: Text.Wrap; lineHeight: 1.2
-                                    text: field.modelData.value; color: c.text; font.family: c.font; font.pixelSize: 13
-                                }
-                                Row {
-                                    id: buttons
-                                    readonly property bool hovered: bh.hovered
-                                    visible: fh.hovered
-                                    anchors.right: parent.right; anchors.rightMargin: 7; y: 7
-                                    spacing: 2
-                                    HoverHandler { id: bh }
-                                    Repeater {
-                                        model: field.actions
-                                        delegate: AppIconButton {
-                                            required property var modelData
-                                            c: win.look
-                                            glyph: modelData.glyph; glyphColor: c.faint; hoverColor: c.sel
-                                            tip: modelData.tip
-                                            onClicked: win.use(modelData.id, field.modelData.value)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Text {
-                        visible: card.p !== null && card.p.note !== ""
-                        width: parent.width
-                        leftPadding: 12; rightPadding: 12
-                        wrapMode: Text.Wrap; lineHeight: 1.25
-                        text: card.p ? card.p.note : ""
-                        color: c.dim; font.family: c.font; font.pixelSize: 12
-                    }
-                }
-                Text {
-                    visible: win.loaded && card.p === null && !win.needsAccount
-                    anchors.centerIn: parent
-                    text: "No contact open"
-                    color: c.faint; font.family: c.font; font.pixelSize: 12
-                }
+                visible: (!win.onePane || win.cardOpen) && !win.editing
+                app: win
+                c: win.look
+                onEdit: win.edit()
+            }
+            ContactEditor {
+                id: editor
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: win.editing
+                app: win
+                c: win.look
+                onDone: win.endEdit()
             }
         }
 
@@ -527,13 +455,23 @@ ShellRoot {
             }
         }
 
+        Store { id: store; app: win }
+        ConfirmPanel {
+            id: confirm
+            c: win.look
+            onClosed: if (win.editing) editor.forceActiveFocus(); else list.forceActiveFocus()
+        }
+
         property alias cheats: sheet.shown
+        function sheetKey(e) { sheet.pressed(e) }      // for the card's keys (ContactCard)
         KeySheet {
             id: sheet
             c: win.look
             groups: [
                 { title: "Contacts", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  →", "Open the card (a narrow window)"], ["Esc  ←", "Back to the list (on the card: ↑ ↓ scroll, j k next)"], ["PgUp PgDn", "Ten up, down"], ["Space ⇧Space", "Scroll the card"],
                                            ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
+                { title: "Editing", keys: [["⌘N", "New contact"], ["⌘E  e", "Edit the contact"], ["⌘S  ⌘⏎", "Save"], ["Esc", "Leave the editor"],
+                                          ["Tab", "Next field"], ["Delete", "Delete the contact"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["⌘R", "Read the contacts again"], ["⌘B", "Hide or show the sidebar"],
                                          ["Click", "Copy a number, write to an address"]] }
             ]

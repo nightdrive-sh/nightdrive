@@ -4,7 +4,8 @@
     cards.py list      {accounts: [{id, name, count}], groups: [{id, account, name, members}], contacts: [...], people: [...]}
 
 A contact is {id, account, name, sort, org, title, nickname, initials, photo, emails, phones, addresses, urls, birthday,
-note}: emails, phones and urls are [{label, value}], addresses [{label, lines}]. id is the file's path under the folder.
+note}: emails, phones and urls are [{label, value, ref}], addresses [{label, lines, ref, street, code, city, region,
+country}]; ref is what edit.py finds the line by. id is the file's path under the folder.
 photo is a picture to show: a file in the cache for one inside the card, the address of one on the web, or "".
 people are the contacts of every account with one person's cards as one (people() says when), each with ids and accounts.
 Apple's groups are cards of their own (X-ADDRESSBOOKSERVER-KIND:group); the others come from CATEGORIES.
@@ -70,19 +71,22 @@ def label(item, grouped):
 
 
 def values(card, key, grouped):
-    return [{"label": label(i, grouped), "value": i.value.strip()} for i in card.contents.get(key, [])
+    """ref: the line's place among the card's lines of its kind, which edit.py finds it by"""
+    return [{"label": label(i, grouped), "value": i.value.strip(), "ref": n} for n, i in enumerate(card.contents.get(key, []))
             if isinstance(i.value, str) and i.value.strip()]
 
 
 def addresses(card, grouped):
+    """lines to show, and the parts the editor shows (street holds the box and the extended line too)"""
     out = []
-    for item in card.contents.get("adr", []):
+    for n, item in enumerate(card.contents.get("adr", [])):
         a = item.value
         street = " ".join(x for x in (a.box, a.extended, a.street) if x).strip()
         town = " ".join(x for x in (a.code, a.city) if x).strip()
         lines = [x.strip() for x in (street, town, a.region, a.country) if x and x.strip()]
         if lines:
-            out.append({"label": label(item, grouped), "lines": lines})
+            out.append({"label": label(item, grouped), "lines": lines, "ref": n, "street": street, "code": a.code or "",
+                        "city": a.city or "", "region": a.region or "", "country": a.country or ""})
     return out
 
 
@@ -171,7 +175,8 @@ def main():
             contacts.append({
                 "id": cid, "uid": uid, "account": account, "name": name,
                 "given": given, "family": family,
-                "org": org if org != name else "", "title": text(card, "title"), "nickname": text(card, "nickname"),
+                # org is left out of a company's own card, where it is the name; company is it as written, for the editor
+                "org": org if org != name else "", "company": org, "title": text(card, "title"), "nickname": text(card, "nickname"),
                 "initials": initials(name), "photo": photo(card),
                 "emails": emails, "phones": phones, "addresses": addresses(card, grouped),
                 "urls": values(card, "url", grouped), "birthday": birthday(card), "note": text(card, "note").strip(),
@@ -212,7 +217,7 @@ def people(contacts):
         same["ids"].append(x["id"])
         if x["account"] not in same["accounts"]:
             same["accounts"].append(x["account"])
-        for field in ("org", "title", "nickname", "photo", "birthday", "given", "family"):
+        for field in ("org", "company", "title", "nickname", "photo", "birthday", "given", "family"):
             same[field] = same[field] or x[field]
         if x["note"] and x["note"] not in same["note"]:
             same["note"] = (same["note"] + "\n\n" + x["note"]).strip()

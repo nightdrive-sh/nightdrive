@@ -7,6 +7,7 @@ CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/contacts
 ACCOUNTS=$CONFIG_DIR/accounts.conf                      # the user's accounts (README.md › Setting up an account)
 VDIRSYNCER_CONFIG=$CONFIG_DIR/vdirsyncer                # written from accounts.conf by lib/config.py
 DATA_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/contacts  # the vCards, a folder per account
+BASE_DIR=${XDG_STATE_HOME:-$HOME/.local/state}/contacts/base  # cards as they were before an edit (lib/edit.py, merge.py)
 SYNC_UNIT=nightdrive-contacts-sync.service              # systemd/, `contacts enable`
 SYNC_LOCK=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/contacts-sync.lock
 QS_DIR=$APP_DIR/app                                     # Contacts' own Quickshell config, apart from the desktop's shell
@@ -18,8 +19,12 @@ APP_IPC=contacts
 
 vds() { vdirsyncer -c "$VDIRSYNCER_CONFIG" "$@"; }
 
-# sync [NAME…]: the accounts' address books down to DATA_DIR, one sync at a time (the timer's and yours wait for each other)
+# sync [--force-delete] [NAME…]: the accounts' address books and DATA_DIR in step, both ways, one sync at a time (the
+# timer's and yours wait for each other). --force-delete: an address book emptied here empties the server's too (the app
+# passes it when you deleted the last contact in one; vdirsyncer won't otherwise).
 sync_now() {
+  local force=()
+  [[ ${1:-} == --force-delete ]] && { force=(--force-delete); shift; }
   [[ -f $ACCOUNTS ]] || { echo "No accounts yet: contacts setup, or README.md › Setting up an account." >&2; return 1; }
   mkdir -p "$(dirname "$SYNC_LOCK")"
   exec 9>"$SYNC_LOCK"
@@ -33,7 +38,10 @@ sync_now() {
   ((${#names[@]})) || { echo "No accounts in $ACCOUNTS." >&2; return 1; }
   # discover finds an account's address books (and new ones later); it asks before making their folders, so say yes
   yes | vds discover "${names[@]}" >/dev/null || return 1
-  vds sync "${names[@]}"
+  vds sync "${force[@]}" "${names[@]}" || return 1
+  # The edits are on the server now: what they were made over is no longer needed to merge
+  local name
+  for name in "${names[@]}"; do rm -rf "${BASE_DIR:?}/$name"; done
 }
 
 # accounts: each one with its number of contacts here
@@ -97,7 +105,8 @@ Usage: contacts [command]
   (none), open   open Contacts, or bring it forward if it is open
   search TEXT    open Contacts on what a search finds
   setup          set up an account with Claude, in a terminal
-  sync [NAME…]   fetch the contacts of every account (or these) now
+  sync [NAME…]   sync the contacts of every account (or these) now, both ways
+                 (--force-delete first: an address book emptied here empties the server's too)
   accounts       the accounts and how many contacts each has here
   enable         Contacts among the desktop's apps, and the sync every 30 minutes (the installer)
   disable        take them away again (your contacts and accounts stay)

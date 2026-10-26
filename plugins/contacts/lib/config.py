@@ -5,7 +5,7 @@
     config.py names     only print them
 
 accounts.conf is what the user (or Claude) edits: one section per account, in Mail's account.conf's form. vdirsyncer's
-config follows from it, so its pairs, paths and the one-way sync stay the same for everyone and a change to them here
+config follows from it, so its pairs, paths and the two-way sync stay the same for everyone and a change to them here
 reaches every account at the next sync.
 """
 
@@ -27,6 +27,7 @@ STATUS_DIR = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / "co
 ICLOUD_URL = "https://contacts.icloud.com/"
 # Google's CardDAV takes an app password (Basic auth) at the address book itself; its discovery wants OAuth
 GOOGLE_URL = "https://www.googleapis.com/carddav/v1/principals/{address}/lists/default/"
+MERGE = Path(__file__).resolve().parent / "merge.py"
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
@@ -68,16 +69,15 @@ def storage_pair(name, values):
 a = "{name}_remote"
 b = "{name}_local"
 collections = {"null" if single else '["from a"]'}
-conflict_resolution = "a wins"
-# One way for now: the server's contacts come down, and a change made here gives way to the server's at the next sync
-partial_sync = "revert"
+# Both ways: an edit here goes up, one on the phone comes down. A card changed on both sides since the last sync is
+# merged a field at a time (merge.py)
+conflict_resolution = {json.dumps(["command", str(MERGE)])}
 
 [storage {name}_remote]
 type = "carddav"
 url = {json.dumps(url)}
 username = {json.dumps(values["address"])}
 password.fetch = {json.dumps(fetch)}
-read_only = true
 
 [storage {name}_local]
 type = "filesystem"
