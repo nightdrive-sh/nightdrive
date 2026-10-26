@@ -6,15 +6,17 @@ vCards; `contacts sync` then takes the change to the server.
     edit.py delete ID…  deletes these cards; prints the accounts whose address book that left empty
 
 save takes {id ("" for a new one), account, given, family, company, title, nickname, birthday, note, phones, emails,
-urls, addresses}: phones, emails and urls are [{label, value, ref, orig}], addresses [{label, street, code, city, region,
+urls, addresses, newPhoto}: phones, emails and urls are [{label, value, ref, orig}], addresses [{label, street, code, city, region,
 country, ref, orig}], where ref is the line's place among the card's lines of its kind (cards.py) and orig the line as it
 was loaded (-1 and null for a new line). A line that is as it was stays as the card had it, to the byte; one that
-changed keeps its parameters (pref, Apple's own) where it can; the card's other fields are never touched.
+changed keeps its parameters (pref, Apple's own) where it can; the card's other fields are never touched. newPhoto is
+a picture to make the card's photo (photos.square), "" to remove it, or null (or left out) to keep the card's.
 
 Before a card changes for the first time since the last sync, its old text goes to BASE_DIR: merge.py needs it to tell
 what changed here from what changed on the server, if both did (README.md › Editing).
 """
 
+import base64
 import configparser
 import datetime
 import json
@@ -24,6 +26,7 @@ import sys
 import uuid
 from pathlib import Path
 
+import photos
 import vcard
 from vcard import components, escape, make, unescape, units
 
@@ -259,6 +262,8 @@ def save(data):
         else:
             card.lines_of(kind, data.get(key, []), lambda x: x.get("value", "").strip().replace("\n", " "))
 
+    set_photo(card, data.get("newPhoto"))
+
     # Saved as it was: the file stays as it is, so the sync has nothing to send
     if old is not None and vcard.serialize(card.lines()) == unchanged:
         return path
@@ -270,6 +275,24 @@ def save(data):
     tmp.write_text(text)
     tmp.replace(path)
     return path
+
+
+def set_photo(card, picture):
+    """The card's photo to the picture, inside the card, the way its vCard version writes one; or gone. iCloud takes
+    one inside the card and keeps it apart from then on (PHOTO;VALUE=uri, photos.py fetches it after the sync)."""
+    if picture is None:
+        return
+    if picture == "":
+        card.single("PHOTO", "")
+        return
+    try:
+        data = base64.b64encode(photos.square(picture)).decode()
+    except ValueError as e:
+        fail(str(e))
+    if card.text("VERSION").startswith("4"):
+        card.single("PHOTO", "data:image/jpeg;base64," + data, "")
+    else:
+        card.single("PHOTO", data, ";ENCODING=b;TYPE=JPEG")
 
 
 def keep_base(account, uid, text):

@@ -14,9 +14,7 @@ people are the contacts of every account with one person's cards as one (people(
 Apple's groups are cards of their own (X-ADDRESSBOOKSERVER-KIND:group); the others come from CATEGORIES.
 """
 
-import base64
 import configparser
-import hashlib
 import json
 import os
 import re
@@ -105,28 +103,22 @@ def birthday(card):
     return (year + "-" if year != "--" else "--") + m.group(2) + "-" + m.group(3)
 
 
-def photo(card, photos=True):
+def photo(card, path, photos=True):
     """The card's picture: inside it (written once to the cache, named by its content) or on the web."""
     item = card.contents.get("photo")
     if not item or not photos:
         return ""
     p = item[0]
-    if isinstance(p.value, bytes):
-        data = p.value
-    elif isinstance(p.value, str) and p.value.startswith(("http://", "https://")):
+    if isinstance(p.value, str) and p.value.startswith(("http://", "https://")):
         if not photos_lib.signed_in(p.value):
             return p.value
         # iCloud's need its sign-in: photos.py fetches them after a sync; till then the initials show
         cached = photos_lib.cached(p)
         return str(cached) if cached.exists() else ""
-    elif isinstance(p.value, str) and p.value.startswith("data:"):
-        try:
-            data = base64.b64decode(p.value.split(",", 1)[1])
-        except ValueError:
-            return ""
-    else:
+    data = photos_lib.inside(p, path)
+    if data is None:
         return ""
-    path = PHOTO_DIR / (hashlib.sha1(data).hexdigest() + ".img")
+    path = photos_lib.own(data)
     if not path.exists():
         PHOTO_DIR.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -186,7 +178,7 @@ def load(photos=True):
                 "given": given, "family": family,
                 # org is left out of a company's own card, where it is the name; company is it as written, for the editor
                 "org": org if org != name else "", "company": org, "title": text(card, "title"), "nickname": text(card, "nickname"),
-                "initials": initials(name), "photo": photo(card, photos),
+                "initials": initials(name), "photo": photo(card, path, photos),
                 "emails": emails, "phones": phones, "addresses": addresses(card, grouped),
                 "urls": values(card, "url", grouped), "birthday": birthday(card), "note": text(card, "note").strip(),
                 "categories": [c for c in (categories[0].value if categories else []) if c],

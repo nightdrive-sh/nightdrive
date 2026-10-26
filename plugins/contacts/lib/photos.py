@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""iCloud's contact photos, fetched into the cache after a sync (`contacts sync` runs it), for cards.py to show.
+"""Contact photos: iCloud's, fetched into the cache after a sync (`contacts sync` runs it), for cards.py to show; and a
+picture picked in the editor, made into a card's photo (edit.py).
 
     photos.py fetch [NAME…]    fetch the photos the accounts' cards (or these accounts') point to and the cache lacks,
-                               and remove the fetched ones no card points to any more
+                               and remove the cached ones no card points to any more
 
 iCloud keeps a photo apart from its card: PHOTO;VALUE=uri:https://gateway.icloud.com/… behind the account's sign-in, so
 the window can't load it itself. Here it is fetched with the account's own password-cmd, as vdirsyncer does, and
@@ -27,11 +28,14 @@ from pathlib import Path
 
 import vobject
 
+import vcard
+
 HOME = Path.home()
 DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "contacts"
 ACCOUNTS = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "contacts/accounts.conf"
 PHOTO_DIR = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")) / "contacts/photos"
 PREFIX = "icloud-"              # the fetched ones, apart from the photos cards.py writes from inside a card
+OWN = ".img"                    # the suffix of those cards.py writes, named by their content (own())
 SIZE = 512                      # the cached photo's longest side, in pixels: the card shows it at most ~200
 TIMEOUT = 20                    # seconds for one photo
 WORKERS = 6                     # photos fetched at once
@@ -64,9 +68,31 @@ def cached(item):
     return PHOTO_DIR / (PREFIX + hashlib.sha1(key.encode()).hexdigest() + ".jpg")
 
 
+def own(data):
+    """The cache's file for a photo inside a card (cards.py writes it there when it first shows it)"""
+    return PHOTO_DIR / (hashlib.sha1(data).hexdigest() + OWN)
+
+
+def inside(item, path):
+    """The bytes of a photo inside the card at path (vCard 3's ENCODING=b, or 4's data: address), or None"""
+    if isinstance(item.value, bytes):
+        return item.value
+    if not (isinstance(item.value, str) and item.value.startswith("data:")):
+        return None
+    value = item.value
+    if "," not in value:
+        # vobject reads vCard 4 as 3, where a comma parts a list: the address ends at it. The card's own line has it all.
+        line = next((x for x in vcard.parse(path.read_text(errors="replace")) if x.name == "PHOTO"), None)
+        value = line.value if line else ""
+    try:
+        return base64.b64decode(value.split(",", 1)[1])
+    except (ValueError, IndexError):
+        return None
+
+
 def wanted(account):
-    """{file: (url, crop)} for the account's cards' photos that need its sign-in"""
-    out = {}
+    """({file: (url, crop)} for the account's cards' photos that need its sign-in, {file} of those inside its cards)"""
+    out, inner = {}, set()
     for path in sorted((DATA_DIR / account).rglob("*.vcf")):
         try:
             card = vobject.readOne(path.read_text(errors="replace"))
@@ -75,7 +101,23 @@ def wanted(account):
         for item in card.contents.get("photo", [])[:1]:
             if isinstance(item.value, str) and item.value.startswith("https://") and signed_in(item.value):
                 out[cached(item)] = (item.value, crop_of(item))
-    return out
+            elif (data := inside(item, path)) is not None:
+                inner.add(own(data))
+    return out, inner
+
+
+def square(path):
+    """A picture picked in the editor as a card's photo: JPEG bytes of its middle square, at most SIZE pixels a side.
+    A square, as the iPhone and Google show a contact's photo round, and small, as it travels inside the card."""
+    args = ["magick", str(path) + "[0]", "-auto-orient", "-gravity", "center", "-crop", "1:1", "+repage",
+            "-resize", f"{SIZE}x{SIZE}>", "-background", "white", "-flatten", "-strip", "-quality", "85", "jpg:-"]
+    try:
+        done = subprocess.run(args, capture_output=True, timeout=TIMEOUT)
+    except (OSError, subprocess.SubprocessError):
+        raise ValueError("Couldn't make the photo: ImageMagick (magick) is needed.")
+    if done.returncode != 0 or not done.stdout:
+        raise ValueError(f"Couldn't read the picture: {Path(path).name}")
+    return done.stdout
 
 
 def password(values):
@@ -115,8 +157,8 @@ def fetch(names):
     sections = {s.partition(" ")[2]: parser[s] for s in parser.sections() if s.startswith("account ")}
     keep, failed = set(), 0
     for name, values in sections.items():
-        photos = wanted(name)
-        keep |= set(photos)
+        photos, inner = wanted(name)
+        keep |= set(photos) | inner
         if names and name not in names:
             continue
         missing = {f: v for f, v in photos.items() if not f.exists()}
@@ -141,9 +183,9 @@ def fetch(names):
         # A few at a time: the first sync of an account fetches them all, and the sync's lock waits for it
         with ThreadPoolExecutor(WORKERS) as pool:
             failed += sum(pool.map(one, missing.items()))
-    # A photo no card points to any more (a new one on the phone, a contact deleted) goes; the cards' own stay
+    # A photo no card points to or holds any more (a new one on the phone or in the editor, a contact deleted) goes
     if PHOTO_DIR.is_dir():
-        for f in PHOTO_DIR.glob(PREFIX + "*"):
+        for f in [*PHOTO_DIR.glob(PREFIX + "*"), *PHOTO_DIR.glob("*" + OWN)]:
             if f not in keep:
                 f.unlink(missing_ok=True)
     return failed

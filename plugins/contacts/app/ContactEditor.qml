@@ -4,7 +4,7 @@ import qs
 import qs.kit
 
 // The editor, in the card's place: the name and company, the numbers, addresses and links with their labels, the
-// birthday and the note. It edits a draft of one card (a person in several accounts: the card of the account picked at
+// birthday and the note, the photo (PhotoEdit). It edits a draft of one card (a person in several accounts: the card of the account picked at
 // the top); Store saves it through lib/edit.py, which keeps whatever else the card holds.
 FocusScope {
     id: ed
@@ -34,12 +34,13 @@ FocusScope {
     function fromCard(x) {
         return {
             id: x.id, account: x.account, given: x.given, family: x.family, company: x.company || "",
-            title: x.title, nickname: x.nickname, birthday: day(x.birthday), note: x.note,
+            title: x.title, nickname: x.nickname, birthday: day(x.birthday), note: x.note, photo: x.photo || "", newPhoto: null,
             phones: x.phones.map(line), emails: x.emails.map(line), urls: x.urls.map(line), addresses: x.addresses.map(line)
         }
     }
     function blank(account) {
         return { id: "", account: account, given: "", family: "", company: "", title: "", nickname: "", birthday: "", note: "",
+                 photo: "", newPhoto: null,
                  phones: [{ label: "mobile", value: "", ref: -1, orig: null }],
                  emails: [{ label: "home", value: "", ref: -1, orig: null }], urls: [], addresses: [] }
     }
@@ -162,11 +163,11 @@ FocusScope {
 
             RowLayout {
                 spacing: 22
-                Avatar {
+                PhotoEdit {
                     Layout.alignment: Qt.AlignTop
-                    visible: form.width >= 420
-                    c: ed.c; size: 72; pixelSize: 24
-                    person: ed.draft ? { initials: ((ed.draft.given || "").charAt(0) + (ed.draft.family || ed.draft.company || "").charAt(0)).toUpperCase() } : {}
+                    Layout.topMargin: 4
+                    c: ed.c; draft: ed.draft
+                    size: form.width >= 420 ? 72 : 56
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
