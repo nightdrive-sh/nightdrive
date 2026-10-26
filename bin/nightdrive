@@ -11,11 +11,11 @@ offered="$HOME/.local/state/nightdrive/apps-offered"  # Nightdrive's apps this i
 
 # The help: grouped, one short line per command. Colour only on a terminal (and not with NO_COLOR).
 usage() {
-  local b="" v="" d="" r=""
-  if [[ -t 1 && -z ${NO_COLOR:-} ]]; then b=$'\e[1m' v=$'\e[38;2;192;113;235m' d=$'\e[2m' r=$'\e[0m'; fi
+  local b="" v="" r=""
+  if [[ -t 1 && -z ${NO_COLOR:-} ]]; then b=$'\e[1m' v=$'\e[38;2;192;113;235m' r=$'\e[0m'; fi
   section() { printf '\n%s%s%s\n' "$b" "$1" "$r"; }
   row() { printf '  %s%-28s%s %s\n' "$v" "$1" "$r" "$2"; }
-  printf '%sNightdrive%s %s· your desktop, after dark%s\n' "$b" "$r" "$d" "$r"
+  printf '%sNightdrive%s\n' "$b" "$r"
   printf '\nUsage: nightdrive COMMAND [ARGS]\n'
   section "Update"
   row "update"                   "Update Nightdrive, its packages and apps, then reload the desktop"
