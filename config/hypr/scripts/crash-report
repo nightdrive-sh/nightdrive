@@ -195,7 +195,9 @@ def main():
     if cmd == "status":
         print("on" if systemctl("is-enabled", UNIT).stdout.strip() == "enabled" else "off")
     elif cmd == "on":
-        systemctl("enable", "--now", UNIT)
+        # The repo's path, not the name: the unit is linked from the repo (link.sh), and off (disable) removes such a
+        # link, so by name the next on wouldn't find it. By path systemd links it again.
+        systemctl("enable", "--now", os.path.join(REPO, "config", "systemd", "user", UNIT))
     elif cmd == "off":
         systemctl("disable", "--now", UNIT)
     elif cmd == "watch":

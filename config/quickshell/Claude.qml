@@ -20,8 +20,9 @@ Singleton {
     function addr(a) { return String(a).replace(/^0x/, "") }
     readonly property string activeAddr: Hyprland.activeToplevel ? addr(Hyprland.activeToplevel.address) : ""
 
-    // [{ address, dir, project, topic, state, wants, started }], the ones that want you first, then the newest
-    readonly property var sessions: {
+    // [{ address, dir, project, topic, state, started }] from the windows' titles. Kept apart from wants: the change
+    // handler below writes wants, and a binding that read it would be re-evaluated from its own change (a binding loop).
+    readonly property var seen: {
         const tops = Hyprland.toplevels.values
         const out = []
         for (const f of found) {
@@ -32,18 +33,20 @@ Singleton {
             const m = title.match(/^(\S)\s+(.*)$/)
             const state = !m || m[1] === "✳" || /[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? "waiting" : "working"
             out.push({ address: addr(f.address), dir: f.dir, project: f.dir.replace(/\/+$/, "").split("/").pop() || "/",
-                       topic: m && !/[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? m[2] : title, state: state,
-                       wants: !!wants[addr(f.address)], started: f.started })
+                       topic: m && !/[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? m[2] : title, state: state, started: f.started })
         }
-        return out.sort((a, b) => (b.wants - a.wants) || (b.started - a.started))
+        return out
     }
+    // The same with wants, the ones that want you first, then the newest
+    readonly property var sessions: seen.map(s => Object.assign({ wants: !!wants[s.address] }, s))
+                                        .sort((a, b) => (b.wants - a.wants) || (b.started - a.started))
     readonly property int wanting: sessions.filter(s => s.wants).length
 
     // working → waiting while another window is focused: it wants you
-    onSessionsChanged: {
+    onSeenChanged: {
         const st = {}, w = Object.assign({}, wants)
         let changed = false
-        for (const s of sessions) {
+        for (const s of seen) {
             st[s.address] = s.state
             if (lastState[s.address] === "working" && s.state === "waiting" && s.address !== activeAddr && !w[s.address]) { w[s.address] = true; changed = true }
             if (s.state === "working" && w[s.address]) { delete w[s.address]; changed = true }   // you answered it elsewhere (ssh, the phone)

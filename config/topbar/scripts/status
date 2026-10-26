@@ -22,6 +22,11 @@ case $kind in
     # The traffic goes over a cable (NetworkManager prefers it to Wi-Fi, which stays connected as a standby): a cable,
     # whether Wi-Fi is on or not
     if [[ $(~/.config/hypr/scripts/net-primary | jq -r '.type // ""') == ethernet ]]; then emit cable ""; exit; fi
+    # No Wi-Fi device (a VM, a PC on a cable) and no cable either: no network, which a crossed-out Wi-Fi wouldn't say
+    if ! nmcli -t -f TYPE device 2>/dev/null | grep -qx wifi; then
+      if nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable ""; else emit unplug "" off; fi
+      exit
+    fi
     if [[ $(nmcli radio wifi 2>/dev/null) != enabled ]]; then emit wifi-off "" off; exit; fi
     if nmcli -t -f ACTIVE device wifi list --rescan no 2>/dev/null | grep -q '^yes'; then emit wifi ""
     # Connecting (also after waking up): the arcs fill up one by one (BarModule.qml animates icons separated by |)

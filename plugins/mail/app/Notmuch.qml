@@ -178,7 +178,7 @@ QtObject {
             timestamp: m.timestamp,
             tags: m.tags || [],
             draft: (m.filename || []).some(f => /\/Drafts\/(cur|new)\//.test(f)),
-            body: (parts.plain !== "" ? parts.plain : htmlToText(parts.html)).replace(/^\s+|\s+$/g, ""),
+            body: (parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)).replace(/^\s+|\s+$/g, ""),
             html: parts.html !== "" ? safeHtml(parts.html) : "",
             files: parts.files      // attachments: { part, name, size } (size in bytes, or -1)
         }
@@ -243,6 +243,13 @@ QtObject {
                 .replace(/<[^>]+>/g, "")
                 .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+\d*);/gi, (m, e) => entity(e) ?? m)
                 .replace(/\n{3,}/g, "\n\n").trim()
+    }
+    // Some senders put HTML's entities in the plain part too ("Hei&nbsp;Jari", "viel&auml;"). One that only HTML writes
+    // (&nbsp;, a letter, a numbered character) shows the part came out of HTML, and then the entities are read; a plain
+    // text that only has &amp; or &lt; may be quoting HTML on purpose, so it stays as it is.
+    function plainText(t) {
+        if (!/&(nbsp|[a-z]+(uml|acute|grave|ring|circ|tilde|cedil|slash)|#x?[0-9a-f]+);/i.test(t)) return t
+        return t.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+\d*);/gi, (m, e) => entity(e) ?? m)
     }
     // &#228; &#xE4; &auml; → ä: every numbered character, and the named ones mail most often has
     readonly property var entities: ({ nbsp: " ", amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", auml: "ä", Auml: "Ä",
