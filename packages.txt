@@ -12,6 +12,8 @@ NetworkManager-bluetooth
 pipewire
 wireplumber
 pipewire-pulseaudio
+# AirPlay speakers as outputs (raop_sink.*: the Sound menus, hypr/scripts/airplay-check)
+pipewire-config-raop
 alsa-ucm
 mesa-dri-drivers
 mesa-vulkan-drivers
