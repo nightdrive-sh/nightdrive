@@ -320,6 +320,14 @@ logind-power-key.conf /etc/systemd/logind.conf.d/50-power-key.conf 644
 nightdrive.actions /etc/dnf/libdnf5-plugins/actions.d/nightdrive.actions 644
 dnf-excludes.conf /etc/dnf/libdnf5.conf.d/90-nightdrive.conf 644
 LIST
+  # Asahi Macs: macOS's partitions out of the file manager's sidebar (26.10.2026); udev picks them up at once
+  rules=/etc/udev/rules.d/61-nightdrive-apple-partitions.rules
+  if [[ $("$scripts/platform" machine) == asahi ]] && ! cmp -s "$repo/config/system/apple-partitions.rules" $rules; then
+    echo "    $rules"; copied=1
+    as_root "System files" sudo install -Dm644 "$repo/config/system/apple-partitions.rules" $rules \
+      && as_root "System files" sudo udevadm control --reload \
+      && as_root "System files" sudo udevadm trigger --subsystem-match=block --action=change
+  fi
   # Mac Keyboard Shortcuts (plugins/keyd): its /etc config follows the repo's, if the plugin is installed
   if [[ -f /etc/keyd/default.conf ]] && ! cmp -s "$repo/plugins/keyd/default.conf" /etc/keyd/default.conf; then
     echo "    /etc/keyd/default.conf"; copied=1

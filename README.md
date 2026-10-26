@@ -480,7 +480,10 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   (aarch64 and x86_64; specs in [nightdrive-packages](https://github.com/nightdrive-sh/nightdrive-packages)) and limits
   that repository to them. Ghostty comes from there too.
 - **Asahi specifics.** The notch area needs the `appledrm.show_notch=1` kernel argument, which the installer sets. The 16 KiB memory
-  pages break a few Electron apps, but 1Password works.
+  pages break a few Electron apps, but 1Password works. macOS's partitions (its disk, the boot picker's and the recovery's)
+  are hidden from Files' sidebar by a udev rule (`/etc/udev/rules.d/61-nightdrive-apple-partitions.rules`). They are only
+  hidden, nothing on the disk changes, and macOS's disk can still be opened by hand (with an APFS driver such as
+  apfs-fuse).
 - **The Claude menu** reads your plan's limits with Claude Code's own sign-in, so Claude Code must have been run once.
 - **Claude writes (⌘⇧C)** sends the selected text (or what you type in its card), and the window's class and title, to
   Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers

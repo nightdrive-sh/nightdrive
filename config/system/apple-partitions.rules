@@ -1,0 +1,15 @@
+# Asahi Macs: macOS's partitions on the internal disk (its APFS containers, the boot picker's and the recovery's) stay
+# out of file managers, which otherwise list each as an "N GB Volume". They are only hidden from udisks: nothing is
+# changed on the disk, and they can still be mounted by hand. By partition type, so the Linux EFI partition and /boot
+# are never matched; nvme* only, so an APFS disk plugged in over USB still shows. 61- because the partition type comes
+# from 60-persistent-storage.rules, and udisks reads UDISKS_IGNORE in its 80-udisks2.rules.
+SUBSYSTEM!="block", GOTO="nightdrive_apple_end"
+ENV{DEVTYPE}!="partition", GOTO="nightdrive_apple_end"
+KERNEL!="nvme*", GOTO="nightdrive_apple_end"
+# Apple APFS
+ENV{ID_PART_ENTRY_TYPE}=="7c3457ef-0000-11aa-aa11-00306543ecac", ENV{UDISKS_IGNORE}="1"
+# Apple Silicon boot
+ENV{ID_PART_ENTRY_TYPE}=="69646961-6700-11aa-aa11-00306543ecac", ENV{UDISKS_IGNORE}="1"
+# Apple Silicon recovery
+ENV{ID_PART_ENTRY_TYPE}=="52637672-7900-11aa-aa11-00306543ecac", ENV{UDISKS_IGNORE}="1"
+LABEL="nightdrive_apple_end"

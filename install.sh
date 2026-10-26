@@ -321,6 +321,9 @@ fi
 if [[ $machine == asahi ]]; then
   echo "==> Notch: the display uses the full top edge (appledrm.show_notch=1, requires a reboot)"
   sudo grubby --update-kernel=ALL --args="appledrm.show_notch=1"
+  echo "==> Files: macOS's partitions hidden from the sidebar (config/system/apple-partitions.rules; still there, mountable by hand)"
+  sudo install -Dm644 "$repo/config/system/apple-partitions.rules" /etc/udev/rules.d/61-nightdrive-apple-partitions.rules
+  sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=block --action=change || true
 fi
 # The MacBook's settings (with the Finnish keyboard) are hyprland.lua's own; another machine or keyboard gets its own in
 # local.lua (not in the repo)
