@@ -123,8 +123,6 @@ boot_files() { ls /boot 2>/dev/null | grep -E '^(vmlinuz|initramfs)-' | sort || 
 
 machine=$("$repo/config/hypr/scripts/platform" machine)
 kind=pc; [[ $machine == asahi ]] && kind=asahi
-# Not yet run for real on a Mac: until it has been, it only shows what it would do there (#1608)
-[[ $kind == pc ]] || (( dry )) || die "not yet on Apple Silicon Macs: --dry-run shows what it would do"
 echo "Reading what is installed and what Fedora Minimal has (base-$kind.txt)…"
 add_file "$here/base-$kind.txt"
 # install.sh removes these from Asahi's Minimal image (a Mac doesn't use them)

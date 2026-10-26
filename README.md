@@ -311,8 +311,7 @@ only a convention.
 **Installed on Fedora KDE?** Installs from before Nightdrive moved to Fedora Minimal go on as they are, KDE as a
 fallback session. To make one what a fresh install on Minimal is, run `nightdrive minimal --dry-run` first: it lists what
 would go (KDE and what only it needed, some 600 packages) and what stays as yours (what you installed yourself), and
-changes nothing. (On an Apple Silicon Mac only `--dry-run` works for now.) Then, from Nightdrive's desktop or a text
-console (not from Plasma):
+changes nothing. Then, from Nightdrive's desktop or a text console (not from Plasma):
 
 ```sh
 nightdrive minimal   # asks once; --keep kate,okular keeps KDE apps you still use
