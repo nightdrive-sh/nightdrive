@@ -151,7 +151,7 @@ ShellRoot {
         Process { id: copier }
         function lineActions(kind) {
             const copy = { id: "copy", glyph: "copy", tip: "Copy" }
-            if (kind === "email") return [{ id: "write", glyph: "send", tip: "Write an email" }, copy]
+            if (kind === "email") return [{ id: "write", glyph: "send", tip: "New email" }, copy]
             if (kind === "url") return [{ id: "open", glyph: "external-link", tip: "Open" }, copy]
             return kind === "birthday" ? [] : [copy]
         }
@@ -160,8 +160,14 @@ ShellRoot {
             else if (action === "open") Qt.openUrlExternally(/^\w+:/.test(value) ? value : "https://" + value)
             else if (action === "copy") { copier.command = ["wl-copy", value]; copier.running = true; say("Copied: " + value.replace(/\n/g, ", ")) }
         }
-        // w: an email to the open contact's first address, in the email app (Settings › Apps › Default apps)
-        function write() { if (contact && contact.emails.length) use("write", contact.emails[0].value) }
+        // w and Send email: a new email in the email app (Settings › Apps › Default apps), straight to a single address,
+        // else from the card's menu of them (opening the card first in one pane)
+        function write() {
+            if (!contact || !contact.emails.length) return
+            if (contact.emails.length === 1) { use("write", contact.emails[0].value); return }
+            if (onePane && !cardOpen) openCard()
+            card.chooseEmail()
+        }
         function when(b) {
             // YYYY-MM-DD or --MM-DD (no year)
             const m = b.match(/^(\d{4}|-)-(\d{2})-(\d{2})$/) || b.match(/^--(\d{2})-(\d{2})$/)
@@ -509,7 +515,7 @@ ShellRoot {
             groups: [
                 { title: "Contacts", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  →", "Open the card (a narrow window)"], ["Esc  ←", "Back to the list (on the card: ↑ ↓ scroll, j k next)"], ["PgUp PgDn", "Ten up, down"], ["Space ⇧Space", "Scroll the card"],
                                            ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
-                { title: "Editing", keys: [["⌘N", "New contact"], ["⌘E  e", "Edit the contact"], ["w", "Write an email to them"], ["⌘S  ⌘⏎", "Save"], ["Esc", "Leave the editor"],
+                { title: "Editing", keys: [["⌘N", "New contact"], ["⌘E  e", "Edit the contact"], ["w", "Send email (a menu if they have more addresses)"], ["⌘S  ⌘⏎", "Save"], ["Esc", "Leave the editor"],
                                           ["Tab", "Next field"], ["Delete", "Delete the contact"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["⌘R", "Read the contacts again"], ["⌘,", "Settings: accounts, sync"], ["⌘B", "Hide or show the sidebar"],
                                          ["Click", "Copy a number, write to an address"]] }

@@ -41,15 +41,30 @@ Flickable {
         tip: "All of them"; keys: "Esc"
         onClicked: app.closeCard()
     }
-    // Write to the first address (the rest each have their own button on their line)
+    // A new email: straight to a single address, else the menu of them (each line has its own button too)
     AppButton {
+        id: sendButton
         visible: card.p !== null && card.p.emails.length > 0
         anchors.right: editButton.left; anchors.rightMargin: 8; y: 16; z: 1
         c: card.c
-        glyph: "send"; label: card.width < 420 ? "" : "Write"
-        tip: "Write an email"; keys: "w"
+        glyph: "send"; label: card.width < 420 ? "" : "Send email"
+        tip: "A new email to them"; keys: "w"
         onClicked: app.write()
     }
+    // A click away from the menu closes it
+    MouseArea {
+        visible: emailMenu.open
+        x: 0; y: card.contentY; z: 2
+        width: card.width; height: card.height
+        onClicked: emailMenu.close()
+    }
+    EmailMenu {
+        id: emailMenu
+        anchors.right: sendButton.right; y: sendButton.y + sendButton.height + 4; z: 3
+        c: card.c
+        onChosen: address => card.app.use("write", address)
+    }
+    function chooseEmail() { emailMenu.show(card.p.emails) }
     AppButton {
         id: editButton
         visible: card.p !== null
