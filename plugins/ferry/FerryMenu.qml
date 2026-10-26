@@ -282,14 +282,6 @@ Column {
         onActionClicked: m.run(["clear", "received"])
     }
 
-    // Files dragged over turn the menu into device tiles: say what a drop does. The list of what arrived needs no title.
-    MenuSection {
-        visible: m.dropping
-        title: "Send to"
-        topPadding: 0
-        color: Theme.dim
-    }
-
     // Why the other devices can't get here, if they can't
     Rectangle {
         readonly property string why: !m.st ? ""
@@ -297,7 +289,7 @@ Column {
             : !m.st.tailscale ? "Tailscale is off: your other devices can't reach this computer."
             : !m.st.serving ? "Not on the tailnet yet. Run once: sudo tailscale set --operator=$USER, then: ferry enable"
             : ""
-        visible: why !== "" && !m.dropping
+        visible: why !== ""   // through a drop too: hiding it would move the drop area under the cursor
         width: parent.width
         height: whyText.implicitHeight + 24
         radius: 12
@@ -318,10 +310,14 @@ Column {
     }
 
     // The list, the pill (its list floats over the list) and the buttons; files over any of it turn it into tiles
+    // While files are over it, it keeps at least the height it had before: tiles shorter than the list would leave the
+    // cursor below it, the tiles would go, the list come back under the cursor, and so on (the menu flickered).
     Item {
         id: body
+        property real restHeight: 0
         width: parent.width
-        height: stack.y + stack.height
+        height: Math.max(stack.y + stack.height, m.dropping ? restHeight : 0)
+        onHeightChanged: if (!m.dropping) restHeight = height
 
         // Files dropped between the tiles go to the pill's device, as on the bar icon. Under the tiles, which take
         // the drop over them.
@@ -347,6 +343,14 @@ Column {
             spacing: 12
 
             // ---- dropping: a tile per device ----
+            // What a drop does; the list of what arrived needs no title. Here in the drop area, not above it: coming
+            // down from the bar icon, a title above would push the area from under the cursor as it showed.
+            MenuSection {
+                visible: m.dropping
+                title: "Send to"
+                topPadding: 0
+                color: Theme.dim
+            }
             Grid {
                 visible: m.dropping
                 width: parent.width
