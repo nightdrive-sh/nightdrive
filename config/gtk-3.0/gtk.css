@@ -39,9 +39,10 @@
 @define-color shadow_color rgba(0, 0, 0, 0.4);
 
 /* Adwaita draws most widgets with its own colours, not the names above: set the rules directly */
-window, .background { background-color: @nd_card; color: @nd_text; }
-headerbar, .titlebar { background: @nd_bg; color: @nd_text; border-color: @nd_border; box-shadow: none; }
-textview, textview text, .view, .view text, iconview { background-color: @nd_card; color: @nd_text; }
+/* One colour for the whole window, as in gtk-4.0/gtk.css: the look's background and opacity, with see-through panes */
+window, .background { background-color: @nd_window; color: @nd_text; }
+headerbar, .titlebar { background: transparent; color: @nd_text; border-color: @nd_border; box-shadow: none; }
+textview, textview text, .view, .view text, iconview { background-color: transparent; color: @nd_text; }
 separator { background-color: @nd_border; }
 selection, *:selected { background-color: @nd_sel; color: @nd_accent; }
 
@@ -56,7 +57,7 @@ button.suggested-action:disabled { background-color: @nd_card; color: @nd_dim; b
 button.flat:not(:hover):not(:checked):not(:active) { background-color: transparent; border-color: transparent; }
 
 /* Places sidebar (Recent, Home…) and the file list */
-placessidebar, placessidebar list, .sidebar, .sidebar list, stacksidebar list { background-color: @nd_bg; color: @nd_text; }
+placessidebar, placessidebar list, .sidebar, .sidebar list, stacksidebar list { background-color: transparent; color: @nd_text; }
 placessidebar, .sidebar { border-color: @nd_border; }
 placessidebar row:hover, .sidebar row:hover { background-color: @nd_hover; }
 placessidebar row:selected, .sidebar row:selected, list row:selected, row:selected,

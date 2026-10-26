@@ -1,6 +1,9 @@
 /* libadwaita windows (Nautilus, Loupe, zenity…) in the desktop's colours. The @nd_* colours come from the theme
    (hypr/scripts/theme apply), so this file stays the same for every theme. The path is relative to ~/.config/gtk-4.0,
-   where link.sh links this file. libadwaita 1.6+ reads its colours from the CSS variables, older ones from the names. */
+   where link.sh links this file. libadwaita 1.6+ reads its colours from the CSS variables, older ones from the names.
+   One colour for the whole window, as in the kit apps (Mail, Contacts): the window's background is the look's, with its
+   opacity (nd_window), and the panes and bars over it are transparent, so the translucency doesn't add up where they
+   overlap. */
 @import url("../../.cache/nightdrive/gtk-colors.css");
 
 :root {
@@ -19,27 +22,27 @@
   --error-color: @nd_danger;
   --error-bg-color: @nd_danger;
   --error-fg-color: @nd_bg;
-  --window-bg-color: @nd_card;
+  --window-bg-color: @nd_window;
   --window-fg-color: @nd_text;
-  --view-bg-color: @nd_card;
+  --view-bg-color: transparent;
   --view-fg-color: @nd_text;
-  --headerbar-bg-color: @nd_bg;
+  --headerbar-bg-color: transparent;
   --headerbar-fg-color: @nd_text;
   --headerbar-border-color: @nd_border;
-  --headerbar-backdrop-color: @nd_bg;
+  --headerbar-backdrop-color: transparent;
   --card-bg-color: @nd_hover;
   --card-fg-color: @nd_text;
   --dialog-bg-color: @nd_card;
   --dialog-fg-color: @nd_text;
   --popover-bg-color: @nd_card;
   --popover-fg-color: @nd_text;
-  --sidebar-bg-color: @nd_bg;
+  --sidebar-bg-color: transparent;
   --sidebar-fg-color: @nd_text;
-  --sidebar-backdrop-color: @nd_bg;
+  --sidebar-backdrop-color: transparent;
   --sidebar-border-color: @nd_border;
-  --secondary-sidebar-bg-color: @nd_bg;
+  --secondary-sidebar-bg-color: transparent;
   --secondary-sidebar-fg-color: @nd_text;
-  --secondary-sidebar-backdrop-color: @nd_bg;
+  --secondary-sidebar-backdrop-color: transparent;
   --secondary-sidebar-border-color: @nd_border;
   --thumbnail-bg-color: @nd_hover;
   --thumbnail-fg-color: @nd_text;
@@ -60,28 +63,31 @@
 @define-color error_color @nd_danger;
 @define-color error_bg_color @nd_danger;
 @define-color error_fg_color @nd_bg;
-@define-color window_bg_color @nd_card;
+@define-color window_bg_color @nd_window;
 @define-color window_fg_color @nd_text;
-@define-color view_bg_color @nd_card;
+@define-color view_bg_color transparent;
 @define-color view_fg_color @nd_text;
-@define-color headerbar_bg_color @nd_bg;
+@define-color headerbar_bg_color transparent;
 @define-color headerbar_fg_color @nd_text;
 @define-color headerbar_border_color @nd_border;
-@define-color headerbar_backdrop_color @nd_bg;
+@define-color headerbar_backdrop_color transparent;
 @define-color card_bg_color @nd_hover;
 @define-color card_fg_color @nd_text;
 @define-color dialog_bg_color @nd_card;
 @define-color dialog_fg_color @nd_text;
 @define-color popover_bg_color @nd_card;
 @define-color popover_fg_color @nd_text;
-@define-color sidebar_bg_color @nd_bg;
+@define-color sidebar_bg_color transparent;
 @define-color sidebar_fg_color @nd_text;
-@define-color sidebar_backdrop_color @nd_bg;
-@define-color secondary_sidebar_bg_color @nd_bg;
+@define-color sidebar_backdrop_color transparent;
+@define-color secondary_sidebar_bg_color transparent;
 @define-color secondary_sidebar_fg_color @nd_text;
-@define-color secondary_sidebar_backdrop_color @nd_bg;
+@define-color secondary_sidebar_backdrop_color transparent;
 @define-color thumbnail_bg_color @nd_hover;
 @define-color thumbnail_fg_color @nd_text;
+
+/* libadwaita draws the window's own background without --window-bg-color: nd_window by hand, as the panes are see-through */
+window.background { background-color: @nd_window; }
 
 /* The selected row in a sidebar or list: the theme's selected-row colour, as in the launcher (not accent at 10 %) */
 .navigation-sidebar > row:selected, row:selected { background-color: @nd_sel; color: @nd_accent; }

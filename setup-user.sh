@@ -22,11 +22,12 @@ blesh_src=$HOME/.local/src/ble.sh
 [[ -d $blesh_src/.git ]] || git clone -q --recursive --depth 1 --shallow-submodules https://github.com/akinomyoga/ble.sh.git "$blesh_src"
 [[ -e $HOME/.local/share/blesh/ble.sh ]] || make -C "$blesh_src" -s install PREFIX="$HOME/.local"
 
-echo "==> GTK: no KDE 1.7x text scaling, Papirus icons"
+echo "==> GTK: no KDE 1.7x text scaling, Papirus icons, the freedesktop sounds (Plasma's ocean is gone with it)"
 for v in 3.0 4.0; do
   f=$HOME/.config/gtk-$v/settings.ini
   [[ -f $f ]] || { mkdir -p "$(dirname "$f")"; printf '[Settings]\n' > "$f"; }
-  for kv in 'gtk-xft-dpi=98304' 'gtk-icon-theme-name=Papirus-Dark' 'gtk-decoration-layout=:' 'gtk-cursor-theme-name=breeze_cursors' 'gtk-application-prefer-dark-theme=1'; do
+  for kv in 'gtk-xft-dpi=98304' 'gtk-icon-theme-name=Papirus-Dark' 'gtk-decoration-layout=:' 'gtk-cursor-theme-name=breeze_cursors' 'gtk-application-prefer-dark-theme=1' \
+            'gtk-sound-theme-name=freedesktop'; do
     k=${kv%%=*}
     if grep -q "^$k=" "$f"; then sed -i "s|^$k=.*|$kv|" "$f"; else echo "$kv" >> "$f"; fi
   done
@@ -35,6 +36,7 @@ gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null 
 gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita' 2>/dev/null || true
 gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
 gsettings set org.gnome.desktop.wm.preferences button-layout ':' 2>/dev/null || true
+gsettings set org.gnome.desktop.sound theme-name 'freedesktop' 2>/dev/null || true
 # No "Connection established" from nm-applet each time Wi-Fi connects (a Mac doesn't say either); losing it still shows
 gsettings set org.gnome.nm-applet disable-connected-notifications true 2>/dev/null || true
 
