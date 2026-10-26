@@ -33,7 +33,7 @@ usage() {
   row "snippets [COMMAND]"       "Text snippets: list, set, remove, status, enable, disable"
   row "defaults [set KIND APP]"  "Default apps (browser, email, files…), e.g. nightdrive defaults set pdf org.gnome.Papers"
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
-  row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --effort LEVEL, --background)"
+  row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --effort LEVEL, --background, --workspace WS)"
   row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
   section "Plugins"
   row "plugins [list]"           "Optional parts, and which are installed, on or off"
