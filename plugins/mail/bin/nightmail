@@ -8,6 +8,12 @@ SYNC_UNIT=nightdrive-mail-sync.service                  # fetches and indexes ma
 PUSH_UNIT=nightdrive-mail-push.service                  # runs the sync as soon as mail comes (IMAP IDLE)
 FETCH_LOCK=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/mail-fetch.lock
 
+# `qs list` and `qs ipc` only find a Quickshell with the same QT_QPA_PLATFORM as theirs (Hyprland sets it, hyprland.lua).
+# A notification's buttons (lib/notify.py, run by systemd-run) and the sync's service get the user manager's environment,
+# which lacks it: without it they didn't see the open Mail, so a notification's Delete left the row until Mail's own
+# 30 s reload, and Open would start a second Mail.
+export QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-wayland;xcb}
+
 # The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
 APP_TITLE=Mail
 APP_IPC=mail
