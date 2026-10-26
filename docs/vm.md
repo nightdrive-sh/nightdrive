@@ -58,6 +58,7 @@ Once Fedora is installed, leave out the `scsi-cd` line to boot from the disk; `s
   move the window or leave it.
 - Keys arrive by their place on the keyboard: pick the guest's layout to match the Mac's in Fedora's installer. Nothing
   is shared with the clipboard: copy commands in over `ssh -p 2222 localhost` (the minimal install has `sshd` on).
-- The window gives the guest its size in real pixels, so the installer's scale 2.0 is right on a Mac's Retina display;
-  on a 1× external display, pick 1.0 in the launcher's Settings › Display. Nightdrive's screen in it follows the window:
-  tiled smaller or dragged to a new size, the guest takes the window's size, as in UTM and Parallels.
+- The window gives the guest its size in real pixels, so the guest's scale 2.0 (the default) is right on a Mac's Retina
+  display; on an external display, pick that display's scale (1.5, say) in the guest's launcher › Settings › Display, which
+  offers 1 to 2.5 there whatever the window's size. Nightdrive's screen in it follows the window: tiled smaller or dragged
+  to a new size, the guest takes the window's size, as in UTM and Parallels, cut by a pixel or two to one its scale divides.

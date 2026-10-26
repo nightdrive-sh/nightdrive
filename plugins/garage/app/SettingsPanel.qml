@@ -4,7 +4,8 @@ import qs.kit
 // A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, its ssh user, and deleting it.
 // They change while it is stopped (garage-ctl set, one call each for what changed), but for the user, which only ssh's
 // config reads; while it runs the rest show, and a click on what would change them says why it can't. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
-// The display has no setting: SDL gives the guest its window's size, and its scale is the guest's own.
+// The display has no setting: SDL gives the guest its window's size, and its scale is the guest's own (Nightdrive's:
+// Settings › Display, hypr/vm-display.lua).
 AppPanel {
     id: root
     required property QtObject ctl
