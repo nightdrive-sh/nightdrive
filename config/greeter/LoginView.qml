@@ -34,7 +34,7 @@ Item {
     property bool main: true
     // false: the prompt straight away, without the logo typing itself in or the sounds (a lock later in the session)
     property bool intro: true
-    onMainChanged: if (main) input.forceActiveFocus()
+    onMainChanged: { if (main) input.forceActiveFocus(); view.decideSound() }
 
     // node.dont-move: EasyEffects (started with the session, under this lock) moves every stream into its own sink, and at
     // boot that sink isn't linked to the output yet, so the startup sound went nowhere. These go straight to the output.
@@ -67,9 +67,20 @@ Item {
         stdout: SplitParser { onRead: view.soundStarted = true }
     }
     Timer { interval: 4500; running: !view.soundStarted; onTriggered: view.soundStarted = true }
+    // Which view plays it is decided once, at the start. Under the lock the surface's screen (and so main) is set only
+    // after the view is created: main was still false here, and the sound never played at boot. So a view that isn't main
+    // yet waits a moment before giving the sound up.
+    property bool soundDecided: false
+    function decideSound() {
+        if (soundDecided || !main || !intro) return
+        soundDecided = true
+        soundWait.stop()
+        startupSound.running = true
+    }
+    Timer { id: soundWait; interval: 300; onTriggered: { view.soundDecided = true; view.soundStarted = true } }
     Component.onCompleted: {
-        if (view.main && view.intro) startupSound.running = true
-        else view.soundStarted = true
+        if (!view.intro) view.soundStarted = true
+        else if (!view.soundDecided) { soundWait.start(); view.decideSound() }
         if (!view.intro) { logo.finish(); view.promptShown = true }
     }
 
