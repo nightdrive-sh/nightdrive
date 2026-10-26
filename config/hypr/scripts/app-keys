@@ -95,6 +95,11 @@ def state(apps=None):
         d = k["default"]
         # "Music (Deck, Spotify)": its own name or one in its parentheses (Deck)
         app_id = d and next((names[n.lower()] for n in [d["name"]] + d.pop("also") if n.lower() in names), None)
+        # else a name that is a part of an app's id: "VS Code" is Visual Studio Code, com.microsoft.VSCode.desktop.
+        # Without its app a default can't move, and its key in the launcher only offers to change the app (#1646)
+        if d and not app_id:
+            short = d["name"].lower().replace(" ", "")
+            app_id = next((i for i, a in apps.items() if da.usable(a) and short in i.lower().split(".")[:-1]), None)
         if app_id in apps: d.update(app=app_id, icon=apps[app_id].get("Icon", ""))
     used = {k["key"] for k in keys if not k["set"] or k["app"]}   # a key set to no app is free (its default shows there)
     return {"keys": keys, "free": [k for k in KEYS if k not in used],
