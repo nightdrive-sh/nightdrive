@@ -3,7 +3,9 @@
 # ("<output> <scale>" per line, "mode <output> <width>x<height>@<hz>" and "builtin <side>"), which hyprland.lua reads on
 # every (re)load, so a choice survives a reboot and wins over MONITOR_SCALE and local.lua.
 #   display list              one line per output: name, description, current scale, then "scale:width×height" for every scale
-#                             that divides the panel evenly (Hyprland adjusts any other value, which blurs text)
+#                             that divides the panel evenly (Hyprland adjusts any other value, which blurs text); a VM's
+#                             screen (Virtual-N) gets 1 to 2.5 whatever its size, as it takes its window's size cut to
+#                             one the scale divides (hypr/vm-display.lua)
 #   display scale <out> <s>   saves the scale for that output and reloads Hyprland
 #   display rates             one line per output: name, current refresh rate, the chosen one (or auto: the display's
 #                             preferred mode, often 60 Hz on a TV that does 120), then every rate at its current resolution
@@ -18,12 +20,14 @@ case ${1:-} in
     hyprctl -j monitors | jq -r '.[] | [.name, (.description | if . == "" then "-" else . end), .width, .height, .scale] | @tsv' |
     while IFS=$'\t' read -r name desc w h cur; do
       # Candidates the panel divides into whole pixels; 1.333 is 4/3, 1.667 is 5/3
-      opts=$(awk -v w="$w" -v h="$h" '
+      # A VM's: any that leaves a desktop of 640×400 (its window may be small), and 1 and the current one always
+      opts=$(awk -v w="$w" -v h="$h" -v cur="$cur" -v vm="$([[ $name == Virtual-* ]] && echo 1)" '
         function whole(x) { x -= int(x + 0.5); return x > -0.01 && x < 0.01 }
+        function fits(v) { return v == 1 || (v - cur) ^ 2 < 0.0001 || w / v >= 640 && h / v >= 400 }
         BEGIN {
-          n = split("1 1.2 1.25 1.333333 1.5 1.6 1.666667 1.75 2 2.4 2.5 3", s, " ")
+          n = split(vm ? "1 1.25 1.5 1.75 2 2.5" : "1 1.2 1.25 1.333333 1.5 1.6 1.666667 1.75 2 2.4 2.5 3", s, " ")
           for (i = 1; i <= n; i++)
-            if (w / s[i] >= 800 && h / s[i] >= 600 && whole(w / s[i]) && whole(h / s[i])) printf "\t%s:%d×%d", s[i], w / s[i] + 0.5, h / s[i] + 0.5
+            if (vm ? fits(s[i]) : w / s[i] >= 800 && h / s[i] >= 600 && whole(w / s[i]) && whole(h / s[i])) printf "\t%s:%d×%d", s[i], w / s[i] + 0.5, h / s[i] + 0.5
         }')
       printf '%s\t%s\t%s%s\n' "$name" "$desc" "$cur" "$opts"
     done ;;

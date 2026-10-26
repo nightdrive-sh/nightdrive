@@ -4,6 +4,7 @@ import qs
 
 // Tailscale: on/off, this machine and the other machines on the network, online and offline (click copies the IP address).
 // On/off requires running this once: sudo tailscale set --operator=$USER
+// Not logged in (a new install): Log in starts the login and opens its link in the browser (./login).
 Column {
     id: m
     width: parent ? parent.width : 300
@@ -11,6 +12,7 @@ Column {
 
     property bool running: LastState.tailscale
     onRunningChanged: LastState.tailscale = running
+    property bool needsLogin: false
     property string selfIp: ""
     property string selfName: ""
     property var peers: []           // [{ host, ip, online, os }]
@@ -20,9 +22,16 @@ Column {
 
     function refresh() { statusProc.running = true }
     function toggle() {
+        if (m.needsLogin && !m.running) { m.login(); return }   // tailscale up would only wait for the login
         m.message = ""
         toggleProc.script = m.running ? "tailscale down" : "tailscale up"
         toggleProc.running = true
+    }
+    // Detached, with its error as a notification: the browser takes the focus and the menu closes
+    function login() {
+        Quickshell.execDetached(["bash", "-c", 'msg=$("$1") || notify-send Tailscale "$msg"', "_",
+                                 Qt.resolvedUrl("login").toString().replace(/^file:\/\//, "")])
+        m.close()
     }
     function copy(ip) {
         Quickshell.execDetached(["wl-copy", ip])
@@ -40,6 +49,7 @@ Column {
             let j
             try { j = JSON.parse(text) } catch (e) { m.running = false; m.peers = []; return }
             m.running = j.BackendState === "Running"
+            m.needsLogin = j.BackendState === "NeedsLogin"
             m.selfIp = ((j.Self || {}).TailscaleIPs || [""])[0]
             // Machine name from the admin console (MagicDNS name), not the OS hostname: they differ after a rename
             const name = p => ((p.DNSName || "").split(".")[0]) || p.HostName || ""
@@ -83,7 +93,14 @@ Column {
     }
     MenuNote {
         visible: !m.running
-        text: "Tailscale is off"
+        text: m.needsLogin ? "Not logged in" : "Tailscale is off"
+    }
+    MenuButton {
+        visible: m.needsLogin && !m.running
+        width: parent.width
+        icon: "log-in"
+        label: "Log in"
+        onClicked: m.login()
     }
 
     // The other machines: online ones first, then offline ones (dimmed) under their own title

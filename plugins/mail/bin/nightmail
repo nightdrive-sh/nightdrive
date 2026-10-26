@@ -73,14 +73,10 @@ disable() {
   uninstall_app
 }
 
-# Setting up an account with Claude (Mail's first start offers it): Claude Code in a terminal goes through README.md ›
-# Setting up an account with you. The password goes in by a command you run yourself (! secret-tool …), so it never
-# passes through Claude.
+# Setting up an account with Claude (Mail's first start offers it, and so does Welcome to Nightdrive): Claude Code in a
+# terminal goes through README.md › Setting up an account with you, held to that by claude-setup. The password goes in by
+# a command you run yourself (! secret-tool …), so it never passes through Claude.
 setup() {
-  local claude=$HOME/.local/bin/claude
-  [[ -x $claude ]] || claude=$(command -v claude) || { echo "Claude Code is not installed: README.md › Setting up an account has the steps." >&2; return 1; }
-  # Clear inherited CLAUDE* variables, so the new Claude doesn't think it's a child session (as terminal-or-claude does)
-  for v in $(compgen -e | grep '^CLAUDE'); do unset "$v"; done
   local prompt="Set up my email account for Nightdrive Mail, by the steps in $APP_DIR/README.md, section \"Setting up an account\" \
 (and \"More accounts\" for the ones after it). Read it first, then go through it with me one step at a time, saying in plain \
 words what each step is for: I may not know mbsync or notmuch. Mail's plugin is installed, so step 1 is only the app password, \
@@ -91,7 +87,7 @@ notmuch's config or ~/.config/nightmail/account.conf is already there, add to it
 big mailbox can take long: run it in the background and tell me how it goes. Finish with \`nightmail enable\`, \
 \`nightmail restart\` and step 8's check. Once that account works, ask whether I want to add another one: if so, set it up the \
 same way by \"More accounts\", and ask again after each."
-  setsid -f "$HOME/.config/hypr/scripts/terminal" --dir "$HOME" -- "$claude" -- "$prompt" >/dev/null 2>&1
+  "$HOME/.config/hypr/scripts/claude-setup" mail Mail <<<"$prompt"
 }
 
 # The timer's full round and push's inbox-only one wait here for each other: two mbsyncs on the same folders would
@@ -175,6 +171,7 @@ Usage: nightmail [command]
   show ID        open Mail on a message (notmuch message id)
   reply ID       open Mail on a message and reply to it
   claude ID      the same, with Claude writing the reply
+  archive ID     archive a message, as Mail's a does
   delete ID      move a message to Trash
   notify         notify of new mail (notmuch's post-new hook runs it)
   keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
@@ -206,9 +203,11 @@ case ${1:-open} in
     case $1 in show) fn=openMessage ;; reply) fn=replyTo ;; claude) fn=claudeReply ;; esac
     ipc "$fn" "$2"
     ;;
-  delete)
+  archive|delete)
+    # The same move as Mail's a and d: from the inbox to Archive or Trash (move.py keeps Gmail's All Mail as it is)
     [[ -n ${2:-} ]] || { usage >&2; exit 2; }
-    python3 "$APP_DIR/lib/move.py" Trash "id:\"$2\"" INBOX >/dev/null && notmuch tag -inbox -- "id:\"$2\""
+    [[ $1 == archive ]] && to=Archive || to=Trash
+    python3 "$APP_DIR/lib/move.py" "$to" "id:\"$2\"" INBOX >/dev/null && notmuch tag -inbox -- "id:\"$2\""
     running && ipc refresh
     ;;
   notify)    python3 "$APP_DIR/lib/notify.py" ;;

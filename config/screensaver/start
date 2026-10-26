@@ -1,7 +1,11 @@
 #!/bin/bash
 # Launches the Nightdrive screensaver in a fullscreen kitty.
 # Usage: start [saver|rain|clock]  (without an argument: the choice in launcher › Settings › Screensaver › Style, random by default)
-pgrep -f '[n]ightdrive-(saver|rain)|screensaver/[c]lock' >/dev/null && exit 0
+# One running already: the savers themselves (as stop matches them), not a command that names one, and this session's
+# only: a container's (nightdrive sandbox) run as the same user in another PID namespace
+pgrep --ns $$ --nslist pid -f '^(python3 -I|qs -p) .*/screensaver/(nightdrive-saver|nightdrive-rain|clock)$' >/dev/null && exit 0
+# Not under the lock (hypridle's timer runs on while locked): the lock covers it, and it would outlive the unlock
+pgrep --ns $$ --nslist pid -u "$UID" -f '[q]s -p .*/greeter/lock\.qml' >/dev/null && exit 0
 dir=$(dirname "$(readlink -f "$0")")
 choice=${1:-$(awk '$1 == "style" { print $2 }' ~/.local/state/nightdrive/idle 2>/dev/null)}
 case $choice in

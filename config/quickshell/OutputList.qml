@@ -87,8 +87,9 @@ Column {
     }
     Sh {
         id: btProc
-        // Audio Sink UUID = headphones / speakers
-        script: 'bluetoothctl devices Paired | sed "s/\\x1b\\[[0-9;]*m//g" | while read -r _ mac name; do\n' +
+        // Audio Sink UUID = headphones / speakers. Without bluetoothd (the sandbox, a VM) bluetoothctl aborts or hangs
+        script: 'systemctl is-active -q bluetooth 2>/dev/null || exit 0\n' +
+                'bluetoothctl devices Paired | sed "s/\\x1b\\[[0-9;]*m//g" | while read -r _ mac name; do\n' +
                 '  info=$(bluetoothctl info "$mac")\n' +
                 '  grep -q "Connected: no" <<<"$info" && grep -q "UUID: Audio Sink" <<<"$info" && echo "$mac|$name"\n' +
                 'done'

@@ -127,15 +127,24 @@ class Watch:
             raise RuntimeError("its PassCmd gave no password")
         return result.stdout.rstrip("\n")
 
+    def tls_context(self):
+        """Verifies the server's certificate, as mbsync does: IMAP4_SSL's default doesn't, which would give the password
+        to anyone in the middle. The account's CertificateFile (a self-signed server's) is trusted on top of the system's."""
+        context = ssl.create_default_context()
+        if "certificatefile" in self.account:
+            context.load_verify_locations(os.path.expanduser(unquote(self.account["certificatefile"])))
+        return context
+
     def connect(self):
         host = self.account["host"]
         tls = (self.account.get("tlstype") or self.account.get("ssltype") or "STARTTLS").upper()
         if tls == "IMAPS":
-            imap = imaplib.IMAP4_SSL(host, int(self.account.get("port", 993)), timeout=TIMEOUT)
+            imap = imaplib.IMAP4_SSL(host, int(self.account.get("port", 993)), ssl_context=self.tls_context(),
+                                     timeout=TIMEOUT)
         else:
             imap = imaplib.IMAP4(host, int(self.account.get("port", 143)), timeout=TIMEOUT)
             if tls != "NONE":
-                imap.starttls(ssl.create_default_context())
+                imap.starttls(self.tls_context())
         try:
             if self.password is None:
                 self.password = self.get_password()

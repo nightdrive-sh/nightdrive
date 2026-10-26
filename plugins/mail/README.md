@@ -10,7 +10,8 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 - In a narrow window the folders hide by themselves (⌘B shows them), and narrower still the list and the thread take turns: a click, `Enter` or → opens the thread, `Esc`, ← or the arrow above it goes back to the list. With the list alone, the arrows (and PgUp / PgDn) move in it without opening anything, so nothing is marked read on the way; with the thread alone, they scroll it and `j` / `k` (or ⌥↑ / ⌥↓) go to the next thread.
 - With more than one account, each has its own folders: `Tab` / ⇧Tab (or a click on an address under the folders) shows the next one. A notification's message opens in its own account.
 - In a thread of three messages or more, the read ones before the last show as one line each (who, the first line, when): a click opens one. The quote at the end of a message hides behind `•••` when all of it is in an earlier message of the thread; when any of it isn't, it shows.
-- `h` shows a message as text, as HTML on the dark page, or as HTML on light paper as it was sent; which one comes first is a setting (text by default). Remote images stay off.
+- `h` shows a message as text, as HTML on the dark page, or as HTML on light paper as it was sent; which one comes first is a setting (text by default). Remote images stay off. A link opens in your browser, a mailto: link as a new message; other kinds (file:, smb:, an app's own) don't open from a message.
+- `⇧H` (or the button beside it) opens the HTML in your browser, where newsletters laid out in tables look as they were meant to. The page loads nothing from the network: no remote images, fonts or scripts, so the sender can't tell you opened it. Pictures sent with the message show, and links open when you click them. When the message has remote images, a bar at the top says so: Load images opens the page again with them (still without scripts).
 - `Enter` or a double click opens the thread in a window of its own (in Drafts, it goes on writing the draft). Opening an unread thread marks it read; `u` marks it unread again (and read again after that). ⇧U (or ✓ beside a folder's unread count) marks the whole folder read, or with a search on, what it found; ⌘Z takes it back.
 - The buttons above a message do the same with the mouse: Reply, Reply with Claude, Forward, Archive, Delete and Spam. Held under the pointer, a button shows its key. With several threads selected, the rows in the reading pane are buttons too.
 - `a` archives, `d` or Delete (⌫) moves to Trash, `!` marks spam (in Spam: not spam, back to the Inbox), ⌘Z undoes them. The next sync makes the same move on the server, so your phone and webmail see it too.
@@ -34,11 +35,11 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 - ⌘⇧C on a message has Claude write the reply, in the message's language, signed with your first name (with a signature of your own, Claude leaves the end to it). In the writing window, ⌘⇧C writes out what you started: select your draft (a start, a few points, "say yes, but next week") and Claude's reply takes its place.
 - The reply shows first in a card by the mouse, with what Claude read: `Enter` puts it in place, ⌘⇧C writes another version, `Esc` cancels. Nothing is sent before you press Ctrl+Enter.
 - What Claude reads is your choice, asked the first time you press ⌘⇧C: the whole thread (the best replies), or only the text you select, so the thread stays on your computer. Settings (⌘,) changes it later.
-- It needs Claude Code signed in (`claude`): the reply is written by `claude -p` with no tools.
+- It needs Claude Code signed in (`claude`): the reply is written by `claude -p` with no tools, not even your MCP servers or claude.ai connectors, so a message can't steer it into using them.
 
 ## Notifications
 
-- New unread mail in the inbox gets a notification with Reply, Reply with Claude and Delete; a click opens the message in Mail. More than three at once come as one notification that counts them.
+- New unread mail in the inbox gets a notification with Reply, Reply with Claude, Archive and Delete (as `a` and `d` in Mail); a click opens the message in Mail. More than three at once come as one notification that counts them.
 - They come after each sync even when Mail is closed: notmuch's post-new hook runs `nightmail notify`. A hook of your own is left alone; add `nightmail notify` to it yourself.
 - Mail in an inbox comes within seconds: a connection to each account waits for the server to say a message has arrived (IMAP IDLE, `nightmail push`), and then fetches that inbox alone. The other folders, and an account whose server can't do that, sync every 5 minutes. Gmail can tell of new mail up to a minute late.
 
@@ -48,9 +49,9 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 
 ## Setting up an account
 
-Mail reads the mail that mbsync has fetched into `~/Mail` and notmuch has indexed, and sends through your provider's SMTP server. These steps set up one account; each command can be run as it is, after putting your own values in place of the examples (you@example.com, mail.example.com, the account name `example`). Claude can do them with you: Mail's first start, before an account, offers Set up with Claude, which opens Claude Code in a terminal to go through them a step at a time and then offers to add more accounts (`nightmail setup` does the same, and so does asking Claude to set up Nightdrive Mail by this page). Your password goes only into the login keyring, by a command you run yourself.
+Mail reads the mail that mbsync has fetched into `~/Mail` and notmuch has indexed, and sends through your provider's SMTP server. These steps set up one account; each command can be run as it is, after putting your own values in place of the examples (you@example.com, mail.example.com, the account name `example`). Claude can do them with you: Mail's first start, before an account, offers Set up with Claude, which opens Claude Code in a terminal to go through them a step at a time and then offers to add more accounts (`nightmail setup` does the same, and so do Welcome to Nightdrive, launcher › System › Set up Nightdrive, and asking Claude to set up Nightdrive Mail by this page). Your password goes only into the login keyring, by a command you run yourself.
 
-1. Install the plugin (launcher › System › Install › Plugins › Mail): it installs notmuch, isync (mbsync), libsecret (secret-tool) and zenity, and says what is still missing. Many providers want an app password for mail apps (Gmail, iCloud, Outlook, Fastmail): make one in the provider's account settings first.
+1. Mail comes with Nightdrive; on an install without it, `nightdrive plugins install mail` installs it: notmuch, isync (mbsync), libsecret (secret-tool) and zenity, and it says what is still missing. Many providers want an app password for mail apps (Gmail, iCloud, Fastmail): make one in the provider's account settings first.
 
 2. Put the password in the login keyring, so it is never in a file (it asks for the password):
 
@@ -110,7 +111,7 @@ mbsync -a
 notmuch new
 ```
 
-6. Tell Mail how to send: `~/.config/nightmail/account.conf`. `sent` and `drafts` are the folders under `~/Mail` that mbsync made (a copy of each sent message goes there, and the next sync uploads it). `signature` is optional: its further lines are indented, and it goes under what you write. `suggest-model` is optional too: the Claude model that writes replies (sonnet by default).
+6. Tell Mail how to send: `~/.config/nightmail/account.conf`. `sent` and `drafts` are the folders under `~/Mail` that mbsync made (a copy of each sent message goes there, and the next sync uploads it). `signature` is optional: its further lines are indented, and it goes under what you write. `suggest-model` is optional too: the Claude model that writes replies (sonnet by default). Mail checks the server's certificate when it sends, as mbsync does when it syncs, so nothing goes out to a server whose certificate isn't valid. A server with a self-signed certificate can't be used for sending: mbsync and the inbox watch trust the one in the account's `CertificateFile` in `isyncrc`, sending doesn't.
 
 ```
 [account example]
@@ -165,7 +166,7 @@ SyncState *
 | `nightmail setup` | Sets up an email account with Claude, in a terminal |
 | `nightmail settings` | Opens Mail's settings |
 | `nightmail sync` | Fetches new mail now and shows it |
-| `nightmail show ID`, `reply ID`, `claude ID`, `delete ID` | A message by its notmuch id, as the notifications use them |
+| `nightmail show ID`, `reply ID`, `claude ID`, `archive ID`, `delete ID` | A message by its notmuch id, as the notifications use them |
 | `nightmail enable`, `disable` | Mail among the apps, its notifications and the sync, on or off (your mail and settings stay). Run `enable` again after changing `isyncrc`. |
 | `nightmail restart`, `quit`, `log` | After a change to Mail, and its QML errors |
 

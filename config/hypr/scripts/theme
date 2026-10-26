@@ -13,6 +13,7 @@ Themes). Choices: ~/.local/state/theme-color, ~/.local/state/nightdrive/theme-lo
   theme delete ID      deletes a theme of yours
   theme reset          back to the Default theme
   theme apply          writes ~/.cache/nightdrive/: theme.json (Quickshell), notify-icons, fuzzel.ini, hyprlock.conf,
+                       hyprtoolkit.conf (the polkit password prompt),
                        gtk-colors.css (imported by config/gtk-*/gtk.css), the look's files for the terminals and
                        Hyprland (look.lua), nightdrive-colors.css in the Firefox and Thunderbird profiles and Apostrophe,
                        aerc's default styleset (when aerc is installed) and the top bar's bar.json via bar-style
@@ -222,6 +223,11 @@ def apply():
           f"text={hx['muted']}ff\ninput={hx['muted']}ff\nprompt={hx['primary']}ff\nmatch={hx['primary']}ff\nselection={hx['sel']}ff\n"
           f"selection-text={hx['accent']}ff\nselection-match={hx['primary']}ff\nborder={hx['primary']}ff\n")
     write(f"{OUT}/hyprlock.conf", f"# written by theme\n$primary = rgb({hx['primary']})\n$accent = rgb({hx['accent']})\n")
+    # hyprtoolkit windows (hyprpolkitagent's password prompt): config/hypr/hyprtoolkit.conf sources this
+    write(f"{OUT}/hyprtoolkit.conf", "# written by theme\n" + "".join(f"{k} = rgba({hx[v] if v in hx else FIXED[v][1:]}ff)\n"
+          for k, v in {"background": "bg", "base": "card", "alternate_base": "border", "text": "text",
+                       "bright_text": "accent", "link_text": "primary", "accent": "primary",
+                       "accent_secondary": "deep"}.items()))
     # GTK 3 and 4 windows (file picker, Sushi, Loupe…): named colours only; the rules that use them are in the repo's
     # gtk.css files, so switching themes doesn't change a tracked file. GTK reads it when an app starts.
     write(f"{OUT}/gtk-colors.css", "/* written by theme */\n"
@@ -315,11 +321,15 @@ def reload():
     # again on the next Open dialog), unless a picker is open right now
     out = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True).stdout
     try:
-        busy = any(c.get("class") == "xdg-desktop-portal-gtk" for c in json.loads(out))
+        classes = {c.get("class") for c in json.loads(out)}
     except ValueError:
-        busy = True
-    if not busy:
+        classes = None
+    if classes is not None and "xdg-desktop-portal-gtk" not in classes:
         run("systemctl", "--user", "try-restart", "xdg-desktop-portal-gtk")
+    # The polkit agent too: hyprtoolkit watches hyprtoolkit.conf but not the colours it sources (restarting it cancels
+    # a prompt that is open, so not then)
+    if classes is not None and "hyprpolkitagent" not in classes:
+        run("systemctl", "--user", "try-restart", "hyprpolkitagent")
 
 
 args = sys.argv[1:]

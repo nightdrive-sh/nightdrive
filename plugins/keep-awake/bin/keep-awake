@@ -1,0 +1,59 @@
+#!/bin/bash
+# Keep Awake (README.md): keeps the computer awake, for a while or until turned off.
+#
+#   keep-awake on [MIN]  keep awake for MIN minutes, or until turned off
+#   keep-awake off       back to the usual idle times
+#   keep-awake toggle    on until turned off, or off (a right click on the top bar icon)
+#   keep-awake status    one line of JSON: {"on": true, "until": 1761397800, "minutes": 60} (until 0 = until turned off)
+#
+# hypridle (hypr/scripts/idle) honours logind's idle inhibitors: it skips the screensaver, the lock and the screen-off
+# while one is held. So "on" is `systemd-inhibit --what=idle:handle-lid-switch` in a transient user unit: it survives a
+# Quickshell restart, and logging out or a restart ends it. The lid lock keeps closing the lid from putting the computer
+# to sleep. A timed one also gets a transient timer at the wall-clock end time, so the time spent asleep (suspended
+# from the menu) counts too, which a `sleep` wouldn't.
+
+UNIT=nightdrive-keep-awake
+END=nightdrive-keep-awake-end
+WHAT=idle:handle-lid-switch
+# The end time and the minutes chosen (for the menu), in the runtime dir: gone at logout like the units
+STATE=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/keep-awake
+SELF=$(realpath "$0")
+
+# --any-display: from the end timer's unit qs doesn't see the session's display, and finds no bar without it
+refresh() { qs ipc --any-display call bar refreshModule keep-awake >/dev/null 2>&1 || true; }
+
+stop() {
+  systemctl --user stop "$END.timer" "$UNIT.service" 2>/dev/null
+  rm -f "$STATE"
+}
+
+on() {
+  local min=${1:-0} until=0
+  [[ $min =~ ^[0-9]+$ ]] || { echo "keep-awake: minutes are a number: $min" >&2; exit 2; }
+  stop
+  systemd-run --user --quiet --collect --unit="$UNIT" --description="Keep Awake: the idle and lid inhibitor" -- \
+    systemd-inhibit --what="$WHAT" --who="Keep Awake" --why="Keep awake (Nightdrive)" --mode=block sleep infinity || exit 1
+  if (( min > 0 )); then
+    until=$(( $(date +%s) + min * 60 ))
+    systemd-run --user --quiet --collect --unit="$END" --description="Keep Awake: back to the usual idle times" \
+      --on-calendar="$(date -d "@$until" '+%F %T')" -- "$SELF" off || { stop; exit 1; }
+  fi
+  mkdir -p "${STATE%/*}"
+  echo "$until $min" >"$STATE"
+}
+
+case $1 in
+  on) on "$2"; refresh ;;
+  off) stop; refresh ;;
+  toggle)
+    if systemctl --user -q is-active "$UNIT.service"; then stop; else on 0; fi
+    refresh ;;
+  status)
+    if systemctl --user -q is-active "$UNIT.service"; then
+      read -r until min 2>/dev/null <"$STATE"
+      echo "{\"on\": true, \"until\": ${until:-0}, \"minutes\": ${min:-0}}"
+    else
+      echo '{"on": false, "until": 0, "minutes": 0}'
+    fi ;;
+  *) sed -n '4,7s/^# \?//p' "$0" >&2; exit 2 ;;
+esac

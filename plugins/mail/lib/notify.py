@@ -4,7 +4,7 @@
     notify.py            notify of new unread mail in the inbox, then tag it notified
     notify.py wait ID    show one message's notification and act on the button pressed (run detached by the above)
 
-A notification has Reply, Reply with Claude and Delete buttons, and a click opens the message in Mail. More than MAX_EACH new messages at
+A notification has Reply, Reply with Claude, Archive and Delete buttons, and a click opens the message in Mail. More than MAX_EACH new messages at
 once get one notification that counts them. Messages are tagged `notified` so each is announced once; mail older
 than RECENT (an inbox synced for the first time) is tagged without a notification.
 """
@@ -70,7 +70,7 @@ def wait(msgid):
     body = h.get("Subject", "") or "(no subject)"
     out = subprocess.run(["notify-send", "--app-name=" + APP, "--icon=" + ICON, "--hint=string:desktop-entry:nightmail",
                           "--action=default=Open", "--action=reply=Reply", "--action=claude=Reply with Claude",
-                          "--action=delete=Delete",
+                          "--action=archive=Archive", "--action=delete=Delete",
                           summary, body], capture_output=True, text=True).stdout.strip()
     if out == "default":
         subprocess.run([NIGHTMAIL, "show", msgid])
@@ -78,8 +78,8 @@ def wait(msgid):
         subprocess.run([NIGHTMAIL, "reply", msgid])
     elif out == "claude":
         subprocess.run([NIGHTMAIL, "claude", msgid])
-    elif out == "delete":
-        subprocess.run([NIGHTMAIL, "delete", msgid])
+    elif out in ("archive", "delete"):
+        subprocess.run([NIGHTMAIL, out, msgid])
 
 
 def many(n):

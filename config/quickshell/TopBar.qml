@@ -116,6 +116,8 @@ Singleton {
     function moduleLabel(m) { return m.label || (moduleLabels[m.name] || [])[0] || m.name.charAt(0).toUpperCase() + m.name.slice(1) }
     function moduleGlyph(m) { return m.glyph || (moduleLabels[m.name] || [])[1] || "panel-top" }
     property var states: ({})          // name -> {icon, text, class}
+    // The modules in the "…" menu (OverflowMenu.qml) of the bar that opened it last: [{ def, menu }] (Bar.qml)
+    property var overflow: []
     function parseJsonc(t) {
         try { return JSON.parse(t.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n")) } catch (e) { return null }
     }

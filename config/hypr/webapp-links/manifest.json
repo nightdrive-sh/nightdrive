@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Nightdrive web app links",
+  "description": "Opens links to other sites in the default browser (hypr/scripts/webapp-links)",
+  "version": "1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4g2huS2Wxhr7Ey0cfZ3T6yRZYxW5XxCY2aADYrD3ujrDvQUVUjI/DOh8lMuP9KiRhqPxAAIkq4k/HVFoPtCfSBTm8aT/CCM2YcK6GigYdFRXMAMKGhR3OQM/IqStUJPJeto8WX9GEnt3fnWGc9MdxHMHbm5Mtb8BoUjzTKiy6Z0BoPi27+hYunXKPFFPN7MwZaMA2WTf8LYxfeJSqQ8DHOs7NzIRWbNLsQm+/H91LdbxuU5eo2fMDIo5oXeM5J/EnthvCfcoZJ766c3GSuF7KtuEw4N5ELmgTUWXHjksOh26ZRAWx+7V6bwftVmJAhXSrZLAmuh57o0TGmerV/PPGQIDAQAB",
+  "permissions": ["nativeMessaging", "tabs", "webNavigation"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{ "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_start" }]
+}

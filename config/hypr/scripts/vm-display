@@ -1,0 +1,26 @@
+#!/bin/bash
+# A VM's screen follows its window (hypr/vm-display.lua has why).
+#   vm-display watch     follows the virtual GPU's hotplug events (started with the session); quits at once on a
+#                        machine without one
+#   vm-display apply     sets the size its window has now, by hand (testing)
+# No waiting here for a drag to settle: qemu does that itself, telling the guest a second after the window's last change
+# of size, and its picture is stretched until then. Each change goes to the journal (journalctl -t nightdrive-vm-display).
+
+apply() {
+  hyprctl eval 'NightdriveVmDisplay(true)' >/dev/null
+  logger -t nightdrive-vm-display "$(hyprctl monitors | sed -n 2p | tr -d '\t')"
+}
+
+case $1 in
+  apply) apply ;;
+  watch)
+    compgen -G '/sys/class/drm/card*-Virtual-*' >/dev/null || exit 0
+    exec 9>"$XDG_RUNTIME_DIR/nightdrive-vm-display.lock"
+    flock -n 9 || exit 0   # one watcher per session
+    # Only this shell holds the lock (9>&-): a udevadm or grep left behind by a watcher that was killed would keep it,
+    # and the next watcher would quit at once
+    udevadm monitor --udev --subsystem-match=drm 9>&- \
+      | grep --line-buffered ' change ' 9>&- \
+      | while read -r _; do apply; done ;;
+  *) echo "usage: vm-display watch | apply" >&2; exit 1 ;;
+esac

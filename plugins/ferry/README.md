@@ -4,6 +4,8 @@ A mailbox between your computers and your phone. Leave photos, files, text or a 
 
 ![Ferry's menu in the top bar](ferry.jpg)
 
+Ferry is an app of its own, for Linux, the Mac and the iPhone. This plugin installs its latest release, with its window and Files' "Open With → Ferry", and puts its menu in Nightdrive's top bar, where other desktops have Ferry's tray icon. `nightdrive update` updates Ferry too. A Ferry from before, when the plugin had its own server, moves over with its phones and its box.
+
 ## On the computer
 
 - The menu lists what your other devices sent: a click on a row copies a text or opens a file (the round mark on the right says which), a file drags out into another app, and Clear empties the list (files stay in Downloads).
@@ -48,4 +50,5 @@ The `ferry` command does the same, and `ferry help` lists all of it.
 
 Only you can get in. The page isn't on the internet (tailscale serve, not Funnel), and it answers only the Tailscale user who owns the computer. Nothing that arrives is opened or run by itself. The phone is the key: if it's lost unlocked, remove it in Tailscale's admin console. Ferry suits a computer that is yours alone, and its tailnet name (computer.tailXXXX.ts.net) shows in public certificate logs.
 
+Homepage: https://github.com/nightdrive-sh/ferry
 Needs: the Tailscale plugin on the computer and the phone, with HTTPS certificates turned on for the tailnet (Tailscale's admin console › DNS)

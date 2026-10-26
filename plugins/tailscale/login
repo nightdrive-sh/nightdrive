@@ -1,0 +1,28 @@
+#!/bin/bash
+# Logs this machine in to Tailscale: starts the login and opens its link in the browser. Settings › Tailscale's and the
+# menu's Log in run it, and so do their switches and ./toggle while Tailscale needs a login (tailscale up would wait for
+# it with nothing on screen). tailscale up waits until the login is done in the browser, so it's left running on its
+# own; the link comes from its output, or from tailscale status when a login was already started.
+# Prints why (and exits 1) when it can't.
+WAIT=10   # seconds for tailscale up to print the link
+
+url=$(tailscale status --json 2>/dev/null | jq -r '.AuthURL // empty')
+if [[ -z $url ]]; then
+  out=$(mktemp)
+  trap 'rm -f "$out"' EXIT   # tailscale up keeps writing to the open file
+  setsid tailscale up >"$out" 2>&1 </dev/null &
+  pid=$!
+  for (( i = 0; i < WAIT * 4; i++ )); do
+    url=$(grep -oE 'https://login\.tailscale\.com/\S+' "$out" | head -1)
+    [[ -n $url ]] && break
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid" && exit 0   # done without a login: it was logged in already
+      if grep -qiE 'access denied|operator' "$out"; then echo "Permission denied. Run once: sudo tailscale set --operator=\$USER"
+      else grep -v '^\s*$' "$out" | tail -1; fi
+      exit 1
+    fi
+    sleep 0.25
+  done
+  [[ -z $url ]] && { echo "Tailscale gave no login link. Try again, or run tailscale up in a terminal."; exit 1; }
+fi
+xdg-open "$url" >/dev/null 2>&1

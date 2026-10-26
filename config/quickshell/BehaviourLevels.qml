@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 
-// The launcher's Settings › Mouse (the wheel's scroll speed), Launcher (fuzzy search, shortcut hints), Firefox (its links and tab bar), Computer name, Remote login (sshd), Notifications (how long a popup stays,
+// The launcher's Settings › Mouse (the wheel's scroll speed), Launcher (fuzzy search, shortcut hints), Firefox (its links, tab bar and start), Computer name, Remote login (sshd), Notifications (how long a popup stays,
 // the two sounds, FUMonitor's alerts), Crash reports and Update channel. Startup stays in Launcher.qml: its rows are the app rows.
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered), shows compName
 // channel and the mouse's speed on Settings' own rows, and calls entered("settings") to read them.
@@ -10,6 +10,7 @@ Item {
     property var launcher: null
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
+    readonly property var inputs: ["compname"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
     readonly property var levels: ["launcherprefs", "compname", "remotelogin", "sounds", "notiftime", "soundregular", "soundurgent", "channel", "browser", "mousescroll", "crashreports"]
     readonly property var titles: ({ launcherprefs: "Settings › Launcher", compname: "Settings › Computer name", remotelogin: "Settings › Remote login", channel: "Settings › Update channel",
                                      browser: "Apps › Firefox", mousescroll: "Settings › Mouse", crashreports: "Settings › Crash reports",
@@ -25,33 +26,41 @@ Item {
         script: 'n=$(hostnamectl --pretty 2>/dev/null); [ -n "$n" ] || { n=$(uname -n); n=${n%%.*}; n=${n^}; }; echo "$n"'
         onResult: text => b.compName = text.trim()
     }
-    // Settings › Remote login: SSH into this computer, off by default like a Mac's (Fedora's preset leaves sshd off; the
-    // firewall lets 22 in, so the service is what decides). on | off | none (no openssh-server), "" = not read yet
+    // Settings › Remote login: SSH into this computer, off by default like a Mac's (Fedora's preset leaves sshd off).
+    // When on, the firewall lets it in over Tailscale and on the networks trusted (scripts/remote-login), not on a
+    // café's. on | off | none (no openssh-server), "" = not read yet. remoteNet: the network the traffic goes out on
+    // ({uuid, name, allowed: yes | no | ""}), empty off Wi-Fi and cable or without firewalld
     property string remoteLogin: ""
-    property string sshAddress: ""
+    property var remoteNet: ({})
     readonly property var remoteLoginItems: remoteLogin === "on" || remoteLogin === "off"
         ? [{ kind: "nav", name: "Remote login", glyph: "terminal", target: "remotelogin", summary: remoteLogin }] : []
     Sh {
         id: remoteLoginProc
-        script: 'systemctl list-unit-files -q sshd.service | grep -q . || { echo none; exit; }; systemctl -q is-active sshd.service && echo on || echo off; h=$(uname -n); echo "$USER@${h%%.*}.local"'
+        script: '"$HOME/.config/hypr/scripts/remote-login" status'
         onResult: text => {
-            const f = text.trim().split("\n")
+            const f = text.replace(/\n$/, "").split("\n")
             b.remoteLogin = f[0] || ""
-            b.sshAddress = f[1] || ""
+            b.remoteNet = f[1] ? { uuid: f[1], name: f[2] || "", allowed: f[3] || "" } : {}
         }
     }
-    // systemd's polkit asks for the password; cancelling it leaves the switch as it was
+    // firewalld's and systemd's polkit ask for the password; cancelling either leaves the switch as it was, without a
+    // notification (firewall-cmd says "Authorization failed", systemctl "Access denied")
     Sh {
         id: remoteLoginSetProc
         onResult: text => {
-            if (exitCode !== 0 && !/not authorized|cancel/i.test(text))
+            if (exitCode !== 0 && !/not authorized|authorization failed|access denied|cancel/i.test(text))
                 Quickshell.execDetached(["notify-send", "-u", "critical", "-a", "Settings", "Remote login failed", text.trim()])
             remoteLoginProc.running = true
         }
     }
     function setRemoteLogin(on) {
         remoteLogin = on ? "on" : "off"
-        remoteLoginSetProc.script = "systemctl " + (on ? "enable" : "disable") + " --now sshd.service"
+        remoteLoginSetProc.script = '"$HOME/.config/hypr/scripts/remote-login" ' + (on ? "on" : "off")
+        remoteLoginSetProc.running = true
+    }
+    function setRemoteNet(allow) {
+        remoteNet = Object.assign({}, remoteNet, { allowed: allow ? "yes" : "no" })
+        remoteLoginSetProc.script = '"$HOME/.config/hypr/scripts/remote-login" ' + (allow ? "allow" : "deny") + " " + remoteNet.uuid
         remoteLoginSetProc.running = true
     }
     // Settings › Update channel: stable | dev | custom (nightdrive channel; the channel is the checkout's branch)
@@ -70,7 +79,7 @@ Item {
         }
     }
     // Settings › Apps › Firefox (hypr/scripts/firefox-prefs): "" until read, "none" without a Firefox profile, else
-    // { links: window|tab, tabbar: auto|always }. Its row in Settings shows only with a profile.
+    // { links: window|tab, tabbar: auto|always, startup: empty|restore }. Its row in Settings shows only with a profile.
     property var firefox: ""
     readonly property var browserItems: firefox !== "" && firefox !== "none"
         ? [{ kind: "nav", name: "Firefox", glyph: "globe", target: "browser" }] : []
@@ -173,13 +182,15 @@ Item {
 
     function footer(level, query) {
         const cur = launcher.results[launcher.selIndex] || {}
-        if (level === "launcherprefs" || cur.kind === "firefox" || cur.kind === "remotelogin" || cur.kind === "fumon" || cur.kind === "crashreports") return "Enter: on/off"
+        if (level === "launcherprefs" || cur.kind === "firefox" || cur.kind === "remotelogin" || cur.kind === "remotenet" || cur.kind === "fumon" || cur.kind === "crashreports") return "Enter: on/off"
         if (cur.kind === "mousescroll") return "Enter: choose, then try the wheel"
         if (cur.kind === "sound") return "Enter: choose  ·  Shift+Enter: listen"
         if (level === "compname" && query.trim() !== "") return "Enter: rename (asks for your password)"
         return ""
     }
-    function opened() {}
+    // The rows that show only once read (Firefox, Remote login, Crash reports) are in the root search too, so read
+    // them on every open, not only on entering Settings: after a reload they were missing until Settings was opened
+    function opened() { firefoxProc.running = true; remoteLoginProc.running = true; crashReportsProc.running = true }
     function entered(level) {
         if (level === "settings" || level === "compname") compNameProc.running = true
         if (level === "settings" || level === "channel") channelProc.running = true
@@ -200,6 +211,8 @@ Item {
                       sub: "Typos and initials also match: firefx, vsc", switchOn: launcher.prefs.fuzzy },
                     { kind: "lpref", key: "shortcuts", name: "Shortcut hints", glyph: "keyboard",
                       sub: "An app’s or menu’s keys on its row (Hyper P)", switchOn: launcher.prefs.shortcuts }]
+                .concat([{ kind: "lpref", key: "comma", name: "Decimal comma in results", glyph: "calculator",
+                      sub: "The calculator answers 3,5 instead of 3.5 (type either)", switchOn: launcher.prefs.comma }])
                 .concat(Plugins.has("deck") ? [{ kind: "lpref", key: "deck", name: "Include Deck artists, albums and songs", glyph: "disc-3",
                       sub: "Your shelf and Curated in the search, and a row to search Spotify", switchOn: launcher.prefs.deck }] : [])
         }
@@ -213,9 +226,11 @@ Item {
             // Firefox reads them when it starts (user.js, userChrome.css)
             if (typeof firefox !== "object") return []
             return [{ kind: "firefox", key: "links", on: "window", off: "tab", name: "Links from other apps in a new window", glyph: "app-window",
-                      sub: "Off: as a tab in the last Firefox window", switchOn: firefox.links === "window" },
+                      sub: "A link from Mail or chat opens on its own, not among your tabs", switchOn: firefox.links === "window" },
                     { kind: "firefox", key: "tabbar", on: "auto", off: "always", name: "Tab bar only with several tabs", glyph: "panel-top",
-                      sub: "Off: the tab bar shows also with one tab", switchOn: firefox.tabbar === "auto" },
+                      sub: "One tab, no tab bar: more room for the page", switchOn: firefox.tabbar === "auto" },
+                    { kind: "firefox", key: "startup", on: "empty", off: "restore", name: "Start with an empty window", glyph: "history",
+                      sub: "A fresh start, not the last session’s tabs again", switchOn: firefox.startup !== "restore" },
                     { kind: "note", name: "Changes apply when Firefox restarts" }]
         }
         if (level === "compname") {
@@ -225,10 +240,12 @@ Item {
             return [{ kind: "compset", name: "Rename to “" + name + "”", glyph: "laptop", value: name }]
         }
         if (level === "remotelogin") {
-            return [{ kind: "remotelogin", name: "Remote login", glyph: "terminal", switchOn: remoteLogin === "on",
-                      sub: "Log in to this computer from another one with SSH" },
-                    { kind: "note", name: remoteLogin === "on" ? "ssh " + sshAddress + " from the same network"
-                                                              : "Off by default. Turning it on asks for your password" }]
+            const on = remoteLogin === "on"
+            return [{ kind: "remotelogin", name: "Remote login", glyph: "terminal", switchOn: on,
+                      sub: "Log in to this computer from another one with SSH" }]
+                .concat(on && remoteNet.uuid ? [{ kind: "remotenet", name: "Allow from “" + remoteNet.name + "”", glyph: "house",
+                      switchOn: remoteNet.allowed === "yes", sub: "Safe at home or work, not on a café’s or hotel’s network" }] : [])
+                .concat(on ? [] : [{ kind: "note", name: "Off by default. Turning it on asks for your password" }])
         }
         if (level === "crashreports") {
             return [{ kind: "crashreports", name: "Crash reports to Claude", glyph: "bug", switchOn: crashReports === "on",
@@ -273,6 +290,7 @@ Item {
             return true
         }
         if (it.kind === "remotelogin") { l.keepSelection(); setRemoteLogin(!it.switchOn); return true }
+        if (it.kind === "remotenet") { l.keepSelection(); setRemoteNet(!it.switchOn); return true }
         if (it.kind === "fumon") {
             l.keepSelection()
             fumon = fumon === "on" ? "off" : "on"

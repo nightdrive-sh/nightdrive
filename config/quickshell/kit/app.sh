@@ -7,7 +7,8 @@
 
 running() { qs list -p "$QS_DIR" 2>/dev/null | grep -q 'Process ID'; }
 pid() { qs list -p "$QS_DIR" 2>/dev/null | awk '/Process ID/ { print $3; exit }'; }
-start() { setsid -f qs -p "$QS_DIR" >/dev/null 2>&1; }
+# </dev/null: started from a terminal (an installer's), Quickshell would keep its stdin and the terminal would stay open
+start() { setsid -f qs -p "$QS_DIR" </dev/null >/dev/null 2>&1; }
 
 stop() {
   running || return 0

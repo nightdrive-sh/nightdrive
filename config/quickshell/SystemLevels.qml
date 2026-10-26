@@ -11,6 +11,7 @@ Item {
     id: s
     property var launcher: null
 
+    readonly property var inputs: ["wifipw", "mirrorpin"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
     readonly property var levels: ["wifi", "wifipw", "bluetooth", "sound", "headphones", "tailscale", "status", "mirrorpin"]
     readonly property var titles: ({ status: "System › Status", mirrorpin: "Screen Mirroring › Code", wifi: "Settings › Wi-Fi", wifipw: "Wi-Fi › Password", bluetooth: "Settings › Bluetooth",
                                      sound: "Settings › Sound", headphones: "Sound › Headphones", tailscale: "Settings › Tailscale" })
@@ -25,6 +26,7 @@ Item {
     function footer(level, query) {
         const cur = launcher.results[launcher.selIndex] || {}
         if (cur.kind === "slider") return "Left+Right: " + cur.name.toLowerCase() + "  ·  Enter: mute on/off"
+        if (cur.kind === "tslogin" || (cur.key === "tailscale" && tsNeedsLogin && !tsRunning)) return "Enter: log in"
         if (cur.kind === "systoggle") return "Enter: on/off"
         if (cur.kind === "wifinet") return cur.active ? "" : "Enter: connect"
         if (cur.kind === "btdev") return "Enter: " + (cur.connected ? "disconnect" : cur.paired ? "connect" : "pair and connect")
@@ -77,12 +79,16 @@ Item {
                 powered = !powered
                 Quickshell.execDetached(["bluetoothctl", "power", powered ? "on" : "off"])
             } else if (it.key === "tailscale") {
-                tsMessage = ""
-                tsToggle.script = tsRunning ? "tailscale down" : "tailscale up"
-                tsToggle.running = true
+                if (tsNeedsLogin && !tsRunning) tsLogin()   // tailscale up would only wait for the login
+                else {
+                    tsMessage = ""
+                    tsToggle.script = tsRunning ? "tailscale down" : "tailscale up"
+                    tsToggle.running = true
+                }
             }
             return true
         }
+        if (it.kind === "tslogin") { sel(); tsLogin(); return true }
         if (it.kind === "wifinet") { sel(); wifiActivate(it.net); return true }
         if (it.kind === "wifidisconnect") { sel(); wifiActivate(activeNet); return true }
         if (it.kind === "wififorget") {
@@ -429,12 +435,14 @@ done; true'
     Timer { interval: 2500; repeat: true; running: s.shown && s.level === "bluetooth"; onTriggered: s.btRefresh() }
     Sh {
         id: powerProc
-        command: ["bluetoothctl", "show"]
+        // Without bluetoothd (the sandbox, a VM) bluetoothctl aborts or hangs
+        script: 'systemctl is-active -q bluetooth 2>/dev/null && bluetoothctl show'
         onResult: text => { const p = /Powered:\s*yes/.test(text); if (p !== s.powered) { s.sel(); s.powered = p } }
     }
     Sh {
         id: btListProc
-        script: 'bluetoothctl devices | sed "s/\\x1b\\[[0-9;]*m//g" | while read -r _ mac name; do\n' +
+        script: 'systemctl is-active -q bluetooth 2>/dev/null || exit 0\n' +
+                'bluetoothctl devices | sed "s/\\x1b\\[[0-9;]*m//g" | while read -r _ mac name; do\n' +
                 '  info=$(bluetoothctl info "$mac")\n' +
                 '  c=$(grep -c "Connected: yes" <<<"$info"); p=$(grep -c "Paired: yes" <<<"$info"); n=$(grep -c "^\\s*Name:" <<<"$info")\n' +
                 '  b=$(grep -oP "Battery Percentage: 0x\\w+ \\(\\K[0-9]+" <<<"$info")\n' +
@@ -673,6 +681,7 @@ done; true'
     // ================= Tailscale (as in the Tailscale plugin's menu, plugins/tailscale/TailscaleMenu.qml) =================
     property bool tsRunning: LastState.tailscale
     onTsRunningChanged: LastState.tailscale = tsRunning
+    property bool tsNeedsLogin: false
     property string selfIp: ""
     property string selfName: ""
     property var peers: []           // [{ host, ip, online, os }]
@@ -681,6 +690,8 @@ done; true'
     Timer { id: copiedTimer; interval: 1500; onTriggered: { s.sel(); s.copied = "" } }
     function tsRows() {
         const r = [{ kind: "systoggle", key: "tailscale", name: "Tailscale", glyph: tsRunning ? "shield-check" : "shield-off", switchOn: tsRunning }]
+        if (tsNeedsLogin && !tsRunning)
+            r.push({ kind: "tslogin", name: "Log in", glyph: "log-in", summary: "opens the link in the browser" })
         if (tsMessage !== "") r.push({ kind: "hint", name: tsMessage })
         if (!tsRunning) return r
         if (selfIp !== "") r.push({ kind: "header", name: "This machine" },
@@ -712,19 +723,37 @@ done; true'
             }
             arr.sort((a, b) => (b.online - a.online) || a.host.localeCompare(b.host))
             const running = j.BackendState === "Running"
+            const needsLogin = j.BackendState === "NeedsLogin"
             const ip = ((j.Self || {}).TailscaleIPs || [""])[0]
-            if (running === s.tsRunning && ip === s.selfIp && JSON.stringify(arr) === JSON.stringify(s.peers)) return
+            if (running === s.tsRunning && needsLogin === s.tsNeedsLogin && ip === s.selfIp
+                && JSON.stringify(arr) === JSON.stringify(s.peers)) return
             s.sel()
             s.tsRunning = running
+            s.tsNeedsLogin = needsLogin
+            if (running && s.tsMessage === s.tsWaiting) s.tsMessage = ""
             s.selfIp = ip
             s.selfName = (j.Self || {}).HostName || ""
             s.peers = arr
         }
     }
+    // Logging in: the plugin's ./login starts it and opens the link in the browser; the rows follow tailscale status
+    // until it's done
+    readonly property string tsWaiting: "Finish logging in in the browser"
+    function tsLogin() {
+        const menu = TopBar.plugin.menus.tailscale || ""
+        if (menu === "") { tsMessage = "Turn the Tailscale plugin on to log in here, or run tailscale up in a terminal"; return }
+        tsMessage = ""
+        tsToggle.script = "'" + menu.replace(/[^/]*$/, "login") + "'"
+        tsToggle.loggingIn = true
+        tsToggle.running = true
+    }
     Sh {
         id: tsToggle
+        property bool loggingIn: false
         onResult: text => {
             s.sel()
+            if (tsToggle.loggingIn && tsToggle.exitCode === 0) s.tsMessage = s.tsWaiting
+            tsToggle.loggingIn = false
             if (tsToggle.exitCode !== 0)
                 s.tsMessage = /denied|operator/i.test(text) ? "Permission denied. Run once: sudo tailscale set --operator=$USER"
                                                             : text.trim().split("\n").pop()

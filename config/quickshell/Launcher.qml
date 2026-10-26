@@ -54,6 +54,7 @@ PanelWindow {
     readonly property real topPosition: 0.189  // card top edge as a fraction of screen height (0 = top)
 
     property bool open: false
+    property bool stepAside: false            // a polkit password prompt is open (PolkitWatch): hidden, not closed
     property string level: "root"             // root | apps | keys
     property string query: ""
     property var syncHidden: []               // apps hidden by sync-apps: [{ path, name, icon, extra }]
@@ -62,16 +63,16 @@ PanelWindow {
     property string armed: ""                 // action awaiting confirmation
     readonly property var detail: details.item   // Install / Remove: the row whose details are shown (DetailCard.qml), null = none
     readonly property int detailWidth: 860    // the card's width while showing them
-    // Settings › Launcher: { fuzzy, shortcuts, deck } in ~/.local/state/nightdrive/launcher.json (missing = on; deck, the
-    // music player's albums and artists in the search, only when asked for)
-    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false })
+    // Settings › Launcher: { fuzzy, shortcuts, deck, comma } in ~/.local/state/nightdrive/launcher.json (missing = on; deck, the
+    // music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for)
+    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false })
     readonly property string prefsFile: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
     FileView {
         path: win.prefsFile; watchChanges: true; onFileChanged: reload(); printErrors: false
         onLoaded: {
             let v = {}
             try { v = JSON.parse(text()) || {} } catch (e) {}
-            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true }
+            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true }
             if (JSON.stringify(n) !== JSON.stringify(win.prefs)) win.prefs = n
         }
     }
@@ -94,11 +95,11 @@ PanelWindow {
     // SystemLevels (Wi-Fi, Bluetooth, Sound, Tailscale, Status), HomeLevels (Home Assistant), DefaultAppsLevels, AppKeyLevels
     // (App shortcuts), BehaviourLevels (Mouse, Launcher, Firefox, Computer name, Remote login, Notifications, Crash reports, Update channel), InstallLevels,
     // ToolsLevels (Clipboard, Emoji, Snippets), AppearanceLevels (Top bar, Screensaver), DisplayLevels (Display, Battery),
-    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, the plugins' and the private
+    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, AboutLevels, the plugins' and the private
     // extension. A new file goes in this list, not in each question's code
     // The installed plugins' level files (their <Name>Levels.qml, TopBar.plugin.levels: Deck's Music) come after the core's
     property var pluginExts: []
-    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite].concat(pluginExts, ext ? [ext] : [])
+    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, about].concat(pluginExts, ext ? [ext] : [])
     // A plugin's row above the search field (topRow; Deck's player): the first file that has one. ↑ from the list's first
     // row selects it, its keys then go to topKey(event), and Ctrl+Space anywhere to topPress()
     readonly property var topExt: exts.find(e => e.topRow) || null
@@ -107,6 +108,8 @@ PanelWindow {
     readonly property int selIndex: list.currentIndex
     function shakeNow() { shake.restart() }
     function search(target, text) { go(target); input.text = text }   // a level with its query typed (Default apps › Find more)
+    function insertText(text) { input.insert(input.cursorPosition, text) }   // at the cursor (Snippets: Shift+Enter → ↵)
+    property alias field: input                                         // the search / text field (ClipPicker keeps its text and cursor)
     readonly property var swCats: inst.swCats                          // Install › Software's categories (Default apps › Find more)
     function openCategory(key, name) { inst.openCategory(key, name) }
     readonly property var parents: Object.assign({ install: "system", screenshot: "tools", startup: "appsettings", appsettings: "settings" }, ...exts.map(e => e.parents))
@@ -123,6 +126,7 @@ PanelWindow {
         : (results[list.currentIndex] || {}).kind === "mirrordev" ? sys.footer(level, query)
         : (results[list.currentIndex] || {}).kind === "haent" ? home.footer(level, query)
         : (results[list.currentIndex] || {}).kind === "nightlight" ? "Enter: night light on/off"
+        : (results[list.currentIndex] || {}).kind === "calc" ? "Enter: copy the result"
         : extOf(level) ? extOf(level).footer(level, query)   // not extLevel: it can lag a level change by one update
         : ""
     // The footer as key caps: "Ctrl+Enter: show in Apps  ·  Esc: back" → [{ keys: ["Ctrl", "Enter"], text: "show in Apps" }, ...].
@@ -163,7 +167,7 @@ PanelWindow {
         { kind: "nav", name: "Tools", glyph: "wrench", target: "tools" },
         { kind: "nav", name: "Keybindings", glyph: "keyboard", target: "keys" },
         { kind: "nav", name: "Settings", glyph: "settings", target: "settings" },
-        // System: Install, Remove, Update and Status (the update count shows here too)
+        // System: Install, Remove, Update, Status and About Nightdrive (the update count shows here too)
         { kind: "nav", name: "System", glyph: "monitor-cog", target: "system", summary: updates > 0 ? updates + " new" : undefined },
         { kind: "nav", name: "Power", glyph: "power", target: "power" }
     ])
@@ -175,7 +179,11 @@ PanelWindow {
             { kind: "nav", name: "Remove", glyph: "package-minus", target: "remove", extra: "uninstall delete package app" },
             { kind: "action", name: "Update", glyph: "refresh-cw", confirm: true, cmd: term('"$HOME/.local/bin/nightdrive" update'),
               summary: updates > 0 ? updates + " new" : undefined, extra: "upgrade dnf flatpak nightdrive" },
-            { kind: "nav", name: "Status", glyph: "activity", target: "status", extra: "cpu memory processes temperature claude usage" }
+            // Welcome to Nightdrive (config/welcome): the first login's window, again
+            { kind: "action", name: "Set up Nightdrive", glyph: "sparkles", cmd: [Quickshell.env("HOME") + "/.local/bin/nightdrive", "welcome"],
+              extra: "welcome first run start setup claude sign in login tailscale mail deck" },
+            { kind: "nav", name: "Status", glyph: "activity", target: "status", extra: "cpu memory processes temperature claude usage" },
+            { kind: "nav", name: "About Nightdrive", glyph: "info", target: "about", extra: "version release channel info website github" }
         ],
         tools: [
             { kind: "nav", name: "Screenshot", glyph: "camera", target: "screenshot" },
@@ -187,7 +195,7 @@ PanelWindow {
               extra: "phone iphone share airdrop text link" },
             { kind: "action", name: "Send files with LocalSend", glyph: "smartphone", cmd: [Quickshell.env("HOME") + "/.local/bin/localsend", "send-pick"],
               extra: "phone iphone share airdrop" }
-        ] : []),
+        ] : [], ...pluginExts.map(e => e.toolItems || [])),   // the plugins' level files add theirs (toolItems: Keep Awake)
         screenshot: [
             { kind: "action", name: "Region", glyph: "crop", cmd: shot("region") },
             { kind: "action", name: "Window", glyph: "app-window", cmd: shot("window") },
@@ -230,7 +238,8 @@ PanelWindow {
         ]),
         // Settings › Apps: what is about apps in general first, then each app's own settings (only those installed)
         appsettings: defs.settingsItems.concat(akeys.settingsItems, [
-            { kind: "nav", name: "Startup", glyph: "rocket", target: "startup" }
+            { kind: "nav", name: "Startup", glyph: "rocket", target: "startup" },
+            { kind: "nav", name: "Nightdrive apps", glyph: "app-window", target: "ndapps", summary: "on or off" }   // InstallLevels.qml
         ], behave.browserItems.length || home.settingsItems.length || Plugins.has("mail") ? [{ kind: "header", name: "Installed apps" }] : [],
            behave.browserItems.concat(home.settingsItems,
                Plugins.has("mail") ? [{ kind: "action", name: "Mail", glyph: "mail", cmd: [Quickshell.env("HOME") + "/.local/bin/nightmail", "settings"] }] : [])
@@ -354,21 +363,26 @@ PanelWindow {
         }
     }
     readonly property int headerHeight: 40
-    // A row's description (sub) wraps, up to subMaxLines: each line after the first makes the row this much taller
+    // A row's description (sub) wraps, up to subMaxLines (or the row's own subMax: a snippet's lines): each line after
+    // the first makes the row this much taller. subPlain: in the name's font instead (a snippet's text, all of it alike)
     readonly property int subMaxLines: 3
     readonly property int subLineHeight: Math.ceil(subMetrics.height)
+    readonly property int plainLineHeight: Math.ceil(plainMetrics.height)
     FontMetrics { id: subMetrics; font { family: Theme.font; pixelSize: win.fontSize - 5; weight: win.fontWeight } }
+    FontMetrics { id: plainMetrics; font { family: Theme.font; pixelSize: win.fontSize; weight: win.fontWeight } }
     // The lines a row's description takes (an estimate from its width, for the list's height; the row measures its own)
     function subLines(it) {
         if (!it.sub || fixedRow(it)) return 1
         const room = Math.max(1, list.width - iconSize - 70)
-        return Math.min(subMaxLines, Math.max(1, Math.ceil(subMetrics.advanceWidth(keySpaced(it.sub)) / room)))
+        const m = it.subPlain ? plainMetrics : subMetrics
+        const lines = keySpaced(it.sub).split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(m.advanceWidth(l) / room)), 0)
+        return Math.min(it.subMax || subMaxLines, lines)
     }
     function listHeight() {
         const cap = maxRows * (rowHeight + rowGap)
         let h = 0
         for (const it of results) {
-            h += (fixedRow(it) ? headerHeight : rowHeight + (subLines(it) - 1) * subLineHeight) + rowGap
+            h += (fixedRow(it) ? headerHeight : rowHeight + (subLines(it) - 1) * (it.subPlain ? plainLineHeight : subLineHeight)) + rowGap
             if (h >= cap) return cap
         }
         return h
@@ -490,6 +504,9 @@ PanelWindow {
         const fuzzyOk = prefs.fuzzy && !short   // letters in order would hit too many of them
         all.forEach((x, i) => {
             let s = score(x.text, fq)
+            // An app's own settings ("Firefox settings") right after the app while its name is being typed: "fire" hits
+            // both as a start, and the settings come earlier in the list
+            if (s >= 0 && s < 1 && x.item.appName && score(x.item.appName, fq) >= 0) s += 0.25
             const extra = x.extra ? fold(x.extra) : ""
             if (s < 0 && extra.includes(fq)) s = 3
             if (s < 0 && words.length > 1) {
@@ -503,6 +520,9 @@ PanelWindow {
         })
         scored.sort((a, b) => (a.s - b.s) || (level === "apps" ? a.x.text.localeCompare(b.x.text) : short ? (a.x.text.length - b.x.text.length) || (a.i - b.i) : a.i - b.i))
         const res = scored.map(o => o.x.item).concat(tail)
+        // The calculator's answer ("3*8" → "= 24") first, unless a name starts with what was typed: "7-zip" stays an app
+        const sum = level === "root" ? calc.row(query) : null
+        if (sum) res.splice(scored.filter(o => o.s <= 0.5).length, 0, sum)
         return level === "keys" ? grouped(res) : res
     }
     readonly property var results: items()
@@ -640,6 +660,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         }
         else if (item.kind === "stat" && item.copy !== undefined) sys.copyText(item.copy)   // Public IP, Local IP, Router: as ⌘C
         else if (item.kind === "stat") shake.restart()   // information only
+        else if (item.kind === "calc") { sys.copyText(item.copy); win.open = false }   // ready to paste
         else if (exts.some(e => e.activate(item))) {}
         else if (item.kind === "menu") { win.open = false; win.openMenu(item.target) }
         else if (item.src && detail === null) details.show(item)
@@ -700,6 +721,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     function selectWhere(pred) { const i = results.findIndex(pred); if (i >= 0) list.currentIndex = i }
     function back() {
         if (detail !== null) { details.close(); return }
+        if (tools.picker.back()) return      // Clipboard as a text field's picker: back to the field, its text kept
         if (level === "root") { win.open = false; return }
         go(parents[level] || "root")
         const sel = lastSel[level]
@@ -732,6 +754,8 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     RemoveLevels { id: rm; launcher: win }
     PasswordLevels { id: pw; launcher: win }
     ThemeLevels { id: themes; launcher: win }
+    AboutLevels { id: about; launcher: win }
+    Calculator { id: calc; launcher: win }
     Instantiator {
         id: pluginLevels
         model: TopBar.plugin.levels
@@ -869,14 +893,17 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         function toggle(): void { win.open = !win.open }
         function close(): void { win.open = false }
         // openLevel apps | keys | root: opens a sublevel directly
-        function openLevel(level: string): void { win.open = true; win.go(level) }
+        // ⌘⇧V (clipboard) over a text field (a level in a Levels file's `inputs`) opens Clipboard as a picker for it
+        function openLevel(level: string): void { if (level === "clipboard" && tools.picker.begin()) return; win.open = true; win.go(level) }
         function setQuery(text: string): void { input.text = text }
         // askClaude: ⌘⌥Enter with the launcher open and a non-empty query → sends the text to Claude Code (hypr/scripts/terminal-or-claude). Returns "ok" or "".
         function askClaude(): string {
             const q = win.query.trim()
             if (!win.open || q === "" || (win.level !== "root" && win.level !== "apps")) return ""
             win.open = false
-            Quickshell.execDetached([win.scripts + "/terminal-or-claude", q])
+            // the session's name (claude -n) is the question's start, to find it again in the Claude menu and /resume
+            const name = q.length > 40 ? q.slice(0, 40).replace(/\s+\S*$/, "") + "…" : q
+            Quickshell.execDetached([win.scripts + "/terminal-or-claude", "--name", name, "--", q])
             return "ok"
         }
         // rows: the open level's title, footer, selected index and rows as JSON, primitive fields only (automated testing)
@@ -913,7 +940,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         function back(): void { win.back() }
     }
 
-    visible: open
+    visible: open && !stepAside
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
@@ -1084,8 +1111,10 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                     width: list.width
                     readonly property int extraLines: subText.visible ? Math.max(0, subText.lineCount - 1) : 0
                     // A taller row keeps its icon and right side at the name and the first line, not in the middle
-                    readonly property real topShift: -extraLines * win.subLineHeight / 2
-                    height: isHeader || isNote ? win.headerHeight : win.rowHeight + extraLines * win.subLineHeight
+                    readonly property bool plain: modelData.subPlain === true
+                    readonly property int lineH: plain ? win.plainLineHeight : win.subLineHeight
+                    readonly property real topShift: -extraLines * lineH / 2
+                    height: isHeader || isNote ? win.headerHeight : win.rowHeight + extraLines * lineH
                     radius: 10
                     color: current ? Theme.sel : "transparent"
 
@@ -1143,7 +1172,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                             left: row.noIcon ? parent.left : slot.right; leftMargin: 16
                             right: keyFrames.visible ? keyFrames.left : shortcut.visible ? shortcut.left : trailing.left; rightMargin: (row.modelData.kind === "key" ? 24 : 12) + (dot.visible ? 19 : 0) + (badge.visible ? badge.implicitWidth + 10 : 0) + (note.visible ? note.implicitWidth + 10 : 0)   // keybindings get more room before the keys (description is elided with …)
                             verticalCenter: parent.verticalCenter
-                            verticalCenterOffset: twoLines ? (subLine ? -9 - row.extraLines * win.subLineHeight / 2 : -7) : 0
+                            verticalCenterOffset: twoLines ? (subLine ? (row.plain ? -row.lineH / 2 : -9) - row.extraLines * row.lineH / 2 : -7) : 0
                         }
                         elide: Text.ElideRight
                         // liveName: a name that changes often (Status' processes), bound here instead of rebuilding the rows
@@ -1151,7 +1180,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                             : row.isHeader ? row.modelData.name.toUpperCase()
                             : row.modelData.name
                         color: row.armedNow ? Theme.primary : (row.isHeader ? Theme.primary : row.modelData.kind === "hint" || row.isNote || row.modelData.dimmed ? Theme.dim : (row.current ? Theme.accent : Theme.text))
-                        font { family: Theme.font; pixelSize: row.isHeader ? win.fontSize - 5 : row.isNote ? win.fontSize - 4 : nameText.subLine ? win.fontSize - 2 : win.fontSize; weight: row.isHeader ? Font.Bold : win.fontWeight; letterSpacing: row.isHeader ? 1.5 : 0 }
+                        font { family: Theme.font; pixelSize: row.isHeader ? win.fontSize - 5 : row.isNote ? win.fontSize - 4 : nameText.subLine && !row.plain ? win.fontSize - 2 : win.fontSize; weight: row.isHeader ? Font.Bold : win.fontWeight; letterSpacing: row.isHeader ? 1.5 : 0 }
                         topPadding: row.isHeader ? 10 : 0
                     }
                     Text {      // a row that asks first, asked: what a second Enter does (armHint), after the name in smaller text
@@ -1194,14 +1223,14 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         visible: nameText.twoLines
                         anchors { left: nameText.left; right: nameText.right; top: nameText.bottom; topMargin: nameText.subLine ? 0 : -1 }
                         wrapMode: nameText.subLine ? Text.Wrap : Text.NoWrap
-                        maximumLineCount: win.subMaxLines
+                        maximumLineCount: row.modelData.subMax || win.subMaxLines
                         lineHeightMode: Text.FixedHeight
-                        lineHeight: win.subLineHeight
+                        lineHeight: row.lineH
                         elide: Text.ElideRight
                         textFormat: Text.PlainText
                         text: win.keySpaced(row.modelData.sub || (row.modelData.artist || "").toUpperCase())
-                        color: row.modelData.sub ? Theme.dim : Theme.primary
-                        font { family: Theme.font; pixelSize: nameText.subLine ? win.fontSize - 5 : win.fontSize - 6; weight: nameText.subLine ? win.fontWeight : Font.Normal
+                        color: row.plain ? nameText.color : row.modelData.sub ? Theme.dim : Theme.primary
+                        font { family: Theme.font; pixelSize: row.plain ? win.fontSize : nameText.subLine ? win.fontSize - 5 : win.fontSize - 6; weight: nameText.subLine ? win.fontWeight : Font.Normal
                                letterSpacing: nameText.subLine ? 0 : 1 }
                     }
                     Rectangle {      // the row's shortcut (shortcutFor) in a key frame like the footer's, before the › of a submenu;

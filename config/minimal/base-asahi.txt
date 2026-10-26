@@ -1,0 +1,44 @@
+# Fedora Minimal on an Apple Silicon Mac: Fedora Asahi Remix's Minimal image, as its kiwi description builds it
+# (pagure.io/fedora-asahi/kiwi-descriptions: platforms/minimal.xml, components/base.xml and boot.xml), less what
+# install.sh removes from it (packages-remove-asahi.txt, read by `nightdrive minimal` too). Kept as for base-pc.txt.
+@core
+@standard
+@hardware-support
+NetworkManager-wifi
+chrony
+glibc-all-langpacks
+fedora-release
+initial-setup
+# The Mac's own: sound, the boot chain (m1n1, U-Boot), firmware updates, the Touch Bar
+alsa-ucm-asahi
+asahi-platform-metapackage
+asahi-repos
+fedora-asahi-remix-scripts
+tiny-dfr
+asahi-fwupdate
+dracut-asahi
+update-m1n1
+uboot-images-armv8
+# The kernel (16K pages) and the boot loader
+kernel-16k
+kernel-16k-core
+kernel-16k-modules
+kernel-16k-modules-core
+kernel-16k-modules-extra
+grubby
+grub2-efi-aa64
+grub2-efi-aa64-modules
+shim-signed-aa64
+btrfs-progs
+systemd-oomd-defaults
+systemd-resolved
+# Left out of the image (its <ignore> lines)
+-dracut-config-rescue
+-qemu-user-static
+-amd-gpu-firmware
+-amd-ucode-firmware
+-intel-audio-firmware
+-intel-gpu-firmware
+-iwlwifi-mvm-firmware
+-nvidia-gpu-firmware
+-qcom-firmware

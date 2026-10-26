@@ -12,7 +12,11 @@ CONF=/etc/plymouth/plymouthd.conf
 
 case ${1:-on} in
   on)
-    sudo dnf install -y plymouth plymouth-plugin-two-step plymouth-theme-spinner ImageMagick jetbrains-mono-fonts
+    pkgs=(plymouth plymouth-plugin-two-step plymouth-theme-spinner ImageMagick jetbrains-mono-fonts)
+    sudo dnf install -y "${pkgs[@]}"
+    # On Fedora KDE the Plymouth plugin and the spinner theme (its images are copied below) are already there as KDE's
+    # dependencies, and install leaves them so: marked as wanted, so removing KDE doesn't take them along
+    sudo dnf mark user -y "${pkgs[@]}" >/dev/null
     tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
     "$here/images.sh" "$tmp" >/dev/null
     cp "$here/$THEME.plymouth" /usr/share/plymouth/themes/spinner/{bullet,capslock,entry,keyboard,keymap-render,lock}.png "$tmp/"

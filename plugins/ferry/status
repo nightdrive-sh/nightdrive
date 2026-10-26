@@ -2,6 +2,6 @@
 # Ferry's top bar module (module.jsonc): highlighted with a count while things from the phone wait unseen (opening the
 # menu sees them); dimmed while its server isn't running
 . ~/.config/topbar/scripts/emit
-systemctl --user -q is-active nightdrive-ferry.service || { emit inbox "" off; exit; }
-n=$(jq '[.items[]? | select(.to == "computer" and (.seen | not))] | length' ~/.local/share/nightdrive/ferry/items.json 2>/dev/null)
+systemctl --user -q is-active ferry.service || { emit inbox "" off; exit; }
+n=$(jq '[.items[]? | select(.to == "computer" and (.seen | not))] | length' "${XDG_DATA_HOME:-$HOME/.local/share}/ferry/items.json" 2>/dev/null)
 if (( ${n:-0} > 0 )); then emit inbox "$n" active; else emit inbox ""; fi

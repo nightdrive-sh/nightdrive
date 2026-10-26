@@ -5,8 +5,9 @@ keys. Each one is a folder, `plugins/<id>/`, and the folder's name is its id. Us
 later in launcher › System › Install or with `nightdrive plugins`. A plugin that isn't installed, or is turned off,
 doesn't show anywhere: no bar icon, menu, keys or shortcut lines.
 
-This page is all you need to make one. [`ferry/`](ferry) is the full example (a bar module with a menu, a service, a
-command and a web page); [Disk](#a-small-example-disk), at the end, is a small one to copy.
+This page is all you need to make one. [`ferry/`](ferry) is the full example of a bar module with its menu, over an app
+that has its own repo and install script; [`localsend/`](localsend) has a service, a command and a Files extension of
+its own; [Disk](#a-small-example-disk), at the end, is a small one to copy.
 
 One-line parts (a web app, an app from dnf or Flathub, with no files of their own) stay lines in
 [`plugins.txt`](../plugins.txt), with their page in `docs/plugins/<id>.md`. Ids are unique across both.
@@ -20,6 +21,7 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | --- | --- | --- |
 | `plugin.conf` | Name, icon, description, how to install it and how to tell it's installed | [plugin.conf](ferry/plugin.conf) |
 | `README.md` | Its page: the launcher shows it, and GitHub (and later the website) the same file. Pictures go in the folder | [README.md](ferry/README.md), [ferry.jpg](ferry/ferry.jpg) |
+| `steps.md` | Its setup by hand, a step at a time, for Welcome to Nightdrive without Claude (see [below](#setting-up-by-hand-stepsmd)) | — (Mail's [steps.md](mail/steps.md)) |
 | `module.jsonc` | A top bar module | [module.jsonc](ferry/module.jsonc) |
 | `status` | The module's state, one line of JSON | [status](ferry/status) |
 | `icons/` | The module's own SVG icons, for a logo Lucide hasn't got | — (Tailscale's [icons/](tailscale/icons)) |
@@ -29,10 +31,10 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | `SHORTCUTS.md` | Its lines in the key list (⌘⇧K, launcher › Keybindings) | — (Deck's [SHORTCUTS.md](deck/SHORTCUTS.md)) |
 | `hyprland.lua` | Hyprland settings: window rules, and programs that start with the session | — (Deck's [hyprland.lua](deck/hyprland.lua)) |
 | `quit-commands` | What ⌘Q runs on its window instead of closing it, e.g. to stop a player that plays on without one | — (Deck's [quit-commands](deck/quit-commands)) |
-| `systemd/` | User units, linked to `~/.config/systemd/user` | [nightdrive-ferry.service](ferry/systemd/nightdrive-ferry.service) |
-| `bin/` | Commands, linked to `~/.local/bin` | [ferry](ferry/bin/ferry) |
+| `systemd/` | User units, linked to `~/.config/systemd/user` | — (LocalSend's [nightdrive-localsend.service](localsend/systemd/nightdrive-localsend.service)) |
+| `bin/` | Commands, linked to `~/.local/bin` | — (LocalSend's [localsend](localsend/bin/localsend)) |
 | `nautilus-python/` | Files extensions, linked to `~/.local/share/nautilus-python/extensions` | — (LocalSend's [localsend.py](localsend/nautilus-python/localsend.py)) |
-| anything else | Whatever it needs, used by its own files | [web/](ferry/web) (the phone's page) |
+| anything else | Whatever it needs, used by its own files | [install.sh](ferry/install.sh) (installs Ferry from its repo), [hook](ferry/hook) (Ferry runs it when its box changes) |
 
 `link.sh` links `bin/`, `systemd/` and `nautilus-python/` whether the plugin is installed or not, so its installer can
 use them. The rest is picked up by `nightdrive plugins installed`, which installing and turning a plugin off or on run: it
@@ -52,10 +54,11 @@ name=Ferry
 icon=inbox
 description=Files and text both ways with your phone over Tailscale, no app (experimental)
 default=off
-install=sudo dnf install -y python3-cryptography qrencode && bin/ferry enable
-installed=systemctl --user -q is-enabled nightdrive-ferry.service
+install=install.sh
+installed=systemctl --user -q is-enabled ferry.service
+units=ferry.service
 group=plugin
-version=0.1.0
+version=0.3.0
 author=@jarilehtinen
 ```
 
@@ -67,11 +70,28 @@ author=@jarilehtinen
 | `default` | `on`: ticked in `install.sh`'s list; `off` (default): not |
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
-| `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up) or `webapp` |
+| `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
+| `units` | User units the installer set up outside the folder, space-separated (Ferry's `ferry.service`, which Ferry's own install writes): `nightdrive plugins off` stops them with the folder's `systemd/` ones |
+| `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up), `webapp`, or `app`: one of Nightdrive's own apps (below) |
+| `bundled` | For an `app`: `yes` (default) comes with every install; `no` doesn't (below) |
 | `version` | `MAJOR.MINOR.PATCH`, e.g. `1.0.0` (`0.x` while it's experimental). It shows on the plugin's page in the launcher and on the website, so a bug report can name it. See [Versions](#versions) |
 | `author` | Who made it: a GitHub user (`@name`) or a name |
-| `setup` | A shell command, run in the folder, that sets the installed plugin up with Claude: Claude Code in a terminal, going through the README's steps with the user. The plugin's page gets a button Set up with Claude (and the key C) for it. For a plugin whose use needs more than its installer can ask, such as Mail's account (`bin/nightmail setup`) |
+| `setup` | A shell command, run in the folder, that sets the installed plugin up with Claude: Claude Code in a terminal, going through the README's steps with the user. The plugin's page gets a button Set up with Claude (and the key C) for it. For a plugin whose use needs more than its installer can ask, such as Mail's account (`bin/nightmail setup`). Start Claude through `~/.config/hypr/scripts/claude-setup ID NAME`, with your steps on its stdin: it holds the session to them, and Welcome to Nightdrive sees it running. Installed plugins with a `setup` are rows in Welcome to Nightdrive (launcher › System › Set up Nightdrive) |
+| `configured` | A shell test, run in the folder, like `installed`: the setup is done while it succeeds (an account written, a login made). Welcome shows the plugin's row as Done by it. Quick, as `installed`. Without it, a setup counts as done once its Claude session has closed |
+| `welcome` | The plugin's row in Welcome to Nightdrive: one line, in plain words, of what setting it up gives you (with Claude or without). Default: `description` |
 | `order` | A number, default 50: `install.sh` installs the plugins in this order, and the lists show them in it. Lower goes first; the same order keeps the folders' (alphabetical) order, then `plugins.txt`'s lines. Home Assistant has 90: its installer asks for addresses, so it runs last |
+
+An `app` (Mail, Deck) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
+it isn't listed in System › Install while it's installed, and its settings are in Settings › Apps (Nightdrive apps
+turns one off or on). One the user removed is back in Install › Recommended, to install again from there.
+`nightdrive update` installs an app that an existing install has never had (one made an app later, or a new one), once:
+the ids it has offered are kept in
+`~/.local/state/nightdrive/apps-offered` (`install.sh` writes the ones it offered, left out or not), and an app the
+user removed afterwards is never installed again. Whether a new app comes with Nightdrive or would be bloat there (then
+it is `recommended`) is decided for each app. An app that most users wouldn't want on every install, but that is still
+one of Nightdrive's own (built on the apps' kit, Settings › Apps once installed), has `bundled=no`: `install.sh` lists
+it unticked, `nightdrive update` never installs it, and it waits in Install › Recommended (Garage). Only the repo's own plugins can be apps: `nightdrive update` doesn't
+install an external plugin by its group.
 
 Pick `installed` so it follows what the installer did: a unit that is enabled, a command that exists. A plugin with
 nothing to install can use `installed=true`, but then everyone who has the folder has it on, which suits an external
@@ -89,12 +109,12 @@ explains every key), with a few differences:
 - `size`: its icon size in px.
 - `label` (required) and `glyph` (a Lucide name): its row in launcher › Settings › Top bar › Items, where it can be
   hidden.
-- Its commands (`status`, `right`, `middle`, `drop`) run in the plugin's folder, so `bin/ferry add` finds Ferry's
-  command.
+- Its commands (`status`, `right`, `middle`, `drop`) run in the plugin's folder with bash, so `bin/<command>` finds
+  the plugin's own command (Ferry's is installed elsewhere: `~/.local/bin/ferry add`).
 
 ```jsonc
 // Ferry's top bar module; its state: ./status; a click opens FerryMenu.qml; files dropped on the icon go to the box.
-{ "interval": 5, "drop": "bin/ferry add", "after": "system", "size": 17, "label": "Ferry – Device mailbox", "glyph": "inbox" }
+{ "interval": 5, "drop": "~/.local/bin/ferry add", "after": "system", "size": 17, "label": "Ferry – Device mailbox", "glyph": "inbox" }
 ```
 
 `status` is an executable script in the folder (the module runs it without a `status` key). It prints one line of JSON,
@@ -105,8 +125,8 @@ of an SVG in the plugin's `icons/`, drawn in `currentColor`: Tailscale's logo), 
 ```bash
 #!/bin/bash
 . ~/.config/topbar/scripts/emit          # emit ICON TEXT [CLASS]
-systemctl --user -q is-active nightdrive-ferry.service || { emit inbox "" off; exit; }
-n=$(jq '[.items[]? | select(.to == "computer" and (.seen | not))] | length' ~/.local/share/nightdrive/ferry/items.json 2>/dev/null)
+systemctl --user -q is-active ferry.service || { emit inbox "" off; exit; }
+n=$(jq '[.items[]? | select(.to == "computer" and (.seen | not))] | length' ~/.local/share/ferry/items.json 2>/dev/null)
 if (( ${n:-0} > 0 )); then emit inbox "$n" active; else emit inbox ""; fi
 ```
 
@@ -137,7 +157,8 @@ calendar's grid, Ferry's drop zone and QR code are all fine).
   names: the themes change them.
 - **Commands with `Sh`** (`command: [...]` or `script: "…"`, the output in `onResult`), or
   `Quickshell.execDetached([...])` for one that just starts something. Your own command's path:
-  `Qt.resolvedUrl("bin/ferry")` without the `file://` (FerryMenu.qml's `ferry`).
+  `Qt.resolvedUrl("bin/<command>")` without the `file://`; one in `~/.local/bin`, `Quickshell.env("HOME") +
+  "/.local/bin/<command>"` (FerryMenu.qml's `ferry`), since Quickshell's PATH may not have that folder.
 - `Divider` is the separator line; `Slider`, `BusyDots` and `Plugins.has("tailscale")` (is another plugin on?) are there
   too.
 - **A text field** needs the keyboard, which a menu doesn't have by default: `readonly property bool wantsKeyboard`
@@ -175,9 +196,12 @@ it (`qs kill; setsid -f qs`).
 
 **Pages in the launcher.** A `<Name>Levels.qml` is a launcher level file like the core's (`config/quickshell/*Levels.qml`;
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also
-have `rootItems` (rows at the launcher's root: Deck's Music), `rootRows()` (rows for the root search: Deck's albums) and
-`topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
-Deck's [MusicLevels.qml](deck/MusicLevels.qml) has all of them. The same restart applies.
+have `rootItems` (rows at the launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `rootRows()`
+(rows for the root search: Deck's albums) and `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
+`inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
+into the field.
+Deck's [MusicLevels.qml](deck/MusicLevels.qml) has most of them, Keep Awake's [KeepAwakeLevels.qml](keep-awake/KeepAwakeLevels.qml)
+is a small one to copy. The same restart applies.
 
 ## The page: README.md
 
@@ -202,6 +226,24 @@ rest of it would be a paragraph of its own (`nightdrive plugin check` points out
 Commands go in a code block, indented by 4 spaces after a blank line (or in ``` fences), one command a line. The
 launcher shows it in a box with its lines as they are, and a `command   # comment` line with the comment dimmed in a
 column beside the commands (under the command when there isn't room), so keep the comments short, as Ferry's are.
+
+## Setting up by hand: steps.md
+
+Welcome to Nightdrive asks first whether you have Claude. Without, Enter on a plugin's row shows its `steps.md` in the
+window, a step at a time (without a `steps.md`, Enter opens the plugin's page). Its third answer, *I'll do it myself*,
+opens the plugin's `README.md` in Apostrophe instead, so keep the README's setup section complete on its own. Write
+`steps.md` for someone new to Linux: what the step is for, then what to do. The first step says why the plugin matters
+in Nightdrive. `config/welcome/steps` reads it; Tailscale's, Mail's and Deck's are examples.
+
+- Each `## Title` is a step: its paragraphs (Markdown), at most one fenced code block, and lines of their own:
+  - `Ask: key | Label | example`: a field to fill in. `{key}` in a later code block, button or test becomes its value,
+    kept only while the window is open; a command that needs one waits until it is filled in.
+  - `Edit: ~/path`: the code block is the file's template. Enter writes it, if the file isn't there yet, and opens it
+    in the text editor. Without `Edit:`, the code block is a command: Enter runs it in a terminal, y copies it.
+  - `Run: Label | command` and `Open: Label | https://…`: a button that runs a command in the plugin's folder, or opens
+    a page. `Open:` with a file of the folder's (`README.md`) opens it in Apostrophe, for the details a step leaves out.
+  - `Done when: test`: a quick shell test, run in the folder every few seconds; the step shows Done while it succeeds.
+- The row counts as done by `configured` in plugin.conf, as with Claude; Finish on the last step marks it started.
 
 ## Keys: bindings.lua and SHORTCUTS.md
 
@@ -262,9 +304,9 @@ window rule after the plugin, so it can't replace one of the core's. After editi
 Units in `systemd/` are linked to `~/.config/systemd/user`, files in `bin/` to `~/.local/bin` and Files extensions in
 `nautilus-python/` to `~/.local/share/nautilus-python/extensions`, by `link.sh` (and `nightdrive plugins add` for an
 external one). A name that something else already has is left alone, so an external plugin can't replace Nightdrive's
-commands or services. The installer enables the units (Ferry's `bin/ferry enable`), and `installed` usually tests for
-that. Enable a unit by its path in the folder (`systemctl --user enable --now …/systemd/nightdrive-ferry.service`, as
-`ferry enable` does): `systemctl --user disable` removes a linked unit's link too, and the path links it again. Name them
+commands or services. The installer enables the units (LocalSend's `bin/localsend enable`), and `installed` usually
+tests for that. Enable a unit by its path in the folder (`systemctl --user enable --now …/systemd/nightdrive-localsend.service`, as
+`localsend enable` does): `systemctl --user disable` removes a linked unit's link too, and the path links it again. Name them
 so they can't clash: `nightdrive-<id>.service`, a command named after the plugin. A Files extension runs whether the
 plugin is on or not, so it checks that itself (LocalSend's tests its unit and `~/.local/state/nightdrive/plugins-off/<id>`).
 
@@ -289,7 +331,7 @@ something is off. `nightdrive sandbox check` runs it too. It checks a plugin fol
 
 - The id: the folder's name is letters, digits, `-` and `_`, and no other plugin (or `plugins.txt` line) has it.
 - `plugin.conf`: only `key=value` lines and known keys, each once; `name`, `icon`, `description`, `installed`,
-  `version` and `author` are there; `default` is `on` or `off`, `group` one of the three, `version` is
+  `version` and `author` are there; `default` is `on` or `off`, `group` one of the four, `version` is
   `MAJOR.MINOR.PATCH` and `order` a number; `install` and `installed` parse as shell (`bash -n`).
 - The icons are Lucide names: plugin.conf's `icon`, module.jsonc's `glyph`, and the ones `status` prints with `emit`
   (or one of the bar's own in `config/topbar/icons`; a `pack:name` isn't checked).

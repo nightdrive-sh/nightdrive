@@ -1,0 +1,8 @@
+#!/bin/bash
+# Ends a running screensaver. The lock (greeter/lock.qml) runs this once it is up and again at the unlock: a saver
+# closes itself only on its own key press or mouse movement, and under the lock every input goes to the lock, so one
+# started before the lock was still there after the unlock. Its start script then brings the cursor back.
+# Anchored to the savers themselves (kitty closes with its program), not whatever names them, an editor say; and this
+# session's only, not a container's (nightdrive sandbox: the same user in another PID namespace)
+pkill --ns $$ --nslist pid -u "$UID" -f '^(python3 -I|qs -p) .*/screensaver/(nightdrive-saver|nightdrive-rain|clock)$'
+exit 0

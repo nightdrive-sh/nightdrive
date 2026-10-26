@@ -62,16 +62,18 @@ else
 fi
 
 # --no-first-run: each web app has a Chromium profile of its own, so each start would be a first run, and Fedora's
-# /etc/chromium/master_preferences opens its first_run_tabs page in a window of its own then
+# /etc/chromium/master_preferences opens its first_run_tabs page in a window of its own then. --load-extension: links to
+# other sites go to the default browser (webapp-links, which also puts the extension's native host in the profile)
 cat > "$apps/webapp-$slug.desktop" <<DESK
 [Desktop Entry]
 Type=Application
 Name=$name
-Exec=chromium-browser --no-first-run --disable-spell-checking --app=$url --user-data-dir=$HOME/.local/share/webapps/$slug
+Exec=chromium-browser --no-first-run --disable-spell-checking --load-extension=$HOME/.config/hypr/webapp-links --app=$url --user-data-dir=$HOME/.local/share/webapps/$slug
 Icon=$icon
 StartupWMClass=$(wmclass "$url")
 Categories=Network;
 DESK
 
+"$(dirname "$0")/webapp-links" setup >/dev/null
 update-desktop-database "$apps" 2>/dev/null || true
 echo "Added: $name ($apps/webapp-$slug.desktop)"

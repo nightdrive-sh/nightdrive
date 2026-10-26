@@ -7,20 +7,22 @@ scripts="$repo/config/hypr/scripts"
 cache="$HOME/.cache/nightdrive"
 external="$HOME/.local/share/nightdrive/plugins"     # plugins from elsewhere (plugins add), one folder each
 off="$HOME/.local/state/nightdrive/plugins-off"      # an empty file per plugin that is off (plugins off)
+offered="$HOME/.local/state/nightdrive/apps-offered"  # Nightdrive's apps this install has had once, one id a line (offer_apps)
 
 # The help: grouped, one short line per command. Colour only on a terminal (and not with NO_COLOR).
 usage() {
-  local b="" v="" d="" r=""
-  if [[ -t 1 && -z ${NO_COLOR:-} ]]; then b=$'\e[1m' v=$'\e[38;2;192;113;235m' d=$'\e[2m' r=$'\e[0m'; fi
+  local b="" v="" r=""
+  if [[ -t 1 && -z ${NO_COLOR:-} ]]; then b=$'\e[1m' v=$'\e[38;2;192;113;235m' r=$'\e[0m'; fi
   section() { printf '\n%s%s%s\n' "$b" "$1" "$r"; }
   row() { printf '  %s%-28s%s %s\n' "$v" "$1" "$r" "$2"; }
-  printf '%sNightdrive%s %s· your desktop, after dark%s\n' "$b" "$r" "$d" "$r"
+  printf '%sNightdrive%s\n' "$b" "$r"
   printf '\nUsage: nightdrive COMMAND [ARGS]\n'
   section "Update"
   row "update"                   "Update Nightdrive, its packages and apps, then reload the desktop"
   row "update check"             "Look for new changes (runs every 6 h and notifies)"
   row "channel [stable|dev]"     "Which branch updates follow: stable (main) or dev, the bigger changes first"
   row "version"                  "The release this desktop is at, and its channel"
+  row "minimal [--dry-run]"      "An install on Fedora KDE to Fedora Minimal: KDE goes, your own apps stay"
   section "Desktop"
   row "theme COMMAND"            "The theme colour, e.g. nightdrive theme color teal"
   row "wallpaper COMMAND"        "The background: list, set, add, remove"
@@ -31,6 +33,8 @@ usage() {
   row "snippets [COMMAND]"       "Text snippets: list, set, remove, status, enable, disable"
   row "defaults [set KIND APP]"  "Default apps (browser, email, files…), e.g. nightdrive defaults set pdf org.gnome.Papers"
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
+  row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --effort LEVEL)"
+  row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
   section "Plugins"
   row "plugins [list]"           "Optional parts, and which are installed, on or off"
   row "plugins install NAME"     "Install one, e.g. nightdrive plugins install deck"
@@ -38,6 +42,7 @@ usage() {
   row "plugins add GIT-URL [ID]" "Add one from elsewhere (an external plugin; install it afterwards)"
   row "plugins remove NAME"      "Turn an external one off and delete its folder"
   row "plugins installed"        "The installed ones' ids (those that are on)"
+  row "plugins packages"         "The packages the installed ones need (plugin.conf's packages=)"
   row "plugins bump [NAME…]"     "Before a release: raise the version of every plugin that changed since its last (--dry-run lists)"
   row "plugin check [NAME]"       "Check plugins against the rules (plugins/README.md): file:line findings, exit 1"
   section "Preview"
@@ -272,9 +277,23 @@ update() {
   fi
 
   echo "==> New packages"
-  want=$(cat "$repo/packages.txt" "$repo/packages-hyprland.txt" 2>/dev/null | grep -vE '^\s*(#|$)')
+  # With the machine's own list (packages-pc.txt, packages-asahi.txt), its groups (@hardware-support) left to install.sh.
+  # --skip-unavailable: one this architecture lacks (microcode_ctl is x86 only)
+  want=$(cat "$repo/packages.txt" "$repo/packages-hyprland.txt" "$repo/packages-$("$scripts/platform" machine).txt" 2>/dev/null \
+    | grep -vE '^\s*(#|$|@)')
   missing=$(for p in $want; do rpm -q --whatprovides "$p" >/dev/null 2>&1 || echo "$p"; done)
-  if [[ -n $missing ]]; then echo "    $(echo $missing)"; as_root "New packages" sudo dnf install -y $missing; else echo "    none"; fi
+  if [[ -n $missing ]]; then echo "    $(echo $missing)"; as_root "New packages" sudo dnf install -y --skip-unavailable $missing; else echo "    none"; fi
+  # install.sh marks the list's packages as wanted, so removing KDE doesn't take them along. One added to it since may
+  # be here as KDE's dependency (pipewire-utils, 25.10.2026): marked too. -C: the installed ones only, no metadata download
+  # The installed plugins' packages likewise (plugin.conf's packages=, marked by plugins install since 25.10.2026)
+  deps=$(dnf -q -C repoquery --installed --qf '%{name} %{reason}\n' $want $(plugin_packages) 2>/dev/null | awk '/Dependency$/ { print $1 }' | sort -u)
+  [[ -z $deps ]] || as_root "New packages" sudo dnf mark user -y $deps >/dev/null
+  # nwg-panel came with Hyprland (Fedora's package supplements it) until config/system/dnf-excludes.conf, put in place
+  # under System files below. One installed on purpose stays.
+  if [[ $(dnf -q -C repoquery --installed --setopt=disable_excludes='*' --qf '%{reason}' nwg-panel 2>/dev/null) == *Dependency ]]; then
+    echo "    removing nwg-panel (came with Hyprland; the top bar is Nightdrive's own)"
+    as_root "New packages" sudo dnf remove -y --setopt=disable_excludes='*' nwg-panel
+  fi
 
   # doubletake (Screen Mirroring, plugins/mirroring): built again when the tested commit in its install.sh changes.
   # Not installed when missing: it was left out at install time (or not added in Install › Plugins).
@@ -299,6 +318,7 @@ nightdrive-sleep /usr/lib/systemd/system-sleep/nightdrive-sleep 755
 logind-ignore-sleep-key.conf /etc/systemd/logind.conf.d/50-ignore-sleep-key.conf 644
 logind-power-key.conf /etc/systemd/logind.conf.d/50-power-key.conf 644
 nightdrive.actions /etc/dnf/libdnf5-plugins/actions.d/nightdrive.actions 644
+dnf-excludes.conf /etc/dnf/libdnf5.conf.d/90-nightdrive.conf 644
 LIST
   # Mac Keyboard Shortcuts (plugins/keyd): its /etc config follows the repo's, if the plugin is installed
   if [[ -f /etc/keyd/default.conf ]] && ! cmp -s "$repo/plugins/keyd/default.conf" /etc/keyd/default.conf; then
@@ -311,13 +331,21 @@ LIST
   (( changed )) && as_root "System files" sudo systemctl kill -s HUP systemd-logind
   (( copied )) || echo "    up to date"
 
+  # Remote login: SSH only over Tailscale and on the networks trusted, once (config/hypr/scripts/remote-login, 23.10.2026).
+  # In the session firewalld lets a wheel user do it (on Fedora KDE without a password); over ssh it needs sudo (exit 2)
+  echo "==> Remote login"
+  "$scripts/remote-login" setup | sed 's/^/    /'
+  case ${PIPESTATUS[0]} in 1) echo "    up to date" ;; 2) as_root "Remote login" sudo "$scripts/remote-login" setup ;; esac
+
   # The login screen's and the boot splash's copies in /etc/greetd and /usr/share/plymouth: installed again when the repo's
   # differ (their version file: the git tree they came from). An install from before both were the default (18.10.2026)
   # is asked once whether to turn them on.
   echo "==> Login screen and boot splash"
   local asked=$HOME/.local/state/nightdrive/boot-asked did=0 a
   if systemctl -q is-enabled greetd.service 2>/dev/null; then
-    if ! grep -q '^\[initial_session\]' /etc/greetd/config.toml 2>/dev/null && [[ ! -e $asked && -t 0 ]]; then
+    # Not asked with the text login (switch.sh text), chosen in place of the login screen
+    if ! grep -q -e '^\[initial_session\]' -e '^# Text login (switch.sh text)' /etc/greetd/config.toml 2>/dev/null &&
+       [[ ! -e $asked && -t 0 ]]; then
       echo "    New: the boot splash goes straight over to the login screen, with the desktop starting behind it as its lock"
       echo "    (no black flashes at boot). Turning it on rebuilds the initramfs, which takes a minute or two."
       read -rp "    Turn it on? [Y/n] " a
@@ -350,8 +378,20 @@ LIST
     || missed+=("Flatpak apps: flatpak install --user flathub $(echo $flatpaks)"); }   # already installed ones are skipped
   flatpak update --user -y --noninteractive || missed+=("Flatpak apps: flatpak update --user")
 
-  (( deck )) && { echo "==> Deck (rebuild)"; DECK_SRC=${DECK_SRC:-$HOME/.local/src/deck} "$repo/plugins/deck/install.sh" \
+  offer_apps     # before the Deck rebuild: a Deck installed there was just built
+
+  # Only while Deck is installed: its source stays when the app is removed, and a rebuild would bring it back
+  # No DECK_SRC of its own: install.sh builds a DECK_SRC as one's own source, which would turn a packaged Deck into a build
+  (( deck )) && [[ -x $HOME/.local/bin/deck ]] && { echo "==> Deck (rebuild)"; "$repo/plugins/deck/install.sh" \
     || missed+=("Deck (rebuild): $repo/plugins/deck/install.sh"); }
+
+  # Ferry (plugins/ferry): its own app from its own repo, which the plugin installs, and Nightdrive's update brings its
+  # latest release along. A Ferry from before (the plugin's own server, until 10.2026; its state is still in Nightdrive's
+  # folder) is replaced by it here, with its phones and box: its old command and unit are gone from the plugin.
+  if systemctl --user -q is-enabled ferry.service 2>/dev/null || [[ -d $HOME/.local/share/nightdrive/ferry ]]; then
+    echo "==> Ferry"
+    as_root "Ferry" "$repo/plugins/ferry/install.sh" --update
+  fi
 
   plugins_installed >/dev/null     # the optional parts' list, before the reload reads it (hypr/bindings.lua)
   "$repo/config/fuzzel/sync-apps" >/dev/null 2>&1 || true   # the launcher's app list, as at the end of install.sh
@@ -360,8 +400,9 @@ LIST
     hyprctl reload >/dev/null
     "$repo/config/hypr/scripts/theme" apply >/dev/null 2>&1
     # Restarted: Quickshell doesn't watch a file that was missing when it started (e.g. the top bar's files before
-    # this update linked them), and new QML types need a fresh start
-    qs kill >/dev/null 2>&1; hyprctl dispatch 'hl.dsp.exec_cmd("qs")' >/dev/null
+    # this update linked them), and new QML types need a fresh start. --any-display: qs kill otherwise only sees the
+    # instances started with this shell's display variables, and over SSH it missed the bar and left two
+    qs kill --any-display >/dev/null 2>&1; hyprctl dispatch 'hl.dsp.exec_cmd("qs")' >/dev/null
     # hypridle reads its config only at start: restarted through hypr/scripts/idle, which writes it from the current
     # template (before 14.10.2026 Hyprland ran plain hypridle, whose screensaver closed right away)
     pkill -x hypridle || true; hyprctl dispatch "hl.dsp.exec_cmd(\"$HOME/.config/hypr/scripts/idle start\")" >/dev/null
@@ -383,6 +424,42 @@ LIST
     return 1
   fi
   echo "Nightdrive is up to date."
+}
+
+# Nightdrive's own apps (group app in plugin.conf: Mail, Deck) come with every install. An install that has never had one
+# (from before it was an app, or before it existed) gets it here, once: each is then marked in $offered (install.sh marks
+# the ones it offered, left out or not), and one marked is never installed again, so an app the user removed stays
+# away. One installed already (or off) is only marked. An install from before the list (23.10.2026) has no record of an
+# app removed earlier: what the app leaves behind tells (Mail's settings after `nightmail disable`, Deck's source), and
+# it is marked without installing. Without sudo (can_sudo, update) it waits, unmarked, for a run in a terminal. A
+# failed install is marked too, so a build that fails doesn't run again on every update: missed has the command.
+# Only the repo's plugins: an external one can't install itself by naming the group. An app with bundled=no in its
+# plugin.conf (Garage) isn't offered at all: it waits in Install › Recommended for the user to pick it.
+offer_apps() {
+  local a id name inst dir trace apps did=0
+  mkdir -p "${offered%/*}"; touch "$offered"
+  mapfile -t apps < <(plugins | awk -F'\t' '$8 == "app" && $11 == "repo" { print $1 "\t" $2 "\t" $7 "\t" $9 }')
+  echo "==> Nightdrive apps"
+  for a in "${apps[@]}"; do
+    IFS=$'\t' read -r id name inst dir <<<"$a"
+    grep -qxF "$id" "$offered" && continue
+    [[ $(conf_value "$dir/plugin.conf" bundled) == no ]] && continue
+    case $id in
+      mail) trace=$HOME/.config/nightmail ;;
+      deck) trace=${DECK_SRC:-$HOME/.local/src/deck} ;;
+      *) trace="" ;;
+    esac
+    if (( inst )) || [[ -n $trace && -e $trace ]]; then echo "$id" >> "$offered"; continue; fi
+    if (( ! can_sudo )); then
+      echo "    $name is new: skipped, its installer needs sudo and there's no terminal to ask for the password" >&2
+      missed+=("$name (new): run nightdrive update in a terminal"); did=1; continue
+    fi
+    echo "    $name is new here: installing it once (removed later, an update won't bring it back)"; did=1
+    NIGHTDRIVE_INSTALL=1 plugin_install "$id" || missed+=("$name: nightdrive plugins install $id")
+    echo "$id" >> "$offered"
+    [[ $id == deck ]] && deck=0
+  done
+  (( did )) || echo "    up to date"
 }
 
 # as_root WHAT CMD…: an update step that needs sudo (CMD is sudo itself, or a script that runs it). Skipped without a
@@ -471,7 +548,7 @@ plugins_installed() {
 # Runs a plugin's installer (by id or name) in its folder (the repo for plugins.txt), then refreshes the list. One that
 # is off is turned on first: installing it again means it's wanted (and its unit could not start while off).
 plugin_install() {
-  local id name inst dir rc
+  local id name inst dir rc pk
   IFS=$'\t' read -r id name inst dir < <(plugins | awk -F'\t' -v n="$1" 'tolower($1) == tolower(n) || tolower($2) == tolower(n) { print $1 "\t" $2 "\t" $6 "\t" ($9 == "" ? "-" : $9); exit }')
   [[ -n ${id:-} ]] || { echo "Unknown plugin: ${1:-} (see: nightdrive plugins)" >&2; exit 1; }
   [[ $dir == - ]] && dir=$repo
@@ -488,17 +565,40 @@ plugin_install() {
       (cd "$dir" && bash -c "$inst") ;;
   esac
   rc=$?
+  # Its packages= as wanted: one KDE (or another plugin) had already pulled in stays a dependency otherwise, and removing
+  # KDE (nightdrive minimal) would take it along
+  if (( rc == 0 )) && [[ $dir != "$repo" ]]; then
+    pk=$(installed_names $(conf_value "$dir/plugin.conf" packages))
+    [[ -z $pk ]] || sudo dnf mark user -y $pk >/dev/null || true
+  fi
   plugins_installed >/dev/null
   qs ipc call bar refresh >/dev/null 2>&1 || true
   return $rc
+}
+
+# A plugin.conf's value (conf_value FILE KEY), empty when it has none
+conf_value() { sed -n "s/^$2=//p" "$1" 2>/dev/null | tail -1; }
+# The names of these packages that are installed
+installed_names() { (( $# )) && rpm -q --qf '%{NAME}\n' "$@" 2>/dev/null | grep -v ' ' | sort -u | tr '\n' ' ' || true; }
+# The installed plugins' packages (plugin.conf's packages=), one a line: also those that are off, which stay installed
+plugin_packages() {
+  local dir
+  plugins | awk -F'\t' '$7 == 1 && $9 != "" { print $9 }' | while read -r dir; do
+    conf_value "$dir/plugin.conf" packages | tr ' ' '\n'
+  done | sed '/^$/d' | sort -u
 }
 
 # A plugin by id or name (any case): its id, name and folder ("-" for a plugins.txt line), tab-separated; nothing if unknown
 plugin_find() {
   plugin_rows | awk -F'\x1f' -v n="$1" 'n != "" && (tolower($1) == tolower(n) || tolower($2) == tolower(n)) { print $1 "\t" $2 "\t" $9; exit }'
 }
-# A plugin folder's user units (systemd/), by name
-plugin_units() { local f; for f in "$1"/systemd/*; do [[ -f $f ]] && echo "${f##*/}"; done; }
+# A plugin folder's user units, by name: its systemd/ ones, and those its installer set up elsewhere (plugin.conf's units=,
+# Ferry's ferry.service)
+plugin_units() {
+  local f
+  for f in "$1"/systemd/*; do [[ -f $f ]] && echo "${f##*/}"; done
+  sed -n 's/^units=//p' "$1/plugin.conf" 2>/dev/null | tr ' ' '\n' | sed '/^$/d'
+}
 
 # plugins off|on NAME. Off: the desktop treats it as not installed (no bar module, menu, launcher rows, keys or shortcut
 # lines: plugins_installed leaves it out) and its folder's units are stopped. They stay enabled, so its installed test
@@ -641,6 +741,7 @@ case ${1:-} in
   plugins) case ${2:-list} in
              list) if [[ -t 1 ]]; then plugins_table; else plugins; fi ;;
              installed) plugins_installed ;;
+             packages) plugin_packages ;;
              install) plugin_install "${3:-}" ;;
              off|on) plugin_switch "$2" "${3:-}" ;;
              add) plugin_add "${3:-}" "${4:-}" ;;
@@ -659,11 +760,15 @@ case ${1:-} in
            esac ;;
   agent-warn) exec "$scripts/agent-warn" "${@:2}" ;;                  # AGENTS.md
   sandbox) exec "$repo/config/sandbox/sandbox" "${@:2}" ;;             # docs/sandbox.md
+  minimal) exec "$repo/config/minimal/minimal" "${@:2}" ;;             # README › Install (Installed on Fedora KDE?)
   # topbar adjust: config/topbar/adjust.conf; software-catalog: config/quickshell/data/software.json
   platform|software-catalog|snippets) exec "$scripts/$1" "${@:2}" ;;
   theme|display|wallpaper|bar-style) exec "$scripts/$1" "${@:2}" ;;    # the desktop's own scripts (hypr/scripts)
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
+  ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }
+       exec "$scripts/terminal-or-claude" "${@:2}" ;;                   # what the launcher's ⌘⌥Enter runs
+  welcome) exec "$repo/config/welcome/welcome" "${@:2}" ;;             # Welcome to Nightdrive (launcher › System › Set up Nightdrive)
   ""|help|-h|--help) usage ;;
   *) usage >&2; exit 1 ;;
 esac

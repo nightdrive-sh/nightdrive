@@ -90,7 +90,8 @@ body:
         journalctl --user -b | tail -100
         tail -50 "$XDG_RUNTIME_DIR"/hypr/*/hyprland.log   # the last Hyprland of this boot
         ```
-        `~/dotfiles/config/greeter/switch.sh off` brings back the KDE login screen meanwhile.
+        `~/dotfiles/config/greeter/switch.sh text` gives a text login that starts the desktop meanwhile
+        (`off`: KDE's login screen, on Fedora KDE).
       render: text
   - type: textarea
     id: notes

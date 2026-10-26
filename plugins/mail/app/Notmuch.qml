@@ -113,6 +113,16 @@ QtObject {
         } })
     }
 
+    // The message's HTML as a page for the browser, with nothing in it that loads from the network; done gets
+    // { path } or { error }.
+    function page(msgid, done) {
+        proc.createObject(nm, { command: ["python3", parter, "html", msgid], done: t => {
+            let r
+            try { r = JSON.parse(t) } catch (e) { r = { error: t.trim() || "No answer from parts.py" } }
+            done(r)
+        } })
+    }
+
     // All of a message's attachments ({ part, name }) to the downloads folder; done gets { paths } or { error }.
     function saveAll(msgid, files, done) {
         const pairs = files.reduce((a, f) => a.concat([String(f.part), f.name]), [])
@@ -190,14 +200,30 @@ QtObject {
         }
     }
 
-    // HTML for Qt's rich text: no scripts, styles or head, and no images, which would load from the sender's server
-    // (and tell it the message was opened). An image keeps its alt text.
+    // HTML for Qt's rich text: no scripts, styles or head, and nothing that loads from the sender's server (and tells
+    // it the message was opened). Qt fetches <img>, a background="…" and CSS url(…) from the network, so those go, in
+    // any quoting (as an attribute: ?src= in a link stays); an image keeps its alt text. Again until nothing changes: a
+    // tag split by another (<im<img>g src=…>) forms once the inner one goes.
     function safeHtml(h) {
-        return h.replace(/<(style|script|head|title)[\s\S]*?<\/\1>/gi, "")
-                .replace(/<img\b[^>]*?\balt\s*=\s*"([^"]+)"[^>]*>/gi, "[$1]")
-                .replace(/<img\b[^>]*>/gi, "")
-                .replace(/\sbackground\s*=\s*"[^"]*"/gi, "")
-                .replace(/url\([^)]*\)/gi, "none")
+        for (let was = ""; was !== h;) {
+            was = h
+            h = h.replace(/<(style|script|head|title)\b[\s\S]*?<\/\1\s*>/gi, "")
+                 .replace(/<img\b[^>]*?\balt\s*=\s*"([^"]+)"[^>]*>/gi, "[$1]")
+                 .replace(/<\/?(img|style|script|link|meta|base)\b[^>]*>/gi, "")
+                 .replace(/(^|[\s"'])(src|srcset|background)\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "$1")
+                 .replace(/(^|[\s"'])style\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, (m, s, v) => s + 'style="' + safeStyle(/^["']/.test(v) ? v.slice(1, -1) : v) + '"')
+                 .replace(/url\s*\(/gi, "none(")
+        }
+        return h
+    }
+    // A style attribute without the declarations that load something. Qt reads the value with its entities
+    // (&#117;rl( is url(), and CSS has \75 escapes of its own), so they are read first, and written back escaped.
+    function safeStyle(v) {
+        const loads = d => /url\s*\(|image|@import/i.test(d.replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/\\([0-9a-f]{1,6})\s?/gi, (m, x) => entity("#x" + x) ?? "").replace(/\\/g, ""))
+        return v.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+\d*);?/gi, (m, e) => entity(e) ?? m)
+                .split(";").filter(d => !loads(d)).join(";")
+                .replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     }
 
     // The same HTML for a dark page: the sender's text and background colours go, so the text takes the window's own

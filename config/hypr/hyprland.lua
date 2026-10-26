@@ -11,7 +11,7 @@
 local MONITOR_SCALE = 2.0
 local KB_LAYOUT     = "fi"
 local KB_VARIANT    = "mac"
-local BUILTIN_DISPLAY = "eDP-1"   -- a laptop's own screen (a desktop has none: the rule below then does nothing)
+local BUILTIN_DISPLAY = "eDP-1"   -- a laptop's own screen (a desktop has none)
 local BAR_HEIGHT    = 37      -- the top bar in logical px (Theme.barHeight in quickshell/Theme.qml): the top corners start under it
 
 local HOME = os.getenv("HOME")
@@ -89,6 +89,8 @@ end
 for output, p in pairs(positions) do
     hl.monitor({ output = output, mode = modes[output] or "preferred", position = p.pos, scale = scales[output] or p.m.scale })
 end
+-- In a VM, its screen follows its window (vm-display.lua, scripts/vm-display)
+require("vm-display")(scales, modes)
 -- Lid closed with an external display (logind: docked, so it doesn't suspend): the built-in screen is turned off, so the
 -- windows, workspaces and the pointer move to the external one instead of staying under the lid. scripts/lid follows
 -- logind's LidClosed and reloads the config, which reads the state again.
@@ -111,9 +113,28 @@ if lidClosed and login1("Docked") then hl.monitor({ output = BUILTIN_DISPLAY, di
 -- laptop's screen has them all, from 1 (an HDMI display that dropped out for a moment at boot left the MacBook on 3).
 -- The rules follow the screens at each reload; NightdriveArrangeWorkspaces moves the workspaces that already exist.
 LAPTOP_WORKSPACE = 10
+-- The first parse comes before Hyprland has its screens, so then they are read from the kernel's connectors: each screen
+-- has to come up on its own workspace at once. Without rules a laptop with an external display came up with 1 on its
+-- own screen and 2 on the external one, and moving 1 over afterwards left the external one showing 2.
+-- Only on the DRM backend: a nested Hyprland (the sandbox, in KWin) has WAYLAND_DISPLAY from its host already, and the
+-- connectors it would see are the host's, not its own window.
+local function connectedScreens()
+    local list = {}
+    if os.getenv("WAYLAND_DISPLAY") then return list end
+    local p = io.popen("grep -lx connected /sys/class/drm/card*-*/status 2>/dev/null")
+    if not p then return list end
+    for path in p:lines() do
+        local name = path:match("/card%d+%-(.+)/status$")
+        if name then list[#list + 1] = { name = name } end
+    end
+    p:close()
+    return list
+end
 local function screens()
     local builtin, ext
-    for _, m in ipairs(hl.get_monitors()) do
+    local list = hl.get_monitors() or {}
+    if #list == 0 then list = connectedScreens() end   -- none in a headless sandbox either: then no rules at all
+    for _, m in ipairs(list) do
         if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext then ext = m end
     end
     return builtin, ext
@@ -123,14 +144,17 @@ do
     if builtin and ext then
         hl.workspace_rule({ workspace = tostring(LAPTOP_WORKSPACE), monitor = BUILTIN_DISPLAY, default = true })
         for i = 1, 9 do hl.workspace_rule({ workspace = tostring(i), monitor = ext.name, default = i == 1 }) end
-    else
-        hl.workspace_rule({ workspace = "1", monitor = BUILTIN_DISPLAY, default = true })
+    elseif builtin or ext then
+        -- 1 on the one screen there is. Never on a screen that isn't there (a VM's or a desktop's built-in one): 1 was
+        -- kept for it and the real screen opened on 2
+        hl.workspace_rule({ workspace = "1", monitor = (builtin or ext).name, default = true })
     end
 end
 function NightdriveArrangeWorkspaces()
     local builtin, ext = screens()
     if not (builtin and ext) then return end
     local was = hl.get_active_workspace()
+    local shown = builtin.active_workspace and builtin.active_workspace.id
     -- The laptop's workspace on its screen first, so moving the others away leaves no gap there to fill
     local lw = hl.get_workspace(LAPTOP_WORKSPACE)
     if lw and lw.monitor and lw.monitor.name ~= BUILTIN_DISPLAY then
@@ -144,7 +168,15 @@ function NightdriveArrangeWorkspaces()
             hl.dispatch(hl.dsp.workspace.move({ workspace = w.id, monitor = ext.name }))
         end
     end
-    if was and was.id >= 1 and was.id <= 9 then hl.dispatch(hl.dsp.focus({ workspace = was.id })) end
+    -- The external screen shows what the laptop's screen showed (it moved there), else what had the focus. Never an empty
+    -- workspace Hyprland opened for the screen as it came, while 1 was bound elsewhere: 1 instead. That left it on 2 when
+    -- plugged in at the login screen, and when it dropped out for a moment at boot (then 1, empty, was gone)
+    local target = shown and shown >= 1 and shown <= 9 and shown or nil
+    if not target and was and was.id >= 1 and was.id <= 9 then target = was.id end
+    local showing = target or (ext.active_workspace and ext.active_workspace.id)   -- the focus stays on the laptop's
+    local tw = showing and hl.get_workspace(showing)
+    if not (tw and tw.windows > 0) then target = 1 end
+    if target then hl.dispatch(hl.dsp.focus({ workspace = target })) end
 end
 -- A screen that comes or goes: the rules again (reload), then the workspaces
 hl.on("monitor.added",   function () hl.exec_cmd("hyprctl reload && hyprctl eval 'NightdriveArrangeWorkspaces()'") end)
@@ -194,6 +226,7 @@ function NightdriveLocked()
     -- graphical-session.target for xdg-desktop-portal (config/systemd/user); restart: fresh environment after a re-login
     hl.exec_cmd("systemctl --user restart nightdrive-session.target")
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/lid watch")   -- the lid with an external display (DISPLAY above)
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/vm-display watch")   -- in a VM, its screen follows its window (DISPLAY above)
     -- Theme colours (~/.cache/nightdrive, hypr/scripts/theme) first: Quickshell (the top bar, its menus and the notifications)
     -- reads them on startup
     hl.exec_cmd("sh -c '\"$HOME/.config/hypr/scripts/theme\" apply; exec qs'")
@@ -207,6 +240,7 @@ function NightdriveLocked()
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/bt-audio-follow")   -- Bluetooth headphones become the output when they connect
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/jack-volume")   -- headphones or speakers in the jack: a volume for each, starts quiet
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/headphones-ctl")   -- Sony / AirPods: listening mode in the headphones menu, AirPods ear detection
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/remote-login watch")   -- Remote login on: a network joined for the first time asks whether to allow it
     -- reset-failed: the previous session's agent crash-loops after logout (Restart=on-failure) and hits the start limit
     hl.exec_cmd("sh -c 'systemctl --user reset-failed hyprpolkitagent; systemctl --user restart hyprpolkitagent'")
     hl.exec_cmd("nm-applet --indicator")
@@ -221,6 +255,7 @@ function NightdriveUnlocked()
     if not once(UNLOCKED_FLAG) then return end
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/autostart")   -- the user's login apps (launcher › Settings › Apps › Startup; 1Password by default)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/reopen session offer")   -- the battery ran out: open its windows again?
+    hl.exec_cmd(HOME .. "/.config/welcome/welcome login")   -- a new install's first login: Welcome to Nightdrive (later ones: a reminder)
     update_corners()
 end
 
@@ -231,9 +266,8 @@ hl.on("hyprland.start", function ()
         NightdriveLocked(); NightdriveUnlocked()
         return
     end
-    local pam = io.open("/etc/pam.d/nightdrive-lock")
-    if pam then pam:close() end
-    hl.exec_cmd("env NIGHTDRIVE_LOCK_PAM=" .. (pam and "nightdrive-lock" or "login") .. " qs -p " .. HOME .. "/.config/greeter/lock.qml")
+    -- Through the lock script, which starts the lock again if it dies (a screen going away as it starts)
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/lock --boot")
     hl.exec_cmd("sh -c 'sleep " .. LOCK_TIMEOUT .. "; [ -e \"" .. LOCKED_FLAG .. "\" ] || hyprctl dispatch \"hl.dsp.exit()\"'")
 end)
 
@@ -243,7 +277,9 @@ end)
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
-hl.env("QT_QPA_PLATFORMTHEME", "kde")  -- Qt apps (Dolphin) use KDE's dark theme
+-- Qt apps (EasyEffects) follow the GTK settings, which setup-user.sh makes dark. Not "kde": that needs plasma-integration,
+-- which --no-kde removes, and even with it the apps are light unless Plasma's own colour scheme was set dark
+hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
 hl.env("MOZ_ENABLE_WAYLAND", "1")
 -- NVIDIA's own driver (a PC, install.sh): video decoding and GLX through it (Hyprland wiki › NVIDIA). Checked at start
 -- rather than written by install.sh, so a driver added or removed later is followed.
@@ -406,6 +442,7 @@ hl.gesture({ fingers = 3, direction = "down", action = function() drawer_gesture
 ------------------------
 require("bindings")
 require("scroll")
+require("float-link")   -- ⌃⌘ + click on a link: the window it opens floats
 
 -----------------------
 ---- WINDOW RULES ----
@@ -448,6 +485,8 @@ hl.window_rule({
     size  = "460 monitor_h-57",             -- the screen's height under the bar; it scrolls
     move  = "monitor_w-470 47",
 })
+-- Welcome to Nightdrive (config/welcome): its window rules, and what it opens comes over it
+require("welcome")
 hl.window_rule({
     name  = "float-preview",
     match = { class = "^org\\.gnome\\.Loupe$" },
@@ -482,6 +521,18 @@ hl.window_rule({
     match = { class = "^(sh\\.nightdrive\\.)?floating-help$" },
     float = true,
     size  = "900 750",
+})
+-- Polkit password prompt (hyprpolkitagent; its size: hyprpolkitagent/hyprpolkitagent.conf): centred over everything,
+-- on whatever workspace is shown, with the keyboard, since a prompt left unseen times out. Over the launcher and the
+-- bar's menus too: those are overlay layers no window gets above, so they hide while it is open (quickshell/PolkitWatch.qml).
+hl.window_rule({
+    name  = "polkit-prompt",
+    match = { class = "^hyprpolkitagent$" },
+    float = true,
+    size  = "600 window_h",   -- its own width (window_width) is only a preference: floating, it opened at its minimum, 460
+    center = true,
+    pin = true,
+    stay_focused = true,
 })
 -- 1Password: floating window centred on screen, hidden from screen sharing. Here rather than in plugins/1password: the app
 -- may run while the plugin is off (it starts at login), and it must stay out of a shared screen then too.

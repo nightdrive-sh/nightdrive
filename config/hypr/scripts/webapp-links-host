@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+# The native messaging host of the web apps' links extension (hypr/webapp-links): Chromium runs it for each link, with
+# {"url": …} on stdin, and reads {"opened": true|false} back. It opens the link in the default browser, unless that
+# is Chromium itself: then "opened": false and Chromium opens it as before. Each message is a 4-byte length in native
+# byte order, then that much JSON (Chromium's native messaging).
+import json
+import struct
+import subprocess
+import sys
+
+
+def read_message():
+    head = sys.stdin.buffer.read(4)
+    if len(head) < 4:
+        return None
+    return json.loads(sys.stdin.buffer.read(struct.unpack("=I", head)[0]))
+
+
+def send(obj):
+    out = json.dumps(obj).encode()
+    sys.stdout.buffer.write(struct.pack("=I", len(out)) + out)
+    sys.stdout.buffer.flush()
+
+
+def default_is_chromium():
+    # xdg-mime reads mimeapps.list itself (fast); xdg-settings' answer is the same file, a shell script slower
+    try:
+        out = subprocess.run(["xdg-mime", "query", "default", "x-scheme-handler/https"],
+                             capture_output=True, text=True, timeout=3).stdout.strip().lower()
+    except (OSError, subprocess.SubprocessError):
+        return True   # can't tell: Chromium's own way is the safe one
+    return out == "" or "chromium" in out
+
+
+def open_url(url):
+    if not url.startswith(("https://", "http://")) or default_is_chromium():
+        return False
+    # Detached, its output away from stdout: that pipe is Chromium's and takes only messages
+    subprocess.Popen(["xdg-open", url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+    return True
+
+
+def main():
+    msg = read_message()
+    if msg is None:
+        return
+    send({"opened": open_url(str(msg.get("url", "")))})
+
+
+if __name__ == "__main__":
+    main()

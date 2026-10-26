@@ -1,0 +1,133 @@
+#!/bin/bash
+# Remote login (launcher › Settings › Remote login): sshd, and where the firewall lets SSH in. Over Tailscale from
+# anywhere, and on the networks the user trusts (home, work), not on a café's or hotel's: their addresses are private
+# space too, so a network is trusted by name, one NetworkManager connection at a time. SSH is open only in the zone
+# $ZONE (a copy of the default zone with ssh; tailscale0 is in it), the default zone loses it, and a trusted
+# connection is put in $ZONE. A connection's zone is also the answer to "allow it?": $ZONE yes, the default zone's
+# name no, empty never asked, so nothing else is stored.
+#   status            on|off|none, then the primary connection's uuid, name and yes|no|"" (its answer)
+#   on | off          sshd on (after setup, trusting the networks it is on now: almost always home) or off
+#   allow|deny [UUID] trust a connection or not (the primary one without UUID)
+#   setup             the zone and the default zone without ssh, once; sshd already on (an install from before,
+#                     23.10.2026): its networks now are trusted, so nothing stops working. Exit 1 if it had nothing to
+#                     do, 2 if it failed or needs root (over ssh firewalld lets no one but root in)
+#   watch             started by hyprland.lua: a network joined for the first time while sshd is on asks with a
+#                     notification whether to allow remote login from it
+# NetworkManager lets wheel users in the session change a connection without a password; firewalld only on Fedora KDE
+# and Workstation (its desktop polkit rule), elsewhere it asks, and so does systemd for sshd: two password prompts.
+# One (pkexec, or a polkit rule of Nightdrive's) was turned down, 24.10.2026: neither is worth even a small risk.
+# Every step is ordered so that one failing, or its prompt cancelled or timing out, leaves no half state: SSH still
+# reaches the computer wherever it did before. update runs setup with sudo when there's no session (ssh).
+ZONE=nightdrive-home
+TAILSCALE_IF=tailscale0
+
+# Not firewall-cmd --state: over ssh firewalld refuses a user that, which read as "no firewalld"
+has_firewalld() { command -v firewall-cmd >/dev/null && systemctl -q is-active firewalld.service; }
+sshd_on() { systemctl -q is-active sshd.service; }
+# A device's connection as "type<TAB>uuid<TAB>name" (-g: one value a line, a name with a colon as it is)
+conn_of() { local v; mapfile -t v < <(nmcli -g GENERAL.TYPE,GENERAL.CON-UUID,GENERAL.CONNECTION device show "$1" 2>/dev/null); printf '%s\t%s\t%s\n' "${v[@]:0:3}"; }
+# The connection the traffic goes out on (net-primary), as "uuid<TAB>name", if it is Wi-Fi or a cable
+primary() {
+  local dev type uuid name; dev=$("$(dirname "$0")/net-primary" | jq -r '.dev // empty')
+  [[ -n $dev ]] || return 1
+  IFS=$'\t' read -r type uuid name < <(conn_of "$dev")
+  [[ ($type == wifi || $type == ethernet) && -n $uuid ]] && printf '%s\t%s\n' "$uuid" "$name"
+}
+# The active Wi-Fi and wired connections' uuids, and one connection's answer: yes | no | "" (never asked)
+active() { nmcli -t -f TYPE,UUID connection show --active | awk -F: '$1 ~ /wireless|ethernet/ { print $2 }'; }
+answer() {
+  case $(nmcli -g connection.zone connection show "$1" 2>/dev/null) in
+    "") ;; "$ZONE") echo yes ;; *) echo no ;;
+  esac
+}
+# NetworkManager hands an active connection's new zone to firewalld at once (reapply), not at the next connect
+set_zone() {
+  nmcli connection modify "$1" connection.zone "$2" || return 1
+  local dev; dev=$(nmcli -g GENERAL.DEVICES connection show "$1" 2>/dev/null)
+  [[ -z $dev ]] || nmcli device reapply "$dev" >/dev/null
+}
+
+# The zone, once (exit 1 if it is there): a copy of the default zone $1 with ssh, tailscale0 in it. A new zone isn't in
+# use until the reload, so this changes nothing yet about what reaches the computer
+make_zone() {
+  local s p
+  if firewall-cmd --permanent --get-zones | tr ' ' '\n' | grep -qx "$ZONE"; then
+    # Made, but a run stopped before its reload: in use now
+    firewall-cmd --get-zones | tr ' ' '\n' | grep -qx "$ZONE" && return 1
+    firewall-cmd -q --reload && return 0 || return 2
+  fi
+  firewall-cmd -q --permanent --new-zone="$ZONE" || return 2
+  firewall-cmd -q --permanent --zone="$ZONE" --set-short="Nightdrive: trusted networks"
+  firewall-cmd -q --permanent --zone="$ZONE" --set-description="$1 with SSH in: Tailscale, and the networks Remote login trusts"
+  # What the default zone lets in stays the same there (AirPlay, LocalSend and Ferry use its open ports)
+  for s in $(firewall-cmd --permanent --zone="$1" --list-services) ssh; do firewall-cmd -q --permanent --zone="$ZONE" --add-service="$s"; done
+  for p in $(firewall-cmd --permanent --zone="$1" --list-ports); do firewall-cmd -q --permanent --zone="$ZONE" --add-port="$p"; done
+  firewall-cmd -q --permanent --zone="$ZONE" --add-interface="$TAILSCALE_IF"
+  firewall-cmd -q --reload || return 2
+}
+# ssh out of the default zone $1, the last of the firewall's steps: by then the networks that keep it are in $ZONE.
+# Permanent, and at once without a second reload
+close_default() {
+  firewall-cmd -q --permanent --zone="$1" --query-service=ssh || return 0
+  firewall-cmd -q --permanent --zone="$1" --remove-service=ssh || return 1
+  firewall-cmd -q --zone="$1" --remove-service=ssh 2>/dev/null
+  return 0
+}
+
+setup() {
+  has_firewalld || return 1
+  local def did=0 s
+  def=$(firewall-cmd --get-default-zone 2>/dev/null) || return 2
+  make_zone "$def"; case $? in 0) did=1 ;; 2) return 2 ;; esac
+  firewall-cmd -q --permanent --zone="$def" --query-service=ssh && did=1
+  (( did )) || return 1
+  if sshd_on; then for s in $(active); do [[ -n $(answer "$s") ]] || set_zone "$s" "$ZONE" || return 2; done; fi
+  close_default "$def" || return 2
+  echo "Remote login: SSH now only over Tailscale and on the networks it trusts"
+}
+
+# One notification per connection joined while sshd is on, until it is answered; dismissed, it asks the next time
+watch() {
+  exec 9>"${XDG_RUNTIME_DIR:-/tmp}/remote-login-watch.lock"
+  flock -n 9 || exit 0
+  local line dev uuid name type got
+  nmcli monitor 9>&- | while read -r line; do   # 9>&-: a monitor outliving this one mustn't keep the lock
+    [[ $line =~ ^([^:]+):\ connected$ ]] || continue
+    dev=${BASH_REMATCH[1]}
+    sshd_on && has_firewalld || continue
+    IFS=$'\t' read -r type uuid name < <(conn_of "$dev")
+    [[ ($type == wifi || $type == ethernet) && -n $uuid && -z $(answer "$uuid") ]] || continue
+    # In the background (without the lock), so the next network's event isn't held up by an unanswered one
+    ( got=$(notify-send -a Settings -i lucide:terminal -A allow="Allow" -A deny="Not here" -w \
+        "Remote login on “$name”?" \
+        "Allow logging in to this computer with SSH from this network? Safe at home or work, not on a café's or hotel's. Tailscale works everywhere anyway.")
+      case $got in allow) set_zone "$uuid" "$ZONE" ;; deny) set_zone "$uuid" "$(firewall-cmd --get-default-zone)" ;; esac
+    ) 9>&- &
+  done
+}
+
+case ${1:-} in
+  status)
+    systemctl list-unit-files -q sshd.service | grep -q . || { echo none; exit 0; }
+    sshd_on && echo on || echo off
+    if has_firewalld && IFS=$'\t' read -r uuid name < <(primary); then printf '%s\n%s\n%s\n' "$uuid" "$name" "$(answer "$uuid")"; fi ;;
+  on)
+    # setup's steps with the networks it is on now trusted (unless one was answered "Not here" before), then sshd: only
+    # errors are printed, for the notification
+    if has_firewalld; then
+      def=$(firewall-cmd --get-default-zone) || exit 1
+      make_zone "$def"; (( $? == 2 )) && exit 1
+      for c in $(active); do [[ $(answer "$c") == no ]] || set_zone "$c" "$ZONE" || exit 1; done
+      close_default "$def" || exit 1
+    fi
+    systemctl enable --now sshd.service ;;
+  off) systemctl disable --now sshd.service ;;
+  allow|deny)
+    uuid=${2:-}; [[ -n $uuid ]] || IFS=$'\t' read -r uuid _ < <(primary)
+    [[ -n $uuid ]] || { echo "Not on a Wi-Fi or wired network" >&2; exit 1; }
+    has_firewalld || { echo "No firewalld" >&2; exit 1; }
+    if [[ $1 == allow ]]; then set_zone "$uuid" "$ZONE"; else set_zone "$uuid" "$(firewall-cmd --get-default-zone)"; fi ;;
+  setup) setup ;;
+  watch) watch ;;
+  *) echo "usage: remote-login status|on|off|allow [UUID]|deny [UUID]|setup|watch" >&2; exit 1 ;;
+esac

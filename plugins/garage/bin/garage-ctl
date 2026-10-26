@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+# qemu/KVM VMs for the Garage window (app/) and the garage command, one folder each under
+# ~/.local/share/nightdrive/garage/NAME:
+#   vm.conf      MEM (MB), CPUS, ISO (in its drive while set; it boots after the disk), SSH_PORT (its own: lib/ssh.sh),
+#                USER (for ssh, if known): KEY=VALUE lines, read by read_conf
+#   disk.qcow2   the disk; snapshots are internal to it (qemu-img snapshot, only while the VM is stopped)
+#   vars.raw     the UEFI variables
+#   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
+#   snapsizes.json  what each snapshot keeps on its own, in bytes, as of the disk's mtime (lib/snapsize.py)
+#   qmp.sock, qga.sock, pid, serial.log while it runs (qemu's monitor, the guest agent's channel)
+#   firstboot/   a disk image's first boot: its user, until it has run (lib/firstboot.sh)
+# What differs between an Asahi Mac and a PC is lib/arch.sh's; qemu itself, its command line and its sockets, are
+# lib/qemu.sh's; the ready-made images are lib/images.sh's.
+#
+#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, shown (its window on a workspace that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
+#   garage-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
+#   garage-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
+#   garage-ctl fetch ID                      download one in the background (images shows how far)
+#   garage-ctl create-image NAME ID MEM_GB DISK_GB CPUS USER     a VM from one, with USER (the password on stdin)
+#   garage-ctl start|stop|kill|display|hide|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power
+#                                            button; hide: its window out of sight (special:bg), the VM running on
+#   garage-ctl set NAME mem GB | cpus N | disk GB | iso PATH | port N | user USER     while it is stopped (user: any
+#                                            time, "" for none); the disk only grows, iso "" ejects
+#   garage-ctl rename-vm NAME NEWNAME        while it is stopped: its folder, and its ssh name (lib/ssh.sh)
+#   garage-ctl ssh-sync                      ~/.ssh/config.d/garage written again from the VMs
+#   garage-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
+#   garage-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
+#   garage-ctl restore|unsnap NAME TAG       go back to one, delete one
+#   garage-ctl duplicate NAME TAG NEWTAG [LABEL]   a copy of one in the same disk, under NEWTAG (shown as LABEL)
+#   garage-ctl rename NAME TAG LABEL         the name a snapshot shows (while it runs too: only names.json changes)
+#   garage-ctl isos                          .iso files in ~/Downloads and ~/vm, newest first, not another arch's
+#   garage-ctl cmdline NAME                  the qemu command start runs (GARAGE_ARCH=x86_64|aarch64: another host's)
+set -euo pipefail
+
+ROOT=${GARAGE_ROOT:-$HOME/.local/share/nightdrive/garage}
+MAX_CPUS=8
+HOST_SPARE_GB=2     # memory the host keeps: a VM gets at most the rest
+
+# The VMs are the user's alone: their disks, logs, first boot's credentials and qemu's sockets (qemu inherits the
+# umask), whatever the session's umask. The folder itself too, which covers what was made before with 644 and 755
+umask 077
+mkdir -p "$ROOT" && chmod 700 "$ROOT"
+
+die() { echo "$*" >&2; exit 1; }
+# A VM's name is its folder's: not . or .. (nor a hidden one), not an option (-x), and not images/, the images' folder
+good_name() { [[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && $1 != images ]]; }
+dir() { good_name "$1" || die "Bad name: $1 (letters, digits, - . _, starting with a letter or digit)"; echo "$ROOT/$1"; }
+need() { local d; d=$(dir "$1"); [[ -f $d/vm.conf ]] || die "No VM called $1"; }
+running() { local p; p=$(cat "$(dir "$1")/pid" 2>/dev/null) && kill -0 "$p" 2>/dev/null; }
+stopped() { running "$1" && die "$1 is running: shut it down first"; return 0; }
+# A snapshot command's checks: the VM, stopped (qemu-img writes the disk), and its tag. A new one is as the window makes
+# them (s and the time) or as plain as a VM's name; one there already only has to be on the disk, as snapshots taken
+# before that rule have spaces in theirs ("Clean Fedora"). Neither passes for one of qemu-img's options.
+good_tag() { [[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "Bad snapshot tag: $1"; }
+has_snap() {
+  [[ $2 != -* ]] && qemu-img info -U --output=json "$(dir "$1")/disk.qcow2" \
+    | jq -e --arg tag "$2" 'any(.snapshots[]?; .name == $tag)' >/dev/null || die "$1 has no snapshot $2"
+}
+snap() {
+  [[ -n ${3:-} ]] || die "$1 NAME TAG"; need "$2"
+  if [[ $1 == snapshot ]]; then good_tag "$3"; else has_snap "$2" "$3"; fi
+  stopped "$2"
+}
+# A new VM's memory, disk and CPUs: whole numbers, the memory what the host can spare
+max_mem() { echo $(( $(awk '/^MemTotal/ { print int($2 / 1048576) }' /proc/meminfo) - HOST_SPARE_GB )); }
+sizes() {
+  [[ $1 =~ ^[0-9]+$ && $2 =~ ^[0-9]+$ && $3 =~ ^[0-9]+$ ]] || die "Memory, disk and CPUs are whole numbers"
+  local max; max=$(max_mem)
+  (($1 >= 1 && $1 <= max)) || die "Memory: 1 to $max GB"
+  (($3 >= 1 && $3 <= MAX_CPUS)) || die "CPUs: 1 to $MAX_CPUS"
+}
+
+# read_conf NAME: its vm.conf into MEM, CPUS, ISO, SSH_PORT and SSH_USER (the caller's locals; USER's not $USER, the
+# session's). Read a line at a time, not sourced: the file is data, and a line that isn't (a command) mustn't run. ISO
+# is the path as such, "" while there is none; SSH_PORT is "" in a VM made before each had its own (lib/ssh.sh)
+read_conf() {
+  local f k v; f=$(dir "$1")/vm.conf
+  MEM=0; CPUS=0; ISO=""; SSH_PORT=""; SSH_USER=""
+  while IFS= read -r v || [[ -n $v ]]; do
+    k=${v%%=*}; v=${v#*=}
+    case $k in
+      MEM|CPUS) [[ $v =~ ^[0-9]+$ ]] || die "$f: $k isn't a number"; printf -v "$k" %s "$v" ;;
+      ISO)      [[ $v == '""' ]] && v=""; ISO=$v ;;
+      SSH_PORT) good_port "$v" || die "$f: SSH_PORT isn't a port"; SSH_PORT=$v ;;
+      USER)     [[ -z $v ]] || good_user "$v" || die "$f: USER isn't a user name"; SSH_USER=$v ;;
+    esac
+  done < "$f"
+}
+
+# shellcheck source=../lib/arch.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/arch.sh"
+# shellcheck source=../lib/qemu.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/qemu.sh"
+# shellcheck source=../lib/firstboot.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/firstboot.sh"
+# shellcheck source=../lib/images.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/images.sh"
+# shellcheck source=../lib/ssh.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/ssh.sh"
+
+# A snapshot's name in names.json (LABEL empty: its entry goes). Written to a new file, then renamed over the old one
+label() {
+  local f; f=$(dir "$1")/names.json
+  jq --arg tag "$2" --arg label "$3" 'if $label == "" then del(.[$tag]) else .[$tag] = $label end' \
+     <(cat "$f" 2>/dev/null || echo '{}') > "$f.new" && mv "$f.new" "$f"
+}
+rename() {
+  [[ -n ${3:-} && -n ${4:-} ]] || die "rename NAME TAG LABEL"; need "$2"; has_snap "$2" "$3"
+  label "$2" "$3" "$4"
+}
+
+# What each snapshot keeps on its own (lib/snapsize.py), cached in snapsizes.json by the disk's mtime: read again only
+# while the VM is stopped, as qemu changes the disk's tables under it, and the cache stands for it meanwhile
+snap_sizes() {
+  local d=$1 f=$1/snapsizes.json mtime sizes LIB; LIB=$(dirname "$(readlink -f "$0")")/../lib
+  mtime=$(stat -c %Y "$d/disk.qcow2")
+  if ! running "$(basename "$d")" && [[ $(jq -r .mtime "$f" 2>/dev/null) != "$mtime" ]] \
+     && sizes=$(python3 -I "$LIB/snapsize.py" "$d/disk.qcow2" 2>/dev/null); then
+    jq -nc --argjson mtime "$mtime" --argjson sizes "$sizes" '{ mtime: $mtime, sizes: $sizes }' > "$f.new" && mv "$f.new" "$f"
+  fi
+  jq -c '.sizes' "$f" 2>/dev/null || echo '{}'
+}
+
+# A copy of snapshot TAG as NEWTAG. qemu-img can't copy one, but a snapshot only counts references to the disk's
+# clusters, so the disk's state now is kept as a snapshot of its own, TAG's is applied and taken again as NEWTAG, and
+# the state now comes back: no data is copied, it takes a moment and no space. If going back fails, the state now
+# stays in that snapshot, under its name, for a restore by hand
+duplicate() {
+  [[ -n ${4:-} ]] || die "duplicate NAME TAG NEWTAG [LABEL]"
+  snap "$@"; good_tag "$4"
+  local f now; f=$(dir "$2")/disk.qcow2; now="garage-now-$(date +%s)"
+  qemu-img info -U --output=json "$f" | jq -e --arg tag "$4" 'any(.snapshots[]?; .name == $tag)' >/dev/null \
+    && die "$2 has a snapshot $4 already"
+  qemu-img snapshot -c "$now" "$f"
+  local ok=1
+  qemu-img snapshot -a "$3" "$f" && qemu-img snapshot -c "$4" "$f" || ok=0
+  qemu-img snapshot -a "$now" "$f" || die "$2's disk is as $3 left it: its state before is the snapshot $now"
+  qemu-img snapshot -d "$now" "$f"
+  ((ok)) || die "Couldn't copy the snapshot $3"
+  [[ -z ${5:-} ]] || label "$2" "$4" "$5"
+}
+
+list() {
+  local first=1 shown='{}'
+  # One look at Hyprland for all the VMs, and none while none runs
+  for d in "$ROOT"/*/; do [[ -f $d/pid ]] && { shown=$(shown_windows); break; }; done
+  echo -n "["
+  for d in "$ROOT"/*/; do
+    [[ -f $d/vm.conf ]] || continue
+    local name MEM CPUS ISO SSH_PORT SSH_USER run=false pid=""
+    name=$(basename "$d")
+    # A folder made by hand with a name garage-ctl wouldn't take: the window and the menu would pass it back to it
+    good_name "$name" || continue
+    read_conf "$name"
+    running "$name" && { run=true; pid=$(cat "$d/pid"); }
+    # -U reads the disk while qemu holds its lock
+    local info; info=$(qemu-img info -U --output=json "$d/disk.qcow2")
+    ((first)) || echo -n ","; first=0
+    jq -nc --arg name "$name" --argjson mem "$MEM" --argjson cpus "$CPUS" --arg iso "$ISO" --argjson run "$run" \
+       --argjson shown "$shown" --arg pid "$pid" --argjson info "$info" --arg ssh "$SSH_PORT" --arg user "$SSH_USER" --argjson names "$(cat "$d/names.json" 2>/dev/null || echo '{}')" \
+       --argjson sizes "$(snap_sizes "${d%/}")" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run, shown: ($run and ($shown[$pid] // false)),
+         ssh: (if $ssh == "" then null else ($ssh | tonumber) end), user: $user,
+         disk: ($info["virtual-size"] / 1073741824 | floor),
+         used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
+         snapshots: [($info.snapshots // []) | sort_by(-.["date-sec"])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")), size: $sizes[.name] }] }'
+  done
+  echo "]"
+}
+
+create() {
+  local name=$1 iso=$2 mem=$3 disk=$4 cpus=${5:-4} d; d=$(dir "$1")
+  [[ -e $d ]] && die "$name exists already"
+  [[ -f $iso ]] || die "No such ISO: $iso"
+  sizes "$mem" "$disk" "$cpus"
+  need_qemu
+  mkdir -p "$d"
+  cp "$FW_VARS" "$d/vars.raw"
+  qemu-img create -q -f qcow2 "$d/disk.qcow2" "${disk}G"
+  iso=$(iso_path "$iso")
+  printf 'MEM=%s\nCPUS=%s\nISO=%s\nSSH_PORT=%s\n' $((mem * 1024)) "$cpus" "$iso" "$(free_port)" > "$d/vm.conf"
+  ssh_sync
+}
+
+# An ISO's full path, as vm.conf keeps it: on one line
+iso_path() {
+  local p; p=$(realpath "$1")
+  [[ $p != *$'\n'* ]] || die "An ISO's path can't have a line break in it"
+  echo "$p"
+}
+
+# One line of vm.conf: the others kept, KEY's replaced
+conf() {
+  local f; f=$(dir "$1")/vm.conf
+  { grep -v "^$2=" "$f" || true; printf '%s=%s\n' "$2" "$3"; } > "$f.new" && mv "$f.new" "$f"
+}
+
+# What the window's Settings change, one at a time, while the VM is stopped. The disk grows only (qemu-img won't
+# shrink one without losing what is past its new end); the guest then sees the new space unpartitioned
+settings() {
+  [[ $# -ge 3 ]] || die "set NAME mem GB | cpus N | disk GB | iso PATH | port N | user USER"
+  need "$1"
+  # Only ssh's config reads the user: it changes while the VM runs too
+  if [[ $2 == user ]]; then
+    [[ -z $3 ]] || good_user "$3" || die "User: lower-case letters, digits, - and _, starting with a letter"
+    conf "$1" USER "$3"; ssh_sync; return
+  fi
+  stopped "$1"
+  local name=$1 key=$2 v=$3 d; d=$(dir "$1")
+  case $key in
+    port)
+      good_port "$v" || die "Port: 1024 to 65535"
+      vm_ports "$name" | grep -qx "$v" && die "Another VM has port $v"
+      conf "$name" SSH_PORT "$v"; ssh_sync ;;
+    mem)
+      local max; max=$(max_mem)
+      [[ $v =~ ^[0-9]+$ ]] && ((v >= 1 && v <= max)) || die "Memory: 1 to $max GB"
+      conf "$name" MEM $((v * 1024)) ;;
+    cpus)
+      [[ $v =~ ^[0-9]+$ ]] && ((v >= 1 && v <= MAX_CPUS)) || die "CPUs: 1 to $MAX_CPUS"
+      conf "$name" CPUS "$v" ;;
+    disk)
+      local now; now=$(qemu-img info --output=json "$d/disk.qcow2" | jq '.["virtual-size"] / 1073741824 | floor')
+      [[ $v =~ ^[0-9]+$ ]] || die "Disk: a size in GB"
+      ((v == now)) && return 0
+      ((v > now)) || die "The disk only grows: more than $now GB"
+      qemu-img resize -q "$d/disk.qcow2" "${v}G" ;;
+    iso)
+      [[ -z $v || -f $v ]] || die "No such ISO: $v"
+      if [[ -z $v ]]; then conf "$name" ISO '""'; else v=$(iso_path "$v"); conf "$name" ISO "$v"; fi ;;
+    *) die "set: mem, cpus, disk, iso, port or user" ;;
+  esac
+}
+
+# A new name for a stopped VM: its folder moves, and its ssh name with it. Its first boot's hostname, if that is still to
+# come, becomes the new name too (lib/firstboot.sh); one that has run is the guest's own, and stays
+rename_vm() {
+  [[ -n ${2:-} ]] || die "rename-vm NAME NEWNAME"
+  need "$1"; stopped "$1"
+  local old new; old=$(dir "$1"); new=$(dir "$2")
+  [[ -e $new ]] && die "$2 exists already"
+  mv "$old" "$new"
+  firstboot_rename "$2"
+  ssh_forget "$1"
+  ssh_sync
+}
+
+# The .iso files, newest first, but not another architecture's (by its name: Fedora's say theirs)
+isos() {
+  ls -t "$HOME"/Downloads/*.iso "$HOME"/vm/*.iso 2>/dev/null | grep -viE "[-_.](${OTHER_ISO})[-_.]" || true
+}
+
+case ${1:-} in
+  list)     list ;;
+  isos)     isos ;;
+  create)   (($# >= 5)) || die "create NAME ISO MEM_GB DISK_GB [CPUS]"; create "${@:2}" ;;
+  images)   images ;;
+  fetch)    fetch "$2" ;;
+  fetch-run) fetch_run "$2" ;;   # fetch's own, in the background
+  create-image) create_image "${@:2}" ;;
+  start)    start "$2" ;;
+  stop)     stop "$2" ;;
+  kill)     force_off "$2" ;;
+  synctime) synctime "$2" ;;
+  display)  display "$2" ;;
+  hide)     hide "$2" ;;
+  cmdline)  cmdline "$2" ;;
+  eject)    settings "$2" iso "" ;;
+  set)      settings "${@:2}" ;;
+  delete)   need "$2"; stopped "$2"; rm -rf "$(dir "$2")"; ssh_forget "$2"; ssh_sync ;;
+  rename-vm) rename_vm "$2" "${3:-}" ;;
+  ssh-sync) ssh_sync ;;
+  snapshot) snap "$@"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2"; [[ -z ${4:-} ]] || label "$2" "$3" "$4" ;;
+  restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
+  unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2"; label "$2" "$3" "" ;;
+  duplicate) duplicate "$@" ;;
+  rename)   rename "$@" ;;
+  *)        sed -n '2,/^set /{/^#/p}' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

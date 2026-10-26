@@ -14,6 +14,7 @@
   Hyper Y            YouTube {youtube}
   ⌘ Esc / F3         Notifications (history, do not disturb)
   ⌘ Ctrl L           Lock screen
+  ⌃ ⌥ F3             Lock screen, and brings back a lock that died (Hyprland's "lockscreen app died" screen)
   ⌘ ⇧ Space          Top bar by keyboard (←/→ menu, ↑/↓ row, Enter select, Esc close)
   ⌘ ⇧ K              This help
 
@@ -26,9 +27,9 @@
   ⌘ R / ⌘ ⇧ R        Reload / reload without the cache (not in the terminal)
   ⌘ F / ⌘ T / ⌘ J    Find / new tab / downloads: the app's own keys (not in the terminal)
   ⌘ ⌫                Move file to trash (in Files) {!keyd}
-  ⌘ ⇧ V              Clipboard history (Enter pastes into the active window, ⇧ Enter copies only)
+  ⌘ ⇧ V              Clipboard history (Enter pastes into the active window, ⇧ Enter copies only; over a launcher text field it pastes there)
   ⌘ ⇧ E              Emoji picker (Enter pastes, ⇧ Enter copies only)
-  ⌘ ⇧ C              Claude writes the selected text out (a preview first: Enter replaces, ⌘ ⇧ C writes a new one, Esc cancels; in terminals, if turned on: the command)
+  ⌘ ⇧ C              Claude writes the selected text out (a preview first: Enter replaces, ⌘ ⇧ C writes a new one, Esc cancels; nothing selected: it asks what to write and inserts it; in terminals, if turned on: the command)
 
 ## Windows
   ⌘ W                Close window; background apps (Deck, WhatsApp, Slack, 1Password…) are only hidden and keep running, with a green dot in the launcher (their shortcut brings them back)
@@ -42,6 +43,7 @@
   ⌘ ⇧ arrows         Move window
   ⌘ + mouse drag     Move window / right button: resize
   ⌘ + drag           A top bar icon: move it (the order is kept; also launcher › Settings › Top bar › Items)
+  ⌃ ⌘ + click       A link: the window it opens floats in the centre (not a link that opens in a tab)
   ⌘ ⌥ ← / →         Previous / next tab (any app: sends Ctrl+PageUp/PageDown)
   ⌃ ⌘ ← / →         Back / forward (browsers, web apps, Nautilus)
   ⌥ ← / →           Move by word (⇧ selects)
@@ -49,7 +51,7 @@
 ## Workspaces (like macOS Spaces)
   ⌘ 1 … ⌘ 0          Go to workspace (⌘ 0: the laptop's own screen, with an external display)
   ⌘ ⇧ 1 … ⌘ ⇧ 0      Move window to workspace
-  ⌘ ⌥ 1 … ⌘ ⌥ 0      Move all windows to workspace (and go there)
+  ⌘ ⌥ 1 … ⌘ ⌥ 0      Move all windows to workspace (and go there). These three and ⌘ ⇧ F also work over a VM's window, which otherwise takes every key
   ⌘ Tab / ⌘ ⇧ Tab    Next / previous workspace
   3-finger swipe     Switch workspace
   4-finger swipe     Move window in the swipe direction
@@ -70,3 +72,4 @@
   F4                 App launcher (like ⌘Space)
   ⌘ F5              Mic on/off (toast)
   F6                 Do not disturb (hides notifications, toast shows state)
+  ⌃ + click          In the terminal: a link, or a file or folder path in the output (Claude Code's too): a folder in Files, a file in the code editor at its line (file.py:42)

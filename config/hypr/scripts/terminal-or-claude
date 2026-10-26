@@ -1,10 +1,34 @@
 #!/bin/bash
 # ⌘⌥Enter: if the launcher is open with text typed in it, send that to Claude Code; otherwise open an empty Claude.
-# terminal-or-claude <prompt>: start Claude Code with that prompt (the launcher's askClaude calls this).
-projects="$HOME/Projects"
+# terminal-or-claude [--dir DIR] [--name NAME] [--effort LEVEL] [--] [PROMPT…]: start Claude Code with that prompt, in
+# DIR (~/Projects unless given), the session named NAME (claude -n, as /rename), at effort LEVEL (claude --effort).
+# The launcher's askClaude, crash reports and `nightdrive ask` call this.
+dir="$HOME/Projects"; name=; effort=; bare=$(( $# == 0 ))
+while (( $# )); do
+  case $1 in
+    --dir) [[ -n ${2:-} ]] || { echo "--dir needs a folder" >&2; exit 1; }; dir=$2; shift 2 ;;
+    --name) [[ -n ${2:-} ]] || { echo "--name needs a name" >&2; exit 1; }; name=$2; shift 2 ;;
+    # checked here: a wrong level would only show as an error in the new terminal
+    --effort) [[ ${2:-} =~ ^(low|medium|high|xhigh|max)$ ]] || { echo "--effort needs low, medium, high, xhigh or max" >&2; exit 1; }
+              effort=$2; shift 2 ;;
+    --) shift; break ;;
+    -*) echo "Unknown option: $1 (usage: nightdrive ask [--dir DIR] [--name NAME] [--effort LEVEL] MESSAGE)" >&2; exit 1 ;;
+    *) break ;;
+  esac
+done
+# the terminal would quietly fall back to ~ in a folder that doesn't exist
+[[ -d $dir ]] || { echo "No such folder: $dir" >&2; exit 1; }
+dir=$(cd "$dir" && pwd)   # relative to where it was called, before the terminal starts elsewhere
 # clear inherited CLAUDE* variables so the new Claude doesn't think it's a child session
 for v in $(compgen -e | grep '^CLAUDE'); do unset "$v"; done
 term="$HOME/.config/hypr/scripts/terminal"   # the terminal chosen in Default apps
-[ $# -gt 0 ] && exec "$term" --dir "$projects" -- "$HOME/.local/bin/claude" -- "$1"
-[ "$(qs ipc call launcher askClaude 2>/dev/null)" = "ok" ] && exit 0
-exec "$term" --dir "$projects" -- "$HOME/.local/bin/claude"
+claude=("$HOME/.local/bin/claude")
+[[ -n $name ]] && claude+=(-n "$name")
+[[ -n $effort ]] && claude+=(--effort "$effort")
+(( $# )) && claude+=(-- "$*")
+if (( bare )); then
+  [ "$(qs ipc call launcher askClaude 2>/dev/null)" = "ok" ] && exit 0
+  exec "$term" --dir "$dir" -- "${claude[@]}"
+fi
+# detached: `nightdrive ask` returns at once, and the terminal's own messages stay out of the shell it was run from
+setsid -f "$term" --dir "$dir" -- "${claude[@]}" >/dev/null 2>&1

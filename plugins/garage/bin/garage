@@ -1,0 +1,78 @@
+#!/bin/bash
+# garage [open | start|stop|kill|display|hide [NAME] | ssh [NAME [COMMAND…]] | list | install | uninstall | restart | quit | log |
+# GARAGE-CTL-COMMAND …]: Garage, the window of virtual machines (app/, a Quickshell config of its own), and its VMs from
+# the terminal. Without a NAME, start, stop, kill, display, hide and ssh take the only VM there is. ssh is `ssh NAME`, through
+# the Host block garage-ctl keeps in ~/.ssh/config.d/garage. install puts Garage among the desktop's apps, uninstall
+# takes it out (the VMs and qemu stay). Anything else goes to garage-ctl as such (create, snapshot, restore, delete…:
+# `garage help` lists them).
+set -u
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app
+GARAGE_CTL=$APP_DIR/bin/garage-ctl
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+APP_TITLE=Garage
+APP_IPC=garage
+. "$QS_DIR/kit/app.sh"
+
+# The VM a command means: the one named, or the only one there is
+vm_name() {
+  if [[ -n ${1:-} ]]; then echo "$1"; return; fi
+  local names
+  names=$("$GARAGE_CTL" list | jq -r '.[].name') || return 1
+  case $(grep -c . <<<"$names") in
+    0) echo "No VMs yet: \`garage\` opens the window to make one." >&2; return 1 ;;
+    1) echo "$names" ;;
+    *) echo "Which VM? $(paste -sd ' ' <<<"$names")" >&2; return 1 ;;
+  esac
+}
+
+# Puts Garage among the desktop's apps (share/garage.desktop, its Keywords for the launcher's search, and its icon
+# share/garage.svg), with Exec's full path filled in: the compositor's PATH may not have ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/garage.svg" "$icons/garage.svg"
+  sed "s|^Exec=garage|Exec=$HOME/.local/bin/garage|" "$APP_DIR/share/garage.desktop" > "$apps/garage.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  echo "Installed: $apps/garage.desktop"
+}
+
+# Takes Garage out of the desktop's apps, so it is back in Install › Recommended (plugin.conf's installed test). The
+# VMs stay in garage-ctl's folder and qemu stays installed: removing the app shouldn't take a user's machines with it.
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  app_command quit >/dev/null 2>&1 || true
+  rm -f "$data/applications/garage.desktop" "$data/icons/hicolor/scalable/apps/garage.svg"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$data/applications" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  "$HOME/.local/bin/nightdrive" plugins installed >/dev/null 2>&1 || true      # its key and key-list line go
+  echo "Garage is out of your apps; your VMs stay in ${GARAGE_ROOT:-$HOME/.local/share/nightdrive/garage}."
+  echo "Install it again from launcher › System › Install › Recommended, or: nightdrive plugins install garage"
+}
+
+# One line each for the terminal (garage-ctl's list is JSON, for the window)
+list() {
+  "$GARAGE_CTL" list | jq -r '.[] | [.name, (if .running then "running" else "stopped" end),
+    "\(.mem / 1024 | floor) GB", "\(.cpus) CPUs", "\(.disk) GB disk", "\(.snapshots | length) snapshots"] | @tsv' \
+    | column -t -s $'\t'
+}
+
+case ${1:-open} in
+  start|stop|kill|display|hide)
+    name=$(vm_name "${2:-}") || exit 1
+    exec "$GARAGE_CTL" "$1" "$name" ;;
+  ssh)
+    name=$(vm_name "${2:-}") || exit 1
+    # A VM's name as garage-ctl takes one, so it can't be one of ssh's options (-oProxyCommand=…)
+    [[ $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "Bad name: $name" >&2; exit 1; }
+    "$GARAGE_CTL" ssh-sync || exit 1      # its block there, if it hasn't had one yet
+    exec ssh -- "$name" "${@:3}" ;;
+  list)     list ;;
+  install)  install_app ;;
+  uninstall) uninstall_app ;;
+  help|-h|--help) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; echo; "$GARAGE_CTL" help || true ;;
+  *)        app_command "$@"; rc=$?; ((rc == 2)) && exec "$GARAGE_CTL" "$@"; exit $rc ;;
+esac

@@ -1,0 +1,103 @@
+#!/bin/bash
+# welcome [open | login | skip-rest | off | path [claude | manual | self | none] | readme FILE]: Welcome to Nightdrive, the
+# window that sets up what a new install still needs (Tailscale, Mail, Deck…). Its first question is the path: with
+# Claude (signing in to Claude, then each in a Claude session of its own, hypr/scripts/claude-setup), guided by hand, a
+# step at a time (each plugin's steps.md), or self: the apps' READMEs, opened in Apostrophe (`readme`). `path` prints
+# the answer (empty: not asked yet), `path claude|manual|self` changes it and `path none` asks again.
+# `nightdrive welcome` and launcher › System › Set up Nightdrive open it. At login (hyprland.lua, once unlocked):
+#   - the first login after install.sh (setup.json's welcome: pending) opens it;
+#   - later ones, while something is neither done nor skipped, ask with a notification (Set up, Don't remind me);
+#   - after Skip for now, Finish or Don't remind me (welcome: off), nothing; on the self path closing the window too.
+set -u
+
+QS_DIR=$(dirname "$(readlink -f "$0")")                 # this folder: the window's own Quickshell config
+STATE=$HOME/.local/state/nightdrive/setup.json          # { welcome: pending | shown | off, path: claude | manual,
+                                                        #   tasks: { ID: started | skipped } }
+APOSTROPHE=org.gnome.gitlab.somas.Apostrophe            # the Markdown viewer that comes with Nightdrive (plugins/apostrophe)
+LOGIN_DELAY=3                                           # seconds after unlocking, so the window comes up over the login apps
+
+# The window: started, brought forward and stopped by the apps' kit (kit/app.sh)
+APP_TITLE="Welcome to Nightdrive"
+APP_IPC=welcome
+. "$QS_DIR/kit/app.sh"
+
+state() { jq -r '.welcome // empty' "$STATE" 2>/dev/null; }
+path() { jq -r '.path // empty' "$STATE" 2>/dev/null; }
+
+# set_key KEY VALUE: one of setup.json's own keys (welcome, path), the rest kept
+set_key() {
+  local tmp
+  mkdir -p "${STATE%/*}"
+  tmp=$(mktemp "$STATE.XXXXXX") || return 1
+  jq --arg k "$1" --arg v "$2" '.[$k] = $v' "$STATE" 2>/dev/null >"$tmp" || jq -n --arg k "$1" --arg v "$2" '{ ($k): $v }' >"$tmp"
+  mv "$tmp" "$STATE"
+}
+set_state() { set_key welcome "$1"; }
+
+# The rows that count, one JSON object a line: by hand, Claude's sign-in isn't one of them
+rows() { "$QS_DIR/tasks" | jq -c --arg p "$(path)" '.[] | select($p != "manual" or .id != "claude")'; }
+
+# Something is neither done nor skipped
+unfinished() { rows | jq -se 'any(.[]; (.done | not) and .mark != "skipped")' >/dev/null; }
+
+login() {
+  case $(state) in
+    pending)
+      set_state shown
+      sleep "$LOGIN_DELAY"
+      open_window
+      ;;
+    shown)
+      unfinished || return 0
+      local answer
+      answer=$(notify-send -a Nightdrive -i lucide:sparkles -A open="Set up" -A off="Don't remind me" \
+                 "Finish setting up Nightdrive" \
+                 "A few things still need your accounts. Set them up one at a time, with Claude or by hand.")
+      case $answer in
+        open) open_window ;;
+        off) set_state off ;;
+      esac
+      ;;
+  esac
+}
+
+# Skip for now: what isn't done is put aside, and logins no longer ask
+skip_rest() {
+  local id
+  for id in $(rows | jq -r 'select((.done | not) and .mark != "skipped") | .id'); do
+    "$HOME/.config/hypr/scripts/claude-setup" mark "$id" skipped
+  done
+  set_state off
+}
+
+# A README in Apostrophe; an install from before it came with Nightdrive (update doesn't add it) gets the default app
+readme() {
+  if flatpak info --user "$APOSTROPHE" >/dev/null 2>&1; then
+    setsid -f flatpak run --user "$APOSTROPHE" "$1" >/dev/null 2>&1
+  else
+    setsid -f xdg-open "$1" >/dev/null 2>&1
+  fi
+}
+
+USAGE="usage: welcome [open | login | skip-rest | off | path [claude | manual | self | none] | readme FILE | restart | quit | log]"
+
+case ${1:-open} in
+  login) login ;;
+  skip-rest) skip_rest ;;
+  off) set_state off ;;
+  path)
+    case ${2:-} in
+      "") path || true ;;      # nothing: not asked yet
+      claude|manual|self) set_key path "$2" ;;
+      none) set_key path "" ;;
+      *) echo "usage: welcome path [claude | manual | self | none]" >&2; exit 2 ;;
+    esac
+    ;;
+  readme) [[ -f ${2:-} ]] || { echo "usage: welcome readme FILE" >&2; exit 2; }; readme "$2" ;;
+  settings) echo "$USAGE" >&2; exit 2 ;;
+  *)
+    app_command "$@"; status=$?    # open, restart, quit, log
+    ((status == 2)) && { echo "$USAGE" >&2; exit 2; }
+    exit $status
+    ;;
+esac

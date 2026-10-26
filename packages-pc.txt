@@ -1,0 +1,9 @@
+# A PC's own packages (install.sh, `nightdrive platform machine` = pc), on top of packages.txt. Fedora KDE has them; the
+# netinstall's "Fedora Custom Operating System" is only @core.
+# Firmware for the hardware a PC may have (Wi-Fi, graphics, sound, fingerprint readers…)
+@hardware-support
+# The processor's microcode updates (x86 only: skipped elsewhere)
+microcode_ctl
+amd-ucode-firmware
+# Laptops' sound: Intel's Sound Open Firmware
+alsa-sof-firmware

@@ -20,10 +20,11 @@ ICONS_QML = os.path.join(REPO, "config/quickshell/Icons.qml")     # the launcher
 BAR_ICONS = os.path.join(REPO, "config/topbar/icons")             # the bar's own SVGs, on top of Lucide (status)
 CORE_MODULES = os.path.join(REPO, "config/topbar/modules.jsonc")
 
-CONF_KEYS = ("name", "icon", "description", "default", "install", "installed", "group", "version", "author", "order", "setup")
+CONF_KEYS = ("name", "icon", "description", "default", "install", "installed", "packages", "units", "group", "version",
+             "author", "order", "setup", "configured", "welcome", "bundled")
 CONF_NEEDED = ("name", "icon", "description", "installed", "version", "author")   # without installed it never counts
                                                              # as installed; version and author go in bug reports
-GROUPS = ("recommended", "webapp", "plugin")
+GROUPS = ("app", "recommended", "webapp", "plugin")
 MODULE_KEYS = {"name", "interval", "status", "menu", "right", "middle", "spacing", "drop", "after", "before", "size",
                "label", "glyph"}                                           # modules.jsonc's header; needs is implied
 FACTS = ("Homepage", "Needs", "Keys")                             # in this order, the last lines of a README
@@ -113,6 +114,8 @@ def check_conf(d, pid, icons):
         find(path, at["default"], f"default={conf['default']}: on or off")
     if "group" in conf and conf["group"] not in GROUPS:
         find(path, at["group"], f"group={conf['group']}: {', '.join(GROUPS)}")
+    if "bundled" in conf and (conf["bundled"] not in ("yes", "no") or conf.get("group") != "app"):
+        find(path, at["bundled"], f"bundled={conf['bundled']}: yes or no, and only with group=app")
     if conf.get("version") and not re.match(r"^[0-9]+\.[0-9]+\.[0-9]+$", conf["version"]):
         find(path, at["version"], f"version={conf['version']}: MAJOR.MINOR.PATCH, e.g. 1.0.0")
     if conf.get("author") and not re.match(r"^@?[A-Za-z0-9][\w.-]*( <[^>]+>)?$|^[^@\n]{2,}$", conf["author"]):

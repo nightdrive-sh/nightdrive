@@ -1,6 +1,10 @@
 #!/bin/bash
-# Tailscale on/off: a right click on its top bar icon (module.jsonc). The icon itself: ./status.
+# Tailscale on/off: a right click on its top bar icon (module.jsonc). The icon itself: ./status. Not logged in: ./login.
 state=$(tailscale status --json 2>/dev/null | jq -r '.BackendState // "Stopped"')
+if [[ $state == NeedsLogin ]]; then
+  msg=$("$(dirname "$0")"/login) || notify-send "Tailscale" "$msg"
+  exit 0
+fi
 if [[ $state == Running ]]; then cmd=down; else cmd=up; fi
 tailscale $cmd 2>&1 | grep -qiE 'access denied|operator' \
   && notify-send "Tailscale" "Permission denied. Run once: sudo tailscale set --operator=\$USER"

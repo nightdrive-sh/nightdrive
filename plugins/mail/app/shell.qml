@@ -298,6 +298,15 @@ ShellRoot {
                 say("")
             })
         }
+        // The newest message with HTML, as a page in the browser (lib/parts.py html)
+        function openBrowser(msgs) {
+            const m = (msgs || win.messages).slice().reverse().find(x => x.html !== "")
+            if (!m) { say("This thread has no HTML version"); return }
+            nm.page(m.id, r => {
+                if (r.error) { say(r.error); return }
+                Qt.openUrlExternally("file://" + r.path)
+            })
+        }
         function savePart(msg, f) {
             nm.part("save", msg.id, f.part, f.name, r => say(r.error || "Saved to " + r.path.replace(Quickshell.env("HOME"), "~")))
         }
@@ -781,7 +790,10 @@ ShellRoot {
                             else if (k === Qt.Key_Down) win.scrollMessage(win.arrowStep)
                             else if (k === Qt.Key_Up) win.scrollMessage(-win.arrowStep)
                             else if (k === Qt.Key_Question) win.cheats = !win.cheats
+                            else if (k === Qt.Key_H && shift) win.openBrowser()
                             else if (k === Qt.Key_H) win.htmlMode = (win.htmlMode + 1) % 3
+                            // ⌘C copies the text selected in the message (Thread.copy), and never starts a new message
+                            else if ((ctrl || e.modifiers & Qt.MetaModifier) && k === Qt.Key_C) reader.copy()
                             else if (k === Qt.Key_C) win.compose("new")
                             else if (k === Qt.Key_F) win.compose("forward")
                             // Enter opens the thread in a window of its own; in one pane, first in the window
@@ -910,6 +922,7 @@ ShellRoot {
                     messages: win.messages
                     htmlMode: win.htmlMode
                     onCycleHtml: win.htmlMode = (win.htmlMode + 1) % 3
+                    onOpenBrowser: win.openBrowser()
                     onResumeDraft: win.compose("resume")
                     actions: win.readerActions
                     onAct: id => win.act(id)
@@ -1096,14 +1109,14 @@ ShellRoot {
             }
             Text {
                 width: parent.width; wrapMode: Text.Wrap; color: c.faint; font.family: c.font; font.pixelSize: 11
-                text: "To do it yourself: launcher › System › Install › Plugins › Mail has the steps."
+                text: "To do it yourself: Mail's README has the steps (plugins/mail/README.md in Nightdrive)."
             }
         }
 
         property alias cheats: sheet.shown
 
         readonly property var keyHelp: [
-            { title: "Read", keys: [["↑ ↓  j k", "Previous, next"], ["⏎", "Open in a window"], ["Esc  ←", "Back to the list (narrow window)"], ["PgUp PgDn", "In the list alone: a page in it"], ["↑ ↓", "In the thread alone: scroll it"], ["Space ⇧Space  PgDn PgUp", "Page down, up"], ["h", "HTML or text"],
+            { title: "Read", keys: [["↑ ↓  j k", "Previous, next"], ["⏎", "Open in a window"], ["Esc  ←", "Back to the list (narrow window)"], ["PgUp PgDn", "In the list alone: a page in it"], ["↑ ↓", "In the thread alone: scroll it"], ["Space ⇧Space  PgDn PgUp", "Page down, up"], ["h", "HTML or text"], ["⇧H", "HTML in the browser"],
                                     ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
             { title: "Act", keys: [["a", "Archive"], ["d  ⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Refresh"],
                                    ["⇧↑ ⇧↓  ⇧-click", "Select several"], ["Ctrl-click", "Select or leave out"], ["⌘A", "Select all"]] },
@@ -1178,6 +1191,7 @@ ShellRoot {
                 messages: mw.msgs
                 htmlMode: mw.htmlMode
                 onCycleHtml: mw.htmlMode = (mw.htmlMode + 1) % 3
+                onOpenBrowser: win.openBrowser(mw.msgs)
                 onResumeDraft: win.compose("resume", mw.msgs)
                 actions: win.windowActions
                 onAct: id => win.act(id, mw.msgs)
@@ -1186,10 +1200,12 @@ ShellRoot {
                     const k = e.key
                     keys.pressed(e)             // ? and Ctrl+? show and hide the keys
                     if (k === Qt.Key_Question) {}
+                    else if ((e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)) && k === Qt.Key_C) thread.copy()
                     else if (k === Qt.Key_Escape) mw.visible = false
                     else if (k === Qt.Key_Down) mw.scroll(win.arrowStep)
                     else if (k === Qt.Key_Up) mw.scroll(-win.arrowStep)
                     else if (k === Qt.Key_Space) mw.scroll((e.modifiers & Qt.ShiftModifier ? -1 : 1) * (thread.height - 80))
+                    else if (k === Qt.Key_H && e.modifiers & Qt.ShiftModifier) win.openBrowser(mw.msgs)
                     else if (k === Qt.Key_H) mw.htmlMode = (mw.htmlMode + 1) % 3
                     else if (k === Qt.Key_R) win.compose(e.modifiers & Qt.ShiftModifier ? "reply" : "all", mw.msgs)
                     else if (k === Qt.Key_F) win.compose("forward", mw.msgs)
@@ -1202,7 +1218,7 @@ ShellRoot {
                 id: keys
                 c: win.look
                 groups: [
-                    { title: "Read", keys: [["↑ ↓", "Scroll"], ["Space ⇧Space", "Page down, up"], ["h", "HTML or text"], ["Esc  ⌘W", "Close the window"]] },
+                    { title: "Read", keys: [["↑ ↓", "Scroll"], ["Space ⇧Space", "Page down, up"], ["h", "HTML or text"], ["⇧H", "HTML in the browser"], ["Esc  ⌘W", "Close the window"]] },
                     { title: "Write", keys: [["r", "Reply to all"], ["⇧R", "Reply to the sender only"], ["f", "Forward"], ["⌘⇧C", "Claude writes the reply"]] }
                 ]
             }

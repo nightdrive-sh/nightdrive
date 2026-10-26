@@ -8,6 +8,8 @@ import Quickshell.Io
 // Install › Software: Fedora's packages and Flathub's apps in one search (hypr/scripts/pkg-search): apps first, one row per
 // app (Fedora's if both have it), then command-line tools. Software itself has Search and Browse: Popular and the
 // categories, lists from data/software.json (hypr/scripts/software-catalog) for this machine's architecture.
+// Settings › Apps › Nightdrive apps (ndapps): the installed apps of group app (Mail, Deck), each one's details with its
+// on/off switch; one removed is back in Recommended, the user's own way to get it again (nightdrive update never is).
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered).
 Item {
     id: n
@@ -21,12 +23,13 @@ Item {
     property var pluginList: null             // Recommended, Plugins and Webapp's ready-made ones: [{ id, name, icon, desc, installed, group, off, external }] (nightdrive plugins), null = loading
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
-    readonly property var levels: ["software", "swcat", "swsearch", "webapp", "webname", "webaddr", "recommended", "plugins"]
+    readonly property var inputs: ["webname", "webaddr"]   // text fields: ⌘⇧V pastes into them (ClipPicker)
+    readonly property var levels: ["software", "swcat", "swsearch", "webapp", "webname", "webaddr", "recommended", "plugins", "ndapps"]
     readonly property var titles: ({ software: "Install › Software", swcat: "Software › " + swCat.name, swsearch: "Software › Search", webapp: "Install › Webapp",
                                      recommended: "Install › Recommended", plugins: "Install › Plugins", webname: "Install › Webapp › Name",
-                                     webaddr: "Install › Webapp › Address" })
+                                     webaddr: "Install › Webapp › Address", ndapps: "Settings › Apps › Nightdrive apps" })
     readonly property var parents: ({ software: "install", swcat: "software", swsearch: "software", webapp: "install", recommended: "install",
-                                      plugins: "install", webname: "webapp", webaddr: "webname" })
+                                      plugins: "install", webname: "webapp", webaddr: "webname", ndapps: "appsettings" })
 
     function footer(level, query) {
         const cur = launcher.results[launcher.selIndex] || {}
@@ -39,7 +42,7 @@ Item {
     function entered(level) {
         if (level === "swsearch") results = []
         if (level === "swcat") { swList = null; swProc.command = [scripts + "/pkg-search", "--list", swCat.key]; swProc.running = true }
-        if (level === "plugins" || level === "recommended" || level === "webapp") pluginsProc.running = true
+        if (level === "plugins" || level === "recommended" || level === "webapp" || level === "ndapps") pluginsProc.running = true
     }
     function shiftActivate(it) {}
     // A category from elsewhere too (Default apps › Find more)
@@ -76,19 +79,26 @@ Item {
             if (l.query.trim() === "") return l.hint("Type the address for “" + webName + "” (e.g. web.whatsapp.com)")
             return [{ kind: "wadd", name: "Add “" + webName + "”", summary: l.query.trim(), glyph: "app-window", value: l.query.trim() }]
         }
-        if (level === "plugins" || level === "recommended") {
+        if (level === "plugins" || level === "recommended" || level === "ndapps") {
             // Enter opens the details (src "plugin"), whose Enter runs the installer in a terminal (they ask things: sudo, tokens,
             // logins); an installed one can be run again (rerun)
             if (pluginList === null) return l.hint("Loading…")
             // "experimental" in the description becomes a tag after the name (plugins.txt keeps it in the text for install.sh)
             const exp = /\bexperimental\b/i
             const plain = d => d.replace(/\s*\(experimental\)/i, "").replace(/,\s*experimental(?=[;)])/i, "").replace(/\(experimental;\s*/i, "(")
-            const rows = (group, from) => pluginList.filter(p => p.group === group).map(p => ({ item: { kind: "action", name: p.name, glyph: p.icon, sub: plain(p.desc), installed: p.installed,
+            // Recommended also has Nightdrive's apps while one isn't installed (as the App Store has Apple's own once removed)
+            const inGroup = (p, group) => group === "ndapps" ? p.group === "app" && p.installed
+                                                             : p.group === group || (group === "recommended" && p.group === "app" && !p.installed)
+            const rows = (group, from) => pluginList.filter(p => inGroup(p, group)).map(p => ({ item: { kind: "action", name: p.name, glyph: p.icon, sub: plain(p.desc), installed: p.installed,
                                                  experimental: exp.test(p.desc), external: p.external,
                                                  src: "plugin", id: p.id, rerun: true, groupTag: from,
-                                                 summary: p.installed ? (p.off ? "off" : "installed") : undefined,
+                                                 summary: p.installed ? (p.off ? "off" : group === "ndapps" ? "on" : "installed") : undefined,
                                                  cmd: l.term('"$HOME/.local/bin/nightdrive" plugins install "$1"', p.id) },
                                          text: p.name, extra: p.desc }))
+            if (level === "ndapps") {
+                const r = rows("ndapps")
+                return r.length ? { all: r } : l.hint("None installed: they are in System › Install › Recommended")
+            }
             // A search also finds the other group's rows, tagged with it: whether something is a plugin or a recommended app
             // isn't obvious ("tailscale" in Plugins found only Ferry, whose description mentions it; Tailscale is Recommended)
             return { all: level === "plugins" ? rows("plugin").concat(q !== "" ? rows("recommended", "Recommended") : [])

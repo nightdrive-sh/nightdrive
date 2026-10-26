@@ -1,12 +1,13 @@
 #!/bin/bash
-# Firefox's own settings (launcher › Settings › Browser): where links from other apps open, and whether a window with one
-# tab shows the tab bar. The choices live in ~/.config/nightdrive/firefox, outside the repo, and apply writes them into the
+# Firefox's own settings (launcher › Settings › Browser): where links from other apps open, whether a window with one
+# tab shows the tab bar, and whether Firefox starts empty or with the last session's tabs. The choices live in ~/.config/nightdrive/firefox, outside the repo, and apply writes them into the
 # default profile: user.js (the repo's config/firefox/user.js with the choice after it: Firefox reads only one user.js,
 # so it is a written file, not a link) and chrome/nightdrive-tabs.css (imported by userChrome.css). link.sh runs apply,
 # so a change to the repo's user.js reaches the profile with `nightdrive update`. Firefox reads both when it starts.
-#   firefox-prefs status            links=window|tab tabbar=auto|always, or none (no Firefox profile yet)
+#   firefox-prefs status            links=window|tab tabbar=auto|always startup=empty|restore, or none (no profile yet)
 #   firefox-prefs links window|tab  links from other apps: a new window (default) or a tab in the last window
 #   firefox-prefs tabbar auto|always the tab bar: only with several tabs (default) or always
+#   firefox-prefs startup empty|restore  at start: an empty window (default) or the last session's windows and tabs
 #   firefox-prefs apply
 repo=$(cd "$(dirname "$(readlink -f "$0")")/../../.." && pwd)
 conf=$HOME/.config/nightdrive/firefox
@@ -15,6 +16,7 @@ profiles=("$HOME"/.config/mozilla/firefox/*.default-release)
 get() { local v; v=$(sed -n "s/^$1=//p" "$conf" 2>/dev/null | tail -1); echo "${v:-$2}"; }
 links=$(get links window)
 tabbar=$(get tabbar auto)
+startup=$(get startup empty)
 
 # Written next to the target and moved over it, so Firefox starting meanwhile never reads half a file
 put() { cat > "$1.tmp" && mv -f "$1.tmp" "$1"; }
@@ -28,6 +30,18 @@ apply() {
       echo
       echo "// Launcher › Settings › Browser (written by hypr/scripts/firefox-prefs from ~/.config/nightdrive/firefox)"
       echo "user_pref(\"browser.link.open_newwindow.override.external\", $([[ $links == tab ]] && echo 3 || echo 2));"
+      # Empty: a blank page (0), not the last session (3). Crash restore off too, as logging out or shutting down kills
+      # Firefox rather than closing it, so every next start would look like one after a crash. The last session
+      # stays in History › Restore previous session either way.
+      if [[ $startup == restore ]]; then
+        echo 'user_pref("browser.startup.page", 3);'
+        echo 'user_pref("browser.sessionstore.resume_from_crash", true);'
+      else
+        echo 'user_pref("browser.startup.page", 0);'
+        echo 'user_pref("browser.sessionstore.resume_from_crash", false);'
+      fi
+      # Sync carries browser.startup.page between devices: keep this machine's choice off it, both ways
+      echo 'user_pref("services.sync.prefs.sync.browser.startup.page", false);'
     } | put "$p/user.js"
     mkdir -p "$p/chrome"
     if [[ $tabbar == always ]]; then
@@ -54,13 +68,16 @@ set_pref() {
 case ${1:-} in
   status)
     [[ -d ${profiles[0]} ]] || { echo none; exit 0; }
-    echo "links=$links tabbar=$tabbar" ;;
+    echo "links=$links tabbar=$tabbar startup=$startup" ;;
   links)
     [[ ${2:-} == window || ${2:-} == tab ]] || { echo "links: window or tab" >&2; exit 1; }
     set_pref links "$2"; links=$2; apply ;;
   tabbar)
     [[ ${2:-} == auto || ${2:-} == always ]] || { echo "tabbar: auto or always" >&2; exit 1; }
     set_pref tabbar "$2"; tabbar=$2; apply ;;
+  startup)
+    [[ ${2:-} == empty || ${2:-} == restore ]] || { echo "startup: empty or restore" >&2; exit 1; }
+    set_pref startup "$2"; startup=$2; apply ;;
   apply) apply ;;
-  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

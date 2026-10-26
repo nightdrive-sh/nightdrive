@@ -28,7 +28,7 @@ empty. None of the optional parts (`plugins.txt`, `plugins/`) is installed, so t
 `install.sh --none`. To see a part's rows, bar module and keys, fake its installed test: e.g. `nightdrive sandbox exec sh -c
 'printf "#!/bin/sh\n" > ~/.local/bin/deck && chmod +x ~/.local/bin/deck && nightdrive plugins installed'`. A test that asks
 systemd works too, as there's no user manager to start anything: `nightdrive sandbox exec sh -c 'systemctl --user enable
-nightdrive-ferry.service && nightdrive plugins installed'` (Ferry). A plugin folder put in the container's
+nightdrive-localsend.service && nightdrive plugins installed'` (LocalSend). A plugin folder put in the container's
 `~/.local/share/nightdrive/plugins/` is picked up like one of the repo's, which is handy for trying one out.
 
 ## Display and VNC

@@ -83,7 +83,7 @@ ShellRoot {
         if (navMode) { current = ""; return }
         viaSubmap = false
         navMode = true
-        openNav(Math.max(0, bar.navOrder().indexOf(current)))
+        openNav(Math.max(0, bar.navIndex(current)))
         keyItem.forceActiveFocus()
     }
     function navRows() {
@@ -132,8 +132,8 @@ ShellRoot {
     }
     function navAct(a) {     // a: left | right | up | down | enter
         if (!navMode) return false
-        if (a === "left")       openNav(bar.navOrder().indexOf(current) - 1)
-        else if (a === "right") openNav(bar.navOrder().indexOf(current) + 1)
+        if (a === "left")       openNav(bar.navIndex(current) - 1)
+        else if (a === "right") openNav(bar.navIndex(current) + 1)
         else if (a === "up")    navMove(-1)
         else if (a === "down")  navMove(1)
         else if (a === "enter") { if (navItem) navItem.navActivate() }
@@ -193,6 +193,8 @@ ShellRoot {
         onMenuClicked: (name, x, screen) => root.clickMenu(name, x, screen)
         onMoveStarted: root.current = ""
     }
+    // The "…" menu lists the modules that didn't fit on its screen's bar
+    Binding { target: TopBar; property: "overflow"; value: bar.tuckedOf(root.menuScreen) }
 
     Osd {}
 
@@ -216,14 +218,17 @@ ShellRoot {
 
     Shelf {}
 
+    PolkitWatch { id: polkit }
+
     Launcher {
         id: launcher
+        stepAside: polkit.asking
         extSource: root.localLauncher ? "local/LauncherExtension.qml" : ""
         onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.current = name }   // below its bar icon (-1 = none: right edge)
     }
 
     PanelWindow {
-        visible: root.current !== ""
+        visible: root.current !== "" && !polkit.asking   // the password prompt is a window: it can't get above an overlay
         screen: root.menuScreen || Quickshell.screens[0]
         anchors { top: true; bottom: true; left: true; right: true }
         margins { top: Theme.barHeight }   // the top bar stays clickable
@@ -275,6 +280,7 @@ ShellRoot {
                 target: loader.item
                 ignoreUnknownSignals: true
                 function onClose() { root.current = "" }
+                function onOpenMenu(name) { root.current = name }   // the "…" menu (OverflowMenu): a module's, in its place
             }
         }
     }

@@ -45,6 +45,7 @@ import os
 import re
 import shlex
 import smtplib
+import ssl
 import subprocess
 import sys
 from email.message import EmailMessage
@@ -248,11 +249,13 @@ def send(f):
     host, _, port = acc["smtp"].partition(":")
     password = subprocess.run(shlex.split(acc["password-cmd"]), capture_output=True, text=True, check=True).stdout.strip()
     port = int(port or 465)
+    # smtplib's default doesn't verify the server's certificate, which would give the password to anyone in the middle
+    tls = ssl.create_default_context()
     if port == 465:
-        server = smtplib.SMTP_SSL(host, port, timeout=SMTP_TIMEOUT)
+        server = smtplib.SMTP_SSL(host, port, timeout=SMTP_TIMEOUT, context=tls)
     else:
         server = smtplib.SMTP(host, port, timeout=SMTP_TIMEOUT)
-        server.starttls()
+        server.starttls(context=tls)
     with server:
         server.login(acc.get("user", acc["address"]), password)
         server.send_message(msg, to_addrs=rcpts)
@@ -307,8 +310,10 @@ def thread_text(msgid):
 
 
 def ask_claude(acc, system, text):
-    # No tools and no saved session: Claude only writes the text.
-    cmd = ["claude", "-p", "--tools", "", "--no-session-persistence", "--system-prompt", system,
+    # No tools and no saved session: Claude only writes the text. --tools "" leaves out only the built-in tools, so
+    # --strict-mcp-config (with no --mcp-config) keeps the user's MCP servers and claude.ai connectors away from a
+    # stranger's mail too.
+    cmd = ["claude", "-p", "--tools", "", "--strict-mcp-config", "--no-session-persistence", "--system-prompt", system,
            "--model", acc.get("suggest-model", "sonnet")]
     return subprocess.run(cmd, input=text, capture_output=True, text=True, check=True,
                           timeout=SUGGEST_TIMEOUT, cwd=os.path.expanduser("~")).stdout.strip()
@@ -377,6 +382,8 @@ def main():
         result = {"error": "The message's file is missing: sync, then try again"}
     except subprocess.TimeoutExpired:
         result = {"error": "Claude took too long"}
+    except ssl.SSLCertVerificationError as e:
+        result = {"error": f"Not sent: the mail server's certificate is not valid ({e.verify_message})"}
     except (smtplib.SMTPException, OSError) as e:
         result = {"error": f"Sending failed: {e}"}
     print(json.dumps(result))

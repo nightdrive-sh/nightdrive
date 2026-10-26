@@ -12,6 +12,7 @@ Flickable {
     property var messages: []
     property int htmlMode: 0            // 0 text, 1 HTML on the dark page, 2 HTML on light paper
     signal cycleHtml()
+    signal openBrowser()
     signal resumeDraft()
     // Buttons above the thread, for the mouse: [{ id, icon, text, short, tip, keys }]; a click sends act(id). Where they
     // don't all fit beside the view button, the short names show, and where those don't either, only the icons. Held
@@ -21,6 +22,17 @@ Flickable {
     // In a window too narrow for the list beside it, the thread has the window to itself: a back button first in the bar
     property bool back: false
     signal goBack()
+    // The message's text is selected with the mouse but never takes the keyboard (activeFocusOnPress: false): with the
+    // focus in a TextEdit the window's keys (the list's arrows, shortcuts, Esc) stopped working until a click on the list.
+    // So the window's key handler copies the selection on ⌘C (copy()), persistentSelection shows it without the focus,
+    // and one selection shows at a time.
+    property var selecting: null
+    function selected(t) {
+        if (t.selectedText === "") return
+        if (selecting && selecting !== t) selecting.deselect()
+        selecting = t
+    }
+    function copy() { if (selecting && selecting.selectedText) selecting.copy() }
     // Light paper for HTML as sent: senders pick their colours for a white page, whatever the desktop's theme
     readonly property color paperBg: "#f4f1f6"
     readonly property color paperText: "#1d1a21"
@@ -34,6 +46,14 @@ Flickable {
     onMessagesChanged: { unfolded = ({}); quotesShown = ({}) }
     function folded(m, i) {
         return messages.length >= foldFrom && i < messages.length - 1 && !m.draft && m.tags.indexOf("unread") < 0 && !unfolded[m.id]
+    }
+    // A link in a message opens on the web, or as a new message (mailto:). Any other kind (file:, smb:, an app's own)
+    // would open something on this computer at a stranger's word, so it doesn't open at all.
+    function openLink(link) {
+        link = link.trim()
+        if (/^https?:\/\//i.test(link)) Qt.openUrlExternally(link)
+        else if (/^mailto:/i.test(link)) app.compose("new", null, app.mailtoFields(link))
+        else app.say("Only web and email links open from a message")
     }
     function unfold(m) { const u = Object.assign({}, unfolded); u[m.id] = true; unfolded = u }
     function showQuote(m) { const q = Object.assign({}, quotesShown); q[m.id] = true; quotesShown = q }
@@ -128,7 +148,7 @@ Flickable {
         visible: root.messages.length > 0 && root.actions.length > 0
         // Where it may start: after the back button, if there is one; in one pane the buttons are centred from there on
         readonly property real start: root.back ? backButton.x + backButton.width + 6 : page.x - 10
-        readonly property real end: viewButton.visible ? viewButton.x - 12 : root.back ? root.width - 12 : page.x + page.width
+        readonly property real end: viewButton.visible ? browserButton.x - 12 : root.back ? root.width - 12 : page.x + page.width
         readonly property real room: end - start
         readonly property bool full: fullBar.implicitWidth <= room
         readonly property bool compact: !full && shortBar.implicitWidth > room
@@ -183,11 +203,25 @@ Flickable {
                 id: viewKey
                 scale: 0.8
                 anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "h"; tint: c.dim
-                visible: iconBar.implicitWidth + 12 + implicitWidth + viewRow.spacing + viewText.implicitWidth + 24
+                visible: iconBar.implicitWidth + 12 + browserButton.width + 2 + implicitWidth + viewRow.spacing + viewText.implicitWidth + 24
                          <= page.x + page.width + 12 - bar.start   // start, not x: x follows the width in one pane
             }
             Text { id: viewText; anchors.verticalCenter: parent.verticalCenter; text: ["Text", "HTML, dark", "HTML as sent"][root.htmlMode]; color: c.dim; font.family: c.font; font.pixelSize: 12 }
         }
+    }
+    // The HTML as sent, in the browser: tables and pictures sent with it as the sender laid them out, still with
+    // nothing loaded from the network
+    AppIconButton {
+        id: browserButton
+        visible: viewButton.visible
+        z: 2
+        x: viewButton.x - width - 2
+        y: root.contentY + 12
+        implicitWidth: 30; implicitHeight: 30; radius: 8
+        c: root.c
+        glyph: "external-link"; glyphSize: 14
+        tip: "Open in the browser"; keys: "⇧H"
+        onClicked: root.openBrowser()
     }
     Column {
         id: page
@@ -288,13 +322,16 @@ Flickable {
                     width: parent.width
                     readOnly: true
                     selectByMouse: true
+                    activeFocusOnPress: false
+                    persistentSelection: true
+                    onSelectedTextChanged: root.selected(this)
                     wrapMode: TextEdit.Wrap
                     textFormat: TextEdit.RichText
                     text: !visible ? "" : app.rich(msgCol.cut && !root.quotesShown[modelData.id] ? msgCol.cut.own : modelData.body)
                     font.family: c.font; font.pixelSize: 14
                     color: c.body
                     selectionColor: c.sel
-                    onLinkActivated: link => Qt.openUrlExternally(link)
+                    onLinkActivated: link => root.openLink(link)
                     HoverHandler { cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor }
                 }
                 // The HTML version: on the dark page with the sender's colours taken out, or on light paper as sent
@@ -323,13 +360,16 @@ Flickable {
                         width: parent.width - 2 * x
                         readOnly: true
                         selectByMouse: true
+                        activeFocusOnPress: false
+                        persistentSelection: true
+                        onSelectedTextChanged: root.selected(this)
                         wrapMode: TextEdit.Wrap
                         textFormat: TextEdit.RichText
                         text: !parent.visible ? "" : parent.paper ? modelData.html : nm.darken(modelData.html, c.accent)
                         font.pixelSize: 14
                         color: parent.paper ? root.paperText : c.body
                         selectionColor: parent.paper ? root.paperSelection : c.sel
-                        onLinkActivated: link => Qt.openUrlExternally(link)
+                        onLinkActivated: link => root.openLink(link)
                         HoverHandler { cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor }
                     }
                 }

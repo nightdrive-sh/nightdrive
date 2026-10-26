@@ -1,0 +1,110 @@
+#!/usr/bin/python3 -I
+"""The Welcome window's list, as JSON on stdout: signing in to Claude first, then every installed plugin whose plugin.conf
+has a `setup` (Tailscale, Mail, Deck…): FIRST's, then the others in plugins' order.
+  tasks
+Each row: { id, name, icon, about, done, running, mark, setup, help, steps, readme }
+  done     the thing works: Claude is signed in, or the plugin's `configured` test succeeds (its `setup` ran to the end)
+  running  its Claude session is open (claude-setup's pid file)
+  mark     setup.json's word for it: "started", "skipped" or ""
+  setup    the command line that starts its setup (claude-setup, through the plugin's own command)
+  help     where its steps are without Claude: the plugin's page on the website, or its README for an external one
+  steps    it has a steps.md: the window shows those steps by hand, one at a time (`steps`)
+  readme   its README.md, which the "I'll do it myself" path opens in Apostrophe, or ""
+The list is read again every few seconds while the window is open, so the tests are quick ones."""
+import json, os, re, subprocess
+
+REPO = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../.."))
+HOME = os.path.expanduser("~")
+INSTALLED = os.path.join(HOME, ".cache/nightdrive/plugins")          # `nightdrive plugins installed` writes it
+EXTERNAL = os.path.join(HOME, ".local/share/nightdrive/plugins")
+STATE = os.path.join(HOME, ".local/state/nightdrive/setup.json")
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "nightdrive/setup")
+SCRIPTS = os.path.join(HOME, ".config/hypr/scripts")
+CLAUDE = os.path.join(HOME, ".local/bin/claude")
+SITE = "https://nightdrive.sh/plugins/"                              # the website's page for each of the repo's plugins
+TEST_TIMEOUT = 5                                                     # seconds for a configured test
+# What to set up first, the rest after them in plugins' order: the network, then mail before music
+FIRST = ("tailscale", "mail", "deck")
+
+CLAUDE_ABOUT = ("Sign in first: the rest are set up with Claude. "
+                "Claude Code needs a Pro or Max plan, or an API account.")
+
+
+def running(tid):
+    try:
+        pid = open(os.path.join(RUN, tid + ".pid")).read().strip()
+        return b"claude" in open(f"/proc/{pid}/cmdline", "rb").read()
+    except (OSError, ValueError):
+        return False
+
+
+def succeeds(cmd, cwd):
+    try:
+        return subprocess.run(["bash", "-c", cmd], cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              timeout=TEST_TIMEOUT).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def signed_in():
+    try:
+        out = subprocess.run([CLAUDE, "auth", "status", "--json"], capture_output=True, text=True, timeout=TEST_TIMEOUT).stdout
+        return bool(json.loads(out).get("loggedIn"))
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return False
+
+
+def conf(folder):
+    try:
+        lines = open(os.path.join(folder, "plugin.conf")).read().split("\n")
+    except OSError:
+        return None
+    return dict(l.split("=", 1) for l in lines if re.match(r"[a-z]+=", l))
+
+
+def plugins():
+    """The installed plugins with a setup: (place in FIRST, order, id, folder, conf, external)"""
+    try:
+        ids = [l.strip() for l in open(INSTALLED) if l.strip()]
+    except OSError:
+        ids = []
+    out = []
+    for pid in ids:
+        for base, external in ((os.path.join(REPO, "plugins"), False), (EXTERNAL, True)):
+            folder = os.path.join(base, pid)
+            c = conf(folder)
+            if c is None:
+                continue
+            if c.get("setup"):
+                try:
+                    order = int(c.get("order", 50))
+                except ValueError:
+                    order = 50
+                out.append((FIRST.index(pid) if pid in FIRST else len(FIRST), order, pid, folder, c, external))
+            break
+    return sorted(out, key=lambda p: p[:3])
+
+
+def main():
+    try:
+        marks = json.load(open(STATE)).get("tasks") or {}
+    except (OSError, ValueError, AttributeError):
+        marks = {}
+    rows = [{ "id": "claude", "name": "Claude", "icon": "sparkles", "about": CLAUDE_ABOUT, "done": signed_in(),
+              "running": running("claude"), "mark": marks.get("claude", ""),
+              "setup": [os.path.join(SCRIPTS, "claude-setup"), "signin"], "help": "", "steps": False, "readme": "" }]
+    for _, _, pid, folder, c, external in plugins():
+        rows.append({
+            "id": pid, "name": c.get("name", pid), "icon": c.get("icon", "puzzle"),
+            "about": c.get("welcome") or c.get("description", ""),
+            # without a test, a setup that was started counts as done once its session has closed
+            "done": succeeds(c["configured"], folder) if c.get("configured") else marks.get(pid) == "started" and not running(pid),
+            "running": running(pid), "mark": marks.get(pid, ""),
+            "setup": ["bash", "-c", 'cd "$1" && ' + c["setup"], "setup", folder],
+            "help": os.path.join(folder, "README.md") if external else SITE + pid + "/",
+            "steps": os.path.isfile(os.path.join(folder, "steps.md")),
+            "readme": readme if os.path.isfile(readme := os.path.join(folder, "README.md")) else "" })
+    print(json.dumps(rows))
+
+
+main()

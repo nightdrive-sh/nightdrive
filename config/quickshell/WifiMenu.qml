@@ -1,7 +1,8 @@
 import QtQuick
 import Quickshell
 
-// Wi-Fi: on/off, network list, connecting (asks for a password for new secured networks).
+// Wi-Fi: on/off, network list, connecting (asks for a password for new secured networks). The wired profiles
+// (WiredProfiles.qml) below it when there are two or more; without a Wi-Fi device only the cable and those.
 // Uses nmcli (Quickshell's Networking module returns no data on this machine).
 Column {
     id: m
@@ -41,6 +42,9 @@ Column {
     readonly property bool onCable: primary.type === "ethernet"
     readonly property bool wifiUp: wifiOn && activeNet !== null
     readonly property var otherNets: nets.filter(n => !n.active)
+    // No Wi-Fi device (a VM, a PC on a cable): no toggle, no search, only the cable and its profiles
+    readonly property bool hasWifi: wired.hasWifi
+    readonly property bool wifiShown: wired.ready && hasWifi
 
     // Public IP (external service api.ipify.org): fetched when the menu opens, every minute and when the connected network changes
     property string publicIp: ""
@@ -263,9 +267,9 @@ done; true'
 
     MenuHeader {
         width: parent.width
-        title: m.onCable ? "Network" : "Wi-Fi"
-        subtitle: m.onCable ? "Wi-Fi" : ""   // what the toggle turns on and off
-        showToggle: true
+        title: m.onCable || !m.hasWifi ? "Network" : "Wi-Fi"
+        subtitle: m.onCable && m.hasWifi ? "Wi-Fi" : ""   // what the toggle turns on and off
+        showToggle: m.hasWifi
         checked: m.wifiOn
         onToggled: {
             m.wifiOn = !m.wifiOn
@@ -363,7 +367,7 @@ done; true'
     }
 
     Item {      // the dots at the right edge, like the toggle above them
-        visible: m.wifiOn && m.nets.length === 0
+        visible: m.wifiShown && m.wifiOn && m.nets.length === 0
         width: parent.width
         height: searching.height
         MenuNote {
@@ -373,11 +377,16 @@ done; true'
         BusyDots { anchors.right: parent.right; y: (searching.height - height) / 2 + 1 }
     }
     MenuNote {
-        visible: !m.wifiOn
+        visible: m.wifiShown && !m.wifiOn
         text: "Wi-Fi is off"
     }
 
-    MenuSection { visible: m.wifiOn && m.otherNets.length > 0; apart: m.activeNet !== null; title: m.activeNet ? "Other networks" : "Networks" }
+    MenuNote {
+        visible: wired.ready && !m.hasWifi && !m.onCable
+        text: "Not connected"
+    }
+
+    MenuSection { visible: m.wifiShown && m.wifiOn && m.otherNets.length > 0; apart: m.activeNet !== null; title: m.activeNet ? "Other networks" : "Networks" }
 
     Column {
         width: parent.width
@@ -446,6 +455,12 @@ done; true'
         visible: m.message !== ""
         variant: "danger"
         text: m.message
+    }
+
+    WiredProfiles {
+        id: wired
+        width: parent.width
+        apart: m.onCable || m.wifiShown
     }
 
     MenuButton {

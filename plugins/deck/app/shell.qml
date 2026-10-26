@@ -254,7 +254,23 @@ ShellRoot {
         // Setting up Deck with Claude (`deck-window setup`, which asks only for what is missing): offered at the first start
         // (setupPanel) until it is done or put aside, and by Curated's button until it is done
         property bool setupStarted: false
-        readonly property bool setupOffer: configRead && prefsRead && !curatedReady && !prefs.setupDismissed
+        readonly property bool setupOffer: configRead && prefsRead && setupStateRead && !curatedReady && !prefs.setupDismissed
+                                           && (!setupElsewhere || setupStarted)
+        // Started elsewhere (Welcome to Nightdrive, the plugin's page: claude-setup marks it in setup.json), the setup isn't
+        // offered again at the first start; Curated's button still offers it until it is done
+        property bool setupElsewhere: false
+        property bool setupStateRead: false
+        FileView {
+            path: win.home + "/.local/state/nightdrive/setup.json"
+            watchChanges: true
+            printErrors: false
+            onFileChanged: reload()
+            onLoaded: {
+                try { win.setupElsewhere = (JSON.parse(text()).tasks || {}).deck === "started" } catch (e) { win.setupElsewhere = false }
+                win.setupStateRead = true
+            }
+            onLoadFailed: win.setupStateRead = true
+        }
         function startSetup() { setupStarted = true; Quickshell.execDetached([home + "/.local/bin/deck-window", "setup"]) }
         function dismissSetup() {
             prefs = Object.assign({}, prefs, { setupDismissed: true })
@@ -332,8 +348,42 @@ ShellRoot {
         // (each change of Deck's state does that in the queue)
         property int cursor: 0
         readonly property var view: stack[stack.length - 1]
+        // Narrow windows: below onePaneMax the sidebar and the view take turns, as Mail's list and thread: Esc or the back
+        // arrow at a section's own view shows the sections, a click or Enter on one its view. ⌘B shows and hides the
+        // sidebar, in a wide window too. Below playerMin the player keeps to the controls and the track.
+        readonly property int onePaneMax: 720
+        readonly property int playerMin: 900
+        readonly property bool onePane: width < onePaneMax
+        readonly property bool narrowPlayer: width < playerMin
+        property var sidebarChoice: null            // ⌘B's, in a wide window
+        property bool sectionsOpen: false           // in one pane: the sections show instead of the view
+        property string sectionCursor: "shelf"      // the section the keys point at while they show
+        readonly property bool sidebarShown: onePane ? sectionsOpen : sidebarChoice !== null ? sidebarChoice : true
+        onOnePaneChanged: sectionsOpen = false
+        function openSections() { sectionCursor = section; sectionsOpen = true; list.forceActiveFocus() }
+        function stepCursor(d) {
+            const i = sections.findIndex(s => s.id === sectionCursor) + d
+            if (i >= 0 && i < sections.length) sectionCursor = sections[i].id
+        }
+        function toggleSidebar() {
+            if (!onePane) sidebarChoice = !sidebarShown
+            else if (sectionsOpen) sectionsOpen = false
+            else openSections()
+        }
+        // A key while the sections show: whether it was theirs
+        function sectionKey(k) {
+            if (k === Qt.Key_Down || k === Qt.Key_J) stepCursor(1)
+            else if (k === Qt.Key_Up || k === Qt.Key_K) stepCursor(-1)
+            else if (k === Qt.Key_Home) sectionCursor = sections[0].id
+            else if (k === Qt.Key_End) sectionCursor = sections[sections.length - 1].id
+            else if (k === Qt.Key_Return || k === Qt.Key_Enter) pickSection(sectionCursor)
+            else if (k === Qt.Key_Escape || k === Qt.Key_Backspace) sectionsOpen = false
+            else return [Qt.Key_P, Qt.Key_E, Qt.Key_A, Qt.Key_D, Qt.Key_Delete, Qt.Key_F].indexOf(k) >= 0
+            return true
+        }
         function moveTo(i) { cursor = Math.max(0, Math.min(i, rows.length - 1)); list.currentIndex = cursor }
         function pickSection(id) {
+            sectionsOpen = false
             section = id
             cursor = 0
             stack = [{ kind: id }]
@@ -342,12 +392,14 @@ ShellRoot {
             else list.forceActiveFocus()
         }
         function push(v) {
+            sectionsOpen = false
             cursors = cursors.concat([cursor])
             cursor = 0
             stack = stack.concat([v])
             list.forceActiveFocus()
         }
         function back() {
+            if (stack.length < 2 && onePane) { openSections(); return }
             if (stack.length < 2) { if (section === "search") searchField.forceActiveFocus(); return }
             cursor = cursors[cursors.length - 1]
             cursors = cursors.slice(0, -1)
@@ -609,6 +661,7 @@ ShellRoot {
         // too (plugins/deck/quit-commands)
         Shortcut { sequences: ["Ctrl+F", "/"]; onActivated: win.pickSection("search") }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
+        Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
         Shortcut { sequences: ["Ctrl+1", "Meta+1"]; onActivated: win.pickSection("shelf") }
         Shortcut { sequences: ["Ctrl+2", "Meta+2"]; onActivated: win.pickSection("curated") }
         Shortcut { sequences: ["Ctrl+3", "Meta+3"]; onActivated: win.pickSection("radio") }
@@ -634,9 +687,12 @@ ShellRoot {
                 Layout.fillHeight: true
                 spacing: 0
 
-                // Sections: the title level with the view's, the first section level with the first row
+                // Sections: the title level with the view's, the first section level with the first row. In one pane, the
+                // whole width while they show.
                 AppSidebar {
-                    Layout.preferredWidth: 196
+                    visible: win.sidebarShown
+                    Layout.preferredWidth: win.onePane ? -1 : 196
+                    Layout.fillWidth: win.onePane
                     c: win.look
                     title: "Deck"
                     headerHeight: win.headerHeight
@@ -648,7 +704,7 @@ ShellRoot {
                             c: win.look
                             glyph: modelData.glyph
                             label: modelData.name
-                            selected: win.section === modelData.id
+                            selected: (win.sectionsOpen ? win.sectionCursor : win.section) === modelData.id
                             count: modelData.id === "queue" && win.queue.length ? win.queue.length
                                  : modelData.id === "curated" && win.curated.length ? win.curated.length : ""
                             onClicked: win.pickSection(modelData.id)
@@ -657,10 +713,13 @@ ShellRoot {
                     Item { Layout.fillHeight: true }
                 }
 
-                // The view
+                // The view. While the sections show in one pane it is there at no width: its list keeps the keyboard, so
+                // the arrows move in the sections and Space and the rest go on working
                 ColumnLayout {
-                    Layout.fillWidth: true
+                    Layout.preferredWidth: win.sectionsOpen ? 0 : -1
+                    Layout.fillWidth: !win.sectionsOpen
                     Layout.fillHeight: true
+                    clip: true
                     spacing: 0
 
                     // Its title (with the way back), or the search field: as high whatever it holds, with a line under it, so the
@@ -678,19 +737,31 @@ ShellRoot {
                                 Layout.leftMargin: 28
                                 Layout.rightMargin: 28
                                 // As high as the tallest it holds (an album's cover, the buttons), so it centres in the bar
-                                Layout.preferredHeight: 30
+                                Layout.preferredHeight: win.onePane ? 40 : 30
                                 spacing: 10
-                                visible: win.view.kind !== "search"
                                 // The way back: a button the size of the album buttons, its arrow where the title starts
-                                // in a section's own view
+                                // in a section's own view. In one pane a finger's size, and in a section's own view too,
+                                // to the sections.
                                 AppIconButton {
-                                    visible: win.stack.length > 1
-                                    Layout.leftMargin: -8
-                                    implicitWidth: 30; implicitHeight: 28; radius: 7
+                                    visible: win.stack.length > 1 || win.onePane
+                                    Layout.leftMargin: win.onePane ? -16 : -8
+                                    implicitWidth: win.onePane ? 40 : 30; implicitHeight: win.onePane ? 40 : 28; radius: win.onePane ? 8 : 7
                                     c: win.look
-                                    glyph: "arrow-left"; glyphSize: 16
-                                    tip: "Back"; keys: "Esc"
+                                    glyph: "arrow-left"; glyphSize: win.onePane ? 17 : 16
+                                    tip: win.stack.length > 1 ? "Back" : "Sections"; keys: "Esc"
                                     onClicked: win.back()
+                                }
+                                // As high as the title's row, so the field sits where the title does
+                                AppSearchField {
+                                    id: searchField
+                                    Layout.fillWidth: true
+                                    visible: win.view.kind === "search"
+                                    c: win.look
+                                    placeholder: "Search Spotify"
+                                    onEdited: searchTimer.restart()
+                                    onReturnPressed: { searchTimer.stop(); win.search(); list.forceActiveFocus() }
+                                    onDownPressed: list.forceActiveFocus()
+                                    onEscapePressed: { if (text) { text = ""; win.results = null } else if (win.onePane) win.openSections(); else list.forceActiveFocus() }
                                 }
                                 // The album's cover, a little taller than the line
                                 Image {
@@ -702,7 +773,10 @@ ShellRoot {
                                     Rectangle { anchors.fill: parent; color: c.hover; visible: parent.status !== Image.Ready }
                                 }
                                 Text {
+                                    visible: win.view.kind !== "search"
                                     Layout.maximumWidth: implicitWidth
+                                    // Narrow, the title is the last to give way
+                                    Layout.minimumWidth: Math.min(implicitWidth, 160)
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
                                     text: win.heading; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.DemiBold
@@ -726,6 +800,7 @@ ShellRoot {
                                 }
                                 // What it is, quieter on the same line (the album's year, how many Curated has)
                                 Text {
+                                    visible: win.view.kind !== "search"
                                     Layout.fillWidth: true
                                     Layout.alignment: Qt.AlignBaseline
                                     Layout.leftMargin: albumArtist.visible ? -4 : 10      // after the artist, a space's width (the row's spacing is 10)
@@ -763,18 +838,22 @@ ShellRoot {
                                         // A Curated suggestion: out of the list, and the next one learns from it
                                         { glyph: "thumbs-down", label: "Not for me", tip: "Out of Curated: no more like it", keys: "d", act: () => { win.notForMe(win.view.album); win.back() } }
                                     ] : []) : []
+                                    // In one pane the glyphs alone, the tip saying what each does
                                     delegate: AppButton {
                                         required property var modelData
                                         c: win.look
-                                        glyph: modelData.glyph; label: modelData.label
+                                        glyph: modelData.glyph; label: win.onePane ? "" : modelData.label
                                         on: !!modelData.on || modelData.glyph === "check"
-                                        tip: modelData.tip; keys: modelData.keys
+                                        tip: win.onePane ? modelData.label + ": " + modelData.tip : modelData.tip; keys: modelData.keys
                                         onClicked: modelData.act()
                                     }
                                 }
                                 // Curated: a new list by Claude. The first press says what it does, the second does it.
                                 Text {
                                     visible: win.view.kind === "curated" && win.curateAsk
+                                    Layout.fillWidth: true
+                                    Layout.maximumWidth: implicitWidth
+                                    elide: Text.ElideRight
                                     text: "Claude picks new albums in a few minutes, on your Claude plan"
                                     color: c.dim; font.family: c.font; font.pixelSize: 12
                                 }
@@ -783,30 +862,18 @@ ShellRoot {
                                          : !win.curatedReady ? [{ label: win.setupStarted ? "Open Claude again" : "Set up with Claude", glyph: "sparkles", strong: true, act: () => win.startSetup() }]
                                          : win.curateAsk ? [{ label: "Make it", glyph: "sparkles", strong: true, act: () => win.curate() },
                                                             { label: "Cancel", glyph: "", strong: false, act: () => win.curateAsk = false }]
-                                         : (win.curated.length ? [{ label: "Pick for me", glyph: "dices", strong: false, act: () => win.pick("curated") }] : [])
-                                           .concat([{ label: "New list", glyph: "refresh-cw", strong: false, act: () => win.curateAsk = true }])
+                                         : (win.curated.length ? [{ label: "Pick for me", glyph: "dices", strong: false, tip: "An album you haven't played in a while", keys: "r", act: () => win.pick("curated") }] : [])
+                                           .concat([{ label: "New list", glyph: "refresh-cw", strong: false, tip: "Claude picks new albums", act: () => win.curateAsk = true }])
+                                    // The one to press keeps its label in one pane, the others are their glyphs
                                     delegate: AppButton {
                                         required property var modelData
                                         c: win.look
-                                        glyph: modelData.glyph; label: modelData.label
+                                        glyph: modelData.glyph; label: win.onePane && !modelData.strong && modelData.glyph ? "" : modelData.label
+                                        tip: win.onePane && modelData.tip ? modelData.label + ": " + modelData.tip : ""; keys: modelData.keys || ""
                                         strong: modelData.strong
                                         onClicked: modelData.act()
                                     }
                                 }
-                            }
-                            // As high as the title's row, so the field sits where the title does
-                            AppSearchField {
-                                id: searchField
-                                Layout.fillWidth: true
-                                Layout.leftMargin: 28
-                                Layout.rightMargin: 28
-                                visible: win.view.kind === "search"
-                                c: win.look
-                                placeholder: "Search Spotify"
-                                onEdited: searchTimer.restart()
-                                onReturnPressed: { searchTimer.stop(); win.search(); list.forceActiveFocus() }
-                                onDownPressed: list.forceActiveFocus()
-                                onEscapePressed: { if (text) { text = ""; win.results = null } else list.forceActiveFocus() }
                             }
                         }
                     }
@@ -839,6 +906,9 @@ ShellRoot {
                             if (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier | Qt.AltModifier)) return
                             // The list takes most keys before they reach the sheet: any but ? closes it here
                             if (sheet.shown && k !== Qt.Key_Question && sheet.modifierKeys.indexOf(k) < 0) sheet.shown = false
+                            // The sections on show (one pane): the keys move in them and Enter opens one; the player's keys
+                            // work as ever, and what acts on a row of the view out of sight does nothing
+                            if (win.sectionsOpen && win.sectionKey(k)) { e.accepted = true; return }
                             if (k === Qt.Key_Down || k === Qt.Key_J) win.moveTo(currentIndex + 1)
                             else if (k === Qt.Key_Up || k === Qt.Key_K) {
                                 if (currentIndex > 0) win.moveTo(currentIndex - 1)
@@ -1062,8 +1132,10 @@ ShellRoot {
                             Text { anchors.centerIn: parent; text: Icons.g("disc-3"); color: c.dim; font.family: Icons.family; font.pixelSize: 24 }
                         }
                     }
+                    // A narrow player gives the track what the controls leave, and the note its second line
                     Column {
-                        Layout.preferredWidth: 260
+                        Layout.preferredWidth: win.narrowPlayer ? 1 : 260
+                        Layout.fillWidth: win.narrowPlayer
                         // Room before the playhead's time, so a long album name doesn't run up to it
                         Layout.rightMargin: 16
                         spacing: 3
@@ -1074,7 +1146,7 @@ ShellRoot {
                         }
                         Row {
                             width: parent.width
-                            visible: !!win.info
+                            visible: !!win.info && !playerNote.visible
                             spacing: 8
                             Text {
                                 width: Math.min(implicitWidth, parent.width - (shelfButton.visible ? shelfButton.width + 8 : 0))
@@ -1104,7 +1176,14 @@ ShellRoot {
                             }
                         }
                         Text {
-                            visible: !win.alive
+                            id: playerNote
+                            visible: win.narrowPlayer && win.note !== ""
+                            width: parent.width; elide: Text.ElideRight
+                            text: win.note
+                            color: win.noteDanger ? c.danger : c.dim; font.family: c.font; font.pixelSize: 11
+                        }
+                        Text {
+                            visible: !win.alive && !playerNote.visible
                             text: "Start Deck"
                             color: sth.hovered ? c.primary : c.text; font.family: c.font; font.pixelSize: 12
                             HoverHandler { id: sth; cursorShape: Qt.PointingHandCursor }
@@ -1113,7 +1192,8 @@ ShellRoot {
                     }
                     // Controls over the playhead; a click or a drag on the bar jumps
                     ColumnLayout {
-                        Layout.fillWidth: true
+                        Layout.fillWidth: !win.narrowPlayer
+                        Layout.preferredWidth: win.narrowPlayer ? 170 : -1
                         spacing: 8
                         opacity: win.info ? 1 : 0.35
                         Row {
@@ -1169,9 +1249,10 @@ ShellRoot {
                         }
                     }
                     Item {
-                        Layout.preferredWidth: 260
+                        Layout.preferredWidth: win.narrowPlayer ? speaker.width + (heart.visible ? 18 + heart.width : 0) : 260
                         Layout.fillHeight: true
                         Text {
+                            visible: !win.narrowPlayer
                             anchors.right: speaker.left; anchors.rightMargin: 18
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
@@ -1213,7 +1294,7 @@ ShellRoot {
 
         readonly property QtObject look: c
         readonly property var keyHelp: [
-            { title: "Browse", keys: [["↑ ↓  j k", "Move"], ["⏎", "Open, or play a song"], ["Esc  ⌫", "Back"], ["⌘1 … ⌘6", "Shelf, Curated, Radio, Search, Queue, History"], ["Ctrl ↑ ↓", "Previous, next section"], ["⌘F  /", "Search Spotify"], ["n", "What plays: its album or radio"], ["r", "Pick for me: an album you haven't played lately"],
+            { title: "Browse", keys: [["↑ ↓  j k", "Move"], ["⏎", "Open, or play a song"], ["Esc  ⌫", "Back; at a section, narrow: the sections"], ["⌘1 … ⌘6", "Shelf, Curated, Radio, Search, Queue, History"], ["Ctrl ↑ ↓", "Previous, next section"], ["⌘B", "Show or hide the sections"], ["⌘F  /", "Search Spotify"], ["n", "What plays: its album or radio"], ["r", "Pick for me: an album you haven't played lately"],
                                       ["f", "A favourite genre, or not"], ["d", "Out of the queue; Not for me in Curated"]] },
             { title: "Play", keys: [["Space", "Play, pause"], ["← →", "Previous, next track"], [", .", "Back, ahead 10 seconds"], ["p", "Play the album, song or radio"], ["e", "Queue the album or song"], ["a", "On the shelf, or off it"],
                                     ["l", "Like the playing track"], ["o", "Where the sound plays"], ["?  Ctrl ?", "These keys"]] }
