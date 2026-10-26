@@ -158,7 +158,11 @@ ColumnLayout {
             readonly property string tipSide: index === root.snaps.length - 1 && index > 0 ? "above" : "below"
             selected: list.activeFocus && index === root.current
             marked: !list.activeFocus && index === root.current && root.snaps.length > 1
-            TapHandler { onTapped: { root.current = row.index; list.forceActiveFocus() } }
+            // A double click restores it, as its Restore button does (asking first, and only while the VM is stopped)
+            TapHandler {
+                onTapped: { root.current = row.index; list.forceActiveFocus() }
+                onDoubleTapped: root.restore(row.index)
+            }
             // Its name, then when it was taken and the space it alone keeps (garage-ctl list's size), close after it
             Row {
                 x: 14; anchors.verticalCenter: parent.verticalCenter
