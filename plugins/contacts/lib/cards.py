@@ -2,6 +2,8 @@
 """The contacts in ~/.local/share/contacts as JSON, for Contacts' window (app/shell.qml).
 
     cards.py list      {accounts: [{id, name, count}], groups: [{id, account, name, members}], contacts: [...], people: [...]}
+    cards.py people    [{id, name, org, emails, phones, addresses}]: the people alone, lines as text, for Mail and the
+                       launcher (`contacts people`; no pictures, so it is quick and writes nothing)
 
 A contact is {id, account, name, sort, org, title, nickname, initials, photo, emails, phones, addresses, urls, birthday,
 note}: emails, phones and urls are [{label, value, ref}], addresses [{label, lines, ref, street, code, city, region,
@@ -100,10 +102,10 @@ def birthday(card):
     return (year + "-" if year != "--" else "--") + m.group(2) + "-" + m.group(3)
 
 
-def photo(card):
+def photo(card, photos=True):
     """The card's picture: inside it (written once to the cache, named by its content) or on the web."""
     item = card.contents.get("photo")
-    if not item:
+    if not item or not photos:
         return ""
     p = item[0]
     if isinstance(p.value, bytes):
@@ -144,7 +146,8 @@ def read(path):
         return None
 
 
-def main():
+def load(photos=True):
+    """(accounts, contacts, groups, counts) from the folders; photos=False leaves the pictures out"""
     found = accounts()
     contacts, groups, counts = [], [], {}
     for account, _ in found:
@@ -177,7 +180,7 @@ def main():
                 "given": given, "family": family,
                 # org is left out of a company's own card, where it is the name; company is it as written, for the editor
                 "org": org if org != name else "", "company": org, "title": text(card, "title"), "nickname": text(card, "nickname"),
-                "initials": initials(name), "photo": photo(card),
+                "initials": initials(name), "photo": photo(card, photos),
                 "emails": emails, "phones": phones, "addresses": addresses(card, grouped),
                 "urls": values(card, "url", grouped), "birthday": birthday(card), "note": text(card, "note").strip(),
                 "categories": [c for c in (categories[0].value if categories else []) if c],
@@ -193,6 +196,11 @@ def main():
             groups.append({"id": account + "/" + n, "account": account, "name": n, "members": members})
     groups.sort(key=lambda g: (g["account"], g["name"].casefold()))
     contacts.sort(key=lambda x: x["name"].casefold())
+    return found, contacts, groups, counts
+
+
+def main():
+    found, contacts, groups, counts = load()
     json.dump({"accounts": [{"id": a, "name": n, "count": counts.get(a, 0)} for a, n in found],
                "groups": groups, "contacts": contacts, "people": people(contacts)}, sys.stdout, ensure_ascii=False)
 
@@ -230,7 +238,21 @@ def people(contacts):
     return out
 
 
+def brief():
+    """The people, each line as its text: what Mail completes addresses from and the launcher finds people by"""
+    out = []
+    for p in people(load(photos=False)[1]):
+        out.append({"id": p["id"], "name": p["name"], "org": p["org"],
+                    "emails": [{"label": v["label"], "value": v["value"]} for v in p["emails"]],
+                    "phones": [{"label": v["label"], "value": v["value"]} for v in p["phones"]],
+                    "addresses": [{"label": v["label"], "value": "\n".join(v["lines"])} for v in p["addresses"]]})
+    json.dump(out, sys.stdout, ensure_ascii=False)
+
+
 if __name__ == "__main__":
-    if sys.argv[1:] != ["list"]:
+    if sys.argv[1:] == ["list"]:
+        main()
+    elif sys.argv[1:] == ["people"]:
+        brief()
+    else:
         sys.exit(__doc__)
-    main()

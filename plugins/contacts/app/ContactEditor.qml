@@ -52,7 +52,17 @@ FocusScope {
     }
     // cards: the person's, one per account (the first is opened); account: where a new one goes
     function openCards(cards) { choices = cards; start(fromCard(cards[0])) }
-    function openNew(account) { choices = []; start(blank(account)) }
+    // name, email: filled in already (Mail's Add to contacts), the last word of the name as the family name; the draft
+    // counts as changed, so Esc asks before dropping them
+    function openNew(account, name, email) {
+        choices = []
+        start(blank(account))
+        if (!name && !email) return
+        const words = (name || "").trim().split(/\s+/).filter(w => w)
+        draft = Object.assign({}, draft, { given: words.length > 1 ? words.slice(0, -1).join(" ") : words.join(""),
+                                           family: words.length > 1 ? words[words.length - 1] : "",
+                                           emails: [{ label: "home", value: email || "", ref: -1, orig: null }] })
+    }
     function dirty() { return draft !== null && JSON.stringify(draft) !== original }
     function pick(i) {
         if (isNew) draft = Object.assign({}, draft, { account: app.accounts[i].id })

@@ -104,6 +104,11 @@ Usage: contacts [command]
 
   (none), open   open Contacts, or bring it forward if it is open
   search TEXT    open Contacts on what a search finds
+  show WHO       open the card of WHO: a card's id (as \`people\` gives it), an email address or a number
+  new [NAME] [EMAIL]
+                 a new contact in the editor, with these filled in (Mail's Add to contacts)
+  people         everyone as JSON (name, emails, numbers, addresses), for Mail and the launcher
+  settings       open Contacts' settings (launcher › Settings › Apps › Contacts)
   setup          set up an account with Claude, in a terminal
   sync [NAME…]   sync the contacts of every account (or these) now, both ways
                  (--force-delete first: an address book emptied here empties the server's too)
@@ -121,6 +126,9 @@ USAGE
 
 case ${1:-open} in
   search)    open_ready; ipc search "${*:2}" ;;
+  show)      open_ready; ipc card "${2:-}" ;;   # not "show": qs ipc takes that for its own command
+  new)       open_ready; ipc createWith "${2:-}" "${3:-}" ;;
+  people)    python3 "$APP_DIR/lib/cards.py" people ;;
   sync)      sync_now "${@:2}"; status=$?; running && ipc refresh; exit $status ;;
   accounts)  list_accounts ;;
   setup)     setup ;;
@@ -130,7 +138,7 @@ case ${1:-open} in
   vdirsyncer) python3 "$APP_DIR/lib/config.py" write >/dev/null && vds "${@:2}" ;;
   help|-h|--help) usage ;;
   *)
-    app_command "$@"; status=$?        # open (the default), restart, quit, log
+    app_command "$@"; status=$?        # open (the default), settings, restart, quit, log
     ((status == 2)) && { usage >&2; exit 2; }
     exit $status
     ;;

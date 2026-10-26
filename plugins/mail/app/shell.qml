@@ -21,6 +21,8 @@ ShellRoot {
         AppLook { id: c }
 
         Notmuch { id: nm }
+        // Nightdrive Contacts' people, when it is installed: addresses to complete, a sender's card (ContactBook.qml)
+        readonly property ContactBook book: ContactBook {}
         // For components in their own files, which don't see this file's ids.
         readonly property QtObject look: c
         readonly property QtObject mailer: nm
@@ -244,7 +246,8 @@ ShellRoot {
         // The addresses to complete from are read again each time, so the newest are there.
         function showCompose() {
             composeWin.opening = true; composeWin.visible = true
-            nm.addresses(list => composer.book = list.filter(a => !accounts.some(x => x.address === a.address)))
+            win.book.load()
+            nm.addresses(list => composer.book = win.book.merge(list.filter(a => !accounts.some(x => x.address === a.address))))
         }
         // The open thread's draft, newest first, if it has one.
         function draft(msgs) { return (msgs || messages).filter(m => m.draft).pop() }
@@ -571,6 +574,7 @@ ShellRoot {
                 if (old.length) nm.tag(old.map(x => "-" + x), old.map(x => "tag:" + x).join(" or "))
             })
             loadAccounts()
+            book.load()
             list.forceActiveFocus()
         }
         // Without an account yet (no account.conf), Mail offers to set one up (setupPanel), and looks again with each

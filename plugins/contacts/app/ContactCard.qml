@@ -20,6 +20,7 @@ Flickable {
         if (k === Qt.Key_Question) {}
         else if (k === Qt.Key_Escape || k === Qt.Key_Left || k === Qt.Key_Backspace) app.closeCard()
         else if (k === Qt.Key_E && !(e.modifiers & Qt.ControlModifier)) card.edit()
+        else if (k === Qt.Key_W && !(e.modifiers & Qt.ControlModifier)) app.write()
         else if (k === Qt.Key_Delete) app.askDelete()
         else if (k === Qt.Key_J) { app.move(1); card.contentY = 0 }
         else if (k === Qt.Key_K) { app.move(-1); card.contentY = 0 }
@@ -40,7 +41,17 @@ Flickable {
         tip: "All of them"; keys: "Esc"
         onClicked: app.closeCard()
     }
+    // Write to the first address (the rest each have their own button on their line)
     AppButton {
+        visible: card.p !== null && card.p.emails.length > 0
+        anchors.right: editButton.left; anchors.rightMargin: 8; y: 16; z: 1
+        c: card.c
+        glyph: "send"; label: card.width < 420 ? "" : "Write"
+        tip: "Write an email"; keys: "w"
+        onClicked: app.write()
+    }
+    AppButton {
+        id: editButton
         visible: card.p !== null
         anchors.right: parent.right; anchors.rightMargin: 16; y: 16; z: 1
         c: card.c

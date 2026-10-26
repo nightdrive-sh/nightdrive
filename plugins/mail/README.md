@@ -19,6 +19,7 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 - In Trash, `d` (or ⌫) deletes a thread for good, and ⌘⇧⌫ (or Empty Trash under the list) empties it. Both ask first, as there is no ⌘Z for them; the next sync deletes them on the server too.
 - A message (or the selected ones) dragged sideways from the list onto Inbox, Archive, Spam or Trash moves there in the same way (⌘Z undoes it too).
 - Attachments show under their message: a click opens one, Save puts it in Downloads, and Save all (with two or more) puts them all there.
+- With Nightdrive Contacts, a button beside the sender's address opens their card in Contacts, or, for someone not in your contacts, Add to contacts: a new contact with their name and address, for you to finish and save.
 
 ## Writing
 
@@ -26,7 +27,7 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 - A reply or a forward goes from the account the message came to, a new message from the account shown. With more than one account, a click on From changes it.
 - Your signature (`signature` in `account.conf`, below) is put under what you write, above the quote.
 - Writing opens in a window of its own: Ctrl+Enter sends, ⌘S saves it in Drafts. `Esc` closes it (a message saved before is saved again; with something new written, the second `Esc` throws it away). Closing the window with ⌘W keeps what you wrote in Drafts.
-- To and Cc offer the addresses in your mail as you type, the ones you use most first: ↑ / ↓ choose, `Tab` or `Enter` takes one.
+- To and Cc offer the addresses in your mail as you type, the ones you use most first: ↑ / ↓ choose, `Tab` or `Enter` takes one. With Nightdrive Contacts, your contacts' addresses come first, by the names they have there, and so do those you haven't written to yet.
 - ⌘⇧A or Attach picks files to attach, files dropped on the window are attached too, and × takes one off.
 - Mail opens mailto: links when you pick it as the email app (launcher › Settings › Apps › Default apps): then Hyper E opens Mail too.
 

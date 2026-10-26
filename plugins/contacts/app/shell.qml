@@ -21,15 +21,20 @@ ShellRoot {
         AppLook { id: c }
         readonly property QtObject look: c
 
-        // `contacts sync` asks for a reload once it has fetched; `contacts settings` has nothing to open yet
+        // `contacts sync` asks for a reload once it has fetched
         IpcHandler {
             target: "contacts"
             function refresh(): void { win.load() }
-            function openSettings(): void {}
-            // All contacts, searched (`contacts search TEXT`; the launcher's later)
+            // Settings › Apps › Contacts (`contacts settings`)
+            function openSettings(): void { win.showSettings = true }
+            // All contacts, searched (`contacts search TEXT`)
             function create(): void { win.newContact() }
+            // A new contact with a name and an address in it (`contacts new NAME EMAIL`: Mail's Add to contacts)
+            function createWith(name: string, email: string): void { if (win.loaded) win.newContact(name, email); else win.newNext = { name: name, email: email } }
             function edit(): void { win.edit() }
             function search(text: string): void { win.source = 0; searchField.text = text; win.filter(""); list.forceActiveFocus() }
+            // One person's card (`contacts show WHO`: the launcher's Open in Contacts, Mail's sender), once the list is read
+            function card(who: string): void { if (win.loaded) win.showWho(who); else win.showNext = who }
         }
 
         readonly property int headerHeight: 22  // the sidebar's title line and the list's search line, as Mail's
@@ -76,6 +81,8 @@ ShellRoot {
                     win.loaded = true
                     win.source = Math.min(win.source, win.sources.length - 1)
                     win.filter(keep)
+                    if (win.showNext) { win.showWho(win.showNext); win.showNext = "" }
+                    if (win.newNext) { win.newContact(win.newNext.name, win.newNext.email); win.newNext = null }
                 }
             }
         }
@@ -108,6 +115,22 @@ ShellRoot {
             current = i >= 0 ? i : list.length ? 0 : -1
             list.length && listView.positionViewAtIndex(current, ListView.Contain)
         }
+        // WHO: a card's id, an email address or a number (its last 9 digits, as cards.py's people() matches them)
+        property string showNext: ""
+        property var newNext: null          // createWith's, likewise
+        function showWho(who) {
+            const w = who.trim().toLowerCase(), digits = w.replace(/\D/g, "").slice(-9)
+            const isNumber = /^\+?[\d\s\-()]+$/.test(w) && digits.length >= 5
+            const p = people.find(x => (x.ids || [x.id]).indexOf(who) >= 0)
+                || people.find(x => x.emails.some(e => e.value.toLowerCase() === w))
+                || (isNumber ? people.find(x => x.phones.some(n => n.value.replace(/\D/g, "").slice(-9) === digits)) : null)
+            if (editing) return
+            showSettings = false
+            source = 0; searchField.text = ""
+            if (!p) { filter(""); say("Not in your contacts: " + who); list.forceActiveFocus(); return }
+            filter(p.id)
+            if (onePane) openCard(); else { card.contentY = 0; list.forceActiveFocus() }
+        }
         function pickSource(i) {
             if (i < 0 || i >= sources.length) return
             source = i; searchField.text = ""; filter(""); list.forceActiveFocus()
@@ -137,6 +160,8 @@ ShellRoot {
             else if (action === "open") Qt.openUrlExternally(/^\w+:/.test(value) ? value : "https://" + value)
             else if (action === "copy") { copier.command = ["wl-copy", value]; copier.running = true; say("Copied: " + value.replace(/\n/g, ", ")) }
         }
+        // w: an email to the open contact's first address, in the email app (Settings › Apps › Default apps)
+        function write() { if (contact && contact.emails.length) use("write", contact.emails[0].value) }
         function when(b) {
             // YYYY-MM-DD or --MM-DD (no year)
             const m = b.match(/^(\d{4}|-)-(\d{2})-(\d{2})$/) || b.match(/^--(\d{2})-(\d{2})$/)
@@ -177,12 +202,14 @@ ShellRoot {
             editing = true
             editor.openCards(cards)
         }
-        function newContact() {
+        // name, email: filled in already (`contacts new`)
+        function newContact(name, email) {
             if (editing || !accounts.length) return
             // In the account (or its group) the sidebar is on, else the first one
             const s = sources[source] || {}
+            showSettings = false
             editing = true
-            editor.openNew(s.kind === "account" ? s.id : s.kind === "group" ? s.account : accounts[0].id)
+            editor.openNew(s.kind === "account" ? s.id : s.kind === "group" ? s.account : accounts[0].id, name || "", email || "")
         }
         function endEdit() {
             editing = false
@@ -209,6 +236,7 @@ ShellRoot {
 
         Shortcut { sequences: ["/", "Ctrl+F"]; onActivated: searchField.forceActiveFocus() }
         Shortcut { sequence: "Ctrl+R"; onActivated: win.load() }
+        Shortcut { sequences: ["Ctrl+,", "Meta+,"]; onActivated: win.showSettings = !win.showSettings }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
 
@@ -320,6 +348,7 @@ ShellRoot {
                             else if (k === Qt.Key_Escape && searchField.text !== "") { searchField.text = ""; win.filter(win.contact ? win.contact.id : "") }
                             else if (k === Qt.Key_Question) win.cheats = !win.cheats
                             else if (k === Qt.Key_E && !ctrl) win.edit()
+                            else if (k === Qt.Key_W && !ctrl) win.write()
                             else if (k === Qt.Key_Delete || k === Qt.Key_Backspace) win.askDelete()
                             else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
                             else return
@@ -455,6 +484,16 @@ ShellRoot {
             }
         }
 
+        // Settings (⌘,): the accounts, Sync now, Add an account (SettingsPanel)
+        property bool showSettings: false
+        onShowSettingsChanged: if (showSettings) settings.open(); else if (settings.visible) settings.close()
+        SettingsPanel {
+            id: settings
+            app: win
+            c: win.look
+            onClosed: { win.showSettings = false; if (win.editing) editor.forceActiveFocus(); else list.forceActiveFocus() }
+        }
+
         Store { id: store; app: win }
         ConfirmPanel {
             id: confirm
@@ -470,9 +509,9 @@ ShellRoot {
             groups: [
                 { title: "Contacts", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  →", "Open the card (a narrow window)"], ["Esc  ←", "Back to the list (on the card: ↑ ↓ scroll, j k next)"], ["PgUp PgDn", "Ten up, down"], ["Space ⇧Space", "Scroll the card"],
                                            ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
-                { title: "Editing", keys: [["⌘N", "New contact"], ["⌘E  e", "Edit the contact"], ["⌘S  ⌘⏎", "Save"], ["Esc", "Leave the editor"],
+                { title: "Editing", keys: [["⌘N", "New contact"], ["⌘E  e", "Edit the contact"], ["w", "Write an email to them"], ["⌘S  ⌘⏎", "Save"], ["Esc", "Leave the editor"],
                                           ["Tab", "Next field"], ["Delete", "Delete the contact"]] },
-                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["⌘R", "Read the contacts again"], ["⌘B", "Hide or show the sidebar"],
+                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["⌘R", "Read the contacts again"], ["⌘,", "Settings: accounts, sync"], ["⌘B", "Hide or show the sidebar"],
                                          ["Click", "Copy a number, write to an address"]] }
             ]
         }

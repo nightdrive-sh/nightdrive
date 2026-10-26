@@ -1,6 +1,6 @@
 # Contacts
 
-Your contacts from iCloud, Google or another CardDAV server, on this computer and kept in sync: a quiet window with the accounts, the list and the open card. They are kept as vCard files in `~/.local/share/contacts`, one folder per account, synced by vdirsyncer both ways every 30 minutes, so they open at once and are there offline too. A contact you add, edit or delete here goes to the server at once, and on to your phone; addresses in Mail come later.
+Your contacts from iCloud, Google or another CardDAV server, on this computer and kept in sync: a quiet window with the accounts, the list and the open card. They are kept as vCard files in `~/.local/share/contacts`, one folder per account, synced by vdirsyncer both ways every 30 minutes, so they open at once and are there offline too. A contact you add, edit or delete here goes to the server at once, and on to your phone. Mail completes addresses from them, and the launcher finds them (Mail and the launcher, below).
 
 ## Using it
 
@@ -8,9 +8,15 @@ Your contacts from iCloud, Google or another CardDAV server, on this computer an
 - All contacts shows each person once: the cards of one person in iCloud and Google (the same name, and a number or address in common) are one, with every line of them. Under it each account has its own, as it is there, and the groups (Apple's, or a card's categories) theirs.
 - `↑` / `↓` or `j` / `k` move in the list, `Space` and ⇧Space scroll the card. `/` or ⌘F searches names, companies, email addresses and numbers (040 123 finds +358 40 123 too), `Esc` clears the search.
 - Ctrl+↑ / Ctrl+↓ or `1`–`9` pick a row of the sidebar, ⌘B hides it, ⌘R reads the contacts again.
-- A click on an email address writes to it (in the email app: launcher › Settings › Apps › Default apps), on a link opens it, and on a number or an address copies it.
+- A click on an email address writes to it (in the email app: launcher › Settings › Apps › Default apps), on a link opens it, and on a number or an address copies it. `w` (or Write above the card) writes to the first address.
+- ⌘, opens the settings: your accounts and how many contacts each has, when they last synced, Sync now (`S`) and Add an account with Claude (`A`). launcher › Settings › Apps › Contacts opens them too.
 - ⌘N (or the button by the search) adds a contact, ⌘E or `e` (or Edit) edits the open one, and `Delete` deletes it, after asking. More under Editing.
 - Pictures show when the card has one inside it, or one on the web (Google's). iCloud keeps its pictures behind its sign-in, so its contacts show their initials.
+
+## Mail and the launcher
+
+- In Nightdrive Mail, To and Cc complete from your contacts as well as from your mail: your contacts first, by their names here. Beside a sender's address, a button opens their card here, or adds them: Add to contacts opens the editor with their name and address in it.
+- The launcher's search (⌘Space) finds people by name, company, email address or number (`0401234` finds +358 40 123 4567 too). Enter on one shows their card in the launcher: Open in Contacts, then their numbers and addresses, which Enter copies, and their email addresses, which Enter writes to (⇧Enter copies). Settings › Launcher › Include contacts leaves them out of the search.
 
 ## Editing
 
@@ -66,6 +72,10 @@ Google's CardDAV with an app password works, but Google's own documentation asks
 | --- | --- |
 | `contacts` | Opens Contacts, or brings it forward |
 | `contacts search TEXT` | Opens Contacts on what a search finds |
+| `contacts show WHO` | Opens the card of WHO: an email address, a number, or a card's id |
+| `contacts new [NAME] [EMAIL]` | A new contact in the editor, with these filled in |
+| `contacts settings` | Opens the settings: the accounts, Sync now, Add an account |
+| `contacts people` | Everyone as JSON (names, numbers, email and street addresses), as Mail and the launcher read them |
 | `contacts setup` | Sets up an account with Claude, in a terminal |
 | `contacts sync [NAME…]` | Syncs every account's contacts both ways now (or these accounts') |
 | `contacts accounts` | The accounts and how many contacts each has here |
