@@ -1,4 +1,4 @@
-# Optional parts. install.sh installs the Default on ones and Tailscale, Mail and Deck (ALWAYS there) without asking
+# Optional parts. install.sh installs the Default on ones and Tailscale, Mail, Contacts and Deck without asking
 # (--choose asks; --with/--without/--all/--none), the launcher lists them under System › Install and `nightdrive plugins`
 # in a terminal, so what was skipped can be added later. The desktop hides a part that isn't installed: the launcher
 # (Plugins.has), the top bar ("needs" in topbar/modules.jsonc), the keybindings (hypr/bindings.lua) and their lines in
@@ -15,7 +15,7 @@
 #   Installer: `flatpak APP-ID` (Flathub, per user), `webapp URL` (a Chromium app window named after the Name column), or
 #   any other shell command; run in the repo root. A part that needs a script of its own is a folder (its install.sh).
 #   Group: where it is listed (launcher and install.sh):
-#     app          Nightdrive's own app (Mail, Deck): comes with every install and isn't listed in Install. `nightdrive
+#     app          Nightdrive's own app (Mail, Contacts, Deck): comes with every install and isn't listed in Install. `nightdrive
 #                  update` installs a new one on an existing install once (~/.local/state/nightdrive/apps-offered), never
 #                  again after it was removed. Only for a plugin folder, and a new app is decided one by one: part of
 #                  Nightdrive, or bloat that belongs in Recommended.

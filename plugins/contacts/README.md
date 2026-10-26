@@ -1,6 +1,6 @@
 # Contacts
 
-Your contacts from iCloud, Google or another CardDAV server, on this computer and kept in sync: a quiet window with the accounts, the list and the open card. They are kept as vCard files in `~/.local/share/contacts`, one folder per account, synced by vdirsyncer both ways every 30 minutes, so they open at once and are there offline too. iCloud keeps a contact's photo apart from the card, behind your sign-in: the sync fetches the new ones into `~/.cache/contacts/photos`, cut to the part chosen on the iPhone, and until then the initials show. A contact you add, edit or delete here goes to the server at once, and on to your phone. Mail completes addresses from them, and the launcher finds them (Mail and the launcher, below).
+Your contacts from iCloud, Google or another CardDAV server, on this computer and kept in sync. Contacts is one of Nightdrive's own apps, on every install like Mail and Deck (Settings › Apps › Nightdrive apps turns it off or on): a quiet window with the accounts, the list and the open card. They are kept as vCard files in `~/.local/share/contacts`, one folder per account, synced by vdirsyncer both ways every 30 minutes, so they open at once and are there offline too. iCloud keeps a contact's photo apart from the card, behind your sign-in: the sync fetches the new ones into `~/.cache/contacts/photos`, cut to the part chosen on the iPhone, and until then the initials show. A contact you add, edit or delete here goes to the server at once, and on to your phone. Mail completes addresses from them, and the launcher finds them (Mail and the launcher, below).
 
 ## Using it
 
@@ -11,7 +11,7 @@ Your contacts from iCloud, Google or another CardDAV server, on this computer an
 - A click on an email address writes to it (in the email app: launcher › Settings › Apps › Default apps), on a link opens it, and on a number or an address copies it. `w` (or Write above the card) writes to the first address.
 - ⌘, opens the settings: your accounts and how many contacts each has, when they last synced, Sync now (`S`) and Add an account with Claude (`A`). launcher › Settings › Apps › Contacts opens them too.
 - ⌘N (or the button by the search) adds a contact, ⌘E or `e` (or Edit) edits the open one, and `Delete` deletes it, after asking. More under Editing.
-- Pictures show when the card has one inside it, or one on the web (Google's). iCloud keeps its pictures behind its sign-in, so its contacts show their initials.
+- Pictures show when the card has one inside it, or one on the web (Google's). iCloud's are fetched by the sync (above); until then, and for a contact without one, the initials show.
 
 ## Mail and the launcher
 
@@ -28,9 +28,9 @@ If the same contact was changed on the phone too before the change here reached 
 
 ## Setting up an account
 
-Contacts reads your accounts from `~/.config/contacts/accounts.conf`, one section each, and signs in with an app password kept in the login keyring. Claude can do these steps with you: the plugin's page has Set up with Claude (`contacts setup` does the same), which opens Claude Code in a terminal and goes through them a step at a time. Your password goes only into the login keyring, by a command you run yourself.
+Contacts reads your accounts from `~/.config/contacts/accounts.conf`, one section each, and signs in with an app password kept in the login keyring. Claude can do these steps with you: Contacts' first start offers it, and so do Welcome to Nightdrive (launcher › System › Set up Nightdrive) and `contacts setup`, which open Claude Code in a terminal and go through them a step at a time. Your password goes only into the login keyring, by a command you run yourself. Without Claude, Welcome shows the steps one at a time.
 
-1. Install the plugin (launcher › System › Install › Plugins › Contacts): it installs vdirsyncer, python3-vobject, libsecret (secret-tool) and ImageMagick (for iCloud's photos).
+1. Contacts comes with Nightdrive. If you removed it, install it again (launcher › System › Install › Recommended › Contacts, or `nightdrive plugins install contacts`): it installs vdirsyncer, python3-vobject, libsecret (secret-tool) and ImageMagick (for iCloud's photos).
 
 2. Make an app password for Contacts in your account's settings, as mail apps need:
    - iCloud: [account.apple.com](https://account.apple.com) › Sign-In and Security › App-Specific Passwords.

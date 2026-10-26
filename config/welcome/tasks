@@ -23,8 +23,8 @@ SCRIPTS = os.path.join(HOME, ".config/hypr/scripts")
 CLAUDE = os.path.join(HOME, ".local/bin/claude")
 SITE = "https://nightdrive.sh/plugins/"                              # the website's page for each of the repo's plugins
 TEST_TIMEOUT = 5                                                     # seconds for a configured test
-# What to set up first, the rest after them in plugins' order: the network, then mail before music
-FIRST = ("tailscale", "mail", "deck")
+# What to set up first, the rest after them in plugins' order: the network, then mail and its contacts before music
+FIRST = ("tailscale", "mail", "contacts", "deck")
 
 CLAUDE_ABOUT = ("Sign in first: the rest are set up with Claude. "
                 "Claude Code needs a Pro or Max plan, or an API account.")

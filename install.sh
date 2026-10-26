@@ -11,10 +11,10 @@
 #                              (packages-remove-asahi.txt), updates the system, installs packages, fonts, the notch
 #                              setting, links the configs, gives a Minimal system the desktop's settings (graphical
 #                              boot, the firewall as on Fedora KDE, SSH off until Remote login turns it on), installs
-#                              Claude Code, Tailscale and Apostrophe (ALWAYS), Nightdrive's apps (Mail, Deck), the
-#                              login screen and boot splash (active from the next boot: the splash, then the desktop
-#                              under the login screen as its lock) and the optional parts that are Default on in
-#                              plugins.txt.
+#                              Claude Code, Tailscale and Apostrophe (ALWAYS), Nightdrive's apps (Mail, Contacts,
+#                              Deck), the login screen and boot splash (active from the next boot: the splash, then
+#                              the desktop under the login screen as its lock) and the optional parts that are Default
+#                              on in plugins.txt.
 #   ./install.sh --choose      first lists the optional parts (1Password, web apps…, plugins.txt) and, on a Mac, the
 #                              removals to tick or untick. Home Assistant, if chosen, asks for its address at the end.
 #   ./install.sh --with 1password,slack   these parts on top of the defaults (ids: --dry-run lists them)
@@ -39,8 +39,8 @@ set -euo pipefail
 repo=$(cd "$(dirname "$0")" && pwd)
 # Part of Nightdrive like Claude Code, so not asked: Tailscale is quiet until it's logged in, Apostrophe opens the .md
 # files (Welcome's do-it-yourself path shows the apps' READMEs in it). Nightdrive's own apps (group app in plugin.conf:
-# Mail, Deck) are too, Mail until its account is set up. Folders in plugins/, so their packages and services stay out of
-# the core.
+# Mail, Contacts, Deck) are too, Mail and Contacts quiet until their accounts are set up. Folders in plugins/, so their
+# packages and services stay out of the core.
 ALWAYS=(tailscale apostrophe)
 machine=""; nvidia=1; secureboot=0; greeter=1; autologin=1; splash=1; dry=0; choose=0; remove=1   # machine: "" = detected
 base=""; with=""; without=""; keyboard=""   # base: all | none | defaults, "" = the defaults

@@ -480,7 +480,7 @@ ShellRoot {
             }
             Text {
                 width: parent.width; wrapMode: Text.Wrap; color: c.faint; font.family: c.font; font.pixelSize: 11
-                text: "To do it yourself: launcher › System › Install › Plugins › Contacts has the steps."
+                text: "To do it yourself: launcher › System › Set up Nightdrive shows the steps one at a time."
             }
         }
 

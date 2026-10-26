@@ -72,7 +72,7 @@ Browse has Popular (top 100) and categories: Flathub's most installed apps that 
 Terminals Fedora's terminals first (Ghostty, kitty, Alacritty, foot, Ptyxis). System ›
 Remove has Software (both) and Webapps, and its search looks in both.
 
-Nightdrive's own apps (Mail, Deck) and Tailscale come with every install; Garage, Nightdrive's app for virtual machines,
+Nightdrive's own apps (Mail, Contacts, Deck) and Tailscale come with every install; Garage, Nightdrive's app for virtual machines,
 waits in System › Install › Recommended. Everything else is an optional part: the
 installer adds the ones on by default (or the ones you tick with `./install.sh --choose`), and the rest are under System ›
 Install: apps Nightdrive sets up (1Password, Home Assistant…), ready-made web apps with a keybinding, and plugins for
@@ -214,7 +214,7 @@ sudo dnf install -y git   # not in a fresh install
 git clone https://github.com/nightdrive-sh/nightdrive.git ~/dotfiles
 cd ~/dotfiles
 ./install.sh              # asks nothing: system update, packages, fonts, the notch setting, config links, Claude
-                          # Code, Tailscale, Mail, Deck, login screen and the default optional parts
+                          # Code, Tailscale, Mail, Contacts, Deck, login screen and the default optional parts
 ```
 
 It tells which machine it's on and then runs unattended (sudo asks for the password once at the start); the system
@@ -222,7 +222,7 @@ update takes a while. On a Mac it first asks for the keyboard layout, if it's st
 screen's password is typed with it (`--keyboard "fi mac"` answers in advance). A minimal Fedora gets what a desktop
 edition would have: it boots to the login screen, the firewall has the desktop's settings as on Fedora KDE (so LocalSend
 and AirPlay are reached), and SSH is off until you turn on Remote login (launcher › Settings), unless you install over
-ssh. Claude Code, Tailscale, Mail and Deck come with every install, like the rest of the desktop: each stays quiet until
+ssh. Claude Code, Tailscale, Mail, Contacts and Deck come with every install, like the rest of the desktop: each stays quiet until
 you set it up. The optional parts that are on by default (YouTube) come too, and the rest can be added later from the
 launcher (System › Install) or with `nightdrive plugins install ID`.
 
@@ -286,12 +286,12 @@ desktop behind the login screen).
 | `--vm` | The virtual machine settings, if the VM isn't detected as one ([docs/vm.md](docs/vm.md)) |
 | `--no-nvidia` | On a PC, leaves an NVIDIA card's driver alone instead of installing RPM Fusion's ([docs/pc.md](docs/pc.md)) |
 | `--with 1password,slack` | These optional parts on top of the defaults (`--dry-run` lists the ids) |
-| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail or Deck too |
-| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (YouTube); Tailscale, Mail and Deck come with each |
+| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail, Contacts or Deck too |
+| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (YouTube); Tailscale, Mail, Contacts and Deck come with each |
 | `--dry-run` | Shows the optional parts, the packages and system settings it would add and what it would remove, then stops |
 
 At your first login, **Welcome to Nightdrive** opens and asks first whether you have Claude Code (a Pro or Max plan).
-With Claude, sign in there first, then it sets up Tailscale, Mail and Deck with you, each in a Claude session of its own
+With Claude, sign in there first, then it sets up Tailscale, Mail, Contacts and Deck with you, each in a Claude session of its own
 that does only that one thing. Without, it shows each one's steps right there, one at a time in plain words. Or choose
 *I'll do it myself*: a list of the apps, each opening its README in Apostrophe, and Finish when you're done. Leave what
 you don't need; Back in the list asks the question again, Launcher › System › *Set up Nightdrive* (or
@@ -351,7 +351,7 @@ You can also update any time from the launcher (**Update**) or a terminal:
 nightdrive update   # pulls Nightdrive (and Deck), relinks, installs new packages, updates the system, reloads the desktop
 ```
 
-An install that doesn't have one of Nightdrive's apps yet (Mail, Deck) gets it with the update, once: one you remove
+An install that doesn't have one of Nightdrive's apps yet (Mail, Contacts, Deck) gets it with the update, once: one you remove
 afterwards isn't installed again: it is back in launcher › System › Install › Recommended (or `nightdrive plugins
 install mail`). Settings › Apps › Nightdrive apps turns one off or on.
 
@@ -388,7 +388,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the launcher) |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
 | `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the launcher; `--dir ~/dotfiles` starts it in that folder (`~/Projects` otherwise), `--name "Clock"` names the session (as `/rename`), `--effort high` sets its effort level (low to max) |
-| `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Deck… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
+| `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
 ## Keys
 

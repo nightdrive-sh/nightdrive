@@ -426,12 +426,12 @@ LIST
   echo "Nightdrive is up to date."
 }
 
-# Nightdrive's own apps (group app in plugin.conf: Mail, Deck) come with every install. An install that has never had one
-# (from before it was an app, or before it existed) gets it here, once: each is then marked in $offered (install.sh marks
-# the ones it offered, left out or not), and one marked is never installed again, so an app the user removed stays
-# away. One installed already (or off) is only marked. An install from before the list (23.10.2026) has no record of an
-# app removed earlier: what the app leaves behind tells (Mail's settings after `nightmail disable`, Deck's source), and
-# it is marked without installing. Without sudo (can_sudo, update) it waits, unmarked, for a run in a terminal. A
+# Nightdrive's own apps (group app in plugin.conf: Mail, Deck, Contacts) come with every install. An install that has
+# never had one (from before it was an app, or before it existed) gets it here, once: each is then marked in $offered
+# (install.sh marks the ones it offered, left out or not), and one marked is never installed again, so an app the user
+# removed stays away. One installed already (or off) is only marked. An install from before the list (23.10.2026) has no
+# record of an app removed earlier: what the app leaves behind tells (Mail's settings after `nightmail disable`, Deck's
+# source, Contacts' accounts after `contacts disable`), and it is marked without installing. Without sudo (can_sudo, update) it waits, unmarked, for a run in a terminal. A
 # failed install is marked too, so a build that fails doesn't run again on every update: missed has the command.
 # Only the repo's plugins: an external one can't install itself by naming the group. An app with bundled=no in its
 # plugin.conf (Garage) isn't offered at all: it waits in Install › Recommended for the user to pick it.
@@ -447,6 +447,7 @@ offer_apps() {
     case $id in
       mail) trace=$HOME/.config/nightmail ;;
       deck) trace=${DECK_SRC:-$HOME/.local/src/deck} ;;
+      contacts) trace=${XDG_CONFIG_HOME:-$HOME/.config}/contacts ;;   # its accounts, kept by contacts disable
       *) trace="" ;;
     esac
     if (( inst )) || [[ -n $trace && -e $trace ]]; then echo "$id" >> "$offered"; continue; fi

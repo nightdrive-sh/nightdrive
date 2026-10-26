@@ -81,7 +81,7 @@ author=@jarilehtinen
 | `welcome` | The plugin's row in Welcome to Nightdrive: one line, in plain words, of what setting it up gives you (with Claude or without). Default: `description` |
 | `order` | A number, default 50: `install.sh` installs the plugins in this order, and the lists show them in it. Lower goes first; the same order keeps the folders' (alphabetical) order, then `plugins.txt`'s lines. Home Assistant has 90: its installer asks for addresses, so it runs last |
 
-An `app` (Mail, Deck) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
+An `app` (Mail, Contacts, Deck) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
 it isn't listed in System › Install while it's installed, and its settings are in Settings › Apps (Nightdrive apps
 turns one off or on). One the user removed is back in Install › Recommended, to install again from there.
 `nightdrive update` installs an app that an existing install has never had (one made an app later, or a new one), once:
