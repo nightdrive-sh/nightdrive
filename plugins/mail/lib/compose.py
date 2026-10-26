@@ -113,6 +113,14 @@ def html_text(h):
     return re.sub(r"\n{3,}", "\n\n", h).strip()
 
 
+def plain_entities(t):
+    """A plain part with HTML's entities in it ("Hei&nbsp;Jari") read as text (as Notmuch.qml's plainText): only when
+    it has one that only HTML writes, since a plain &amp; or &lt; may quote HTML on purpose."""
+    if not re.search(r"(?i)&(nbsp|[a-z]+(uml|acute|grave|ring|circ|tilde|cedil|slash)|#x?[0-9a-f]+);", t):
+        return t
+    return html.unescape(t).replace("\xa0", " ")
+
+
 def plain_text(parts, kind="text/plain"):
     """The message's first text part; an HTML-only message's HTML as text."""
     for part in parts:
@@ -124,7 +132,7 @@ def plain_text(parts, kind="text/plain"):
             if text:
                 return text
         elif part.get("content-type", "").lower() == kind and content:
-            return content if kind == "text/plain" else html_text(content)
+            return plain_entities(content) if kind == "text/plain" else html_text(content)
     return plain_text(parts, "text/html") if kind == "text/plain" else ""
 
 
