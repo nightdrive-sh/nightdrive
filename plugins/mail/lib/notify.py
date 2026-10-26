@@ -16,6 +16,12 @@ import subprocess
 import sys
 
 NEW = "folder:/INBOX$/ and tag:inbox and tag:unread and not tag:notified"
+# Mail sent from one of your accounts to another: its Message-ID is the Sent copy's, so notmuch adds the received file
+# to that message and gives it no new.tags. Tags belong to the message, not the file, so the inbox tag goes on by the
+# file's folder: a file just delivered to an inbox (new/), and once only: notify tags it notified, and the file stays
+# in new/ until it is read.
+# The other account's Inbox and Sent are path terms (folderQuery in app/shell.qml), so its Sent shows it as before.
+SELF_SENT = r"tag:sent and not tag:inbox and not tag:notified and path:/\/INBOX\/new$/"
 RECENT = "date:2d.."
 MAX_EACH = 3
 APP = "Mail"
@@ -45,6 +51,8 @@ def name(sender):
 
 
 def announce():
+    if notmuch("count", SELF_SENT).strip() != "0":
+        notmuch("tag", "+inbox", "+unread", "--", SELF_SENT)
     new = json.loads(notmuch("search", "--format=json", "--output=summary", "--sort=oldest-first",
                              f"({NEW}) and {RECENT}") or "[]")
     if len(new) > MAX_EACH:
