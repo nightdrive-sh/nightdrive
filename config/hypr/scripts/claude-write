@@ -44,7 +44,7 @@ window_field() { local s; s=$(tr -d '\000-\037\177<>' <<<"$1"); printf '%s' "${s
 # The window is a terminal: the same list as bindings.lua's TERMINAL_CLASSES (Ghostty's windows with a prefix)
 is_terminal() {
   case "${1#sh.nightdrive.}" in
-    kitty|foot|footclient|Alacritty|com.mitchellh.ghostty|org.wezfurlong.wezterm|floating-tui|floating-help|deck) return 0 ;;
+    kitty|foot|footclient|Alacritty|com.mitchellh.ghostty|org.wezfurlong.wezterm|floating-tui|floating-help|deck|claude-background) return 0 ;;
   esac
   return 1
 }

@@ -16,7 +16,7 @@ local email       = scripts .. "/default-apps open email --focus"   -- one mail 
 -- the ones scripts/terminal gives its windows (Ghostty's with a sh.nightdrive. prefix)
 TERMINAL_CLASSES = { ["kitty"] = true, ["foot"] = true, ["footclient"] = true, ["Alacritty"] = true,
                      ["com.mitchellh.ghostty"] = true, ["org.wezfurlong.wezterm"] = true,
-                     ["floating-tui"] = true, ["floating-help"] = true, ["deck"] = true }
+                     ["floating-tui"] = true, ["floating-help"] = true, ["deck"] = true, ["claude-background"] = true }
 function NIGHTDRIVE_IS_TERMINAL(w)
     return w ~= nil and TERMINAL_CLASSES[(w.class:gsub("^sh%.nightdrive%.", ""))] == true
 end

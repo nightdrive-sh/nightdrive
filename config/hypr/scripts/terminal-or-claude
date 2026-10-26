@@ -1,9 +1,14 @@
 #!/bin/bash
 # ⌘⌥Enter: if the launcher is open with text typed in it, send that to Claude Code; otherwise open an empty Claude.
-# terminal-or-claude [--dir DIR] [--name NAME] [--effort LEVEL] [--] [PROMPT…]: start Claude Code with that prompt, in
-# DIR (~/Projects unless given), the session named NAME (claude -n, as /rename), at effort LEVEL (claude --effort).
+# terminal-or-claude [--dir DIR] [--name NAME] [--effort LEVEL] [--background] [--] [PROMPT…]: start Claude Code with
+# that prompt, in DIR (~/Projects unless given), the session named NAME (claude -n, as /rename), at effort LEVEL
+# (claude --effort). --background opens its window without the keyboard, so typing elsewhere isn't cut off (a session
+# another session starts, e.g. the project manager's): its class has a no_initial_focus rule in hyprland.lua, and a
+# notification says it opened, a click on it going to the window.
 # The launcher's askClaude, crash reports and `nightdrive ask` call this.
-dir="$HOME/Projects"; name=; effort=; bare=$(( $# == 0 ))
+readonly BG_CLASS=claude-background   # hyprland.lua's rule, and TERMINAL_CLASSES in bindings.lua
+readonly BG_WAIT=15                   # seconds to wait for the window before giving up on the notification
+dir="$HOME/Projects"; name=; effort=; bg=0; bare=$(( $# == 0 ))
 while (( $# )); do
   case $1 in
     --dir) [[ -n ${2:-} ]] || { echo "--dir needs a folder" >&2; exit 1; }; dir=$2; shift 2 ;;
@@ -11,8 +16,9 @@ while (( $# )); do
     # checked here: a wrong level would only show as an error in the new terminal
     --effort) [[ ${2:-} =~ ^(low|medium|high|xhigh|max)$ ]] || { echo "--effort needs low, medium, high, xhigh or max" >&2; exit 1; }
               effort=$2; shift 2 ;;
+    --background) bg=1; shift ;;
     --) shift; break ;;
-    -*) echo "Unknown option: $1 (usage: nightdrive ask [--dir DIR] [--name NAME] [--effort LEVEL] MESSAGE)" >&2; exit 1 ;;
+    -*) echo "Unknown option: $1 (usage: nightdrive ask [--dir DIR] [--name NAME] [--effort LEVEL] [--background] MESSAGE)" >&2; exit 1 ;;
     *) break ;;
   esac
 done
@@ -30,5 +36,30 @@ if (( bare )); then
   [ "$(qs ipc call launcher askClaude 2>/dev/null)" = "ok" ] && exit 0
   exec "$term" --dir "$dir" -- "${claude[@]}"
 fi
+bg_windows() {   # the addresses of the background sessions' windows (Ghostty's class has a prefix: scripts/terminal)
+  hyprctl -j clients 2>/dev/null | jq -r --arg c "$BG_CLASS" '.[] | select(.class | sub("^sh\\.nightdrive\\."; "") == $c) | .address'
+}
+targs=(--dir "$dir")
+if (( bg )); then targs+=(--class "$BG_CLASS"); before=$(bg_windows); fi
 # detached: `nightdrive ask` returns at once, and the terminal's own messages stay out of the shell it was run from
-setsid -f "$term" --dir "$dir" -- "${claude[@]}" >/dev/null 2>&1
+setsid -f "$term" "${targs[@]}" -- "${claude[@]}" >/dev/null 2>&1
+(( bg )) || exit 0
+
+# The notification, once the new window is there (the one not among the earlier ones), detached as well: it waits for
+# its click. The same icon as claude-notify's.
+icon=lucide:bot
+for f in "$HOME"/.config/nightdrive/agent-icon.{svg,png}; do [[ -f $f ]] && { icon=$f; break; }; done
+prompt=$*; prompt=${prompt%%$'\n'*}; (( ${#prompt} > 120 )) && prompt="${prompt:0:120}…"
+project=${dir/#$HOME/\~}
+export BG_CLASS BG_WAIT before icon
+export -f bg_windows
+setsid -f bash -c '
+  for (( i = 0; i < BG_WAIT * 4; i++ )); do
+    addr=$(comm -13 <(sort <<<"$before") <(bg_windows | sort) | head -n1)
+    [[ -n $addr ]] && break
+    sleep 0.25
+  done
+  [[ -n $addr ]] || exit 0
+  action=$(notify-send -a Claude -i "$icon" -A default=Open -A show="Show session" -w "Claude session opened: $1" "$2")
+  [[ $action == default || $action == show ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+' _ "${name:-${dir##*/}}" "${prompt:+$prompt · }$project" >/dev/null 2>&1 < /dev/null
