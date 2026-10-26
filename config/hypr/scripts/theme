@@ -83,6 +83,15 @@ def rgb2hex(r, g, b):
     return "#" + "".join(f"{round(max(0, min(1, x)) * 255):02x}" for x in (r, g, b))
 
 
+def lighter(hexcol, factor):
+    """Qt's QColor.lighter: the HSV value times factor; past white, the saturation gives way instead."""
+    h, sat, v = colorsys.rgb_to_hsv(*hex2rgb(hexcol))
+    v *= factor
+    if v > 1:
+        sat, v = max(0, sat - (v - 1)), 1
+    return rgb2hex(*colorsys.hsv_to_rgb(h, sat, v))
+
+
 def palette(name):
     _, hue, sat = THEMES[name]
     out = {}
@@ -232,8 +241,11 @@ def apply():
     # gtk.css files, so switching themes doesn't change a tracked file. GTK reads it when an app starts. nd_window is
     # the look's background and opacity, as the terminals' and the kit apps' (Mail, Contacts): the GTK windows' own.
     window = "rgba({}, {}, {}, {:g})".format(*(int(bg[i:i + 2], 16) for i in (1, 3, 5)), float(op) / 100)
+    # nd_divider is the kit's line between the panes (AppLook.divider: the look's background, lighter 1.45 then 1.2)
+    divider = lighter(lighter(bg, 1.45), 1.2)
     write(f"{OUT}/gtk-colors.css", "/* written by theme */\n"
-          + "".join(f"@define-color nd_{k} {v};\n" for k, v in {**FIXED, **p, "window": window}.items()))
+          + "".join(f"@define-color nd_{k} {v};\n"
+                    for k, v in {**FIXED, **p, "window": window, "divider": divider}.items()))
     write_aerc(p)
     apply_look(lk)
 

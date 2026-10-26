@@ -22,13 +22,15 @@
   --error-color: @nd_danger;
   --error-bg-color: @nd_danger;
   --error-fg-color: @nd_bg;
+  --border-color: @nd_divider;
   --window-bg-color: @nd_window;
   --window-fg-color: @nd_text;
   --view-bg-color: transparent;
   --view-fg-color: @nd_text;
   --headerbar-bg-color: transparent;
   --headerbar-fg-color: @nd_text;
-  --headerbar-border-color: @nd_border;
+  --headerbar-border-color: @nd_divider;
+  --headerbar-shade-color: @nd_divider;
   --headerbar-backdrop-color: transparent;
   --card-bg-color: @nd_hover;
   --card-fg-color: @nd_text;
@@ -39,11 +41,11 @@
   --sidebar-bg-color: transparent;
   --sidebar-fg-color: @nd_text;
   --sidebar-backdrop-color: transparent;
-  --sidebar-border-color: @nd_border;
+  --sidebar-border-color: @nd_divider;
   --secondary-sidebar-bg-color: transparent;
   --secondary-sidebar-fg-color: @nd_text;
   --secondary-sidebar-backdrop-color: transparent;
-  --secondary-sidebar-border-color: @nd_border;
+  --secondary-sidebar-border-color: @nd_divider;
   --thumbnail-bg-color: @nd_hover;
   --thumbnail-fg-color: @nd_text;
 }
@@ -69,7 +71,8 @@
 @define-color view_fg_color @nd_text;
 @define-color headerbar_bg_color transparent;
 @define-color headerbar_fg_color @nd_text;
-@define-color headerbar_border_color @nd_border;
+@define-color headerbar_border_color @nd_divider;
+@define-color headerbar_shade_color @nd_divider;
 @define-color headerbar_backdrop_color transparent;
 @define-color card_bg_color @nd_hover;
 @define-color card_fg_color @nd_text;
@@ -80,9 +83,11 @@
 @define-color sidebar_bg_color transparent;
 @define-color sidebar_fg_color @nd_text;
 @define-color sidebar_backdrop_color transparent;
+@define-color sidebar_border_color @nd_divider;
 @define-color secondary_sidebar_bg_color transparent;
 @define-color secondary_sidebar_fg_color @nd_text;
 @define-color secondary_sidebar_backdrop_color transparent;
+@define-color secondary_sidebar_border_color @nd_divider;
 @define-color thumbnail_bg_color @nd_hover;
 @define-color thumbnail_fg_color @nd_text;
 
@@ -91,3 +96,9 @@ window.background { background-color: @nd_window; }
 
 /* The selected row in a sidebar or list: the theme's selected-row colour, as in the launcher (not accent at 10 %) */
 .navigation-sidebar > row:selected, row:selected { background-color: @nd_sel; color: @nd_accent; }
+
+/* The lines between the panes, under the header bar and between rows: the kit apps' divider (nd_divider), as in Mail,
+   not the menus' violet nd_border or libadwaita's text colour at 15 % */
+separator { background: @nd_divider; }
+.sidebar:not(separator) { border-color: @nd_divider; }
+columnview > listview.separators > row:not(.separator), listview.separators > row:not(.separator) { border-color: @nd_divider; }

@@ -19,8 +19,8 @@
 @define-color insensitive_fg_color @nd_dim;
 @define-color insensitive_base_color @nd_card;
 @define-color theme_unfocused_insensitive_color @nd_dim;
-@define-color borders @nd_border;
-@define-color unfocused_borders @nd_border;
+@define-color borders @nd_divider;
+@define-color unfocused_borders @nd_divider;
 @define-color warning_color @nd_warning;
 @define-color error_color @nd_danger;
 @define-color success_color @nd_ok;
@@ -41,9 +41,10 @@
 /* Adwaita draws most widgets with its own colours, not the names above: set the rules directly */
 /* One colour for the whole window, as in gtk-4.0/gtk.css: the look's background and opacity, with see-through panes */
 window, .background { background-color: @nd_window; color: @nd_text; }
-headerbar, .titlebar { background: transparent; color: @nd_text; border-color: @nd_border; box-shadow: none; }
+headerbar, .titlebar { background: transparent; color: @nd_text; border-color: @nd_divider; box-shadow: none; }
 textview, textview text, .view, .view text, iconview { background-color: transparent; color: @nd_text; }
-separator { background-color: @nd_border; }
+/* The lines between the panes and under the header bar: the kit apps' divider, as in gtk-4.0/gtk.css */
+separator { background-color: @nd_divider; }
 selection, *:selected { background-color: @nd_sel; color: @nd_accent; }
 
 button { background-image: none; background-color: @nd_hover; color: @nd_text; border-color: @nd_border;
@@ -58,7 +59,7 @@ button.flat:not(:hover):not(:checked):not(:active) { background-color: transpare
 
 /* Places sidebar (Recent, Home…) and the file list */
 placessidebar, placessidebar list, .sidebar, .sidebar list, stacksidebar list { background-color: transparent; color: @nd_text; }
-placessidebar, .sidebar { border-color: @nd_border; }
+placessidebar, .sidebar { border-color: @nd_divider; }
 placessidebar row:hover, .sidebar row:hover { background-color: @nd_hover; }
 placessidebar row:selected, .sidebar row:selected, list row:selected, row:selected,
 treeview.view:selected, .view:selected { background-color: @nd_sel; color: @nd_accent; }
