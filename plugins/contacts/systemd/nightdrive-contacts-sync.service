@@ -1,0 +1,14 @@
+# Contacts' sync (plugins/contacts): syncs every account in ~/.config/contacts/accounts.conf with
+# ~/.local/share/contacts, by vdirsyncer. Run by nightdrive-contacts-sync.timer and `contacts sync`.
+[Unit]
+Description=Nightdrive Contacts: sync contacts both ways (vdirsyncer)
+After=network-online.target
+# Contacts is installed before its account is set up: nothing to fetch until then
+ConditionPathExists=%h/.config/contacts/accounts.conf
+
+[Service]
+Type=oneshot
+# Skip the round while the login keyring is locked: a password-cmd's secret-tool would otherwise pop up gnome-keyring's
+# own password prompt (Mail's sync does the same, lib/keyring.py says why it's not a bare busctl)
+ExecCondition=/bin/sh -c '! %h/.local/bin/contacts keyring-locked'
+ExecStart=%h/.local/bin/contacts sync

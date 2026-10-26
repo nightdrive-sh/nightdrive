@@ -215,6 +215,8 @@ Item {
                       sub: "The calculator answers 3,5 instead of 3.5 (type either)", switchOn: launcher.prefs.comma }])
                 .concat(Plugins.has("deck") ? [{ kind: "lpref", key: "deck", name: "Include Deck artists, albums and songs", glyph: "disc-3",
                       sub: "Your shelf and Curated in the search, and a row to search Spotify", switchOn: launcher.prefs.deck }] : [])
+                .concat(Plugins.has("contacts") ? [{ kind: "lpref", key: "contacts", name: "Include contacts", glyph: "contact",
+                      sub: "People by name, company, address or number; Enter shows their numbers and addresses", switchOn: launcher.prefs.contacts }] : [])
         }
         if (level === "mousescroll") {
             const cur = Number(mouseScroll)

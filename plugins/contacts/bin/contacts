@@ -1,0 +1,147 @@
+#!/bin/bash
+# contacts: open Nightdrive Contacts and look after its sync and accounts (plugins/contacts, README.md).
+set -u
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/contacts
+ACCOUNTS=$CONFIG_DIR/accounts.conf                      # the user's accounts (README.md › Setting up an account)
+VDIRSYNCER_CONFIG=$CONFIG_DIR/vdirsyncer                # written from accounts.conf by lib/config.py
+DATA_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/contacts  # the vCards, a folder per account
+BASE_DIR=${XDG_STATE_HOME:-$HOME/.local/state}/contacts/base  # cards as they were before an edit (lib/edit.py, merge.py)
+SYNC_UNIT=nightdrive-contacts-sync.service              # systemd/, `contacts enable`
+SYNC_LOCK=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/contacts-sync.lock
+QS_DIR=$APP_DIR/app                                     # Contacts' own Quickshell config, apart from the desktop's shell
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+APP_TITLE=Contacts
+APP_IPC=contacts
+. "$QS_DIR/kit/app.sh"
+
+vds() { vdirsyncer -c "$VDIRSYNCER_CONFIG" "$@"; }
+
+# sync [--force-delete] [NAME…]: the accounts' address books and DATA_DIR in step, both ways, one sync at a time (the
+# timer's and yours wait for each other). --force-delete: an address book emptied here empties the server's too (the app
+# passes it when you deleted the last contact in one; vdirsyncer won't otherwise).
+sync_now() {
+  local force=()
+  [[ ${1:-} == --force-delete ]] && { force=(--force-delete); shift; }
+  [[ -f $ACCOUNTS ]] || { echo "No accounts yet: contacts setup, or README.md › Setting up an account." >&2; return 1; }
+  mkdir -p "$(dirname "$SYNC_LOCK")"
+  exec 9>"$SYNC_LOCK"
+  flock 9
+  local out
+  local -a names
+  out=$(python3 "$APP_DIR/lib/config.py" write) || return 1
+  mapfile -t names <<<"$out"
+  [[ -n $out ]] || names=()
+  (($#)) && names=("$@")
+  ((${#names[@]})) || { echo "No accounts in $ACCOUNTS." >&2; return 1; }
+  # discover finds an account's address books (and new ones later); it asks before making their folders, so say yes
+  yes | vds discover "${names[@]}" >/dev/null || return 1
+  vds sync "${force[@]}" "${names[@]}" || return 1
+  # iCloud's photos are apart from the cards, behind the sign-in: the new ones into the cache (a failure is only a photo)
+  python3 "$APP_DIR/lib/photos.py" fetch "${names[@]}" || echo "Some photos didn't come: they show at the next sync." >&2
+  # The edits are on the server now: what they were made over is no longer needed to merge
+  local name
+  for name in "${names[@]}"; do rm -rf "${BASE_DIR:?}/$name"; done
+}
+
+# accounts: each one with its number of contacts here
+list_accounts() {
+  local name n
+  [[ -f $ACCOUNTS ]] || { echo "No accounts yet."; return 0; }
+  while read -r name; do
+    n=$(find "$DATA_DIR/$name" -name '*.vcf' 2>/dev/null | wc -l)
+    printf '%-16s %s contacts\n' "$name" "$n"
+  done < <(python3 "$APP_DIR/lib/config.py" names)
+}
+
+# Puts Contacts among the desktop's apps (share/contacts.desktop); link.sh has put `contacts` in ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/contacts.svg" "$icons/nightdrive-contacts.svg"
+  sed "s|^Exec=contacts|Exec=$HOME/.local/bin/contacts|" "$APP_DIR/share/contacts.desktop" > "$apps/nightdrive-contacts.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  echo "Installed: $apps/nightdrive-contacts.desktop"
+}
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  rm -f "$data/applications/nightdrive-contacts.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-contacts.svg"
+}
+
+# The sync's units in the plugin's folder, enabled by their path (as Mail's: that links them again after a disable)
+enable() {
+  install_app
+  systemctl --user link "$APP_DIR/systemd/$SYNC_UNIT" >/dev/null
+  systemctl --user enable --now "$APP_DIR/systemd/${SYNC_UNIT%.service}.timer"
+}
+disable() {
+  systemctl --user disable --now "${SYNC_UNIT%.service}.timer" 2>/dev/null
+  uninstall_app
+  echo "The sync is off. Your contacts stay in $DATA_DIR and your accounts in $ACCOUNTS."
+}
+
+# Setting up an account with Claude: Claude Code in a terminal goes through README.md › Setting up an account with you.
+# The password goes in by a command you run yourself (! secret-tool …), so it never passes through Claude.
+setup() {
+  local claude=$HOME/.local/bin/claude
+  [[ -x $claude ]] || claude=$(command -v claude) || { echo "Claude Code is not installed: README.md › Setting up an account has the steps." >&2; return 1; }
+  # Clear inherited CLAUDE* variables, so the new Claude doesn't think it's a child session (as terminal-or-claude does)
+  for v in $(compgen -e | grep '^CLAUDE'); do unset "$v"; done
+  local prompt="Set up my contacts for Nightdrive Contacts, by the steps in $APP_DIR/README.md, section \"Setting up an account\". \
+Read it first, then go through it with me one step at a time, saying in plain words what each step is for. Contacts' plugin \
+is installed. Start by asking where my contacts are (iCloud, Google or another CardDAV server) and the account's address. \
+Never ask me to type a password into this chat: give me the secret-tool command to run myself with ! in front of it, which \
+asks for the password in the terminal. If I already use Nightdrive Mail with the same account, its keyring entry may do \
+(the README says when). If $ACCOUNTS is already there, add to it instead of replacing it. Finish with \`contacts sync\` and \
+\`contacts accounts\`, then \`contacts enable\`. Once that account works, ask whether I want to add another one."
+  setsid -f "$HOME/.config/hypr/scripts/terminal" --dir "$HOME" -- "$claude" -- "$prompt" >/dev/null 2>&1
+}
+
+usage() {
+  cat <<USAGE
+Usage: contacts [command]
+
+  (none), open   open Contacts, or bring it forward if it is open
+  search TEXT    open Contacts on what a search finds
+  show WHO       open the card of WHO: a card's id (as \`people\` gives it), an email address or a number
+  new [NAME] [EMAIL]
+                 a new contact in the editor, with these filled in (Mail's Add to contacts)
+  people         everyone as JSON (name, emails, numbers, addresses), for Mail and the launcher
+  settings       open Contacts' settings (launcher › Settings › Apps › Contacts)
+  setup          set up an account with Claude, in a terminal
+  sync [NAME…]   sync the contacts of every account (or these) now, both ways
+                 (--force-delete first: an address book emptied here empties the server's too)
+  accounts       the accounts and how many contacts each has here
+  enable         Contacts among the desktop's apps, and the sync every 30 minutes (the installer)
+  disable        take them away again (your contacts and accounts stay)
+  restart        close and open again (after a change to the app)
+  quit           close Contacts
+  log            follow the app's log (QML errors show up here)
+  keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
+  vdirsyncer …   vdirsyncer with Contacts' config, for a closer look
+  help           this text
+USAGE
+}
+
+case ${1:-open} in
+  search)    open_ready; ipc search "${*:2}" ;;
+  show)      open_ready; ipc card "${2:-}" ;;   # not "show": qs ipc takes that for its own command
+  new)       open_ready; ipc createWith "${2:-}" "${3:-}" ;;
+  people)    python3 "$APP_DIR/lib/cards.py" people ;;
+  sync)      sync_now "${@:2}"; status=$?; running && ipc refresh; exit $status ;;
+  accounts)  list_accounts ;;
+  setup)     setup ;;
+  enable)    enable ;;
+  disable)   disable ;;
+  keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
+  vdirsyncer) python3 "$APP_DIR/lib/config.py" write >/dev/null && vds "${@:2}" ;;
+  help|-h|--help) usage ;;
+  *)
+    app_command "$@"; status=$?        # open (the default), settings, restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac

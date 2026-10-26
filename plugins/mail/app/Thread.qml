@@ -306,9 +306,28 @@ Flickable {
                                 text: app.fullDate(modelData.timestamp); color: c.faint; font.family: c.font; font.pixelSize: 12
                             }
                         }
-                        Text {
-                            width: parent.width; elide: Text.ElideRight
-                            text: app.address(modelData.from); color: c.faint; font.family: c.font; font.pixelSize: 12
+                        // The address, and with Nightdrive Contacts the sender's card: opened, or made (Add to contacts)
+                        Item {
+                            id: fromLine
+                            readonly property string addr: app.address(modelData.from) || modelData.from.trim()
+                            readonly property bool known: app.book.known(addr)
+                            width: parent.width; height: addrText.implicitHeight
+                            Text {
+                                id: addrText
+                                width: Math.min(implicitWidth, parent.width - (bookButton.visible ? bookButton.width + 6 : 0))
+                                elide: Text.ElideRight
+                                text: app.address(modelData.from); color: c.faint; font.family: c.font; font.pixelSize: 12
+                            }
+                            AppIconButton {
+                                id: bookButton
+                                visible: app.book.available && fromLine.addr.indexOf("@") > 0
+                                anchors.left: addrText.right; anchors.leftMargin: 6; anchors.verticalCenter: addrText.verticalCenter
+                                implicitWidth: 22; implicitHeight: 22
+                                c: root.c
+                                glyph: fromLine.known ? "contact" : "user-plus"; glyphSize: 13; glyphColor: c.faint
+                                tip: fromLine.known ? "Open in Contacts" : "Add to contacts"
+                                onClicked: fromLine.known ? app.book.show(fromLine.addr) : app.book.add(app.name(modelData.from), fromLine.addr)
+                            }
                         }
                         Text {
                             visible: !head.wide

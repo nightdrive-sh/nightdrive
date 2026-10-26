@@ -63,16 +63,16 @@ PanelWindow {
     property string armed: ""                 // action awaiting confirmation
     readonly property var detail: details.item   // Install / Remove: the row whose details are shown (DetailCard.qml), null = none
     readonly property int detailWidth: 860    // the card's width while showing them
-    // Settings › Launcher: { fuzzy, shortcuts, deck, comma } in ~/.local/state/nightdrive/launcher.json (missing = on; deck, the
-    // music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for)
-    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false })
+    // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts } in ~/.local/state/nightdrive/launcher.json (missing = on;
+    // deck, the music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for)
+    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true })
     readonly property string prefsFile: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
     FileView {
         path: win.prefsFile; watchChanges: true; onFileChanged: reload(); printErrors: false
         onLoaded: {
             let v = {}
             try { v = JSON.parse(text()) || {} } catch (e) {}
-            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true }
+            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true, contacts: v.contacts !== false }
             if (JSON.stringify(n) !== JSON.stringify(win.prefs)) win.prefs = n
         }
     }
@@ -240,8 +240,9 @@ PanelWindow {
         appsettings: defs.settingsItems.concat(akeys.settingsItems, [
             { kind: "nav", name: "Startup", glyph: "rocket", target: "startup" },
             { kind: "nav", name: "Nightdrive apps", glyph: "app-window", target: "ndapps", summary: "on or off" }   // InstallLevels.qml
-        ], behave.browserItems.length || home.settingsItems.length || Plugins.has("mail") ? [{ kind: "header", name: "Installed apps" }] : [],
+        ], behave.browserItems.length || home.settingsItems.length || Plugins.has("mail") || Plugins.has("contacts") ? [{ kind: "header", name: "Installed apps" }] : [],
            behave.browserItems.concat(home.settingsItems,
+               Plugins.has("contacts") ? [{ kind: "action", name: "Contacts", glyph: "contact", cmd: [Quickshell.env("HOME") + "/.local/bin/contacts", "settings"] }] : [],
                Plugins.has("mail") ? [{ kind: "action", name: "Mail", glyph: "mail", cmd: [Quickshell.env("HOME") + "/.local/bin/nightmail", "settings"] }] : [])
                .map(t => Object.assign({}, t, { appName: t.name }))),   // an app's own: "Mail settings" in the root search
         power: [
