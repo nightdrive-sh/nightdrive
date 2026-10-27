@@ -1,13 +1,14 @@
 #!/usr/bin/python3 -I
-"""Makes the notification sounds (regular/*.wav, urgent/*.wav), agent-warn's (agent/*.wav), Mail's (mail/*.wav) and
-the login screen's sounds (keys/*.wav) from scratch: no samples, so no licences to track.
+"""Makes the notification sounds (regular/*.wav, urgent/*.wav), agent-warn's (agent/*.wav), Mail's (mail/*.wav), the
+login screen's sounds (keys/*.wav) and the desktop's (system/*.wav, made in system.py) from scratch: no samples, so no
+licences to track.
 
   python3 sounds/generate.py      rewrites the .wav files next to this script
 
 Soft sine/synth tones with a little room. Regular ones peak at -18 dBFS (noticed, not startling), urgent at -12 dBFS.
 hypr/scripts/sounds picks and plays them.
 """
-import math, os, random, struct, wave
+import math, os, random, struct, sys, wave
 
 SR = 48000
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -252,3 +253,8 @@ if __name__ == "__main__":
     for name, (make, peak) in KEYS.items():
         write(os.path.join(HERE, "keys", name + ".wav"), make(), peak)
         print(f"keys/{name}.wav")
+    sys.path.insert(0, HERE)  # -I leaves this folder out
+    import system  # here, as it builds on this file's functions
+    for name, (make, peak) in system.SYSTEM.items():
+        write(os.path.join(HERE, "system", name + ".wav"), make(), peak)
+        print(f"system/{name}.wav")
