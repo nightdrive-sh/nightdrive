@@ -305,9 +305,13 @@ Rectangle {
                 const sc = Math.min(1, 160 / shotClip.width)
                 shotClip.grabToImage(r => shot.Drag.imageSource = r.url, Qt.size(shotClip.width * sc, shotClip.height * sc))
             }
-            onHeightChanged: grabIcon()
             ClippingRectangle {
                 id: shotClip
+                // Grabbed once the clip has its size, not on the preview's own height: that comes first, while the
+                // clip's width (bound to it) is still 0, and the grab was skipped (the popup's preview had no icon).
+                // callLater: one grab for a width and height that change together.
+                onWidthChanged: Qt.callLater(shot.grabIcon)
+                onHeightChanged: Qt.callLater(shot.grabIcon)
                 width: Math.min(parent.width, parent.height / Math.max(shot.ar, 0.001)); height: parent.height
                 radius: 6
                 color: "transparent"
@@ -320,7 +324,7 @@ Rectangle {
                     source: card.row.preview ? card.row.image : ""
                     sourceSize.width: 600
                     asynchronous: true
-                    onStatusChanged: shot.grabIcon()
+                    onStatusChanged: Qt.callLater(shot.grabIcon)
                 }
             }
         }
