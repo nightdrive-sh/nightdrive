@@ -229,7 +229,7 @@ edition would have: it boots to the login screen, the firewall has the desktop's
 and AirPlay are reached), and SSH is off until you turn on Remote login (Launcher › Settings), unless you install over
 ssh. Claude Code, Tailscale, Mail, Contacts and Deck come with every install, like the rest of the desktop: each stays quiet until
 you set it up. The optional parts that are on by default (Apostrophe, YouTube) come too, and the rest can be added later from the
-Launcher (System › Install) or with `nightdrive plugins install ID`.
+Launcher (System › Install) or with `nightdrive plugins install ID` (`nightdrive apps install garage` for an app).
 
 To pick the optional parts yourself, run `./install.sh --choose`: it lists them first (a number toggles one, Enter
 continues):
@@ -389,6 +389,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
 | `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also launcher › Settings › Top bar › Date format |
+| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Garage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
 | `nightdrive plugins` | Optional parts and whether each is installed and on; `nightdrive plugins install home-assistant` runs one's installer |
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the launcher) |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |

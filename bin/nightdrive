@@ -35,9 +35,13 @@ usage() {
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
   row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --effort LEVEL, --background, --workspace WS)"
   row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
+  section "Apps"
+  row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Garage), and which are installed"
+  row "apps install NAME"        "Install one, or again after removing it, e.g. nightdrive apps install garage"
+  row "apps off|on NAME"         "Hide an installed one from the desktop and stop its services, or bring it back"
   section "Plugins"
   row "plugins [list]"           "Optional parts, and which are installed, on or off"
-  row "plugins install NAME"     "Install one, e.g. nightdrive plugins install deck"
+  row "plugins install NAME"     "Install one, e.g. nightdrive plugins install home-assistant"
   row "plugins off|on NAME"      "Hide an installed one from the desktop and stop its services, or bring it back"
   row "plugins add GIT-URL [ID]" "Add one from elsewhere (an external plugin; install it afterwards)"
   row "plugins remove NAME"      "Turn an external one off and delete its folder"
@@ -530,9 +534,10 @@ plugins() {
   done <<<"$rows"
   rm -rf "$tmp"
 }
-# `nightdrive plugins` on a terminal: one line each with its state (the launcher and scripts get the fields above)
+# `nightdrive plugins` on a terminal: one line each with its state (the launcher and scripts get the fields above).
+# With a group (app), only that group's.
 plugins_table() {
-  plugins | awk -F'\t' '{ st = $7 == 1 ? ($10 == 1 ? "off" : "on") : ($10 == 1 ? "not installed, off" : "not installed")
+  plugins | awk -F'\t' -v g="${1:-}" 'g != "" && $8 != g { next } { st = $7 == 1 ? ($10 == 1 ? "off" : "on") : ($10 == 1 ? "not installed, off" : "not installed")
                           v = ""; if ($9 != "") { f = $9 "/plugin.conf"                # a folder: its version
                             while ((getline line < f) > 0) if (line ~ /^version=/) v = substr(line, 9); close(f) }
                           l = sprintf("%-18s %-26s %-8s %-14s %s", $1, $2, v, st, $11 == "external" ? "external: " $9 : ""); sub(/ +$/, "", l); print l }'
@@ -553,6 +558,11 @@ plugins_installed() {
     [[ $old != __none__ && -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && hyprctl reload >/dev/null 2>&1
   fi
   printf '%s\n' "$ids" | sed '/^$/d'
+}
+# `nightdrive apps`: plugins' commands for Nightdrive's own apps (group=app) only; plugins will take others' too
+app_only() {
+  plugin_rows | awk -F'\x1f' -v n="${1,,}" 'n != "" && (tolower($1) == n || tolower($2) == n) && $8 == "app" { f = 1 } END { exit !f }' ||
+    { echo "Unknown app: ${1:-} (see: nightdrive apps)" >&2; exit 1; }
 }
 # Runs a plugin's installer (by id or name) in its folder (the repo for plugins.txt), then refreshes the list. One that
 # is off is turned on first: installing it again means it's wanted (and its unit could not start while off).
@@ -758,6 +768,12 @@ case ${1:-} in
              bump) exec "$scripts/plugin-version" bump "${@:3}" ;;      # plugins/README.md › Versions
              *) usage >&2; exit 1 ;;
            esac ;;
+  apps) case ${2:-list} in
+          list) if [[ -t 1 ]]; then plugins_table app; else plugins | awk -F'\t' '$8 == "app"'; fi ;;
+          install) app_only "${3:-}"; plugin_install "$3" ;;
+          off|on) app_only "${3:-}"; plugin_switch "$2" "$3" ;;
+          *) usage >&2; exit 1 ;;
+        esac ;;
   plugin) case ${2:-} in
             check) exec "$scripts/plugin-check" "${@:3}" ;;             # all of them without a name
             *) usage >&2; exit 1 ;;

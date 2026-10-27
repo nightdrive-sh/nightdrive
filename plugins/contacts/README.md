@@ -31,7 +31,7 @@ If the same contact was changed on the phone too before the change here reached 
 
 Contacts reads your accounts from `~/.config/contacts/accounts.conf`, one section each, and signs in with an app password kept in the login keyring. Claude can do these steps with you: Contacts' first start offers it, and so do Welcome to Nightdrive (launcher › System › Set up Nightdrive) and `contacts setup`, which open Claude Code in a terminal and go through them a step at a time. Your password goes only into the login keyring, by a command you run yourself. Without Claude, Welcome shows the steps one at a time.
 
-1. Contacts comes with Nightdrive. If you removed it, install it again (launcher › System › Install › Recommended › Contacts, or `nightdrive plugins install contacts`): it installs vdirsyncer, python3-vobject, libsecret (secret-tool) and ImageMagick (for iCloud's photos).
+1. Contacts comes with Nightdrive. If you removed it, install it again (launcher › System › Install › Recommended › Contacts, or `nightdrive apps install contacts`): it installs vdirsyncer, python3-vobject, libsecret (secret-tool) and ImageMagick (for iCloud's photos).
 
 2. Make an app password for Contacts in your account's settings, as mail apps need:
    - iCloud: [account.apple.com](https://account.apple.com) › Sign-In and Security › App-Specific Passwords.
