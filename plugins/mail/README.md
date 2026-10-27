@@ -1,57 +1,71 @@
 # Mail
 
-A quiet mail client: folders, the thread list and the open thread, nothing else on screen. New mail arrives as a notification you can answer from, and Claude can write a reply for you to read before anything is sent. Your mail stays in a folder on your computer (fetched with mbsync, searched with notmuch), so it opens at once and works offline.
+A quiet mail client for the keyboard. New mail arrives as a notification you can answer from, and Claude writes a reply for you to read before it goes. Your mail stays on your computer, so it opens at once and works offline.
 
 ## Reading
 
-- Press `?` (or Ctrl+?) in Mail to see its keys. The ⌘ keys follow Mac Mail; on a PC keyboard they are Ctrl (Ctrl+R, Ctrl+N…), as in Thunderbird and Outlook.
-- ↑ / ↓ or `j` / `k` move in the list, as in Mac Mail, and `Space` and ⇧Space page through the message. `/` or ⌘F searches (notmuch's query syntax), `Esc` clears the search.
-- `1`–`6` or Ctrl+↑ / Ctrl+↓ pick a folder: Inbox, Sent, Drafts, Archive, Spam, Trash. ⌘B hides the folders.
-- In a narrow window the folders hide by themselves (⌘B shows them), and narrower still the list and the thread take turns: a click, `Enter` or → opens the thread, `Esc`, ← or the arrow above it goes back to the list. With the list alone, the arrows (and PgUp / PgDn) move in it without opening anything, so nothing is marked read on the way; with the thread alone, they scroll it and `j` / `k` (or ⌥↑ / ⌥↓) go to the next thread.
-- With more than one account, each has its own folders: Ctrl+Tab / Ctrl+⇧Tab (or a click on an address in the bar at the foot of the folders) shows the next one. A notification's message opens in its own account.
-- `Tab` / ⇧Tab move the keys to the folders and back to the list: there ↑ / ↓ pick a folder, and `Esc` or `Enter` go back too.
-- In a thread of three messages or more, the read ones before the last show as one line each (who, the first line, when): a click opens one. The quote at the end of a message hides behind `•••` when all of it is in an earlier message of the thread; when any of it isn't, it shows.
-- `h` shows a message as text, as HTML on the dark page, or as HTML on light paper as it was sent; which one comes first is a setting (text by default). Remote images stay off. A link opens in your browser, a mailto: link as a new message; other kinds (file:, smb:, an app's own) don't open from a message.
-- `⇧H` (or the button beside it) opens the HTML in your browser, where newsletters laid out in tables look as they were meant to. The page loads nothing from the network: no remote images, fonts or scripts, so the sender can't tell you opened it. Pictures sent with the message show, and links open when you click them. When the message has remote images, a bar at the top says so: Load images opens the page again with them (still without scripts).
-- `Enter` or a double click opens the thread in a window of its own (in Drafts, it goes on writing the draft). Opening an unread thread marks it read; `u` marks it unread again (and read again after that). ⇧U (or ✓ beside a folder's unread count) marks the whole folder read, or with a search on, what it found; ⌘Z takes it back.
-- The buttons above a message do the same with the mouse: Reply, Reply with Claude, Forward, Archive, Delete and Spam. Held under the pointer, a button shows its key. With several threads selected, the rows in the reading pane are buttons too.
-- `a` archives, `d` or Delete (⌫) moves to Trash, `!` marks spam (in Spam: not spam, back to the Inbox), ⌘Z undoes them. The next sync makes the same move on the server, so your phone and webmail see it too.
-- ⇧-click, ⇧↑ / ⇧↓ or ⌘A select several threads, Ctrl-click adds one or leaves it out: archive, delete, spam, `u` and a drag then move or mark them all, and ⌘Z takes them all back. `Esc` selects only one again.
-- In Trash, `d` (or ⌫) deletes a thread for good, and ⌘⇧⌫ (or Empty Trash under the list) empties it. Both ask first, as there is no ⌘Z for them; the next sync deletes them on the server too.
-- A message (or the selected ones) dragged sideways from the list onto Inbox, Archive, Spam or Trash moves there in the same way (⌘Z undoes it too).
-- Attachments show under their message: a click opens one, Save puts it in Downloads, and Save all (with two or more) puts them all there.
-- With Nightdrive Contacts, a button beside the sender's address opens their card in Contacts, or, for someone not in your contacts, Add to contacts: a new contact with their name and address, for you to finish and save.
+| Keys | |
+| --- | --- |
+| `?` | Mail's keys. The ⌘ keys follow Mac Mail; on a PC keyboard they are Ctrl |
+| ↑ ↓ or `j` `k` | Move in the list |
+| `Space` ⇧Space | Page through the message |
+| `/` or ⌘F | Search (notmuch's query syntax); `Esc` clears it |
+| `1`–`6` or Ctrl+↑ Ctrl+↓ | Inbox, Sent, Drafts, Archive, Spam, Trash |
+| ⌘B | Hide or show the folders |
+| `Tab` ⇧Tab | Keys to the folders and back |
+| Ctrl+Tab Ctrl+⇧Tab | The next account |
+| `Enter` | The thread in a window of its own (in Drafts, the draft) |
+| `h` | Text, HTML on the dark page, or HTML as it was sent |
+| ⇧H | The HTML in your browser, with nothing loaded from the network |
+| `u` ⇧U | Mark unread; mark the whole folder (or what a search found) read |
+| `a` `d` `!` | Archive, Trash, spam (in Spam: not spam) |
+| ⌘Z | Undo |
+| ⇧↑ ⇧↓ ⌘A | Select several threads (Ctrl-click adds one) |
+| ⌘⇧⌫ | In Trash: empty it (`d` there deletes one for good) |
+
+- The next sync makes every move on the server too, so your phone sees it.
+- In a narrow window the list and the thread take turns: `Enter` or → opens the thread, `Esc` or ← goes back. Moving in the list marks nothing read.
+- In a long thread, the read messages fold to one line each, and a quote that is all in an earlier message hides behind `•••`.
+- Remote images stay off, and so does the sender's tracking. In the browser (⇧H), Load images brings them, still without scripts.
+- With Nightdrive Contacts, a button beside the sender opens their card, or adds them.
 
 ## Writing
 
-- `c` or ⌘N writes a new message, `r` replies to all, ⇧R to the sender only, `f` forwards (with the attachments).
-- A reply or a forward goes from the account the message came to, a new message from the account shown. With more than one account, a click on From changes it.
-- Your signature (`signature` in `account.conf`, below) is put under what you write, above the quote.
-- Writing opens in a window of its own: Ctrl+Enter sends, ⌘S saves it in Drafts. Sending closes the window at once and goes on in the background: "Sending…" shows at the right of the sidebar's title, and a sound plays the moment you send (not under Do Not Disturb). A message that can't be sent is kept in Drafts, and the same place says "Not sent": a click on it tells why, with buttons to try again or to open it; with Mail closed (a mailto: link), a notification does. `Esc` closes it (a message saved before is saved again; with something new written, the second `Esc` throws it away). Closing the window with ⌘W keeps what you wrote in Drafts.
-- To and Cc offer the addresses in your mail as you type, the ones you use most first: ↑ / ↓ choose, `Tab` or `Enter` takes one. With Nightdrive Contacts, your contacts' addresses come first, by the names they have there, and so do those you haven't written to yet.
-- ⌘⇧A or Attach picks files to attach, files dropped on the window are attached too, and × takes one off.
-- Mail opens mailto: links when you pick it as the email app (launcher › Settings › Apps › Default apps): then Hyper E opens Mail too.
+| Keys | |
+| --- | --- |
+| `c` or ⌘N | New message |
+| `r` ⇧R | Reply to all; to the sender only |
+| `f` | Forward, with the attachments |
+| Ctrl+Enter | Send |
+| ⌘S | Save in Drafts |
+| ⌘⇧A | Attach files (or drop them on the window) |
+| `Esc` | Close: saved again if it was saved before, a new one thrown away on the second `Esc` |
+
+- Sending goes on in the background. A message that can't be sent stays in Drafts, and "Not sent" in the sidebar tells why.
+- A reply goes from the account the message came to; a click on From changes it. Your signature (`signature` in `account.conf`, below) goes above the quote.
+- To and Cc suggest addresses from your mail, and from Nightdrive Contacts.
+- Picked as the email app (Launcher › Settings › Apps › Default apps), Mail opens mailto: links, and Hyper E opens it.
 
 ## Claude writes the reply
 
-- ⌘⇧C on a message has Claude write the reply, in the message's language, signed with your first name (with a signature of your own, Claude leaves the end to it). In the writing window, ⌘⇧C writes out what you started: select your draft (a start, a few points, "say yes, but next week") and Claude's reply takes its place.
-- The reply shows first in a card in the middle of the writing window, with what Claude read: `Enter` puts it in place, ⌘⇧C writes another version, `Esc` cancels. Nothing is sent before you press Ctrl+Enter.
-- What Claude reads is your choice, asked the first time you press ⌘⇧C: the whole thread (the best replies), or only the text you select, so the thread stays on your computer. Settings (⌘,) changes it later.
-- It needs Claude Code signed in (`claude`): the reply is written by `claude -p` with no tools, not even your MCP servers or claude.ai connectors, so a message can't steer it into using them.
+- ⌘⇧C on a message has Claude write the reply, in the message's language. In the writing window, select a draft of your own ("say yes, but next week") and ⌘⇧C writes it out.
+- The reply shows first, with what Claude read: `Enter` puts it in place, ⌘⇧C writes another, `Esc` cancels. Nothing is sent before Ctrl+Enter.
+- The first ⌘⇧C asks what Claude reads: the whole thread (the best replies), or only the text you select. Settings (⌘,) changes it.
+- It needs Claude Code signed in. The reply is written by `claude -p` with no tools, not even your MCP servers or connectors, so a message can't steer it into using them.
 
 ## Notifications
 
-- New unread mail in the inbox gets a notification with Reply, Reply with Claude, Archive and Delete (as `a` and `d` in Mail); a click opens the message in Mail. More than three at once come as one notification that counts them.
-- They come after each sync even when Mail is closed: notmuch's post-new hook runs `nightmail notify`. A hook of your own is left alone; add `nightmail notify` to it yourself.
-- Mail in an inbox comes within seconds: a connection to each account waits for the server to say a message has arrived (IMAP IDLE, `nightmail push`), and then fetches that inbox alone. The other folders, and an account whose server can't do that, sync every 5 minutes. Gmail can tell of new mail up to a minute late.
+- New mail in the inbox gets a notification with Reply, Reply with Claude, Archive and Delete, also with Mail closed. More than three at once come as one.
+- Inbox mail arrives within seconds (IMAP IDLE); the other folders, and a server without IDLE, sync every 5 minutes.
+- Notmuch's post-new hook runs `nightmail notify`. A hook of your own is left alone: add `nightmail notify` to it.
 
 ## Settings
 
-⌘, (or the gear that shows when the pointer is over the sidebar's title, or launcher › Settings › Apps › Mail): whether writing and message windows float (the default) or open in the grid beside Mail, how a message opens (text, HTML on the dark page, or HTML as it was sent), and what Claude reads. They are kept in `~/.config/nightmail/settings.json`. Mail's colours follow the desktop's theme.
+⌘, (or Launcher › Settings › Apps › Mail): whether writing and message windows float or open beside Mail, how a message opens, and what Claude reads. Kept in `~/.config/nightmail/settings.json`.
 
 ## Setting up an account
 
-Mail reads the mail that mbsync has fetched into `~/Mail` and notmuch has indexed, and sends through your provider's SMTP server. These steps set up one account; each command can be run as it is, after putting your own values in place of the examples (you@example.com, mail.example.com, the account name `example`). Claude can do them with you: Mail's first start, before an account, offers Set up with Claude, which opens Claude Code in a terminal to go through them a step at a time and then offers to add more accounts (`nightmail setup` does the same, and so do Welcome to Nightdrive, launcher › System › Set up Nightdrive, and asking Claude to set up Nightdrive Mail by this page). Your password goes only into the login keyring, by a command you run yourself.
+Mail reads the mail that mbsync has fetched into `~/Mail` and notmuch has indexed, and sends through your provider's SMTP server. These steps set up one account; each command can be run as it is, after putting your own values in place of the examples (you@example.com, mail.example.com, the account name `example`). Claude can do them with you: Mail's first start, before an account, offers Set up with Claude, which opens Claude Code in a terminal to go through them a step at a time and then offers to add more accounts (`nightmail setup` does the same, and so do Welcome to Nightdrive, Launcher › System › Set up Nightdrive, and asking Claude to set up Nightdrive Mail by this page). Your password goes only into the login keyring, by a command you run yourself.
 
 1. Mail comes with Nightdrive; on an install without it, `nightdrive apps install mail` installs it: notmuch, isync (mbsync), libsecret (secret-tool) and zenity, and it says what is still missing. Many providers want an app password for mail apps (Gmail, iCloud, Fastmail): make one in the provider's account settings first.
 
