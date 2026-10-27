@@ -109,22 +109,20 @@ fetch() {
 # msgid, account, hint, thread, sent, accept) and the answer stay in a folder only you can read.
 CLAUDE_DIR=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/mail-claude
 
-# ask-claude TITLE X Y REQUEST: X Y in the window titled TITLE (the writing window), as Mail sees them
+# ask-claude TITLE REQUEST: the card opens in the middle of the window titled TITLE (the writing window)
 ask_claude() {
-  local title=$1 x=$2 y=$3 at
+  local title=$1 win
   rm -rf "$CLAUDE_DIR"; mkdir -p -m 700 "$CLAUDE_DIR"
-  printf '%s' "$4" >"$CLAUDE_DIR/request.json"
-  # The card opens by the desktop's coordinates: the window's place, or the mouse's while it isn't mapped yet
-  at=$(hyprctl -j clients 2>/dev/null | jq -c --argjson pid "$(pid)" --arg t "$title" \
-         '[.[] | select(.pid == $pid and .title == $t)] | first | .at // empty')
-  if [[ -n $at ]]; then
-    x=$(jq -n --argjson a "$at" --argjson x "$x" '$a[0] + $x'); y=$(jq -n --argjson a "$at" --argjson y "$y" '$a[1] + $y')
-  else
-    read -r x y < <(hyprctl -j cursorpos | jq -r '"\(.x) \(.y)"')
-  fi
+  printf '%s' "$2" >"$CLAUDE_DIR/request.json"
+  # The window's place and size on the desktop, or the active window's while it isn't mapped yet
+  local box='{ x: .at[0], y: .at[1], w: .size[0], h: .size[1] }'
+  win=$(hyprctl -j clients 2>/dev/null | jq -c --argjson pid "$(pid)" --arg t "$title" \
+          "[.[] | select(.pid == \$pid and .title == \$t)] | first | if . then $box else empty end")
+  [[ -z $win ]] && win=$(hyprctl -j activewindow 2>/dev/null | jq -c "if .at then $box else {} end")
+  [[ -z $win ]] && win='{}'
   local self=$APP_DIR/bin/nightmail
-  jq -n --argjson x "$x" --argjson y "$y" --slurpfile r "$CLAUDE_DIR/request.json" --arg self "$self" --arg dir "$CLAUDE_DIR" \
-     '{ x: $x, y: $y, sent: $r[0].sent, accept: $r[0].accept, chars: 0,
+  jq -n --argjson win "$win" --slurpfile r "$CLAUDE_DIR/request.json" --arg self "$self" --arg dir "$CLAUDE_DIR" \
+     '{ window: $win, sent: $r[0].sent, accept: $r[0].accept, chars: 0,
         draft: [$self, "claude-draft", $dir], reply: [$self, "claude-reply", $dir], cancel: [$self, "claude-cancel", $dir] }' \
      >"$CLAUDE_DIR/meta.json"
   qs ipc call write ask "$CLAUDE_DIR" >/dev/null 2>&1 || echo '{"error": "The Claude card did not open (is the desktop shell running?)"}'
@@ -227,7 +225,7 @@ case ${1:-open} in
   fetch)     fetch "${@:2}" ;;
   keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
   push)      exec python3 "$APP_DIR/lib/push.py" ;;
-  ask-claude)    ask_claude "$2" "$3" "$4" "$5" ;;   # Mail's ⌘⇧C (the commands below are the card's)
+  ask-claude)    ask_claude "$2" "$3" ;;   # Mail's ⌘⇧C (the commands below are the card's)
   claude-draft)  claude_draft "$2" ;;
   claude-reply)  claude_reply "$2" ;;
   claude-cancel) claude_cancel "$2" ;;

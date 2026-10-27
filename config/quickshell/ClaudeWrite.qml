@@ -16,8 +16,8 @@ import Quickshell.Wayland
 //   qs ipc call write open <dir>   (dir: the script's selection and meta.json)
 //   qs ipc call write again
 //   qs ipc call write close         as Esc (for testing: the card takes the keyboard)
-//   qs ipc call write ask <dir>    another app's request (Mail's reply, plugins/mail): dir/meta.json { x, y (the
-//                                  desktop's coordinates), sent (the line saying what goes to Claude), accept (Enter's
+//   qs ipc call write ask <dir>    another app's request (Mail's reply, plugins/mail): dir/meta.json { window (its
+//                                  { x, y, w, h } on the desktop: the card goes in its middle), sent (the line saying what goes to Claude), accept (Enter's
 //                                  hint), draft, reply, cancel (commands, as lists) }. draft prints {text, sent} or
 //                                  {error}; Enter writes dir/result and runs reply instead of pasting; cancel, if given,
 //                                  runs on Esc or a click outside
@@ -52,7 +52,7 @@ PanelWindow {
         selection = meta.draft || typed ? "" : selFile.text()
         sent = meta.draft ? meta.sent || "" : selection
         // The screen the text is on: the caret's or the window's middle, else the focused one
-        const w = meta.window, px = w ? w.x + w.w / 2 : meta.x || 0, py = w ? w.y + w.h / 2 : meta.y || 0
+        const w = meta.window && meta.window.w ? meta.window : null, px = w ? w.x + w.w / 2 : meta.x || 0, py = w ? w.y + w.h / 2 : meta.y || 0
         const f = Hyprland.focusedMonitor
         screen = Quickshell.screens.find(s => px >= s.x && px < s.x + s.width && py >= s.y && py < s.y + s.height)
               || (f && Quickshell.screens.find(s => s.name === f.name)) || Quickshell.screens[0]
@@ -189,14 +189,14 @@ PanelWindow {
         else if (a === "write") write()
     }
 
-    // By the app's caret (meta.x, meta.y: Mail's), else in the middle of the window (meta.window: the script's)
+    // In the middle of the window (meta.window: the script's, or the app's that asked), else by a caret (meta.x, meta.y)
     readonly property real sx: screen ? screen.x : 0
     readonly property real sy: screen ? screen.y : 0
     ClaudeWritePlace {
         id: place
         atLine: !win.meta.window && win.meta.x !== undefined
         line: place.around((win.meta.x || 0) - win.sx, (win.meta.y || 0) - win.sy)
-        window: win.meta.window ? Qt.rect(win.meta.window.x - win.sx, win.meta.window.y - win.sy, win.meta.window.w, win.meta.window.h)
+        window: win.meta.window && win.meta.window.w ? Qt.rect(win.meta.window.x - win.sx, win.meta.window.y - win.sy, win.meta.window.w, win.meta.window.h)
                                 : Qt.rect(0, 0, 0, 0)
         screenWidth: win.width; screenHeight: win.height
         width: card.width; height: card.height

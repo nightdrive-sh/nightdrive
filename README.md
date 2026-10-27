@@ -94,7 +94,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Dictation**: hold F5 (or Fn on a Mac), speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Claude writes**: select your notes or a rough draft in any app (a chat, a form, a mail) and press ⌘⇧C. Claude writes
   it out in a tone that fits the place, in the same language, and shows it in the middle of that window (of the screen
-  when the window fills most of it; by the caret in Nightdrive Mail): Enter puts it in place of
+  when the window fills most of it): Enter puts it in place of
   the selection, ⌘⇧C again writes another version, Esc cancels (the card's buttons do the same). With nothing
   selected (an empty document), the card asks what to write ("a thank-you note to the team"), and Enter inserts it at
   the cursor. Only the selection, or what you typed, and the window's name and title are sent, never from password

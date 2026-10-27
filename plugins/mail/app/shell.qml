@@ -286,11 +286,11 @@ ShellRoot {
             nm.show(t.thread, m => { if (m.length) messageWindow.createObject(shell, { msgs: m }) })
         }
 
-        // Claude writes the reply (Compose.qml asks): the desktop's Claude writes card opens by (x, y) in the writing
+        // Claude writes the reply (Compose.qml asks): the desktop's Claude writes card opens in the middle of the writing
         // window and runs compose.py through `nightmail claude-draft`: the thread up to the message answered with the
         // draft, or the selected text alone. Its Enter comes back through claudeAnswer().
-        function suggest(request, x, y) {
-            nm.nightmail(["ask-claude", composeWin.title, String(Math.round(x)), String(Math.round(y)), JSON.stringify(request)],
+        function suggest(request) {
+            nm.nightmail(["ask-claude", composeWin.title, JSON.stringify(request)],
                          t => { if (t.trim()) { try { composer.failed = true; composer.status = JSON.parse(t).error } catch (e) {} } })
         }
 
@@ -1161,7 +1161,7 @@ ShellRoot {
             anchors.fill: parent
             c: c
             onSend: f => win.sendMail(f)
-            onSuggest: (request, x, y) => win.suggest(request, x, y)
+            onSuggest: request => win.suggest(request)
             claudeReads: win.settings.claudeReads || ""
             accounts: win.accounts
             onChooseReads: v => win.setting("claudeReads", v)

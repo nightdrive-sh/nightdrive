@@ -30,17 +30,15 @@ Item {
     // It shows first in the desktop's Claude writes card (Nightdrive's ClaudeWrite.qml, through `nightmail
     // ask-claude`), which asks Claude and hands the text back with Enter: answered(). gen ties the answer to the
     // request, so one for a message since closed or started again answers into nothing.
-    signal suggest(var request, real x, real y)
+    signal suggest(var request)
     property var ask: null              // the request on the card: { hint, from, to, thread }
     property int gen: 0
     function askClaude(req) {
         ask = req
         gen++
-        // By the caret, the middle of its line (the card goes below or above that line), wherever the mouse is
-        const p = body.mapToItem(root, body.cursorRectangle.x, body.cursorRectangle.y + body.cursorRectangle.height / 2)
         suggest({ gen: gen, msgid: replyId, account: from.id || "", hint: req.hint, thread: req.thread,
                   sent: req.thread ? "the thread" + (req.hint ? " and your draft: " + req.hint : "") : req.hint,
-                  accept: req.from >= 0 ? "Replace selection" : "Insert reply" }, p.x, p.y)
+                  accept: req.from >= 0 ? "Replace selection" : "Insert reply" })
     }
     // Enter on the card: the text goes in the selection's place, or in place of all you wrote above the quote.
     function answered(g, text, read) {
