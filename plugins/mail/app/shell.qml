@@ -840,14 +840,24 @@ ShellRoot {
                                 spacing: 6
                                 Item {
                                     width: parent.width; height: who.implicitHeight
+                                    // The names take what the count and the date leave, so only they elide and the
+                                    // count always shows right after them.
                                     Text {
                                         id: who
-                                        anchors.left: parent.left; anchors.right: date.left; anchors.rightMargin: 16
+                                        anchors.left: parent.left
+                                        width: Math.max(0, Math.min(implicitWidth, date.x - 16 - (count.visible ? count.implicitWidth : 0)))
                                         elide: Text.ElideRight
-                                        text: row.modelData.authors + (row.modelData.total > 1 ? "  " + row.modelData.total : "")
+                                        text: row.modelData.authors
                                         font.family: c.font; font.pixelSize: 13
                                         font.weight: row.unread ? Font.Medium : Font.Normal
                                         color: c.title
+                                    }
+                                    Text {
+                                        id: count
+                                        visible: row.modelData.total > 1
+                                        anchors.left: who.right; anchors.baseline: who.baseline
+                                        text: "  " + row.modelData.total
+                                        font: who.font; color: who.color
                                     }
                                     // Unread: a dot in the row's left padding, in the accent of the cursor by the name.
                                     Rectangle {
