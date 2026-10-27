@@ -285,7 +285,7 @@ PanelWindow {
                       : win.phase === "ask" ? Math.min(request.implicitHeight, 160, win.textMax) + 28
                       : win.phase === "working" ? 52 : note.implicitHeight + 28
                 radius: 10
-                color: Theme.card
+                color: win.phase === "done" ? "transparent" : Theme.card   // Claude's text straight on the card
                 BusyDots {
                     anchors.centerIn: parent
                     visible: win.phase === "working"
@@ -350,7 +350,7 @@ PanelWindow {
                     height: 36; radius: 10
                     gradient: Gradient {
                         GradientStop { position: 0; color: "transparent" }
-                        GradientStop { position: 1; color: Theme.card }
+                        GradientStop { position: 1; color: win.phase === "done" ? Theme.launcherBg : Theme.card }
                     }
                 }
             }
