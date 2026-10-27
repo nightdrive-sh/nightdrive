@@ -37,7 +37,8 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
   would do.
 - Release notes are for users, in plain words: what they can now do, what works better, what they need to do. Never
   the commit messages as such. Write them from the commits (`--dry-run` lists them), let the user read them, then
-  `nightdrive release … --notes FILE --yes`.
+  `nightdrive release … --notes FILE --yes`. A release with a name (Afterglow) gets `--name NAME`: the heading
+  `## 0.6.0 Afterglow – date` and the GitHub release "Nightdrive 0.6 Afterglow"; the tag and updates keep the number.
 - A big piece of work that shouldn't hold up or swell the next release (a new app: Calendar, Contacts) gets a branch of
   its own off `dev`, in a worktree beside the live one: `git worktree add ~/dotfiles-<name> -b <name> dev`. `~/dotfiles`
   stays on `dev`, so the desktop doesn't change; an app runs from the worktree (`qs -p ~/dotfiles-<name>/plugins/<name>/app`)
