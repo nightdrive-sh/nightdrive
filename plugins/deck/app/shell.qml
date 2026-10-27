@@ -243,13 +243,11 @@ ShellRoot {
         // closing the window doesn't stop it; the list shows up when curated.json changes.
         property bool curating: false
         property bool curateAsk: false              // New list asks first (curatePanel)
-        property string curateLine: ""              // the run's latest line in its log
         readonly property string curateLog: home + "/.cache/deck/curate.log"
         function curate() {
             curateAsk = false
             Quickshell.execDetached(["setsid", "-f", deckBin, "curate"])
             curating = true
-            curateLine = "Starting Claude…"
         }
         // Setting up Deck with Claude (`deck-window setup`, which asks only for what is missing): offered at the first start
         // (setupPanel) until it is done or put aside, and by Curated's button until it is done
@@ -281,13 +279,13 @@ ShellRoot {
         onCuratedReadyChanged: if (curatedReady && setupStarted) pickSection("curated")
         Process {
             id: curateCheck
-            // A run (this one, or the weekly one) is going: its latest log line; then "done" and the last line
+            // A run (this one, or the weekly one) is going; then "done" and the log's last line, for a failure
             command: ["sh", "-c", 'pgrep -f "^[^ ]*deck curate$" >/dev/null && echo run || echo done; tail -n 1 "$1" | cut -c 22-', "sh", win.curateLog]
             stdout: StdioCollector {
                 onStreamFinished: {
                     const [state, ...rest] = text.split("\n")
                     const line = rest.join(" ").trim()
-                    if (state === "run") { win.curating = true; win.curateLine = line || "Starting Claude…"; return }
+                    if (state === "run") { win.curating = true; return }
                     if (!win.curating) return
                     win.curating = false
                     win.note = /failed/.test(line) ? "Curated failed: " + line.replace(/^=== curate: failed: /, "") : "A new Curated list"
@@ -540,7 +538,7 @@ ShellRoot {
             // The artist is a link of its own before this
             if (v.kind === "album") return year(v.album) ? (v.album.artist ? "· " : "") + year(v.album) : ""
             if (v.kind === "artist") return v.shelf ? "On your shelf" : "On Spotify"
-            if (v.kind === "curated") return curating ? curateLine : curated.length ? curated.length + " albums picked for you this week" : ""
+            if (v.kind === "curated") return curated.length ? curated.length + " albums picked for you this week" : ""
             if (v.kind === "queue") return queue.length ? "Plays next, after the current track" : ""
             if (v.kind === "history") return history.length ? "What you have played in the last 30 days" : ""
             if (v.kind === "radio") return "A radio for each genre, your favourites first"
@@ -873,6 +871,18 @@ ShellRoot {
                                         tip: win.onePane && modelData.tip ? modelData.label + ": " + modelData.tip : ""; keys: modelData.keys || ""
                                         strong: modelData.strong
                                         onClicked: modelData.act()
+                                    }
+                                }
+                                // While a new list is being made, in place of its buttons: what goes on in plain words, not the
+                                // run's log lines, which meant nothing here
+                                Row {
+                                    visible: win.view.kind === "curated" && win.curating
+                                    spacing: 10
+                                    BusyDots { anchors.verticalCenter: parent.verticalCenter }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "Claude is looking for albums…"
+                                        color: c.dim; font.family: c.font; font.pixelSize: 12
                                     }
                                 }
                             }
