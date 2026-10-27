@@ -99,7 +99,7 @@ Scope {
                 Rectangle {
                     width: parent.width * Math.min(1, osd.level)
                     height: parent.height; radius: 3
-                    color: osd.mode === "volume" && osd.muted ? Theme.dim : Theme.primary
+                    color: osd.mode === "volume" && osd.muted ? Theme.off : Theme.primary
                 }
             }
             Text {

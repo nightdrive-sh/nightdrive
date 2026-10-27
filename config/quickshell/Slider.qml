@@ -24,7 +24,7 @@ Item {
         Rectangle {
             width: parent.width * Math.min(1, Math.max(0, s.shown))
             height: parent.height; radius: 3
-            color: s.dimmed ? Theme.dim : s.fillColor
+            color: s.dimmed ? Theme.off : s.fillColor
         }
         Rectangle {
             visible: !s.readOnly
@@ -51,7 +51,7 @@ Item {
                 readonly property real pos: (index + 1) / meter.count
                 width: meter.pill; height: 4; radius: 2
                 color: (index + 0.5) / meter.count > s.level ? Theme.border
-                     : s.dimmed ? Theme.dim
+                     : s.dimmed ? Theme.off
                      : pos > 0.95 ? Theme.danger : pos > 0.8 ? Theme.caution : Theme.ok
             }
         }

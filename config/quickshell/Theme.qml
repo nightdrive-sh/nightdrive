@@ -23,6 +23,7 @@ Singleton {
     readonly property color text:    c.text    || "#c9bdd3"
     readonly property color dim:     c.dim     || "#9486a3"
     readonly property color muted:   c.muted   || "#aea3b5"       // notification text
+    readonly property color off:     Qt.darker(dim, 2.0)          // a muted level's bar (OSD, sliders): dark, so off doesn't pass for on
     readonly property color accent:  c.accent  || "#e0bff2"       // selected text and icons
     readonly property color title:   "#ffffff"                    // notification titles: white reads first over the tinted text
     readonly property color primary: c.primary || "#c071eb"       // borders and highlights (the theme's main colour)
