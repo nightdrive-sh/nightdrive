@@ -51,7 +51,17 @@ QtObject {
     // Threads matching the query, newest first.
     function search(query, done) {
         json(["search", "--format=json", "--limit=500", query],
-             t => JSON.parse(t).map(x => Object.assign(x, { subject: oneLine(x.subject) })), [], done)
+             t => JSON.parse(t).map(x => Object.assign(x, { subject: oneLine(x.subject), authors: authors(x.authors) })),
+             [], done)
+    }
+
+    // notmuch lists the authors of the messages the query matched, then "| " and the rest's (e.g. your own reply in
+    // Sent): the list shows them all as one list, each name once.
+    function authors(s) {
+        const names = []
+        for (const n of (s || "").split(/\s*[,|]\s*/))
+            if (n && names.indexOf(n) < 0) names.push(n)
+        return names.join(", ")
     }
 
     // Some senders fold a header with stray spaces or end it in line breaks, which keeps a Text from eliding it.
