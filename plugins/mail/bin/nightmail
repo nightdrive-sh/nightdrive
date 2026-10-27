@@ -121,9 +121,14 @@ ask_claude() {
   [[ -z $win ]] && win=$(hyprctl -j activewindow 2>/dev/null | jq -c "if .at then $box else {} end")
   [[ -z $win ]] && win='{}'
   local self=$APP_DIR/bin/nightmail
+  # The card runs the draft in the desktop shell's environment, not Mail's: a Mail started with a notmuch database or
+  # a config folder of its own (NOTMUCH_CONFIG, XDG_CONFIG_HOME) passes them on, or Claude would read the wrong thread
   jq -n --argjson win "$win" --slurpfile r "$CLAUDE_DIR/request.json" --arg self "$self" --arg dir "$CLAUDE_DIR" \
-     '{ window: $win, sent: $r[0].sent, accept: $r[0].accept, chars: 0,
-        draft: [$self, "claude-draft", $dir], reply: [$self, "claude-reply", $dir], cancel: [$self, "claude-cancel", $dir] }' \
+        --arg nm "${NOTMUCH_CONFIG:-}" --arg xc "${XDG_CONFIG_HOME:-}" \
+     '([(if $nm != "" then "NOTMUCH_CONFIG=\($nm)" else empty end), (if $xc != "" then "XDG_CONFIG_HOME=\($xc)" else empty end)]
+        | if length > 0 then ["env"] + . else [] end) as $env
+      | { window: $win, sent: $r[0].sent, accept: $r[0].accept, chars: 0,
+          draft: ($env + [$self, "claude-draft", $dir]), reply: [$self, "claude-reply", $dir], cancel: [$self, "claude-cancel", $dir] }' \
      >"$CLAUDE_DIR/meta.json"
   qs ipc call write ask "$CLAUDE_DIR" >/dev/null 2>&1 || echo '{"error": "The Claude card did not open (is the desktop shell running?)"}'
 }

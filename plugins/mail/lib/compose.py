@@ -44,6 +44,7 @@ import mimetypes
 import os
 import re
 import shlex
+import shutil
 import smtplib
 import ssl
 import subprocess
@@ -55,6 +56,9 @@ CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.c
 PARTS = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "nightmail", "parts")
 SMTP_TIMEOUT = 30  # seconds
 SUGGEST_TIMEOUT = 120  # seconds for Claude to write a reply
+# Claude Code's installer puts `claude` in ~/.local/bin, which the desktop shell's PATH lacks: the Claude writes card
+# runs the reply from there (nightmail claude-draft), as claude-write does
+CLAUDE = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
 SUGGEST_PROMPT = """You write email replies for {name} <{address}>. You get an email thread, oldest message first.
 Write {first}'s reply to the last message. Use the language of the last message. Sound like a person: short, warm, to
 the point, no filler, no subject line, no quote of the thread, no placeholders unless a fact is truly missing (then
@@ -321,7 +325,7 @@ def ask_claude(acc, system, text):
     # No tools and no saved session: Claude only writes the text. --tools "" leaves out only the built-in tools, so
     # --strict-mcp-config (with no --mcp-config) keeps the user's MCP servers and claude.ai connectors away from a
     # stranger's mail too.
-    cmd = ["claude", "-p", "--tools", "", "--strict-mcp-config", "--no-session-persistence", "--system-prompt", system,
+    cmd = [CLAUDE, "-p", "--tools", "", "--strict-mcp-config", "--no-session-persistence", "--system-prompt", system,
            "--model", acc.get("suggest-model", "sonnet")]
     return subprocess.run(cmd, input=text, capture_output=True, text=True, check=True,
                           timeout=SUGGEST_TIMEOUT, cwd=os.path.expanduser("~")).stdout.strip()
