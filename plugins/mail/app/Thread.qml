@@ -90,6 +90,8 @@ Flickable {
     clip: true
     contentHeight: page.implicitHeight + 96
     boundsBehavior: Flickable.StopAtBounds
+    // A mouse drag selects a message's text instead of dragging the page; the wheel and the touchpad still scroll
+    acceptedButtons: Qt.NoButton
     TouchScroll { view: root }
     component ActButton: Rectangle {
         id: btn

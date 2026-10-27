@@ -358,6 +358,8 @@ Item {
             clip: true
             contentHeight: body.implicitHeight
             boundsBehavior: Flickable.StopAtBounds
+            // A mouse drag selects text instead of dragging the page; the wheel and the touchpad still scroll
+            acceptedButtons: Qt.NoButton
             TouchScroll { view: scroller }
             TextEdit {
                 id: body
