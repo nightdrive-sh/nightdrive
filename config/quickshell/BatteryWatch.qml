@@ -43,10 +43,28 @@ Scope {
             Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/sounds", "event", name])
     }
     // UPower's "on battery" going false is the charger plugged in (a machine without a battery never is on battery).
+    // It can flap as the plug goes in (on a Mac the power controller negotiates for a moment), which
+    // chimed twice: so it has to hold for `settleMs` first, and the charger chimes at most once per `chargerGap`.
     // Its first value comes as Quickshell starts and is only ever true then, so it never chimes.
+    readonly property int settleMs: 1000
+    readonly property int chargerGap: 5000
+    property bool settledOnBattery: false
+    property double lastCharger: 0
     Connections {
         target: UPower
-        function onOnBatteryChanged() { if (!UPower.onBattery && w.present) w.sound("charger") }
+        function onOnBatteryChanged() { settle.restart() }
+    }
+    Timer {
+        id: settle
+        interval: w.settleMs
+        onTriggered: {
+            const was = w.settledOnBattery
+            w.settledOnBattery = UPower.onBattery
+            if (was && !UPower.onBattery && w.present && Date.now() - w.lastCharger > w.chargerGap) {
+                w.lastCharger = Date.now()
+                w.sound("charger")
+            }
+        }
     }
     function clear() { Notifs.history = Notifs.history.filter(h => h.tag !== "Battery\n" + tag) }
     function warn(last) {
@@ -73,5 +91,5 @@ Scope {
 
     onPctChanged: check()
     onDrainingChanged: check()
-    Component.onCompleted: check()
+    Component.onCompleted: { settledOnBattery = UPower.onBattery; check() }
 }
