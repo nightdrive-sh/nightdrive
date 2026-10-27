@@ -16,6 +16,10 @@ Column {
     property bool micMuted: false
     property real micPending: -1
     property real micLevel: 0
+    // The meter's scale in dBFS, measured on the MacBook's mic (asahi-audio's chain adds ~45 dB): a quiet room peaks
+    // around -46, speech around -32 (loud -15). Other mics sit lower in silence, so this suits them too.
+    readonly property int micFloorDb: -45
+    readonly property int micTopDb: -10
     signal close()
 
     function refresh() { volProc.running = true; micProc.running = true }
@@ -62,19 +66,22 @@ Column {
     }
     // Input level meter for the mic slider. The menu is loaded only while open, so the mic is recorded only then.
     // The stream follows the default source and sees its volume, so the meter shows what apps get.
-    // Peak per 50 ms block on a dB scale (-60..0 dB -> 0..1); the first block is a start-up click, so it's skipped.
+    // Peak per 50 ms block on a dB scale (micFloorDb..micTopDb -> 0..1); the first block is a start-up click, so it's
+    // skipped. --raw: without it pw-record writes an AU file to stdout (a header and big-endian samples), read here as
+    // noise near 0 dB.
     Process {
         running: true
         command: ["python3", "-I", "-c", `
-import array, math, subprocess
-p = subprocess.Popen(["pw-record", "--rate", "16000", "--channels", "1", "--format", "s16", "--latency", "50ms",
+import array, math, subprocess, sys
+lo, hi = float(sys.argv[1]), float(sys.argv[2])
+p = subprocess.Popen(["pw-record", "--raw", "--rate", "16000", "--channels", "1", "--format", "s16", "--latency", "50ms",
                       "-P", "{ node.name = nightdrive-mic-meter, media.name = \\"Mic level meter\\" }", "-"],
                      stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 p.stdout.read(1600)
 while (b := p.stdout.read(1600)) and len(b) == 1600:
     peak = max(map(abs, array.array("h", b))) / 32768
-    print(round(max(0, min(1, (20 * math.log10(peak) + 60) / 60)) if peak > 0 else 0, 3), flush=True)
-`]
+    print(round(max(0, min(1, (20 * math.log10(peak) - lo) / (hi - lo))) if peak > 0 else 0, 3), flush=True)
+`, String(m.micFloorDb), String(m.micTopDb)]
         stdout: SplitParser {
             // fast attack, slower fall so the line doesn't flicker
             onRead: line => { const v = parseFloat(line); if (!isNaN(v)) m.micLevel = Math.max(v, m.micLevel * 0.75) }
