@@ -641,6 +641,7 @@ ShellRoot {
             // Folders. The title's line and the search's are as high (headerHeight) and as far from the top, so the first
             // folder and the first message line up.
             AppSidebar {
+                id: sidebar
                 Layout.preferredWidth: win.width < 900 ? 168 : 208
                 z: 1        // a folder's tip lies over the list
                 visible: win.showFolders
@@ -648,7 +649,7 @@ ShellRoot {
                 title: "Mail"
                 headerHeight: 2 * 18 + win.headerHeight
                 contentTop: 18 + win.headerHeight + win.headerGap
-                bottomMargin: 24
+                bottomMargin: 0     // the account bar's line reaches the foot (AccountBar.qml)
                 Repeater {
                     id: folderRows
                     model: win.folders
@@ -680,67 +681,18 @@ ShellRoot {
                     }
                 }
                 Item { Layout.fillHeight: true }
-                // More than one account: each with its inbox's unread count; a click or Ctrl+Tab shows another one's folders
-                Repeater {
-                    model: win.accounts.length > 1 ? win.accounts : []
-                    delegate: Rectangle {
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 12
-                        Layout.rightMargin: 12
-                        implicitHeight: 30
-                        radius: 8
-                        color: ah.hovered ? c.hover : "transparent"
-                        HoverHandler { id: ah; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: { win.pickAccount(index); list.forceActiveFocus() } }
-                        Rectangle {
-                            visible: index === win.acct
-                            x: 6; anchors.verticalCenter: parent.verticalCenter
-                            width: 3; height: 14; radius: 1.5; color: c.primary
-                        }
-                        Text {
-                            anchors.left: parent.left; anchors.leftMargin: 16; anchors.right: count.left; anchors.rightMargin: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideRight
-                            text: modelData.address; font.family: c.font; font.pixelSize: 12
-                            color: index === win.acct ? c.title : c.dim
-                        }
-                        Text {
-                            id: count
-                            anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter
-                            text: win.inboxUnread[modelData.id] > 0 ? win.inboxUnread[modelData.id] : ""
-                            font.family: c.font; font.pixelSize: 11; color: c.dim
-                        }
-                    }
+                AccountBar {
+                    c: win.look
+                    accounts: win.accounts
+                    current: win.acct
+                    unread: win.inboxUnread
+                    onPicked: i => { win.pickAccount(i); list.forceActiveFocus() }
                 }
-                // The foot: Settings (its key in the tip) and the account, when there is only one, or a message being sent
-                Item {
-                    Layout.fillWidth: true
-                    Layout.topMargin: win.accounts.length > 1 ? 12 : 0
-                    implicitHeight: 26
-                    // Its glyph lines up with the folders' names above
-                    AppIconButton {
-                        id: gear
-                        anchors.left: parent.left; anchors.leftMargin: 22; anchors.verticalCenter: parent.verticalCenter
-                        c: win.look
-                        glyph: "settings"; glyphColor: c.faint
-                        tip: "Settings"; keys: "⌘,"; tipSide: "above"
-                        onClicked: win.showSettings = true
-                    }
-                    Text {
-                        anchors.left: gear.right; anchors.leftMargin: 4; anchors.right: parent.right; anchors.rightMargin: 28
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: win.accounts.length < 2 && !sendStatus.visible
-                        elide: Text.ElideRight
-                        text: win.account.address; color: c.faint; font.family: c.font; font.pixelSize: 11
-                    }
-                    SendStatus {
-                        id: sendStatus
-                        anchors.left: gear.right; anchors.leftMargin: 4; anchors.right: parent.right; anchors.rightMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-                        c: win.look; outbox: outbox
-                    }
+                SidebarHead {
+                    parent: sidebar     // over the sidebar's title, outside its column
+                    c: win.look; outbox: outbox
+                    headerHeight: sidebar.headerHeight
+                    onSettings: win.showSettings = true
                 }
             }
 

@@ -8,7 +8,7 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 - ↑ / ↓ or `j` / `k` move in the list, as in Mac Mail, and `Space` and ⇧Space page through the message. `/` or ⌘F searches (notmuch's query syntax), `Esc` clears the search.
 - `1`–`6` or Ctrl+↑ / Ctrl+↓ pick a folder: Inbox, Sent, Drafts, Archive, Spam, Trash. ⌘B hides the folders.
 - In a narrow window the folders hide by themselves (⌘B shows them), and narrower still the list and the thread take turns: a click, `Enter` or → opens the thread, `Esc`, ← or the arrow above it goes back to the list. With the list alone, the arrows (and PgUp / PgDn) move in it without opening anything, so nothing is marked read on the way; with the thread alone, they scroll it and `j` / `k` (or ⌥↑ / ⌥↓) go to the next thread.
-- With more than one account, each has its own folders: Ctrl+Tab / Ctrl+⇧Tab (or a click on an address under the folders) shows the next one. A notification's message opens in its own account.
+- With more than one account, each has its own folders: Ctrl+Tab / Ctrl+⇧Tab (or a click on an address in the bar at the foot of the folders) shows the next one. A notification's message opens in its own account.
 - `Tab` / ⇧Tab move the keys to the folders and back to the list: there ↑ / ↓ pick a folder, and `Esc` or `Enter` go back too.
 - In a thread of three messages or more, the read ones before the last show as one line each (who, the first line, when): a click opens one. The quote at the end of a message hides behind `•••` when all of it is in an earlier message of the thread; when any of it isn't, it shows.
 - `h` shows a message as text, as HTML on the dark page, or as HTML on light paper as it was sent; which one comes first is a setting (text by default). Remote images stay off. A link opens in your browser, a mailto: link as a new message; other kinds (file:, smb:, an app's own) don't open from a message.
@@ -27,7 +27,7 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 - `c` or ⌘N writes a new message, `r` replies to all, ⇧R to the sender only, `f` forwards (with the attachments).
 - A reply or a forward goes from the account the message came to, a new message from the account shown. With more than one account, a click on From changes it.
 - Your signature (`signature` in `account.conf`, below) is put under what you write, above the quote.
-- Writing opens in a window of its own: Ctrl+Enter sends, ⌘S saves it in Drafts. Sending closes the window at once and goes on in the background: "Sending…" shows beside Settings at the foot of the sidebar, and a soft swoosh plays as it goes (not under Do Not Disturb). A message that can't be sent is kept in Drafts, and the same place says so, with buttons to try again or to open it; with Mail closed (a mailto: link), a notification does. `Esc` closes it (a message saved before is saved again; with something new written, the second `Esc` throws it away). Closing the window with ⌘W keeps what you wrote in Drafts.
+- Writing opens in a window of its own: Ctrl+Enter sends, ⌘S saves it in Drafts. Sending closes the window at once and goes on in the background: "Sending…" shows at the right of the sidebar's title, and a soft swoosh plays as it goes (not under Do Not Disturb). A message that can't be sent is kept in Drafts, and the same place says "Not sent": a click on it tells why, with buttons to try again or to open it; with Mail closed (a mailto: link), a notification does. `Esc` closes it (a message saved before is saved again; with something new written, the second `Esc` throws it away). Closing the window with ⌘W keeps what you wrote in Drafts.
 - To and Cc offer the addresses in your mail as you type, the ones you use most first: ↑ / ↓ choose, `Tab` or `Enter` takes one. With Nightdrive Contacts, your contacts' addresses come first, by the names they have there, and so do those you haven't written to yet.
 - ⌘⇧A or Attach picks files to attach, files dropped on the window are attached too, and × takes one off.
 - Mail opens mailto: links when you pick it as the email app (launcher › Settings › Apps › Default apps): then Hyper E opens Mail too.
@@ -47,7 +47,7 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 
 ## Settings
 
-⌘, (or the gear at the foot of the folders, or launcher › Settings › Apps › Mail): whether writing and message windows float (the default) or open in the grid beside Mail, how a message opens (text, HTML on the dark page, or HTML as it was sent), and what Claude reads. They are kept in `~/.config/nightmail/settings.json`. Mail's colours follow the desktop's theme.
+⌘, (or the gear that shows when the pointer is over the sidebar's title, or launcher › Settings › Apps › Mail): whether writing and message windows float (the default) or open in the grid beside Mail, how a message opens (text, HTML on the dark page, or HTML as it was sent), and what Claude reads. They are kept in `~/.config/nightmail/settings.json`. Mail's colours follow the desktop's theme.
 
 ## Setting up an account
 
