@@ -11,7 +11,7 @@ Ferry is an app of its own, for Linux, the Mac and the iPhone. This plugin insta
 - The menu lists what your other devices sent: a click on a row copies a text or opens a file (the round mark on the right says which), a file drags out into another app, and Clear empties the list (files stay in Downloads).
 - Below the list are the three ways to send, as in the phone's app: **Aa** types a text, **Send Clipboard** sends the clipboard, and **+** picks files. They go to the device in the pill above them: click it to pick another of your computers or phones (Ferry remembers the last one picked), or to add a device.
 - Drag files over the menu and the list turns into a tile for each device: drop them on the one they're for. Files dropped on the inbox icon in the top bar go to the picked device.
-- **Devices…** in the pill's list forgets a device you no longer use: it leaves the lists on all your devices, and a phone gets no more notifications. Forgotten devices are listed below, dimmed: click one to bring it back.
+- **Settings** beside Clear opens the settings: click a device there twice to forget it when you no longer use it. It leaves the lists on all your devices, and a phone gets no more notifications. It stays gone until you add it again with Add Device, which is there too.
 - A send to a phone waits in the box until that phone picks it up, and only that phone gets the notification. A send to another computer goes straight there: it shows up in that computer's menu, and Send Clipboard puts it on that computer's clipboard. A computer that's asleep can't take one.
 - Files from the phone go to Downloads, and you get a notification when something arrives (a photo or an image shows in it, as a screenshot does).
 - What the phone sends with Clipboard lands on the computer's clipboard too, ready to paste (an image also stays in Downloads).
@@ -41,7 +41,7 @@ The `ferry` command does the same, and `ferry help` lists all of it.
 | `ferry send [file…]` | Sends files, or a text; with nothing, the clipboard. `--to DEVICE` for another device than the picked one |
 | `ferry devices` | Your other computers running Ferry and your phones, the picked one marked |
 | `ferry target [DEVICE]` | The device sends go to, or picks another |
-| `ferry forget DEVICE` | Takes a device off the lists on all your devices, until `ferry unforget DEVICE` brings it back |
+| `ferry forget DEVICE` | Takes a device off the lists on all your devices |
 | `ferry list` | What's in the box, numbered |
 | `ferry get [n]` | An item from the phone (the newest without a number): a text printed, a file saved here |
 | `ferry open <n>` | Opens a file |

@@ -142,7 +142,8 @@ calendar's grid, Ferry's drop zone and QR code are all fine).
 
 - **`MenuHeader` first**: `MenuHeader { width: parent.width; title: "Ferry" }`. Optional `subtitle` (dimmed, on the
   right), an on/off toggle (`showToggle`, `checked`, `onToggled`) and a small button (`action: "Clear"`,
-  `onActionClicked`, `actionEnabled`).
+  `onActionClicked`, `actionEnabled`), and an icon button at the right edge (`tool: "settings"`, `toolLabel`, `onToolClicked`:
+  Ferry's Settings).
 - **Rows are `MenuRow`**: `icon`, `label`, `detail` (dimmed, on the right), `onClicked`. `danger: true` red,
   `active: true` the selected one, `interactive: false` an information row. Rows get keyboard navigation (⌘⇧Space) for
   free.
