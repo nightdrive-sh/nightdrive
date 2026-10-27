@@ -10,7 +10,8 @@ import qs
 // text typed here), Send Clipboard and + (files from a dialog), to the device in the pill above them (the last one
 // picked; a click on it lists the devices, and Add Device). Files dragged over the menu turn the list into a tile per
 // device: the drop goes to the tile's device (a drop on the bar icon, or between the tiles, to the pill's). The big
-// button says for a moment that a send went, whoever sent it (`ferry list --json`'s sent).
+// button says for a moment that a send went, whoever sent it (`ferry list --json`'s sent). Devices… in the pill's list
+// forgets devices and brings them back (FerrySettings.qml, in the menu's place).
 Column {
     id: m
     width: parent ? parent.width : 360
@@ -27,7 +28,7 @@ Column {
     property string picked: ""         // the device just picked, until `ferry list` says so too
     readonly property string targetId: picked || (st ? st.target || "" : "")
     readonly property var target: devices.find(d => d.id === targetId) || null
-    property string mode: "list"       // list | pick (the pill's list floating over the list) | write (a text to send)
+    property string mode: "list"       // list | pick (the pill's list floating over the list) | write (a text to send) | devices
     property string flash: ""          // what says "copied" for a moment: an item's id or "url"
     property bool adding: false        // Add Device: the QR code in the middle of the screen
     property string qr: ""             // the QR code's SVG once made
@@ -279,6 +280,7 @@ Column {
     // The plugin's name as in the other menus. Clear: what the other devices sent here leaves the box (files stay in
     // Downloads)
     MenuHeader {
+        visible: m.mode !== "devices"
         width: parent.width
         title: "Ferry"
         action: !m.dropping && m.received.length ? "Clear" : ""
@@ -317,6 +319,7 @@ Column {
     // cursor below it, the tiles would go, the list come back under the cursor, and so on (the menu flickered).
     Item {
         id: body
+        visible: m.mode !== "devices"
         property real restHeight: 0
         width: parent.width
         height: Math.max(stack.y + stack.height, m.dropping ? restHeight : 0)
@@ -635,7 +638,7 @@ Column {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: if (!m.target && m.devices.length === 0) m.addDevice(); else m.mode = m.mode === "pick" ? "list" : "pick"
+                        onClicked: if (!m.target && m.devices.length + (m.st && m.st.forgotten || []).length === 0) m.addDevice(); else m.mode = m.mode === "pick" ? "list" : "pick"
                     }
                 }
             }
@@ -748,8 +751,20 @@ Column {
                     icon: "qr-code"
                     onClicked: m.addDevice()
                 }
+                DeviceRow {
+                    label: "Devices…"
+                    icon: "settings"
+                    onClicked: m.mode = "devices"
+                }
             }
         }
+    }
+
+    FerrySettings {
+        visible: m.mode === "devices"
+        width: parent.width
+        menu: m
+        onDone: m.mode = "list"
     }
 
     // Add Device: in the middle of the screen, over everything, in a window of its own that goes with the menu. The
