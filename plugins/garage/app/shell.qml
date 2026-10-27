@@ -63,6 +63,7 @@ ShellRoot {
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
 
         RowLayout {
+            id: content          // what a panel turns off while it shows (AppPanel.behind)
             anchors.fill: parent
             spacing: 0
             // ? and Ctrl+? show the keys, as in Mail and Deck: what the page and the snapshot list leave alone comes here
@@ -142,6 +143,7 @@ ShellRoot {
         }
 
         NewVmPanel {
+            behind: content
             visible: win.showNew
             c: win.look
             ctl: ctl
@@ -150,6 +152,7 @@ ShellRoot {
         }
 
         SettingsPanel {
+            behind: content
             visible: win.showSettings && !!win.vm
             c: win.look
             ctl: ctl
@@ -161,12 +164,14 @@ ShellRoot {
 
         NamePanel {
             id: namePanel
+            behind: content
             c: win.look
             onClosed: page.refocus()
         }
 
         ConfirmPanel {
             id: confirmPanel
+            behind: content
             visible: win.confirmDone !== null
             c: win.look
             onAnswered: ok => win.confirmed(ok)

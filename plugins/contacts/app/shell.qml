@@ -263,6 +263,7 @@ ShellRoot {
         onOnePaneChanged: if (!onePane && cardOpen) closeCard()
 
         RowLayout {
+            id: content          // what a panel turns off while it shows (AppPanel.behind)
             anchors.fill: parent
             Keys.onPressed: e => sheet.pressed(e)
             AppPointer { c: win.look }      // the pointer hides the keys' frame
@@ -474,6 +475,7 @@ ShellRoot {
         // Contacts' first start, before an account: Enter (or the button) opens Claude Code in a terminal, which sets
         // one up with you by README.md (`contacts setup`)
         AppPanel {
+            behind: content
             id: setupPanel
             visible: win.needsAccount
             c: win.look
@@ -503,6 +505,7 @@ ShellRoot {
         property bool showSettings: false
         onShowSettingsChanged: if (showSettings) settings.open(); else if (settings.visible) settings.close()
         SettingsPanel {
+            behind: content
             id: settings
             app: win
             c: win.look
@@ -511,6 +514,7 @@ ShellRoot {
 
         Store { id: store; app: win }
         ConfirmPanel {
+            behind: content
             id: confirm
             c: win.look
             onClosed: if (win.editing) editor.forceActiveFocus(); else list.forceActiveFocus()

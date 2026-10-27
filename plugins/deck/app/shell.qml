@@ -684,6 +684,7 @@ ShellRoot {
         Shortcut { sequence: "Ctrl+Down"; onActivated: win.stepSection(1) }
 
         ColumnLayout {
+            id: content          // what a panel turns off while it shows (AppPanel.behind)
             anchors.fill: parent
             spacing: 0
             // ? and Ctrl+? show the keys, as in Mail (KeySheet.qml)
@@ -1320,6 +1321,7 @@ ShellRoot {
         // opens Claude Code in a terminal to set up what is missing (`deck-window setup`); Esc or a click outside puts it
         // aside, and Curated's own button offers it again.
         AppPanel {
+            behind: content
             id: setupPanel
             visible: win.setupOffer
             c: win.look
@@ -1360,6 +1362,7 @@ ShellRoot {
 
         CuratePanel {
             id: curatePanel
+            behind: content
             visible: win.curateAsk
             c: win.look
             onAnswered: yes => {

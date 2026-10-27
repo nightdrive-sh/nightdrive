@@ -631,6 +631,7 @@ ShellRoot {
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.foldersChoice = !win.showFolders }
 
         RowLayout {
+            id: content          // what a panel turns off while it shows (AppPanel.behind)
             anchors.fill: parent
             // ? and Ctrl+? show the keys (KeySheet.qml)
             Keys.onPressed: e => sheet.pressed(e)
@@ -1042,6 +1043,7 @@ ShellRoot {
               hint: "What is sent to Claude when it writes a reply (⌘⇧C)" }
         ]
         AppPanel {
+            behind: content
             id: settingsPanel
             visible: win.showSettings
             c: win.look
@@ -1099,6 +1101,7 @@ ShellRoot {
 
         // Asks before what can't be undone (deleting for good): Enter does it, Esc or a click outside doesn't.
         AppPanel {
+            behind: content
             id: confirmPanel
             visible: win.confirm !== null
             c: win.look
@@ -1127,6 +1130,7 @@ ShellRoot {
         property bool setupStarted: false
         function startSetup() { setupStarted = true; nm.nightmail(["setup"], () => {}) }
         AppPanel {
+            behind: content
             id: setupPanel
             visible: win.needsAccount
             c: win.look
