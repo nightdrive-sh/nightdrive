@@ -24,7 +24,7 @@ QtObject {
 
     // Jobs are found again by id: a var property may hand back a copy of the object, not the same one
     property int nextId: 0
-    // The swoosh plays as Send is pressed, not once the message has gone: a failure says so on its own (Drafts, "Not sent").
+    // The sent sound plays as Send is pressed, not once the message has gone: a failure says so on its own (Drafts, "Not sent").
     function send(f, heading, replyId, forwardId) {
         chime()
         const job = { id: nextId++, f: f, heading: heading, replyId: replyId, forwardId: forwardId, state: "sending", error: "" }
