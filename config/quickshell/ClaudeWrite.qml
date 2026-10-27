@@ -4,8 +4,8 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 
-// Claude writes: the preview next to the mouse after ⌘⇧C (hypr/scripts/claude-write, which reads the selection and the
-// window). Claude's text shows here first, and goes in place of the selection only with Enter: Esc or a click outside
+// Claude writes: the preview by the text after ⌘⇧C (hypr/scripts/claude-write, which reads the selection and the
+// window; the place, by the text or the window: ClaudeWritePlace.qml). Claude's text shows here first, and goes in place of the selection only with Enter: Esc or a click outside
 // cancels, ⌘⇧C again writes another version; the card's buttons do the same with the mouse (ClaudeWriteButton.qml).
 // In a terminal it is the command for what the selection asked, with a warning when it deletes, overwrites or needs
 // root; Enter puts it on the command line, it doesn't run it. In a Claude Code session (meta.claude) it is text, and
@@ -51,8 +51,11 @@ PanelWindow {
         typed = !meta.draft && !fresh
         selection = meta.draft || typed ? "" : selFile.text()
         sent = meta.draft ? meta.sent || "" : selection
+        // The screen the text is on: the caret's or the window's middle, else the focused one
+        const w = meta.window, px = w ? w.x + w.w / 2 : meta.x || 0, py = w ? w.y + w.h / 2 : meta.y || 0
         const f = Hyprland.focusedMonitor
-        screen = (f && Quickshell.screens.find(s => s.name === f.name)) || Quickshell.screens[0]
+        screen = Quickshell.screens.find(s => px >= s.x && px < s.x + s.width && py >= s.y && py < s.y + s.height)
+              || (f && Quickshell.screens.find(s => s.name === f.name)) || Quickshell.screens[0]
         result = ""; warning = ""; error = ""
         open = true
         keys.forceActiveFocus()
@@ -186,16 +189,29 @@ PanelWindow {
         else if (a === "write") write()
     }
 
-    // Below the mouse, kept on the screen
-    readonly property real mx: (meta.x || 0) - (screen ? screen.x : 0)
-    readonly property real my: (meta.y || 0) - (screen ? screen.y : 0)
+    // By the app's caret (meta.x, meta.y: Mail's), else in the middle of the window (meta.window: the script's)
+    readonly property real sx: screen ? screen.x : 0
+    readonly property real sy: screen ? screen.y : 0
+    ClaudeWritePlace {
+        id: place
+        atLine: !win.meta.window && win.meta.x !== undefined
+        line: place.around((win.meta.x || 0) - win.sx, (win.meta.y || 0) - win.sy)
+        window: win.meta.window ? Qt.rect(win.meta.window.x - win.sx, win.meta.window.y - win.sy, win.meta.window.w, win.meta.window.h)
+                                : Qt.rect(0, 0, 0, 0)
+        screenWidth: win.width; screenHeight: win.height
+        width: card.width; height: card.height
+    }
+    // The card around the text box: its padding, header, warning and buttons. The text box gets the rest of the room
+    // on its side, and scrolls what doesn't fit
+    readonly property real chrome: 36 + header.height + 12 + 12 + 38 + (warn.visible ? warn.height + 12 : 0)
+    readonly property real textMax: Math.max(60, place.room - chrome - 28)
 
     Rectangle {
         id: card
         width: Math.min(480, win.width - 32)
         height: body.implicitHeight + 36
-        x: Math.max(16, Math.min(win.mx - 24, win.width - width - 16))
-        y: win.my + 24 + height < win.height - 16 ? win.my + 24 : Math.max(16, win.my - 24 - height)
+        x: place.x
+        y: place.y
         radius: 14
         color: Theme.launcherBg
         border { color: Theme.primary; width: 1 }
@@ -210,6 +226,7 @@ PanelWindow {
             // The title, and under it what was sent in quotes, so it's clear what left the machine; the glyph is as
             // tall as the two lines
             Row {
+                id: header
                 width: parent.width
                 spacing: 10
                 Text {
@@ -264,8 +281,8 @@ PanelWindow {
             // question or the error in it when there is one
             Rectangle {
                 width: parent.width
-                height: win.phase === "done" ? Math.min(resultText.implicitHeight, 320) + 28
-                      : win.phase === "ask" ? Math.min(request.implicitHeight, 160) + 28
+                height: win.phase === "done" ? Math.min(resultText.implicitHeight, 320, win.textMax) + 28
+                      : win.phase === "ask" ? Math.min(request.implicitHeight, 160, win.textMax) + 28
                       : win.phase === "working" ? 52 : note.implicitHeight + 28
                 radius: 10
                 color: Theme.card
@@ -338,6 +355,7 @@ PanelWindow {
                 }
             }
             Row {
+                id: warn
                 visible: win.phase === "done" && win.warning !== ""
                 width: parent.width
                 spacing: 8

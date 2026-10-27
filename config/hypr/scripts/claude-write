@@ -82,11 +82,13 @@ start() {
   text=$(wl-paste --primary --no-newline 2>/dev/null)
   rm -rf "$WORK"; mkdir -p -m 700 "$WORK"
   printf '%s' "$text" >"$WORK/selection"
-  local cursor; cursor=$(hyprctl -j cursorpos 2>/dev/null) || cursor='{"x":0,"y":0}'
+  # The window's place: the preview goes in its middle. The mouse isn't a guide to where the text is (a selection made
+  # with the keyboard, a mouse moved since), so it isn't used
   jq -n --arg addr "$addr" --arg class "$class" --arg title "$title" --argjson terminal "$terminal" \
-        --argjson claude "$claude" --argjson cursor "$cursor" --arg dir "$WORK" --argjson chars "${#text}" \
-        '{ addr: $addr, class: $class, title: $title, terminal: $terminal, claude: $claude, x: $cursor.x,
-           y: $cursor.y, dir: $dir, chars: $chars }' >"$WORK/meta.json"
+        --argjson claude "$claude" --argjson win "$win" --arg dir "$WORK" --argjson chars "${#text}" \
+        '{ addr: $addr, class: $class, title: $title, terminal: $terminal, claude: $claude,
+           window: { x: $win.at[0], y: $win.at[1], w: $win.size[0], h: $win.size[1] }, dir: $dir, chars: $chars }' \
+    >"$WORK/meta.json"
   qs ipc call write open "$WORK" >/dev/null 2>&1 || notify "The preview didn't open (is Quickshell running?)."
 }
 

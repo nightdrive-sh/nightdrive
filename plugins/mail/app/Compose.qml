@@ -36,8 +36,8 @@ Item {
     function askClaude(req) {
         ask = req
         gen++
-        // By the mouse when it is over the window, else by the caret
-        const p = pointer.hovered ? pointer.point.position : body.mapToItem(root, body.cursorRectangle.x, body.cursorRectangle.y + body.cursorRectangle.height)
+        // By the caret, the middle of its line (the card goes below or above that line), wherever the mouse is
+        const p = body.mapToItem(root, body.cursorRectangle.x, body.cursorRectangle.y + body.cursorRectangle.height / 2)
         suggest({ gen: gen, msgid: replyId, account: from.id || "", hint: req.hint, thread: req.thread,
                   sent: req.thread ? "the thread" + (req.hint ? " and your draft: " + req.hint : "") : req.hint,
                   accept: req.from >= 0 ? "Replace selection" : "Insert reply" }, p.x, p.y)
@@ -544,8 +544,6 @@ Item {
             }
         }
     }
-
-    HoverHandler { id: pointer }
 
     readonly property alias toInput: toRow.input
     property alias to: toRow.input

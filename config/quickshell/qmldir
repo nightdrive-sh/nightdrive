@@ -47,6 +47,7 @@ singleton Plugins 1.0 Plugins.qml
 SharePicker 1.0 SharePicker.qml
 ClaudeWrite 1.0 ClaudeWrite.qml
 ClaudeWriteButton 1.0 ClaudeWriteButton.qml
+ClaudeWritePlace 1.0 ClaudeWritePlace.qml
 LevelRing 1.0 LevelRing.qml
 BatteryBar 1.0 BatteryBar.qml
 BatteryShape 1.0 BatteryShape.qml

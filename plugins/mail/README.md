@@ -35,7 +35,7 @@ A quiet mail client: folders, the thread list and the open thread, nothing else 
 ## Claude writes the reply
 
 - ⌘⇧C on a message has Claude write the reply, in the message's language, signed with your first name (with a signature of your own, Claude leaves the end to it). In the writing window, ⌘⇧C writes out what you started: select your draft (a start, a few points, "say yes, but next week") and Claude's reply takes its place.
-- The reply shows first in a card by the mouse, with what Claude read: `Enter` puts it in place, ⌘⇧C writes another version, `Esc` cancels. Nothing is sent before you press Ctrl+Enter.
+- The reply shows first in a card by the caret, with what Claude read: `Enter` puts it in place, ⌘⇧C writes another version, `Esc` cancels. Nothing is sent before you press Ctrl+Enter.
 - What Claude reads is your choice, asked the first time you press ⌘⇧C: the whole thread (the best replies), or only the text you select, so the thread stays on your computer. Settings (⌘,) changes it later.
 - It needs Claude Code signed in (`claude`): the reply is written by `claude -p` with no tools, not even your MCP servers or claude.ai connectors, so a message can't steer it into using them.
 
