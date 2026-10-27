@@ -265,7 +265,8 @@ Item {
             id: row
             anchors.centerIn: parent
             spacing: 8
-            KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: a.hint; tint: root.c.faint }
+            // In a narrow window the keys go: with them the buttons are wider than the form and push it past the edge
+            KeyCap { visible: root.width >= 560; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: a.hint; tint: root.c.faint }
             Text { id: t; anchors.verticalCenter: parent.verticalCenter; color: a.tint; font.family: root.c.font; font.pixelSize: 12 }
         }
     }
@@ -299,15 +300,19 @@ Item {
                     TapHandler { onTapped: root.nextAccount() }
                 }
             }
-            Field { id: toRow; label: "To"; completes: true }
+            // Add Cc sits at To's right end, as in Gmail: the Cc row it shows comes right under it.
+            Field {
+                id: toRow; label: "To"; completes: true
+                Text {
+                    visible: !root.showCc
+                    Layout.leftMargin: 12
+                    text: "Add Cc"; color: addCcHover.hovered ? root.c.text : root.c.faint; font.family: root.c.font; font.pixelSize: 11
+                    HoverHandler { id: addCcHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: { root.showCc = true; cc.forceActiveFocus() } }
+                }
+            }
             Field { id: ccRow; label: "Cc"; visible: root.showCc; completes: true }
             Field { id: subjectRow; label: "Subject" }
-            Text {
-                visible: !root.showCc
-                text: "Add Cc"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
-                HoverHandler { cursorShape: Qt.PointingHandCursor }
-                TapHandler { onTapped: { root.showCc = true; cc.forceActiveFocus() } }
-            }
             // Attachments: a file's name and ×, which takes it off.
             Flow {
                 Layout.fillWidth: true

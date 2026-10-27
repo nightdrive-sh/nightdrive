@@ -24,7 +24,9 @@ QtObject {
 
     // Jobs are found again by id: a var property may hand back a copy of the object, not the same one
     property int nextId: 0
+    // The swoosh plays as Send is pressed, not once the message has gone: a failure says so on its own (Drafts, "Not sent").
     function send(f, heading, replyId, forwardId) {
+        chime()
         const job = { id: nextId++, f: f, heading: heading, replyId: replyId, forwardId: forwardId, state: "sending", error: "" }
         jobs = jobs.concat([job])
         run(job.id)
@@ -40,7 +42,7 @@ QtObject {
         update(id, { state: "sending", error: "" })
         nm.compose(["send", JSON.stringify(get(id).f)], r => {
             // Tagged before it leaves the list: with Mail started for this message alone, an empty list quits it
-            if (!r.error) { chime(); sent(get(id)); drop(id); return }
+            if (!r.error) { sent(get(id)); drop(id); return }
             // Kept in Drafts until it goes: the new copy replaces the one saved before (draft_id), and sending drops it.
             // It shows as failed (Retry, Open) only once saved, so Open writes on the new copy.
             nm.compose(["draft", JSON.stringify(get(id).f)], d => {
