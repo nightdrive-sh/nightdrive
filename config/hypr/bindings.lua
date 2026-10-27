@@ -115,6 +115,7 @@ ownKey = false
 local optional = {
     { "whatsapp",    "W", "'^chrome-web\\.whatsapp\\.com' gtk-launch webapp-whatsapp" },   -- WhatsApp webapp
     { "slack",       "S", "'^chrome-app\\.slack\\.com' gtk-launch webapp-slack" },         -- Slack webapp
+    { "teams",       "T", "'^chrome-teams\\.microsoft\\.com' gtk-launch webapp-teams" },  -- Teams webapp
     { "youtube",     "Y", "'^chrome-www\\.youtube\\.com' gtk-launch webapp-youtube" },     -- YouTube webapp
 }
 for _, o in ipairs(optional) do

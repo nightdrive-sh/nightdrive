@@ -11,6 +11,7 @@
   F8 (play)          Play/pause {!deck}
   Hyper W            WhatsApp {whatsapp}
   Hyper S            Slack {slack}
+  Hyper T            Teams {teams}
   Hyper Y            YouTube {youtube}
   ⌘ Esc / F3         Notifications (history, do not disturb)
   ⌘ Ctrl L           Lock screen
