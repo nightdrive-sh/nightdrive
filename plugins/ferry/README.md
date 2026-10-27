@@ -15,7 +15,8 @@ Ferry is an app of its own, for Linux, the Mac and the iPhone. This plugin insta
 - A send to a phone waits in the box until that phone picks it up, and only that phone gets the notification. A send to another computer goes straight there: it shows up in that computer's menu, and Send Clipboard puts it on that computer's clipboard. A computer that's asleep can't take one.
 - Files from the phone go to Downloads, and you get a notification when something arrives (a photo or an image shows in it, as a screenshot does).
 - What the phone sends with Clipboard lands on the computer's clipboard too, ready to paste (an image also stays in Downloads).
-- Everything leaves the box after 7 days.
+- Everything leaves the box after 7 days. A text that looks like a code or a password leaves after 15 minutes, or as soon as it's copied (Send Clipboard's is copied already, so the box doesn't keep it at all).
+- A notification doesn't show a code or a password: it says "Code or password · open to see", and its Copy still copies it. What Send Clipboard brings, and a code or a password you copy, stays out of the clipboard history (cliphist).
 
 ## On the phone
 

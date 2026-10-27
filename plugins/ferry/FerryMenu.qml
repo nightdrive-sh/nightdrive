@@ -23,7 +23,13 @@ Column {
     readonly property string ferry: Quickshell.env("HOME") + "/.local/bin/ferry"
     property var st: null              // `ferry list --json`: { on, tailscale, url, serving, items, devices, target, sent }
     readonly property var items: st ? st.items : []
-    readonly property var received: items.filter(i => i.to === "computer").reverse()
+    // A copied code or password leaves the box at once: its row stays while it says "copied", or it would look lost
+    readonly property var received: {
+        const r = items.filter(i => i.to === "computer").reverse()
+        if (copied && flash === copied.id && !r.some(i => i.id === copied.id)) r.splice(copied.at, 0, copied.item)
+        return r
+    }
+    property var copied: null          // the row last copied, and where it was
     readonly property var devices: st && st.devices ? st.devices : []
     property string picked: ""         // the device just picked, until `ferry list` says so too
     readonly property string targetId: picked || (st ? st.target || "" : "")
@@ -61,7 +67,7 @@ Column {
         return (i === 0 ? n : n.toFixed(1)) + " " + u[i]
     }
     function act(it) {
-        if (it.kind === "text") { m.run(["copy", it.id]); m.flashOn(it.id) }
+        if (it.kind === "text") { m.copied = { id: it.id, item: it, at: Math.max(0, m.received.indexOf(it)) }; m.run(["copy", it.id]); m.flashOn(it.id) }
         else { m.run(["open", it.id]); m.close() }
     }
     function deviceIcon(d) { return !d ? "qr-code" : d.kind === "computer" ? "laptop" : d.kind === "tablet" ? "tablet" : "smartphone" }
@@ -118,8 +124,13 @@ Column {
     Sh {
         id: listProc
         command: [m.ferry, "list", "--json"]
+        // Read every 2 s, but only a change is shown: a new list would make every row anew, and with them the keyboard's
+        // pick and a picture's load
+        property string last: ""
         onResult: text => {
+            if (text === last) return
             try { m.st = JSON.parse(text) } catch (e) { return }
+            last = text
             // Seen once the menu shows them: the bar's count goes
             if (m.st.items.some(i => i.to === "computer" && !i.seen)) seenProc.running = true
         }
