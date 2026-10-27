@@ -242,7 +242,7 @@ ShellRoot {
         // A new Curated list (`deck curate`: Claude Code, a few minutes, on your Claude plan). It runs on its own, so
         // closing the window doesn't stop it; the list shows up when curated.json changes.
         property bool curating: false
-        property bool curateAsk: false              // the button's first press asks, the second runs it
+        property bool curateAsk: false              // New list asks first (curatePanel)
         property string curateLine: ""              // the run's latest line in its log
         readonly property string curateLog: home + "/.cache/deck/curate.log"
         function curate() {
@@ -859,20 +859,10 @@ ShellRoot {
                                         onClicked: modelData.act()
                                     }
                                 }
-                                // Curated: a new list by Claude. The first press says what it does, the second does it.
-                                Text {
-                                    visible: win.view.kind === "curated" && win.curateAsk
-                                    Layout.fillWidth: true
-                                    Layout.maximumWidth: implicitWidth
-                                    elide: Text.ElideRight
-                                    text: "Claude picks new albums in a few minutes, on your Claude plan"
-                                    color: c.dim; font.family: c.font; font.pixelSize: 12
-                                }
+                                // Curated: a new list by Claude, asked first in curatePanel
                                 Repeater {
                                     model: win.view.kind !== "curated" || win.curating ? []
                                          : !win.curatedReady ? [{ label: win.setupStarted ? "Open Claude again" : "Set up with Claude", glyph: "sparkles", strong: true, act: () => win.startSetup() }]
-                                         : win.curateAsk ? [{ label: "Make it", glyph: "sparkles", strong: true, act: () => win.curate() },
-                                                            { label: "Cancel", glyph: "", strong: false, act: () => win.curateAsk = false }]
                                          : (win.curated.length ? [{ label: "Pick for me", glyph: "dices", strong: false, tip: "An album you haven't played in a while", keys: "r", act: () => win.pick("curated") }] : [])
                                            .concat([{ label: "New list", glyph: "refresh-cw", strong: false, tip: "Claude picks new albums", act: () => win.curateAsk = true }])
                                     // The one to press keeps its label in one pane, the others are their glyphs
@@ -1355,6 +1345,17 @@ ShellRoot {
             Text {
                 width: parent.width; wrapMode: Text.Wrap; color: c.faint; font.family: c.font; font.pixelSize: 11
                 text: "Later: Curated (⌘2) has the same button. To do it yourself: Deck's README, " + (win.hasApp ? "" : "Create your own Spotify app and ") + "Setting up Curated."
+            }
+        }
+
+        CuratePanel {
+            id: curatePanel
+            visible: win.curateAsk
+            c: win.look
+            onAnswered: yes => {
+                if (yes) win.curate()
+                else win.curateAsk = false
+                list.forceActiveFocus()
             }
         }
 
