@@ -72,7 +72,7 @@ Browse has Popular (top 100) and categories: Flathub's most installed apps that 
 Terminals Fedora's terminals first (Ghostty, kitty, Alacritty, foot, Ptyxis). System ›
 Remove has Software (both) and Webapps, and its search looks in both.
 
-Nightdrive's own apps (Mail, Contacts, Deck) and Tailscale come with every install; Garage, Nightdrive's app for virtual machines,
+Nightdrive's own apps (Mail, Contacts, Deck, Ferry) and Tailscale come with every install; Garage, Nightdrive's app for virtual machines,
 waits in System › Install › Recommended. Everything else is an optional part: the
 installer adds the ones on by default (or the ones you tick with `./install.sh --choose`), and the rest are under System ›
 Install: apps Nightdrive sets up (1Password, Home Assistant…), ready-made web apps with a keybinding, and plugins for
@@ -108,11 +108,10 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Snippets**: text snippets in launcher › Tools › Snippets; Enter pastes one. Turn on auto-expand and typing a trigger
   anywhere replaces it with the text. A text can have several lines (an email signature): Shift+Enter adds a line break,
   shown as ↵, or `nightdrive snippets set s# - < signature.txt` reads one from a file.
-- **From your phone** (experimental plugins): [LocalSend](plugins/localsend/README.md) receives files from a phone after
-  you accept them in a notification, and [AirPlay Receiver](plugins/airplay-receiver/README.md) mirrors an iPhone, iPad or
-  Mac into a window. [Ferry](plugins/ferry/README.md) is a
-  mailbox over Tailscale: drop files on its top bar icon and they wait for the phone, which needs no app, only a web page
-  on its Home Screen.
+- **From your phone**: [Ferry](plugins/ferry/README.md), Nightdrive's own, is a mailbox over Tailscale: drop files on its
+  top bar icon and they wait for the phone, which needs no app, only a web page on its Home Screen. Two experimental
+  plugins: [LocalSend](plugins/localsend/README.md) receives files from a phone after you accept them in a notification,
+  and [AirPlay Receiver](plugins/airplay-receiver/README.md) mirrors an iPhone, iPad or Mac into a window.
 - **[Screen Mirroring](plugins/mirroring/README.md)**: mirror the screen to an Apple TV or an AirPlay TV from the display menu or the launcher (search
   "airplay"), with sound. Google Cast works from Chromium (⋮ › Cast…). Sharing the screen, for these and video calls, asks
   in a themed window: the whole screen or one window.
@@ -178,7 +177,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | External display | Hyprland | workspaces 1–9 on the external display, one on the laptop's screen (⌘0, a laptop icon in the bar); with the lid closed only the external display is used, and the login screen shows on the screen you're on; where the laptop's screen is (below, above, left or right of the display, for the pointer to cross where they meet) in launcher › Settings › Display |
 | Lock and idle | the login screen as the lock (Quickshell), hypridle | screensaver after 10 min, lock after 30 min (screensaver and screen-off times: Settings › Screensaver) |
 | Smart home (optional) | [Home Assistant](plugins/home-assistant/README.md) | Home in the launcher: rooms and their devices, Enter turns one on/off or runs a scene, ←/→ sets a light's brightness; pinned devices in the top bar's Home menu; the webapp. Local, Tailscale and Nabu Casa addresses tried in order |
-| Phone (optional) | [LocalSend](https://localsend.org) receiver, [UxPlay](https://github.com/FDH2/UxPlay), Ferry (own, over `tailscale serve`) | files and text from a phone, asked first in a notification; an iPhone, iPad or Mac mirrored into a window; a mailbox both ways with a web page and Web Push. All experimental |
+| Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own, over `tailscale serve`); optional: [LocalSend](https://localsend.org) receiver, [UxPlay](https://github.com/FDH2/UxPlay) | a mailbox both ways with a web page and Web Push; files and text from a phone, asked first in a notification; an iPhone, iPad or Mac mirrored into a window (both experimental) |
 | [Mac Keyboard Shortcuts](plugins/keyd/README.md) (optional) | [keyd](https://github.com/rvaiya/keyd), a Nautilus extension | ⌥⌫ deletes a word, ⌘⌫ to the line start; Files like Finder: Enter renames, ⌘O opens, ⌘⌫ to the trash |
 | Optional parts | everything marked optional above, Jottacloud, VS Code | chosen when installing; the rest later in launcher › System › Install (Recommended: apps Nightdrive sets up; Webapp; Plugins: desktop features like Screen Mirroring) or `nightdrive plugins` (`plugins.txt` and [`plugins/`](plugins/README.md)). A part that isn't installed doesn't show anywhere: no launcher level, bar icon or keybinding. One installed later (the launcher, `dnf`, Flatpak) shows up by itself |
 
@@ -219,7 +218,7 @@ sudo dnf install -y git   # not in a fresh install
 git clone https://github.com/nightdrive-sh/nightdrive.git ~/dotfiles
 cd ~/dotfiles
 ./install.sh              # asks nothing: system update, packages, fonts, the notch setting, config links, Claude
-                          # Code, Tailscale, Mail, Contacts, Deck, login screen and the default optional parts
+                          # Code, Tailscale, Mail, Contacts, Deck, Ferry, login screen and the default optional parts
 ```
 
 It tells which machine it's on and then runs unattended (sudo asks for the password once at the start); the system
@@ -227,7 +226,7 @@ update takes a while. On a Mac it first asks for the keyboard layout, if it's st
 screen's password is typed with it (`--keyboard "fi mac"` answers in advance). A minimal Fedora gets what a desktop
 edition would have: it boots to the login screen, the firewall has the desktop's settings as on Fedora KDE (so LocalSend
 and AirPlay are reached), and SSH is off until you turn on Remote login (Launcher › Settings), unless you install over
-ssh. Claude Code, Tailscale, Mail, Contacts and Deck come with every install, like the rest of the desktop: each stays quiet until
+ssh. Claude Code, Tailscale, Mail, Contacts, Deck and Ferry come with every install, like the rest of the desktop: each stays quiet until
 you set it up. The optional parts that are on by default (Apostrophe, YouTube) come too, and the rest can be added later from the
 Launcher (System › Install) or with `nightdrive plugins install ID` (`nightdrive apps install garage` for an app).
 
@@ -240,21 +239,21 @@ Machine: Apple Silicon Mac (Fedora Asahi Remix, keyboard: fi mac)
   Nightdrive apps
    1 [x] Contacts          Your iCloud and Google contacts in a window of their own, kept in sync
    2 [x] Deck              Spotify player (needs Premium), Launcher and top bar
-   3 [ ] Garage            Virtual machines: start, snapshot and restore them
-   4 [x] Mail              Mail over notmuch: quiet reading, notifications, Claude's replies
+   3 [x] Ferry             Files and text both ways with your phone over Tailscale, no app
+   4 [ ] Garage            Virtual machines: start, snapshot and restore them
+   5 [x] Mail              Mail over notmuch: quiet reading, notifications, Claude's replies
 
   Recommended apps
-   5 [ ] 1Password         Password manager: Launcher › Passwords, op CLI, SSH agent
-   6 [x] Apostrophe        Markdown editor (Flatpak), opens .md files
+   6 [ ] 1Password         Password manager: Launcher › Passwords, op CLI, SSH agent
+   7 [x] Apostrophe        Markdown editor (Flatpak), opens .md files
    …
 
   Web apps
-  12 [ ] Slack             Slack as a web app (Hyper+S)
+  13 [ ] Slack             Slack as a web app (Hyper+S)
    …
 
   Plugins
-  16 [ ] AirPlay Receiver  Mirror an iPhone, iPad or Mac here (UxPlay, experimental)
-  17 [ ] Ferry             Files and text both ways with your phone over Tailscale, no app (experimental)
+  17 [ ] AirPlay Receiver  Mirror an iPhone, iPad or Mac here (UxPlay, experimental)
    …
 
   22 [ ] Install all       every optional part above
@@ -291,12 +290,12 @@ desktop behind the login screen).
 | `--vm` | The virtual machine settings, if the VM isn't detected as one ([docs/vm.md](docs/vm.md)) |
 | `--no-nvidia` | On a PC, leaves an NVIDIA card's driver alone instead of installing RPM Fusion's ([docs/pc.md](docs/pc.md)) |
 | `--with 1password,slack` | These optional parts on top of the defaults (`--dry-run` lists the ids) |
-| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail, Contacts or Deck too |
-| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale, Mail, Contacts and Deck come with each |
+| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail, Contacts, Deck or Ferry too |
+| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale, Mail, Contacts, Deck and Ferry come with each |
 | `--dry-run` | Shows the optional parts, the packages and system settings it would add and what it would remove, then stops |
 
 At your first login, **Welcome to Nightdrive** opens and asks first whether you have Claude Code (a Pro or Max plan).
-With Claude, sign in there first, then it sets up Tailscale, Mail, Contacts and Deck with you, each in a Claude session of its own
+With Claude, sign in there first, then it sets up Tailscale, Mail, Contacts, Deck and Ferry with you, each in a Claude session of its own
 that does only that one thing. Without, it shows each one's steps right there, one at a time in plain words. Or choose
 *I'll do it myself*: a list of the apps, each opening its README in Apostrophe, and Finish when you're done. Leave what
 you don't need; Back in the list asks the question again, Launcher › System › *Set up Nightdrive* (or
@@ -356,7 +355,7 @@ You can also update any time from the launcher (**Update**) or a terminal:
 nightdrive update   # pulls Nightdrive (and Deck), relinks, installs new packages, updates the system, reloads the desktop
 ```
 
-An install that doesn't have one of Nightdrive's apps yet (Mail, Contacts, Deck) gets it with the update, once: one you remove
+An install that doesn't have one of Nightdrive's apps yet (Mail, Contacts, Deck, Ferry) gets it with the update, once: one you remove
 afterwards isn't installed again: it is back in launcher › System › Install › Recommended (or `nightdrive plugins
 install mail`). Settings › Apps › Nightdrive apps turns one off or on.
 
@@ -389,12 +388,12 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
 | `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also launcher › Settings › Top bar › Date format |
-| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Garage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
+| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
 | `nightdrive plugins` | Optional parts and whether each is installed and on; `nightdrive plugins install home-assistant` runs one's installer |
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the launcher) |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
 | `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the launcher; `--dir ~/dotfiles` starts it in that folder (`~/Projects` otherwise), `--name "Clock"` names the session (as `/rename`), `--effort high` sets its effort level (low to max), `--background` opens it without taking the keyboard from the window you are typing in, on the workspace of the window it was run from even if you have moved to another, with a notification that goes to it; `--workspace 3` opens it on that workspace |
-| `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
+| `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck, Ferry… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
 ## Keys
 

@@ -1,0 +1,21 @@
+#!/bin/bash
+# Setting up Ferry with Claude (plugin.conf's setup, run in this folder; Welcome to Nightdrive runs it after Tailscale's):
+# Claude checks what stands in Ferry's way (`ferry list --json`'s setup step: Tailscale, the tailnet's HTTPS
+# certificates, Tailscale's permission), helps clear it, and walks the phone through Add Device. The phone's page and
+# the tailnet's admin console stay in the browser.
+dir=$(dirname "$(readlink -f "$0")")
+"$HOME/.config/hypr/scripts/claude-setup" ferry Ferry <<EOF
+Set up Ferry with me, by $dir/README.md. First say in a few plain sentences what Ferry is for: a mailbox between this
+computer and my phone, for photos, files, text and links both ways, from anywhere over Tailscale, with no app on the
+phone (a page added to the Home Screen). Then run \`ferry list --json\` and read its "setup": null means Ferry is on my
+tailnet; otherwise it names the first thing in the way, with what to do. Tailscale comes first: if it isn't logged in,
+tell me to set up Tailscale in Welcome to Nightdrive first and stop there. If the tailnet's HTTPS certificates are off,
+open https://login.tailscale.com/admin/dns for me and tell me to turn on HTTPS Certificates at the bottom of that page.
+If Tailscale needs permission, give me \`! sudo tailscale set --operator=\$USER\` to run myself. After each fix run
+\`ferry enable\`, then check \`ferry list --json\` again. Once "setup" is null, add my phone: run \`ferry app\` and tell
+me to pick Add Device there, scan the QR code with the phone's camera, open the page, add it to the Home Screen
+(Share › Add to Home Screen on an iPhone), open Ferry from there and tap Turn on notifications. Check that "push" in
+\`ferry list --json\` grows to 1 or more. Finish by telling me where Ferry lives now: the inbox icon in the top bar
+(its menu lists what my devices sent, and Aa, Send Clipboard and + send to the phone), and that files dropped on the
+icon go to the phone.
+EOF
