@@ -21,22 +21,34 @@ APP_TITLE=Deck
 APP_IPC=deck
 . "$QS_DIR/kit/app.sh"
 
-# A Deck plays: its state file's pid lives (a killed one leaves the file behind)
-player_running() {
+# A Deck answers `deck ctl`: its state file's pid (its Now Playing helper's, which serves the control socket) lives.
+# A killed one leaves the file behind.
+player_ready() {
   local pid
   pid=$(jq -r '.pid // empty' "$RUNTIME/state.json" 2>/dev/null)
   [[ -n $pid && -d /proc/$pid ]]
 }
 
+# A Deck runs: it holds its lock from its very start, before it has signed in (Deck's src/instance.rs). The state file
+# alone let a second Deck start beside one that was still signing in or had lost its helper, and both played (#1680).
+# A Deck built before the lock shows only by its state file.
+player_running() {
+  { [[ -e $RUNTIME/deck.lock ]] && ! flock -n "$RUNTIME/deck.lock" true; } || player_ready
+}
+
+# Starts the player if none runs, then waits until it answers, so a command right after (deck-ctl) reaches it
 start_player() {
-  player_running && return 0
-  mkdir -p "$(dirname "$SERVE_LOG")"
-  setsid -f "$DECK" serve >"$SERVE_LOG" 2>&1 </dev/null
+  if ! player_running; then
+    mkdir -p "$(dirname "$SERVE_LOG")"
+    setsid -f "$DECK" serve >"$SERVE_LOG" 2>&1 </dev/null
+  fi
   for _ in $(seq "$START_WAIT"); do
-    player_running && return 0
+    player_ready && return 0
     sleep 0.2
   done
-  # Still starting (the first sign-in waits for the browser), or it stopped: then its last words say why
+  # Still signing in (the first sign-in waits for the browser), or it stopped: then its last words say why. A Deck
+  # built before the lock shows only as a process.
+  player_running && return 0
   pgrep -xf "$DECK serve" >/dev/null && return 0
   notify-send -a Deck "Deck didn't start" "$(tail -n 1 "$SERVE_LOG" 2>/dev/null)"
   return 1
