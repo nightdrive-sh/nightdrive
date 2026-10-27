@@ -4,9 +4,10 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 
-// Claude writes: the preview by the text after ⌘⇧C (hypr/scripts/claude-write, which reads the selection and the
-// window; the place, by the text or the window: ClaudeWritePlace.qml). Claude's text shows here first, and goes in place of the selection only with Enter: Esc or a click outside
-// cancels, ⌘⇧C again writes another version; the card's buttons do the same with the mouse (ClaudeWriteButton.qml).
+// Claude writes: the preview after ⌘⇧C, in the middle of the window (hypr/scripts/claude-write, which reads the
+// selection and the window; the place: ClaudeWritePlace.qml). Claude's text shows here first, and goes in place of the
+// selection only with Enter: Esc or a click outside cancels, ⌘⇧C again writes another version; the card's buttons do
+// the same with the mouse (ClaudeWriteButton.qml).
 // In a terminal it is the command for what the selection asked, with a warning when it deletes, overwrites or needs
 // root; Enter puts it on the command line, it doesn't run it. In a Claude Code session (meta.claude) it is text, and
 // Enter inserts it at the prompt's cursor: a terminal can't replace a selection.
@@ -17,8 +18,8 @@ import Quickshell.Wayland
 //   qs ipc call write again
 //   qs ipc call write close         as Esc (for testing: the card takes the keyboard)
 //   qs ipc call write ask <dir>    another app's request (Mail's reply, plugins/mail): dir/meta.json { window (its
-//                                  { x, y, w, h } on the desktop: the card goes in its middle), sent (the line saying what goes to Claude), accept (Enter's
-//                                  hint), draft, reply, cancel (commands, as lists) }. draft prints {text, sent} or
+//                                  { x, y, w, h } on the desktop: the card goes in its middle), sent (the line saying
+//                                  what goes to Claude), accept (Enter's hint), draft, reply, cancel (commands, as lists) }. draft prints {text, sent} or
 //                                  {error}; Enter writes dir/result and runs reply instead of pasting; cancel, if given,
 //                                  runs on Esc or a click outside
 // (Not named *Menu.qml: shell.qml treats those as top bar menus.)
@@ -51,8 +52,9 @@ PanelWindow {
         typed = !meta.draft && !fresh
         selection = meta.draft || typed ? "" : selFile.text()
         sent = meta.draft ? meta.sent || "" : selection
-        // The screen the text is on: the caret's or the window's middle, else the focused one
-        const w = meta.window && meta.window.w ? meta.window : null, px = w ? w.x + w.w / 2 : meta.x || 0, py = w ? w.y + w.h / 2 : meta.y || 0
+        // The screen the window is on (its middle), else the focused one
+        const w = meta.window && meta.window.w ? meta.window : null
+        const px = w ? w.x + w.w / 2 : -1, py = w ? w.y + w.h / 2 : -1
         const f = Hyprland.focusedMonitor
         screen = Quickshell.screens.find(s => px >= s.x && px < s.x + s.width && py >= s.y && py < s.y + s.height)
               || (f && Quickshell.screens.find(s => s.name === f.name)) || Quickshell.screens[0]
@@ -189,20 +191,18 @@ PanelWindow {
         else if (a === "write") write()
     }
 
-    // In the middle of the window (meta.window: the script's, or the app's that asked), else by a caret (meta.x, meta.y)
+    // In the middle of the window (meta.window: the script's, or the app's that asked)
     readonly property real sx: screen ? screen.x : 0
     readonly property real sy: screen ? screen.y : 0
     ClaudeWritePlace {
         id: place
-        atLine: !win.meta.window && win.meta.x !== undefined
-        line: place.around((win.meta.x || 0) - win.sx, (win.meta.y || 0) - win.sy)
-        window: win.meta.window && win.meta.window.w ? Qt.rect(win.meta.window.x - win.sx, win.meta.window.y - win.sy, win.meta.window.w, win.meta.window.h)
-                                : Qt.rect(0, 0, 0, 0)
+        readonly property var w: win.meta.window
+        window: w && w.w ? Qt.rect(w.x - win.sx, w.y - win.sy, w.w, w.h) : Qt.rect(0, 0, 0, 0)
         screenWidth: win.width; screenHeight: win.height
         width: card.width; height: card.height
     }
     // The card around the text box: its padding, header, warning and buttons. The text box gets the rest of the room
-    // on its side, and scrolls what doesn't fit
+    // below the card's top, and scrolls what doesn't fit
     readonly property real chrome: 36 + header.height + 12 + 12 + 38 + (warn.visible ? warn.height + 12 : 0)
     readonly property real textMax: Math.max(60, place.room - chrome - 28)
 
