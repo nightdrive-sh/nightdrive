@@ -5,7 +5,7 @@ trace of the octave, E major, a small room. generate.py writes them; this file o
 import math, random
 
 import generate
-from generate import SR, mix, reverb
+from generate import SR, mix, reverb, slide
 
 E4, Gs4, E5, Gs5, B5 = 329.63, 415.305, 659.26, 830.61, 987.77
 
@@ -13,17 +13,6 @@ E4, Gs4, E5, Gs5, B5 = 329.63, 415.305, 659.26, 830.61, 987.77
 def note(freq, dur, kind="sine", start=0.0, attack=0.004, decay=0.12, amp=1.0):
     """generate.note() made at 0 and shifted: its own buffer can come out a sample short with a fractional start."""
     return [0.0] * int(start * SR) + generate.note(freq, dur, kind, 0.0, attack, decay, amp)
-
-
-def slide(freq, to, dur, decay, glide):
-    """A tone gliding from freq to `to` over glide seconds: a pop up or down."""
-    buf, ph = [], 0.0
-    for i in range(int(dur * SR)):
-        t = i / SR
-        env = min(t / 0.003, 1.0) * math.exp(-t / decay)
-        buf.append((math.sin(ph) + 0.12 * math.sin(2 * ph)) * env)
-        ph += 2 * math.pi * freq * (to / freq) ** min(t / glide, 1.0) / SR
-    return buf
 
 
 def click(centre, dur, decay, start=0.0, amp=1.0, q=3.0, seed=1):

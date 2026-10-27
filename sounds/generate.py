@@ -99,23 +99,21 @@ AGENT = {
 }
 
 
-def swoosh(f0, ratio, dur, q=1.4, decay=.5, shape=2.0, seed=3):
-    """Air: noise through a band-pass whose centre glides f0 -> f0*ratio, swelling and fading over dur."""
-    rnd = random.Random(seed)
-    out, low, band = [], 0.0, 0.0
+def slide(freq, to, dur, decay, glide):
+    """A tone gliding from freq to `to` over glide seconds: a pop up or down."""
+    buf, ph = [], 0.0
     for i in range(int(dur * SR)):
         t = i / SR
-        f = 2 * math.sin(math.pi * min(f0 * ratio ** (t / dur), 9000) / SR)
-        low += f * band
-        band += f * (rnd.uniform(-1, 1) - low - band / q)
-        out.append(band * math.sin(math.pi * t / dur) ** shape * math.exp(-t / decay))
-    return out
+        env = min(t / 0.003, 1.0) * math.exp(-t / decay)
+        buf.append((math.sin(ph) + 0.12 * math.sin(2 * ph)) * env)
+        ph += 2 * math.pi * freq * (to / freq) ** min(t / glide, 1.0) / SR
+    return buf
 
 
-# plugins/mail: a message has gone (Mail plays it after sending, in the background). A soft, deep swoosh rising away.
-# Name → (sound, peak dBFS)
+# plugins/mail: a message has gone (Mail plays it as Send is pressed). A quick pop gliding up B5 -> E6, picked by ear
+# (#1690) over swooshes and chimes: a two-note B5 E6 sounded like Mario's coin, the glide doesn't. Name → (sound, peak dBFS)
 MAIL = {
-    "sent": (lambda: reverb(swoosh(350, 6, .6), wet=.12, tail=.07), -18),
+    "sent": (lambda: reverb(slide(B5, E6, .22, .06, .04), wet=.2), -21),
 }
 
 
