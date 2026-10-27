@@ -7,6 +7,8 @@ import Quickshell.Services.UPower
 // Plugging in the charger takes the notification away. A desktop without a battery never gets one.
 // From `lastAt` on, the open windows are kept each minute, so the next login can open them again if the battery runs
 // out (hypr/scripts/reopen session); the charger drops them.
+// Sounds (hypr/scripts/sounds event): the warning plays system/battery-low instead of the urgent chime, and plugging in
+// the charger plays system/charger. Neither in do not disturb or under the login screen: they happen by themselves.
 Scope {
     id: w
 
@@ -36,6 +38,16 @@ Scope {
     function session(what) {
         Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/reopen", "session", what])
     }
+    function sound(name) {
+        if (!Notifs.dnd && !Notifs.locked)
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/sounds", "event", name])
+    }
+    // UPower's "on battery" going false is the charger plugged in (a machine without a battery never is on battery).
+    // Its first value comes as Quickshell starts and is only ever true then, so it never chimes.
+    Connections {
+        target: UPower
+        function onOnBatteryChanged() { if (!UPower.onBattery && w.present) w.sound("charger") }
+    }
     function clear() { Notifs.history = Notifs.history.filter(h => h.tag !== "Battery\n" + tag) }
     function warn(last) {
         const mins = dev.timeToEmpty > 0 ? Math.round(dev.timeToEmpty / 60) : 0
@@ -46,7 +58,9 @@ Scope {
         Quickshell.execDetached(["gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
             "--object-path", "/org/freedesktop/Notifications", "--method", "org.freedesktop.Notifications.Notify",
             "Battery", "0", "lucide:battery-warning", last ? "Battery almost empty" : "Battery low", body, "[]",
-            "{'urgency': <byte 2>, 'x-dunst-stack-tag': <'" + tag + "'>, 'value': <int32 " + pct + ">}", "int32 -1"])
+            "{'urgency': <byte 2>, 'x-dunst-stack-tag': <'" + tag + "'>, 'value': <int32 " + pct + ">, 'suppress-sound': <true>}",
+            "int32 -1"])
+        sound("battery-low")
     }
 
     Timer {

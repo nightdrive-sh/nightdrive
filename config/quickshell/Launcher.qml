@@ -248,9 +248,9 @@ PanelWindow {
         power: [
             { kind: "action", name: "Lock", glyph: "lock", cmd: ["loginctl", "lock-session"] },
             { kind: "action", name: "Sleep", glyph: "moon", cmd: ["systemctl", "suspend"] },
-            { kind: "action", name: "Log out", glyph: "log-out", cmd: ["hyprctl", "dispatch", "hl.dsp.exit()"] },
-            { kind: "action", name: "Restart", glyph: "rotate-cw", confirm: true, cmd: ["systemctl", "reboot"] },
-            { kind: "action", name: "Shut down", glyph: "power", confirm: true, cmd: ["systemctl", "poweroff"] }
+            { kind: "action", name: "Log out", glyph: "log-out", cmd: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-end", "logout"] },
+            { kind: "action", name: "Restart", glyph: "rotate-cw", confirm: true, cmd: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-end", "reboot"] },
+            { kind: "action", name: "Shut down", glyph: "power", confirm: true, cmd: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-end", "poweroff"] }
         ]
     })
 
@@ -962,10 +962,11 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         color: Theme.launcherBg
         border.color: Theme.primary
         border.width: 2
-        // Enter with no results: the card shakes side to side ("no match")
+        // Enter with no results: the card shakes side to side ("no match"), with the error sound (hypr/scripts/sounds)
         transform: Translate { id: shakeShift }
         SequentialAnimation {
             id: shake
+            onStarted: Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/sounds", "event", "error"])
             NumberAnimation { target: shakeShift; property: "x"; to: -16; duration: 45; easing.type: Easing.OutQuad }
             NumberAnimation { target: shakeShift; property: "x"; to: 16; duration: 80; easing.type: Easing.InOutQuad }
             NumberAnimation { target: shakeShift; property: "x"; to: -10; duration: 70; easing.type: Easing.InOutQuad }

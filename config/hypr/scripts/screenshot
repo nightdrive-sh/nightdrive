@@ -22,12 +22,16 @@ pick_window() {
 # The notification: "Screenshot" with the launcher's glyph for the kind (Tools › Screenshot: crop, app-window, monitor),
 # the picture under the text (category x-nightdrive.preview: quickshell/NotificationCard.qml). Straight over D-Bus:
 # notify-send -i sets the picture, not the app's icon. The picture is a file:// URI (a bare path is taken as an icon name).
+# It doesn't chime (suppress-sound): the shutter has played as the picture was taken.
 # Usage: notify <picture> <text> <glyph>
 notify() {
   gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications \
     --method org.freedesktop.Notifications.Notify Screenshot 0 "lucide:$3" \
-    "$2" "" "[]" "{'category': <'x-nightdrive.preview'>, 'image-path': <'file://$1'>}" 'int32 -1' >/dev/null   # (as text: a bare -1 would be an option)
+    "$2" "" "[]" "{'category': <'x-nightdrive.preview'>, 'image-path': <'file://$1'>, 'suppress-sound': <true>}" 'int32 -1' >/dev/null   # (as text: a bare -1 would be an option)
 }
+
+# The shutter (system/screenshot.wav), as soon as grim has the picture
+shutter() { "$HOME/.config/hypr/scripts/sounds" event screenshot & }
 
 # Clipboard only: the picture for the notification's preview in the runtime dir (gone at logout)
 clip=${XDG_RUNTIME_DIR:-/tmp}/screenshots
@@ -40,7 +44,7 @@ case "$mode" in
     esac
     mkdir -p "$clip"; find "$clip" -name '*.png' -mmin +60 -delete 2>/dev/null
     f=$clip/$(date +%H-%M-%S-%N).png
-    grim ${geom:+-g "$geom"} "$f" && wl-copy --type image/png < "$f"
+    grim ${geom:+-g "$geom"} "$f" && shutter && wl-copy --type image/png < "$f"
     notify "$f" "$what copied to clipboard" "$glyph"; exit 0 ;;
 esac
 
@@ -52,5 +56,6 @@ case "$mode" in
   window) geom=$(pick_window) || exit 0;  grim -g "$geom" "$file"; glyph=app-window ;;
   *)      grim "$file"; glyph=monitor ;;
 esac
+[[ -s $file ]] && shutter
 wl-copy < "$file"
 notify "$file" "Saved and copied to clipboard" "$glyph"

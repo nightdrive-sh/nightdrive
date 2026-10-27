@@ -1,0 +1,14 @@
+#!/bin/bash
+# Ends the session with its sound: session-end logout | reboot | poweroff (the power dialog's and the launcher's Power
+# rows). It plays system/logout.wav or system/shutdown.wav (restart too: the machine goes down and Horizon greets it
+# again) and waits for it, as PipeWire goes with the session; then logs out, restarts or shuts down. With the desktop's
+# sounds off (Settings › Notifications › System sounds) it doesn't wait.
+case ${1:-} in
+  logout)   sound=logout;   cmd=(hyprctl dispatch 'hl.dsp.exit()') ;;
+  reboot)   sound=shutdown; cmd=(systemctl reboot) ;;
+  poweroff) sound=shutdown; cmd=(systemctl poweroff) ;;
+  *) echo "usage: session-end logout|reboot|poweroff" >&2; exit 2 ;;
+esac
+# At most a few seconds: a stuck audio server never keeps the machine from going down
+timeout 4 "$HOME/.config/hypr/scripts/sounds" event "$sound" >/dev/null 2>&1
+exec "${cmd[@]}"

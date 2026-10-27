@@ -12,12 +12,14 @@ PanelWindow {
     property bool open: false
     property int index: actions.length - 1     // Shut down is selected when the dialog opens
 
+    // Log out, Restart and Shut down play their sound first and wait for it (hypr/scripts/session-end)
+    readonly property string sessionEnd: Quickshell.env("HOME") + "/.config/hypr/scripts/session-end"
     readonly property var actions: [
         { name: "Lock",      glyph: "lock",      cmd: ["loginctl", "lock-session"] },
         { name: "Sleep",     glyph: "moon",      cmd: ["systemctl", "suspend"] },
-        { name: "Log out",   glyph: "log-out",   cmd: ["hyprctl", "dispatch", "hl.dsp.exit()"] },
-        { name: "Restart",   glyph: "rotate-cw", cmd: ["systemctl", "reboot"] },
-        { name: "Shut down", glyph: "power",     cmd: ["systemctl", "poweroff"] }
+        { name: "Log out",   glyph: "log-out",   cmd: [win.sessionEnd, "logout"] },
+        { name: "Restart",   glyph: "rotate-cw", cmd: [win.sessionEnd, "reboot"] },
+        { name: "Shut down", glyph: "power",     cmd: [win.sessionEnd, "poweroff"] }
     ]
 
     function show() { index = actions.length - 1; open = true; keys.forceActiveFocus() }

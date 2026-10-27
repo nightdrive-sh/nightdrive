@@ -1,11 +1,17 @@
 #!/bin/bash
 # Notification sounds (launcher Settings › Notifications; quickshell/Notifs.qml plays them). The files are in
 # ~/.local/share/nightdrive/sounds/<kind>/<name>.wav (the repo's sounds/, made by sounds/generate.py).
-# Choice: ~/.local/state/nightdrive/sounds, lines "<kind> <name>"; "none" = no sound.
+# Choice: ~/.local/state/nightdrive/sounds, lines "<kind> <name>"; "none" = no sound; "system off", "volume off".
 #
 #   sounds regular|urgent [NAME]       prints / sets the sound for regular or urgent (critical) notifications
 #   sounds play regular|urgent [NAME]  plays the chosen sound, or NAME (the launcher's preview)
 #   sounds file PATH                   plays a .wav as a notification sound (agent-warn, dictation's tones)
+#   sounds event NAME                  plays the desktop's sound NAME (system/NAME.wav: volume, screenshot, charger,
+#                                      battery-low, error, device-in, device-out, lock, logout, shutdown), unless turned off;
+#                                      it returns when the sound has played (session-end waits for it)
+#   sounds system|volume [on|off]      prints / sets whether the desktop's sounds play at all, and the volume keys' tick
+# Do not disturb silences only the sounds of things that happen by themselves (charger, battery, devices): their callers
+# in Quickshell check it. Feedback on what you just did (a key, a screenshot, a lock) always plays.
 # They play only on personal outputs, never on speakers in the room: the Mac's own speakers, wired headphones or Bluetooth
 # headphones. The current output when it is one of those; otherwise (AirPlay, a Bluetooth speaker, a screen's HDMI audio,
 # EasyEffects' sink) Bluetooth headphones if connected, then wired headphones if plugged in, then the Mac's speakers.
@@ -51,6 +57,17 @@ play_file() {
   [[ -n $sink ]] && target=(--target "$sink")
   exec pw-play --media-role=Notification "${target[@]}" "$1"
 }
+# The volume tick plays where the volume just changed, so it is heard at the new level; not on AirPlay, whose two
+# seconds' delay would make it a beat behind every key
+play_volume() {
+  [[ $(pactl get-default-sink 2>/dev/null) == raop_sink.* ]] && exit 0
+  exec pw-play --media-role=Notification "$dir/system/volume.wav"
+}
+switch() { [[ $( { awk -v k="$1" '$1 == k { print $2 }' "$state" 2>/dev/null || true; } | tail -n1) != off ]]; }
+save() {
+  mkdir -p "${state%/*}"
+  { grep -v "^$1 " "$state" 2>/dev/null || true; echo "$1 $2"; } > "$state.tmp" && mv "$state.tmp" "$state"
+}
 kind() { [[ -n ${default[${1:-}]+x} ]] || { echo "usage: sounds regular|urgent [NAME] | play regular|urgent [NAME]" >&2; exit 2; }; }
 
 if [[ ${1:-} == play ]]; then
@@ -60,9 +77,22 @@ if [[ ${1:-} == play ]]; then
   play_file "$dir/$2/$name.wav"
 fi
 [[ ${1:-} == file ]] && play_file "${2:?usage: sounds file PATH}"
+if [[ ${1:-} == event ]]; then
+  [[ -f $dir/system/${2:-}.wav ]] || { echo "no such sound: system/${2:-}" >&2; exit 1; }
+  switch system || exit 0
+  [[ $2 == volume ]] && { switch volume || exit 0; play_volume; }
+  play_file "$dir/system/$2.wav"
+fi
+if [[ ${1:-} == system || ${1:-} == volume ]]; then
+  case ${2:-} in
+    "") switch "$1" && echo on || echo off ;;
+    on|off) save "$1" "$2" ;;
+    *) echo "usage: sounds $1 [on|off]" >&2; exit 2 ;;
+  esac
+  exit 0
+fi
 
 kind "${1:-}"
 if [[ -z ${2:-} ]]; then get "$1"; exit 0; fi
 [[ $2 == none || -f $dir/$1/$2.wav ]] || { echo "no such sound: $1/$2" >&2; exit 1; }
-mkdir -p "${state%/*}"
-{ grep -v "^$1 " "$state" 2>/dev/null || true; echo "$1 $2"; } > "$state.tmp" && mv "$state.tmp" "$state"
+save "$1" "$2"

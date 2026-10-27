@@ -201,6 +201,7 @@ ShellRoot {
     NotificationPopups {}
 
     BatteryWatch {}
+    DeviceSounds {}
 
     Picker {}
 

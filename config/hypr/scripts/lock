@@ -10,6 +10,8 @@
 # app died" screen, whose way out (a text console) a Mac keyboard doesn't reach without Fn. It died at boot when a screen
 # went away as it was starting (Quickshell asked for a lock surface on the gone screen: a Wayland protocol error).
 # With allow_session_lock_restore (hyprland.lua) the new one takes the lock over. Steps go to the journal (journalctl -t lock).
+# A new lock plays system/lock.wav (hypr/scripts/sounds event); not at boot (the login screen has its own sound), nor
+# at a relock after sleep or a restart here.
 RESTARTS=5        # at most this many restarts within WINDOW seconds; then the "lock died" screen stays (still locked)
 WINDOW=60
 lock='[q]s -p .*/greeter/lock\.qml'
@@ -18,6 +20,7 @@ mine=(--ns $$ --nslist pid -u "$UID")
 pam=login; [[ -e /etc/pam.d/nightdrive-lock ]] && pam=nightdrive-lock   # it also opens the keyring (switch.sh autologin)
 quick=1; [[ $1 == --boot ]] && quick=
 starts=()
+[[ -z $1 ]] && { "$HOME/.config/hypr/scripts/sounds" event lock >/dev/null 2>&1 & }
 while :; do
   NIGHTDRIVE_LOCK_PAM=$pam NIGHTDRIVE_LOCK_QUICK=$quick qs -p "$HOME/.config/greeter/lock.qml"
   status=$?

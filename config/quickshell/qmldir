@@ -51,6 +51,7 @@ LevelRing 1.0 LevelRing.qml
 BatteryBar 1.0 BatteryBar.qml
 BatteryShape 1.0 BatteryShape.qml
 BatteryWatch 1.0 BatteryWatch.qml
+DeviceSounds 1.0 DeviceSounds.qml
 AirPodsSettings 1.0 AirPodsSettings.qml
 ThemeEditor 1.0 ThemeEditor.qml
 BehaviourLevels 1.0 BehaviourLevels.qml

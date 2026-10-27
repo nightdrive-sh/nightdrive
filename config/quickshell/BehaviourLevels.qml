@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 
 // The launcher's Settings › Mouse (the wheel's scroll speed), Launcher (fuzzy search, shortcut hints), Firefox (its links, tab bar and start), Computer name, Remote login (sshd), Notifications (how long a popup stays,
-// the two sounds, FUMonitor's alerts), Crash reports and Update channel. Startup stays in Launcher.qml: its rows are the app rows.
+// the two sounds, the desktop's own sounds on/off, FUMonitor's alerts), Crash reports and Update channel. Startup stays in Launcher.qml: its rows are the app rows.
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered), shows compName
 // channel and the mouse's speed on Settings' own rows, and calls entered("settings") to read them.
 Item {
@@ -128,6 +128,10 @@ Item {
                  ["arpeggio", "Arpeggio", "bell-ring"], ["pulse", "Pulse", "bell-ring"]]
     })
     readonly property var soundDefaults: ({ regular: "plip", urgent: "double-plip" })
+    // The desktop's own sounds (hypr/scripts/sounds event: screenshot, charger, devices, lock…) and the volume keys'
+    // tick: on | off, "" = not read yet (shown on)
+    property string systemSounds: ""
+    property string volumeTick: ""
     property string fumon: ""                 // uwsm's failed unit monitor (hypr/scripts/fumon): on | off | none, "" = not read yet
     function soundName(which, v) { return v === "none" ? "none" : (soundChoices[which].find(t => t[0] === v) || [])[1] }
     // Settings › Notifications › Show for: how long a popup stays (Notifs.timeout, read from its file)
@@ -141,7 +145,11 @@ Item {
         return [
             { kind: "nav", name: "Show for", glyph: "timer", target: "notiftime", summary: Math.round(Notifs.timeout / 1000) + " s" },
             { kind: "nav", name: "Regular sound", glyph: "bell", target: "soundregular", summary: soundName("regular", soundRegular) },
-            { kind: "nav", name: "Urgent sound", glyph: "bell-ring", target: "soundurgent", summary: soundName("urgent", soundUrgent) }
+            { kind: "nav", name: "Urgent sound", glyph: "bell-ring", target: "soundurgent", summary: soundName("urgent", soundUrgent) },
+            { kind: "syssound", key: "system", name: "System sounds", glyph: "volume-2", switchOn: systemSounds !== "off",
+              sub: "Screenshot, charger, battery, devices, lock, log out, errors" },
+            { kind: "syssound", key: "volume", name: "Volume key tick", glyph: "volume-1", switchOn: volumeTick !== "off",
+              sub: systemSounds === "off" ? "Off with the system sounds" : "A tick at the new level on each step" }
         ].concat(fumon === "on" || fumon === "off" ? [   // only where uwsm has fumon (up to 0.26)
             { kind: "fumon", name: "Failed service alerts", glyph: "triangle-alert", switchOn: fumon === "on",
               sub: "FUMonitor’s “Failed unit detected” and “Unit recovered”" }] : [])
@@ -154,11 +162,13 @@ Item {
     // Settings › Notifications: the current sounds; select the current one
     Sh {
         id: soundsProc
-        script: 's="$HOME/.config/hypr/scripts/sounds"; "$s" regular; "$s" urgent'
+        script: 's="$HOME/.config/hypr/scripts/sounds"; "$s" regular; "$s" urgent; "$s" system; "$s" volume'
         onResult: text => {
             const f = text.trim().split("\n")
             b.soundRegular = f[0] || ""
             b.soundUrgent = f[1] || ""
+            b.systemSounds = f[2] || ""
+            b.volumeTick = f[3] || ""
             const l = b.launcher
             if ((l.level === "soundregular" || l.level === "soundurgent") && l.query === "")
                 l.selectWhere(r => r.value === (l.level === "soundregular" ? b.soundRegular : b.soundUrgent))
@@ -183,6 +193,7 @@ Item {
     function footer(level, query) {
         const cur = launcher.results[launcher.selIndex] || {}
         if (level === "launcherprefs" || cur.kind === "firefox" || cur.kind === "remotelogin" || cur.kind === "remotenet" || cur.kind === "fumon" || cur.kind === "crashreports") return "Enter: on/off"
+        if (cur.kind === "syssound") return "Enter: on/off  ·  Shift+Enter: listen"
         if (cur.kind === "mousescroll") return "Enter: choose, then try the wheel"
         if (cur.kind === "sound") return "Enter: choose  ·  Shift+Enter: listen"
         if (level === "compname" && query.trim() !== "") return "Enter: rename (asks for your password)"
@@ -202,7 +213,10 @@ Item {
         if (level === "settings" || level === "crashreports") crashReportsProc.running = true
         if (level === "notiftime") Qt.callLater(() => launcher.selectWhere(r => r.summary === "current"))   // the cursor on the current time
     }
-    function shiftActivate(it) { if (it.kind === "sound") listenSound(it) }
+    function shiftActivate(it) {
+        if (it.kind === "sound") listenSound(it)
+        if (it.kind === "syssound") Quickshell.execDetached([scripts + "/sounds", "file", Quickshell.env("HOME") + "/.local/share/nightdrive/sounds/system/" + (it.key === "volume" ? "volume" : "screenshot") + ".wav"])
+    }
 
     function items(level, q) {
         if (level === "launcherprefs") {
@@ -297,6 +311,15 @@ Item {
             l.keepSelection()
             fumon = fumon === "on" ? "off" : "on"
             Quickshell.execDetached([scripts + "/fumon", fumon])
+            return true
+        }
+        if (it.kind === "syssound") {    // turned on, it plays one (the tick, or the screenshot's shutter) to hear it
+            l.keepSelection()
+            const on = !it.switchOn
+            if (it.key === "system") systemSounds = on ? "on" : "off"
+            else volumeTick = on ? "on" : "off"
+            Quickshell.execDetached(["bash", "-c", '"$1" "$2" "$3" && [ "$3" = on ] && "$1" event "$4"', "_", scripts + "/sounds",
+                                     it.key, on ? "on" : "off", it.key === "volume" ? "volume" : "screenshot"])
             return true
         }
         if (it.kind === "sound") {       // stays open: each sound plays as it's chosen, so they can be compared

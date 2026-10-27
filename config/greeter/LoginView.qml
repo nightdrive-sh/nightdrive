@@ -18,6 +18,11 @@ Item {
     readonly property string wallpaper: Quickshell.shellDir + "/background.jpg"
     // The beeps (sounds/generate.py: keys/); the greeter has its copy in /etc/greetd/greeter/sounds
     readonly property string sounds: Quickshell.shellDir + "/sounds/"
+    // An error line (a wrong password) plays system/error.wav. The greeter has it with the beeps (keys/error.wav is a
+    // link to it, so install.sh copies it too); lock.qml plays it through hypr/scripts/sounds instead, so Settings ›
+    // Notifications › System sounds silences it there.
+    property var errorCommand: ["pw-play", "--volume", "0.7", "-P", "{ node.dont-move = true }", sounds + "error.wav"]
+    onMessageChanged: if (message !== "" && main) Quickshell.execDetached(errorCommand)
 
     readonly property color bg: "#1a1b26"
     readonly property color text: "#c0caf5"

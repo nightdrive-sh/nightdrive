@@ -6,6 +6,8 @@ import Quickshell.Wayland
 // Toast at the top: volume, screen or keyboard brightness, do not disturb and mic mute.
 // The keybinding runs:  qs ipc call osd volume | brightness | kbd | dnd | mic
 // (called only after wpctl / brightnessctl / the dnd toggle, so this just reads the current state).
+// A volume key also ticks (hypr/scripts/sounds event volume: off in Settings › Notifications › System sounds), at the
+// new level, so you hear how loud it is; not when it's muted.
 Scope {
     id: osd
     property real volume: 0
@@ -35,6 +37,8 @@ Scope {
             const m = text.match(/([\d.]+)/)
             osd.volume = m ? parseFloat(m[1]) : 0
             osd.muted = text.indexOf("[MUTED]") >= 0
+            if (!osd.muted && osd.volume > 0)
+                Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/sounds", "event", "volume"])
             win.visible = true
             hide.restart()
         }

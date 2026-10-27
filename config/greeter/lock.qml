@@ -85,6 +85,7 @@ ShellRoot {
                 intro: !root.quick
                 busy: root.busy
                 message: root.message
+                errorCommand: [Quickshell.env("HOME") + "/.config/hypr/scripts/sounds", "event", "error"]
                 onTyping: root.message = ""
                 onSubmitted: password => root.submit(password)
             }
