@@ -223,10 +223,10 @@ It tells which machine it's on and then runs unattended (sudo asks for the passw
 update takes a while. On a Mac it first asks for the keyboard layout, if it's still the Minimal image's `us`: the login
 screen's password is typed with it (`--keyboard "fi mac"` answers in advance). A minimal Fedora gets what a desktop
 edition would have: it boots to the login screen, the firewall has the desktop's settings as on Fedora KDE (so LocalSend
-and AirPlay are reached), and SSH is off until you turn on Remote login (launcher › Settings), unless you install over
+and AirPlay are reached), and SSH is off until you turn on Remote login (Launcher › Settings), unless you install over
 ssh. Claude Code, Tailscale, Mail, Contacts and Deck come with every install, like the rest of the desktop: each stays quiet until
-you set it up. The optional parts that are on by default (YouTube) come too, and the rest can be added later from the
-launcher (System › Install) or with `nightdrive plugins install ID`.
+you set it up. The optional parts that are on by default (Apostrophe, YouTube) come too, and the rest can be added later from the
+Launcher (System › Install) or with `nightdrive plugins install ID`.
 
 To pick the optional parts yourself, run `./install.sh --choose`: it lists them first (a number toggles one, Enter
 continues):
@@ -235,28 +235,28 @@ continues):
 Machine: Apple Silicon Mac (Fedora Asahi Remix, keyboard: fi mac)
 
   Nightdrive apps
-   1 [x] Deck              Spotify player (needs Premium), launcher and top bar
-   2 [ ] Garage            Virtual machines: start, snapshot and restore them
-   3 [x] Mail              Mail over notmuch: quiet reading, notifications, Claude's replies
+   1 [x] Contacts          Your iCloud and Google contacts in a window of their own, kept in sync
+   2 [x] Deck              Spotify player (needs Premium), Launcher and top bar
+   3 [ ] Garage            Virtual machines: start, snapshot and restore them
+   4 [x] Mail              Mail over notmuch: quiet reading, notifications, Claude's replies
 
   Recommended apps
-   4 [ ] 1Password         Password manager: launcher › Passwords, op CLI, SSH agent
-   5 [x] Tailscale         VPN, in the top bar (log in from Settings › Tailscale)
+   5 [ ] 1Password         Password manager: Launcher › Passwords, op CLI, SSH agent
+   6 [x] Apostrophe        Markdown editor (Flatpak), opens .md files
    …
 
   Web apps
-  11 [ ] Slack             Slack as a web app (Hyper+S)
+  12 [ ] Slack             Slack as a web app (Hyper+S)
    …
 
   Plugins
-  14 [ ] AirPlay Receiver  Mirror an iPhone, iPad or Mac here (UxPlay, experimental)
-  15 [ ] Ferry             Files and text both ways with your phone over Tailscale, no app (experimental)
-  16 [ ] Mac Keyboard Shortcuts ⌥⌫ deletes a word, ⌘⌫ to the line start; Files: Enter renames, ⌘O opens, ⌘⌫ to the trash
+  16 [ ] AirPlay Receiver  Mirror an iPhone, iPad or Mac here (UxPlay, experimental)
+  17 [ ] Ferry             Files and text both ways with your phone over Tailscale, no app (experimental)
    …
 
-  19 [ ] Install all       every optional part above
+  22 [ ] Install all       every optional part above
 
-  20 [x] Remove services   28 installed packages a Mac doesn't use: realmd sssd-common sssd-kcm nfs-utils …
+  23 [x] Remove services   28 installed packages a Mac doesn't use: realmd sssd-common sssd-kcm nfs-utils …
 ```
 
 The last row is a Mac's only: the Minimal image's server services (network logins and shares, system logs, crash
@@ -289,7 +289,7 @@ desktop behind the login screen).
 | `--no-nvidia` | On a PC, leaves an NVIDIA card's driver alone instead of installing RPM Fusion's ([docs/pc.md](docs/pc.md)) |
 | `--with 1password,slack` | These optional parts on top of the defaults (`--dry-run` lists the ids) |
 | `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail, Contacts or Deck too |
-| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (YouTube); Tailscale, Mail, Contacts and Deck come with each |
+| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale, Mail, Contacts and Deck come with each |
 | `--dry-run` | Shows the optional parts, the packages and system settings it would add and what it would remove, then stops |
 
 At your first login, **Welcome to Nightdrive** opens and asks first whether you have Claude Code (a Pro or Max plan).
@@ -300,11 +300,12 @@ you don't need; Back in the list asks the question again, Launcher › System �
 `nightdrive welcome`) opens it again, and later logins ask with a notification until you finish it or say not to.
 
 A few things stay manual:
-- 1Password: in Settings › Developer, turn on *SSH agent* and *Integrate with 1Password CLI*. The launcher's Passwords level
+- 1Password: in Settings › Developer, turn on *SSH agent* and *Integrate with 1Password CLI*. The Launcher's Passwords level
   needs the CLI integration.
-- Open Firefox (and Thunderbird) once and run `./link.sh` again: it themes their profiles, which don't exist before the first start.
+- Thunderbird, if you chose it: open it once and run `./link.sh` again. It themes Thunderbird's profile, which doesn't exist
+  before the first start (Firefox's the installer makes itself).
 - Optionally, set up dictation ([docs/dictation.md](docs/dictation.md)).
-- More optional parts: launcher › System › Install (Recommended, Webapp, Plugins), or `nightdrive plugins`. Each opens its
+- More optional parts: Launcher › System › Install (Recommended, Webapp, Plugins), or `nightdrive plugins`. Each opens its
   installer in a terminal (a ready-made web app is added right away); running one again is safe.
 
 `./link.sh` on its own just (re)links the config files and is safe to run again. The repo can live anywhere; `~/dotfiles` is
