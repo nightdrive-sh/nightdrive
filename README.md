@@ -13,7 +13,7 @@ So I installed Fedora Asahi on my MacBook Pro and built Nightdrive, evening by e
 of help from Claude Code.
 
 > **Work in progress.** Nightdrive is my daily setup, published so others can use it or borrow from it. It's used every day on
-> a MacBook Pro 14″ (M2 Max) and tested in a virtual machine; PC support is new and not yet tested on real PC hardware.
+> a MacBook Pro 14″ (M2 Max), and tested on a PC and in a virtual machine.
 > Feedback, issues and ideas are very welcome.
 
 ## Why Nightdrive?
@@ -187,16 +187,19 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 One of these, with a minimal Fedora 44: Nightdrive adds what the desktop needs, nothing else. The installer tells which
 machine it's on and sets it up to match.
 
+- A **PC** (x86_64) with **Fedora 44** from the [Everything netinstall image](https://fedoraproject.org/misc/), with
+  *Fedora Custom Operating System* picked in its Software Selection, and NVIDIA, AMD or Intel graphics. See
+  [docs/pc.md](docs/pc.md) for the install and what differs from a Mac.
 - An **Apple Silicon Mac** (M1 or M2 series) with **[Fedora Asahi Remix](https://asahilinux.org/fedora/) 44**, its
   **Minimal** image (one of the choices in the Asahi installer). Used daily on a MacBook Pro 14″ with an M2 Max; other
   models should work, but you may need to adjust a few values (see [Make it yours](#make-it-yours)).
-- A **PC** (x86_64) with **Fedora 44** from the [Everything netinstall image](https://fedoraproject.org/misc/), with
-  *Fedora Custom Operating System* picked in its Software Selection, and NVIDIA, AMD or Intel graphics. Experimental, see
-  [docs/pc.md](docs/pc.md) for the install and what differs from the MacBook.
 - A Fedora 44 **virtual machine**, e.g. in Parallels on a Mac or with qemu on an Asahi Mac ([docs/vm.md](docs/vm.md)).
 
 The KDE edition of either (Fedora Asahi Remix with KDE Plasma, Fedora 44 KDE) works too, as Nightdrive was first built on
 it: KDE stays, as a fallback session, until `nightdrive minimal` takes it away ([Install](#install)).
+
+Claude's features (Claude writes, Ask Claude, Mail's Reply with Claude, Deck's Curated, setting things up with Claude in
+Welcome to Nightdrive) need a paid Claude plan, Pro or Max. The rest of Nightdrive works without one.
 
 ## Install
 

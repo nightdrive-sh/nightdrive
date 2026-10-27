@@ -1,8 +1,8 @@
-# Nightdrive on a PC (experimental)
+# Nightdrive on a PC
 
 Nightdrive is built on a MacBook, but runs on an x86_64 PC with a minimal **Fedora 44**. The installer recognises the
 machine (`nightdrive platform machine`: `asahi`, `pc` or `vm`) and prints it first, e.g.
-`Machine: PC (x86_64, graphics: nvidia, keyboard: fi)`. Not yet tested on real PC hardware: a report helps (Discussions).
+`Machine: PC (x86_64, graphics: nvidia, keyboard: fi)`.
 
 1. Download Fedora 44's **Everything netinstall** image for x86_64 from [fedoraproject.org/misc](https://fedoraproject.org/misc/)
    (Fedora 44, because the Hyprland COPR builds for that release) and write it to a USB stick (Fedora Media Writer, or
