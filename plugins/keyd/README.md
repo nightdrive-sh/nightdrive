@@ -2,7 +2,7 @@
 
 The text keys your fingers know from macOS, in every app, and Finder's keys in Files.
 
-| Keys | What they do |
+| Keys | |
 | --- | --- |
 | ⌥⌫ | Deletes the word before the cursor |
 | ⌘⌫ | Deletes to the start of the line; in Files, moves to the trash; in Thunderbird, deletes the message |

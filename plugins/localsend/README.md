@@ -10,7 +10,7 @@ Send files, photos and links between your phone and this computer with the free 
 
 ## To the phone
 
-- Right-click files in Files › Send with LocalSend, or use the launcher: Tools › Send clipboard / Send files with LocalSend.
+- Right-click files in Files › Send with LocalSend, or the Launcher: Tools › Send clipboard / Send files with LocalSend.
 - Keep LocalSend open on the phone: it asks before it saves anything.
 
 ## In a terminal

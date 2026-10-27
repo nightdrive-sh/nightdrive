@@ -1,11 +1,16 @@
 # Home Assistant
 
-Your smart home on the desktop: lights, switches and scenes from the launcher and the top bar.
+Your smart home on the desktop: lights, switches and scenes from the Launcher and the top bar.
 
-- Launcher › Home: your rooms, devices, scenes and scripts. Enter turns a device on or off, and ←/→ dims a light.
-- Shift+Enter pins a device to the Home menu in the top bar, where a click switches it and the scroll wheel dims it.
-- The house in the top bar fades while Home Assistant doesn't answer. A right click opens Home Assistant itself.
-- Give it several addresses (home, Tailscale, Nabu Casa), and it uses the first one that answers, at home or away.
+| Keys | |
+| --- | --- |
+| Enter | Turn a device on or off |
+| ← → | Dim a light |
+| Shift+Enter | Pin a device to the top bar's Home menu |
+
+- Launcher › Home has your rooms, devices, scenes and scripts.
+- In the top bar's Home menu, a click switches a device and the scroll wheel dims it. The house fades while Home Assistant doesn't answer, and a right click opens Home Assistant itself.
+- Give it several addresses (home, Tailscale, Nabu Casa), and it uses the first one that answers.
 
 ## Setting up
 
