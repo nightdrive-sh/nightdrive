@@ -798,24 +798,34 @@ ShellRoot {
                                     visible: win.view.kind === "album" && !!win.view.album.artist
                                     Layout.alignment: Qt.AlignBaseline
                                     Layout.leftMargin: 10
-                                    // Its own width (a long name at most this much); the year after it takes the rest
-                                    Layout.preferredWidth: Math.min(implicitWidth, 320)
+                                    // Its own width (a long name at most this much), the year after it in the same text, so
+                                    // that in a narrow window the year gives way first and then the name. fillWidth only so it
+                                    // can give way at all: without it a layout keeps the preferred width, and the album's
+                                    // buttons were pushed out past the window's edge.
+                                    Layout.preferredWidth: Math.min(Math.ceil(implicitWidth), 360)
+                                    Layout.maximumWidth: Math.min(Math.ceil(implicitWidth), 360)   // ceil: a layout rounds down, and half a pixel short elides the year
+                                    Layout.minimumWidth: 0
+                                    Layout.fillWidth: true
                                     elide: Text.ElideRight
-                                    text: visible ? win.view.album.artist : ""
+                                    textFormat: Text.StyledText
+                                    readonly property string name: visible ? win.view.album.artist.replace(/&/g, "&amp;").replace(/</g, "&lt;") : ""
+                                    text: !visible ? "" : (arh.hovered && linked ? "<u>" + name + "</u>" : name)
+                                        + (win.year(win.view.album) ? "<font color=\"" + c.dim + "\"> · " + win.year(win.view.album) + "</font>" : "")
                                     color: arh.hovered && linked ? c.text : c.dim; font.family: c.font; font.pixelSize: 12
-                                    font.underline: arh.hovered && linked
                                     HoverHandler { id: arh; enabled: albumArtist.linked; cursorShape: Qt.PointingHandCursor }
                                     TapHandler { enabled: albumArtist.linked; onTapped: win.openAlbumArtist() }
                                     Tip { y: parent.height + 8; c: win.look; text: "Open the artist"; hovered: arh.hovered }
                                 }
-                                // What it is, quieter on the same line (the album's year, how many Curated has)
+                                // What it is, quieter on the same line (the album's year, how many Curated has). After an
+                                // album's artist, which has the year, it is empty and only keeps the buttons at the right.
                                 Text {
                                     visible: win.view.kind !== "search"
                                     Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
                                     Layout.alignment: Qt.AlignBaseline
-                                    Layout.leftMargin: albumArtist.visible ? -4 : 10      // after the artist, a space's width (the row's spacing is 10)
+                                    Layout.leftMargin: albumArtist.visible ? 0 : 10
                                     elide: Text.ElideRight
-                                    text: win.subheading; color: c.dim; font.family: c.font; font.pixelSize: 12
+                                    text: albumArtist.visible ? "" : win.subheading; color: c.dim; font.family: c.font; font.pixelSize: 12
                                 }
                                 // An album's own buttons, as Curated's New list: play it, queue it, shelve it. The tip tells the key.
                                 Repeater {
@@ -842,7 +852,7 @@ ShellRoot {
                                             : { glyph: "play", label: "Play", tip: "Play the album", keys: "p", act: () => win.ctl(["play-album", win.view.album.uri]) },
                                         { glyph: "list-plus", label: "Queue", tip: "Queue the album", keys: "e", act: () => { win.ctl(["queue-album", win.view.album.uri]); win.note = "Queued: " + win.view.album.name } },
                                         win.shelfUris[win.view.album.uri]
-                                            ? { glyph: "check", label: "On the shelf", tip: "Take it off the shelf", keys: "a", act: () => win.shelve(null) }
+                                            ? { glyph: "check", label: "Shelf", tip: "On the shelf: take it off", keys: "a", act: () => win.shelve(null) }
                                             : { glyph: "library", label: "Shelf", tip: "Put it on the shelf", keys: "a", act: () => win.shelve(null) }
                                     ].concat(win.curatedUris[win.view.album.uri] ? [
                                         // A Curated suggestion: out of the list, and the next one learns from it
