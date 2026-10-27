@@ -1,0 +1,49 @@
+#!/bin/bash
+# Media keys: media play|pause|next|previous. They act on the player that is playing, else on the one that played last,
+# never simply the first one playerctl lists: with Deck open, a bare `playerctl play-pause` started Deck's music over a
+# YouTube video playing in Firefox.
+#   play      F8: pause what plays; nothing playing -> play the last player; no player at all -> start Deck (or bring its
+#             window up), if it is installed (plugins/deck, whose bin/deck-window is linked to ~/.local/bin)
+#   pause     always pause, never toggle (Bluetooth headphones send PAUSE when taken off): everything that plays
+#   next, previous   the player that plays, else the last one
+# "The last one" comes from playerctld, which keeps the players in order of activity (D-Bus starts it on first use,
+# hyprland.lua at login so it has seen the session's players from the start).
+
+# Every player and its status in one call: each playerctl call goes through all the players on D-Bus, and a busy browser
+# answers slowly, so a call per player made the keys lag
+players=() playing=()
+while read -r p status; do
+  [[ $p ]] || continue
+  players+=("$p")
+  [[ $status == Playing ]] && playing+=("$p")
+done < <(playerctl -a status --format '{{playerInstance}} {{status}}' 2>/dev/null)
+
+# The most recently active player by playerctld's order (bus names org.mpris.MediaPlayer2.<instance>), else the first one
+last() {
+  local names
+  names=$(busctl --user get-property org.mpris.MediaPlayer2.playerctld /org/mpris/MediaPlayer2 \
+    com.github.altdesktop.playerctld PlayerNames 2>/dev/null | grep -o '"org\.mpris\.MediaPlayer2\.[^"]*"' | head -1)
+  names=${names//\"/}
+  echo "${names#org.mpris.MediaPlayer2.}"
+}
+target() {
+  if (( ${#playing[@]} )); then echo "${playing[0]}"; return; fi
+  local p; p=$(last)
+  echo "${p:-${players[0]}}"
+}
+
+case $1 in
+  play)
+    if (( ${#playing[@]} )); then
+      for p in "${playing[@]}"; do playerctl -p "$p" pause; done
+    elif (( ${#players[@]} )); then
+      playerctl -p "$(target)" play
+    elif [[ -x $HOME/.local/bin/deck ]]; then
+      exec "$HOME/.local/bin/deck-window"
+    fi ;;
+  pause)
+    for p in "${playing[@]}"; do playerctl -p "$p" pause; done ;;
+  next|previous)
+    (( ${#players[@]} )) && playerctl -p "$(target)" "$1" ;;
+  *) echo "usage: media play|pause|next|previous" >&2; exit 2 ;;
+esac

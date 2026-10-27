@@ -2,7 +2,7 @@
 # deck-window [search QUERY | player | setup | configured | restart | quit | log]: Deck's window (app/, a Quickshell config of its own) over
 # the player, `deck serve`, which is started first if no Deck runs. The window only talks to the player, so closing it
 # leaves the music playing. `deck` opens it (Deck hands over to a deck-window on PATH; `deck tui` is Deck's own screen in
-# the terminal), and so do the launcher, the bar, Hyper+M and F8 (hypr/scripts/media-play), as ~/.local/bin/deck-window.
+# the terminal), and so do the launcher, the bar, Hyper+M and F8 (hypr/scripts/media), as ~/.local/bin/deck-window.
 set -u
 
 APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
