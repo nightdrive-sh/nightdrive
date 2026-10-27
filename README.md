@@ -3,7 +3,7 @@
 **A keyboard-driven Hyprland desktop for Fedora, on an Apple Silicon Mac (Fedora Asahi Remix) or a PC.**
 Mac-style ⌘ shortcuts, one launcher for everything, a top bar of thoughtful little menus, and a synthwave look.
 
-![Nightdrive: Firefox, Deck playing FM-84 and the launcher on top](docs/screenshots/desktop.jpg)
+![Nightdrive: Firefox, the Deck window playing FM-84, Mail and the Launcher on top](docs/screenshots/desktop.jpg)
 
 **Hi, I'm [Jari Lehtinen](https://github.com/jarilehtinen).** I've used a Mac for over 20 years. Every year or so I've tried a Linux distro or two, but none of them quite
 stuck. Omarchy came closest, but I wanted something built entirely around my own preferences and the apps I actually use.
