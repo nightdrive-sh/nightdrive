@@ -402,12 +402,17 @@ LIST
   (( deck )) && [[ -x $HOME/.local/bin/deck ]] && { echo "==> Deck (rebuild)"; "$repo/plugins/deck/install.sh" \
     || missed+=("Deck (rebuild): $repo/plugins/deck/install.sh"); }
 
-  # Ferry (plugins/ferry): its own app from its own repo, which the plugin installs, and Nightdrive's update brings its
-  # latest release along. A Ferry from before (the plugin's own server, until 10.2026; its state is still in Nightdrive's
-  # folder) is replaced by it here, with its phones and box: its old command and unit are gone from the plugin.
+  # Ferry (plugins/ferry): its own app from its own repo, which the plugin installs, and Nightdrive's update brings the
+  # release pinned there along. A Ferry from before (the plugin's own server, until 10.2026; its state is still in
+  # Nightdrive's folder) is replaced by it here, with its phones and box: its old command and unit are gone from the plugin.
   if systemctl --user -q is-enabled ferry.service 2>/dev/null || [[ -d $HOME/.local/share/nightdrive/ferry ]]; then
     echo "==> Ferry"
-    as_root "Ferry" "$repo/plugins/ferry/install.sh" --update
+    # Not through as_root: Ferry's installer comes from another repo, so the sudo timestamp the steps above cached is
+    # dropped first, and it gets root only by asking for the password itself (a package it lacks). What it runs is the
+    # release pinned in plugins/ferry/release.conf, checked by its sha256. Nothing after this step needs sudo.
+    sudo -k
+    "$repo/plugins/ferry/install.sh" --update \
+      || { echo "    failed" >&2; missed+=("Ferry: $repo/plugins/ferry/install.sh --update"); }
   fi
 
   plugins_installed >/dev/null     # the optional parts' list, before the reload reads it (hypr/bindings.lua)

@@ -4,7 +4,7 @@ A mailbox between your computers and your phone: leave photos, files, text or a 
 
 ![Ferry's menu in the top bar](ferry.jpg)
 
-Ferry is an app of its own, for Linux, the Mac and the iPhone, and comes with Nightdrive: its latest release, with its menu in the top bar; `nightdrive update` updates it too (removed, `nightdrive apps install ferry` brings it back). Welcome to Nightdrive sets it up after Tailscale. ⌘⇧T tiles its window. A Ferry from before, when the plugin had its own server, moves over with its phones and its box.
+Ferry is an app of its own, for Linux, the Mac and the iPhone, and comes with Nightdrive: the release Nightdrive pins, checked against its sha256 before it's installed, with its menu in the top bar; `nightdrive update` updates it too (removed, `nightdrive apps install ferry` brings it back). Welcome to Nightdrive sets it up after Tailscale. ⌘⇧T tiles its window. A Ferry from before, when the plugin had its own server, moves over with its phones and its box.
 
 ## On the computer
 
@@ -45,6 +45,8 @@ ferry enable
 | `ferry open <n>` | Opens a file |
 | `ferry copy <n>` | Copies a text |
 | `ferry qr` | The page's QR code, for adding a phone |
+
+A new Ferry release reaches Nightdrive once `plugins/ferry/pin` has written its tag and sha256 to `release.conf` and that is committed. `FERRY_FROM=<a Ferry checkout's linux/>` installs one that isn't pinned (`plugins/ferry/install.sh`).
 
 ## Privacy
 

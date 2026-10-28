@@ -34,7 +34,7 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | `systemd/` | User units, linked to `~/.config/systemd/user` | — (LocalSend's [nightdrive-localsend.service](localsend/systemd/nightdrive-localsend.service)) |
 | `bin/` | Commands, linked to `~/.local/bin` | — (LocalSend's [localsend](localsend/bin/localsend)) |
 | `nautilus-python/` | Files extensions, linked to `~/.local/share/nautilus-python/extensions` | — (LocalSend's [localsend.py](localsend/nautilus-python/localsend.py)) |
-| anything else | Whatever it needs, used by its own files | [install.sh](ferry/install.sh) (installs Ferry from its repo), [hook](ferry/hook) (Ferry runs it when its box changes) |
+| anything else | Whatever it needs, used by its own files | [install.sh](ferry/install.sh) (installs the Ferry release pinned in [release.conf](ferry/release.conf), checked by its sha256), [hook](ferry/hook) (Ferry runs it when its box changes) |
 
 `link.sh` links `bin/`, `systemd/` and `nautilus-python/` whether the plugin is installed or not, so its installer can
 use them. The rest is picked up by `nightdrive plugins installed`, which installing and turning a plugin off or on run: it

@@ -1,0 +1,31 @@
+#!/bin/bash
+# Pins the Ferry release Nightdrive installs: writes release.conf here with its tag and the sha256 of its two Linux
+# assets, which install.sh checks before it runs either. Run it when a Ferry is released, try that Ferry, and commit
+# release.conf in dev: users get it with their next `nightdrive update` (stable users with Nightdrive's next release).
+#   pin          the latest release
+#   pin TAG      that one (v1.0.0-beta.1)
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+repo=nightdrive-sh/ferry
+conf=$here/release.conf
+
+tag=${1:-$(curl -fsSI -o /dev/null -w '%{redirect_url}' "https://github.com/$repo/releases/latest" | sed -nE 's|.*/tag/||p')}
+[[ -n $tag ]] || { echo "Couldn't ask GitHub for Ferry's latest release" >&2; exit 1; }
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+for f in install.sh ferry-linux.tar.gz; do
+  curl -fsSL -o "$tmp/$f" "https://github.com/$repo/releases/download/$tag/$f" \
+    || { echo "Couldn't download $f of Ferry $tag" >&2; exit 1; }
+done
+sum() { sha256sum "$tmp/$1" | cut -d' ' -f1; }
+
+old=$(sed -nE 's/^tag=//p' "$conf" 2>/dev/null) || true
+cat > "$conf" <<EOF
+# The Ferry release Nightdrive installs, and the sha256 of its assets: written by ./pin, checked by ./install.sh
+tag=$tag
+install_sha256=$(sum install.sh)
+tarball_sha256=$(sum ferry-linux.tar.gz)
+EOF
+echo "Ferry ${old:+$old → }$tag pinned in $conf:"
+sed 1d "$conf"
