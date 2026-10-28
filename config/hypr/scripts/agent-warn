@@ -13,7 +13,7 @@ play() { "$HOME/.config/hypr/scripts/sounds" file "$sounds/$1.wav" >/dev/null 2>
 # The body counts down: the same notification is replaced each second (-r), which doesn't chime again.
 note() { notify-send -e -a "$name" -i "$icon" -h boolean:suppress-sound:true -t "$2" ${id:+-r "$id"} -p \
   "⚠️ $name is opening ${what}" "$1"; }
-what=${1:-the launcher}
+what=${1:-the Launcher}
 id=$(note "Stop typing: it opens in 5 seconds" 6000)
 play attention
 for n in 4 3 2 1; do

@@ -20,4 +20,4 @@ MSG
   [[ -n ${WAYLAND_DISPLAY:-} ]] && bin/contacts
   exit 0
 fi
-echo "Contacts is ready: contacts opens it (or the launcher: Contacts)."
+echo "Contacts is ready: contacts opens it (or the Launcher: Contacts)."

@@ -56,4 +56,4 @@ StartupWMClass=deck
 DESK
 "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true     # visibility in the launcher
 echo "Deck installed: ~/.local/bin/deck, $how"
-echo "Open it with Hyper+M (Caps Lock + M) or from the launcher."
+echo "Open it with Hyper+M (Caps Lock + M) or from the Launcher."

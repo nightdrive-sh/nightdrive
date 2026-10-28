@@ -202,7 +202,7 @@ def check_readme(path, name, keys_needed):
         elif s.startswith(("- ", "* ")):
             item = n
         elif item and s and not s.startswith(("#", "![")) and not re.match(r"(%s): .+$" % "|".join(FACTS), s):
-            find(path, n, f"the - item on line {item} goes on here: the launcher ends an item at the line break")
+            find(path, n, f"the - item on line {item} goes on here: the Launcher ends an item at the line break")
             item = 0
         else:
             item = 0

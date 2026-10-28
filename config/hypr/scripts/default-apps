@@ -246,7 +246,7 @@ def open_kind(kind, focus=False):
     apps = entries()
     if app_id not in apps:
         subprocess.run(["notify-send", "-a", "Default apps", f"No {k[1].lower()} app",
-                        "Choose one in the launcher: Settings › Apps › Default apps"])
+                        "Choose one in the Launcher: Settings › Apps › Default apps"])
         sys.exit(1)
     launch(app_id, apps[app_id], focus)
 

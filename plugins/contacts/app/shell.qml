@@ -497,7 +497,7 @@ ShellRoot {
             }
             Text {
                 width: parent.width; wrapMode: Text.Wrap; color: c.faint; font.family: c.font; font.pixelSize: 11
-                text: "To do it yourself: launcher › System › Set up Nightdrive shows the steps one at a time."
+                text: "To do it yourself: Launcher › System › Set up Nightdrive shows the steps one at a time."
             }
         }
 

@@ -157,7 +157,7 @@ def open_app(app_id):
     apps = da.entries()
     if app_id not in apps:
         subprocess.run(["notify-send", "-a", "Keyboard Shortcuts", "App not found: " + app_id,
-                        "Choose another one in the launcher: Settings › Keyboard Shortcuts"])
+                        "Choose another one in the Launcher: Settings › Keyboard Shortcuts"])
         sys.exit(1)
     da.launch(app_id, apps[app_id], focus=True)
 

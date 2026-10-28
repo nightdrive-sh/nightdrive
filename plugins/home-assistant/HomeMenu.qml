@@ -21,7 +21,7 @@ Column {
         variant: Home.error !== "" ? "danger" : "dim"
         text: !Home.loaded ? "Loading…"
             : Home.error !== "" ? Home.error
-            : "No pinned devices. Pin them in the launcher: ⌘Space › Home, Shift+Enter on a device."
+            : "No pinned devices. Pin them in the Launcher: ⌘Space › Home, Shift+Enter on a device."
     }
 
     Column {

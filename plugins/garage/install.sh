@@ -14,4 +14,4 @@ sudo dnf install -y $PACKAGES jq
 
 bin/garage install
 "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true     # visibility in the launcher
-echo "Garage is ready: Hyper+G (Caps Lock + G) or the launcher opens it, and its first VM is ⌘N there."
+echo "Garage is ready: Hyper+G (Caps Lock + G) or the Launcher opens it, and its first VM is ⌘N there."

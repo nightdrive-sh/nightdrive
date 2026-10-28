@@ -26,4 +26,4 @@ sudo dnf install -y code
 mkdir -p "$HOME/.config"
 ln -sfn "$here/code-flags.conf" "$HOME/.config/code-flags.conf"
 "$HOME/.config/fuzzel/sync-apps"
-echo "Done: run 'code' or find it in the launcher (⌘Space)."
+echo "Done: run 'code' or find it in the Launcher (⌘Space)."

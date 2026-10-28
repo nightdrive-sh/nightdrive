@@ -20,4 +20,4 @@ To do it yourself, Mail's README has the steps: $PWD/README.md
 MSG
   exit 0
 fi
-echo "Mail is ready: nightmail opens it (or the launcher: Mail)."
+echo "Mail is ready: nightmail opens it (or the Launcher: Mail)."

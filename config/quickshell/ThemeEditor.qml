@@ -254,7 +254,7 @@ FloatingWindow {
             SettingLevel {
                 width: parent.width; labelWidth: win.labelWidth
                 title: "Opacity"
-                desc: "Terminals and the launcher: below 100 % the wallpaper shows through"
+                desc: "Terminals and the Launcher: below 100 % the wallpaper shows through"
                 value: win.num("background-opacity")
                 onPicked: v => win.setValue("background-opacity", v)
             }

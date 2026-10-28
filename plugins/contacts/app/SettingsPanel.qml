@@ -90,6 +90,6 @@ AppPanel {
 
     Text {
         width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.2; color: c.faint; font.family: c.font; font.pixelSize: 11
-        text: "Your contacts are in the launcher's search too (launcher › Settings › Launcher), and Mail completes addresses from them."
+        text: "Your contacts are in the Launcher's search too (Launcher › Settings › Launcher), and Mail completes addresses from them."
     }
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Snippets: typed abbreviations that expand into text in any app (like macOS's Text Replacements).
 
-    snippets list                   the snippets as JSON ([{"trigger", "text"}]), launcher › Tools › Snippets
+    snippets list                   the snippets as JSON ([{"trigger", "text"}]), Launcher › Tools › Snippets
     snippets set TRIGGER TEXT       add one, or change the text of an existing trigger (TEXT - reads it from stdin:
                                     several lines, e.g. an email signature from a file)
     snippets remove TRIGGER
@@ -99,7 +99,7 @@ def enable():
     subprocess.run(["systemctl", "--user", "enable", "--now", os.path.realpath(SERVICE_SRC)], check=True)
     time.sleep(1)
     if readable_keyboards():
-        print("\nAuto-expand is on. Add snippets in launcher › Tools › Snippets.")
+        print("\nAuto-expand is on. Add snippets in Launcher › Tools › Snippets.")
     else:
         print("\nThe service runs, but the keyboard isn't readable yet: log out and back in once.")
     return 0
@@ -112,7 +112,7 @@ def disable():
         subprocess.run(["sudo", "rm", "-f", UDEV_RULE])
         subprocess.run(["sudo", "udevadm", "control", "--reload"])
         subprocess.run(["sudo", "udevadm", "trigger", "--subsystem-match=input", "--action=change"])
-    print("Auto-expand is off. The snippets stay: Enter in launcher › Tools › Snippets still pastes them.")
+    print("Auto-expand is off. The snippets stay: Enter in Launcher › Tools › Snippets still pastes them.")
     return 0
 
 

@@ -55,7 +55,7 @@ usage() {
   row "platform [WHAT]"          "What this runs on: arch, name, machine, gpu, keyboard, pagesize"
   row "sandbox COMMAND"          "Nightdrive in a headless container: up, check, shot, ipc, vnc, down"
   row "software-catalog"         "Rebuild Install › Software's lists from Flathub"
-  row "agent-warn [\"WHAT\"]"    "For coding agents: warn before the launcher or a menu opens"
+  row "agent-warn [\"WHAT\"]"    "For coding agents: warn before the Launcher or a menu opens"
   row "release [patch|minor|major]" "Maintainers: release dev into stable, with notes (--dry-run shows what it would do)"
   printf '\n'
 }
@@ -710,7 +710,7 @@ plugin_add() {
   name=$(sed -n 's/^name=//p' "$external/$id/plugin.conf" | head -1)
   echo "Added ${name:-$id} ($id) in $external/$id."
   echo "Its code runs as you, like Nightdrive's own: add only plugins whose source you trust."
-  echo "Install it: nightdrive plugins install $id (or launcher › Install). nightdrive update keeps it up to date."
+  echo "Install it: nightdrive plugins install $id (or Launcher › Install). nightdrive update keeps it up to date."
 }
 
 # plugins remove NAME: an external plugin only (the repo's own are turned off instead). Turned off, its units disabled

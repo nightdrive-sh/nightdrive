@@ -72,7 +72,7 @@ Item {
               summary: barHl === "theme" ? "theme color" : (barHl || undefined) },
             { kind: "nav", name: "Date format", glyph: "calendar", target: "bardate",
               summary: (dateStyles.find(d => d[0] === barDate) || [])[1] },
-            { kind: "barlogo", name: "Logo", glyph: "square", summary: "opens the launcher",
+            { kind: "barlogo", name: "Logo", glyph: "square", summary: "opens the Launcher",
               trailGlyph: logoOn ? "check" : "minus", dimmed: !logoOn },
             { kind: "nav", name: "Items", glyph: "layout-list", target: "baritems",
               summary: TopBar.modules.length + " of " + TopBar.allModules.length + " shown" }

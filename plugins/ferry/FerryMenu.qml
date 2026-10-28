@@ -304,7 +304,7 @@ Column {
     // Why the other devices can't get here, if they can't
     Rectangle {
         readonly property string why: !m.st ? ""
-            : !m.st.on ? "Ferry's server isn't running. Turn it on: launcher › System › Install › Plugins › Ferry."
+            : !m.st.on ? "Ferry's server isn't running. Turn it on: Launcher › System › Install › Plugins › Ferry."
             : !m.st.tailscale ? "Tailscale is off: your other devices can't reach this computer."
             : !m.st.serving ? "Not on the tailnet yet. Run once: sudo tailscale set --operator=$USER, then: ferry enable"
             : ""
