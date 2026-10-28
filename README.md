@@ -488,7 +488,8 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
 - **Reopened terminals**: the programs that ⌘⇧U starts again in a closed terminal (editors and the like) are in
   [`config/hypr/reopen-commands`](config/hypr/reopen-commands).
 - **Launcher apps**: only the apps in [`config/fuzzel/apps-allow.txt`](config/fuzzel/apps-allow.txt) are listed. Search finds
-  the rest.
+  the rest. An app whose program isn't installed (its `TryExec`, or else its `Exec`) is left out, even if its `.desktop`
+  file remains.
 - **Private additions**: some things don't belong in a public repo, like work tools or a personal dashboard. You can keep them in
   your own private repo and link them into git-ignored *local* slots. Nightdrive loads them when they exist:
 

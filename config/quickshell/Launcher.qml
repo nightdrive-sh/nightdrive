@@ -65,6 +65,7 @@ PanelWindow {
     property string level: "root"             // root | apps | keys
     property string query: ""
     property var syncHidden: []               // apps hidden by sync-apps: [{ path, name, icon, extra }]
+    property var missingApps: ({})            // ids of entries whose program isn't installed (missing-apps.sh): left out
     property var keyList: []                  // [{ name, sub, keys, section }]
     property var keyIndex: ({})               // lower-case name → keys (shortcutFor)
     property string armed: ""                 // action awaiting confirmation
@@ -409,12 +410,12 @@ PanelWindow {
 
     // App rows: with an empty query only allow-listed apps; when searching, also those hidden by sync-apps
     function appEntries(q) {
-        const all = apps.filter(e => !e.noDisplay).map(e => ({
+        const all = apps.filter(e => !e.noDisplay && !missingApps[appId({ entry: e })]).map(e => ({
             item: { kind: "app", name: e.name, icon: e.icon, entry: e, shown: true },
             text: e.name,
             extra: (e.genericName || "") + " " + (e.keywords || []).join(" ")
         }))
-        if (q !== "") for (const h of syncHidden) all.push({ item: { kind: "app", name: h.name, icon: h.icon, path: h.path, shown: false }, text: h.name, extra: h.extra })
+        if (q !== "") for (const h of syncHidden) if (!missingApps[appId({ path: h.path })]) all.push({ item: { kind: "app", name: h.name, icon: h.icon, path: h.path, shown: false }, text: h.name, extra: h.extra })
         // An app just moved with ⌃Enter: the two sources (DesktopEntries, hidden-apps.sh) update at different moments, so
         // until its new place shows up the row is kept from the snapshot, and its old place is left out
         const out = all.filter(a => { const p = pinPending[appId(a.item)]; return !p || p.shown === a.item.shown })
@@ -562,6 +563,7 @@ PanelWindow {
             fromSearch[target] = query.trim() !== "" ? { level: level, query: query, sel: cur ? { kind: cur.kind, name: cur.name } : null } : undefined
         level = target; input.text = ""; query = ""; armed = ""; topFocused = false; details.close()
         hiddenProc.running = true
+        missingProc.running = true
         if (target === "keys") keysProc.running = true     // re-read SHORTCUTS.md: changes show up immediately
         list.currentIndex = firstSelectable()
         if (target === "settings" || target === "appsettings") behave.entered("settings")   // the computer name and channel on its rows, Firefox's
@@ -834,6 +836,17 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 const f = l.split("|")
                 return { path: f[0], name: f[1], icon: f[2], extra: f[3] || "" }
             })
+        }
+    }
+
+    // entries whose program is gone (a removed package's local copy or link) → ids to leave out of Apps
+    Sh {
+        id: missingProc
+        command: [Quickshell.env("HOME") + "/.config/quickshell/missing-apps.sh"]
+        onResult: text => {
+            const m = {}
+            for (const id of text.split("\n")) if (id) m[id] = true
+            win.missingApps = m
         }
     }
 
