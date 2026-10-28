@@ -237,8 +237,8 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 x: 10
                                 spacing: 12
-                                Text { text: modelData.name || modelData.address; color: root.c.title; font.family: root.c.font; font.pixelSize: 12 }
-                                Text { visible: modelData.name !== ""; text: modelData.address; color: root.c.faint; font.family: root.c.font; font.pixelSize: 12 }
+                                Text { textFormat: Text.PlainText; text: modelData.name || modelData.address; color: root.c.title; font.family: root.c.font; font.pixelSize: 12 }
+                                Text { textFormat: Text.PlainText; visible: modelData.name !== ""; text: modelData.address; color: root.c.faint; font.family: root.c.font; font.pixelSize: 12 }
                             }
                         }
                     }
@@ -293,6 +293,7 @@ Item {
                 spacing: 0
                 Text { Layout.preferredWidth: 88; text: "From"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 13 }
                 Text {
+                    textFormat: Text.PlainText
                     text: root.from.address; color: fromHover.hovered ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 13
                     HoverHandler { id: fromHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: root.nextAccount() }
@@ -333,6 +334,7 @@ Item {
                             anchors.centerIn: parent
                             spacing: 10
                             Text {
+                                textFormat: Text.PlainText
                                 text: chip.modelData.replace(/^.*\//, ""); color: root.c.text
                                 font.family: root.c.font; font.pixelSize: 12
                                 width: Math.min(implicitWidth, 260); elide: Text.ElideMiddle
@@ -381,6 +383,7 @@ Item {
 
         // What just happened (what Claude read, an error): a line of its own above the buttons, wrapped, not cut off
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             Layout.topMargin: 16
             visible: root.status !== ""

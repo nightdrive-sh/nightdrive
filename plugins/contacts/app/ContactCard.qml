@@ -128,24 +128,30 @@ Flickable {
             Column {
                 width: card.narrow ? body.width : body.width - 84 - 22
                 spacing: 6
+                // Every field of a card is plain text: a card can come from anyone, and Qt would read one with a tag in
+                // it as HTML (an <img> loading from the web as the card shows)
                 Text {
+                    textFormat: Text.PlainText
                     width: parent.width; wrapMode: Text.Wrap
                     text: card.p ? card.p.name : ""
                     color: c.title; font.family: c.font; font.pixelSize: 22; font.weight: Font.Medium
                 }
                 Text {
+                    textFormat: Text.PlainText
                     visible: text !== ""
                     width: parent.width; wrapMode: Text.Wrap
                     text: card.p ? [card.p.title, card.p.org].filter(x => x).join(" · ") : ""
                     color: c.dim; font.family: c.font; font.pixelSize: 13
                 }
                 Text {
+                    textFormat: Text.PlainText
                     visible: text !== ""
                     text: card.p && card.p.nickname ? "“" + card.p.nickname + "”" : ""
                     color: c.faint; font.family: c.font; font.pixelSize: 12
                 }
                 // Where the card is from, with more than one account: one person's cards in several show as one
                 Text {
+                    textFormat: Text.PlainText
                     visible: app.accounts.length > 1 && card.p !== null
                     text: !card.p ? "" : (card.p.accounts || [card.p.account])
                         .map(a => (app.accounts.find(x => x.id === a) || { name: a }).name).join(" · ")
@@ -183,12 +189,14 @@ Flickable {
                     }
                     Text {
                         id: labelText
+                        textFormat: Text.PlainText
                         x: 44; y: 12; width: card.narrow ? parent.width - x - 12 : 96
                         elide: Text.ElideRight
                         text: field.modelData.label; color: c.faint; font.family: c.font; font.pixelSize: 12
                     }
                     Text {
                         id: valueText
+                        textFormat: Text.PlainText
                         x: card.narrow ? 44 : 148; y: card.narrow ? 32 : 11
                         width: parent.width - x - 64        // room for its buttons
                         wrapMode: Text.Wrap; lineHeight: 1.2
@@ -223,6 +231,7 @@ Flickable {
             }
         }
         Text {
+            textFormat: Text.PlainText
             visible: card.p !== null && card.p.note !== ""
             width: parent.width
             leftPadding: 12; rightPadding: 12

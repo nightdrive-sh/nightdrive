@@ -33,8 +33,10 @@ Rectangle {
         text: Icons.g(root.glyph); font.family: Icons.family; font.pixelSize: 15
         color: root.selected ? root.c.accent : root.c.dim
     }
-    // A long name in a narrow sidebar gives way to the count (cut short with …), never under it
+    // A long name in a narrow sidebar gives way to the count (cut short with …), never under it. Plain text: the name
+    // can be data (a mail folder's, an address book's), which Qt would read as HTML if it held a tag.
     Text {
+        textFormat: Text.PlainText
         anchors.left: glyphText.right; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
         anchors.right: countText.left; anchors.rightMargin: root.count === "" ? 0 : 8
         elide: Text.ElideRight

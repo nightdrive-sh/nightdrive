@@ -235,7 +235,10 @@ Flickable {
         y: bar.visible || viewButton.visible || root.back ? root.barHeight + 33 : 33
         // The gaps are the messages' own, so folded ones lie close together
         spacing: 0
+        // The headers are plain text: with a tag in them Qt would read them as HTML and load an <img> past the body's
+        // blocked images (the body alone is HTML, from app.rich and safeHtml)
         Text {
+            textFormat: Text.PlainText
             width: parent.width
             bottomPadding: 12
             visible: root.messages.length > 0
@@ -266,11 +269,13 @@ Flickable {
                     TapHandler { onTapped: root.unfold(msgCol.modelData) }
                     Text {
                         id: foldName
+                        textFormat: Text.PlainText
                         anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                         width: Math.min(implicitWidth, parent.width * 0.3); elide: Text.ElideRight
                         text: app.name(msgCol.modelData.from); color: c.accent; font.family: c.font; font.pixelSize: 13
                     }
                     Text {
+                        textFormat: Text.PlainText
                         anchors.left: foldName.right; anchors.leftMargin: 16; anchors.right: foldDate.left; anchors.rightMargin: 16
                         anchors.baseline: foldName.baseline
                         elide: Text.ElideRight
@@ -298,6 +303,7 @@ Flickable {
                             width: parent.width; height: sender.implicitHeight
                             Text {
                                 id: sender
+                                textFormat: Text.PlainText
                                 anchors.left: parent.left
                                 anchors.right: head.wide ? sideDate.left : parent.right
                                 anchors.rightMargin: head.wide ? 24 : 0
@@ -319,6 +325,7 @@ Flickable {
                             width: parent.width; height: addrText.implicitHeight
                             Text {
                                 id: addrText
+                                textFormat: Text.PlainText
                                 width: Math.min(implicitWidth, parent.width - (bookButton.visible ? bookButton.width + 6 : 0))
                                 elide: Text.ElideRight
                                 text: app.address(modelData.from); color: c.faint; font.family: c.font; font.pixelSize: 12
@@ -421,6 +428,7 @@ Flickable {
                                 spacing: 10
                                 Text {
                                     id: fileName
+                                    textFormat: Text.PlainText
                                     text: file.modelData.name; color: c.text; font.family: c.font; font.pixelSize: 12
                                     width: Math.min(implicitWidth, 280); elide: Text.ElideMiddle
                                 }

@@ -58,12 +58,14 @@ FocusScope {
                     TapHandler { onTapped: root.choose(parent.index) }
                     Text {
                         id: label
+                        textFormat: Text.PlainText
                         x: 10; anchors.verticalCenter: parent.verticalCenter
                         text: parent.modelData.label || "email"
                         color: root.c.dim; font.family: root.c.font; font.pixelSize: 12
                     }
                     Text {
                         id: address
+                        textFormat: Text.PlainText
                         anchors.left: label.right; anchors.leftMargin: 10
                         anchors.right: parent.right; anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter

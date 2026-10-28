@@ -32,8 +32,9 @@ AppPanel {
         else if (e.key === Qt.Key_Escape) answer(false)
         e.accepted = true
     }
-    Text { text: root.title; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium }
+    Text { textFormat: Text.PlainText; text: root.title; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium }
     Text {
+        textFormat: Text.PlainText
         visible: root.text !== ""
         width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.2
         text: root.text; color: c.dim; font.family: c.font; font.pixelSize: 12

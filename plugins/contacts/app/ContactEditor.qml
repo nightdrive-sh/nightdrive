@@ -114,6 +114,7 @@ FocusScope {
                 TapHandler { onTapped: ed.pick(parent.index) }
                 Text {
                     id: chip
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     text: ed.app.store.accountName(parent.account)
                     color: parent.on ? c.title : c.dim; font.family: c.font; font.pixelSize: 11
@@ -126,6 +127,7 @@ FocusScope {
     }
     Text {
         id: errorText
+        textFormat: Text.PlainText
         visible: ed.error !== ""
         anchors.left: parent.left; anchors.right: parent.right
         anchors.leftMargin: ed.margin; anchors.rightMargin: ed.margin

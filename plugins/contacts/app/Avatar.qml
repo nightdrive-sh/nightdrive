@@ -11,6 +11,7 @@ Rectangle {
     width: size; height: size; radius: size / 2
     color: Qt.rgba(c.primary.r, c.primary.g, c.primary.b, 0.18)
     Text {
+        textFormat: Text.PlainText
         anchors.centerIn: parent
         visible: img.status !== Image.Ready
         text: av.person.initials || ""

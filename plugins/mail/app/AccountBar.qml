@@ -37,6 +37,7 @@ ColumnLayout {
                 width: 3; height: 14; radius: 1.5; color: root.c.primary
             }
             Text {
+                textFormat: Text.PlainText
                 anchors.left: parent.left; anchors.leftMargin: 16; anchors.right: count.left; anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight

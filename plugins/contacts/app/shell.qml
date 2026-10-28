@@ -161,8 +161,16 @@ ShellRoot {
         }
         function use(action, value) {
             if (action === "write") Qt.openUrlExternally("mailto:" + value)
-            else if (action === "open") Qt.openUrlExternally(/^\w+:/.test(value) ? value : "https://" + value)
+            else if (action === "open") openUrl(value.trim())
             else if (action === "copy") { copier.command = ["wl-copy", value]; copier.running = true; say("Copied: " + value.replace(/\n/g, ", ")) }
+        }
+        // A card's web address opens on the web or as a new email, as a link in Mail does: a card can come from anyone
+        // (a shared or synced vCard), and any other scheme (file:, smb:, an app's own) would open something on this
+        // computer at its word. One without a scheme is a site ("example.com", "example.com:8080/x").
+        function openUrl(url) {
+            if (/^(https?:\/\/|mailto:)/i.test(url)) Qt.openUrlExternally(url)
+            else if (/^[a-z][a-z0-9+.-]*:(?!\d)/i.test(url)) say("Only web and email links open from a card")
+            else Qt.openUrlExternally("https://" + url)
         }
         // w and Send email: a new email in the email app (Settings › Apps › Default apps), straight to a single address,
         // else from the card's menu of them (opening the card first in one pane)
@@ -387,6 +395,7 @@ ShellRoot {
                             section.property: "letter"
                             section.delegate: Text {
                                 required property string section
+                                textFormat: Text.PlainText
                                 leftPadding: 16; topPadding: 10; bottomPadding: 4
                                 text: section; color: c.faint; font.family: c.font; font.pixelSize: 11; font.weight: Font.Medium
                             }
@@ -410,11 +419,13 @@ ShellRoot {
                                     anchors.verticalCenter: parent.verticalCenter
                                     spacing: 3
                                     Text {
+                                        textFormat: Text.PlainText
                                         width: parent.width; elide: Text.ElideRight
                                         text: row.modelData.name
                                         font.family: c.font; font.pixelSize: 13; color: c.title
                                     }
                                     Text {
+                                        textFormat: Text.PlainText
                                         visible: text !== ""
                                         width: parent.width; elide: Text.ElideRight
                                         text: row.modelData.org
@@ -431,6 +442,7 @@ ShellRoot {
                         }
                     }
                     Text {
+                        textFormat: Text.PlainText
                         Layout.fillWidth: true
                         Layout.margins: 28
                         Layout.topMargin: 8
@@ -465,6 +477,7 @@ ShellRoot {
 
         // What just happened (Copied: …), where the list's line for it is away: under the card, in one pane
         Text {
+            textFormat: Text.PlainText
             visible: win.note !== "" && win.onePane && win.cardOpen
             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
             anchors.margins: 24

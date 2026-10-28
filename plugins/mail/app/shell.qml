@@ -853,9 +853,12 @@ ShellRoot {
                                 Item {
                                     width: parent.width; height: who.implicitHeight
                                     // The names take what the count and the date leave, so only they elide and the
-                                    // count always shows right after them.
+                                    // count always shows right after them. Plain text, as every field with a message's
+                                    // words: Qt reads text with a tag in it as HTML, so an <img> in a name or subject
+                                    // loaded as the list showed it, unopened, past the body's blocked images.
                                     Text {
                                         id: who
+                                        textFormat: Text.PlainText
                                         anchors.left: parent.left
                                         width: Math.max(0, Math.min(implicitWidth, date.x - 16 - (count.visible ? count.implicitWidth : 0)))
                                         elide: Text.ElideRight
@@ -886,6 +889,7 @@ ShellRoot {
                                     }
                                 }
                                 Text {
+                                    textFormat: Text.PlainText
                                     width: parent.width; elide: Text.ElideRight
                                     text: row.modelData.subject || "(no subject)"
                                     font.family: c.font; font.pixelSize: 12
@@ -910,6 +914,7 @@ ShellRoot {
                         onClicked: win.emptyTrash()
                     }
                     Text {
+                        textFormat: Text.PlainText
                         Layout.fillWidth: true
                         Layout.margins: 28
                         Layout.topMargin: 8
@@ -997,6 +1002,7 @@ ShellRoot {
             border.color: win.dropFolder >= 0 ? c.primary : c.line
             Text {
                 id: ghostText
+                textFormat: Text.PlainText
                 anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 14
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
@@ -1086,8 +1092,8 @@ ShellRoot {
                 else if (e.key === Qt.Key_Escape) win.confirm = null
                 e.accepted = true
             }
-            Text { text: win.confirm ? win.confirm.title : ""; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium }
-            Text { width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.2; text: win.confirm ? win.confirm.detail : ""; color: c.text; font.family: c.font; font.pixelSize: 12 }
+            Text { textFormat: Text.PlainText; text: win.confirm ? win.confirm.title : ""; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium }
+            Text { textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.2; text: win.confirm ? win.confirm.detail : ""; color: c.text; font.family: c.font; font.pixelSize: 12 }
             Row {
                 spacing: 18
                 AppKeyAction {

@@ -71,11 +71,12 @@ AppPanel {
             delegate: Row {
                 required property var modelData
                 width: parent.width
-                Text { width: parent.width - count.width; elide: Text.ElideRight; text: modelData.name; color: c.title; font.family: c.font; font.pixelSize: 12 }
+                Text { textFormat: Text.PlainText; width: parent.width - count.width; elide: Text.ElideRight; text: modelData.name; color: c.title; font.family: c.font; font.pixelSize: 12 }
                 Text { id: count; text: modelData.count + " contacts"; color: c.faint; font.family: c.font; font.pixelSize: 12 }
             }
         }
         Text {
+            textFormat: Text.PlainText
             width: parent.width; wrapMode: Text.Wrap; color: c.faint; font.family: c.font; font.pixelSize: 11
             text: root.syncing ? "Syncing…"
                 : "Synced both ways every 30 minutes" + (root.lastSync ? ", last at " + root.lastSync : "") + ". A change made here goes at once."

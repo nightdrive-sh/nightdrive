@@ -54,6 +54,7 @@ Item {
             x: 14; y: 12; width: parent.width - 28
             spacing: 10
             Text {
+                textFormat: Text.PlainText
                 width: parent.width
                 wrapMode: Text.Wrap
                 text: root.job ? root.job.error : ""

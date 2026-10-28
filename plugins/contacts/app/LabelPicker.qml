@@ -47,6 +47,7 @@ FocusScope {
         HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
         TapHandler { onTapped: { root.forceActiveFocus(); root.open ? root.open = false : root.show() } }
         Text {
+            textFormat: Text.PlainText
             anchors.left: parent.left; anchors.leftMargin: 8
             anchors.right: chevron.left; anchors.rightMargin: 4
             anchors.verticalCenter: parent.verticalCenter
@@ -98,6 +99,7 @@ FocusScope {
                     HoverHandler { id: rowHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: root.choose(parent.index) }
                     Text {
+                        textFormat: Text.PlainText
                         x: 8; anchors.verticalCenter: parent.verticalCenter
                         text: parent.modelData
                         color: parent.index === root.pick ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 12
