@@ -155,8 +155,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Battery ran out?** When the battery is low (under 20 % as the laptop goes to sleep, and each minute from 5 %), the open
   windows are kept. If it runs out, the next login asks whether to open them again, each on its workspace.
 - **Web apps**: any site as an app window, from Launcher › System › Install › Webapp; System › Remove › Webapps removes
-  one, with its logins. Their notifications have the web app's own name and icon, and a link to another site opens in
-  your default browser.
+  one, with its logins. Their notifications have the web app's own name and icon (and emoji: Slack's `:thumbsup:` as
+  👍), and a link to another site opens in your default browser.
 - **Default apps**: which app opens links, mail, folders, text, code, images, video, music, PDFs and calendar files, and
   which terminal ⌘Enter opens: Launcher › Settings › Apps › Default apps (or `nightdrive defaults`). Hyper B, F and E
   open the browser, Files and Email you chose.

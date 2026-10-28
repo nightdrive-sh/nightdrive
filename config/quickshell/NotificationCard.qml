@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
+import "Emoji.js" as Emoji
 
 // One notification as a card: the app's icon and name with the time (× while the mouse is over it), the title, the text,
 // the notification's own picture on the right (a preview, e.g. a screenshot: small under the text), and the app's
@@ -226,7 +227,8 @@ Rectangle {
                     maximumLineCount: 2
                     elide: Text.ElideRight
                     textFormat: Text.PlainText
-                    text: card.n ? card.n.summary : card.row.summary
+                    // :thumbsup: as 👍 (Slack's web notifications send the names)
+                    text: Emoji.replace(card.n ? card.n.summary : card.row.summary)
                     color: Theme.title
                     font { family: Theme.font; pointSize: 9.25; weight: Font.DemiBold }   // 1 px under mako's 10 pt
                 }
@@ -238,7 +240,7 @@ Rectangle {
                     maximumLineCount: 6
                     elide: Text.ElideRight
                     textFormat: Text.PlainText
-                    readonly property string raw: card.n ? Notifs.bodyOf(card.n) : card.row.body
+                    readonly property string raw: Emoji.replace(card.n ? Notifs.bodyOf(card.n) : card.row.body)
                     text: card.whole.length ? raw : raw.replace(/<[^>]*>/g, "")
                     color: Theme.muted
                     font { family: Theme.font; pointSize: 8.875 }   // ≈ 11.8 px
