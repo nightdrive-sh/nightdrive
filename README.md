@@ -91,7 +91,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 ### Little things that add up
 
 - **Shelf**: drag a file to the top edge of the screen to park it, then drag it into another app (like Dropover / Yoink).
-- **Dictation**: hold F5 (or Fn on a Mac), speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
+- **Dictation**: hold F5 or Fn on a Mac, Insert on a PC, speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Claude writes**: select your notes or a rough draft in any app (a chat, a form, a mail) and press ⌘⇧C. Claude writes
   it out in a tone that fits the place, in the same language, and shows it in the middle of that window (of the screen
   when the window fills most of it): Enter puts it in place of
@@ -164,7 +164,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, over qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
 | Passwords (optional) | [1Password](plugins/1password/README.md) + `op` CLI | Passwords level in the launcher, SSH agent |
 | AI | [Claude Code](https://claude.com/claude-code) (the installer sets it up; log in once with `claude`) | ⌘⌥Enter in `~/Projects`, ask from the launcher, sessions and usage limits in the bar |
-| Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet) | F5 / Fn push-to-talk, recording card on screen |
+| Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet) | F5 / Fn (Mac), Insert (PC) push-to-talk, recording card on screen |
 | Network | NetworkManager, BlueZ, [Tailscale](plugins/tailscale/README.md) | Wi-Fi, Bluetooth and Tailscale menus |
 | Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too), EQ presets for headphones; the headphone jack asks whether headphones or speakers went in, keeps a volume for each and starts quiet until you answer; Sony and AirPods listening mode, AirPods battery per pod and case and their own settings; the headphones' microphone in the Sound menus or Use for › Calls in the headphones menu (headset mode; another microphone or Use for › Music switches back to music mode, and music started in headset mode offers it in a notification) |
 | Screen Mirroring (optional) | [doubletake](https://github.com/omarroth/doubletake) (AirPlay, built by `plugins/mirroring/install.sh`) | Settings › Display; experimental, picture limited to 1080p (no hardware encoder on Asahi) |
@@ -419,7 +419,7 @@ which app is yours to choose (launcher › Settings › Apps › App shortcuts).
 | ⌘ ⇧ Space | Walk through the top bar menus with the keyboard |
 | ⌘ + drag | On a top bar icon: move it to another place in the bar |
 | ⌘ Esc | Notifications |
-| F5 (hold; Fn on a Mac) | Dictation |
+| F5 / Fn / Insert (held) | Dictation: F5 or Fn on a Mac, Insert on a PC ([another key](docs/dictation.md)) |
 | ⌘ ⇧ K | All shortcuts (also in the launcher under *Keybindings*) |
 
 The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).

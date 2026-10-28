@@ -95,6 +95,10 @@ hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate start"), { lock
 -- The releases are transparent: a mouse click while the key is held "shadows" the binds of every held key (Hyprland's
 -- shadowKeybinds), and the release would be skipped, so dictation kept recording until the key was pressed again.
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true })    -- release -> transcribe and type
+-- A PC keyboard has neither F5's mic key nor a Fn the system sees: Insert, held, is its dictation key (a Mac keyboard has
+-- no Insert). Plain Insert only, so Shift+Insert / Ctrl+Insert (paste, copy, and ⌘V / ⌘C above) still reach the app.
+hl.bind("Insert", hl.dsp.exec_cmd(scripts .. "/dictate start"), { locked = true })
+hl.bind("Insert", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true })
 hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-down"), { locked = true })                       -- Fn held (over 0.3 s) -> dictation, like F5
 hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true })
 hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-down"), { locked = true })                       -- Fn when keyd (Mac Keyboard Shortcuts) runs: keyd sends F19 for it

@@ -1,6 +1,6 @@
 # Dictation (Voxtype)
 
-Hold **F5** (or **Fn** for more than 0.3 s), speak, and let go: the text is typed into the active window. Music and
+Hold **F5** or **Fn** on a Mac, **Insert** on a PC (or another key: below), speak, and let go: the text is typed into the active window. Music and
 other sound playing drops to 10% while you speak, so it doesn't end up in the text (`duck_media` in `config.toml`). It runs fully offline
 with [Voxtype](https://github.com/peteonrails/voxtype) and NVIDIA's Parakeet model, on the CPU (about 1.4 s for 6 s of speech on an M2 Max).
 
@@ -34,11 +34,12 @@ the text to type on stdout, e.g. a script that puts product names right (Hyperla
 ## A key on a PC
 
 A MacBook's F5 sends the mic key (`XF86AudioMicMute`), and Fn reaches the system. A PC keyboard usually has neither,
-so give dictation a key of its own in `config/hypr/local.lua`, held like F5:
+so there Insert is the key (Shift+Insert still pastes); a mic key that sends `XF86AudioMicMute` works as F5. Where Insert
+is awkward (a laptop's Fn layer), give dictation another key in `config/hypr/local.lua`, held like F5:
 
 ```lua
-hl.bind("Insert", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate start"), { locked = true })
-hl.bind("Insert", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate stop"), { locked = true, release = true, transparent = true })
+hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate start"), { locked = true })
+hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate stop"), { locked = true, release = true, transparent = true })
 ```
 
 (`transparent` keeps the release working when you click with the mouse while holding the key.)
@@ -48,7 +49,7 @@ hl.bind("Insert", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/di
 - **A mic or assistant key** often sends a shortcut as one tap (Win+C, Cortana's), so the release comes at once and
   holding it does nothing. Turn it into a free key with keyd (`[alt]` or `[meta]` layer, e.g. `c = f18`, in a file of its
   own under `/etc/keyd/` with the keyboard's id in `[ids]`) and bind that key to `voxtype-onnx record toggle`: one press
-  starts, the next one stops.
+  starts, the next one stops. The **Copilot key** of newer laptops is often such a tap too (⇧⌘F23, `SUPER + SHIFT + F23`).
 - **F20** is `XF86AudioMicMute` in XKB, the hold-to-talk key above: a tap of it starts and stops at once. F13–F18 are
   free (XKB names them `XF86Tools`, `XF86Launch5` … `XF86Launch9`).
 - With **keyd** running (the Mac Keyboard Shortcuts plugin), the right Ctrl arrives as the left one, so it can't be bound
