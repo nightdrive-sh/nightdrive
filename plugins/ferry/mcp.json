@@ -1,0 +1,49 @@
+{
+  "tools": [
+    {
+      "name": "ferry_status",
+      "title": "Ferry's box and devices",
+      "description": "Ferry, the user's mailbox between their phone and computers over Tailscale: on (the server runs), tailscale, url (the phone's address), setup (what's missing, or null), devices (id, name, kind phone or computer, online) and the box's items, newest last: what came to this computer (to \"computer\", from a device: a text, or a file with its path in ~/Downloads) and what was sent from here (to \"phone\", for a device). Use it to read what the user sent from their phone, and for a device's id before ferry_send_files or ferry_send_text.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["ferry", "list", "--json"],
+      "class": "read",
+      "area": "ferry"
+    },
+    {
+      "name": "ferry_send_files",
+      "title": "Send files with Ferry",
+      "description": "Sends files (a folder: its files) from this computer to one of the user's devices with Ferry: to a phone into its box, with a notification; to another computer straight into its Downloads. The user allows it on screen first. Fails with the reason when the device is asleep or the files aren't there.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {"type": "array", "items": {"type": "string"}, "minItems": 1, "title": "Files", "description": "Absolute paths of files or folders"},
+          "to": {"type": "string", "title": "Device", "description": "The device's id or name from ferry_status's devices"}
+        },
+        "required": ["paths", "to"],
+        "additionalProperties": false
+      },
+      "command": ["ferry", "add", "--to", "{to}", "{paths}"],
+      "class": "act",
+      "area": "ferry",
+      "timeout": 300
+    },
+    {
+      "name": "ferry_send_text",
+      "title": "Send a text with Ferry",
+      "description": "Sends a text (a link, a note, an address) to one of the user's devices with Ferry: to a phone into its box, with a notification; to another computer as a text in its box. The user allows it on screen first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "title": "Text", "minLength": 1},
+          "to": {"type": "string", "title": "Device", "description": "The device's id or name from ferry_status's devices"}
+        },
+        "required": ["text", "to"],
+        "additionalProperties": false
+      },
+      "command": ["ferry", "text", "--to", "{to}", "{text}"],
+      "class": "act",
+      "area": "ferry",
+      "timeout": 60
+    }
+  ]
+}
