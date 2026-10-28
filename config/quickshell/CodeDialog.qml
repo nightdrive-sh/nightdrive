@@ -5,7 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 
 // A code to type on another device, in the middle of the screen: AirPlay's PIN when an iPhone connects
-// (plugins/airplay-receiver). A notification of it went unnoticed, and the device waits for it. Floats as the Claude
+// (plugins/airplay-receiver), LocalSend's when a phone sends (plugins/localsend/lib/codes.py). A notification of it went unnoticed, and the device waits for it. Floats as the Claude
 // writes card does (ClaudeWrite.qml); Esc, the button or a click outside closes it, and so does the sender once the
 // code has been typed (close), or `timeout` passing.
 //   qs ipc call code open <glyph> <title> <code> <text>   (glyph: a Lucide name; not "show": qs reads that as its own)
@@ -92,12 +92,14 @@ PanelWindow {
                     spacing: 2
                     Text {
                         text: win.title
+                        textFormat: Text.PlainText   // the title and text may hold a name a device gave itself
                         color: Theme.title
                         font { family: Theme.font; pixelSize: 14; bold: true }
                     }
                     Text {
                         width: parent.width
                         text: win.text
+                        textFormat: Text.PlainText
                         color: Theme.dim
                         wrapMode: Text.Wrap
                         font { family: Theme.font; pixelSize: 11 }
