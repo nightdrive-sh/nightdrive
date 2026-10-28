@@ -647,6 +647,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
 
     function activate(item) {
         if (!item) return
+        if (item.switchBusy) { shake.restart(); return }   // its last change is still waiting (e.g. for the password)
         if (item.kind === "nav") go(item.target)
         else if (item.kind === "app" && level === "startup") toggleAutostart(item)
         else if (item.kind === "app") {
@@ -1290,18 +1291,12 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                             }
                         }
                     }
-                    Rectangle {      // row.switchOn: an on/off switch like the top bar menus' (MenuHeader), instead of "on"/"off"
-                        id: rowSwitch
+                    Toggle {         // row.switchOn: an on/off switch like the top bar menus' (MenuHeader), instead of "on"/"off"
+                        id: rowSwitch    // row.switchBusy: still changing (rowArea above takes the clicks; activate() refuses it)
                         visible: row.modelData.switchOn !== undefined
                         anchors { right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        width: 34; height: 20; radius: 10
-                        color: row.modelData.switchOn ? Theme.accent : Theme.border
-                        Rectangle {
-                            width: 14; height: 14; radius: 7; y: 3
-                            x: row.modelData.switchOn ? 17 : 3
-                            color: row.modelData.switchOn ? Theme.bg : Theme.text
-                            Behavior on x { NumberAnimation { duration: 120 } }
-                        }
+                        checked: row.modelData.switchOn === true
+                        busy: row.modelData.switchBusy === true
                     }
                     Text {
                         id: trailing

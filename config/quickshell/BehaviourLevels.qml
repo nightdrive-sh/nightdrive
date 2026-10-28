@@ -32,6 +32,10 @@ Item {
     // ({uuid, name, allowed: yes | no | ""}), empty off Wi-Fi and cable or without firewalld
     property string remoteLogin: ""
     property var remoteNet: ({})
+    // From the change until the state is read again (the password prompt open meanwhile), its switches wait in place:
+    // setting the new state at once showed it on before the password, and back off a while after a cancel
+    property bool remoteBusy: false
+    property bool remoteRecheck: false
     readonly property var remoteLoginItems: remoteLogin === "on" || remoteLogin === "off"
         ? [{ kind: "nav", name: "Remote login", glyph: "terminal", target: "remotelogin", summary: remoteLogin }] : []
     Sh {
@@ -41,6 +45,7 @@ Item {
             const f = text.replace(/\n$/, "").split("\n")
             b.remoteLogin = f[0] || ""
             b.remoteNet = f[1] ? { uuid: f[1], name: f[2] || "", allowed: f[3] || "" } : {}
+            if (b.remoteRecheck) { b.remoteRecheck = false; b.remoteBusy = false }
         }
     }
     // firewalld's and systemd's polkit ask for the password; cancelling either leaves the switch as it was, without a
@@ -50,16 +55,17 @@ Item {
         onResult: text => {
             if (exitCode !== 0 && !/not authorized|authorization failed|access denied|cancel/i.test(text))
                 Quickshell.execDetached(["notify-send", "-u", "critical", "-a", "Settings", "Remote login failed", text.trim()])
+            b.remoteRecheck = true
             remoteLoginProc.running = true
         }
     }
     function setRemoteLogin(on) {
-        remoteLogin = on ? "on" : "off"
+        remoteBusy = true
         remoteLoginSetProc.script = '"$HOME/.config/hypr/scripts/remote-login" ' + (on ? "on" : "off")
         remoteLoginSetProc.running = true
     }
     function setRemoteNet(allow) {
-        remoteNet = Object.assign({}, remoteNet, { allowed: allow ? "yes" : "no" })
+        remoteBusy = true
         remoteLoginSetProc.script = '"$HOME/.config/hypr/scripts/remote-login" ' + (allow ? "allow" : "deny") + " " + remoteNet.uuid
         remoteLoginSetProc.running = true
     }
@@ -257,11 +263,12 @@ Item {
         }
         if (level === "remotelogin") {
             const on = remoteLogin === "on"
-            return [{ kind: "remotelogin", name: "Remote login", glyph: "terminal", switchOn: on,
+            return [{ kind: "remotelogin", name: "Remote login", glyph: "terminal", switchOn: on, switchBusy: remoteBusy,
                       sub: "Log in to this computer from another one with SSH" }]
                 .concat(on && remoteNet.uuid ? [{ kind: "remotenet", name: "Allow from “" + remoteNet.name + "”", glyph: "house",
-                      switchOn: remoteNet.allowed === "yes", sub: "Safe at home or work, not on a café’s or hotel’s network" }] : [])
-                .concat(on ? [] : [{ kind: "note", name: "Off by default. Turning it on asks for your password" }])
+                      switchOn: remoteNet.allowed === "yes", switchBusy: remoteBusy, sub: "Safe at home or work, not on a café’s or hotel’s network" }] : [])
+                .concat(remoteBusy ? [{ kind: "note", name: "Asking for your password…" }]
+                        : on ? [] : [{ kind: "note", name: "Off by default. Turning it on asks for your password" }])
         }
         if (level === "crashreports") {
             return [{ kind: "crashreports", name: "Crash reports to Claude", glyph: "bug", switchOn: crashReports === "on",
