@@ -1,0 +1,37 @@
+{
+  "tools": [
+    {
+      "name": "recent_changes",
+      "title": "Claude's recent changes",
+      "description": "The changes you (Claude) have made on this desktop with Nightdrive's tools, newest first: id, time, what it was (notice), the tool and its arguments, and state (done, or undone). Use it when the user asks to undo something, to find which change they mean.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {"type": "integer", "minimum": 1, "maximum": 100, "description": "How many, default 10"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["python3", "undo.py", "recent_changes"],
+      "stdin": "json",
+      "class": "read",
+      "area": "nightdrive"
+    },
+    {
+      "name": "undo_change",
+      "title": "Undo a change",
+      "description": "Undo a change you (Claude) made with Nightdrive's tools, when the user asks (\"undo that\", \"put the old wallpaper back\"): by its id from recent_changes, or without one the newest change still in place. It puts back what was there before the change; the user sees it in a notification, with Redo.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer", "description": "The change's id, as recent_changes or the change's own answer gave it"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["python3", "undo.py", "undo_change"],
+      "stdin": "json",
+      "class": "change",
+      "undo": ["python3", "undo.py", "redo", "{id}"],
+      "area": "nightdrive"
+    }
+  ]
+}

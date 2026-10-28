@@ -10,8 +10,8 @@ format is left out with a line in the log; `python3 registry.py` shows what is l
 The steps of phase 3 slot in as modules beside this one, found by name:
     confirm.ask(tool, arguments) -> bool     the card that allows an act tool's call (MCP 5, #1766). Without it,
                                              act tools are refused: nothing with consequences runs unasked
-    undo.offer(tool, arguments, result)      the notice that undoes a change tool's call (MCP 6, #1767; it builds the
-                                             command with run.undo_argv)
+    undo.before(tool, arguments) -> dict     the state a change tool's call will change, read first (MCP 6, #1767)
+    undo.offer(tool, arguments, result, state)  the log entry and the notification that undo the call
 """
 
 import importlib
@@ -102,6 +102,13 @@ def problem(spec, plugin):
         return f"{name}: {', '.join(sorted(unknown))} in its command isn't in inputSchema"
     if spec["class"] == "change" and not is_template(spec.get("undo")):
         return f"{name}: a change tool needs undo (the command that undoes it); one that can't be undone is act"
+    if "before" in spec and not is_template(spec["before"]):
+        return f"{name}: before must be a list of strings (and lists of them)"
+    unknown = run.placeholders(spec.get("before") or []) - set(schema.get("properties", {}))
+    if unknown:
+        return f"{name}: {', '.join(sorted(unknown))} in its before isn't in inputSchema"
+    if not isinstance(spec.get("notice", ""), str):
+        return f"{name}: notice must be a string"
     timeout = spec.get("timeout", run.TIMEOUT)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout <= run.TIMEOUT_MAX:
         return f"{name}: timeout must be 1–{run.TIMEOUT_MAX} seconds"
@@ -201,10 +208,12 @@ class Registry:
                                 "which this version doesn't have yet.")
             if not self.confirm.ask(tool, arguments):
                 raise ToolError(f"The user didn't allow {name} on screen, so it wasn't run. Don't try it another way.")
+        undoable = tool.cls == "change" and self.undo is not None
+        state = self.undo.before(tool, arguments) if undoable else None  # ToolError: nothing is changed
         answer = run.run(tool, arguments)
-        if tool.cls == "change" and self.undo is not None:
+        if undoable:
             try:
-                self.undo.offer(tool, arguments, answer)
+                self.undo.offer(tool, arguments, answer, state)
             except Exception as e:  # the change is made: a notice that fails mustn't turn it into an error
                 self.log(f"{name}: undo notice failed: {e!r}")
         return answer

@@ -343,9 +343,15 @@ card, undo, timeouts).
 | `command` | Argv, run without a shell. `{name}` is that argument (a whole element or part of one; a list gives one element each). A nested list is optional: left out unless every argument in it is given. A boolean in one is the switch itself: `["--all", "{all}"]` gives `--all` when true |
 | `stdin` | Optional: `"json"` writes all the arguments as JSON on the command's stdin, `"{body}"` one argument's text (long text that doesn't fit argv) |
 | `class` | `read` runs at once. `change` runs at once and tells the user, who can undo it. `act` (sending, devices, installing) runs only after the user allows it on Nightdrive's card |
-| `undo` | For `change`, required: the argv that undoes it. Its `{name}`s come from the command's JSON output (its object's fields) and then the arguments |
+| `undo` | For `change`, required: the argv that undoes it. Its `{name}`s come from `before`'s JSON object, then the command's JSON output (its object's fields), then the arguments |
+| `before` | Optional, for `change`: argv that prints the state the tool changes as a JSON object (`{"path": "…"}`, the wallpaper set now), run first. If it fails, the tool isn't run: a change must be one the user can undo |
+| `notice` | Optional, for `change`: the notification's line, e.g. `"Changed the wallpaper to {path}"` (the output's fields, then the arguments). Default: `title` |
 | `area` | The row in Settings › Claude › Access that turns it off or on: `mail`, `contacts`, `calendar`, `reminders`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `appearance`, `sound-display`, `apps-files`, `software`, or the plugin's own id |
 | `timeout` | Optional: seconds before it's stopped (30, at most 300) |
+
+A `change` tool's call shows a notification with Undo (it stays in the history for an hour) and goes in
+`~/.local/state/nightdrive/claude-changes.jsonl` (the last 100), from which Claude can undo it too when asked
+(`recent_changes`, `undo_change`). Undo runs the logged `undo` argv the way the tool ran, and Redo the command again.
 
 The command runs in the plugin's folder, with its `bin/` and Nightdrive's first in `PATH`. stdout is the result Claude
 reads (a JSON object also as structured content, at most 100 000 characters); an exit status other than 0 is an error

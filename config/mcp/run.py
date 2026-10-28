@@ -167,8 +167,8 @@ def result(out):
     return answer
 
 
-def run(tool, arguments):
-    """One call: the tool's command with these (checked) arguments; MCP's tools/call result, or ToolError."""
+def prepare(tool, arguments):
+    """The argv and stdin text (None for none) of a call: what run() runs, and undo.py keeps for redo."""
     spec = tool.spec
     try:
         argv = expand(spec["command"], arguments)
@@ -179,17 +179,29 @@ def run(tool, arguments):
             stdin = "".join(expand([stdin], arguments))
     except ToolError as e:
         raise ToolError(f"{tool.name} {e}")
-    timeout = min(spec.get("timeout", TIMEOUT), TIMEOUT_MAX)
-    out, err, status = execute(tool, argv, stdin, timeout)
+    return argv, stdin
+
+
+def timeout_of(tool):
+    return min(tool.spec.get("timeout", TIMEOUT), TIMEOUT_MAX)
+
+
+def run(tool, arguments):
+    """One call: the tool's command with these (checked) arguments; MCP's tools/call result, or ToolError."""
+    argv, stdin = prepare(tool, arguments)
+    out, err, status = execute(tool, argv, stdin, timeout_of(tool))
     if status != 0:
         message = (err.strip() or out.strip() or "no message")[-MESSAGE_MAX:]
         raise ToolError(f"{tool.name} failed ({Path(argv[0]).name} exited with {status}): {message}")
     return result(out)
 
 
-def undo_argv(tool, arguments, answer):
-    """The argv that undoes a change tool's call (undo.py runs it): its `undo` template, with the fields of the
-    command's JSON output (what it changed from) and then the call's arguments."""
-    values = dict(arguments)
-    values.update(answer.get("structuredContent") or {})
-    return expand(tool.spec["undo"], values)
+def undo_values(arguments, answer, before=None):
+    """What a change tool's `undo` fills its {name}s from: the fields of its `before` command's JSON
+    (the state it changed), then of its own JSON output, then the call's arguments."""
+    return {**arguments, **(answer.get("structuredContent") or {}), **(before or {})}
+
+
+def undo_argv(tool, arguments, answer, before=None):
+    """The argv that undoes a change tool's call (undo.py keeps it and runs it on Undo)."""
+    return expand(tool.spec["undo"], undo_values(arguments, answer, before))
