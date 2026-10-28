@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import qs
 import qs.kit
+import "sender.js" as Sender
 
 // Nightdrive Mail: folders, thread list and the open thread, over notmuch.
 ShellRoot {
@@ -593,8 +594,9 @@ ShellRoot {
             return Qt.formatDate(d, "d MMM yyyy")
         }
         function fullDate(ts) { return Qt.formatDateTime(new Date(ts * 1000), "ddd d MMM yyyy, HH:mm") }
-        function name(from) { const m = from.match(/^\s*"?([^"<]*?)"?\s*</); return m && m[1] !== "" ? m[1] : from.replace(/[<>]/g, "") }
-        function address(from) { const m = from.match(/<([^>]+)>/); return m ? m[1] : "" }
+        // A sender's name and address (sender.js: a name may hold text that looks like a tag)
+        function name(from) { return Sender.name(from) }
+        function address(from) { return Sender.address(from) }
         // Plain text to rich text: links clickable, quoted lines quiet.
         function rich(t) {
             const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
