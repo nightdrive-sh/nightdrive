@@ -47,31 +47,74 @@ set_zone() {
   [[ -z $dev ]] || nmcli device reapply "$dev" >/dev/null
 }
 
-# The zone, once (exit 1 if it is there): a copy of the default zone $1 with ssh, tailscale0 in it. A new zone isn't in
-# use until the reload, so this changes nothing yet about what reaches the computer
-make_zone() {
-  local s p
-  if firewall-cmd --permanent --get-zones | tr ' ' '\n' | grep -qx "$ZONE"; then
-    # Made, but a run stopped before its reload: in use now
-    firewall-cmd --get-zones | tr ' ' '\n' | grep -qx "$ZONE" && return 1
-    firewall-cmd -q --reload && return 0 || return 2
+# firewall-cmd with only its error, for the notification (-q would hide that too). "Not authorized" (253: its password
+# prompt cancelled, or over ssh) is what Settings passes over without one; a prompt left unanswered ends in D-Bus's
+# 25 s reply timeout instead (254), told in plain words
+fw() {
+  local err rc
+  err=$(firewall-cmd "$@" 2>&1 >/dev/null) && return 0
+  rc=$?
+  if (( rc == 253 )); then err="Not authorized"
+  elif [[ $err == *"Did not receive a reply"* ]]; then err="The password prompt timed out"
   fi
-  firewall-cmd -q --permanent --new-zone="$ZONE" || return 2
-  firewall-cmd -q --permanent --zone="$ZONE" --set-short="Nightdrive: trusted networks"
-  firewall-cmd -q --permanent --zone="$ZONE" --set-description="$1 with SSH in: Tailscale, and the networks Remote login trusts"
-  # What the default zone lets in stays the same there (AirPlay, LocalSend and Ferry use its open ports)
-  for s in $(firewall-cmd --permanent --zone="$1" --list-services) ssh; do firewall-cmd -q --permanent --zone="$ZONE" --add-service="$s"; done
-  for p in $(firewall-cmd --permanent --zone="$1" --list-ports); do firewall-cmd -q --permanent --zone="$ZONE" --add-port="$p"; done
-  firewall-cmd -q --permanent --zone="$ZONE" --add-interface="$TAILSCALE_IF"
-  firewall-cmd -q --reload || return 2
+  echo "${err:-firewall-cmd $*: failed ($rc)}" >&2
+  return "$rc"
+}
+
+# The zone, once (exit 1 if it is there): a copy of the default zone $1 with ssh, tailscale0 in it. A new zone isn't in
+# use until the reload, so this changes nothing yet about what reaches the computer.
+# Made in one call, from a file: whole or not at all, and without a password where Fedora lets a wheel user in the
+# session make a zone (FirewallD1.config), elsewhere one prompt. Filled a step at a time, each step asked for the
+# password again (polkit keeps it per process), and a prompt cancelled halfway left an empty zone that the next run
+# took as done and moved the network into: SSH reached nothing, and the default zone's open ports were shut
+# (28.10.2026). So a zone is done only with ssh in it, and one without (left by that) is made again.
+make_zone() {
+  local s p q d f
+  firewall-cmd -q --permanent --zone="$ZONE" --query-service=ssh; q=$?
+  (( q == 253 )) && { echo "Not authorized" >&2; return 2; }
+  if (( q == 0 )); then
+    # Done, but a run stopped before its reload: in use now
+    firewall-cmd --get-zones | tr ' ' '\n' | grep -qx "$ZONE" && return 1
+    fw --reload && return 0 || return 2
+  fi
+  if firewall-cmd --permanent --get-zones | tr ' ' '\n' | grep -qx "$ZONE"; then
+    fw --permanent --delete-zone="$ZONE" || return 2
+  fi
+  # Named for the zone: firewalld takes the file's name as one, and refuses a "." in it (mktemp's)
+  d=$(mktemp -d) || return 2
+  f=$d/$ZONE.xml
+  {
+    echo '<?xml version="1.0" encoding="utf-8"?>'
+    echo '<zone>'
+    echo '  <short>Nightdrive: trusted networks</short>'
+    echo "  <description>$1 with SSH in: Tailscale, and the networks Remote login trusts</description>"
+    # What the default zone lets in stays the same there (AirPlay, LocalSend and Ferry use its open ports)
+    for s in $(firewall-cmd --permanent --zone="$1" --list-services); do [[ $s == ssh ]] || echo "  <service name=\"$s\"/>"; done
+    for p in $(firewall-cmd --permanent --zone="$1" --list-ports); do echo "  <port protocol=\"${p#*/}\" port=\"${p%/*}\"/>"; done
+    # Unless tailscale0 is bound to a zone of its own (by hand): the file would fail, so it is left there
+    firewall-cmd --permanent --get-zone-of-interface="$TAILSCALE_IF" >/dev/null 2>&1 || echo "  <interface name=\"$TAILSCALE_IF\"/>"
+    echo '  <service name="ssh"/>'
+    echo '</zone>'
+  } > "$f"
+  fw --permanent --new-zone-from-file="$f" --name="$ZONE"; q=$?
+  rm -rf "$d"
+  (( q == 0 )) || return 2
+  fw --reload || return 2
 }
 # ssh out of the default zone $1, the last of the firewall's steps: by then the networks that keep it are in $ZONE.
-# Permanent, and at once without a second reload
+# Permanent, then in the running firewall by a reload: removing it there too was a second firewall-cmd, and so a second
+# password prompt (polkit keeps the password per process), where a reload asks for none (FirewallD1.config). Each half
+# is looked at on its own, so a run stopped between them finishes the other next time
 close_default() {
-  firewall-cmd -q --permanent --zone="$1" --query-service=ssh || return 0
-  firewall-cmd -q --permanent --zone="$1" --remove-service=ssh || return 1
-  firewall-cmd -q --zone="$1" --remove-service=ssh 2>/dev/null
-  return 0
+  firewall-cmd -q --permanent --zone="$1" --query-service=ssh
+  case $? in
+    0) fw --permanent --zone="$1" --remove-service=ssh || return 1 ;;
+    1) ;;
+    253) echo "Not authorized" >&2; return 1 ;;
+    *) return 1 ;;
+  esac
+  firewall-cmd -q --zone="$1" --query-service=ssh || return 0
+  fw --reload || return 1
 }
 
 setup() {
@@ -106,6 +149,16 @@ watch() {
   done
 }
 
+# sshd enabled and started, or the other way ($1: enable | disable). A cancelled password prompt says "Access denied",
+# which Settings passes over; one left unanswered, "Connection timed out", told in the words fw uses
+sshd_unit() {
+  local err
+  err=$(systemctl "$1" --now sshd.service 2>&1) && return 0
+  [[ $err == *"timed out"* ]] && err="The password prompt timed out"
+  echo "$err" >&2
+  return 1
+}
+
 case ${1:-} in
   status)
     systemctl list-unit-files -q sshd.service | grep -q . || { echo none; exit 0; }
@@ -120,8 +173,8 @@ case ${1:-} in
       for c in $(active); do [[ $(answer "$c") == no ]] || set_zone "$c" "$ZONE" || exit 1; done
       close_default "$def" || exit 1
     fi
-    systemctl enable --now sshd.service ;;
-  off) systemctl disable --now sshd.service ;;
+    sshd_unit enable ;;
+  off) sshd_unit disable ;;
   allow|deny)
     uuid=${2:-}; [[ -n $uuid ]] || IFS=$'\t' read -r uuid _ < <(primary)
     [[ -n $uuid ]] || { echo "Not on a Wi-Fi or wired network" >&2; exit 1; }

@@ -344,10 +344,15 @@ LIST
   (( copied )) || echo "    up to date"
 
   # Remote login: SSH only over Tailscale and on the networks trusted, once (config/hypr/scripts/remote-login, 23.10.2026).
-  # In the session firewalld lets a wheel user do it (on Fedora KDE without a password); over ssh it needs sudo (exit 2)
+  # In the session firewalld lets a wheel user do it (on Fedora KDE without a password); over ssh only root may read its
+  # config, so setup exits 2 and runs again with sudo. Its 1 is "nothing to do" either way, not a failure for as_root,
+  # and the first try's "Not authorized" is left out, the sudo one following
   echo "==> Remote login"
-  "$scripts/remote-login" setup | sed 's/^/    /'
-  case ${PIPESTATUS[0]} in 1) echo "    up to date" ;; 2) as_root "Remote login" sudo "$scripts/remote-login" setup ;; esac
+  setup_remote_login() {   # $@: what runs it (sudo, or nothing)
+    "$@" "$scripts/remote-login" setup | sed 's/^/    /'
+    case ${PIPESTATUS[0]} in 0) ;; 1) echo "    up to date" ;; *) return 2 ;; esac
+  }
+  setup_remote_login 2>/dev/null || as_root "Remote login" setup_remote_login sudo
 
   # The login screen's and the boot splash's copies in /etc/greetd and /usr/share/plymouth: installed again when the repo's
   # differ (their version file: the git tree they came from). An install from before both were the default (18.10.2026)

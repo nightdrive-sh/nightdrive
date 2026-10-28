@@ -44,7 +44,7 @@ Item {
         }
     }
     // firewalld's and systemd's polkit ask for the password; cancelling either leaves the switch as it was, without a
-    // notification (firewall-cmd says "Authorization failed", systemctl "Access denied")
+    // notification (remote-login says "Not authorized" for firewall-cmd, systemctl "Access denied")
     Sh {
         id: remoteLoginSetProc
         onResult: text => {
