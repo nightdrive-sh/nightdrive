@@ -157,6 +157,9 @@ hl.bind(mod .. " + SHIFT + C", function ()
         hl.dispatch(hl.dsp.exec_cmd(scripts .. "/claude-write"))
     end
 end)
+-- Send to Claude: the selected text or files, or the clipboard's picture, to a Claude Code session's prompt, not sent
+-- (scripts/send-capture gathers them, the launcher's Send to Claude level shows them and the sessions)
+hl.bind(mod .. " + CTRL + C",    hl.dsp.exec_cmd(scripts .. "/send-capture sendclaude"))
 -- Shelf (quickshell/Shelf.qml): no key, a file dragged to the top edge of the screen opens it (qs ipc call shelf toggle)
 hl.bind(mod .. " + ESCAPE",      hl.dsp.exec_cmd("qs ipc call menu toggle notifications"))
 hl.bind(mod .. " + CTRL + L",    hl.dsp.exec_cmd("loginctl lock-session"))

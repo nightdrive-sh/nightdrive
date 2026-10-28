@@ -1,0 +1,130 @@
+#!/bin/bash
+# Send to Claude's Enter (quickshell/SendClaudeLevels.qml): what scripts/send-capture gathered goes to a Claude Code
+# session's prompt, pasted the way ⌘V pastes, and is never sent: you write your question after it and press Enter.
+#   claude-send-paste DIR WHAT ADDR   WHAT: files | selection | clipboard | image | screenshot; ADDR: the session's window
+#   claude-send-paste DIR WHAT new    a new session (in the files' folder, else ~/Projects), pasted once it's ready
+# What goes in: text inside <selection window="its title"> or <clipboard> tags, so Claude reads it as data and your
+# own words after it as the question; files and pictures as their paths (quoted as a terminal quotes a dropped file),
+# which Claude reads itself. A picture is kept for a day in $XDG_RUNTIME_DIR/nightdrive/claude-send-images, where the
+# session can still read it later. Control codes are taken out of the text: a pasted escape could end the terminal's
+# bracketed paste, and a carriage return after it would send the prompt.
+set -uo pipefail
+
+readonly IMAGES="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/claude-send-images"
+readonly SESSIONS="$HOME/.config/topbar/scripts/claude-sessions"
+readonly NEW_DIR="$HOME/Projects"   # a new session's folder when no files say otherwise, as terminal-or-claude's
+readonly TITLE_CHARS=200            # the window's title is cut at this length in the tag
+readonly FOCUS_WAIT=40              # × 0.05 s for the session's window to get the keyboard
+readonly NEW_WAIT=60                # × 0.5 s for a new session's window
+readonly READY_WAIT=240             # × 0.5 s for its prompt: a folder's trust question waits for you to answer it
+readonly RESTORE_DELAY=0.8          # seconds before the clipboard gets its old content back: the terminal reads it when it pastes
+
+notify() { notify-send -a Claude -i claude "Send to Claude" "$1"; }
+
+dir=${1:-}; what=${2:-}; target=${3:-}
+[[ -f $dir/meta.json && -n $what && -n $target ]] || { echo "usage: claude-send-paste DIR WHAT ADDR|new" >&2; exit 2; }
+umask 077
+
+# Text without control codes (a tab and a newline stay), the C1 ones included (U+0080–U+009F: 8-bit escapes)
+clean() { LC_ALL=C tr -d '\000-\010\013-\037\177' | LC_ALL=C sed 's/\xc2[\x80-\x9f]//g'; }
+# A path as a terminal quotes a dropped file: as it is when it's plain, else in single quotes
+quote() { if [[ $1 =~ ^[A-Za-z0-9_./~+:@%-]+$ ]]; then printf '%s' "$1"; else printf "'%s'" "${1//\'/\'\\\'\'}"; fi; }
+# A picture to the folder that outlives this send, for a day
+keep_image() {
+  mkdir -p -m 700 "$IMAGES"
+  find "$IMAGES" -name '*.png' -mmin +1440 -delete 2>/dev/null
+  local f; f="$IMAGES/$(date +%Y-%m-%d-%H%M%S)-$1.png"
+  cp "$2" "$f" && printf '%s' "$f"
+}
+
+# The text that goes to the prompt, ending in a space or a newline: your words follow it
+payload() {
+  local title tag body
+  case $what in
+    selection|clipboard)
+      if [[ $what == selection ]]; then
+        title=$(jq -r '.title // ""' "$dir/meta.json" | tr -d '\000-\037\177<>"'); title=${title:0:TITLE_CHARS}
+        tag="selection"; printf '<selection window="%s">\n' "$title"; body=primary.txt
+      else
+        tag="clipboard"; printf '<clipboard>\n'; body=clipboard.txt
+      fi
+      # Its own closing tag inside the text would end the block early
+      clean <"$dir/$body" | sed "s#</$tag#<\\\\/$tag#g"
+      printf '\n</%s>\n' "$tag" ;;
+    files)
+      local f sep=
+      while IFS= read -r f; do printf '%s' "$sep"; quote "$f"; sep=' '; done <"$dir/files" | clean
+      printf ' ' ;;
+    image|screenshot)
+      local src=clipboard.png; [[ $what == screenshot ]] && src=window.png
+      local f; f=$(keep_image "$what" "$dir/$src") || return 1
+      quote "$f"; printf ' ' ;;
+    *) return 1 ;;
+  esac
+}
+
+# Pasted into the window that has the keyboard now, as ⌘V does (Shift+Insert: the terminals paste the clipboard with
+# it); the clipboard gets its old content back after
+paste_into() {
+  local addr=$1 text=$2 types type saved="$dir/.clip" active
+  hyprctl dispatch "hl.dsp.focus({ window = \"address:0x$addr\" })" >/dev/null
+  for _ in $(seq "$FOCUS_WAIT"); do
+    active=$(hyprctl -j activewindow 2>/dev/null | jq -r '.address // "" | sub("^0x"; "")')
+    [[ $active == "$addr" ]] && break
+    sleep 0.05
+  done
+  if [[ $active != "$addr" ]]; then
+    printf '%s' "$text" | wl-copy --sensitive
+    notify "The session's window didn't come up, so nothing was pasted. It is on the clipboard."
+    return 1
+  fi
+  types=$(wl-paste --list-types 2>/dev/null)
+  type=$(grep -m1 -x 'text/plain;charset=utf-8' <<<"$types" || head -n1 <<<"$types")
+  [[ -n $type ]] && wl-paste --no-newline --type "$type" >"$saved" 2>/dev/null
+  # --sensitive: the clipboard history (cliphist) doesn't keep it
+  printf '%s' "$text" | wl-copy --sensitive
+  hyprctl dispatch 'hl.dsp.send_shortcut({ mods = "SHIFT", key = "Insert" })' >/dev/null
+  sleep "$RESTORE_DELAY"
+  if [[ -n $type && -s $saved ]]; then wl-copy --type "$type" <"$saved"; else wl-copy --clear; fi
+  rm -f "$saved"
+}
+
+addresses() { "$SESSIONS" 2>/dev/null | jq -r '.[].address | sub("^0x"; "")'; }
+title_of() { hyprctl -j clients 2>/dev/null | jq -r --arg a "$1" '.[] | select(.address | sub("^0x"; "") == $a) | .title'; }
+
+# A new session: started without a prompt (terminal-or-claude), then waited for: its window among the sessions, and its
+# prompt ready (Claude Code titles its window ✳ when it waits for you; before that a folder's trust question may be up,
+# which a paste must not answer)
+new_session() {
+  local cwd=$NEW_DIR before addr= f
+  if [[ $what == files ]]; then
+    f=$(head -n1 "$dir/files"); [[ -d $f ]] || f=${f%/*}
+    [[ -d $f ]] && cwd=$f
+  fi
+  before=$(addresses)
+  "$HOME/.config/hypr/scripts/terminal-or-claude" --dir "$cwd" || return 1
+  for _ in $(seq "$NEW_WAIT"); do
+    addr=$(comm -13 <(sort <<<"$before") <(addresses | sort) | head -n1)
+    [[ -n $addr ]] && break
+    sleep 0.5
+  done
+  [[ -n $addr ]] || { notify "The new session didn't start in time, so nothing was pasted."; return 1; }
+  for _ in $(seq "$READY_WAIT"); do
+    [[ $(title_of "$addr") == "✳"* ]] && break
+    sleep 0.5
+  done
+  [[ $(title_of "$addr") == "✳"* ]] || { notify "The new session isn't ready (a question in it?), so nothing was pasted."; return 1; }
+  sleep 0.5   # the prompt draws itself after the title
+  printf '%s' "$addr"
+}
+
+text=$(payload && printf x)
+[[ -n $text ]] || { notify "Nothing to send."; exit 1; }
+text=${text%x}   # the x keeps the trailing newline or space that $( ) would cut
+if [[ $target == new ]]; then
+  target=$(new_session) || exit 1
+elif ! addresses | grep -qx "${target#0x}"; then
+  notify "That Claude session has closed, so nothing was pasted."
+  exit 1
+fi
+paste_into "${target#0x}" "$text"

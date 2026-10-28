@@ -79,7 +79,9 @@ start() {
     terminal=true
   fi
   # The selection, from the primary selection: the clipboard stays as it is. Empty or old, the preview asks instead
-  text=$(wl-paste --primary --no-newline 2>/dev/null)
+  # As UTF-8 by name: a GTK app's plain text/plain, which wl-paste may take first, has ä as \C3\A4
+  local ptype; ptype=$(wl-paste --primary --list-types 2>/dev/null | grep -m1 -x -e 'text/plain;charset=utf-8' -e 'UTF8_STRING')
+  text=$(wl-paste --primary --no-newline ${ptype:+--type "$ptype"} 2>/dev/null)
   rm -rf "$WORK"; mkdir -p -m 700 "$WORK"
   printf '%s' "$text" >"$WORK/selection"
   # The window's place: the preview goes in its middle. The mouse isn't a guide to where the text is (a selection made

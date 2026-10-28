@@ -26,6 +26,7 @@ singleton LastState 1.0 LastState.qml
 singleton TopBar 1.0 TopBar.qml
 singleton Notifs 1.0 Notifs.qml
 singleton Claude 1.0 Claude.qml
+singleton PrimaryWatch 1.0 PrimaryWatch.qml
 NotificationPopups 1.0 NotificationPopups.qml
 NotificationCard 1.0 NotificationCard.qml
 Bar 1.0 Bar.qml
@@ -69,4 +70,6 @@ PasswordLevels 1.0 PasswordLevels.qml
 ThemeLevels 1.0 ThemeLevels.qml
 DetailCard 1.0 DetailCard.qml
 ClaudeWriteLevels 1.0 ClaudeWriteLevels.qml
+SendCapture 1.0 SendCapture.qml
+SendClaudeLevels 1.0 SendClaudeLevels.qml
 PolkitWatch 1.0 PolkitWatch.qml

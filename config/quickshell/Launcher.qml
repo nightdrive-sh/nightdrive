@@ -102,11 +102,11 @@ PanelWindow {
     // SystemLevels (Wi-Fi, Bluetooth, Sound, Tailscale, Status), HomeLevels (Home Assistant), DefaultAppsLevels, AppKeyLevels
     // (App shortcuts), BehaviourLevels (Mouse, Launcher, Firefox, Computer name, Remote login, Notifications, Crash reports, Update channel), InstallLevels,
     // ToolsLevels (Clipboard, Emoji, Snippets), AppearanceLevels (Top bar, Screensaver), DisplayLevels (Display, Battery),
-    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, AboutLevels, the plugins' and the private
+    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, SendClaudeLevels, AboutLevels, the plugins' and the private
     // extension. A new file goes in this list, not in each question's code
     // The installed plugins' level files (their <Name>Levels.qml, TopBar.plugin.levels: Deck's Music) come after the core's
     property var pluginExts: []
-    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, about].concat(pluginExts, ext ? [ext] : [])
+    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, sendclaude, about].concat(pluginExts, ext ? [ext] : [])
     // A plugin's row above the search field (topRow; Deck's player): the first file that has one. ↑ from the list's first
     // row selects it, its keys then go to topKey(event), and Ctrl+Space anywhere to topPress()
     readonly property var topExt: exts.find(e => e.topRow) || null
@@ -196,7 +196,10 @@ PanelWindow {
             { kind: "nav", name: "Screenshot", glyph: "camera", target: "screenshot" },
             { kind: "nav", name: "Emoji", glyph: "smile", target: "emoji" },
             { kind: "nav", name: "Snippets", glyph: "text-cursor-input", target: "snippets", extra: "text expansion replacement abbreviation autotext" },
-            { kind: "action", name: "Color Picker", glyph: "pipette", cmd: ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/color-picker\""] }
+            { kind: "action", name: "Color Picker", glyph: "pipette", cmd: ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/color-picker\""] },
+            // as ⌘⌃C, once the launcher is gone: the window under it is what's gathered, and its screenshot is without the launcher
+            { kind: "action", name: "Send to Claude", glyph: "bot", keyHint: true, extra: "selection files picture screenshot prompt claude code",
+              cmd: ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/send-capture\" sendclaude"] }
         ].concat(Plugins.has("localsend") ? [   // to a phone running LocalSend (plugins/localsend); several: picked from a list
             { kind: "action", name: "Send clipboard with LocalSend", glyph: "smartphone", cmd: [Quickshell.env("HOME") + "/.local/bin/localsend", "send-clipboard"],
               extra: "phone iphone share airdrop text link" },
@@ -351,8 +354,9 @@ PanelWindow {
         return out
     }
     // Rows that can't be selected: section headers, and notes (kind "note": a line of help in small text, e.g. Settings ›
-    // App shortcuts' "the others are in the config files"), unlike a hint, which stands in for the rows ("Loading…")
-    function fixedRow(it) { return it.kind === "header" || it.kind === "note" }
+    // App shortcuts' "the others are in the config files"), unlike a hint, which stands in for the rows ("Loading…"), and
+    // quotes (kind "quote": lines of what something holds, in a darker box: Send to Claude's preview)
+    function fixedRow(it) { return it.kind === "header" || it.kind === "note" || it.kind === "quote" }
     function firstSelectable() {
         for (let i = 0; i < results.length; i++) if (!fixedRow(results[i])) return i
         return 0
@@ -378,6 +382,11 @@ PanelWindow {
     readonly property int plainLineHeight: Math.ceil(plainMetrics.height)
     FontMetrics { id: subMetrics; font { family: Theme.font; pixelSize: win.fontSize - 5; weight: win.fontWeight } }
     FontMetrics { id: plainMetrics; font { family: Theme.font; pixelSize: win.fontSize; weight: win.fontWeight } }
+    // A quote's lines (its name, already cut to a few lines) and the box's padding
+    readonly property int quoteLineHeight: Math.ceil(quoteMetrics.height)
+    readonly property int quotePad: 12
+    FontMetrics { id: quoteMetrics; font { family: Theme.font; pixelSize: win.fontSize - 3; weight: win.fontWeight } }
+    function quoteHeight(it) { return it.name.split("\n").length * quoteLineHeight + 2 * quotePad }
     // The lines a row's description takes (an estimate from its width, for the list's height; the row measures its own)
     function subLines(it) {
         if (!it.sub || fixedRow(it)) return 1
@@ -390,7 +399,7 @@ PanelWindow {
         const cap = Math.min(maxRows * (rowHeight + rowGap), listRoom)
         let h = 0
         for (const it of results) {
-            h += (fixedRow(it) ? headerHeight : rowHeight + (subLines(it) - 1) * (it.subPlain ? plainLineHeight : subLineHeight)) + rowGap
+            h += (it.kind === "quote" ? quoteHeight(it) : fixedRow(it) ? headerHeight : rowHeight + (subLines(it) - 1) * (it.subPlain ? plainLineHeight : subLineHeight)) + rowGap
             if (h >= cap) return cap
         }
         return h
@@ -734,6 +743,8 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     function select(i) { list.currentIndex = i }
     function selectFirst() { list.currentIndex = firstSelectable() }
     function selectWhere(pred) { const i = results.findIndex(pred); if (i >= 0) list.currentIndex = i }
+    // Back to the list's top after the selection moved down to a row (Send to Claude: its preview stays in view)
+    function showTop() { Qt.callLater(() => list.positionViewAtBeginning()) }
     function back() {
         if (detail !== null) { details.close(); return }
         if (tools.picker.back()) return      // Clipboard as a text field's picker: back to the field, its text kept
@@ -773,6 +784,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     AppKeyLevels { id: akeys; launcher: win }
     BehaviourLevels { id: behave; launcher: win }
     ClaudeWriteLevels { id: cwrite; launcher: win }
+    SendClaudeLevels { id: sendclaude; launcher: win }
     InstallLevels { id: inst; launcher: win }
     ToolsLevels { id: tools; launcher: win }
     AppearanceLevels { id: look; launcher: win }
@@ -825,7 +837,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     readonly property var shortcutAliases: ({ "kitty": "terminal", "firefox": "browser", "visual studio code": "vs code",
                                               "clipboard": "clipboard history", "emoji": "emoji picker", "keybindings": "this help" })
     function shortcutFor(it) {
-        if (!it || !it.name || (it.kind !== "app" && it.kind !== "nav")) return ""
+        if (!it || !it.name || (it.kind !== "app" && it.kind !== "nav" && !it.keyHint)) return ""   // keyHint: an action with a key of its own
         if (level === "startup") return ""      // there the rows are switches, not apps to open
         // settings pages: "Notifications" is not the ⌘Esc panel, Apps › "Firefox" not Hyper B
         if (it.kind === "nav" && (parents[it.target] === "settings" || parents[it.target] === "appsettings")) return ""
@@ -1135,8 +1147,9 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                     required property int index
                     readonly property bool isHeader: modelData.kind === "header"
                     readonly property bool isNote: modelData.kind === "note"
-                    readonly property bool current: !isHeader && !isNote && !win.topFocused && index === list.currentIndex
-                    readonly property bool noIcon: modelData.kind === "key" || modelData.kind === "hint" || isHeader || isNote
+                    readonly property bool isQuote: modelData.kind === "quote"
+                    readonly property bool current: !isHeader && !isNote && !isQuote && !win.topFocused && index === list.currentIndex
+                    readonly property bool noIcon: modelData.kind === "key" || modelData.kind === "hint" || isHeader || isNote || isQuote
                     readonly property bool armedNow: (modelData.kind === "action" && modelData.confirm === true && win.armed === modelData.name)
                                                     || (modelData.armKey !== undefined && win.armed === modelData.armKey)
                     readonly property bool chevron: modelData.kind === "nav" || modelData.kind === "menu" || modelData.chevron === true
@@ -1146,9 +1159,20 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                     readonly property bool plain: modelData.subPlain === true
                     readonly property int lineH: plain ? win.plainLineHeight : win.subLineHeight
                     readonly property real topShift: -extraLines * lineH / 2
-                    height: isHeader || isNote ? win.headerHeight : win.rowHeight + extraLines * lineH
+                    height: isQuote ? win.quoteHeight(modelData) : isHeader || isNote ? win.headerHeight : win.rowHeight + extraLines * lineH
                     radius: 10
-                    color: current ? Theme.sel : "transparent"
+                    color: current ? Theme.sel : isQuote ? Theme.card : "transparent"
+                    Text {      // a quote's lines, in the darker box
+                        visible: row.isQuote
+                        anchors { fill: parent; margins: win.quotePad; leftMargin: 16; rightMargin: 16 }
+                        text: row.isQuote ? row.modelData.name : ""
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: win.quoteLineHeight
+                        color: Theme.text
+                        font { family: Theme.font; pixelSize: win.fontSize - 3; weight: win.fontWeight }
+                    }
 
                     // Icon: app = image, root item = Lucide glyph, keybinding = no icon
                     Item {
@@ -1206,6 +1230,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                             verticalCenter: parent.verticalCenter
                             verticalCenterOffset: twoLines ? (subLine ? (row.plain ? -row.lineH / 2 : -9) - row.extraLines * row.lineH / 2 : -7) : 0
                         }
+                        visible: !row.isQuote
                         elide: Text.ElideRight
                         // liveName: a name that changes often (Status' processes), bound here instead of rebuilding the rows
                         text: row.modelData.liveName !== undefined ? sys.liveText(row.modelData.liveName)

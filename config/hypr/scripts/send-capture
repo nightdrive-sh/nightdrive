@@ -1,0 +1,138 @@
+#!/bin/bash
+# The Send keys' first half (⌘⌃C Send to Claude, bindings.lua): what you have in the window is gathered while it still
+# has the keyboard, then a launcher level shows it and where it can go (LEVEL: quickshell/SendClaudeLevels.qml, which
+# reads the capture with SendCapture.qml). Nothing here knows the target: another one (Mail, Ferry…) reuses it as it is.
+#   send-capture LEVEL   gather and open that launcher level (sendclaude)
+# What is gathered, in DIR ($XDG_RUNTIME_DIR/nightdrive/send, only you can read it), each only when there is one:
+#   files          the files selected in a file manager (Files: its own ⌘C, read from the clipboard, which gets its old
+#                  content back), one path per line
+#   primary.txt    the selected text (the primary selection: the clipboard stays as it is). The level tells an old
+#                  selection apart, as Claude writes does
+#   clipboard.png  the clipboard's picture, or clipboard.txt its text. A password manager's copy (they mark it secret) is
+#                  never read; text that looks like a password or a code is marked so (meta's clip "secret"), and the
+#                  level hides it until chosen
+#   window.png     a screenshot of the window
+#   meta.json      { addr, class, title, window: {x, y, w, h}, files, firstIsDir, primary, clip, clipChars, shot }
+# The same apps are left out as in Claude writes: password managers, keyrings, private browser windows (claude-write
+# always) and your own (launcher › Settings › Claude writes › Not in these apps).
+set -uo pipefail
+
+readonly WORK="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/send"
+readonly WRITE="$HOME/.config/hypr/scripts/claude-write"
+readonly WRITE_SETTINGS="$HOME/.local/state/nightdrive/claude-write.json"
+readonly BLOCKED_TITLES='(Private Browsing|Incognito|InPrivate)'   # as in claude-write
+# File managers whose ⌘C (Ctrl+C) copies the selected files as a text/uri-list (window class, a regex)
+readonly FILE_MANAGERS='^(org\.gnome\.Nautilus|nautilus|thunar|nemo|pcmanfm(-qt)?|org\.kde\.dolphin|caja)$'
+readonly COPY_WAIT=20          # × 0.05 s for the file manager's copy to reach the clipboard
+readonly SECRET_HINT='x-kde-passwordManagerHint'   # the type password managers add to a secret they copy
+
+notify() { notify-send -a Nightdrive -i document-send "Send" "$1"; }
+
+# Text that may be a password or a one-time code: one word of up to 64 characters that is 4–8 digits, or 8 or more
+# characters mixing three of lower case, upper case, digits and symbols. Not a link or a path. A guess both ways: the
+# level only hides such text until it's chosen
+looks_secret() {
+  local t=$1 kinds=0
+  [[ $t == *[[:space:]]* || ${#t} -gt 64 || ${#t} -lt 4 ]] && return 1
+  [[ $t == *://* || $t == /* || $t == '~/'* ]] && return 1
+  [[ $t =~ ^[0-9]{4,8}$ ]] && return 0
+  (( ${#t} < 8 )) && return 1
+  [[ $t =~ [a-z] ]] && ((kinds++)); [[ $t =~ [A-Z] ]] && ((kinds++))
+  [[ $t =~ [0-9] ]] && ((kinds++)); [[ $t =~ [^A-Za-z0-9] ]] && ((kinds++))
+  (( kinds >= 3 ))
+}
+
+# The clipboard's preferred type: a picture, else text, else whatever comes first
+clip_type() {
+  local types=$1
+  grep -m1 -x 'image/png' <<<"$types" || grep -m1 '^image/' <<<"$types" \
+    || grep -m1 -x -e 'text/plain;charset=utf-8' -e 'UTF8_STRING' <<<"$types" || grep -m1 -x 'text/plain' <<<"$types" || head -n1 <<<"$types"
+}
+
+# file:///a/b%20c → /a/b c (a URI's %XX bytes, UTF-8 too); other schemes are left out
+uri_paths() {
+  local u
+  while IFS= read -r u; do
+    u=${u%$'\r'}
+    [[ $u == file://* ]] || continue
+    u=${u#file://}; u=${u#localhost}
+    printf '%b\n' "${u//%/\\x}"
+  done
+}
+
+level=${1:-}
+[[ $level =~ ^[a-z]+$ ]] || { echo "usage: send-capture LEVEL" >&2; exit 2; }
+win=$(hyprctl -j activewindow 2>/dev/null) || win='{}'
+addr=$(jq -r '.address // ""' <<<"$win"); class=$(jq -r '.class // ""' <<<"$win")
+title=$(jq -r '.title // ""' <<<"$win")
+[[ -z $addr ]] && exit 0
+always=$("$WRITE" always 2>/dev/null)
+shopt -s nocasematch
+if [[ ( -n $always && $class =~ $always ) || $title =~ $BLOCKED_TITLES ]] \
+   || jq -e --arg c "$class" '(.blocked // []) | map(ascii_downcase) | index($c | ascii_downcase)' "$WRITE_SETTINGS" >/dev/null 2>&1; then
+  notify "Not in this window: nothing was gathered."
+  exit 0
+fi
+shopt -u nocasematch
+
+rm -rf "$WORK"; mkdir -p -m 700 "$WORK"
+umask 077
+
+# The window as it is now, before the launcher covers it
+geom=$(jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' <<<"$win")
+shot=false
+grim -g "$geom" "$WORK/window.png" 2>/dev/null && shot=true
+
+# The selected text
+# As UTF-8 by name: a GTK app's plain text/plain, which wl-paste may take first, has ä as \C3\A4
+ptype=$(wl-paste --primary --list-types 2>/dev/null | grep -m1 -x -e 'text/plain;charset=utf-8' -e 'UTF8_STRING')
+wl-paste --primary --no-newline ${ptype:+--type "$ptype"} >"$WORK/primary.txt" 2>/dev/null
+[[ -s $WORK/primary.txt ]] || rm -f "$WORK/primary.txt"
+
+# The clipboard: a secret isn't read at all; its type and content are kept to give it back after a file manager's copy
+types=$(wl-paste --list-types 2>/dev/null)
+secret=false; grep -q "^$SECRET_HINT" <<<"$types" && secret=true
+type=$(clip_type "$types")
+clip=; clipchars=0
+if [[ -n $type ]]; then
+  wl-paste --no-newline --type "$type" >"$WORK/.saved" 2>/dev/null
+  if [[ $secret == true ]]; then :
+  elif [[ $type == image/png ]]; then cp "$WORK/.saved" "$WORK/clipboard.png"; clip=image
+  elif [[ $type == image/* ]] && magick "$WORK/.saved" "$WORK/clipboard.png" 2>/dev/null; then clip=image
+  elif [[ ( $type == text/plain* || $type == UTF8_STRING ) && -s $WORK/.saved ]]; then
+    cp "$WORK/.saved" "$WORK/clipboard.txt"; clipchars=$(wc -m <"$WORK/clipboard.txt")
+    if looks_secret "$(cat "$WORK/clipboard.txt")"; then clip=secret; else clip=text; fi
+  fi
+fi
+
+# The file manager's selected files: its own copy, into an emptied clipboard so an earlier copy isn't taken for it
+files=0
+if [[ $class =~ $FILE_MANAGERS ]]; then
+  wl-copy --clear
+  hyprctl dispatch 'hl.dsp.send_shortcut({ mods = "CTRL", key = "C" })' >/dev/null
+  for _ in $(seq "$COPY_WAIT"); do
+    wl-paste --list-types 2>/dev/null | grep -qx 'text/uri-list' && break
+    sleep 0.05
+  done
+  wl-paste --no-newline --type text/uri-list 2>/dev/null | uri_paths >"$WORK/files"
+  files=$(grep -c . "$WORK/files")
+  (( files )) || rm -f "$WORK/files"
+  # The clipboard back as it was (a secret stays one: --sensitive marks it so, and the history doesn't keep it)
+  if [[ -n $type && -s $WORK/.saved ]]; then
+    if [[ $secret == true ]]; then wl-copy --sensitive --type "$type" <"$WORK/.saved"
+    else wl-copy --type "$type" <"$WORK/.saved"; fi
+  else
+    wl-copy --clear
+  fi
+fi
+rm -f "$WORK/.saved"
+
+primary=0; [[ -f $WORK/primary.txt ]] && primary=$(wc -m <"$WORK/primary.txt")
+# A new session opens in the first file's folder, or in the folder itself when that's what was selected
+firstdir=false; (( files )) && [[ -d $(head -n1 "$WORK/files") ]] && firstdir=true
+jq -n --arg addr "$addr" --arg class "$class" --arg title "$title" --argjson win "$win" --argjson files "$files" \
+      --argjson primary "$primary" --arg clip "$clip" --argjson clipchars "$clipchars" --argjson shot "$shot" \
+      --argjson firstdir "$firstdir" '{ addr: ($addr | sub("^0x"; "")), class: $class, title: $title,
+         window: { x: $win.at[0], y: $win.at[1], w: $win.size[0], h: $win.size[1] },
+         files: $files, firstIsDir: $firstdir, primary: $primary, clip: $clip, clipChars: $clipchars, shot: $shot }' >"$WORK/meta.json"
+qs ipc call launcher openLevel "$level" >/dev/null 2>&1 || notify "The launcher didn't open (is Quickshell running?)."

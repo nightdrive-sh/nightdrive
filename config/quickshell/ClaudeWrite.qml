@@ -13,7 +13,7 @@ import Quickshell.Wayland
 // Enter inserts it at the prompt's cursor: a terminal can't replace a selection.
 // With nothing selected just now (an empty document) the card asks what to write instead, and Enter inserts it at the
 // cursor: a selection stays on offer long after it's gone from the screen, so only one made in the last minute, in
-// the window the key was pressed in, counts (the watcher below; the text itself isn't kept).
+// the window the key was pressed in, counts (PrimaryWatch.qml; the text itself isn't kept).
 //   qs ipc call write open <dir>   (dir: the script's selection and meta.json)
 //   qs ipc call write again
 //   qs ipc call write close         as Esc (for testing: the card takes the keyboard)
@@ -27,7 +27,6 @@ PanelWindow {
     id: win
     readonly property string script: Quickshell.env("HOME") + "/.config/hypr/scripts/claude-write"
     readonly property int maxChars: 8000   // a longer selection is sent only after an Enter: it may be more than meant
-    readonly property int freshMs: 60000   // a selection older than this is an old one: the card asks instead
 
     property bool open: false
     property string dir: ""
@@ -36,8 +35,9 @@ PanelWindow {
     property string sent: ""               // what goes to Claude, in a line: the selection, or an app's own words
     property string phase: ""              // ask | confirm | working | done | error
     property bool typed: false             // nothing was selected just now: what to write is asked, and inserted
-    property real primaryAt: 0             // when the primary selection last changed, and in which window
-    property string primaryAddr: ""
+    // A selection made in the last minute, in the key's window (PrimaryWatch.qml): binding to it starts its watch with
+    // the shell
+    readonly property real primaryAt: PrimaryWatch.at
     property string result: ""
     property string warning: ""
     property string error: ""
@@ -48,7 +48,7 @@ PanelWindow {
         metaFile.path = ""; metaFile.path = d + "/meta.json"
         selFile.path = ""; selFile.path = d + "/selection"
         try { meta = JSON.parse(metaFile.text()) } catch (e) { return }
-        const fresh = selFile.text().trim() !== "" && Date.now() - primaryAt < freshMs && primaryAddr === addr(meta.addr)
+        const fresh = selFile.text().trim() !== "" && PrimaryWatch.fresh(meta.addr)
         typed = !meta.draft && !fresh
         selection = meta.draft || typed ? "" : selFile.text()
         sent = meta.draft ? meta.sent || "" : selection
@@ -99,26 +99,6 @@ PanelWindow {
 
     // Hyprland's addresses with or without 0x
     function addr(a) { return String(a || "").replace(/^0x/, "") }
-
-    // Every change of the primary selection, as a line: when, and the window that had the keyboard. The text is read
-    // only so the app isn't left writing into a closed pipe, and goes nowhere
-    Process {
-        id: primaryWatch
-        property real started: 0
-        command: ["wl-paste", "--primary", "--watch", "sh", "-c", "cat >/dev/null; echo"]
-        running: true
-        onStarted: started = Date.now()
-        onExited: rewatch.start()
-        stdout: SplitParser {
-            onRead: {
-                // wl-paste reports the selection that's already there when it starts: that one is old
-                if (Date.now() - primaryWatch.started < 1000) return
-                win.primaryAt = Date.now()
-                win.primaryAddr = Hyprland.activeToplevel ? win.addr(Hyprland.activeToplevel.address) : ""
-            }
-        }
-    }
-    Timer { id: rewatch; interval: 5000; onTriggered: primaryWatch.running = true }
 
     // Another workspace, or the drawer (a special workspace) opening or closing, takes you away from the window the
     // text was for: the card closes as with Esc, instead of staying over a place it no longer belongs to
