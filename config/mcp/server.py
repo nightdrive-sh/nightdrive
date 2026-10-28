@@ -28,7 +28,13 @@ Nightdrive is a desktop for Fedora built on Hyprland and Quickshell: a top bar w
 apps (Mail, Contacts, Deck, Ferry) and plugins. These tools act on the desktop of the person you are talking to, on \
 this machine. Which tools you see follows their Settings › Claude › Access: what is off isn't listed at all. Tools \
 that change something tell the user, who can undo it; those with consequences (sending, devices, installing) ask the \
-user on screen first, and a refusal there is the user's answer, not an error to work around."""
+user on screen first, and a refusal there is the user's answer, not an error to work around.
+
+Nightdrive's documentation is in your tools, as this machine has it: docs_search before you guess how something \
+works, where a setting is or which command does it, then docs_read for the section; shortcuts for the keys; \
+nightdrive_status for the version, channel, theme, displays and which apps and plugins are installed. Settings are in \
+the launcher (⌘ Space › Settings), and most have a `nightdrive` command (`nightdrive help` lists them). Answer with \
+the path a user clicks or the key they press, as the docs give it."""
 
 # JSON-RPC 2.0's error codes, as MCP uses them
 PARSE_ERROR = -32700
