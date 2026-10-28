@@ -977,9 +977,12 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
 
     Rectangle {
         id: card
-        width: Math.min(win.detail !== null ? win.detailWidth : win.cardWidth, parent.width - 2 * win.edge)
+        // Only the details' widening is animated, not the screen's cap: on the first open the window's width is 0 until
+        // Hyprland sizes it, and the card would grow from nothing
+        property real wantWidth: win.detail !== null ? win.detailWidth : win.cardWidth
+        width: Math.min(wantWidth, parent.width - 2 * win.edge)
         // Animated only while open: a closed launcher drops back to the normal width at once (onOpenChanged)
-        Behavior on width { enabled: win.open; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        Behavior on wantWidth { enabled: win.open; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
         height: col.implicitHeight + 36
         x: (parent.width - width) / 2
         // Higher up when the screen is too low for it, but never over the top bar
