@@ -364,11 +364,11 @@ An `act` tool's call first waits on Nightdrive's confirmation card, which shows 
 as plain text, each labelled with its schema `title` (else its name): give the arguments a user can check (`to`,
 `body`, `entity`), not an id that says nothing. Enter allows; Esc, 60 s without an answer, or a card that can't be shown
 (Quickshell not running) refuse it, and Claude reads the refusal. `python3 config/mcp/confirm.py --demo mail` shows one.
-
-## Trying it out
 An act that could leave the user without a usable screen or network can also go back by itself: its command ends with
 `config/mcp/keep.py`, which asks on the same card whether to keep it and runs the revert command unless they do
 (`display scale … --keep`, `network wifi off --keep`).
+
+## Trying it out
 
 ```sh
 nightdrive plugins install disk    # runs its installer in a terminal, then gathers its parts
