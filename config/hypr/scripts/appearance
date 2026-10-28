@@ -1,0 +1,11 @@
+#!/bin/bash
+# The desktop's look in one JSON object, from the scripts that set each part (Claude's appearance_current reads it:
+# config/mcp/tools/appearance.json):
+#   appearance [--json]   {wallpaper, theme: (theme state), night_light, bar: (bar-style show), colors, themes}
+# The wallpapers to choose from: wallpaper list --json.
+set -euo pipefail
+here=$(dirname "$(readlink -f "$0")")   # the sibling scripts of this checkout, not ~/.config's
+jq -n --arg w "$("$here/wallpaper" current)" --argjson t "$("$here/theme" state)" \
+  --arg n "$("$here/nightlight" status)" --argjson b "$("$here/bar-style" show)" \
+  --argjson c "$("$here/theme" themes --json)" \
+  '{wallpaper: $w, theme: $t, night_light: $n, bar: $b, colors: $c.colors, themes: $c.themes}'

@@ -8,7 +8,10 @@ Themes). Choices: ~/.local/state/theme-color, ~/.local/state/nightdrive/theme-lo
   theme set KEY VALUE  sets one of them and applies it (VALUE default: back to the Default theme's)
   theme themes         "id<TAB>name<TAB>main colour hex<TAB>background<TAB>own?<TAB>current | changed?": Nightdrive's
                        themes (config/hypr/themes), then yours (~/.config/nightdrive/themes)
+  theme themes --json  the same as JSON: {colors: [key…], themes: [{id, name, color, own}]}
   theme use ID         the theme's colour and look
+  theme state          the theme now as JSON: {theme (its id), name, color, changed (from the saved theme), look}
+  theme restore COLOR LOOK-JSON ID   puts back what state printed (undo for Claude's tools, config/mcp/tools)
   theme save NAME      the colour and look as a theme of yours (the same name again: updates it)
   theme delete ID      deletes a theme of yours
   theme reset          back to the Default theme
@@ -373,6 +376,31 @@ elif args[:1] == ["set"] and len(args) == 3:
     write(LOOK_STATE, json.dumps(mine, indent=1) + "\n")
     apply()
     reload_look()
+elif args == ["themes", "--json"]:
+    print(json.dumps({"colors": list(THEMES), "themes": [
+        {"id": tid, "name": t.get("name", tid), "color": t.get("color", "violet"), "own": mine}
+        for tid, (t, mine) in themes().items()]}, indent=1))
+elif args[:1] == ["state"]:
+    tid, lk, col = theme_name(), look(), current()
+    t = themes().get(tid, ({}, False))[0]
+    print(json.dumps({"theme": tid, "name": t.get("name", tid), "color": col,
+                      "changed": not t or dict(LOOK, **t.get("look", {})) != lk or t.get("color") != col,
+                      "look": lk}, indent=1))
+elif args[:1] == ["restore"] and len(args) == 4:
+    if args[1] not in THEMES:
+        sys.exit(f"unknown colour: {args[1]} ({', '.join(THEMES)})")
+    try:
+        values = json.loads(args[2])
+    except ValueError:
+        values = None
+    if not isinstance(values, dict):
+        sys.exit("LOOK-JSON: an object, as theme state prints it")
+    save_look(dict(LOOK, **{k: v for k, v in values.items() if k in LOOK}))
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    write(STATE, args[1] + "\n")
+    write(NAME_STATE, args[3] + "\n")
+    apply()
+    reload()
 elif args[:1] == ["themes"]:
     cur, lk, col = theme_name(), look(), current()
     for tid, (t, mine) in themes().items():

@@ -1,0 +1,123 @@
+{
+  "tools": [
+    {
+      "name": "appearance_current",
+      "title": "Appearance now",
+      "description": "The desktop's look now: the wallpaper (its path), the theme (its id and name, colour, whether it was changed from the saved theme, and the look: background, borders, shadow), night light (on/off) and the top bar's style (opacity, icons light/dark, highlight, icon_opacity); also the theme colours and saved themes to choose from. Use it before changing any of them, and to answer what the desktop looks like.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "appearance"],
+      "class": "read",
+      "area": "appearance"
+    },
+    {
+      "name": "appearance_wallpapers",
+      "title": "Wallpapers",
+      "description": "The wallpapers in Settings › Background: the user's own (~/Pictures/Wallpapers, newest first) and Nightdrive's, each with path, name, group and own, and the current one. Any other image (jpg, png, webp) can be set too, such as a new one in Downloads.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "wallpaper", "list", "--json"],
+      "class": "read",
+      "area": "appearance"
+    },
+    {
+      "name": "appearance_wallpaper",
+      "title": "Change the wallpaper",
+      "description": "Set the desktop's wallpaper to an image file (jpg, png or webp; an absolute path). An image from outside the wallpaper folders, such as Downloads, is copied to ~/Pictures/Wallpapers first, so it shows in Settings › Background and stays when the original is deleted. Returns the path it set.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "title": "Image", "description": "The image's absolute path"}
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "wallpaper", "set", "{path}", "--json"],
+      "before": ["nightdrive", "wallpaper", "current", "--json"],
+      "undo": ["nightdrive", "wallpaper", "set", "{path}"],
+      "notice": "Changed the wallpaper to {path}",
+      "class": "change",
+      "area": "appearance"
+    },
+    {
+      "name": "appearance_theme",
+      "title": "Change the theme",
+      "description": "Switch to a saved theme (Settings › Theme › Themes): its colour and its look together. The ids are in appearance_current's themes. To change only the colour, use appearance_color.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "theme": {"type": "string", "title": "Theme", "description": "The theme's id, e.g. default"}
+        },
+        "required": ["theme"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "theme", "use", "{theme}"],
+      "before": ["nightdrive", "theme", "state"],
+      "undo": ["nightdrive", "theme", "restore", "{color}", "{look}", "{theme}"],
+      "notice": "Changed the theme to {theme}",
+      "class": "change",
+      "area": "appearance",
+      "timeout": 60
+    },
+    {
+      "name": "appearance_color",
+      "title": "Change the theme colour",
+      "description": "Change only the theme colour (Settings › Theme › Color): the highlights, borders and selections everywhere; the look (background, borders, shadow) stays.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "color": {"type": "string", "title": "Colour", "enum": ["violet", "blue", "teal", "green", "amber", "rose", "graphite"]}
+        },
+        "required": ["color"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "theme", "color", "{color}"],
+      "before": ["nightdrive", "theme", "state"],
+      "undo": ["nightdrive", "theme", "restore", "{color}", "{look}", "{theme}"],
+      "notice": "Changed the theme colour to {color}",
+      "class": "change",
+      "area": "appearance",
+      "timeout": 60
+    },
+    {
+      "name": "appearance_night_light",
+      "title": "Night light",
+      "description": "Turn night light on or off: a warm tint over the whole screen for the evening (Settings › Display).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {"type": "string", "enum": ["on", "off"]}
+        },
+        "required": ["state"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "nightlight", "{state}", "--json"],
+      "before": ["nightdrive", "nightlight", "status", "--json"],
+      "undo": ["nightdrive", "nightlight", "{state}"],
+      "notice": "Turned night light {state}",
+      "class": "change",
+      "area": "appearance"
+    },
+    {
+      "name": "appearance_bar_style",
+      "title": "Top bar style",
+      "description": "Change the top bar's look (Settings › Top bar): any of its background opacity, icon and text colour (light = white, dark = black), the highlight of the active workspace (theme colour, white or black) and the icons' opacity. What isn't given stays. Returns all four as they are now.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "opacity": {"type": "integer", "minimum": 0, "maximum": 100, "description": "The background's opacity in per cent (default 100)"},
+          "icons": {"type": "string", "enum": ["light", "dark"]},
+          "highlight": {"type": "string", "enum": ["theme", "white", "black"]},
+          "icon_opacity": {"type": "integer", "minimum": 0, "maximum": 100, "description": "The icons' and text's opacity in per cent (default 85)"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "bar-style", "set", ["--opacity", "{opacity}"], ["--icons", "{icons}"],
+                  ["--highlight", "{highlight}"], ["--icon-opacity", "{icon_opacity}"], "--json"],
+      "before": ["nightdrive", "bar-style", "show"],
+      "undo": ["nightdrive", "bar-style", "set", "--opacity", "{opacity}", "--icons", "{icons}",
+               "--highlight", "{highlight}", "--icon-opacity", "{icon_opacity}"],
+      "notice": "Changed the top bar's style",
+      "class": "change",
+      "area": "appearance"
+    }
+  ]
+}

@@ -417,9 +417,11 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive theme color teal` | Theme colour: violet, blue, teal, green, amber, rose or graphite; aerc (if you use it) gets it too, unless you have picked a styleset of your own |
 | `nightdrive theme set background '#181722'` | The look: the terminals', the Launcher's, Firefox's and Thunderbird's background and opacity, the window borders and shadows; `nightdrive theme look` lists the settings, `default` puts one back (also Theme Editor, Launcher › Settings › Theme) |
 | `nightdrive theme save "My theme"` | Saves the colour and the look as a theme of your own; `nightdrive theme themes` lists them, `use ID` switches, `delete ID` removes one, `reset` goes back to Default |
-| `nightdrive wallpaper set <image>` | Changes the wallpaper; `nightdrive wallpaper current` prints it |
+| `nightdrive wallpaper set <image>` | Changes the wallpaper (an image from elsewhere, such as Downloads, is copied to your own backgrounds first); `nightdrive wallpaper current` prints it |
 | `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
+| `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
+| `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |
 | `nightdrive notifications` | The latest notifications (`--limit N`, `--json`); `dnd on` / `off` turns Do Not Disturb on or off, `send "Title" "Text"` shows one (`--app NAME`) and `remove TAG` takes it away again |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
 | `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also Launcher › Settings › Top bar › Date format |

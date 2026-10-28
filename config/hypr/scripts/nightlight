@@ -2,8 +2,8 @@
 # Night light (launcher › Settings › Display, the top bar's display menu): a warm tint through Hyprland's screen shader
 # (hyprland.lua, hypr/shaders/rounded-corners.frag). Asahi's display driver has no gamma tables, so gammastep and the like
 # can't do it. The choice is kept in ~/.local/state/nightdrive/nightlight and applied with a Hyprland reload.
-#   nightlight status       on | off
-#   nightlight on|off|toggle
+#   nightlight status [--json]       on | off ({"state": …})
+#   nightlight on|off|toggle [--json]
 state="$HOME/.local/state/nightdrive/nightlight"
 set_to() {
   mkdir -p "${state%/*}" "$HOME/.cache/hypr"   # the shader copies go to ~/.cache/hypr
@@ -11,9 +11,13 @@ set_to() {
   hyprctl reload >/dev/null
   qs ipc call bar refreshModule display >/dev/null 2>&1   # the bar icon (monitor-dot while on)
 }
+status() { [[ $(cat "$state" 2>/dev/null) == on ]] && echo on || echo off; }
 case ${1:-} in
-  status) [[ $(cat "$state" 2>/dev/null) == on ]] && echo on || echo off ;;
+  status) ;;
   on|off) set_to "$1" ;;
-  toggle) [[ $(cat "$state" 2>/dev/null) == on ]] && set_to off || set_to on ;;
+  toggle) [[ $(status) == on ]] && set_to off || set_to on ;;
   *)      sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
+# status prints the state; the others only with --json (Claude's tools: config/mcp/tools/appearance.json)
+if [[ ${2:-} == --json ]]; then printf '{"state": "%s"}\n' "$(status)"
+elif [[ $1 == status ]]; then status; fi

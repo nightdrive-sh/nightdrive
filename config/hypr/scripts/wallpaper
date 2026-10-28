@@ -1,11 +1,13 @@
 #!/bin/bash
 # Wallpapers: the repo's wallpapers/ (linked as ~/.local/share/wallpapers) and own images in ~/Pictures/Wallpapers. The choice is remembered as a link at ~/.local/state/wallpaper/current.
 #   wallpaper restore      starts swaybg with the remembered image (Hyprland autostart); default nightdrive.jpg
-#   wallpaper set <image>  changes the wallpaper and remembers the choice
+#   wallpaper set <image> [--json]  changes the wallpaper and remembers the choice; an image from elsewhere (Downloads) is
+#                          copied to ~/Pictures/Wallpapers first, as add does, so it stays when the original goes
 #   wallpaper list         "path<TAB>preview<TAB>name<TAB>group<TAB>own (1/0)" for the launcher's Settings › Background; creates missing previews
+#   wallpaper list --json  {current, wallpapers: [{path, name, group, own}]}, without making previews
 #   wallpaper add          picks images with a file chooser, copies them to ~/Pictures/Wallpapers and sets the last one as wallpaper
 #   wallpaper remove <image> moves an own image (~/Pictures/Wallpapers) to the trash; if it was the wallpaper, falls back to the default
-#   wallpaper current      prints the current image path
+#   wallpaper current [--json]  prints the current image path ({"path": …})
 set -euo pipefail
 dir=$(readlink -f "$HOME/.local/share/wallpapers")   # real path, so comparing with the current image (readlink -f) matches
 own="$(xdg-user-dir PICTURES)/Wallpapers"   # the localised Pictures folder (e.g. ~/Kuvat)
@@ -24,15 +26,36 @@ show() {
   setsid -f swaybg -c '#1a1b26' -m fill -i "$1" >/dev/null 2>&1
 }
 
+# The images, own first (newest first), then the bundled ones
+images() {
+  { [[ -d $own ]] && find "$own" -type f -printf '%T@\t%p\n' | sort -rn | cut -f2-; find -L "$dir" -type f | sort; } |
+    grep -iE '\.(jpe?g|png|webp)$'
+}
+
+json=0 args=()
+for a in "$@"; do if [[ $a == --json ]]; then json=1; else args+=("$a"); fi; done
+set -- "${args[@]}"
+
 case ${1:-} in
   restore) show "$(current)" ;;
-  current) current ;;
+  current) if (( json )); then jq -n --arg p "$(current)" '{path: $p}'; else current; fi ;;
   set)
-    f=$(readlink -f "${2:?usage: wallpaper set <file>}")
+    f=$(readlink -m "${2:?usage: wallpaper set <file>}")   # -m: a missing folder still gets the message below
     [[ -f $f ]] || { echo "not found: $f" >&2; exit 1; }
+    [[ ${f,,} =~ \.(jpe?g|png|webp)$ ]] || { echo "not an image swaybg shows (jpg, png, webp): $f" >&2; exit 1; }
+    # From elsewhere: kept as an own image (the same name taken by another image gets a number)
+    if [[ $f != "$dir"/* && $f != "$(readlink -f "$own")"/* ]]; then
+      mkdir -p "$own"
+      dst="$own/$(basename "$f")"; n=1
+      while [[ -e $dst ]] && ! cmp -s "$f" "$dst"; do dst="$own/${f##*/}"; dst="${dst%.*}-$((++n)).${f##*.}"; done
+      [[ -e $dst ]] || cp "$f" "$dst"
+      f=$(readlink -f "$dst")
+    fi
     mkdir -p "$state"
     ln -sfn "$f" "$state/current"
-    show "$f" ;;
+    show "$f"
+    (( json )) && jq -n --arg p "$f" '{path: $p}'
+    exit 0 ;;
   add)
     files=$(zenity --file-selection --multiple --separator=$'\n' --title="Add backgrounds" \
       --filename="$(xdg-user-dir DOWNLOAD)/" --file-filter="Images | *.jpg *.jpeg *.png *.webp *.JPG *.JPEG *.PNG *.WEBP") || exit 0
@@ -54,10 +77,17 @@ case ${1:-} in
     [[ $was == "$f" ]] && { rm -f "$state/current"; show "$default"; }
     exit 0 ;;
   list)
+    if (( json )); then
+      images | while read -r f; do
+        rel=${f#"$dir"/}; rel=${rel#"$own"/}
+        jq -nc --arg p "$f" --arg n "$(basename "${f%.*}" | sed -E 's/^[0-9]+-//; s/-/ /g')" \
+          --arg g "$([[ $rel == */* ]] && basename "$(dirname "$rel")" || true)" \
+          --argjson o "$([[ $f == "$own"/* ]] && echo true || echo false)" '{path: $p, name: $n, group: $g, own: $o}'
+      done | jq -s --arg c "$(current)" '{current: $c, wallpapers: .}'
+      exit 0
+    fi
     mkdir -p "$thumbs"
-    # Own images first (newest first), then the bundled ones
-    { [[ -d $own ]] && find "$own" -type f -printf '%T@\t%p\n' | sort -rn | cut -f2-; find -L "$dir" -type f | sort; } |
-      grep -iE '\.(jpe?g|png|webp)$' |
+    images |
       while read -r f; do
         # Preview cropped to the screen's aspect (3:2, like swaybg's fill); file name from a hash of the path
         t="$thumbs/$(printf %s "$f" | md5sum | cut -c1-16).jpg"
