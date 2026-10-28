@@ -3,6 +3,29 @@
 What each release of Nightdrive changed, newest first. `nightdrive update` shows the new ones when it's done, and
 each is also the release's page on [GitHub](https://github.com/nightdrive-sh/nightdrive/releases).
 
+## 0.6.1 – 2026-10-28
+
+**A safer Afterglow.** The password prompt works again, and a security audit by [@tommimarkus](https://github.com/tommimarkus), made with [his audit skills](https://github.com/tommimarkus/skills), led to a round of fixes in how Nightdrive installs and updates, and in Mail, LocalSend, AirPlay and Claude's notifications. Thank you, Tommi.
+
+- **The password prompt has its password field back.** In 0.6.0 it was missing, so no system password prompt could be answered (Remote login, installing, system settings) and each one timed out.
+- **Installs and updates check what they download:** Ferry comes from a release Nightdrive names, checked by its checksum, and its update no longer runs with your password still cached. Claude Code is installed from Anthropic's signed release instead of a script piped to the shell; RPM Fusion's packages, the fonts and ble.sh are checked too.
+- **Mail and Contacts show subjects, senders and contact fields as plain text.** An image hidden in a subject or a name could load in the message list and tell the sender you'd seen the mail. Contacts opens only web and mail links from a card. A sender's name with odd characters in it shows right.
+- **LocalSend asks for a code:** when your phone sends, a 6-digit code shows in the middle of the screen and the phone asks for it, so only someone who can see your screen can send to your computer. Sending to your phone asks the first time and then goes only to that phone. `localsend forget` forgets your devices.
+- **AirPlay Receiver asks for a PIN** the first time a device mirrors to you; the PIN shows on the screen and the device remembers it until you log in again or the computer sleeps.
+- **Claude's permission notification offers Allow only when it shows everything it allows.** A long command, a file edit or an MCP tool now gets Deny and Show session, and you answer in the session.
+- **Passwords and tokens stay off the command line,** where other users of the computer could read them: Claude's usage in the top bar, Wi-Fi passwords and the Home Assistant token. Home Assistant's setup warns about a plain http address.
+- **Remote login** can no longer be left half on when you cancel the password prompt, which could cut off SSH and close the ports AirPlay, LocalSend and Ferry use. Its switch now waits for your password before it turns.
+- **Garage:** a machine shows Booting up and Shutting down, can be paused and resumed (`p`), and starts at its scale without Hyprland's warning.
+- **AirPlay speakers** no longer jump loud when they connect: they start at 30 % at most.
+- **The Launcher** fits a narrow or low screen, Esc from a page you opened from a search goes back to the search, and Esc closes a Launcher a key opened (⌘⇧V, ⌘⇧E) at once.
+- **⌘L** goes to the browser's address bar, and types a path in Files.
+- **Notifications show emoji:** Slack's `:thumbsup:` is 👍.
+- **Also new:** Send to Claude (⌘⌃C, or Launcher › Tools): the text or files you selected, or a picture on the clipboard, to a Claude Code session's prompt, where you write your question after it. Nothing is sent until you press Enter.
+- **After updating:**
+  - Restart Firefox: developer settings that had been turned on for everyone go back to their defaults. Your own Firefox settings can go in `config/firefox/user.local.js` (README › Make it yours).
+  - The first time your phone sends with LocalSend, or an iPhone mirrors with AirPlay, it asks for the code on your screen.
+  - A Garage machine with an older Nightdrive inside: update it there too (`nightdrive update`), or its picture can look stretched.
+
 ## 0.6.0 Afterglow – 2026-10-28
 
 **Afterglow.** Claude writes in any app, five apps of Nightdrive's own, Welcome to Nightdrive, and an installer that asks nothing, on Fedora Minimal. The whole story is on [nightdrive.sh](https://nightdrive.sh/news/afterglow/).
