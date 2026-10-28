@@ -189,7 +189,9 @@ Column {
     }
     Sh {
         id: connectProc
-        script: 'if [ -n "$PW" ]; then nmcli --wait 20 device wifi connect "$SSID" password "$PW"; else nmcli --wait 20 device wifi connect "$SSID"; fi'
+        // The password reaches nmcli on stdin (--ask), never as an argument: any user can read a process's argv in /proc.
+        // Its stdout (the prompt) is dropped; the errors shown below come on stderr.
+        script: 'if [ -n "$PW" ]; then printf "%s\\n" "$PW" | nmcli --ask --wait 20 device wifi connect "$SSID" >/dev/null; else nmcli --wait 20 device wifi connect "$SSID"; fi'
         onResult: text => {
             m.connecting = ""
             if (connectProc.exitCode !== 0) {

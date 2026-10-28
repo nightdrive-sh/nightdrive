@@ -23,19 +23,33 @@ cat <<'MSG'
 Addresses, one at a time. They're tried in this order.
 Enter on an empty line skips one; Ctrl+U clears a suggestion.
 MSG
-urls=
-ask() {  # ask PROMPT SUGGESTION: adds the answer to urls; "ha:8123" gets http://, a Nabu Casa address https://
+urls=; plain=()
+# ask PROMPT SUGGESTION [tailnet]: adds the answer to urls; "ha:8123" gets http://, a Nabu Casa address https://.
+# An http address goes to plain too, unless it is on the tailnet (Tailscale encrypts its own traffic).
+ask() {
   local u
   read -erp "  $1: " -i "$2" u
   u=${u//[[:space:]]/}; u=${u%/}
   [[ -n $u ]] || return 0
   [[ $u =~ ^https?:// ]] || { [[ $u == *.nabu.casa* ]] && u="https://$u" || u="http://$u"; }
   urls+="${urls:+ }$u"
+  [[ $u == http://* && ${3:-} != tailnet && ! $u =~ ^http://(100\.|[^/:]*\.ts\.net) ]] && plain+=("$u")
+  return 0
 }
 ask "Home network (homeassistant.local:8123)" "$local_url"
-ask "Tailscale (ha:8123)" "$ts_url"
+ask "Tailscale (ha:8123)" "$ts_url" tailnet
 ask "Nabu Casa (xxxx.ui.nabu.casa)" ""
 [[ -n $urls ]] || { echo "No address given" >&2; exit 1; }
+# The addresses are tried in order wherever the laptop is, token and all: on another network, whatever answers
+# homeassistant.local gets it. Say so, and leave the choice to the user.
+if (( ${#plain[@]} )); then
+  echo; printf '! Not encrypted: %s\n' "${plain[@]}"
+  cat <<'MSG'
+  The token goes over the network as plain text there, and on
+  another network to whatever answers that address. An https
+  address or Tailscale is safer: run this again to change it.
+MSG
+fi
 
 cat <<'MSG'
 
@@ -53,7 +67,8 @@ fi
 ok=()
 for u in $urls; do
   u=${u%/}
-  if out=$("$ha" test "$u" "$tok" 2>&1); then echo "  ✓ $u  ($out)"; ok+=("$u"); else echo "  ✗ $out"; fi
+  # The token on stdin: an argument is readable by any user in /proc
+  if out=$("$ha" test "$u" <<<"$tok" 2>&1); then echo "  ✓ $u  ($out)"; ok+=("$u"); else echo "  ✗ $out"; fi
 done
 (( ${#ok[@]} )) || { echo "None of the addresses worked" >&2; exit 1; }
 

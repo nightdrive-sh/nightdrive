@@ -24,8 +24,9 @@ read -r token expires plan < <(jq -r '.claudeAiOauth | [.accessToken // "", (.ex
 [[ -n $token ]] || fail "Not signed in to Claude Code"
 (( expires / 1000 > $(date +%s) )) || fail "Sign-in expired: run claude once to refresh it"
 
-r=$(curl -sf --max-time 15 https://api.anthropic.com/api/oauth/usage \
-  -H "Authorization: Bearer $token" -H "anthropic-beta: oauth-2025-04-20" -H "User-Agent: nightdrive") || fail "Usage request failed"
+# The token goes to curl on stdin (-H @-), not on its command line: any user can read a process's argv in /proc
+r=$(curl -sf --max-time 15 https://api.anthropic.com/api/oauth/usage -H @- \
+  -H "anthropic-beta: oauth-2025-04-20" -H "User-Agent: nightdrive" <<<"Authorization: Bearer $token") || fail "Usage request failed"
 jq -c --arg plan "$plan" '{
   plan: $plan,
   windows: [.limits[]? | {

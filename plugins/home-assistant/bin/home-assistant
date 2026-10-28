@@ -10,7 +10,7 @@
   home-assistant fav ID [on|off]   pins a device to the top bar's Home menu (no on/off: flips it)
   home-assistant bar               the top bar module's state line (modules.jsonc format)
   home-assistant open              opens the Home Assistant webapp (focuses it if already open)
-  home-assistant test URL TOKEN    checks an address and a token (install.sh uses this)
+  home-assistant test URL < TOKEN  checks an address and a token, read from stdin to keep it out of argv (install.sh)
 
 Config: ~/.config/nightdrive/home-assistant (KEY=value, mode 600):
   HA_URLS="http://homeassistant.local:8123 http://ha:8123 https://xxxx.ui.nabu.casa"   tried in order, like the
@@ -299,9 +299,11 @@ def main():
         bar()
     elif cmd == "open":
         open_webapp()
-    elif cmd == "test" and len(a) == 3:
+    elif cmd == "test" and len(a) == 2:
+        # The token comes on stdin: as an argument any user could read it in /proc
+        tok = sys.stdin.readline().strip()
         try:
-            r = request(a[1], a[2], "GET", "/api/config", timeout=5)
+            r = request(a[1], tok, "GET", "/api/config", timeout=5)
             print(r.get("location_name", "Home Assistant"), r.get("version", ""))
         except urllib.error.HTTPError as e:
             die(f"{a[1]}: HTTP {e.code}" + (" (the token was refused)" if e.code == 401 else ""))

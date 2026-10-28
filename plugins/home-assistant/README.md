@@ -16,5 +16,7 @@ Your smart home on the desktop: lights, switches and scenes from the Launcher an
 
 The installer asks for your Home Assistant addresses and a long-lived access token (in Home Assistant: your profile › Security; a 1Password op:// reference works too). Run it again to change them.
 
+An `http://` address sends the token as plain text, and the addresses are tried wherever you are: on another network, whatever answers `homeassistant.local` gets it. Use an `https://` address or Tailscale where you can (the installer warns about the others).
+
 Homepage: https://www.home-assistant.io
 Needs: a Home Assistant server
