@@ -125,7 +125,7 @@ fit go into a **…** menu, the ones farthest from the clock first.
 
 **Launcher › System › Install › Software** searches Fedora's packages and Flathub's apps at once, one row per app, with the
 details before installing (Tab there takes Flathub's when both have it). Browse has the 100 most popular apps and
-categories. System › Remove takes software and web apps away.
+categories. System › Remove takes software and web apps away; Ctrl+Enter there removes one without asking.
 
 Nightdrive's own apps (Mail, Contacts, Deck, Ferry) and Tailscale come with every install; Garage, Nightdrive's app for
 virtual machines, waits in System › Install › Recommended. The rest are optional parts, under System › Install:

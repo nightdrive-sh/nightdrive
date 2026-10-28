@@ -1088,7 +1088,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         }
                         if (win.detail !== null) {         // details: Enter installs / removes, C sets up with Claude, arrows scroll, typing does nothing
                             if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) win.back()
-                            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) details.confirm()
+                            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) details.confirm(ctrl)
                             else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) details.switchSource()
                             else if (event.key === Qt.Key_C && !ctrl) details.setup()
                             else if (event.key === Qt.Key_Down || (ctrl && (event.key === Qt.Key_N || event.key === Qt.Key_J))) details.scroll(win.rowHeight)
