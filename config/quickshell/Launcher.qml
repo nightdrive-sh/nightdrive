@@ -52,6 +52,13 @@ PanelWindow {
     readonly property int fontSize: 17
     readonly property int fontWeight: Font.Light   // text weight (headers in bold)
     readonly property real topPosition: 0.189  // card top edge as a fraction of screen height (0 = top)
+    // A narrow or low screen (a VM's window): the card keeps this far from its edges, narrower, with fewer rows
+    readonly property int edge: 12
+    readonly property bool narrow: width < cardWidth + 2 * edge
+    // The card's height without its list: padding, search field, footer (in more lines on a narrow card), a plugin's top
+    // row. Summed from the parts: the list's room can't depend on the card's height, which depends on the list
+    readonly property int chromeHeight: 36 + 44 + 12 + (footerFlow.visible ? footerFlow.height + 12 : 0) + (topRow.height > 0 ? topRow.height + 12 : 0)
+    readonly property int listRoom: Math.max(3 * (rowHeight + rowGap), height - Theme.barHeight - 2 * edge - chromeHeight)
 
     property bool open: false
     property bool stepAside: false            // a polkit password prompt is open (PolkitWatch): hidden, not closed
@@ -380,7 +387,7 @@ PanelWindow {
         return Math.min(it.subMax || subMaxLines, lines)
     }
     function listHeight() {
-        const cap = maxRows * (rowHeight + rowGap)
+        const cap = Math.min(maxRows * (rowHeight + rowGap), listRoom)
         let h = 0
         for (const it of results) {
             h += (fixedRow(it) ? headerHeight : rowHeight + (subLines(it) - 1) * (it.subPlain ? plainLineHeight : subLineHeight)) + rowGap
@@ -970,12 +977,13 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
 
     Rectangle {
         id: card
-        width: win.detail !== null ? win.detailWidth : win.cardWidth
+        width: Math.min(win.detail !== null ? win.detailWidth : win.cardWidth, parent.width - 2 * win.edge)
         // Animated only while open: a closed launcher drops back to the normal width at once (onOpenChanged)
         Behavior on width { enabled: win.open; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
         height: col.implicitHeight + 36
         x: (parent.width - width) / 2
-        y: parent.height * win.topPosition
+        // Higher up when the screen is too low for it, but never over the top bar
+        y: Math.max(Theme.barHeight + win.edge, Math.min(parent.height * win.topPosition, parent.height - height - win.edge))
         radius: 12
         color: Theme.launcherBg
         border.color: Theme.primary
@@ -1000,6 +1008,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
 
             // A plugin's row (topExt.topRow: Deck's player)
             Loader {
+                id: topRow
                 active: win.topExt !== null
                 visible: active
                 width: parent.width
@@ -1258,7 +1267,8 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         readonly property string keys: row.modelData.capKeys !== undefined ? row.modelData.capKeys
                             : !win.prefs.shortcuts || trailing.tag || row.modelData.keys !== undefined || row.armedNow
                             || (row.modelData.summary !== undefined && row.modelData.summary !== "") ? "" : win.shortcutFor(row.modelData)
-                        visible: keys !== ""
+                        // On a narrow card only where the whole name still fits beside it
+                        visible: keys !== "" && (!win.narrow || nameText.x + nameText.implicitWidth + width + trailing.width + 60 < row.width)
                         anchors { right: trailing.left; rightMargin: trailing.text !== "" ? 18 : 0; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
                         width: shortcutCaps.implicitWidth + 14; height: 24; radius: 6
                         color: "transparent"
@@ -1279,7 +1289,8 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         anchors { right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
                         spacing: 6
                         Repeater {
-                            model: keyFrames.visible ? win.keyParts(row.modelData.keys) : []
+                            // On a narrow card only the first combination ("Hyper B / ⌘ B" → "Hyper B"): the name needs the room
+                            model: !keyFrames.visible ? [] : win.narrow ? win.keyParts(row.modelData.keys).slice(0, 1) : win.keyParts(row.modelData.keys)
                             Rectangle {
                                 id: part
                                 required property var modelData
@@ -1533,16 +1544,22 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 }
             }
 
-            Row {      // footer: the keys of this level, as key caps + what they do
+            Flow {     // footer: the keys of this level, as key caps + what they do; on a narrow card in more lines
+                id: footerFlow
                 visible: win.footer !== ""
                 anchors.right: parent.right
+                // As wide as its parts in one line (right-aligned), at most the card's width
+                readonly property real natural: children.reduce((w, c) => w + (c instanceof Row ? c.implicitWidth + spacing : 0), 0) - spacing
+                width: Math.min(parent.width, natural + rightPadding)
                 rightPadding: 6
-                spacing: 18
+                spacing: 6      // a part's leftPadding makes it 18 between parts
                 Repeater {
                     model: win.footerParts
                     Row {
                         id: part
                         required property var modelData
+                        required property int index
+                        leftPadding: index > 0 ? 12 : 0
                         spacing: 4
                         Rectangle {      // one frame around the part's keys (⌃ ↵)
                             visible: part.modelData.keys.length > 0

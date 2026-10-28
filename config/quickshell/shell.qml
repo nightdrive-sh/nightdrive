@@ -259,7 +259,8 @@ ShellRoot {
             // A bare menu (property bare: true, e.g. NotificationsMenu) draws its own cards: no background or padding here
             readonly property bool bare: loader.item ? loader.item.bare === true : false
             anchors { top: parent.top; topMargin: card.bare ? 10 : 6 }
-            width: loader.item && loader.item.preferredWidth ? loader.item.preferredWidth : 320   // a menu can request a wider card
+            // a menu can request a wider card; never wider than the screen (a narrow VM window)
+            width: Math.min(loader.item && loader.item.preferredWidth ? loader.item.preferredWidth : 320, parent.width - 20)
             // Center below the icon, but keep a 10 px margin from the screen edges
             x: root.anchorX < 0 ? parent.width - width - 10
                                 : Math.max(10, Math.min(parent.width - width - 10, root.anchorX - width / 2))

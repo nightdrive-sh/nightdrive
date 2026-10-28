@@ -28,7 +28,7 @@ Flickable {
     readonly property bool canSetup: item !== null && item.src === "plugin" && info !== null && info.installed && !!info.setup
 
     visible: item !== null
-    height: visible ? Math.min(contentHeight, launcher.maxRows * launcher.rowHeight + 60) : 0
+    height: visible ? Math.min(contentHeight, Math.min(launcher.maxRows * launcher.rowHeight, launcher.listRoom) + 60) : 0
     contentHeight: detailCol.implicitHeight
     clip: true
     boundsBehavior: Flickable.StopAtBounds
