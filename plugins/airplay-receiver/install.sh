@@ -6,8 +6,7 @@
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 
-rpm -q rpmfusion-free-release >/dev/null 2>&1 || \
-  sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+"$here/../../setup-rpmfusion.sh" free   # its key checked by fingerprint before its release RPM goes in
 sudo dnf install -y uxplay libavcodec-freeworld gstreamer1-plugin-libav
 rm -rf "$HOME/.cache/gstreamer-1.0"   # GStreamer's plugin cache: the H.264/HEVC decoders show up at once
 "$here/bin/airplay-receiver" enable

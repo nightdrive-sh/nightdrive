@@ -303,9 +303,7 @@ if (( nvidia )); then
   # RPM Fusion's driver, built for each kernel by akmods. With Secure Boot the module is signed with a key of this machine's
   # own (kmodgenca), which has to be enrolled at the next boot: listed at the end.
   echo "==> NVIDIA driver (RPM Fusion: akmod-nvidia)"
-  fedora=$(rpm -E %fedora)
-  sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$fedora.noarch.rpm" \
-    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$fedora.noarch.rpm"
+  "$repo/setup-rpmfusion.sh" free nonfree   # its keys checked by fingerprint before its release RPMs go in
   mokutil --sb-state 2>/dev/null | grep -q 'SecureBoot enabled' && secureboot=1
   if (( secureboot )); then
     sudo dnf install -y akmods mokutil openssl
@@ -376,11 +374,11 @@ flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/fl
 # Fonts, ble.sh, GTK settings, default apps: also run by `nightdrive update`
 "$repo/setup-user.sh"
 
-# Part of the desktop (⌘⌥Enter, the launcher's questions, the usage limits in the top bar), so not asked. Its own
-# installer puts it in ~/.local/bin and keeps it up to date.
+# Part of the desktop (⌘⌥Enter, the launcher's questions, the usage limits in the top bar), so not asked. setup-claude.sh
+# checks the release's signature and puts it in ~/.local/bin, where it keeps itself up to date.
 echo "==> Claude Code"
 if [[ -x $HOME/.local/bin/claude ]]; then echo "    already installed"
-else curl -fsSL https://claude.ai/install.sh | bash || failed_claude=1; fi
+else "$repo/setup-claude.sh" || failed_claude=1; fi
 
 echo "==> Sleep hook (Wi-Fi and Bluetooth off during sleep, battery drain logging)"
 sudo install -m 0755 "$repo/config/system/nightdrive-sleep" /usr/lib/systemd/system-sleep/nightdrive-sleep
@@ -479,7 +477,7 @@ if (( ${#failed[@]} )) || (( ${failed_claude:-0} )); then
   echo
   echo "Needs a look (an error, see above):"
   (( ${#failed[@]} )) && echo "  • Not installed: ${failed[*]}. Run again: nightdrive plugins install ID"
-  (( ${failed_claude:-0} )) && echo "  • Claude Code not installed. Run again: curl -fsSL https://claude.ai/install.sh | bash"
+  (( ${failed_claude:-0} )) && echo "  • Claude Code not installed. Run again: $repo/setup-claude.sh"
 fi
 echo
 echo "Next:"

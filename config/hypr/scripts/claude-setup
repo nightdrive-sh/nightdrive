@@ -83,7 +83,7 @@ $(cat "$RUN/$id.task")" -- "Set up $name with me."
 signin_session() {
   local claude
   echo $$ >"$RUN/claude.pid"
-  claude=$(claude_bin) || { echo "Claude Code is not installed: curl -fsSL https://claude.ai/install.sh | bash"; read -r; exit 1; }
+  claude=$(claude_bin) || { echo "Claude Code is not installed: $(cd "$(dirname "$(readlink -f "$0")")/../../.." && pwd)/setup-claude.sh"; read -r; exit 1; }
   # claude in the name keeps running's check true until the sign-in ends
   "$claude" auth login && "$claude" auth status --json 2>/dev/null | jq -e .loggedIn >/dev/null && exit 0
   echo; echo "Not signed in. Press Enter to close."; read -r

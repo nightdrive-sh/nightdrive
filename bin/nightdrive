@@ -268,9 +268,9 @@ update() {
   # some other way (npm, a package); once in, its own installer keeps it up to date.
   if [[ ! -x $HOME/.local/bin/claude ]] && ! command -v claude >/dev/null; then
     echo "==> Claude Code"
-    curl -fsSL https://claude.ai/install.sh | bash \
+    "$repo/setup-claude.sh" \
       && echo "    run claude once and log in (⌘⌥Enter and the top bar's usage menu use that sign-in)" \
-      || missed+=("Claude Code: curl -fsSL https://claude.ai/install.sh | bash")
+      || missed+=("Claude Code: $repo/setup-claude.sh")
   fi
 
   # The Hyprland stack's COPR (setup-hyprland-repo.sh): set up again only when it isn't as the repo wants, e.g. still
