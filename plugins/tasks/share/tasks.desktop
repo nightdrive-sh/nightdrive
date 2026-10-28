@@ -1,0 +1,13 @@
+[Desktop Entry]
+# `tasks enable` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH may
+# not have ~/.local/bin), and the icon to ~/.local/share/icons/hicolor/scalable/apps.
+Type=Application
+Name=Tasks
+GenericName=Nightdrive Tasks
+Comment=Your tasks and what is due today
+Keywords=tasks;todo;reminders;to-do;
+Icon=nightdrive-tasks
+Exec=tasks
+Terminal=false
+Categories=Office;ProjectManagement;
+StartupNotify=false

@@ -1,0 +1,8 @@
+# Tasks' notifications (plugins/tasks): notifies the tasks that have come due, with Done and Later. Run every minute by
+# nightdrive-tasks-due.timer; each notification waits in a unit of its own (lib/due.py).
+[Unit]
+Description=Nightdrive Tasks: notify the tasks that have come due
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/tasks due
