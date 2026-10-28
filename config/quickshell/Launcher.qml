@@ -530,12 +530,18 @@ PanelWindow {
 
     // The row each level had selected when a sublevel was opened (by name: a search may have been on), so Esc returns to it
     property var lastSel: ({})
+    // A level opened from a search ("update" → Update channel), by its name: the level, the search and the row it came from,
+    // so Esc goes back to that search like Spotlight does, not to the level's parent (Settings)
+    property var fromSearch: ({})
     // Opens a level with this already typed (Deck's Search Spotify row)
     function goSearch(target, text) { go(target); input.text = text }
-    function go(target) {
+    function go(target, goingBack) {
         const cur = results[list.currentIndex]
         if (cur && cur.name && target !== level && (parents[target] || "root") === level)   // going down one level
             lastSel[level] = { kind: cur.kind, name: cur.name }
+        // back() keeps the record: a sublevel's Esc returns here and this level's Esc still to the search
+        if (!goingBack && target !== level)
+            fromSearch[target] = query.trim() !== "" ? { level: level, query: query, sel: cur ? { kind: cur.kind, name: cur.name } : null } : undefined
         level = target; input.text = ""; query = ""; armed = ""; topFocused = false; details.close()
         hiddenProc.running = true
         if (target === "keys") keysProc.running = true     // re-read SHORTCUTS.md: changes show up immediately
@@ -725,15 +731,26 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         if (detail !== null) { details.close(); return }
         if (tools.picker.back()) return      // Clipboard as a text field's picker: back to the field, its text kept
         if (level === "root") { win.open = false; return }
-        go(parents[level] || "root")
-        const sel = lastSel[level]
+        const s = fromSearch[level]
+        if (s) {
+            delete fromSearch[level]
+            go(s.level, true)
+            input.text = s.query
+            reselect(s.sel)
+            return
+        }
+        go(parents[level] || "root", true)
+        reselect(lastSel[level])
+    }
+    // Selects the row Esc returns to (by kind and name), if the level still has it
+    function reselect(sel) {
         const i = sel ? results.findIndex(r => r.kind === sel.kind && r.name === sel.name) : -1
         if (i >= 0) list.currentIndex = i
     }
 
     // Closing leaves the details right away (after the Behavior above has seen open = false), so the next open starts narrow
     onOpenChanged: if (!open) Qt.callLater(() => { if (!win.open) details.close() })
-    else { lastMouse = null; lastSel = ({}); exts.forEach(e => e.opened()); Plugins.check(); go("root"); bgProc.running = true; bgAppsProc.running = true; autostartProc.running = true; updatesProc.running = true; sys.entered("display"); sys.soundRefresh(); input.forceActiveFocus() }
+    else { lastMouse = null; lastSel = ({}); fromSearch = ({}); exts.forEach(e => e.opened()); Plugins.check(); go("root"); bgProc.running = true; bgAppsProc.running = true; autostartProc.running = true; updatesProc.running = true; sys.entered("display"); sys.soundRefresh(); input.forceActiveFocus() }
     Component.onCompleted: keysProc.running = true
 
     Timer { id: disarm; interval: 4000; onTriggered: win.armed = "" }
