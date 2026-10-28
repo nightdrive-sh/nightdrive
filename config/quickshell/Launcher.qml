@@ -103,11 +103,11 @@ PanelWindow {
     // SystemLevels (Wi-Fi, Bluetooth, Sound, Tailscale, Status), HomeLevels (Home Assistant), DefaultAppsLevels, AppKeyLevels
     // (App shortcuts), BehaviourLevels (Mouse, Launcher, Firefox, Computer name, Remote login, Notifications, Crash reports, Update channel), InstallLevels,
     // ToolsLevels (Clipboard, Emoji, Snippets), AppearanceLevels (Top bar, Screensaver), DisplayLevels (Display, Battery),
-    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, SendClaudeLevels, AboutLevels, the plugins' and the private
+    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, ClaudeAccessLevels, SendClaudeLevels, AboutLevels, the plugins' and the private
     // extension. A new file goes in this list, not in each question's code
     // The installed plugins' level files (their <Name>Levels.qml, TopBar.plugin.levels: Deck's Music) come after the core's
     property var pluginExts: []
-    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, sendclaude, about].concat(pluginExts, ext ? [ext] : [])
+    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, caccess, sendclaude, about].concat(pluginExts, ext ? [ext] : [])
     // A plugin's row above the search field (topRow; Deck's player): the first file that has one. ↑ from the list's first
     // row selects it, its keys then go to topKey(event), and Ctrl+Space anywhere to topPress()
     readonly property var topExt: exts.find(e => e.topRow) || null
@@ -238,7 +238,9 @@ PanelWindow {
             { kind: "header", name: "Apps" },
             { kind: "nav", name: "App settings", glyph: "layout-grid", target: "appsettings" },
             { kind: "header", name: "Claude" },
-            { kind: "nav", name: "Claude writes", glyph: "sparkles", target: "claudewrite", summary: cwrite.modelName(cwrite.model) }
+            { kind: "nav", name: "Claude writes", glyph: "sparkles", target: "claudewrite", summary: cwrite.modelName(cwrite.model) },
+            { kind: "nav", name: "Access", glyph: "shield-half", target: "claudeaccess", summary: caccess.summary,
+              extra: "claude access mcp tools privacy" }   // what Claude Code may use of the desktop (ClaudeAccessLevels)
         ], behave.crashReportItems, [
             { kind: "header", name: "System" },
             { kind: "nav", name: "Launcher", glyph: "text-search", target: "launcherprefs" },
@@ -791,6 +793,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     AppKeyLevels { id: akeys; launcher: win }
     BehaviourLevels { id: behave; launcher: win }
     ClaudeWriteLevels { id: cwrite; launcher: win }
+    ClaudeAccessLevels { id: caccess; launcher: win }
     SendClaudeLevels { id: sendclaude; launcher: win }
     InstallLevels { id: inst; launcher: win }
     ToolsLevels { id: tools; launcher: win }

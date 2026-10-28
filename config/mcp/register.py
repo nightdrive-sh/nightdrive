@@ -303,7 +303,7 @@ def status(args):
     info = {
         "claude": cmd,
         "server": [have["command"], *have["args"]] if have else None,
-        "connection": connected(cmd) if cmd and have else None,
+        "connection": connected(cmd) if cmd and have and not args.quick else None,
         "allowed": allowed(allow),
         "byInstall": {"server": bool(state.get("server")), "rule": bool(state.get("rule"))},
     }
@@ -327,7 +327,10 @@ def main():
         s = sub.add_parser(name, help=text)
         s.add_argument("--yes", action="store_true", help="don't ask")
         s.add_argument("--dry-run", action="store_true", help="only show what would change")
-    sub.add_parser("status", help="whether it is registered and allowed").add_argument("--json", action="store_true")
+    s = sub.add_parser("status", help="whether it is registered and allowed")
+    s.add_argument("--json", action="store_true")
+    # without Claude Code's health check, which starts the server: Settings › Claude › Access asks on every visit
+    s.add_argument("--quick", action="store_true", help="don't check the connection")
     args = p.parse_args()
     try:
         return {"install": install, "remove": remove, "status": status}[args.command](args)

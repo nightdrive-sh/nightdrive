@@ -341,8 +341,9 @@ reports) and other Wi-Fi chips' firmware, listed in `packages-remove-asahi.txt`.
 
 At your first login, **Welcome to Nightdrive** opens and asks whether you have Claude Code (a Pro or Max plan).
 
-- **With Claude**, sign in there first. Then Claude sets up Tailscale, Mail, Contacts, Deck and Ferry with you, each in
-  a session of its own that does only that one thing.
+- **With Claude**, sign in there first, and choose how much Claude may use of your desktop (*Claude's access*, see
+  [Good to know](#good-to-know)). Then Claude sets up Tailscale, Mail, Contacts, Deck and Ferry with you, each in a
+  session of its own that does only that one thing.
 - **Without**, it shows each one's steps right there, one at a time in plain words.
 - **I'll do it myself** lists the apps, each opening its README in Apostrophe.
 
@@ -426,6 +427,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the Launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
 | `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS` |
+| `nightdrive mcp access level normal` | How much Claude may use of your desktop: `strict`, `normal` or `open`; `area mail read` sets one area (`off`, `read`, `change`), `act on` the actions with consequences, and `nightdrive mcp access` alone shows what applies (Launcher › Settings › Claude › *Access*). `nightdrive mcp install` gives Claude Code the tools, `remove` takes them away |
 | `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck, Ferry… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
 ## Keys
@@ -530,6 +532,11 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers
   or claude.ai connectors, and nothing is saved as a session. Its text goes in only after you've seen it, the clipboard
   gets its own content back, and the text isn't kept in the clipboard history.
+- **Claude and your desktop.** With Nightdrive's tools on in Claude Code (Launcher › Settings › Claude › *Access*, or
+  `nightdrive mcp install`), any Claude Code session can use your desktop as far as Access allows. *Strict* gives only
+  Nightdrive's docs and status, *Normal* reading and changes you can undo, *Open* also sending, installing and devices,
+  each only after your Enter on Nightdrive's own card. Each area (Mail, Appearance…) can be set apart: off, reads, or
+  reads and changes. An area that is off isn't there for Claude at all; passwords never are.
 - **No credentials are stored in this repo.** Tokens stay with each app (Deck, Claude Code) or in 1Password.
 
 ## Want to participate?

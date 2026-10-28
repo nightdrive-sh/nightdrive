@@ -34,8 +34,8 @@ set_key() {
 }
 set_state() { set_key welcome "$1"; }
 
-# The rows that count, one JSON object a line: by hand, Claude's sign-in isn't one of them
-rows() { "$QS_DIR/tasks" | jq -c --arg p "$(path)" '.[] | select($p != "manual" or .id != "claude")'; }
+# The rows that count, one JSON object a line: by hand, Claude's sign-in and access aren't among them
+rows() { "$QS_DIR/tasks" | jq -c --arg p "$(path)" '.[] | select($p != "manual" or (.id | startswith("claude") | not))'; }
 
 # Something is neither done nor skipped
 unfinished() { rows | jq -se 'any(.[]; (.done | not) and .mark != "skipped")' >/dev/null; }
