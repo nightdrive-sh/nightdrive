@@ -1,12 +1,14 @@
 #!/bin/bash
 # A VM's screen follows its window (hypr/vm-display.lua has why).
-#   vm-display watch     follows the virtual GPU's hotplug events (started with the session); quits at once on a
-#                        machine without one
+#   vm-display watch     follows the virtual GPU's hotplug events (started with the session, and with the login
+#                        screen's Hyprland: config/greeter); quits at once on a machine without one
 #   vm-display apply     sets the size its window has now, by hand (testing)
 # No waiting here for a drag to settle: qemu does that itself, telling the guest a second after the window's last change
 # of size, and its picture is stretched until then. Each change goes to the journal (journalctl -t nightdrive-vm-display).
 
 apply() {
+  # Its Hyprland gone (the login screen's, once logged in): nothing to follow for
+  [[ -S $XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock ]] || exit 0
   hyprctl eval 'NightdriveVmDisplay(true)' >/dev/null
   logger -t nightdrive-vm-display "$(hyprctl monitors | sed -n 2p | tr -d '\t')"
 }
@@ -15,8 +17,10 @@ case $1 in
   apply) apply ;;
   watch)
     compgen -G '/sys/class/drm/card*-Virtual-*' >/dev/null || exit 0
-    exec 9>"$XDG_RUNTIME_DIR/nightdrive-vm-display.lock"
-    flock -n 9 || exit 0   # one watcher per session
+    # One watcher per Hyprland, its lock in that Hyprland's own folder: one left behind by an earlier Hyprland (the
+    # login screen's, a session before a logout) holds only its own, and quits at the next event (apply)
+    exec 9>"$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/nightdrive-vm-display.lock" || exit 0
+    flock -n 9 || exit 0
     # Only this shell holds the lock (9>&-): a udevadm or grep left behind by a watcher that was killed would keep it,
     # and the next watcher would quit at once
     udevadm monitor --udev --subsystem-match=drm 9>&- \

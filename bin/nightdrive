@@ -369,7 +369,7 @@ LIST
         did=1
       fi
     fi
-    if [[ $(cat /etc/greetd/greeter/version 2>/dev/null) != "$(git -C "$repo/config/greeter" rev-parse HEAD:./ 2>/dev/null)" ]]; then
+    if [[ $(cat /etc/greetd/greeter/version 2>/dev/null) != "$(git -C "$repo/config/greeter" rev-parse HEAD:./ HEAD:../hypr/vm-display.lua HEAD:../hypr/scripts/vm-display 2>/dev/null)" ]]; then
       echo "    login screen"; as_root "Login screen" "$repo/config/greeter/install.sh" >/dev/null && did=1
     fi
   fi
