@@ -25,10 +25,12 @@ Rectangle {
     // Such a text is shown as it is, without the <…> taken out below, which could hide part of a command.
     readonly property var whole: String(((n && n.hints) || {})["x-nightdrive-whole"] || "").split(",").filter(s => s)
     readonly property var actions: n ? Notifs.buttons(n).filter(a => !(bodyText.truncated && whole.includes(a.identifier))) : []
-    // The preview's file (file:// URI and path), "" when there's none
+    // The preview's file (file:// URI and path), "" when there's none. Only a picture by its name: the path is the
+    // sender's, and a double click hands it to xdg-open, which would open a script or a page as readily.
     readonly property string fileUri: {
         const i = row.preview ? row.image || "" : ""
-        return i.startsWith("/") ? "file://" + i : i.startsWith("file://") ? i : ""
+        const uri = i.startsWith("/") ? "file://" + i : i.startsWith("file://") ? i : ""
+        return /\.(png|jpe?g|webp|gif|avif|heic|bmp|tiff?)$/i.test(uri) ? uri : ""
     }
     readonly property string filePath: fileUri ? decodeURIComponent(fileUri.slice(7)) : ""
     // A preview in the runtime dir is only a temporary file (a screenshot to the clipboard: hypr/scripts/screenshot), gone
@@ -297,7 +299,7 @@ Rectangle {
             TapHandler {
                 enabled: card.fileUri !== ""
                 onTapped: (point, button) => {
-                    if (tapCount === 2) {
+                    if (tapCount === 2 && shotImg.status === Image.Ready) {   // and Qt read it as a picture
                         previewClick.stop()
                         Quickshell.execDetached(["xdg-open", card.filePath])
                         card.viewed()

@@ -297,7 +297,9 @@ Singleton {
                 // A picture to show under the text, not as a square (screenshots: hypr/scripts/screenshot; a photo
                 // Ferry received: the standard transfer.complete)
                 preview: !!n.image && !named && (hints.category === "x-nightdrive.preview" || hints.category === "transfer.complete"),
-                entry: n.desktopEntry || (e ? e.id : ""),
+                // Only an app the launcher lists: a click starts it when it has no window (hypr/scripts/focus-app), and
+                // the desktop-entry hint is the sender's word, so it mustn't name a hidden entry (a handler, a helper)
+                entry: e && !e.noDisplay ? e.id : "",
                 wmclass: e ? e.startupClass : "",
                 time: same ? prev.time : Date.now(),
                 critical: n.urgency === NotificationUrgency.Critical,
