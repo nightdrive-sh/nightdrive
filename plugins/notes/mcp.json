@@ -1,0 +1,110 @@
+{
+  "tools": [
+    {
+      "name": "notes_list",
+      "title": "List notes",
+      "description": "The user's notes (Nightdrive Notes: Markdown files in ~/Notes, which the user writes in Apostrophe), newest first: each one's id (its path in the folder, e.g. Shopping.md or Work/Plan.md), title (its first heading, else the file name), when it was last saved, its first line of text and its size in bytes. count is how many there are, limit of them returned (default 50, 0 for all). Use notes_read with an id for the whole text, notes_search to find by words.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {"type": "integer", "title": "At most", "description": "How many notes to return, newest first (default 50, 0 for all)", "minimum": 0}
+        },
+        "additionalProperties": false
+      },
+      "command": ["notes", "list", "--json", ["--limit", "{limit}"]],
+      "class": "read",
+      "area": "notes"
+    },
+    {
+      "name": "notes_search",
+      "title": "Search notes",
+      "description": "Finds the user's notes that have every word (case aside) in their title or text, newest first: each one's id, title, when it was saved, and up to three of its lines where the words are. count is how many matched, at most limit returned (default 25).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "title": "Search", "description": "Words to look for"},
+          "limit": {"type": "integer", "title": "At most", "description": "How many notes to return (default 25)", "minimum": 1}
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "search", "--json", ["--limit", "{limit}"], "{query}"],
+      "class": "read",
+      "area": "notes"
+    },
+    {
+      "name": "notes_read",
+      "title": "Read a note",
+      "description": "One of the user's notes whole: its id, title, when it was saved, its path, and its Markdown text. note is an id from notes_list or notes_search, or a note's title. An error says when there is no such note.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"}
+        },
+        "required": ["note"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "read", "--json", "{note}"],
+      "class": "read",
+      "area": "notes"
+    },
+    {
+      "name": "notes_create",
+      "title": "New note",
+      "description": "Writes a new note in ~/Notes: the file is named after the title (a number added when that name is taken), and starts with the title as its heading (# title), then text, which is Markdown. Returns the new note's id. The user is told and can undo it, which moves the note to the trash.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string", "title": "Title", "description": "The note's title, also its file name", "minLength": 1},
+          "text": {"type": "string", "title": "Text", "description": "The note's text in Markdown, under its heading (may be empty)"}
+        },
+        "required": ["title", "text"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "create", "--json", "{title}"],
+      "stdin": "{text}",
+      "undo": ["notes", "trash", "--json", "{id}"],
+      "notice": "Wrote the note {title}",
+      "class": "change",
+      "area": "notes"
+    },
+    {
+      "name": "notes_append",
+      "title": "Add to a note",
+      "description": "Adds text (Markdown) to the end of one of the user's notes, on a line of its own; nothing already in it changes. note is an id or a title. For a list, add the new items as \"- item\" lines. The user is told and can undo it while the note hasn't been edited since.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"},
+          "text": {"type": "string", "title": "Text", "description": "What to add, in Markdown", "minLength": 1}
+        },
+        "required": ["note", "text"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "append", "--json", "{note}"],
+      "stdin": "{text}",
+      "undo": ["notes", "unappend", "{id}", "{size_before}", "{size_after}"],
+      "notice": "Added to the note {title}",
+      "class": "change",
+      "area": "notes"
+    },
+    {
+      "name": "notes_trash",
+      "title": "Move a note to the trash",
+      "description": "Moves one of the user's notes to the desktop's trash, where Files can put it back; nothing is deleted for good (there is no tool for that). note is an id or a title. The user is told and can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"}
+        },
+        "required": ["note"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "trash", "--json", "{note}"],
+      "undo": ["notes", "restore", "--", "{names}"],
+      "notice": "Moved the note {title} to the trash",
+      "class": "change",
+      "area": "notes"
+    }
+  ]
+}

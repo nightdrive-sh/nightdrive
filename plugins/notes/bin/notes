@@ -1,0 +1,90 @@
+#!/bin/bash
+# notes: Nightdrive Notes, the Markdown files in ~/Notes (plugins/notes, README.md): its window to read them, Apostrophe
+# to write them, and the commands the window and Claude's tools (mcp.json) use.
+set -uo pipefail   # read --json | jq: a note not found fails the whole line
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app                                     # Notes' own Quickshell config, apart from the desktop's shell
+NOTES_PY=$APP_DIR/lib/notes.py
+APOSTROPHE=org.gnome.gitlab.somas.Apostrophe            # plugins/apostrophe: it sees the whole home folder
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+APP_TITLE=Notes
+APP_IPC=notes
+. "$QS_DIR/kit/app.sh"
+
+# A change made outside the window (Claude, a terminal) shows in it at once
+changed() { local status=$?; running && ipc refresh; return $status; }
+
+# edit NOTE: the note in Apostrophe, or in what opens Markdown here when Apostrophe isn't installed
+edit() {
+  local path
+  path=$(python3 "$NOTES_PY" read --json "$*" | jq -r .path) || return 1
+  if flatpak info --user "$APOSTROPHE" >/dev/null 2>&1; then
+    setsid -f flatpak run "$APOSTROPHE" "$path" >/dev/null 2>&1
+  else
+    setsid -f xdg-open "$path" >/dev/null 2>&1
+  fi
+}
+
+# Puts Notes among the desktop's apps (share/notes.desktop), with Exec's full path filled in: the compositor's PATH may
+# not have ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons" "${NOTES_DIR:-$HOME/Notes}"
+  cp "$APP_DIR/share/notes.svg" "$icons/nightdrive-notes.svg"
+  sed "s|^Exec=notes|Exec=$HOME/.local/bin/notes|" "$APP_DIR/share/notes.desktop" > "$apps/nightdrive-notes.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Installed: $apps/nightdrive-notes.desktop"
+}
+
+# Takes Notes out of the desktop's apps; the notes stay in ~/Notes
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  app_command quit >/dev/null 2>&1 || true
+  rm -f "$data/applications/nightdrive-notes.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-notes.svg"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$data/applications" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Notes is out of your apps; your notes stay in ${NOTES_DIR:-$HOME/Notes}."
+}
+
+usage() {
+  cat <<USAGE
+Usage: notes [command]
+
+  (none), open     open Notes, or bring it forward if it is open
+  show NOTE        open Notes on NOTE: an id (as list gives it: Shopping.md, Work/Plan.md) or a title
+  edit NOTE        open NOTE in Apostrophe
+  list             the notes, newest first (--json; --limit N, 50 by default, 0 for all)
+  search WORDS     the notes that have every word (--json; --limit N, 25 by default)
+  read NOTE        a note's whole text (--json: with its id, title and path)
+  create TITLE     a new note, its text from stdin (--json)
+  append NOTE      the text from stdin added to the end of NOTE (--json)
+  trash NOTE       NOTE to the trash, where Files puts it back (--json)
+  restore NAME…    back from the trash (the names trash --json gives)
+  install          Notes among the desktop's apps (the installer), and ~/Notes
+  uninstall        take it out again (your notes stay)
+  restart          close and open again (after a change to the app)
+  quit             close Notes
+  log              follow the app's log (QML errors show up here)
+  help             this text
+USAGE
+}
+
+case ${1:-open} in
+  show)      id=$(python3 "$NOTES_PY" read --json "${*:2}" | jq -r .id) || exit 1; open_ready; ipc pick "$id" ;;
+  edit)      edit "${@:2}" ;;
+  list|search|read) python3 "$NOTES_PY" "$@" ;;
+  create|append|unappend|trash) python3 "$NOTES_PY" "$@"; changed ;;
+  restore)   "$APP_DIR/../../bin/nightdrive" files restore "${@:2}"; changed ;;   # trash's undo: back from the trash
+  install)   install_app ;;
+  uninstall) uninstall_app ;;
+  help|-h|--help) usage ;;
+  *)
+    app_command "$@"; status=$?        # open (the default), settings, restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac
