@@ -2,7 +2,7 @@
 
 A plugin is an optional part of Nightdrive with files of its own: a top bar icon and its menu, a service, commands,
 keys. Each one is a folder, `plugins/<id>/`, and the folder's name is its id. Users choose plugins when installing, or
-later in launcher › System › Install or with `nightdrive plugins`. A plugin that isn't installed, or is turned off,
+later in Launcher › System › Install or with `nightdrive plugins`. A plugin that isn't installed, or is turned off,
 doesn't show anywhere: no bar icon, menu, keys or shortcut lines.
 
 This page is all you need to make one. [`ferry/`](ferry) is the full example of a bar module with its menu, over an app
@@ -20,15 +20,15 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | File | What it is | Ferry's |
 | --- | --- | --- |
 | `plugin.conf` | Name, icon, description, how to install it and how to tell it's installed | [plugin.conf](ferry/plugin.conf) |
-| `README.md` | Its page: the launcher shows it, and GitHub (and later the website) the same file. Pictures go in the folder | [README.md](ferry/README.md), [ferry.jpg](ferry/ferry.jpg) |
+| `README.md` | Its page: the Launcher shows it, and GitHub (and later the website) the same file. Pictures go in the folder | [README.md](ferry/README.md), [ferry.jpg](ferry/ferry.jpg) |
 | `steps.md` | Its setup by hand, a step at a time, for Welcome to Nightdrive without Claude (see [below](#setting-up-by-hand-stepsmd)) | — (Mail's [steps.md](mail/steps.md)) |
 | `module.jsonc` | A top bar module | [module.jsonc](ferry/module.jsonc) |
 | `status` | The module's state, one line of JSON | [status](ferry/status) |
 | `icons/` | The module's own SVG icons, for a logo Lucide hasn't got | — (Tailscale's [icons/](tailscale/icons)) |
 | `<Name>Menu.qml` | The menu a click on the module opens (more `.qml` files beside it if it needs them) | [FerryMenu.qml](ferry/FerryMenu.qml) |
-| `<Name>Levels.qml` | Its pages in the launcher, and rows of its own at the root, in the root search and above the search field | — (Deck's [MusicLevels.qml](deck/MusicLevels.qml)) |
+| `<Name>Levels.qml` | Its pages in the Launcher, and rows of its own at the root, in the root search and above the search field | — (Deck's [MusicLevels.qml](deck/MusicLevels.qml)) |
 | `bindings.lua` | Keys | — (Deck's [bindings.lua](deck/bindings.lua)) |
-| `SHORTCUTS.md` | Its lines in the key list (⌘⇧K, launcher › Keybindings) | — (Deck's [SHORTCUTS.md](deck/SHORTCUTS.md)) |
+| `SHORTCUTS.md` | Its lines in the key list (⌘⇧K, Launcher › Keybindings) | — (Deck's [SHORTCUTS.md](deck/SHORTCUTS.md)) |
 | `hyprland.lua` | Hyprland settings: window rules, and programs that start with the session | — (Deck's [hyprland.lua](deck/hyprland.lua)) |
 | `quit-commands` | What ⌘Q runs on its window instead of closing it, e.g. to stop a player that plays on without one | — (Deck's [quit-commands](deck/quit-commands)) |
 | `systemd/` | User units, linked to `~/.config/systemd/user` | — (LocalSend's [nightdrive-localsend.service](localsend/systemd/nightdrive-localsend.service)) |
@@ -64,9 +64,9 @@ author=@jarilehtinen
 
 | Key | What it is |
 | --- | --- |
-| `name` | Shown in the launcher and `install.sh`; the README's title is the same |
+| `name` | Shown in the Launcher and `install.sh`; the README's title is the same |
 | `icon` | A [Lucide](https://lucide.dev/icons) icon name |
-| `description` | One line. Ending it in `(experimental)` marks the plugin as experimental in the launcher and on the website (the README needn't say so) |
+| `description` | One line. Ending it in `(experimental)` marks the plugin as experimental in the Launcher and on the website (the README needn't say so) |
 | `default` | `on`: ticked in `install.sh`'s list; `off` (default): not |
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
@@ -74,9 +74,9 @@ author=@jarilehtinen
 | `units` | User units the installer set up outside the folder, space-separated (Ferry's `ferry.service`, which Ferry's own install writes): `nightdrive plugins off` stops them with the folder's `systemd/` ones |
 | `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up), `webapp`, or `app`: one of Nightdrive's own apps (below) |
 | `bundled` | For an `app`: `yes` (default) comes with every install; `no` doesn't (below) |
-| `version` | `MAJOR.MINOR.PATCH`, e.g. `1.0.0` (`0.x` while it's experimental). It shows on the plugin's page in the launcher and on the website, so a bug report can name it. See [Versions](#versions) |
+| `version` | `MAJOR.MINOR.PATCH`, e.g. `1.0.0` (`0.x` while it's experimental). It shows on the plugin's page in the Launcher and on the website, so a bug report can name it. See [Versions](#versions) |
 | `author` | Who made it: a GitHub user (`@name`) or a name |
-| `setup` | A shell command, run in the folder, that sets the installed plugin up with Claude: Claude Code in a terminal, going through the README's steps with the user. The plugin's page gets a button Set up with Claude (and the key C) for it. For a plugin whose use needs more than its installer can ask, such as Mail's account (`bin/nightmail setup`). Start Claude through `~/.config/hypr/scripts/claude-setup ID NAME`, with your steps on its stdin: it holds the session to them, and Welcome to Nightdrive sees it running. Installed plugins with a `setup` are rows in Welcome to Nightdrive (launcher › System › Set up Nightdrive) |
+| `setup` | A shell command, run in the folder, that sets the installed plugin up with Claude: Claude Code in a terminal, going through the README's steps with the user. The plugin's page gets a button Set up with Claude (and the key C) for it. For a plugin whose use needs more than its installer can ask, such as Mail's account (`bin/nightmail setup`). Start Claude through `~/.config/hypr/scripts/claude-setup ID NAME`, with your steps on its stdin: it holds the session to them, and Welcome to Nightdrive sees it running. Installed plugins with a `setup` are rows in Welcome to Nightdrive (Launcher › System › Set up Nightdrive) |
 | `configured` | A shell test, run in the folder, like `installed`: the setup is done while it succeeds (an account written, a login made). Welcome shows the plugin's row as Done by it. Quick, as `installed`. Without it, a setup counts as done once its Claude session has closed |
 | `welcome` | The plugin's row in Welcome to Nightdrive: one line, in plain words, of what setting it up gives you (with Claude or without). Default: `description` |
 | `order` | A number, default 50: `install.sh` installs the plugins in this order, and the lists show them in it. Lower goes first; the same order keeps the folders' (alphabetical) order, then `plugins.txt`'s lines. Home Assistant has 90: its installer asks for addresses, so it runs last |
@@ -107,7 +107,7 @@ explains every key), with a few differences:
   a list, and the first one that is in the bar counts: Home Assistant's `"before": ["deck", "claude"]`. Without them, at
   the right end.
 - `size`: its icon size in px.
-- `label` (required) and `glyph` (a Lucide name): its row in launcher › Settings › Top bar › Items, where it can be
+- `label` (required) and `glyph` (a Lucide name): its row in Launcher › Settings › Top bar › Items, where it can be
   hidden.
 - Its commands (`status`, `right`, `middle`, `drop`) run in the plugin's folder with bash, so `bin/<command>` finds
   the plugin's own command (Ferry's is installed elsewhere: `~/.local/bin/ferry add`).
@@ -195,9 +195,9 @@ Column {
 A change to a plugin's menu doesn't reload on save like the core menus: restart Quickshell to see
 it (`qs kill; setsid -f qs`).
 
-**Pages in the launcher.** A `<Name>Levels.qml` is a launcher level file like the core's (`config/quickshell/*Levels.qml`;
+**Pages in the Launcher.** A `<Name>Levels.qml` is a Launcher level file like the core's (`config/quickshell/*Levels.qml`;
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also
-have `rootItems` (rows at the launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `rootRows()`
+have `rootItems` (rows at the Launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `rootRows()`
 (rows for the root search: Deck's albums) and `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
 `inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
 into the field.
@@ -206,26 +206,26 @@ is a small one to copy. The same restart applies.
 
 ## The page: README.md
 
-The launcher's page for the plugin (Install › Plugins › the plugin), GitHub's, and later the website's. The name, icon
+The Launcher's page for the plugin (Install › Plugins › the plugin), GitHub's, and later the website's. The name, icon
 and description come from `plugin.conf`; the README is the body. Follow this shape:
 
 1. `# Name`, the same as `name` in plugin.conf.
 2. One paragraph: what it does for the user.
 3. A screenshot, if the plugin has something to see: `![Ferry's menu in the top bar](ferry.jpg)`, the file in the
-   folder. The launcher shows the first picture.
+   folder. The Launcher shows the first picture.
 4. How to use it, as a list. A longer page splits it under `##` headings, such as `## On the computer`,
-   `## On the phone`, `## In a terminal` and `## Privacy` (Ferry's README); the launcher shows them as section titles.
-   Commands read best as a table (`| Command | What it does |`), which the launcher shows as items.
+   `## On the phone`, `## In a terminal` and `## Privacy` (Ferry's README); the Launcher shows them as section titles.
+   Commands read best as a table (`| Command | What it does |`), which the Launcher shows as items.
 5. Last, the fact lines, each on its own line and in this order (the ones that apply, at least one):
-   `Homepage: https://…`, `Needs: …`, `Keys: ⌘⇧I` (required when the plugin has `bindings.lua`). The launcher shows
+   `Homepage: https://…`, `Needs: …`, `Keys: ⌘⇧I` (required when the plugin has `bindings.lua`). The Launcher shows
    them as facts under the text.
 
-The launcher shows each paragraph and each `- ` item as plain text: links keep their text, `**` and backticks go. Write
-each `- ` item on one line, however long (as Ferry's README does): the launcher ends an item at the line break, and the
+The Launcher shows each paragraph and each `- ` item as plain text: links keep their text, `**` and backticks go. Write
+each `- ` item on one line, however long (as Ferry's README does): the Launcher ends an item at the line break, and the
 rest of it would be a paragraph of its own (`nightdrive plugin check` points out the line).
 
 Commands go in a code block, indented by 4 spaces after a blank line (or in ``` fences), one command a line. The
-launcher shows it in a box with its lines as they are, and a `command   # comment` line with the comment dimmed in a
+Launcher shows it in a box with its lines as they are, and a `command   # comment` line with the comment dimmed in a
 column beside the commands (under the command when there isn't room), so keep the comments short, as Ferry's are.
 
 ## Setting up by hand: steps.md
@@ -256,8 +256,8 @@ Which modifier: a key that opens an app is Hyper (Caps Lock) + a letter, `"MOD3 
 feature, such as a menu, is ⌘⇧ or ⌘⌥ + a letter. ⌘ + a letter alone belongs to the apps (copy, save, reload…).
 In SHORTCUTS.md Hyper is written `Hyper M`.
 
-A plugin's Hyper key is a default: when the user picks an app for the same key (launcher › Settings › Keyboard
-Shortcuts), the core leaves the plugin's binding out and its line out of the key list. Settings › Apps › App shortcuts names
+A plugin's Hyper key is a default: when the user picks an app for the same key (Launcher › Settings › Apps ›
+App shortcuts), the core leaves the plugin's binding out and its line out of the key list. Settings › Apps › App shortcuts names
 the plugin by its SHORTCUTS.md section, so give the key's line the app's name (`Hyper M  Music (Deck, …)`).
 
 ```lua
@@ -361,9 +361,9 @@ nightdrive plugins off ferry    # the desktop treats it as not installed, and it
 nightdrive plugins on ferry     # back as it was
 ```
 
-Off hides its module, menu, launcher rows, keys and shortcut lines, leaves out its `hyprland.lua`, and stops the units in
+Off hides its module, menu, Launcher rows, keys and shortcut lines, leaves out its `hyprland.lua`, and stops the units in
 its `systemd/`. They stay enabled, so its `installed` test still succeeds, and a drop-in keeps them from starting until
-it's on again. The state is an empty file, `~/.local/state/nightdrive/plugins-off/<id>`. The same switch is on the plugin's page in the launcher
+it's on again. The state is an empty file, `~/.local/state/nightdrive/plugins-off/<id>`. The same switch is on the plugin's page in the Launcher
 (Tab to it). The commands work even when the bar is stuck: every plugin's QML runs in the same Quickshell, with no
 isolation, so a terminal is the way out.
 
@@ -371,7 +371,7 @@ isolation, so a terminal is the way out.
 
 ## Versions
 
-A plugin's `version` names what a user has, for a bug report: the launcher shows it on the plugin's page, and
+A plugin's `version` names what a user has, for a bug report: the Launcher shows it on the plugin's page, and
 `nightdrive plugins` lists it. Raise it when a release changes the plugin, by these rules:
 
 - **PATCH** (`1.0.0` → `1.0.1`): fixes and small changes. This is the usual step.
@@ -406,7 +406,7 @@ nightdrive plugins remove disk                                          # turns 
 
 - `add` refuses an id that Nightdrive's own plugins (or `plugins.txt`) already have: give it another,
   `nightdrive plugins add URL OTHER-ID`.
-- The launcher marks it as external. `nightdrive update` pulls it with Nightdrive, and `update check` counts its
+- The Launcher marks it as external. `nightdrive update` pulls it with Nightdrive, and `update check` counts its
   commits.
 - `remove` stops if the folder has changes or commits of its own that aren't pushed: `--force` removes it anyway. What
   the installer put elsewhere (packages, settings) stays.

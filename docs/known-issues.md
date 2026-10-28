@@ -14,7 +14,7 @@ the *Known issue* form.
 - **[The Space preview in Files flashes a zoomed picture as it opens (Sushi 50)](https://github.com/nightdrive-sh/nightdrive/issues/4)**:
   harmless; the image viewer (Loupe) opens a picture without the flash.
 - **[1Password's own keyboard shortcuts do nothing (Quick Access, Autofill)](https://github.com/nightdrive-sh/nightdrive/issues/5)**:
-  Hyper+P opens the app; its commands (`1password --quick-access`) can get keys in `~/.config/hypr/local.lua`.
+  Hyper P opens the app; its commands (`1password --quick-access`) can get keys in `~/.config/hypr/local.lua`.
 - **[iPhone mirroring stops when a screen comes or goes (AirPlay Receiver)](https://github.com/nightdrive-sh/nightdrive/issues/6)**:
   start mirroring again from the phone; the receiver is back by itself.
 - **[WezTerm from Flathub doesn't open a window](https://github.com/nightdrive-sh/nightdrive/issues/7)**:

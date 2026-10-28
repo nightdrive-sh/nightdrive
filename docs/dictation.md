@@ -1,8 +1,8 @@
 # Dictation (Voxtype)
 
-Hold **F5** or **Fn** on a Mac, **Insert** on a PC (or another key: below), speak, and let go: the text is typed into the active window. Music and
-other sound playing drops to 10% while you speak, so it doesn't end up in the text (`duck_media` in `config.toml`). It runs fully offline
-with [Voxtype](https://github.com/peteonrails/voxtype) and NVIDIA's Parakeet model, on the CPU (about 1.4 s for 6 s of speech on an M2 Max).
+Hold **F5** or **Fn** on a Mac, **Insert** on a PC (or another key: below), speak, and let go: the text is typed into the active window.
+
+It runs fully offline with [Voxtype](https://github.com/peteonrails/voxtype) and NVIDIA's Parakeet model, on the CPU (about 1.4 s for 6 s of speech on an M2 Max).
 
 Voxtype is installed by hand:
 
@@ -10,14 +10,24 @@ Voxtype is installed by hand:
    (version 1.1.0) into `~/.local/bin`, check their sha256 (`SHA256SUMS.txt`) and drop the version and platform from the
    names: `voxtype-onnx` (Parakeet), plus `voxtype-osd`, `voxtype-osd-quickshell` and `voxtype-audio-bridge` for the
    on-screen recording card.
-   - MacBook: the `linux-aarch64` files.
    - PC: the `linux-x86_64` files, `onnx-avx2` for `voxtype-onnx` (`onnx-avx512` if `grep avx512f /proc/cpuinfo` finds it).
+   - Apple Silicon Mac: the `linux-aarch64` files.
    - Leave out `voxtype-osd-gtk4`: without it the card is the Quickshell one below, which fits the desktop.
-2. Download the model: `voxtype-onnx setup --download --model parakeet-tdt-0.6b-v3-int8` (into `~/.local/share/voxtype/models`).
-   For better accuracy, also download the full one (`--model parakeet-tdt-0.6b-v3`, 2.4 GB): it gets English names and
-   sentence breaks clearly better, about 0.3 s slower for 20 s of speech. The daemon uses it whenever it's there.
-3. Install the OSD's QML: `voxtype setup quickshell --source <voxtype repo>/quickshell`. `link.sh` then replaces its
-   `OsdSurface.qml` with the one in `config/voxtype/` (card at the top centre, no dimming).
+2. Download the model (into `~/.local/share/voxtype/models`). For better accuracy, also download the full one
+   (`--model parakeet-tdt-0.6b-v3`, 2.4 GB): it gets English names and sentence breaks clearly better, about 0.3 s slower
+   for 20 s of speech. The daemon uses it whenever it's there.
+
+```sh
+voxtype-onnx setup --download --model parakeet-tdt-0.6b-v3-int8
+```
+
+3. Install the OSD's QML. `link.sh` then replaces its `OsdSurface.qml` with the one in `config/voxtype/` (card at the top
+   centre, no dimming).
+
+```sh
+voxtype setup quickshell --source <voxtype repo>/quickshell
+```
+
 4. `sudo dnf install wtype` so the text can be typed into windows (without it, it goes to the clipboard).
 5. Log out and in: Hyprland starts the daemon at login.
 
