@@ -26,7 +26,11 @@ usage() {
   section "Desktop"
   row "theme COMMAND"            "The theme colour, e.g. nightdrive theme color teal"
   row "wallpaper COMMAND"        "The background: list, set, add, remove"
-  row "display COMMAND"          "Screen scale: list, scale OUTPUT SCALE"
+  row "display COMMAND"          "Screens: list, json, scale OUTPUT SCALE, mode OUTPUT WxH (--keep asks)"
+  row "sound [COMMAND]"          "Volume and output as JSON: volume [PCT] [--mute on|off], output [NAME]"
+  row "brightness [PCT]"         "Screen brightness in percent (JSON), set when given"
+  row "network [COMMAND]"        "Wi-Fi and network state as JSON; wifi|all on|off [--keep]"
+  row "bluetooth|battery"        "Bluetooth devices or the battery as JSON"
   row "bar-style COMMAND"        "The top bar's look: opacity, icons, highlight, icon-opacity"
   row "nightlight [on|off]"      "Night light's warm tint: status, on, off, toggle (--json)"
   row "appearance"               "Wallpaper, theme, night light and the top bar's look now, as JSON"
@@ -808,6 +812,9 @@ case ${1:-} in
   platform|software-catalog|snippets) exec "$scripts/$1" "${@:2}" ;;
   theme|display|wallpaper|bar-style|notifications) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
   nightlight|appearance) exec "$scripts/$1" "${@:2}" ;;                # Claude's appearance tools use them too
+  sound|network) exec "$scripts/$1" "${@:2}" ;;                      # also Claude's sound and display tools
+  brightness) exec "$scripts/brightness" screen "${@:2}" ;;
+  bluetooth|battery) exec "$scripts/devices" "$1" ;;
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
   ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }

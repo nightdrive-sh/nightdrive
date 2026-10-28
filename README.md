@@ -418,7 +418,11 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive theme set background '#181722'` | The look: the terminals', the Launcher's, Firefox's and Thunderbird's background and opacity, the window borders and shadows; `nightdrive theme look` lists the settings, `default` puts one back (also Theme Editor, Launcher › Settings › Theme) |
 | `nightdrive theme save "My theme"` | Saves the colour and the look as a theme of your own; `nightdrive theme themes` lists them, `use ID` switches, `delete ID` removes one, `reset` goes back to Default |
 | `nightdrive wallpaper set <image>` | Changes the wallpaper (an image from elsewhere, such as Downloads, is copied to your own backgrounds first); `nightdrive wallpaper current` prints it |
-| `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one |
+| `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one, `mode eDP-1 2560x1440` the resolution (`auto` for either goes back to the default). With `--keep` last, a card asks whether to keep it and it goes back in 20 s unless you do. `display json` gives it all as JSON |
+| `nightdrive sound` | Volume and outputs as JSON; `sound volume 40` sets the volume (`--mute on`/`off`), `sound output NAME` the output |
+| `nightdrive brightness 60` | The screen's brightness in percent; without a number, prints it |
+| `nightdrive network` | Wi-Fi and the network as JSON; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |
+| `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
 | `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |
