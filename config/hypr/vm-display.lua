@@ -13,20 +13,24 @@
 -- (2 pixels to a point there). A guest that came with another local.lua (a converted desktop's "auto" gives 1) gets it too.
 local VM_SCALE = 2.0
 
--- The connector's preferred mode as width, height, or nil (not a virtual GPU's output, or none yet)
-local function preferred(output)
-    if not output:match("^Virtual%-%d+$") then return nil end
+-- The virtual GPU's outputs and their preferred modes, from sysfs: { name = { w, h } }. Not hl.get_monitors(): at
+-- Hyprland's start the config is read before the output is plugged in, so that list is empty, and the output would get
+-- "preferred" at a scale that doesn't divide it (1.5 on 1892x1023 falls back to 11/8 = 1.375, 2 to 11/6 = 1.83, with a
+-- warning) until the next reload (#1732).
+local function virtualOutputs()
+    local found = {}
     for card = 0, 7 do
-        local f = io.open("/sys/class/drm/card" .. card .. "-" .. output .. "/modes")
-        if f then
-            local mode = f:read("*l")
-            f:close()
-            local w, h = (mode or ""):match("^(%d+)x(%d+)$")
-            if w then return tonumber(w), tonumber(h) end
-            return nil
+        for n = 1, 8 do
+            local name = "Virtual-" .. n
+            local f = io.open("/sys/class/drm/card" .. card .. "-" .. name .. "/modes")
+            if f then
+                local w, h = (f:read("*l") or ""):match("^(%d+)x(%d+)$")
+                f:close()
+                if w then found[name] = { tonumber(w), tonumber(h) } end
+            end
         end
     end
-    return nil
+    return found
 end
 
 -- The smallest step of pixels the scale divides into whole ones: 3 for 1.5 (3/2), 5 for 1.25, 4 for 4/3, 2 for 2
@@ -42,15 +46,15 @@ end
 -- Hyprland's old one again. From the watcher, only an output whose size has changed is set.
 return function(scales, modes)
     function NightdriveVmDisplay(changedOnly)
-        for _, m in ipairs(hl.get_monitors()) do
-            local w, h
-            if not modes[m.name] then w, h = preferred(m.name) end
-            if w then
-                local scale = scales[m.name] or VM_SCALE
+        local current = {}
+        for _, m in ipairs(hl.get_monitors()) do current[m.name] = m.width .. "x" .. m.height end
+        for name, size in pairs(virtualOutputs()) do
+            if not modes[name] then
+                local scale = scales[name] or VM_SCALE
                 local n = step(scale)
-                local mode = (w - w % n) .. "x" .. (h - h % n)
-                if not (changedOnly and mode == m.width .. "x" .. m.height) then
-                    hl.monitor({ output = m.name, mode = mode, position = "auto", scale = scale })
+                local mode = (size[1] - size[1] % n) .. "x" .. (size[2] - size[2] % n)
+                if not (changedOnly and mode == current[name]) then
+                    hl.monitor({ output = name, mode = mode, position = "auto", scale = scale })
                 end
             end
         end
