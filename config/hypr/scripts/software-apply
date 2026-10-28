@@ -1,0 +1,206 @@
+#!/usr/bin/python3 -I
+"""Installing and removing software without the launcher (`nightdrive software …`, Claude's software_install and
+software_remove in config/mcp/tools/software.json).
+  software-apply preview install|remove dnf|flatpak ID [--json]   what it would install or remove (nothing changes)
+  software-apply install|remove dnf|flatpak ID [--check] [--json]
+  software-apply plugin-install ID [--check] [--json]   a plugin's installer, in a terminal window (it asks things there)
+dnf runs through pkexec: the password goes to the system's own dialog (polkit), never through this command or its
+caller. Flatpak apps go to the user's own installation and need none. On a terminal it asks first; --check reads on stdin
+what the caller showed the user ({"packages": [...]} as preview gives it, or {"from": ...} for a plugin) and does nothing
+unless it is still what would happen, so Claude's confirmation card shows the real change.
+Waits WAIT seconds at most: a longer install goes on, and the answer says it is still running."""
+import json, os, re, subprocess, sys, tempfile, time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+NIGHTDRIVE = os.path.realpath(os.path.join(HERE, "../../../bin/nightdrive"))
+FLATHUB = "https://dl.flathub.org/repo/flathub.flatpakrepo"
+WAIT = 280                                 # seconds: inside the tool's 300 s timeout (run.py), the dialog's wait included
+PREVIEW_TIMEOUT = 120                      # dnf's dry run refreshes its metadata first
+# dnf5's transaction table: a section title, then " name arch version repository size" rows
+SECTION = re.compile(r"^(Installing|Upgrading|Downgrading|Reinstalling|Removing)\b.*:$")
+
+
+def fail(msg):
+    sys.exit(msg)
+
+
+def run(*cmd, timeout=60):
+    try:
+        return subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout,
+                              env={**os.environ, "LC_ALL": "C"})
+    except subprocess.TimeoutExpired:
+        fail(f"{cmd[0]} took longer than {timeout} s; nothing was changed")
+
+
+def dnf_preview(action, name):
+    """The transaction dnf would make, as "name · repository" rows (an upgrade it pulls in is marked)"""
+    p = run("dnf", action, "--assumeno", "--", name, timeout=PREVIEW_TIMEOUT)
+    rows, verb, space = [], None, ""
+    for line in (p.stdout + p.stderr).splitlines():
+        m = SECTION.match(line)
+        if m:
+            verb = m.group(1)
+        elif verb and line.startswith(" "):
+            f = line.split()
+            if len(f) >= 4 and f[0] != "replacing":
+                rows.append(f"{f[0]} · {f[3]}" + ("" if verb in ("Installing", "Removing") else f" · {verb.lower()}"))
+        else:                                 # a blank line, the summary: the table is over
+            verb = None
+        if line.startswith("After this operation"):
+            space = line.removeprefix("After this operation, ").rstrip(".")
+    if not rows:
+        said = " ".join(l.strip() for l in (p.stderr + p.stdout).splitlines()
+                        if l.strip() and not l.startswith(("Updating and loading", "Repositories loaded", "Operation aborted")))
+        fail(said or f"dnf has nothing to {action} for {name}")
+    return {"packages": rows, "space": space}
+
+
+def flatpak_preview(action, app):
+    if action == "remove":
+        p = run("flatpak", "info", "--user", app)
+        if p.returncode:
+            fail(f"{app} isn't one of your Flatpak apps (software installed lists them)")
+        origin = re.search(r"^\s*Origin:\s*(\S+)", p.stdout, re.M)
+        return {"packages": [f"{app} · {origin.group(1) if origin else 'flathub'}"], "space": ""}
+    if run("flatpak", "info", "--user", app).returncode == 0:
+        fail(f"{app} is already installed")
+    p = run("flatpak", "remote-info", "--user", "flathub", app)
+    if p.returncode:
+        fail(p.stderr.strip() or f"Flathub has no app {app}")
+    rows = [f"{app} · flathub"]
+    runtime = re.search(r"^\s*Runtime:\s*(\S+)", p.stdout, re.M)
+    # Its runtime comes along when no installation has it yet: often the bigger download
+    if runtime and run("flatpak", "info", runtime.group(1)).returncode:
+        rows.append(f"{runtime.group(1)} · flathub · runtime")
+    size = re.search(r"^\s*Download Size:\s*(.+)$", p.stdout, re.M)
+    return {"packages": rows, "space": f"the app is a {size.group(1).strip()} download" if size else ""}
+
+
+def preview(action, source, ident):
+    if action not in ("install", "remove") or source not in ("dnf", "flatpak"):
+        fail("preview install|remove dnf|flatpak ID")
+    out = dnf_preview(action, ident) if source == "dnf" else flatpak_preview(action, ident)
+    return {"action": action, "source": source, "id": ident, **out}
+
+
+def checked(shown, now):
+    """--check: nothing happens unless what the user was shown is what would happen now"""
+    if sorted(shown or []) != sorted(now):
+        fail("Nothing was done: the packages are no longer the ones shown. What would happen now:\n  "
+             + "\n  ".join(now) + "\nShow the user this list and ask again (software_preview).")
+
+
+def asked(what):
+    """On a terminal, the question dnf or flatpak would have asked"""
+    if not sys.stdin.isatty():
+        return True
+    print(what)
+    return input("Go ahead? [y/N] ").strip().lower() in ("y", "yes")
+
+
+def background(cmd):
+    """Runs cmd in its own session (a timeout that stops this command leaves it be: dnf as root couldn't be stopped
+    halfway anyway), output to a log; returns (exit status or None while it still runs, log text)"""
+    log = tempfile.NamedTemporaryFile("w+", prefix="nightdrive-software-", suffix=".log", delete=False)
+    p = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        rc = p.wait(timeout=WAIT)
+    except subprocess.TimeoutExpired:
+        return None, log.name
+    log.seek(0)
+    text = log.read()
+    log.close()
+    os.unlink(log.name)
+    return rc, text
+
+
+def tail(text, n=6):
+    lines = [l for l in text.splitlines() if l.strip()]
+    return "\n".join(lines[-n:])
+
+
+def apply(action, source, ident, check, as_json):
+    plan = preview(action, source, ident)
+    if check:
+        checked(json.load(sys.stdin).get("packages"), plan["packages"])
+    elif not asked(f"{action.capitalize()}:\n  " + "\n  ".join(plan["packages"]) + (f"\n{plan['space']}" if plan["space"] else "")):
+        fail("Nothing was done.")
+    if source == "dnf":
+        rc, out = background(["pkexec", "/usr/bin/dnf", action, "-y", "--", ident])
+    else:
+        if action == "install":
+            run("flatpak", "remote-add", "--user", "--if-not-exists", "flathub", FLATHUB)
+            rc, out = background(["flatpak", "install", "--user", "-y", "--noninteractive", "flathub", ident])
+        else:
+            rc, out = background(["flatpak", "uninstall", "--user", "-y", "--noninteractive", ident])
+    done = {"install": "installed", "remove": "removed"}[action]
+    if rc is None:
+        result = {"state": "running", "log": out,
+                  "note": f"Still going after {WAIT} s (a big download?): it goes on by itself; software_info tells when it's {done}."}
+    elif rc in (126, 127) and source == "dnf":
+        # pkexec: 126 the dialog was dismissed (or not allowed), 127 no password or no polkit agent to ask for one
+        why = ("the system can't ask for the password here (no polkit, or no agent to show its dialog)"
+               if re.search(r"authentication agent|authority", out) else "the system's dialog was closed or the password not given")
+        fail(f"Nothing was {done}: {why}.")
+    elif rc:
+        fail(f"{action.capitalize()} failed ({rc}):\n{tail(out)}")
+    else:
+        result = {"state": done, "packages": plan["packages"]}
+    result = {"action": action, "source": source, "id": ident, **result}
+    print(json.dumps(result, ensure_ascii=False) if as_json else f"{ident}: {result['state']}")
+
+
+def plugin_install(ident, check, as_json):
+    found = json.loads(subprocess.run([os.path.join(HERE, "software"), "plugins", "--json"], capture_output=True,
+                                      text=True).stdout or '{"plugins": []}')["plugins"]
+    p = next((x for x in found if x["id"] == ident), None)
+    if p is None:
+        fail(f"No plugin {ident} (software plugins lists them)")
+    if p["installed"] and p["on"]:
+        fail(f"{p['name']} is already installed and on")
+    if check and json.load(sys.stdin).get("from") != p["from"]:
+        fail(f"Nothing was done: {p['name']} comes from {p['from']}, not from what was shown. Ask again with that.")
+    if not os.environ.get("WAYLAND_DISPLAY"):
+        fail("Its installer runs in a terminal window, and there is no desktop to open one on")
+    status = os.path.join(tempfile.mkdtemp(prefix="nightdrive-plugin-"), "status")
+    # A terminal, as Install › Plugins does: an installer asks for sudo's password, tokens and choices there, of the user
+    subprocess.Popen([os.path.join(HERE, "terminal"), "--class", "floating-tui", "--", "bash", "-c",
+                      '"$1" plugins install "$2"; echo $? > "$3"; echo; read -rp "Done. Press Enter to close…"',
+                      "_", NIGHTDRIVE, ident, status], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+    end = time.monotonic() + WAIT
+    while not os.path.exists(status) and time.monotonic() < end:
+        time.sleep(1)
+    try:
+        with open(status) as fh:
+            rc = int(fh.read().strip() or 1)
+    except (OSError, ValueError):
+        rc = None
+    if rc:
+        fail(f"{p['name']}'s installer failed ({rc}): its terminal window shows why")
+    result = {"plugin": ident, "name": p["name"], "state": "installed" if rc == 0 else "running"}
+    if rc is None:
+        result["note"] = f"Its installer still runs in a terminal window after {WAIT} s (waiting for the user?)."
+    print(json.dumps(result, ensure_ascii=False) if as_json else f"{p['name']}: {result['state']}")
+
+
+def main(argv):
+    check, as_json = "--check" in argv, "--json" in argv
+    args = [a for a in argv if a not in ("--check", "--json")]
+    if len(args) == 4 and args[0] == "preview":
+        r = preview(*args[1:])
+        if as_json:
+            print(json.dumps(r, ensure_ascii=False))
+        else:
+            print("\n".join(r["packages"]) + (f"\n{r['space']}" if r["space"] else ""))
+    elif len(args) == 3 and args[0] in ("install", "remove") and args[1] in ("dnf", "flatpak"):
+        apply(args[0], args[1], args[2], check, as_json)
+    elif len(args) == 2 and args[0] == "plugin-install":
+        plugin_install(args[1], check, as_json)
+    else:
+        print("\n".join(__doc__.split("\n")[2:5]), file=sys.stderr)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

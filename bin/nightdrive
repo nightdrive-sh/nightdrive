@@ -52,6 +52,9 @@ usage() {
   row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage), and which are installed"
   row "apps install NAME"        "Install one, or again after removing it, e.g. nightdrive apps install garage"
   row "apps off|on NAME"         "Hide an installed one from the desktop and stop its services, or bring it back"
+  section "Software"
+  row "software search QUERY"    "Fedora's packages and Flathub's apps; info dnf|flatpak|plugin ID, installed, plugins (--json)"
+  row "software install SRC ID"  "Install a package (SRC dnf or flatpak; dnf asks for the password in the system's dialog); remove, preview install|remove"
   section "Plugins"
   row "plugins [list]"           "Optional parts, and which are installed, on or off"
   row "plugins install NAME"     "Install one, e.g. nightdrive plugins install home-assistant"
@@ -818,6 +821,7 @@ case ${1:-} in
   sound|network) exec "$scripts/$1" "${@:2}" ;;                      # also Claude's sound and display tools
   brightness) exec "$scripts/brightness" screen "${@:2}" ;;
   bluetooth|battery) exec "$scripts/devices" "$1" ;;
+  software) exec "$scripts/software" "${@:2}" ;;                       # Install/Remove › Software without the launcher
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
   ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }

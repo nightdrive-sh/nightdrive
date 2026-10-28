@@ -1,0 +1,151 @@
+#!/usr/bin/python3 -I
+"""Software without the launcher: what Install › Software and Remove › Software show, for a terminal and for Claude's
+tools (config/mcp/tools/software.json). `nightdrive software …` runs it.
+  software search QUERY [--json]             Fedora's packages and Flathub's apps (pkg-search)
+  software info dnf|flatpak|plugin ID [--json]  one's details (pkg-info, plugin-info)
+  software installed [--json]                the packages you installed with dnf, and your Flatpak apps
+  software plugins [--json]                  Nightdrive's plugins: installed, on, where they come from
+  software preview|install|remove|plugin-install …   what changes something: software-apply
+The launcher's own fields (icons, screenshots) are left out: this is what a reader needs."""
+import json, os, subprocess, sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+APPLY = ("preview", "install", "remove", "plugin-install")
+
+
+def call(*cmd, timeout=90):
+    """A helper's stdout; a helper that fails is an error with its stderr, for the reader"""
+    try:
+        p = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        sys.exit(f"{os.path.basename(cmd[0])} took longer than {timeout} s")
+    if p.returncode:
+        sys.exit(p.stderr.strip() or f"{os.path.basename(cmd[0])} failed ({p.returncode})")
+    return p.stdout
+
+
+def row(r):
+    out = {"name": r["name"], "summary": r["summary"], "source": r["src"], "id": r["id"], "installed": r["installed"]}
+    if r.get("alt"):                               # Fedora's package, and Flathub has the same app
+        out["also"] = {"source": r["alt"]["src"], "id": r["alt"]["id"]}
+    return out
+
+
+def search(query):
+    r = json.loads(call(os.path.join(HERE, "pkg-search"), query))
+    return {"apps": [row(a) for a in r["apps"]], "tools": [row(t) for t in r["tools"]]}
+
+
+def paragraph(p):
+    """plugin-info's paragraphs are text, {code: [line]} or {heading}"""
+    if isinstance(p, dict):
+        return "\n".join("    " + l for l in p["code"]) if "code" in p else p.get("heading", "")
+    return p
+
+
+def info(source, ident):
+    if source == "plugin":
+        found = [p for p in plugins() if p["id"] == ident]
+        if not found:
+            sys.exit(f"No plugin {ident} (software plugins lists them)")
+        r = json.loads(call(os.path.join(HERE, "plugin-info"), ident))
+        extra = {"on": found[0]["on"], "from": found[0]["from"]}
+    elif source in ("dnf", "flatpak"):
+        r = json.loads(call(os.path.join(HERE, "pkg-info"), source, ident))
+        extra = {}
+    else:
+        sys.exit(f"Unknown source: {source} (dnf, flatpak or plugin)")
+    if not r.get("name"):
+        sys.exit(f"Nothing called {ident} in {source}")
+    return {"source": source, "id": ident, "name": r["name"], "summary": r["summary"], "installed": r["installed"], **extra,
+            "fields": {k: v for k, v in r["fields"]},
+            "description": "\n\n".join(t for t in map(paragraph, r["paragraphs"]) if t)}
+
+
+def installed():
+    """What Remove › Software lists: dnf's user-installed packages (not their dependencies) and the user's Flatpak apps"""
+    dnf = call("dnf", "repoquery", "--userinstalled", "-q", "--queryformat", "%{name}|%{summary}\n")
+    fp = call("flatpak", "list", "--app", "--user", "--columns=application,name,description")
+    rows = {}
+    for line in dnf.splitlines():
+        name, _, summary = line.partition("|")
+        if name:
+            rows.setdefault(name, {"source": "dnf", "id": name, "name": name, "summary": summary})
+    pkgs = sorted(rows.values(), key=lambda r: r["id"])
+    apps = [{"source": "flatpak", "id": f[0], "name": f[1], "summary": f[2] if len(f) > 2 else ""}
+            for f in (l.split("\t") for l in fp.splitlines()) if len(f) > 1]
+    return {"dnf": pkgs, "flatpak": sorted(apps, key=lambda r: r["name"].lower())}
+
+
+def plugins():
+    """`nightdrive plugins`' tab-separated fields: id name icon description default install installed group dir off origin"""
+    out = []
+    for line in call(os.path.join(HERE, "../../../bin/nightdrive"), "plugins").splitlines():
+        f = line.split("\t")
+        if len(f) < 11:
+            continue
+        version = ""
+        if f[8]:
+            try:
+                with open(os.path.join(f[8], "plugin.conf")) as fh:
+                    version = next((l.split("=", 1)[1].strip() for l in fh if l.startswith("version=")), "")
+            except OSError:
+                pass
+        out.append({"id": f[0], "name": f[1], "description": f[3], "group": f[7], "installed": f[6] == "1",
+                    "on": f[6] == "1" and f[9] == "0", "version": version, "from": origin(f[10], f[8])})
+    return out
+
+
+def origin(kind, folder):
+    """Where a plugin comes from, as the confirmation card shows it: Nightdrive itself, or an external one's repo"""
+    if kind != "external":
+        return "Nightdrive"
+    url = subprocess.run(["git", "-C", folder, "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
+    return url or folder
+
+
+def text(cmd, r):
+    """The same as lines for a terminal"""
+    if cmd == "search":
+        for kind in ("apps", "tools"):
+            for a in r[kind]:
+                print(f"{a['source']}:{a['id']:<40} {'installed  ' if a['installed'] else ''}{a['name']}: {a['summary']}")
+    elif cmd == "info":
+        print(f"{r['name']}: {r['summary']}\n")
+        for k, v in r["fields"].items():
+            print(f"{k + ':':<12} {v}")
+        print("\n" + r["description"] if r["description"] else "")
+    elif cmd == "installed":
+        for p in r["dnf"] + r["flatpak"]:
+            print(f"{p['source']}:{p['id']:<40} {p['summary']}")
+    else:
+        for p in r:
+            state = ("on" if p["on"] else "off") if p["installed"] else "not installed"
+            print(f"{p['id']:<20} {p['name']:<26} {state:<14} {'' if p['from'] == 'Nightdrive' else p['from']}".rstrip())
+
+
+def main(argv):
+    if argv and argv[0] in APPLY:
+        os.execv(os.path.join(HERE, "software-apply"), ["software-apply"] + argv)
+    as_json = "--json" in argv
+    args = [a for a in argv if a != "--json"]
+    cmd, rest = (args[0], args[1:]) if args else ("", [])
+    if cmd == "search" and len(rest) == 1 and rest[0].strip():
+        r = search(rest[0].strip().lower())
+    elif cmd == "info" and len(rest) == 2:
+        r = info(*rest)
+    elif cmd == "installed" and not rest:
+        r = installed()
+    elif cmd == "plugins" and not rest:
+        r = plugins()
+    else:
+        print("\n".join(__doc__.split("\n")[2:7]), file=sys.stderr)
+        sys.exit(2)
+    if as_json:
+        print(json.dumps({"plugins": r} if cmd == "plugins" else r, ensure_ascii=False))
+    else:
+        text(cmd, r)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
