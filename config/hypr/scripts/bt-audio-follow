@@ -5,7 +5,7 @@
 # 50% for headphones without one, 100 = no limit):
 # a change from anywhere (keys, apps, a Mac or phone over AVRCP) is pulled back, and headphones connect at most at it.
 # Started by hyprland.lua; listens to PipeWire (pactl subscribe) in the background. One instance only (flock).
-exec 9>"${XDG_RUNTIME_DIR:-/tmp}/bt-audio-follow.lock"
+exec 9>"${XDG_RUNTIME_DIR:-/run/user/$UID}/bt-audio-follow.lock"
 flock -n 9 || exit 0
 maxdir=~/.local/state/nightdrive/max-volume
 maxdefault=50   # the same in topbar/scripts/eq

@@ -34,7 +34,7 @@ notify() {
 shutter() { "$HOME/.config/hypr/scripts/sounds" event screenshot & }
 
 # Clipboard only: the picture for the notification's preview in the runtime dir (gone at logout)
-clip=${XDG_RUNTIME_DIR:-/tmp}/screenshots
+clip=${XDG_RUNTIME_DIR:-/run/user/$UID}/screenshots
 case "$mode" in
   clip|winclip|fullclip)
     case $mode in

@@ -62,7 +62,7 @@ if [[ -n $ws ]]; then
   # Started by Hyprland with an exec rule, which puts the window there without switching the user's view (it matches the
   # terminal's PID: the launch script and scripts/terminal exec into it). The arguments go through a script that removes
   # itself, as a prompt can hold anything, quotes and newlines too, and wouldn't survive a Lua string.
-  launch=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/nightdrive-ask.XXXXXX") || exit 1
+  launch=$(mktemp "${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive-ask.XXXXXX") || exit 1
   { echo 'rm -f -- "$0"'; printf 'exec'; printf ' %q' "$term" "${targs[@]}" -- "${claude[@]}"; echo ' >/dev/null 2>&1'; } > "$launch"
   hyprctl dispatch "hl.dsp.exec_cmd(\"bash $launch\", { workspace = \"$ws silent\" })" >/dev/null
 else

@@ -28,7 +28,7 @@ from importlib.util import module_from_spec, spec_from_loader
 
 HOME = os.path.expanduser("~")
 HYPR = os.environ.get("XDG_CONFIG_HOME", HOME + "/.config") + "/hypr"
-STACK = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/nightdrive/closed-windows.json"
+STACK = (os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}") + "/nightdrive/closed-windows.json"
 SCRIPTS = os.path.dirname(os.path.realpath(__file__))
 MAX_KEPT = 10
 WAIT = 20           # seconds to wait for the window: a big app can take a while to start

@@ -25,7 +25,8 @@ HOME = os.environ["HOME"]
 CONFIG = f"{HOME}/.config/nightdrive/home-assistant"
 FAVS = f"{HOME}/.local/state/nightdrive/home-favorites"
 CACHE = f"{HOME}/.cache/nightdrive/home-assistant-url"
-TOKEN_CACHE = f"{os.environ.get('XDG_RUNTIME_DIR', '/tmp')}/nightdrive-ha-token"   # HA_TOKEN_CMD's answer, until logout
+# HA_TOKEN_CMD's answer, until logout. Never in /tmp: a file another user made there first would get the token.
+TOKEN_CACHE = f"{os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'}/nightdrive-ha-token"
 PROBE_TIMEOUT = 1.5      # s per address while looking for one that answers
 TIMEOUT = 8              # s for a request to the chosen address
 RECHECK = 300            # s: a fallback address is used this long before the preferred ones are tried again
@@ -70,9 +71,12 @@ def token(cfg):
         pass
     t = subprocess.run(["bash", "-c", cfg["HA_TOKEN_CMD"]], capture_output=True, text=True).stdout.strip()
     if t:
-        fd = os.open(TOKEN_CACHE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        os.write(fd, t.encode())
-        os.close(fd)
+        try:
+            fd = os.open(TOKEN_CACHE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            os.write(fd, t.encode())
+            os.close(fd)
+        except OSError:   # no runtime dir (outside a login session): asked again next time
+            pass
     return t
 
 

@@ -3,7 +3,7 @@
 # dictate daemon: started at login (hyprland.lua) with the best Parakeet model that is installed.
 # dictate <fn-down|fn-up>: Fn held. Starts only after 0.3 s so that Fn combos (Fn+arrows, Fn+Backspace …) don't trigger dictation.
 vt="$HOME/.local/bin/voxtype-onnx"
-run=${XDG_RUNTIME_DIR:-/tmp}
+run=${XDG_RUNTIME_DIR:-/run/user/$UID}
 models="$HOME/.local/share/voxtype/models"
 # The full model gets English names and sentence breaks clearly better than int8 (0.3 s slower), but it's an extra
 # 2.4 GB download (docs/dictation.md), so config.toml keeps int8 and this picks the full one when it's there.

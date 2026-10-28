@@ -14,8 +14,8 @@ dir=~/.local/share/easyeffects
 last=~/.local/state/eq-last          # last style that was on (toggle restores it)
 ancdir=~/.local/state/nightdrive/anc # <sink>: the listening mode picked in the menu (none: Noise cancelling)
 # Headphones that tell their mode and take commands (Sony, AirPods: hypr/scripts/headphones-ctl): read from them instead
-live=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/anc          # <MAC>: the mode now, <MAC>.modes, <MAC>.airpods (headphones-ctl)
-livesock=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/headphones-ctl.sock
+live=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/anc          # <MAC>: the mode now, <MAC>.modes, <MAC>.airpods (headphones-ctl)
+livesock=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/headphones-ctl.sock
 maxdir=~/.local/state/nightdrive/max-volume   # <MAC>: the headphones' max volume in percent (hypr/scripts/bt-audio-follow keeps it)
 maxdefault=50                                 # for headphones without a saved one (100 = no limit)
 

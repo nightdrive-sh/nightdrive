@@ -13,7 +13,7 @@ SENSORS = [("nvme", "SSD"), ("WiFi/BT", "Wi-Fi/BT"),
            ("coretemp Package", "CPU"), ("k10temp Tctl", "CPU"), ("amdgpu edge", "GPU")]
 
 mode = sys.argv[1] if len(sys.argv) > 1 else "menu"
-state_path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), f"sysinfo-{mode}.json")
+state_path = os.path.join((os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"), f"sysinfo-{mode}.json")
 HZ = os.sysconf("SC_CLK_TCK")
 
 def rd(p, default=""):

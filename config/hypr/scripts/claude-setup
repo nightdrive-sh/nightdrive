@@ -15,7 +15,7 @@
 set -u
 
 STATE=$HOME/.local/state/nightdrive/setup.json          # { welcome, tasks: { ID: started | skipped } } (config/welcome)
-RUN=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/setup            # ID.pid (the session's claude), ID.task (its prompt)
+RUN=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/setup            # ID.pid (the session's claude), ID.task (its prompt)
 CLASS_PREFIX=nightdrive-setup-                          # the terminal's class: CLASS_PREFIX + ID, which focus finds
 SCRIPTS=$HOME/.config/hypr/scripts
 

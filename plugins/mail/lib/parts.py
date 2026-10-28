@@ -26,8 +26,9 @@ import sys
 import urllib.parse
 
 PARTS = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "nightmail", "parts")
-# The HTML pages: in memory (tmpfs), the user's alone, gone at logout
-PAGES = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/nightmail-{os.getuid()}", "nightmail")
+# The HTML pages: in memory (tmpfs), the user's alone, gone at logout. Never in /tmp, where another user could make
+# the folder first and read the mail.
+PAGES = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "nightmail")
 
 # First in the page: the browser loads nothing but what is in the file, so no remote image or font tells the sender
 # the message was opened. Pictures sent with the message are in the file (data: URIs); links still open when clicked.

@@ -6,7 +6,7 @@ APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
 QS_DIR=$APP_DIR/app                                     # Mail's own Quickshell config, apart from the desktop's shell
 SYNC_UNIT=nightdrive-mail-sync.service                  # fetches and indexes mail (systemd/, `nightmail enable`)
 PUSH_UNIT=nightdrive-mail-push.service                  # runs the sync as soon as mail comes (IMAP IDLE)
-FETCH_LOCK=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/mail-fetch.lock
+FETCH_LOCK=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/mail-fetch.lock
 
 # `qs list` and `qs ipc` only find a Quickshell with the same QT_QPA_PLATFORM as theirs (Hyprland sets it, hyprland.lua).
 # A notification's buttons (lib/notify.py, run by systemd-run) and the sync's service get the user manager's environment,
@@ -107,7 +107,7 @@ fetch() {
 # Claude's reply shows in the desktop's Claude writes card (quickshell/ClaudeWrite.qml, `qs ipc call write ask`), which
 # runs claude-draft for the text and, on Enter, claude-reply to hand it back to Mail. The request (request.json: gen,
 # msgid, account, hint, thread, sent, accept) and the answer stay in a folder only you can read.
-CLAUDE_DIR=${XDG_RUNTIME_DIR:-/tmp}/nightdrive/mail-claude
+CLAUDE_DIR=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/mail-claude
 
 # ask-claude TITLE REQUEST: the card opens in the middle of the window titled TITLE (the writing window)
 ask_claude() {

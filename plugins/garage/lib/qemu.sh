@@ -96,7 +96,7 @@ start() {
   for _ in $(seq 50); do
     if running "$name"; then
       boot_watch "$name"
-      [[ -n ${GARAGE_HEADLESS:-} ]] || setsid -f flock -n "${XDG_RUNTIME_DIR:-/tmp}/nightdrive-garage-resizing.lock" \
+      [[ -n ${GARAGE_HEADLESS:-} ]] || setsid -f flock -n "${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive-garage-resizing.lock" \
         qs -p "$OVERLAY" >/dev/null 2>&1 || true
       return 0
     fi

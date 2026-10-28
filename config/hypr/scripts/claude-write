@@ -25,7 +25,7 @@ set -uo pipefail
 
 readonly SETTINGS="$HOME/.local/state/nightdrive/claude-write.json"
 readonly INSTRUCTIONS="$HOME/.config/nightdrive/claude-write.txt"
-readonly WORK="${XDG_RUNTIME_DIR:-/tmp}/nightdrive/claude-write"
+readonly WORK="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/claude-write"
 readonly TIMEOUT=90           # seconds Claude may take
 readonly RESTORE_DELAY=0.8    # seconds before the clipboard gets its old content back: the app reads it when it pastes
 readonly WINDOW_CHARS=200     # the window's class and title are cut at this length in what Claude gets

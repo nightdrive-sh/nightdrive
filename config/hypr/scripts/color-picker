@@ -1,7 +1,7 @@
 #!/bin/bash
 # color-picker → freezes the screen and opens the Quickshell picker (Picker.qml): magnifier circle next to the cursor,
 # click copies the colour (#rrggbb) to the clipboard, Esc cancels.
-f=${XDG_RUNTIME_DIR:-/tmp}/color-picker.png
+f=${XDG_RUNTIME_DIR:-/run/user/$UID}/color-picker.png
 # Hide the cursor while capturing (otherwise the software cursor ends up in the image and skews the colour)
 hyprctl eval 'hl.config({ cursor = { invisible = true } })' >/dev/null 2>&1; sleep 0.15
 grim "$f"; rc=$?

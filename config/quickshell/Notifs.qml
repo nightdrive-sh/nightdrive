@@ -65,7 +65,7 @@ Singleton {
     Process {
         id: lockCheck
         running: true
-        command: ["sh", "-c", 'r=${XDG_RUNTIME_DIR:-/tmp}; [ -e "$r/nightdrive-session-started" ] && [ ! -e "$r/nightdrive-apps-started" ]']
+        command: ["sh", "-c", 'r=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}; [ -e "$r/nightdrive-session-started" ] && [ ! -e "$r/nightdrive-apps-started" ]']
         onExited: code => { s.locked = code === 0; if (s.locked) lockPoll.start() }
     }
     Timer { id: lockPoll; interval: 500; onTriggered: lockCheck.running = true }

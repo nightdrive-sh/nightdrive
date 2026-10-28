@@ -25,7 +25,7 @@ declare -rA SHOWN_KEYS=(
 in=$(cat)
 event=$(jq -r '.hook_event_name // "Notification"' <<<"$in")
 dir=$(jq -r '.cwd // empty' <<<"$in"); project=${dir##*/}
-state="${XDG_RUNTIME_DIR:-/tmp}/nightdrive/claude-notify"; mkdir -p "$state"
+state="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/claude-notify"; mkdir -p "$state"
 
 # The session's window: up the parents (claude, its shell, the terminal) to a pid Hyprland knows
 clients=$(hyprctl -j clients 2>/dev/null) || clients='[]'

@@ -8,7 +8,7 @@ set -u
 APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
 QS_DIR=$APP_DIR/app
 DECK=$HOME/.local/bin/deck
-RUNTIME=${XDG_RUNTIME_DIR:-/tmp}/deck
+RUNTIME=${XDG_RUNTIME_DIR:-/run/user/$UID}/deck
 DECK_CONFIG=$HOME/.config/deck/config.toml
 SERVE_LOG=$HOME/.cache/deck/serve.log                   # what `deck serve` says before its own log (deck.log) opens
 START_WAIT=50                                           # × 0.2 s for the player to answer

@@ -131,7 +131,7 @@ setup() {
 
 # One notification per connection joined while sshd is on, until it is answered; dismissed, it asks the next time
 watch() {
-  exec 9>"${XDG_RUNTIME_DIR:-/tmp}/remote-login-watch.lock"
+  exec 9>"${XDG_RUNTIME_DIR:-/run/user/$UID}/remote-login-watch.lock"
   flock -n 9 || exit 0
   local line dev uuid name type got
   nmcli monitor 9>&- | while read -r line; do   # 9>&-: a monitor outliving this one mustn't keep the lock

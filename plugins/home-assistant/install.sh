@@ -79,7 +79,7 @@ umask 077
   echo "HA_URLS=\"${urls}\""
   if [[ -n ${ref:-} ]]; then echo "HA_TOKEN_CMD=\"op read '$ref'\""; else echo "HA_TOKEN=$tok"; fi
 } > "$conf"
-rm -f "$HOME/.cache/nightdrive/home-assistant-url" "${XDG_RUNTIME_DIR:-/tmp}/nightdrive-ha-token"
+rm -f "$HOME/.cache/nightdrive/home-assistant-url" "${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive-ha-token"
 echo "  saved $conf"
 
 # The webapp has one address: its login is tied to it. One that works anywhere is the better choice.

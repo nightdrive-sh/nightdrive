@@ -77,7 +77,7 @@ case ${1:-} in
       [[ -n $idx ]] && set_profile "$(jq -r .id <<<"$dev")" "$idx"
     done ;;
   watch)
-    exec 9>"${XDG_RUNTIME_DIR:-/tmp}/bt-mic-watch.lock"
+    exec 9>"${XDG_RUNTIME_DIR:-/run/user/$UID}/bt-mic-watch.lock"
     flock -n 9 || exit 0
     headset() { devices | jq -r '[.[] | select(.active | startswith("headset-head-unit")) | .name] | first // empty'; }
     # Read from a process substitution, not a pipe: the loop runs in this shell, so ending it can stop playerctl, which
@@ -100,7 +100,7 @@ case ${1:-} in
       [[ $(~/.config/topbar/scripts/privacy | jq '.mic | length') == 0 ]] || continue
       # notify-send waits for the answer in the background (without the lock: 9>&-), and is given up once the
       # headphones leave headset mode some other way, so a notification left unanswered doesn't keep this running
-      answer=${XDG_RUNTIME_DIR:-/tmp}/bt-mic-answer
+      answer=${XDG_RUNTIME_DIR:-/run/user/$UID}/bt-mic-answer
       notify-send -a Sound -i lucide:headphones -A music="Switch to music mode" -w "$name: headset mode" \
         "Music sounds plainer in headset mode, which is for the microphone. Music mode sounds better; the microphone goes back to this computer's." \
         >"$answer" 9>&- &

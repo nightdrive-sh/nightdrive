@@ -2,7 +2,7 @@
 # The share window (what to share when an app captures the screen): xdg-desktop-portal-hyprland runs this instead of
 # hyprland-share-picker (hypr/xdph.conf, written by link.sh). It opens Quickshell's SharePicker and prints the choice in
 # xdph's format: [SELECTION]/screen:<output> or [SELECTION]/window:<id>. Nothing printed = cancelled.
-dir="${XDG_RUNTIME_DIR:-/tmp}/nightdrive"
+dir="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive"
 mkdir -p "$dir"
 fifo="$dir/share-picker.$$" list="$dir/share-windows.$$"
 trap 'rm -f "$fifo" "$list"' EXIT

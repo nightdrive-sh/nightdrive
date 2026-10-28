@@ -5,7 +5,7 @@
 # Until you answer the jack plays at most at SAFE; it is also turned down to that on unplugging, so WirePlumber's own
 # restore on the next plug starts quiet too. A re-plug within REPLUG_MIN minutes is taken as the same device: no question.
 # Started by hyprland.lua; listens to PipeWire (pactl subscribe) in the background. One instance only (flock).
-exec 9>"${XDG_RUNTIME_DIR:-/tmp}/jack-volume.lock"
+exec 9>"${XDG_RUNTIME_DIR:-/run/user/$UID}/jack-volume.lock"
 flock -n 9 || exit 0
 SAFE=25          # percent
 REPLUG_MIN=5

@@ -6,7 +6,7 @@
 # So a speaker is turned down to SAFE when it appears and when it becomes the output; raise it from there as you like.
 # The speaker itself hears nothing of this until audio plays to it (raop_sink sends the volume only while it streams).
 # Started by hyprland.lua; listens to PipeWire (pactl subscribe) in the background. One instance only (flock).
-exec 9>"${XDG_RUNTIME_DIR:-/tmp}/airplay-volume.lock"
+exec 9>"${XDG_RUNTIME_DIR:-/run/user/$UID}/airplay-volume.lock"
 flock -n 9 || exit 0
 SAFE=30   # percent: −21 dB on the speaker
 

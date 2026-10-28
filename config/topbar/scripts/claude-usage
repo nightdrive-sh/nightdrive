@@ -5,7 +5,7 @@
 # The token is only read: Claude Code refreshes it whenever it runs. If it has expired, the last data is shown with an error.
 set -uo pipefail
 creds="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
-dir="${XDG_RUNTIME_DIR:-/tmp}/nightdrive"
+dir="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive"
 cache="$dir/claude-usage.json"
 mkdir -p "$dir"
 
