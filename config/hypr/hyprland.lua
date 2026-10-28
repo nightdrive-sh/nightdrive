@@ -239,6 +239,7 @@ function NightdriveLocked()
     hl.exec_cmd("sh -c '[ -S \"$XDG_RUNTIME_DIR/pipewire-0\" ] && exec easyeffects --service-mode -w'")
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/bt-audio-follow")   -- Bluetooth headphones become the output when they connect
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/jack-volume")   -- headphones or speakers in the jack: a volume for each, starts quiet
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/airplay-volume")   -- AirPlay speakers start at most at 30 %: their volume is the speaker's own
     hl.exec_cmd("playerctld daemon")   -- remembers which player played last, for the media keys (hypr/scripts/media)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/headphones-ctl")   -- Sony / AirPods: listening mode in the headphones menu, AirPods ear detection
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/remote-login watch")   -- Remote login on: a network joined for the first time asks whether to allow it
