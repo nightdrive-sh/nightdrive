@@ -1,0 +1,37 @@
+{
+  "tools": [
+    {
+      "name": "contacts_find",
+      "title": "Find contacts",
+      "description": "Searches the user's contacts (Nightdrive Contacts: iCloud, Google and CardDAV address books, one person's cards in several accounts as one) and returns each match's id, name, company, title, email addresses and phone numbers. Every word must match a name, nickname, company, title, email address, number or street address; a number matches without its spaces or leading 0 (040 123 finds +358 40 123). count is how many matched, people at most limit of them. Use it to find someone's address or number, then contacts_card with the id for the whole card.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "title": "Search", "description": "Words to look for, e.g. a name, a company or part of a number"},
+          "limit": {"type": "integer", "title": "At most", "description": "How many people to return (default 25)", "minimum": 1}
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "command": ["contacts", "find", "--json", ["--limit", "{limit}"], "{query}"],
+      "class": "read",
+      "area": "contacts"
+    },
+    {
+      "name": "contacts_card",
+      "title": "Contact card",
+      "description": "One person's whole card from the user's contacts: name, company, title, nickname, email addresses, phone numbers, street addresses, web addresses, birthday (YYYY-MM-DD, or --MM-DD without the year), note, and the accounts and card ids it comes from. who is an id from contacts_find, an email address or a phone number. An error says when no one matches.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "who": {"type": "string", "title": "Who", "description": "A card's id (from contacts_find), an email address or a phone number"}
+        },
+        "required": ["who"],
+        "additionalProperties": false
+      },
+      "command": ["contacts", "card", "--json", "{who}"],
+      "class": "read",
+      "area": "contacts"
+    }
+  ]
+}

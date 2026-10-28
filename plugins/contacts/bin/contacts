@@ -110,6 +110,8 @@ Usage: contacts [command]
   new [NAME] [EMAIL]
                  a new contact in the editor, with these filled in (Mail's Add to contacts)
   people         everyone as JSON (name, emails, numbers, addresses), for Mail and the launcher
+  find QUERY     the people a search finds, without the window (--json; --limit N, 25 by default)
+  card WHO       WHO's whole card, without the window: an id (as \`find\` gives it), an email address or a number (--json)
   settings       open Contacts' settings (launcher › Settings › Apps › Contacts)
   setup          set up an account with Claude, in a terminal
   sync [NAME…]   sync the contacts of every account (or these) now, both ways
@@ -131,6 +133,7 @@ case ${1:-open} in
   show)      open_ready; ipc card "${2:-}" ;;   # not "show": qs ipc takes that for its own command
   new)       open_ready; ipc createWith "${2:-}" "${3:-}" ;;
   people)    python3 "$APP_DIR/lib/cards.py" people ;;
+  find|card) python3 "$APP_DIR/lib/lookup.py" "$@" ;;
   sync)      sync_now "${@:2}"; status=$?; running && ipc refresh; exit $status ;;
   accounts)  list_accounts ;;
   setup)     setup ;;

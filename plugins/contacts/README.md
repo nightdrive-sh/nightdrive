@@ -89,6 +89,8 @@ Google's CardDAV with an app password works, but Google's own documentation asks
 | `contacts new [NAME] [EMAIL]` | A new contact in the editor, with these filled in |
 | `contacts settings` | Opens the settings: the accounts, Sync now, Add an account |
 | `contacts people` | Everyone as JSON (names, numbers, email and street addresses), as Mail and the Launcher read them |
+| `contacts find QUERY` | The people a search finds, without the window (`--json`; `--limit N`, 25 by default) |
+| `contacts card WHO` | WHO's whole card, without the window: a card's id (as `find` gives it), an email address or a number (`--json`) |
 | `contacts setup` | Sets up an account with Claude, in a terminal |
 | `contacts sync [NAME…]` | Syncs every account's contacts both ways now (or these accounts'), then fetches iCloud's new photos |
 | `contacts accounts` | The accounts and how many contacts each has here |
