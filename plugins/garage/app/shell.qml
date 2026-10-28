@@ -131,6 +131,7 @@ ShellRoot {
                     else if (!v) return
                     else if (e.text === "s") page.start()
                     else if (e.text === "d") page.display()
+                    else if (e.text === "p") page.pauseResume()
                     else if (e.text === "x") page.shutDown()
                     else if (e.text === "X") page.forceOff()
                     else if (e.text === "t") page.takeSnapshot()

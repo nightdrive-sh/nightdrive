@@ -7,12 +7,13 @@
 #   running   qemu runs and nothing else is going on
 #   stopping  a shutdown was asked for (garage-ctl stop), until qemu has gone; "slow" past STOP_WAIT, when the window
 #             offers Force off. A shutdown from inside the guest isn't seen: it is running until qemu has gone
+#   paused    its CPUs stopped (garage-ctl pause, QMP's stop), its memory still taken, until resume (lib/qemu.sh)
 #
 # What isn't simply qemu running or not is kept in the VM's folder, in its file "state": one line, the state and since
-# when (epoch seconds), and for stopping "acpi" when it went to the power button (the guest has no agent). It is
-# written under state.lock, as bootwait.py clears "booting" while garage-ctl may write "stopping". Without qemu the
-# file means nothing: start writes it anew, and list's reading of it ignores it.
-# (A paused VM, #1604, would be one more line here: "paused SINCE", written by pause and cleared by resume.)
+# when (epoch seconds), and for stopping "acpi" when it went to the power button (the guest has no agent), for paused
+# "booting" when it was paused before its guest was up (resume watches its boot again then). It is written under
+# state.lock, as bootwait.py clears "booting" while garage-ctl may write "stopping" or "paused". Without qemu the file
+# means nothing: start writes it anew, and list's reading of it ignores it.
 
 BOOT_WAIT=120    # seconds a guest has to answer before it counts as up anyway
 STOP_WAIT=60     # seconds before a shutdown that hasn't happened is "slow" (Force off then)
@@ -38,6 +39,7 @@ vm_state() {
     # A boot past its wait is up, if bootwait.py has gone (killed) without saying so
     booting)  ((age < BOOT_WAIT)) && echo "booting false false" || echo "running false false" ;;
     stopping) echo "stopping $( ((age >= STOP_WAIT)) && echo true || echo false) $([[ $extra == acpi ]] && echo true || echo false)" ;;
+    paused)   echo "paused false false" ;;
     *)        echo "running false false" ;;
   esac
 }

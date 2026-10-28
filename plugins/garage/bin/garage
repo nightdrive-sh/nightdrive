@@ -1,10 +1,10 @@
 #!/bin/bash
-# garage [open | start|stop|kill|display|hide [NAME] | ssh [NAME [COMMAND…]] | list | install | uninstall | restart | quit | log |
+# garage [open | start|stop|kill|pause|resume|display|hide [NAME] | ssh [NAME [COMMAND…]] | list | install | uninstall | restart | quit | log |
 # GARAGE-CTL-COMMAND …]: Garage, the window of virtual machines (app/, a Quickshell config of its own), and its VMs from
-# the terminal. Without a NAME, start, stop, kill, display, hide and ssh take the only VM there is. ssh is `ssh NAME`, through
-# the Host block garage-ctl keeps in ~/.ssh/config.d/garage. install puts Garage among the desktop's apps, uninstall
-# takes it out (the VMs and qemu stay). Anything else goes to garage-ctl as such (create, snapshot, restore, delete…:
-# `garage help` lists them).
+# the terminal. Without a NAME, start, stop, kill, pause, resume, display, hide and ssh take the only VM there is. ssh
+# is `ssh NAME`, through the Host block garage-ctl keeps in ~/.ssh/config.d/garage. install puts Garage among the
+# desktop's apps, uninstall takes it out (the VMs and qemu stay). Anything else goes to garage-ctl as such (create,
+# snapshot, restore, delete…: `garage help` lists them).
 set -u
 
 APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
@@ -61,7 +61,7 @@ list() {
 }
 
 case ${1:-open} in
-  start|stop|kill|display|hide)
+  start|stop|kill|pause|resume|display|hide)
     name=$(vm_name "${2:-}") || exit 1
     exec "$GARAGE_CTL" "$1" "$name" ;;
   ssh)

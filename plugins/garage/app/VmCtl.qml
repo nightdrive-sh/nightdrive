@@ -14,9 +14,10 @@ QtObject {
 
     function refresh() { if (!lister.running) lister.running = true }
 
-    // Each VM's state is garage-ctl's (lib/state.sh): stopped, booting, running or stopping (slow: for long, and the page
-    // offers Force off). Between a click and the list showing it, pending stands for it, by name: { what: "booting" |
-    // "stopping" | "stopped", since }, until the list has caught up, the call fails or pendingWait has passed.
+    // Each VM's state is garage-ctl's (lib/state.sh): stopped, booting, running, stopping (slow: for long, and the page
+    // offers Force off) or paused. Between a click and the list showing it, pending stands for it, by name: { what:
+    // "booting" | "stopping" | "stopped" | "paused" | "running", since }, until the list has caught up, the call fails or
+    // pendingWait has passed.
     readonly property int pendingWait: 30000
     property var pending: ({})
     function setPending(name, what) {
@@ -29,8 +30,9 @@ QtObject {
         const p = pending[v.name]
         return p ? p.what : v.state || (v.running ? "running" : "stopped")
     }
+    readonly property var pendingOf: ({ start: "booting", stop: "stopping", kill: "stopped", pause: "paused", resume: "running" })
     function power(action, name) {
-        setPending(name, action === "start" ? "booting" : action === "stop" ? "stopping" : "stopped")
+        setPending(name, pendingOf[action])
         run([action, name], null, () => setPending(name, ""))
     }
     function settle() {
@@ -38,6 +40,8 @@ QtObject {
             const v = vms.find(x => x.name === name), p = pending[name], st = v ? v.state : "stopped"
             const there = p.what === "booting" ? st !== "stopped"
                         : p.what === "stopping" ? st === "stopping" || st === "stopped"
+                        : p.what === "paused" ? st === "paused" || st === "stopped"
+                        : p.what === "running" ? st !== "paused"
                         : st === "stopped"
             if (there || Date.now() - p.since > pendingWait) setPending(name, "")
         }
@@ -54,12 +58,13 @@ QtObject {
     property var slowSaid: ({})
 
     // After the host has slept, the running VMs' clocks are behind by as long: a tick much later than the last one says
-    // so, and their guest agents set them (garage-ctl synctime: quiet without one)
+    // so, and their guest agents set them (garage-ctl synctime: quiet without one). A paused one's agent can't answer:
+    // resume sets its clock
     property real lastTick: 0
     function tick() {
         const now = Date.now()
         if (lastTick && now - lastTick > 30000)
-            for (const v of vms) if (v.running) run(["synctime", v.name])
+            for (const v of vms) if (v.running && v.state !== "paused") run(["synctime", v.name])
         lastTick = now
         refresh()
     }

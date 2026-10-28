@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import qs.kit
 
 // The sidebar: the VMs, a running one with a dot in the theme's colour (fading in and out while it boots or shuts
-// down), then a disk image on its way ("Fedora 44 Minimal 43 %") and the new VMs waiting for it, and New machine at
+// down; a paused one says so instead), then a disk image on its way ("Fedora 44 Minimal 43 %") and the new VMs waiting for it, and New machine at
 // the foot. In a narrow window it takes the whole width while it shows (shell.qml's onePane), and picking a VM shows
 // its page.
 AppSidebar {
@@ -26,8 +26,8 @@ AppSidebar {
             c: root.c
             glyph: "monitor"
             label: modelData.name
-            count: vmState !== "stopped" ? "●" : ""
-            countColor: root.c.primary
+            count: vmState === "paused" ? "paused" : vmState !== "stopped" ? "●" : ""
+            countColor: vmState === "paused" ? root.c.faint : root.c.primary
             selected: root.current === modelData.name
             active: root.active
             onClicked: root.picked(modelData.name)
@@ -37,7 +37,7 @@ AppSidebar {
                 loops: Animation.Infinite
                 ColorAnimation { to: root.c.faint; duration: 600; easing.type: Easing.InOutQuad }
                 ColorAnimation { to: root.c.primary; duration: 600; easing.type: Easing.InOutQuad }
-                onRunningChanged: if (!running) vmRow.countColor = Qt.binding(() => root.c.primary)
+                onRunningChanged: if (!running) vmRow.countColor = Qt.binding(() => vmRow.vmState === "paused" ? root.c.faint : root.c.primary)
             }
         }
     }

@@ -28,13 +28,19 @@ Item {
     readonly property bool stopping: vmState === "stopping"
     readonly property bool slow: stopping && !!vm.slow && !ctl.pending[vm.name]
     readonly property bool stopped: !!vm && vmState === "stopped"
+    readonly property bool paused: vmState === "paused"
 
-    // What the buttons and the keys do (shell.qml's s, d, x, ⇧X)
+    // What the buttons and the keys do (shell.qml's s, d, p, x, ⇧X)
     function act(args) { root.ctl.run(args) }
     function start() { if (root.stopped) root.ctl.power("start", root.vm.name) }
     // d toggles: a window that shows goes out of sight with the VM running on (garage-ctl hide), else it comes forward
     readonly property bool shown: running && !!vm.shown
     function display() { if (root.running) root.act([root.shown ? "hide" : "display", root.vm.name]) }
+    // p toggles: a paused VM's CPUs stand still (its memory stays taken) until it resumes; not while it shuts down
+    function pauseResume() {
+        if (root.paused) root.ctl.power("resume", root.vm.name)
+        else if (root.running && !root.stopping) root.ctl.power("pause", root.vm.name)
+    }
     function shutDown() { if (root.running && (!root.stopping || root.slow)) root.ctl.power("stop", root.vm.name) }
     function forceOff() { if (root.running) root.ctl.power("kill", root.vm.name) }
     function takeSnapshot() { snapshots.take() }
@@ -124,10 +130,17 @@ Item {
                 }
                 AppButton {
                     c: root.c; glyph: root.shown ? "monitor-off" : "monitor"; label: root.shown ? "Hide display" : "Show display"
-                    strong: !root.stopping; keys: "d"; tipAlign: "left"
+                    strong: !root.stopping && !root.paused; keys: "d"; tipAlign: "left"
                     tip: root.shown ? "Out of sight, the VM running on" : "Bring its window forward"
                     visible: root.running
                     onClicked: root.display()
+                }
+                AppButton {
+                    c: root.c; glyph: root.paused ? "play" : "pause"; label: root.paused ? "Resume" : "Pause"
+                    strong: root.paused; keys: "p"; tipAlign: "left"
+                    tip: root.paused ? "Go on where it stopped" : "Stop its CPUs where they are"
+                    visible: root.running && !root.stopping
+                    onClicked: root.pauseResume()
                 }
                 AppButton {
                     c: root.c; glyph: "power"; label: root.slow ? "Ask again" : "Shut down"; keys: "x"; tipAlign: "left"

@@ -15,6 +15,7 @@ QtObject {
         { title: "Power", keys: [
             ["s", "Start"],
             ["d", "Bring its display forward, or hide it while it shows"],
+            ["p", "Pause, or resume"],
             ["x", "Shut down"],
             ["⇧X", "Force off: pull the plug"]] },
         { title: "Snapshots", keys: [

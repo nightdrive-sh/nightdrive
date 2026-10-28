@@ -114,6 +114,8 @@ start() {
 # stopping, acpi), and "acpi" is printed then, so the window can say why, if it doesn't go down
 stop() {
   need "$1"; running "$1" || return 0
+  # Paused, the guest agent can't answer and the power button does nothing: it goes on first
+  [[ $(vm_state "$1") == paused* ]] && qmp "$1" cont >/dev/null
   # The agent answering means the first boot's scripts have run (lib/firstboot.sh): their credentials can go
   if qga "$1" guest-shutdown '{"mode": "powerdown"}' >/dev/null 2>&1; then
     state_set "$1" stopping; rm -rf "$(dir "$1")/firstboot"; return 0
@@ -130,10 +132,38 @@ force_off() {
   state_set "$1" ""
 }
 
+# Pause: its CPUs stop where they are (QMP's stop), its memory stays taken; resume goes on from there. Not while it
+# shuts down, as the guest is past the point where going on later means anything. Saving its state to the disk
+# (savevm) would free the memory too, but the virgl GPU doesn't allow it
+pause() {
+  need "$1"; running "$1" || die "$1 isn't running"
+  local st; read -r st _ < <(vm_state "$1")
+  case $st in
+    paused)   return 0 ;;
+    stopping) die "$1 is shutting down" ;;
+  esac
+  qmp "$1" stop >/dev/null
+  # One paused while it boots is booting again on resume ("booting": bootwait.py stops watching meanwhile)
+  state_set "$1" paused "$([[ $st == booting ]] && echo booting)"
+}
+
+# Resume: its clock stood still meanwhile, so it is set (synctime), once the state says it runs: without a guest agent
+# that takes a few seconds, and the window shouldn't show it paused for those
+resume() {
+  need "$1"; running "$1" || return 0
+  local what="" extra=""
+  read -r what _ extra 2>/dev/null < "$(dir "$1")/state" || true
+  qmp "$1" cont >/dev/null
+  if [[ $what == paused && $extra == booting ]]; then boot_watch "$1"; else state_set "$1" ""; fi
+  synctime "$1" || true
+}
+
 # The guest's clock to the host's, through its agent: after the host has slept, the guest's clock is behind by as
-# long. Quiet without an agent (nothing to do then), as the window asks for it on its own
+# long. Quiet without an agent (nothing to do then), as the window asks for it on its own; and while it is paused, as
+# its agent can't answer then (resume sets it)
 synctime() {
   need "$1"; running "$1" || return 0
+  [[ $(vm_state "$1") == paused* ]] && return 0
   local rc=0
   qga "$1" guest-set-time "{\"time\": $(date +%s%N)}" >/dev/null 2>&1 || rc=$?
   ((rc == 0 || rc == 3)) || [[ ! -S $(dir "$1")/qga.sock ]] || die "$1: its clock wasn't set"

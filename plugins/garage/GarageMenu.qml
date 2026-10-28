@@ -5,9 +5,9 @@ import qs
 
 // Garage: the VMs and their state (bin/garage-ctl list, refreshed while the menu is open; the states are lib/state.sh's).
 // A click on a stopped VM starts it, on a running or booting one brings its display forward; a running VM's row ends in
-// two icons, its display shown or hidden (garage-ctl hide: the VM runs on) and Shut down. One booting up or shutting down
-// says so beside pulsing dots, and a shutdown that doesn't happen (slow) gets Force off. Open Garage opens the window,
-// for the rest (new VMs, snapshots, settings).
+// three icons, its display shown or hidden (garage-ctl hide: the VM runs on), Pause (Resume once paused, beside the word)
+// and Shut down. One booting up or shutting down says so beside pulsing dots, and a shutdown that doesn't happen (slow)
+// gets Force off. Open Garage opens the window, for the rest (new VMs, snapshots, settings).
 Column {
     id: m
     width: parent ? parent.width : 320
@@ -20,7 +20,8 @@ Column {
     property var vms: []
     property bool loaded: false
     property string error: ""
-    // Between a click and the list showing it, by name: { what: "booting" | "stopping", since } (as the window's VmCtl)
+    // Between a click and the list showing it, by name: { what: "booting" | "stopping" | "paused" | "running", since }
+    // (as the window's VmCtl)
     property var pending: ({})
     readonly property int running: vms.filter(v => v.running).length
     function stateOf(v) {
@@ -37,14 +38,18 @@ Column {
     function settle() {
         for (const name in pending) {
             const v = vms.find(x => x.name === name), p = pending[name], st = v ? v.state : "stopped"
-            const there = p.what === "booting" ? st !== "stopped" : st === "stopping" || st === "stopped"
+            const there = p.what === "booting" ? st !== "stopped"
+                        : p.what === "paused" ? st === "paused" || st === "stopped"
+                        : p.what === "running" ? st !== "paused"
+                        : st === "stopping" || st === "stopped"
             if (there || Date.now() - p.since > pendingWait) setPending(name, "")
         }
     }
     // garage-ctl's error, if it fails, shows under the header. Its arguments as such, no shell between: a VM's name is a
     // folder's, which garage-ctl checks, but only once it runs
     function act(action, name) {
-        if (action === "start" || action === "stop") setPending(name, action === "start" ? "booting" : "stopping")
+        const what = { start: "booting", stop: "stopping", pause: "paused", resume: "running" }[action]
+        if (what) setPending(name, what)
         m.error = ""
         const job = runner.createObject(m, { command: [m.ctl, action, name] })
         job.exited.connect(code => {
@@ -113,7 +118,8 @@ Column {
                 id: vm
                 required property var modelData
                 readonly property string st: m.stateOf(modelData)
-                readonly property bool on: st === "running"                    // its icons show
+                readonly property bool paused: st === "paused"
+                readonly property bool on: st === "running" || paused         // its icons show
                 readonly property bool slow: st === "stopping" && !!modelData.slow && !m.pending[modelData.name]
                 readonly property bool busy: (st === "booting" || st === "stopping") && !slow
                 width: m.width
@@ -121,7 +127,7 @@ Column {
                 MenuRow {
                     id: row
                     width: parent.width
-                    icon: vm.st !== "stopped" ? "monitor-play" : "monitor"
+                    icon: vm.paused ? "monitor-pause" : vm.st !== "stopped" ? "monitor-play" : "monitor"
                     label: vm.modelData.name
                     detail: vm.st === "stopped" ? "Stopped" : ""
                     active: vm.st !== "stopped"
@@ -155,10 +161,19 @@ Column {
                     visible: vm.on
                     anchors { right: parent.right; rightMargin: 4; verticalCenter: parent.verticalCenter }
                     spacing: 2
+                    Text {
+                        visible: vm.paused
+                        anchors.verticalCenter: parent.verticalCenter
+                        rightPadding: 6
+                        text: "Paused"
+                        color: Theme.dim
+                        font { family: Theme.font; pixelSize: 11 }
+                    }
                     Repeater {
                         model: [
                             { glyph: vm.modelData.shown ? "monitor-off" : "app-window",
                               action: vm.modelData.shown ? "hide" : "display" },
+                            { glyph: vm.paused ? "play" : "pause", action: vm.paused ? "resume" : "pause" },
                             { glyph: "power", action: "stop" }
                         ]
                         delegate: MenuGlyph {

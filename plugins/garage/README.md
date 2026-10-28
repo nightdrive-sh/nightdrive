@@ -11,6 +11,7 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 | ⌘N | New VM |
 | `s` | Start |
 | `d` | Show its display, or bring it to this workspace |
+| `p` | Pause, or resume |
 | `x` | Shut down |
 | ⇧X | Pull the plug |
 | `t` | Take a snapshot (VM stopped) |
@@ -23,6 +24,7 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 - A ready-made image (Fedora 44 Minimal on a Mac, Cloud Base on a PC) needs no installer: its first boot makes your user, with sudo and your ssh key. Or pick an ISO from Downloads (or ~/vm).
 - The top bar's garage icon lights up while a VM runs, and blinks while one boots or shuts down; a click lists your VMs to start or show.
 - A VM is *Booting up* until its guest agent or sshd answers (at most two minutes), and *Shutting down* until qemu has gone. A shutdown that hasn't happened in a minute offers Force off.
+- A paused VM frees its CPUs but keeps its memory. Resume sets its clock (with qemu-guest-agent in it); snapshots and settings still need it shut down.
 - Nightdrive in a VM follows its window's size, as in UTM and Parallels, at scale 2 until you pick another in its Settings › Display.
 - A snapshot's duplicate shares its space on the disk. Beside each snapshot is the space it alone keeps.
 - `ssh NAME` reaches a running VM: each has a port of its own, kept in ~/.ssh/config.d/garage (Garage adds `Include config.d/garage` to ~/.ssh/config).
@@ -35,7 +37,7 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 | --- | --- |
 | `garage` | Opens Garage, or brings it forward |
 | `garage list` | The VMs, one line each |
-| `garage start`, `stop`, `kill`, `display`, `hide [NAME]` | A VM by its name, or the only one there is |
+| `garage start`, `stop`, `kill`, `pause`, `resume`, `display`, `hide [NAME]` | A VM by its name, or the only one there is |
 | `garage ssh [NAME]` | `ssh NAME`: a shell in it, or a command after its name |
 | `garage rename-vm NAME NEWNAME` | A new name for a stopped VM, its ssh name too |
 | `garage set NAME user USER`, `port N` | Its ssh user, or another port (if something else has its own) |

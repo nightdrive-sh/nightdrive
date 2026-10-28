@@ -8,12 +8,12 @@
 #   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
 #   snapsizes.json  what each snapshot keeps on its own, in bytes, as of the disk's mtime (lib/snapsize.py)
 #   qmp.sock, qga.sock, pid, serial.log while it runs (qemu's monitor, the guest agent's channel)
-#   state, state.lock  booting or stopping, since when (lib/state.sh)
+#   state, state.lock  booting, stopping or paused, since when (lib/state.sh)
 #   firstboot/   a disk image's first boot: its user, until it has run (lib/firstboot.sh)
 # What differs between an Asahi Mac and a PC is lib/arch.sh's; qemu itself, its command line and its sockets, are
 # lib/qemu.sh's; the ready-made images are lib/images.sh's.
 #
-#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running (qemu is), state (lib/state.sh: stopped, booting, running, stopping), slow (stopping for long), acpi (stopping by the power button), shown (its window on a workspace that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
+#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running (qemu is), state (lib/state.sh: stopped, booting, running, stopping, paused), slow (stopping for long), acpi (stopping by the power button), shown (its window on a workspace that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
 #   garage-ctl states                        NAME STATE a line, cheaply (the top bar's icon)
 #   garage-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   garage-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
@@ -21,6 +21,7 @@
 #   garage-ctl create-image NAME ID MEM_GB DISK_GB CPUS USER     a VM from one, with USER (the password on stdin)
 #   garage-ctl start|stop|kill|display|hide|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power
 #                                            button; hide: its window out of sight (special:bg), the VM running on
+#   garage-ctl pause|resume NAME             its CPUs stopped where they are (its memory stays taken), and going on
 #   garage-ctl set NAME mem GB | cpus N | disk GB | iso PATH | port N | user USER     while it is stopped (user: any
 #                                            time, "" for none); the disk only grows, iso "" ejects
 #   garage-ctl rename-vm NAME NEWNAME        while it is stopped: its folder, and its ssh name (lib/ssh.sh)
@@ -267,6 +268,8 @@ case ${1:-} in
   start)    start "$2" ;;
   stop)     stop "$2" ;;
   kill)     force_off "$2" ;;
+  pause)    pause "$2" ;;
+  resume)   resume "$2" ;;
   synctime) synctime "$2" ;;
   display)  display "$2" ;;
   hide)     hide "$2" ;;

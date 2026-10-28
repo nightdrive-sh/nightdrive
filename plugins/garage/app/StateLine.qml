@@ -1,7 +1,7 @@
 import QtQuick
 
 // A VM's state as the page's header says it (VmCtl.stateOf): a dot and a word, the dot in the theme's colour while it
-// runs, and pulsing while it boots or shuts down, as the sidebar's does.
+// runs (dim while it is paused), and pulsing while it boots or shuts down, as the sidebar's does.
 Row {
     id: root
     required property QtObject c
@@ -14,7 +14,7 @@ Row {
         id: dot
         anchors.verticalCenter: parent.verticalCenter
         text: root.vmState === "stopped" ? "○" : "●"
-        color: root.vmState === "stopped" ? root.c.dim : root.c.primary
+        color: root.vmState === "stopped" || root.vmState === "paused" ? root.c.dim : root.c.primary
         font.family: root.c.font; font.pixelSize: 12
         SequentialAnimation on opacity {
             running: root.busy
@@ -28,7 +28,7 @@ Row {
         anchors.verticalCenter: parent.verticalCenter
         text: root.vmState === "booting" ? "Booting up…"
             : root.vmState === "stopping" ? (root.slow ? "Not shutting down" : "Shutting down…")
-            : root.vmState === "running" ? "Running" : "Stopped"
+            : root.vmState === "running" ? "Running" : root.vmState === "paused" ? "Paused" : "Stopped"
         color: root.vmState === "running" ? root.c.primary : root.c.dim
         font.family: root.c.font; font.pixelSize: 12
     }
