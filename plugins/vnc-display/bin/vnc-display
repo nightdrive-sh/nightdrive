@@ -2,14 +2,15 @@
 # VNC Display (plugins/vnc-display): an iPad or iPhone as a screen of its own, shown in a VNC app on the device.
 #
 #   vnc-display add DEVICE [NAME] [--home] [--beside|--away]
-#                                  a new screen for a device, with a password of its own; it stays on, also after a login
+#                                  a new screen for a device, with a password of its own: there while the device is
+#                                  connected, listening for it also after a login
 #   vnc-display show NAME [--json] how to connect: the addresses, the user name and the password
 #   vnc-display qr NAME            the connection as a QR code (an SVG file, its path printed) for the device's camera
 #   vnc-display network            the network the computer is on now, which --home would add
-#   vnc-display list [--json]      the devices: size, workspace, on or off, port
+#   vnc-display list [--json]      the devices: size, workspace, on or off, connected, port
 #   vnc-display workspace NAME N   its workspace, 2–9; a device that has N takes this one's
 #   vnc-display place NAME PLACE   where its screen is: right, left, above or below your screens, or away (out of reach)
-#   vnc-display on|off NAME        the screen on, or off (gone, nothing listening) while the device keeps its password
+#   vnc-display on|off NAME        listening for the device, or off (nothing listening) while it keeps its password
 #   vnc-display remove NAME        forgets the device: its screen, its password
 #   vnc-display run NAME           the screen itself (nightdrive-vnc-display@NAME.service, lib/serve.py)
 #
@@ -50,6 +51,8 @@ tailscale_name() {
 }
 # The address a device connects to over Tailscale: the name, or the IP without MagicDNS
 tailscale_host() { local n; n=$(tailscale_name "${1:-}"); if [[ -n $n ]]; then echo "$n"; else tailscale_ip; fi; }
+# A device is connected while its display is there: lib/serve.py makes it as one connects, removes it once none is
+connected() { hyprctl -j monitors all 2>/dev/null | jq -e --arg o "$(output_of "$1")" 'any(.[]; .name == $o)' >/dev/null; }
 # The device's line in the state file: <output> <mode> <scale> <place> <workspace>
 state_line() { [[ -f $state ]] && awk -v o="$(output_of "$1")" '$1 == o' "$state" | head -1; }
 
@@ -174,7 +177,8 @@ cmd_show() {
   [[ ${2:-} == --json ]] && { show_json "$1"; return; }
   local n=$1 ts home port
   ts=$(tailscale_host) port=$(get "$n" port)
-  if systemctl --user -q is-active "$(unit "$n")"; then echo "$n is on, workspace $(state_line "$n" | awk '{ print $5 }')."
+  if systemctl --user -q is-active "$(unit "$n")"; then
+    echo "$n is on, workspace $(state_line "$n" | awk '{ print $5 }'): $(connected "$n" && echo connected || echo "its display comes when it connects")."
   else echo "$n is off: vnc-display on $n"; fi
   echo
   echo "In the VNC app on the device, add a connection:"
@@ -189,12 +193,13 @@ cmd_show() {
 
 # For the launcher (VncDisplayLevels.qml): what show prints, the password too
 show_json() {
-  local n=$1 on=false
+  local n=$1 on=false conn=false
   systemctl --user -q is-active "$(unit "$n")" && on=true
-  jq -n --arg name "$n" --argjson on "$on" --arg ws "$(state_line "$n" | awk '{ print $5 }')" --arg host "$(tailscale_host)" \
+  connected "$n" && conn=true
+  jq -n --arg name "$n" --argjson on "$on" --argjson connected "$conn" --arg ws "$(state_line "$n" | awk '{ print $5 }')" --arg host "$(tailscale_host)" \
     --arg ip "$(tailscale_ip)" --arg home "$(home_ip "$(get "$n" home)")" --arg home_name "$(get "$n" home_name)" \
     --arg port "$(get "$n" port)" --arg password "$(get "$n" password)" \
-    '{name: $name, on: $on, workspace: ($ws | tonumber? // null), tailscale: $host, tailscale_ip: $ip, port: ($port | tonumber),
+    '{name: $name, on: $on, connected: $connected, workspace: ($ws | tonumber? // null), tailscale: $host, tailscale_ip: $ip, port: ($port | tonumber),
       home: (if $home == "" then null else $home end), home_name: (if $home_name == "" then null else $home_name end),
       username: $name, password: $password}'
 }
@@ -214,27 +219,28 @@ cmd_qr() {
 }
 
 cmd_list() {
-  local n line on ts mode scale place ws json=0 first=1
+  local n line on conn ts mode scale place ws json=0 first=1
   [[ ${1:-} == --json ]] && json=1
   ts=$(tailscale_host)
   ((json)) && printf '['
   for n in $(names); do
     line=$(state_line "$n")
     systemctl --user -q is-active "$(unit "$n")" && on=true || on=false
+    connected "$n" && conn=true || conn=false
     read -r _ mode scale place ws <<<"$line"
     if ((json)); then
       ((first)) || printf ','
       first=0
       jq -cn --arg name "$n" --arg output "$(output_of "$n")" --arg size "${mode%@*}" --arg scale "$scale" \
-        --arg place "$place" --arg ws "$ws" --arg port "$(get "$n" port)" --argjson on "$on" --arg ts "$ts" \
+        --arg place "$place" --arg ws "$ws" --arg port "$(get "$n" port)" --argjson on "$on" --argjson connected "$conn" --arg ts "$ts" \
         --arg home "$(get "$n" home_name)" \
         '{name: $name, output: $output, size: $size, scale: ($scale | tonumber? // null), place: $place,
-          workspace: ($ws | tonumber? // null), port: ($port | tonumber), on: $on, tailscale: $ts,
+          workspace: ($ws | tonumber? // null), port: ($port | tonumber), on: $on, connected: $connected, tailscale: $ts,
           home: (if $home == "" then null else $home end)}' | tr -d '\n'
     else
       first=0
-      printf '%-12s %-10s ×%-4s %-7s ⌘%-2s %-4s %s\n' "$n" "${mode%@*}" "$scale" "$place" "$ws" \
-        "$([[ $on == true ]] && echo on || echo off)" "${ts:-tailscale off}:$(get "$n" port)$(
+      printf '%-12s %-10s ×%-4s %-7s ⌘%-2s %-9s %s\n' "$n" "${mode%@*}" "$scale" "$place" "$ws" \
+        "$([[ $conn == true ]] && echo connected || { [[ $on == true ]] && echo on || echo off; })" "${ts:-tailscale off}:$(get "$n" port)$(
           [[ -n $(get "$n" home_name) ]] && echo ", at home on $(get "$n" home_name)")"
     fi
   done
@@ -312,10 +318,10 @@ case ${1:-} in
   network) current_network | cut -f2 ;;
   list) cmd_list "${2:-}" ;;
   on) known "${2:-}"; turn on "$2"; cmd_show "$2" ;;
-  off) known "${2:-}"; turn off "$2"; echo "$2 is off: its display is gone and nothing listens for it (vnc-display on $2)." ;;
+  off) known "${2:-}"; turn off "$2"; echo "$2 is off: nothing listens for it (vnc-display on $2)." ;;
   workspace) cmd_workspace "${2:-}" "${3:-}" ;;
   place) cmd_place "${2:-}" "${3:-}" ;;
   remove) cmd_remove "${2:-}" ;;
   run) known "${2:-}"; exec python3 "$here/lib/serve.py" "$2" ;;
-  *) sed -n '4,14s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
+  *) sed -n '4,15s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
 esac

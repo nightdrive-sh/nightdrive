@@ -43,12 +43,14 @@ Item {
     function phone(d) { const m = String(d.size || "").match(/^(\d+)x(\d+)/); return m !== null && +m[1] < +m[2] }
     function addr(host, port) { return host + ":" + port }
 
-    // Settings › Other displays, with AirPlay's (DisplayLevels.qml asks every plugin's file for displayRows); `active`: on
+    // Settings › Other displays, with AirPlay's (DisplayLevels.qml asks every plugin's file for displayRows); `active`: on.
+    // On, the display is there only while the device is connected (lib/serve.py): until then it waits for it
     function displayRows() {
         const r = []
         for (const d of devices)
             r.push({ kind: "vncopen", dev: d.name, name: label(d.name), glyph: phone(d) ? "smartphone" : "tablet",
-                     summary: d.on ? "on · workspace " + d.workspace : "off", active: d.on })
+                     summary: !d.on ? "off" : d.connected ? "connected · workspace " + d.workspace : "on · waiting for the device",
+                     active: d.on })
         r.push({ kind: "nav", name: "Add a display", glyph: "plus", target: "vncadd",
                  summary: devices.length === 0 ? "an iPad, iPhone or any device with a VNC app" : undefined })
         return r

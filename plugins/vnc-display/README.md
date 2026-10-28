@@ -12,7 +12,7 @@ Add the device in Settings › Other displays › Add a display: an iPad or iPho
 
 - The first display gets workspace 9 (⌘9), the next 8, then 7 and 6: Workspace on its page in Settings › Other displays changes it, to any of 2–9 (1 stays on your main display). The top bar shows it as a tablet or phone icon.
 - An iPad's display is to the right of yours: the pointer slides over the edge onto it. A phone's is away, so the pointer never strays there. Place on its page in Settings › Other displays puts it on another side; several on one side go outwards in the order you added them.
-- The display stays on, also after a login, until you turn it off. While it's on but no device shows it, its windows are out of sight and the pointer can slip onto it: turn it off in Settings › Other displays when you don't use it (or `vnc-display off ipad`).
+- The display is there while the device is connected. When the device disconnects, the display goes, its windows move to workspace 1 and its icon leaves the top bar; it comes back when the device connects again. While its row is on, this computer waits for the device, also after a login: turn it off in Settings › Other displays (or `vnc-display off ipad`) and nothing listens for it.
 - The device uses this computer's own pointer and keyboard: a tap on the iPad moves the pointer there.
 - Sizes: `ipad` (11-inch), `ipad-13`, `ipad-mini`, `iphone`, `iphone-max` (Pro Max), or your own in pixels and scale, e.g. `2752x2064@2`. A second device of the same kind needs a name: `vnc-display add ipad ipad2`.
 
@@ -39,11 +39,11 @@ Another device works the same way with Tailscale and any VNC app: RealVNC Viewer
 | `vnc-display add DEVICE [NAME]` | A new display for a device, with a password of its own. `--home`: also on the home Wi-Fi. `--beside` or `--away` changes where it goes |
 | `vnc-display show NAME` | The addresses, user name and password (`--json` for scripts) |
 | `vnc-display qr NAME` | The connection as a QR code (an SVG file) |
-| `vnc-display list` | The devices, their workspaces and whether they're on (`--json` for scripts) |
+| `vnc-display list` | The devices, their workspaces and whether they're on or connected (`--json` for scripts) |
 | `vnc-display workspace NAME N` | Gives its display workspace N (2–9), its windows too: a device that has N takes this one's |
 | `vnc-display place NAME PLACE` | Puts its display right, left, above or below yours, or away (out of the pointer's reach) |
-| `vnc-display off NAME` | Turns the display off: its windows go back to yours, and nothing listens for it |
-| `vnc-display on NAME` | Turns it back on, with the same password |
+| `vnc-display off NAME` | Turns it off: nothing listens for it, and a connected device's display goes, its windows back to yours |
+| `vnc-display on NAME` | Turns it back on, with the same password: its display comes when the device connects |
 | `vnc-display remove NAME` | Forgets the device: its display and its password |
 
 ## Privacy
