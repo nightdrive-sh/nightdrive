@@ -1,0 +1,321 @@
+#!/bin/bash
+# VNC Display (plugins/vnc-display): an iPad or iPhone as a screen of its own, shown in a VNC app on the device.
+#
+#   vnc-display add DEVICE [NAME] [--home] [--beside|--away]
+#                                  a new screen for a device, with a password of its own; it stays on, also after a login
+#   vnc-display show NAME [--json] how to connect: the addresses, the user name and the password
+#   vnc-display qr NAME            the connection as a QR code (an SVG file, its path printed) for the device's camera
+#   vnc-display network            the network the computer is on now, which --home would add
+#   vnc-display list [--json]      the devices: size, workspace, on or off, port
+#   vnc-display workspace NAME N   its workspace, 2–9; a device that has N takes this one's
+#   vnc-display place NAME PLACE   where its screen is: right, left, above or below your screens, or away (out of reach)
+#   vnc-display on|off NAME        the screen on, or off (gone, nothing listening) while the device keeps its password
+#   vnc-display remove NAME        forgets the device: its screen, its password
+#   vnc-display run NAME           the screen itself (nightdrive-vnc-display@NAME.service, lib/serve.py)
+#
+# DEVICE is a size: ipad, ipad-13, ipad-mini, iphone, iphone-max, or WIDTHxHEIGHT@SCALE in the device's pixels
+# (2360x1640@2). Each device is a headless output, HEADLESS-<NAME>, with a line in the state file that
+# config/hypr/virtual-display.lua reads (its size, place and workspace), and wayvnc on it as a user service of its own.
+# wayvnc listens on the Tailscale address only, and with --home also on the home network (the Wi-Fi it was added on)
+# while the computer is on it. The address shown is the computer's Tailscale name (MagicDNS), the IP when it has none.
+# The passwords are in ~/.config/nightdrive/vnc-display/NAME.conf, readable only by you.
+set -euo pipefail
+
+here=$(dirname "$(dirname "$(realpath "$0")")")
+conf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/nightdrive/vnc-display
+key=$conf_dir/rsa_key.pem                              # install.sh: the computer's identity in RSA-AES
+state=$HOME/.local/state/nightdrive/virtual-displays   # config/hypr/virtual-display.lua
+off=$HOME/.local/state/nightdrive/plugins-off/vnc-display
+FIRST_PORT=5900                  # the first device gets VNC's own port, so most apps need no port at all
+FIRST_WORKSPACE=9 LAST_WORKSPACE=6   # as virtual-display.lua: from the top down, 1–5 stay on the desk
+LOWEST_WORKSPACE=2                   # one chosen (vnc-display workspace) may be lower, never 1: the main screen's
+PASSWORD_LENGTH=12
+# No 0/o, 1/l/i: the password is typed by hand on the device
+PASSWORD_CHARS=abcdefghjkmnpqrstuvwxyz23456789
+
+die() { echo "vnc-display: $*" >&2; exit 1; }
+unit() { echo "nightdrive-vnc-display@$1.service"; }
+conf() { echo "$conf_dir/$1.conf"; }
+get() { sed -n "s/^$2=//p" "$(conf "$1")" | head -1; }
+output_of() { echo "HEADLESS-${1^^}"; }
+names() { local f; for f in "$conf_dir"/*.conf; do [[ -f $f ]] && basename "$f" .conf; done; }
+known() { [[ -f $(conf "${1:-}") ]] || die "no device ${1:-}: see vnc-display list"; }
+tailscale_ip() { tailscale ip -4 2>/dev/null | head -1; }
+# The computer's name on the tailnet as a device types it ("nightdrive": MagicDNS adds the rest), or the whole name with
+# --full (for a link, which doesn't rely on the device's search domain). Nothing without MagicDNS or while it's down.
+# The name gives the IPv6 address too, so lib/serve.py listens on both.
+tailscale_name() {
+  tailscale status --json 2>/dev/null | jq -r --arg full "${1:-}" 'select(.BackendState == "Running" and .CurrentTailnet.MagicDNSEnabled)
+    | .Self.DNSName // "" | rtrimstr(".") | if $full == "" then split(".")[0] else . end' 2>/dev/null || true
+}
+# The address a device connects to over Tailscale: the name, or the IP without MagicDNS
+tailscale_host() { local n; n=$(tailscale_name "${1:-}"); if [[ -n $n ]]; then echo "$n"; else tailscale_ip; fi; }
+# The device's line in the state file: <output> <mode> <scale> <place> <workspace>
+state_line() { [[ -f $state ]] && awk -v o="$(output_of "$1")" '$1 == o' "$state" | head -1; }
+
+# The size of a DEVICE word: "WIDTHxHEIGHT SCALE PLACE". An iPad goes beside the desk's screens, the pointer sliding over
+# as with Sidecar; a phone far off, used away from the desk. A size of your own: beside if it's wider than tall.
+size_of() {
+  case $1 in
+    ipad) echo "2360x1640 2 beside" ;;         # iPad and iPad Air 11-inch
+    ipad-13) echo "2732x2048 2 beside" ;;      # iPad Air and iPad Pro 13-inch
+    ipad-mini) echo "2266x1488 2 beside" ;;
+    iphone) echo "1179x2556 3 away" ;;         # iPhone 15, 16
+    iphone-max) echo "1320x2868 3 away" ;;     # iPhone 16 Pro Max
+    *x*@*)
+      local w=${1%%x*} rest=${1#*x} h s
+      h=${rest%@*} s=${rest#*@}
+      [[ $w =~ ^[0-9]+$ && $h =~ ^[0-9]+$ && $s =~ ^[1-4](\.[0-9]+)?$ ]] || return 1
+      if (( w > h )); then echo "${w}x$h $s beside"; else echo "${w}x$h $s away"; fi ;;
+    *) return 1 ;;
+  esac
+}
+
+free_port() {
+  local p n
+  for ((p = FIRST_PORT; ; p++)); do
+    for n in $(names); do [[ $(get "$n" port) == "$p" ]] && continue 2; done
+    ss -Hltn "sport = :$p" | grep -q . || { echo "$p"; return; }
+  done
+}
+
+free_workspace() {
+  local w
+  for ((w = FIRST_WORKSPACE; w >= LAST_WORKSPACE; w--)); do
+    [[ -f $state ]] && awk -v w="$w" '$1 !~ /^#/ && $5 == w { f = 1 } END { exit !f }' "$state" && continue
+    echo "$w"; return
+  done
+  return 1
+}
+
+new_password() {
+  local p
+  p=$(head -c 1024 /dev/urandom | LC_ALL=C tr -dc "$PASSWORD_CHARS")
+  echo "${p:0:PASSWORD_LENGTH}"
+}
+
+# The connection the computer is on now ("UUID<tab>NAME"): the one its default route goes through
+current_network() {
+  local dev
+  dev=$(ip route show default 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit } }')
+  [[ -n $dev ]] || return 1
+  nmcli -t -g GENERAL.CONNECTION device show "$dev" 2>/dev/null | head -1 | while read -r name; do
+    [[ -n $name ]] && printf '%s\t%s\n' "$(nmcli -g connection.uuid connection show "$name" | head -1)" "$name"
+  done
+}
+
+home_ip() { [[ -n $1 ]] && nmcli -g IP4.ADDRESS connection show "$1" 2>/dev/null | head -1 | sed 's/ |.*//; s,/.*,,'; }
+
+# set_state NAME [LINE]: the device's line replaced where it is, or added last, or removed without a LINE. Its place in
+# the file is its order on a side of the desk (virtual-display.lua: the first added is next to the desk's screens).
+set_state() {
+  local o tmp
+  o=$(output_of "$1")
+  mkdir -p "$(dirname "$state")"
+  tmp=$(mktemp "$state.XXXXXX")
+  {
+    [[ -s $state ]] || echo "# Virtual screens: vnc-display add (plugins/vnc-display); read by config/hypr/virtual-display.lua"
+    [[ -f $state ]] && awk -v o="$o" -v l="${2:-}" '$1 == o { if (l != "") { print l; done = 1 } next } { print } END { if (!done && l != "") print l }' "$state"
+  } > "$tmp"
+  mv "$tmp" "$state"   # whole, as Hyprland may read it at any moment
+}
+
+turn() {   # turn on|off NAME
+  systemctl --user daemon-reload
+  if [[ $1 == on ]]; then
+    [[ -e $off ]] && die "the plugin is turned off: nightdrive plugins on vnc-display"
+    systemctl --user enable --now "$(unit "$2")" 2>&1 | grep -v '^Created symlink' >&2 || true
+    systemctl --user -q is-enabled "$(unit "$2")" || die "couldn't turn $2 on: systemctl --user status $(unit "$2")"
+  else
+    systemctl --user disable --now "$(unit "$2")" 2>/dev/null || true
+  fi
+}
+
+cmd_add() {
+  local device="" name="" home=0 place="" size mode scale default_place port ws pass net="" uuid="" netname=""
+  while (($#)); do
+    case $1 in
+      --home) home=1 ;;
+      --beside|--away) place=${1#--} ;;
+      -*) die "unknown option $1" ;;
+      *) if [[ -z $device ]]; then device=$1; elif [[ -z $name ]]; then name=$1; else die "too many words: $1"; fi ;;
+    esac
+    shift
+  done
+  [[ -n $device ]] || die "which device? vnc-display add ipad (or iphone, ipad-13, ipad-mini, iphone-max, 2360x1640@2)"
+  size=$(size_of "$device") || die "unknown device $device: ipad, ipad-13, ipad-mini, iphone, iphone-max or WIDTHxHEIGHT@SCALE"
+  read -r mode scale default_place <<<"$size"
+  place=${place:-$default_place}
+  [[ -n $name ]] || { name=${device%%-*}; [[ $name == *x*@* ]] && name=screen; }
+  [[ $name =~ ^[a-z0-9][a-z0-9-]{0,15}$ ]] || die "a name is lowercase letters, digits and -, at most 16: $name"
+  [[ ! -e $(conf "$name") ]] || die "$name is already added (vnc-display show $name), or give another name: vnc-display add $device ${name}2"
+  command -v wayvnc >/dev/null && [[ -f $key ]] || die "not installed yet: nightdrive plugins install vnc-display"
+  ws=$(free_workspace) || die "all four workspaces for displays (6–9) are taken: vnc-display remove one first"
+  port=$(free_port)
+  if ((home)); then
+    net=$(current_network) || die "--home: not on a network now. Add it at home, on the home Wi-Fi"
+    IFS=$'\t' read -r uuid netname <<<"$net"
+  fi
+  pass=$(new_password)
+  (
+    umask 077
+    mkdir -p "$conf_dir"
+    printf '%s\n' "# vnc-display add $device: this device's login (vnc-display show $name)" "output=$(output_of "$name")" \
+      "port=$port" "username=$name" "password=$pass" "home=$uuid" "home_name=$netname" > "$(conf "$name")"
+  )
+  set_state "$name" "$(output_of "$name") ${mode}@60 $scale $place $ws"
+  turn on "$name"
+  [[ -n $(tailscale_ip) ]] || echo "Tailscale isn't connected: the display listens there once it is (Tailscale in the top bar)."
+  cmd_show "$name"
+}
+
+cmd_show() {
+  known "${1:-}"
+  [[ ${2:-} == --json ]] && { show_json "$1"; return; }
+  local n=$1 ts home port
+  ts=$(tailscale_host) port=$(get "$n" port)
+  if systemctl --user -q is-active "$(unit "$n")"; then echo "$n is on, workspace $(state_line "$n" | awk '{ print $5 }')."
+  else echo "$n is off: vnc-display on $n"; fi
+  echo
+  echo "In the VNC app on the device, add a connection:"
+  [[ -n $ts ]] || ts="(Tailscale is off)"
+  printf '  %-10s %s\n' Address "$ts:$port   (over Tailscale, anywhere)"
+  if [[ -n $(get "$n" home) ]]; then
+    home=$(home_ip "$(get "$n" home)")
+    printf '  %-10s %s\n' "" "${home:-(not on it now)}:$port   (at home, on $(get "$n" home_name))"
+  fi
+  printf '  %-10s %s\n' User "$n" Password "$(get "$n" password)"
+}
+
+# For the launcher (VncDisplayLevels.qml): what show prints, the password too
+show_json() {
+  local n=$1 on=false
+  systemctl --user -q is-active "$(unit "$n")" && on=true
+  jq -n --arg name "$n" --argjson on "$on" --arg ws "$(state_line "$n" | awk '{ print $5 }')" --arg host "$(tailscale_host)" \
+    --arg ip "$(tailscale_ip)" --arg home "$(home_ip "$(get "$n" home)")" --arg home_name "$(get "$n" home_name)" \
+    --arg port "$(get "$n" port)" --arg password "$(get "$n" password)" \
+    '{name: $name, on: $on, workspace: ($ws | tonumber? // null), tailscale: $host, tailscale_ip: $ip, port: ($port | tonumber),
+      home: (if $home == "" then null else $home end), home_name: (if $home_name == "" then null else $home_name end),
+      username: $name, password: $password}'
+}
+
+# A vnc:// link with the address only: RealVNC Viewer refuses one with a user name or password in it ("no longer
+# supported"), and they are typed once, into the app. In the runtime folder, readable only by you.
+cmd_qr() {
+  known "${1:-}"
+  local host file
+  host=$(tailscale_host --full)
+  [[ -n $host ]] || host=$(home_ip "$(get "$1" home)")
+  [[ -n $host ]] || die "no address to show: Tailscale is off"
+  command -v qrencode >/dev/null || die "qrencode isn't installed: sudo dnf install qrencode"
+  file=${XDG_RUNTIME_DIR:-/tmp}/nightdrive-vnc-display-$1.svg
+  (umask 077; qrencode -t SVG -m 0 -o "$file" "vnc://$host:$(get "$1" port)")
+  echo "$file"
+}
+
+cmd_list() {
+  local n line on ts mode scale place ws json=0 first=1
+  [[ ${1:-} == --json ]] && json=1
+  ts=$(tailscale_host)
+  ((json)) && printf '['
+  for n in $(names); do
+    line=$(state_line "$n")
+    systemctl --user -q is-active "$(unit "$n")" && on=true || on=false
+    read -r _ mode scale place ws <<<"$line"
+    if ((json)); then
+      ((first)) || printf ','
+      first=0
+      jq -cn --arg name "$n" --arg output "$(output_of "$n")" --arg size "${mode%@*}" --arg scale "$scale" \
+        --arg place "$place" --arg ws "$ws" --arg port "$(get "$n" port)" --argjson on "$on" --arg ts "$ts" \
+        --arg home "$(get "$n" home_name)" \
+        '{name: $name, output: $output, size: $size, scale: ($scale | tonumber? // null), place: $place,
+          workspace: ($ws | tonumber? // null), port: ($port | tonumber), on: $on, tailscale: $ts,
+          home: (if $home == "" then null else $home end)}' | tr -d '\n'
+    else
+      first=0
+      printf '%-12s %-10s ×%-4s %-7s ⌘%-2s %-4s %s\n' "$n" "${mode%@*}" "$scale" "$place" "$ws" \
+        "$([[ $on == true ]] && echo on || echo off)" "${ts:-tailscale off}:$(get "$n" port)$(
+          [[ -n $(get "$n" home_name) ]] && echo ", at home on $(get "$n" home_name)")"
+    fi
+  done
+  if ((json)); then echo ']'; elif ((first)); then echo "No devices: vnc-display add ipad"; fi
+}
+
+# Hyprland reloads with the state file and moves the workspaces as when a screen comes (hyprland.lua's monitor.added)
+rearrange() {
+  hyprctl reload >/dev/null && hyprctl eval 'NightdriveArrangeWorkspaces(); NightdriveArrangeVirtual()' >/dev/null || true
+}
+
+# The windows on a workspace, by address
+windows_on() { hyprctl -j clients | jq -r --argjson w "$1" '.[] | select(.workspace.id == $w) | .address'; }
+move_windows() {   # move_windows WORKSPACE ADDRESS…: quietly, the focus stays where it is
+  local w=$1 a
+  shift
+  for a in "$@"; do hyprctl dispatch "hl.dsp.window.move({ workspace = $w, follow = false, window = \"address:$a\" })" >/dev/null; done
+}
+
+# Swaps with the device that has it, so each keeps one of its own. The screen keeps its windows: they move to the new
+# number, otherwise the old workspace would stay on the screen with them, hidden behind the new empty one.
+cmd_workspace() {
+  known "${1:-}"
+  local n=$1 w=${2:-} old other line swapped="" mine theirs=()
+  [[ $w =~ ^[0-9]$ ]] && ((w >= LOWEST_WORKSPACE && w <= FIRST_WORKSPACE)) || die "a workspace is $LOWEST_WORKSPACE–$FIRST_WORKSPACE (1 is the main display's): vnc-display workspace $n 8"
+  line=$(state_line "$n")
+  [[ -n $line ]] || die "$n has no display: vnc-display on $n"
+  old=$(awk '{ print $5 }' <<<"$line")
+  [[ $old != "$w" ]] || return 0
+  for other in $(names); do
+    if [[ $other != "$n" && $(state_line "$other" | awk '{ print $5 }') == "$w" ]]; then
+      set_state "$other" "$(state_line "$other" | awk -v w="$old" '{ $5 = w; print }')"
+      swapped=$other
+    fi
+  done
+  # Before the move, as the two workspaces' windows trade places
+  mapfile -t mine < <(windows_on "$old")
+  [[ -n $swapped ]] && mapfile -t theirs < <(windows_on "$w")
+  set_state "$n" "$(awk -v w="$w" '{ $5 = w; print }' <<<"$line")"
+  rearrange
+  move_windows "$w" "${mine[@]}"
+  move_windows "$old" "${theirs[@]}"
+  echo "$n is on workspace $w (⌘$w)."
+}
+
+# The side of the desk's screens the pointer crosses to it (virtual-display.lua), or away: out of its reach
+cmd_place() {
+  known "${1:-}"
+  local n=$1 p=${2:-} line
+  [[ $p == beside ]] && p=right
+  [[ $p =~ ^(right|left|above|below|away)$ ]] || die "a place is right, left, above, below or away: vnc-display place $n left"
+  line=$(state_line "$n")
+  [[ -n $line ]] || die "$n has no display: vnc-display on $n"
+  set_state "$n" "$(awk -v p="$p" '{ $4 = p; print }' <<<"$line")"
+  rearrange
+  case $p in
+    away) echo "$n is away, out of the pointer's reach." ;;
+    left|right) echo "$n is to the $p of your displays." ;;
+    *) echo "$n is $p your displays." ;;
+  esac
+}
+
+cmd_remove() {
+  known "${1:-}"
+  turn off "$1"
+  set_state "$1"
+  rm -f "$(conf "$1")"
+  echo "$1 removed: its display is gone, and its password no longer works."
+}
+
+case ${1:-} in
+  add) cmd_add "${@:2}" ;;
+  show) cmd_show "${2:-}" "${3:-}" ;;
+  qr) cmd_qr "${2:-}" ;;
+  network) current_network | cut -f2 ;;
+  list) cmd_list "${2:-}" ;;
+  on) known "${2:-}"; turn on "$2"; cmd_show "$2" ;;
+  off) known "${2:-}"; turn off "$2"; echo "$2 is off: its display is gone and nothing listens for it (vnc-display on $2)." ;;
+  workspace) cmd_workspace "${2:-}" "${3:-}" ;;
+  place) cmd_place "${2:-}" "${3:-}" ;;
+  remove) cmd_remove "${2:-}" ;;
+  run) known "${2:-}"; exec python3 "$here/lib/serve.py" "$2" ;;
+  *) sed -n '4,14s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
+esac

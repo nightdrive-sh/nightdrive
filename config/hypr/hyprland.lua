@@ -37,6 +37,9 @@ hl.monitor({
 -- <width>x<height>@<hz>" for a refresh rate other than the display's preferred one (a TV's is often 60 Hz though it does
 -- 120), and "builtin <side>" for where the laptop's own screen is next to the external one. A named output's rule wins
 -- over the "" rules above and in local.lua.
+-- A virtual screen (hyprctl output create headless: a phone or a tablet showing it over VNC) is not an external display:
+-- it takes neither workspaces 1–9 from the laptop's own screen nor the place beside it
+local function isVirtual(m) return m.name:match("^HEADLESS%-") ~= nil end
 local scales, modes, builtinSide = {}, {}, nil
 local state = io.open(HOME .. "/.local/state/nightdrive/display")
 if state then
@@ -55,7 +58,7 @@ local positions = {}
 do
     local builtin, ext
     for _, m in ipairs(hl.get_monitors()) do
-        if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext then ext = m end
+        if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext and not isVirtual(m) then ext = m end
     end
     if builtinSide and builtin and ext then
         local function size(m)
@@ -71,6 +74,19 @@ do
         if at then
             positions[ext.name] = { m = ext, pos = "0x0" }
             positions[builtin.name] = { m = builtin, pos = at[1] .. "x" .. at[2] }
+        end
+    end
+    -- Otherwise side by side from 0,0, in Hyprland's order, as auto does, but written out: auto places a screen past
+    -- all the others, a virtual one too (virtual-display.lua), and the laptop's screen would move behind an iPhone set
+    -- to its right, leaving an iPad on its left unreachable
+    if next(positions) == nil then
+        local x = 0
+        for _, m in ipairs(hl.get_monitors()) do
+            if not isVirtual(m) and not m.disabled then
+                local s = scales[m.name] or m.scale
+                positions[m.name] = { m = m, pos = x .. "x0" }
+                x = x + math.floor((m.transform % 2 == 1 and m.height or m.width) / s + 0.5)
+            end
         end
     end
 end
@@ -135,7 +151,7 @@ local function screens()
     local list = hl.get_monitors() or {}
     if #list == 0 then list = connectedScreens() end   -- none in a headless sandbox either: then no rules at all
     for _, m in ipairs(list) do
-        if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext then ext = m end
+        if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext and not isVirtual(m) then ext = m end
     end
     return builtin, ext
 end
@@ -178,8 +194,13 @@ function NightdriveArrangeWorkspaces()
     if not (tw and tw.windows > 0) then target = 1 end
     if target then hl.dispatch(hl.dsp.focus({ workspace = target })) end
 end
+-- A tablet or a phone over VNC: a screen with a workspace of its own (virtual-display.lua). After the rules above, as
+-- its rules take 9, 8… from the external display.
+require("virtual-display")(positions, scales)   -- the desk's screens' places as just set, which it counts from
 -- A screen that comes or goes: the rules again (reload), then the workspaces
-hl.on("monitor.added",   function () hl.exec_cmd("hyprctl reload && hyprctl eval 'NightdriveArrangeWorkspaces()'") end)
+hl.on("monitor.added",   function ()
+    hl.exec_cmd("hyprctl reload && hyprctl eval 'NightdriveArrangeWorkspaces(); NightdriveArrangeVirtual()'")
+end)
 hl.on("monitor.removed", function () hl.exec_cmd("hyprctl reload") end)
 
 -------------------

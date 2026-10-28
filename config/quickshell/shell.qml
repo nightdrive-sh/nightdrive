@@ -231,6 +231,13 @@ ShellRoot {
         extSource: root.localLauncher ? "local/LauncherExtension.qml" : ""
         onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.current = name }   // below its bar icon (-1 = none: right edge)
     }
+    // An open bar menu (the core's or a plugin's) closes when the launcher opens: its overlay's keyboard focus and the
+    // qsmenu submap (arrows, Enter, Esc) would otherwise keep the keys from the launcher. A Connections: an
+    // onOpenChanged on the Launcher instance above didn't run (Launcher has its own).
+    Connections {
+        target: launcher
+        function onOpenChanged() { if (launcher.open) root.current = "" }
+    }
 
     PanelWindow {
         visible: root.current !== "" && !polkit.asking   // the password prompt is a window: it can't get above an overlay

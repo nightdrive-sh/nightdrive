@@ -15,7 +15,7 @@ Item {
     readonly property var levels: ["wifi", "wifipw", "bluetooth", "sound", "headphones", "tailscale", "status", "mirrorpin"]
     readonly property var titles: ({ status: "System › Status", mirrorpin: "Screen Mirroring › Code", wifi: "Settings › Wi-Fi", wifipw: "Wi-Fi › Password", bluetooth: "Settings › Bluetooth",
                                      sound: "Settings › Sound", headphones: "Sound › Headphones", tailscale: "Settings › Tailscale" })
-    readonly property var parents: ({ status: "system", mirrorpin: "display", wifi: "settings", wifipw: "wifi", bluetooth: "settings", sound: "settings", headphones: "sound", tailscale: "settings" })
+    readonly property var parents: ({ status: "system", mirrorpin: "otherdisplays", wifi: "settings", wifipw: "wifi", bluetooth: "settings", sound: "settings", headphones: "sound", tailscale: "settings" })
     readonly property string level: launcher ? launcher.level : ""
     readonly property bool shown: launcher !== null && launcher.open && levels.indexOf(level) >= 0
 
@@ -49,7 +49,7 @@ Item {
         if (level === "headphones") hpProc.running = true
         if (level === "tailscale") { tsMessage = ""; tsProc.running = true }
         if (level === "status") { sysProc.running = true; claudeProc.running = true }
-        if (level === "mirrorpin" || level === "display") mirrorProc.running = true
+        if (level === "mirrorpin" || level === "display" || level === "otherdisplays") mirrorProc.running = true
     }
     function shiftActivate(item) {}
 
@@ -159,10 +159,12 @@ Item {
     }
     Timer { id: disarmTimer; interval: 4000; onTriggered: if (s.launcher) s.launcher.armed = "" }
 
-    // ⌘C (Hyprland sends Ctrl+Insert) or Enter on a row with a `copy` value: the row says "copied" for a moment
-    function copyText(v) {
+    // ⌘C (Hyprland sends Ctrl+Insert) or Enter on a row with a `copy` value: the row says "copied" for a moment.
+    // sensitive (a password, the row's `sensitive`): not in the clipboard history (cliphist), and cleared after 45 s
+    function copyText(v, sensitive) {
         sel()
-        Quickshell.execDetached(["wl-copy", v])
+        if (sensitive) Quickshell.execDetached(["bash", "-c", 'printf %s "$1" | wl-copy --sensitive; sleep 45; [ "$(wl-paste -n 2>/dev/null)" = "$1" ] && wl-copy --clear', "_", v])
+        else Quickshell.execDetached(["wl-copy", v])
         copied = v
         copiedTimer.restart()
     }
@@ -835,7 +837,7 @@ done; true'
     }
 
     // ================= Screen Mirroring (AirPlay with doubletake; the mirroring plugin, plugins/mirroring) =================
-    // Rows for Settings › Display (Launcher.qml adds them under Screen Mirroring). Nothing while the plugin isn't installed
+    // Rows for Settings › Other displays (DisplayLevels.qml). Nothing while the plugin isn't installed
     // or is off.
     readonly property string mirrorScript: Quickshell.env("HOME") + "/.local/bin/mirroring"
     property bool mirrorAvail: false
@@ -851,12 +853,13 @@ done; true'
             const mine = d.ip === mirrorIp && mirrorState !== "idle"
             r.push({ kind: "mirrordev", name: d.name, ip: d.ip, extra: "airplay cast mirror " + d.model,
                      glyph: /STR-|receiver|HomePod|AudioAccessory|speaker/i.test(d.name + " " + d.model) ? "speaker" : "tv",
-                     summary: !mine ? "AirPlay" : mirrorState === "streaming" ? "mirroring" : mirrorState === "pin_required" ? "waiting for the code" : "connecting…",
-                     trailGlyph: mine && mirrorState === "streaming" ? "check" : undefined })
+                     summary: !mine ? "AirPlay · mirror" : mirrorState === "streaming" ? "mirroring" : mirrorState === "pin_required" ? "waiting for the code" : "connecting…",
+                     trailGlyph: mine && mirrorState === "streaming" ? "check" : undefined,
+                     active: mine && mirrorState === "streaming" })   // in use: Settings › Other displays' summary
         }
         return r
     }
-    Timer { interval: 2000; repeat: true; running: s.launcher !== null && s.launcher.open && (s.level === "display" || s.level === "mirrorpin"); onTriggered: mirrorProc.running = true }
+    Timer { interval: 2000; repeat: true; running: s.launcher !== null && s.launcher.open && (s.level === "otherdisplays" || s.level === "mirrorpin"); onTriggered: mirrorProc.running = true }
     Sh {
         id: mirrorProc
         script: 'c="$HOME/.local/bin/doubletake-ctl"; [ -x "$c" ] || exit 0; "$c" status; echo; "$c" devices; echo; printf "{\\"self\\": \\"%s\\"}\\n" "$(hostname -I)"'

@@ -76,3 +76,4 @@ SendClaudeLevels 1.0 SendClaudeLevels.qml
 PolkitWatch 1.0 PolkitWatch.qml
 ClaudeConfirm 1.0 ClaudeConfirm.qml
 ClaudeConfirmField 1.0 ClaudeConfirmField.qml
+FieldBox 1.0 FieldBox.qml

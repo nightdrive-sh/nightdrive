@@ -69,6 +69,22 @@ PanelWindow {
     property var keyList: []                  // [{ name, sub, keys, section }]
     property var keyIndex: ({})               // lower-case name → keys (shortcutFor)
     property string armed: ""                 // action awaiting confirmation
+    // A form's text field (a level file's row with `field: true`, drawn by FieldBox.qml): while it is selected, typing
+    // goes into its box instead of the search line, and the selection stays on it. The file's activate() reads `query`
+    // on Enter and calls clearQuery() once it has taken it; leaving the row (↑/↓, the mouse) hands what was typed to the
+    // file's commitField(row, text), or drops it if the file has none.
+    readonly property var fieldRow: { const r = results[list.currentIndex]; return r && r.field === true ? r : null }
+    property int fieldAt: -1                  // the field row typed into, while there is one
+    property bool holdIndex: false            // clearing the field's text keeps the selection where it is
+    function clearQuery() { holdIndex = true; input.text = ""; holdIndex = false }
+    function leaveField() {
+        if (fieldAt >= 0 && fieldAt !== list.currentIndex && input.text !== "") {
+            const row = results[fieldAt], t = extOf(level)
+            if (row && row.field === true && t && t.commitField) t.commitField(row, input.text)
+            clearQuery()
+        }
+        fieldAt = fieldRow ? list.currentIndex : -1
+    }
     readonly property var detail: details.item   // Install / Remove: the row whose details are shown (DetailCard.qml), null = none
     readonly property int detailWidth: 860    // the card's width while showing them
     // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts } in ~/.local/state/nightdrive/launcher.json (missing = on;
@@ -227,7 +243,8 @@ PanelWindow {
         ].concat(Plugins.has("tailscale") ? [{ kind: "nav", name: "Tailscale", glyph: "shield-check", target: "tailscale" }] : [], [
             { kind: "header", name: "Hardware" },
             { kind: "nav", name: "Sound", glyph: "volume-2", target: "sound" },   // Headphones are a row there, while connected
-            { kind: "nav", name: "Display", glyph: "monitor", target: "display" },
+            { kind: "nav", name: "Display", glyph: "monitor", target: "display" }
+        ], disp.hasOthers() ? [{ kind: "nav", name: "Other displays", glyph: "monitor-smartphone", target: "otherdisplays", summary: disp.othersSummary() }] : [], [
             { kind: "nav", name: "Mouse", glyph: "mouse", target: "mousescroll", summary: behave.mouseScroll ? behave.mouseScroll + "× scroll" : undefined }
         ], disp.hasBattery ? [{ kind: "nav", name: "Battery", glyph: "battery-medium", target: "battery" }] : [], [
             { kind: "header", name: "Appearance" },
@@ -269,6 +286,7 @@ PanelWindow {
 
     readonly property var settingsAliases: ({ "Wi-Fi": "wifi wlan network internet", "Sound": "audio volume output speakers headphones airpods noise cancelling equalizer", "Battery": "power charge charging health cycles",
                                               "Display": "brightness keyboard backlight night light warm scale scaling resolution monitor screen retina hidpi zoom size bigger smaller",
+                                              "Other displays": "ipad iphone tablet phone android second screen extra extend sidecar vnc airplay apple tv mirror cast",
                                               "Notifications": "notification sounds alert chime beep ping tone urgent critical popup timeout seconds duration",
                                               "Crash reports": "crash crashes bug report claude app quit coredump",
                                               "Tailscale": "vpn", "Mouse": "scroll scrolling wheel speed fast slow",
@@ -304,7 +322,7 @@ PanelWindow {
             .concat(disp.keys >= 0 ? [{ kind: "brightness", key: "keys", name: "Keyboard backlight", glyph: "keyboard" }] : [])
             .concat([{ kind: "nightlight", name: "Night light", glyph: "moon" },
                      { kind: "nav", name: "Scale", glyph: "monitor", target: "display" }],
-                    sys.mirrorAvail ? [{ kind: "nav", name: "Screen Mirroring", glyph: "screen-share", target: "display" }] : [])
+                    sys.mirrorAvail ? [{ kind: "nav", name: "Screen Mirroring", glyph: "screen-share", target: "otherdisplays" }] : [])
     }
     readonly property var installAliases: ({ "Software": "package dnf rpm flatpak flathub app apps program store",
                                              "Webapp": "web app website site pwa url slack teams whatsapp youtube",
@@ -569,7 +587,7 @@ PanelWindow {
         if (target === "keys") keysProc.running = true     // re-read SHORTCUTS.md: changes show up immediately
         list.currentIndex = firstSelectable()
         if (target === "settings" || target === "appsettings") behave.entered("settings")   // the computer name and channel on its rows, Firefox's
-        if (target === "display") sys.entered("display")   // Screen Mirroring's rows there
+        if (target === "display" || target === "otherdisplays") sys.entered("display")   // Screen Mirroring's rows (Other displays)
         if (extOf(target)) extOf(target).entered(target)
     }
     // Background apps (⌘W hides them to special:bg, ⌘Q quits): app name -> window class regex, from hypr/background-apps(.local),
@@ -688,7 +706,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 Quickshell.execDetached([scripts + "/terminal", "--"].concat(item.entry.command))
             else if (item.entry) item.entry.execute(); else Quickshell.execDetached(["gio", "launch", item.path])
         }
-        else if (item.kind === "stat" && item.copy !== undefined) sys.copyText(item.copy)   // Public IP, Local IP, Router: as ⌘C
+        else if (item.kind === "stat" && item.copy !== undefined) sys.copyText(item.copy, item.sensitive === true)   // Public IP, Local IP, Router: as ⌘C
         else if (item.kind === "stat") shake.restart()   // information only
         else if (item.kind === "calc") { sys.copyText(item.copy); win.open = false }   // ready to paste
         else if (exts.some(e => e.activate(item))) {}
@@ -1069,6 +1087,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 TextInput {
                     id: input
                     echoMode: win.level === "wifipw" ? TextInput.Password : TextInput.Normal   // Wi-Fi › Password
+                    opacity: win.fieldRow ? 0 : 1      // a form's field shows the text in its own box (FieldBox.qml)
                     width: parent.width - (crumb.visible ? crumb.width : 0)
                     height: parent.height
                     verticalAlignment: TextInput.AlignVCenter
@@ -1079,7 +1098,9 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                     focus: true
                     clip: true
                     onTextChanged: { if (win.detail !== null) details.close()   // a new search (IPC setQuery)
-                                     win.query = text; win.armed = ""; win.topFocused = false; list.currentIndex = win.firstSelectable() }
+                                     win.query = text; win.armed = ""; win.topFocused = false
+                                     if (win.fieldRow) win.fieldAt = list.currentIndex   // typed into: leaving it hands the text over
+                                     else if (!win.holdIndex) list.currentIndex = win.firstSelectable() }
                     Keys.onPressed: event => {
                         const ctrl = event.modifiers & Qt.ControlModifier
                         if (win.topFocused && win.topExt && win.topExt.topKey(event)) { event.accepted = true; return }
@@ -1087,7 +1108,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         // selected text in the search field is copied as usual
                         const copyRow = win.results[list.currentIndex]
                         if (ctrl && (event.key === Qt.Key_Insert || event.key === Qt.Key_C) && copyRow && copyRow.copy !== undefined && selectedText === "") {
-                            sys.copyText(copyRow.copy); event.accepted = true; return
+                            sys.copyText(copyRow.copy, copyRow.sensitive === true); event.accepted = true; return
                         }
                         if (win.detail !== null) {         // details: Enter installs / removes, C sets up with Claude, arrows scroll, typing does nothing
                             if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) win.back()
@@ -1156,6 +1177,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 visible: !win.grid && win.detail === null
                 height: visible ? win.listHeight() : 0
                 model: win.results
+                onCurrentIndexChanged: win.leaveField()
                 clip: true
                 currentIndex: 0
                 highlightMoveDuration: 0
@@ -1375,24 +1397,36 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         checked: row.modelData.switchOn === true
                         busy: row.modelData.switchBusy === true
                     }
+                    FieldBox {
+                        visible: row.modelData.field === true
+                        anchors { right: parent.right; rightMargin: 12; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
+                        height: win.rowHeight - 20
+                        row: row.modelData
+                        current: row.current
+                        typed: row.current ? win.query : ""
+                        fontSize: win.fontSize - 3
+                    }
                     Text {
                         id: trailing
+                        visible: row.modelData.field !== true
                         anchors { right: parent.right; rightMargin: 16 + (rowSwitch.visible ? 34 + 14 : 0); verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
                         width: Math.min(implicitWidth, row.width * 0.42)
                         elide: Text.ElideRight
                         horizontalAlignment: Text.AlignRight
                         // from = submenu a root-level search hit comes from (small violet tag)
                         readonly property bool tag: row.modelData.from !== undefined
+                        // A row whose `copy` value was just copied (⌘C or Enter: sys.copyText) says so for a moment
+                        readonly property bool copiedNow: row.modelData.copy !== undefined && sys.copied !== "" && sys.copied === row.modelData.copy
                         readonly property bool glyphOnly: row.modelData.trailGlyph !== undefined
                             || (!tag && row.modelData.keys === undefined && !(row.modelData.summary !== undefined && row.modelData.summary !== "" && !row.armedNow) && row.chevron)
-                        text: row.modelData.trailGlyph !== undefined ? Icons.g(row.modelData.trailGlyph)      // Top bar › Items: ✓ / – (hidden)
+                        text: copiedNow ? "copied" : row.modelData.trailGlyph !== undefined ? Icons.g(row.modelData.trailGlyph)      // Top bar › Items: ✓ / – (hidden)
                             : row.modelData.live !== undefined ? sys.liveText(row.modelData.live)   // updates without rebuilding the rows
                             : tag ? row.modelData.from.toUpperCase() : row.modelData.keys !== undefined ? ""   // keyFrames
                             : (row.modelData.summary !== undefined && row.modelData.summary !== "" && !row.armedNow ? row.modelData.summary
                             : (row.chevron ? Icons.g("chevron-right") : ""))
-                        color: row.modelData.trailGlyph !== undefined ? (row.modelData.dimmed ? Theme.dim : row.current ? Theme.accent : Theme.text)
+                        color: copiedNow ? Theme.primary : row.modelData.trailGlyph !== undefined ? (row.modelData.dimmed ? Theme.dim : row.current ? Theme.accent : Theme.text)
                              : tag ? Theme.primary : (row.modelData.keys !== undefined && row.current ? Theme.accent : Theme.dim)
-                        font { family: glyphOnly ? Icons.familyLight : Theme.font; pixelSize: glyphOnly ? win.iconSize - 6 : tag ? win.fontSize - 6 : row.modelData.kind === "album" ? win.fontSize - 5 : win.fontSize - 3
+                        font { family: glyphOnly && !copiedNow ? Icons.familyLight : Theme.font; pixelSize: glyphOnly && !copiedNow ? win.iconSize - 6 : tag ? win.fontSize - 6 : row.modelData.kind === "album" ? win.fontSize - 5 : win.fontSize - 3
                                letterSpacing: tag ? 1 : 0 }   // tags: normal weight and spacing, the same as an album's artist
                     }
                     Rectangle {      // green dot right after the name: the app has a window open (including one hidden to the background by ⌘W)

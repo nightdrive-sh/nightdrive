@@ -198,10 +198,15 @@ it (`qs kill; setsid -f qs`).
 
 **Pages in the Launcher.** A `<Name>Levels.qml` is a Launcher level file like the core's (`config/quickshell/*Levels.qml`;
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also
-have `rootItems` (rows at the Launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `rootRows()`
+have `rootItems` (rows at the Launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `displayRows()` (rows in Settings › Other displays: VNC Display's), `rootRows()`
 (rows for the root search: Deck's albums) and `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
 `inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
 into the field.
+A form's field is a row with `field: true` (`summary` its value, `placeholder` while empty, `unit` after a typed value):
+while it is selected, typing goes into a box on the row (`config/quickshell/FieldBox.qml`) instead of the search line;
+`activate()` reads `launcher.query` on Enter and calls `launcher.clearQuery()`, and `commitField(row, text)` takes it
+when ↑/↓ leaves the row (VNC Display's
+[VncAddLevels.qml](vnc-display/VncAddLevels.qml): Other device).
 Deck's [MusicLevels.qml](deck/MusicLevels.qml) has most of them, Keep Awake's [KeepAwakeLevels.qml](keep-awake/KeepAwakeLevels.qml)
 is a small one to copy. The same restart applies.
 

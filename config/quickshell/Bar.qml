@@ -55,6 +55,21 @@ Variants {
         WlrLayershell.namespace: "nightdrive-bar"
         readonly property real dpr: modelData.devicePixelRatio || 1
         readonly property int laptopWorkspace: 10   // hyprland.lua: LAPTOP_WORKSPACE
+        // A virtual screen (HEADLESS-*: a tablet or a phone over VNC, hypr/virtual-display.lua) isn't a display at the
+        // desk: it doesn't dock the laptop (hyprland.lua's isVirtual), and its workspace is the device's icon, not a number
+        readonly property bool isVirtual: modelData.name.startsWith("HEADLESS-")
+        readonly property int phoneMaxWidth: 600   // logical px: a phone is narrower (an iPhone 440), a tablet not (an iPad mini 744)
+        // Workspace id -> the icon of the virtual screen it is on (2–9: virtual-display.lua never gives one 1)
+        readonly property var virtualWorkspaces: {
+            const out = {}
+            for (const w of Hyprland.workspaces.values) {
+                const s = w.monitor && w.id > 1 && w.id < win.laptopWorkspace && Quickshell.screens.find(s => s.name === w.monitor.name && s.name.startsWith("HEADLESS-"))
+                // A tablet beside the desk is usually wider than tall: "tablet-wide", its icon turned on its side, so it
+                // doesn't pass for the phone's (Lucide has both upright)
+                if (s) out[w.id] = Math.min(s.width, s.height) < phoneMaxWidth ? "smartphone" : s.width > s.height ? "tablet-wide" : "tablet"
+            }
+            return out
+        }
         readonly property bool focused: Quickshell.screens.length < 2 || !Hyprland.focusedMonitor
                                         || Hyprland.focusedMonitor.name === modelData.name
         function modules() { const out = []; for (let i = 0; i < rep.count; i++) out.push(rep.itemAt(i)); return out }
@@ -102,7 +117,11 @@ Variants {
                     const add = w => { if (w && w.id > 0 && ids.indexOf(w.id) < 0) ids.push(w.id) }
                     for (const t of Hyprland.toplevels.values) add(t.workspace)
                     for (const m of Hyprland.monitors.values) add(m.activeWorkspace)
-                    const docked = Quickshell.screens.length > 1 && Quickshell.screens.some(s => s.name.startsWith("eDP"))
+                    // A virtual screen shows only its own workspace, as the laptop's screen beside an external display
+                    if (win.isVirtual) return Hyprland.workspaces.values.filter(w => win.virtualWorkspaces[w.id]
+                        && w.monitor.name === win.modelData.name).map(w => w.id)
+                    const desk = Quickshell.screens.filter(s => !s.name.startsWith("HEADLESS-"))
+                    const docked = desk.length > 1 && desk.some(s => s.name.startsWith("eDP"))
                     // The laptop's screen then has only its own workspace: 1–9 are the external display's
                     if (docked && win.modelData.name.startsWith("eDP")) return [win.laptopWorkspace]
                     if (docked && ids.indexOf(win.laptopWorkspace) < 0) ids.push(win.laptopWorkspace)
@@ -113,27 +132,34 @@ Variants {
                     required property int modelData
                     readonly property bool windows: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === modelData)
                     readonly property bool active: { const m = Hyprland.monitorFor(win.modelData); return !!m && !!m.activeWorkspace && m.activeWorkspace.id === modelData }
-                    readonly property bool laptop: modelData === win.laptopWorkspace
+                    // A device's own workspace is its icon: the laptop's screen, a virtual screen's tablet or phone
+                    readonly property string device: modelData === win.laptopWorkspace ? "laptop" : win.virtualWorkspaces[modelData] || ""
+                    // Its name, once renamed (Launcher › Rename current space): a device's workspace then shows both
+                    readonly property string label: { const w = Hyprland.workspaces.values.find(w => w.id === modelData); return w && w.name ? w.name : String(modelData) }
+                    readonly property bool named: label !== String(modelData)
+                    readonly property int gap: device && named ? 6 : 0
                     readonly property color fg: active ? TopBar.c("hlFg") : windows ? TopBar.c("dim") : TopBar.c("off")
-                    width: (laptop ? icon.implicitWidth : num.implicitWidth) + 20; height: 27; radius: 8
+                    width: (device ? icon.implicitWidth : 0) + gap + (num.visible ? num.implicitWidth : 0) + 20; height: 27; radius: 8
                     color: active ? TopBar.c("wsBg") : "transparent"
                     // Half while the drawer is over it, and on a screen without the focus (with more than one screen):
                     // the bright one shows where the keyboard goes
                     opacity: active && (drawer.open || !win.focused) ? 0.5 : 1
                     BarText {
                         id: num
-                        visible: !ws.laptop
+                        visible: !ws.device || ws.named
                         element: "workspaces"
                         dpr: win.dpr
-                        x: Math.round((parent.width - implicitWidth) / 2 * win.dpr) / win.dpr
-                        text: { const w = Hyprland.workspaces.values.find(w => w.id === ws.modelData); return w && w.name ? w.name : ws.modelData }   // renamed: Launcher › Rename current space
+                        x: Math.round((ws.device ? 10 + icon.implicitWidth + ws.gap : (parent.width - implicitWidth) / 2) * win.dpr) / win.dpr
+                        text: ws.label
                         color: ws.fg
                     }
                     Text {
                         id: icon
-                        visible: ws.laptop
-                        anchors.centerIn: parent
-                        text: Icons.g("laptop")
+                        visible: !!ws.device
+                        x: ws.named ? 10 : (parent.width - implicitWidth) / 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: Icons.g(ws.device === "tablet-wide" ? "tablet" : ws.device || "laptop")
+                        rotation: ws.device === "tablet-wide" ? 90 : 0
                         color: ws.fg
                         font { family: Icons.family; pixelSize: Math.round(num.sz.size * 1.1) }
                     }
