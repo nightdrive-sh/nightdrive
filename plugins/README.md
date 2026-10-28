@@ -34,6 +34,7 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | `systemd/` | User units, linked to `~/.config/systemd/user` | — (LocalSend's [nightdrive-localsend.service](localsend/systemd/nightdrive-localsend.service)) |
 | `bin/` | Commands, linked to `~/.local/bin` | — (LocalSend's [localsend](localsend/bin/localsend)) |
 | `nautilus-python/` | Files extensions, linked to `~/.local/share/nautilus-python/extensions` | — (LocalSend's [localsend.py](localsend/nautilus-python/localsend.py)) |
+| `mcp.json` | Its tools for Claude (see [below](#tools-for-claude-mcpjson)) | — |
 | anything else | Whatever it needs, used by its own files | [install.sh](ferry/install.sh) (installs the Ferry release pinned in [release.conf](ferry/release.conf), checked by its sha256), [hook](ferry/hook) (Ferry runs it when its box changes) |
 
 `link.sh` links `bin/`, `systemd/` and `nautilus-python/` whether the plugin is installed or not, so its installer can
@@ -310,6 +311,46 @@ tests for that. Enable a unit by its path in the folder (`systemctl --user enabl
 `localsend enable` does): `systemctl --user disable` removes a linked unit's link too, and the path links it again. Name them
 so they can't clash: `nightdrive-<id>.service`, a command named after the plugin. A Files extension runs whether the
 plugin is on or not, so it checks that itself (LocalSend's tests its unit and `~/.local/state/nightdrive/plugins-off/<id>`).
+
+## Tools for Claude: mcp.json
+
+`nightdrive mcp`, Nightdrive's MCP server, gives Claude the tools in the `mcp.json` of every plugin that is installed and
+on, after the core's own (`config/mcp/tools/*.json`, the same format). A tool is a command the plugin already has, usually
+with `--json` output: the file only says how Claude calls it, and the server does the rest (Access, the confirmation
+card, undo, timeouts).
+
+```json
+{
+  "tools": [
+    {
+      "name": "disk_usage",
+      "title": "Disk usage",
+      "description": "Free and used space on each disk (or the one holding path), as df prints it.",
+      "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}, "additionalProperties": false},
+      "command": ["df", "--output=target,size,used,avail", ["{path}"]],
+      "class": "read",
+      "area": "disk"
+    }
+  ]
+}
+```
+
+| Field | What it is |
+| --- | --- |
+| `name` | `a-z`, `0-9` and `_`, at most 64, starting with the plugin's id (`disk_…`). A name already taken is left out, with a line in the log |
+| `title`, `description` | What Claude reads: what the tool does and returns, and when to use it |
+| `inputSchema` | The arguments as JSON Schema, an `object`. The server checks the top level (required, types, enums) before running anything |
+| `command` | Argv, run without a shell. `{name}` is that argument (a whole element or part of one; a list gives one element each). A nested list is optional: left out unless every argument in it is given. A boolean in one is the switch itself: `["--all", "{all}"]` gives `--all` when true |
+| `stdin` | Optional: `"json"` writes all the arguments as JSON on the command's stdin, `"{body}"` one argument's text (long text that doesn't fit argv) |
+| `class` | `read` runs at once. `change` runs at once and tells the user, who can undo it. `act` (sending, devices, installing) runs only after the user allows it on Nightdrive's card |
+| `undo` | For `change`, required: the argv that undoes it. Its `{name}`s come from the command's JSON output (its object's fields) and then the arguments |
+| `area` | The row in Settings › Claude › Access that turns it off or on: `mail`, `contacts`, `calendar`, `reminders`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `appearance`, `sound-display`, `apps-files`, `software`, or the plugin's own id |
+| `timeout` | Optional: seconds before it's stopped (30, at most 300) |
+
+The command runs in the plugin's folder, with its `bin/` and Nightdrive's first in `PATH`. stdout is the result Claude
+reads (a JSON object also as structured content, at most 100 000 characters); an exit status other than 0 is an error
+Claude reads, with stderr as the message, so write that for a reader. A tool whose area is off in Access isn't listed at
+all. `python3 config/mcp/registry.py` lists what the server would give, and the files it left out and why.
 
 ## Trying it out
 

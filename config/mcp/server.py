@@ -3,8 +3,8 @@
 
 JSON-RPC 2.0 over stdio, one message a line (MCP's stdio transport), Python's stdlib only. It answers initialize,
 ping, tools/list and tools/call; every other request gets MCP's "method not found". What the tools are and how they
-run is not this file's business: it asks a tool provider (`list()` and `call(name, arguments)`, see testtools.py),
-so the registry of plugins' mcp.json files (registry.py) slots in without the protocol changing.
+run is not this file's business: it asks a tool provider (`list()` and `call(name, arguments)`): registry.py, which
+reads the core's and the plugins' tool files and the user's Access.
 
 stdout carries the protocol and nothing else; diagnostics go to stderr, which Claude Code keeps as the server's log.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from testtools import TestTools, ToolError, UnknownTool  # noqa: E402  (after the path above)
+from registry import Registry, ToolError, UnknownTool  # noqa: E402  (after the path above)
 
 NAME = "nightdrive"
 # Newest first. A client asking for one of these gets it back; any other gets the newest, and the client decides
@@ -175,8 +175,8 @@ def main():
     # UTF-8 whatever the locale: a client may start us with LANG unset
     sys.stdin.reconfigure(encoding="utf-8")
     sys.stdout.reconfigure(encoding="utf-8")
-    # The seam for MCP 2 (#1763): registry.Registry(), filtered by Access, takes TestTools' place here
-    server = Server(TestTools())
+    # The tools of the core and the plugins that are on, as the user's Access lets Claude see them (registry.py)
+    server = Server(Registry())
     try:
         server.serve(sys.stdin, sys.stdout)
     except (KeyboardInterrupt, BrokenPipeError):
