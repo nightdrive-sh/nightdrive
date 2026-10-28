@@ -28,6 +28,7 @@ usage() {
   row "wallpaper COMMAND"        "The background: list, set, add, remove"
   row "display COMMAND"          "Screen scale: list, scale OUTPUT SCALE"
   row "bar-style COMMAND"        "The top bar's look: opacity, icons, highlight, icon-opacity"
+  row "notifications [COMMAND]"  "The latest notifications (--json), dnd [on|off], send SUMMARY [BODY], remove TAG"
   row "topbar adjust"            "The top bar's icon and text sizes, live"
   row "topbar date [STYLE]"      "The clock's date order: auto, dmy, mdy or iso"
   row "snippets [COMMAND]"       "Text snippets: list, set, remove, status, enable, disable"
@@ -803,7 +804,7 @@ case ${1:-} in
   minimal) exec "$repo/config/minimal/minimal" "${@:2}" ;;             # README › Install (Installed on Fedora KDE?)
   # topbar adjust: config/topbar/adjust.conf; software-catalog: config/quickshell/data/software.json
   platform|software-catalog|snippets) exec "$scripts/$1" "${@:2}" ;;
-  theme|display|wallpaper|bar-style) exec "$scripts/$1" "${@:2}" ;;    # the desktop's own scripts (hypr/scripts)
+  theme|display|wallpaper|bar-style|notifications) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
   ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }

@@ -5,7 +5,15 @@
   home-assistant configured        exit status 0 when set up (the launcher and the bar show Home only then)
   home-assistant states            the controllable devices as JSON: [{id, name, domain, state, on, area, fav, detail,
                                    dimmable, bright}] (bright 0..1, 0 when off; dimmable: a light with brightness)
+      --search TEXT                only those whose name, area or id has TEXT (any case)
+      --sensors                    sensors and binary sensors too (temperature, a door's contact), after the devices
+      --brief                      only {id, name, state} and area and detail when they say something (for Claude:
+                                   a home's whole list is long)
   home-assistant toggle ID         turns a device on/off, runs a scene / script / automation, presses a button
+  home-assistant set ID STATE      puts a device in a state, whatever it is now, and prints it then as JSON {id, name,
+                                   state, detail}: on|off (lights, switches, fans, climate, media players, automations),
+                                   open|close (covers), lock|unlock (locks), run (scenes, scripts, buttons; triggers an
+                                   automation). Claude's home_assistant_set (mcp.json), after the user allows it
   home-assistant brightness ID PCT sets a light's brightness, 0–100 (0 turns it off)
   home-assistant fav ID [on|off]   pins a device to the top bar's Home menu (no on/off: flips it)
   home-assistant bar               the top bar module's state line (modules.jsonc format)
@@ -37,6 +45,23 @@ DOMAINS = ["light", "switch", "fan", "cover", "climate", "media_player", "lock",
            "automation", "button", "input_button"]
 # Entities with these states have no on/off to show
 ONE_SHOT = {"scene", "script", "button", "input_button"}
+# Read only: with --sensors, so Claude can answer "is it cold outside" or "is the door open"
+SENSORS = ["sensor", "binary_sensor"]
+# A binary sensor's on/off in words, by its device class: "off" for a door means it's closed
+BINARY = {"door": ("open", "closed"), "window": ("open", "closed"), "opening": ("open", "closed"),
+          "garage_door": ("open", "closed"), "motion": ("detected", "clear"), "occupancy": ("detected", "clear"),
+          "presence": ("home", "away"), "moisture": ("wet", "dry"), "lock": ("unlocked", "locked"),
+          "battery": ("low", "normal"), "smoke": ("smoke", "clear"), "problem": ("problem", "ok")}
+
+# set's states, by domain: (domain, service) for each. Explicit, unlike toggle: Claude says which state it wants, and
+# the confirmation card shows that, so the result doesn't depend on a state read a moment earlier.
+SWITCHED = ("light", "switch", "fan", "climate", "media_player", "input_boolean", "automation")
+SET = {**{d: {"on": (d, "turn_on"), "off": (d, "turn_off")} for d in SWITCHED},
+       "cover": {"open": ("cover", "open_cover"), "close": ("cover", "close_cover")},
+       "lock": {"lock": ("lock", "lock"), "unlock": ("lock", "unlock")},
+       "scene": {"run": ("scene", "turn_on")}, "script": {"run": ("script", "turn_on")},
+       "button": {"run": ("button", "press")}, "input_button": {"run": ("input_button", "press")}}
+SET["automation"]["run"] = ("automation", "trigger")
 
 
 def die(msg, code=1):
@@ -175,6 +200,10 @@ def detail(domain, s):
         return a["media_title"]
     if domain in ONE_SHOT:
         return ""
+    if domain == "binary_sensor" and a.get("device_class") in BINARY and st in ("on", "off"):
+        return BINARY[a["device_class"]][st == "off"]
+    if a.get("unit_of_measurement"):
+        return f"{st} {a['unit_of_measurement']}"
     return st
 
 
@@ -199,7 +228,8 @@ def is_on(domain, st):
     return st == "on"
 
 
-def states(c):
+def states(c, search="", sensors=False):
+    domains = DOMAINS + (SENSORS if sensors else [])
     raw = c.call("GET", "/api/states")
     try:
         areas = c.call("POST", "/api/template", {"template": AREAS_TEMPLATE})   # rendered text, which request() parses
@@ -211,7 +241,7 @@ def states(c):
     for s in raw:
         eid = s["entity_id"]
         domain = eid.split(".", 1)[0]
-        if domain not in DOMAINS:
+        if domain not in domains:
             continue
         name = s.get("attributes", {}).get("friendly_name") or eid
         area = areas.get(eid, "") if isinstance(areas, dict) else ""
@@ -224,7 +254,9 @@ def states(c):
                     "on": on, "area": area, "fav": eid in favs, "detail": detail(domain, s),
                     "dimmable": dimmable(domain, attrs),
                     "bright": round((attrs.get("brightness") or 0) / 255, 3) if on and domain == "light" else 0})
-    out.sort(key=lambda e: (DOMAINS.index(e["domain"]), e["area"].lower(), e["name"].lower()))
+    if search:
+        out = [e for e in out if any(search.casefold() in e[k].casefold() for k in ("name", "area", "id"))]
+    out.sort(key=lambda e: (domains.index(e["domain"]), e["area"].lower(), e["name"].lower()))
     return out
 
 
@@ -244,6 +276,30 @@ def toggle(c, eid):
     else:
         svc = ("homeassistant", "toggle")
     c.call("POST", f"/api/services/{svc[0]}/{svc[1]}", {"entity_id": eid})
+
+
+def set_state(c, eid, state):
+    domain = eid.split(".", 1)[0]
+    choices = SET.get(domain)
+    if not choices:
+        die(f"{eid}: set handles {', '.join(SET)}; a {domain} has no state to set")
+    if state not in choices:
+        die(f"{eid} is a {domain}: its states are {' and '.join(choices)}, not {state}")
+    try:
+        before = c.call("GET", "/api/states/" + eid)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            die(f"Home Assistant has no {eid}: `home-assistant states` lists the devices")
+        raise
+    svc = choices[state]
+    changed = c.call("POST", f"/api/services/{svc[0]}/{svc[1]}", {"entity_id": eid})
+    # The service answers with the states it changed; one that changes later (a cover moving) isn't there yet
+    now = next((s for s in changed if s.get("entity_id") == eid), None) if isinstance(changed, list) else None
+    now = now or c.call("GET", "/api/states/" + eid) or before
+    out = {"id": eid, "name": now.get("attributes", {}).get("friendly_name") or eid, "state": now.get("state", "")}
+    if detail(domain, now) not in ("", out["state"]):
+        out["detail"] = detail(domain, now)
+    print(json.dumps(out, ensure_ascii=False))
 
 
 def brightness(c, eid, pct):
@@ -292,9 +348,25 @@ def main():
         cfg = load_config()
         sys.exit(0 if cfg.get("HA_URLS") and (cfg.get("HA_TOKEN") or cfg.get("HA_TOKEN_CMD")) else 1)
     elif cmd == "states":
-        print(json.dumps(states(Client()), ensure_ascii=False))
+        opts, search = a[1:], ""
+        if "--search" in opts:
+            i = opts.index("--search")
+            if i + 1 >= len(opts):
+                die("--search needs a text", 2)
+            search = opts.pop(i + 1)
+            opts.pop(i)
+        sensors, brief = "--sensors" in opts, "--brief" in opts
+        if [o for o in opts if o not in ("--sensors", "--brief")]:
+            die(__doc__.split("\n\n")[1], 2)
+        out = states(Client(), search, sensors)
+        if brief:
+            out = [{"id": e["id"], "name": e["name"], "state": e["state"],
+                    **{k: e[k] for k in ("area", "detail") if e[k] and e[k] != e["state"]}} for e in out]
+        print(json.dumps(out, ensure_ascii=False))
     elif cmd == "toggle" and len(a) == 2:
         toggle(Client(), a[1])
+    elif cmd == "set" and len(a) == 3:
+        set_state(Client(), a[1], a[2])
     elif cmd == "brightness" and len(a) == 3:
         brightness(Client(), a[1], a[2])
     elif cmd == "fav" and len(a) in (2, 3):

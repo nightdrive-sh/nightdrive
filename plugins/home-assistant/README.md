@@ -18,5 +18,16 @@ The installer asks for your Home Assistant addresses and a long-lived access tok
 
 An `http://` address sends the token as plain text, and the addresses are tried wherever you are: on another network, whatever answers `homeassistant.local` gets it. Use an `https://` address or Tailscale where you can (the installer warns about the others).
 
+## From a terminal, and Claude
+
+| Command | What it does |
+| --- | --- |
+| `home-assistant states` | The devices and their states as JSON; `--search TEXT` only those whose name, area or id has it, `--sensors` adds the sensors |
+| `home-assistant set ID STATE` | Puts a device in a state, whatever it is now: `on`/`off`, `open`/`close` (covers), `lock`/`unlock`, `run` (scenes, scripts, buttons) |
+| `home-assistant toggle ID` | Switches a device the other way, as Enter in the Launcher does |
+
+Claude (Settings › Claude › Access › Home Assistant) can read the states, and switch a device only after you allow it on
+Nightdrive's confirmation card, which shows the device and its new state.
+
 Homepage: https://www.home-assistant.io
 Needs: a Home Assistant server
