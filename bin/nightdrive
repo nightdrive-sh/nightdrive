@@ -35,6 +35,8 @@ usage() {
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
   row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --effort LEVEL, --background, --workspace WS)"
   row "mcp"                      "Nightdrive's MCP server for Claude (stdio: Claude Code starts it)"
+  row "mcp install|remove"       "Register it in Claude Code and allow its tools, or take that away (asks first; --dry-run shows)"
+  row "mcp status"               "Whether Claude Code has it, and its tools are allowed (--json)"
   row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
   section "Apps"
   row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage), and which are installed"
@@ -805,7 +807,11 @@ case ${1:-} in
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
   ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }
        exec "$scripts/terminal-or-claude" "${@:2}" ;;                   # what the launcher's ⌘⌥Enter runs
-  mcp) exec python3 "$repo/config/mcp/server.py" ;;                   # Dashboard #1761; Claude Code runs it
+  mcp) case ${2:-} in
+        "") exec python3 "$repo/config/mcp/server.py" ;;               # Dashboard #1761; Claude Code runs it
+        install|remove|status) exec python3 "$repo/config/mcp/register.py" "${@:2}" ;;
+        *) usage >&2; exit 1 ;;
+      esac ;;
   welcome) exec "$repo/config/welcome/welcome" "${@:2}" ;;             # Welcome to Nightdrive (launcher › System › Set up Nightdrive)
   ""|help|-h|--help) usage ;;
   *) usage >&2; exit 1 ;;
