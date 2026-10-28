@@ -84,14 +84,15 @@ it sends is under [Good to know](#good-to-know).
 ### Send to Claude
 
 Press ⌘⌃C (or Launcher › Tools › Send to Claude) to send what you're looking at to Claude Code: the selected text, the
-files selected in Files, or the picture on the clipboard. The Launcher shows what goes, and Enter puts it at the prompt of the session you pick, or of a new one
-(in the files' folder), without sending it: you write your question after it. Instead offers the rest: the clipboard's
-text, a screenshot of the window. Text goes as data between tags with the window's title; files and pictures as their
-paths, which Claude opens itself.
+files selected in Files, or the picture on the clipboard. The Launcher shows what goes, and Enter puts it at the prompt
+of the session you pick, or of a new one (in the files' folder if Claude Code already trusts it, else in ~/Projects),
+without sending it: you write your question after it. Instead offers the rest: the clipboard's text, a screenshot of the
+window. Text goes as data between tags with the window's title; files and pictures as their paths, which Claude opens
+itself.
 
 Nothing is read from the apps Claude writes leaves out (password managers, private windows, your own list in its
-settings), a password manager's copy on the clipboard is never read, and clipboard text that looks like a password or
-a code stays hidden until you choose it.
+settings), a password manager's copy on the clipboard is never read, and clipboard text that looks like a password, a
+code or a card number stays hidden until you choose it.
 
 ### Menus you want to click
 

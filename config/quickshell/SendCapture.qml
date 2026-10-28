@@ -7,7 +7,7 @@ import Quickshell.Io
 // what there is to send and which goes by default, and shows it; the target's level adds where it goes.
 // What goes by default: the files selected in a file manager, else text selected in the last minute in that window
 // (PrimaryWatch.qml), else the clipboard's picture, else its text. Never on its own: a selection older than that, a
-// screenshot, or clipboard text that looks like a password or a code (send-capture marks it), which stays hidden here
+// screenshot, or clipboard text that looks like a password, a code or a card number (send-capture marks it), hidden here
 // even when chosen; a password manager's copy isn't read at all.
 // A source's kind is what a target gets told: files | selection | clipboard | image | screenshot, the file in dir
 // being files, primary.txt, clipboard.txt, clipboard.png, window.png.
@@ -87,7 +87,7 @@ Item {
             return [{ kind: "header", name: "Clipboard text · " + plural(clipText.length, "character", "characters") }].concat(excerpt(clipText), tail)
         if (source === "secret")
             return [{ kind: "header", name: "Clipboard text" }, { kind: "quote", name: "••••••••" },
-                    { kind: "note", name: "Hidden: it looks like a password or a code" }]
+                    { kind: "note", name: "Hidden: it looks like a password, a code or a card number" }]
         if (source === "image") return [{ kind: "header", name: "The picture on the clipboard" }].concat(tail)
         if (source === "screenshot") return [{ kind: "header", name: "Screenshot of the window" }, { kind: "note", name: app }].concat(tail)
         return [{ kind: "header", name: "Nothing to send" },

@@ -20,12 +20,15 @@ Item {
 
     SendCapture { id: capture }
 
-    // As claude-send-paste picks it: the first file's folder (a folder itself when one is selected), else ~/Projects
-    function newDir() {
-        const f = capture.files
-        if (capture.source !== "files" || !f.length) return "~/Projects"
-        return capture.home(capture.meta.firstIsDir ? f[0] : capture.folderOf(f[0]))
+    // A new session's folder for the files, as claude-send-paste picks it (their own folder only when Claude Code
+    // already trusts it), asked from the script so the row says where it really opens
+    property string filesFolder: ""
+    Sh {
+        id: folderProc
+        command: [s.pasteScript, "folder", capture.dir]
+        onResult: text => s.filesFolder = text.trim()
     }
+    function newDir() { return capture.source === "files" && filesFolder !== "" ? capture.home(filesFolder) : "~/Projects" }
     function sessionRows() {
         return Claude.sessions.map(c => ({ kind: "scsess", name: c.topic || c.project, value: c.address, glyph: "bot",
                                            sub: c.project + " · " + (c.state === "working" ? "working" : "waiting for you"),
@@ -45,6 +48,8 @@ Item {
     function entered(level) {
         if (level !== "sendclaude") return
         capture.load()
+        filesFolder = ""
+        if (capture.files.length) folderProc.running = true
         selectTarget()
     }
 

@@ -549,6 +549,8 @@ PanelWindow {
     // A level opened from a search ("update" → Update channel), by its name: the level, the search and the row it came from,
     // so Esc goes back to that search like Spotlight does, not to the level's parent (Settings)
     property var fromSearch: ({})
+    // The level openLevel opened (a key, a menu, a script), "" when the launcher was opened as itself: back() closes there
+    property string keyLevel: ""
     // Opens a level with this already typed (Deck's Search Spotify row)
     function goSearch(target, text) { go(target); input.text = text }
     function go(target, goingBack) {
@@ -749,6 +751,9 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         if (detail !== null) { details.close(); return }
         if (tools.picker.back()) return      // Clipboard as a text field's picker: back to the field, its text kept
         if (level === "root") { win.open = false; return }
+        // The level a key or a menu opened the launcher on (openLevel: ⌘⇧E Emoji, ⌘⌃C Send to Claude): there's nothing
+        // in the launcher to go back to, so Esc closes it, as that key's own card would
+        if (level === keyLevel) { win.open = false; return }
         const s = fromSearch[level]
         if (s) {
             delete fromSearch[level]
@@ -768,7 +773,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
 
     // Closing leaves the details right away (after the Behavior above has seen open = false), so the next open starts narrow
     onOpenChanged: if (!open) Qt.callLater(() => { if (!win.open) details.close() })
-    else { lastMouse = null; lastSel = ({}); fromSearch = ({}); exts.forEach(e => e.opened()); Plugins.check(); go("root"); bgProc.running = true; bgAppsProc.running = true; autostartProc.running = true; updatesProc.running = true; sys.entered("display"); sys.soundRefresh(); input.forceActiveFocus() }
+    else { lastMouse = null; lastSel = ({}); fromSearch = ({}); keyLevel = ""; exts.forEach(e => e.opened()); Plugins.check(); go("root"); bgProc.running = true; bgAppsProc.running = true; autostartProc.running = true; updatesProc.running = true; sys.entered("display"); sys.soundRefresh(); input.forceActiveFocus() }
     Component.onCompleted: keysProc.running = true
 
     Timer { id: disarm; interval: 4000; onTriggered: win.armed = "" }
@@ -932,7 +937,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         function close(): void { win.open = false }
         // openLevel apps | keys | root: opens a sublevel directly
         // ⌘⇧V (clipboard) over a text field (a level in a Levels file's `inputs`) opens Clipboard as a picker for it
-        function openLevel(level: string): void { if (level === "clipboard" && tools.picker.begin()) return; win.open = true; win.go(level) }
+        function openLevel(level: string): void { if (level === "clipboard" && tools.picker.begin()) return; win.open = true; win.go(level); win.keyLevel = level }
         function setQuery(text: string): void { input.text = text }
         // askClaude: ⌘⌥Enter with the launcher open and a non-empty query → sends the text to Claude Code (hypr/scripts/terminal-or-claude). Returns "ok" or "".
         function askClaude(): string {

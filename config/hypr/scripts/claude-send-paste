@@ -2,7 +2,12 @@
 # Send to Claude's Enter (quickshell/SendClaudeLevels.qml): what scripts/send-capture gathered goes to a Claude Code
 # session's prompt, pasted the way ⌘V pastes, and is never sent: you write your question after it and press Enter.
 #   claude-send-paste DIR WHAT ADDR   WHAT: files | selection | clipboard | image | screenshot; ADDR: the session's window
-#   claude-send-paste DIR WHAT new    a new session (in the files' folder, else ~/Projects), pasted once it's ready
+#   claude-send-paste DIR WHAT new    a new session, pasted once it's ready
+#   claude-send-paste folder DIR      the folder a new session for DIR's files opens in (the level shows it)
+# A new session opens in the files' folder only when Claude Code already trusts it (a project), else in ~/Projects: a
+# folder others write into (~/Downloads: a web page's download, an archive, LocalSend) could hold a CLAUDE.md or a
+# .claude/settings.json with hooks, which trusting it would run, and the trust question isn't one to answer in passing.
+# Files elsewhere go as paths all the same: Claude asks before it reads them.
 # What goes in: text inside <selection window="its title"> or <clipboard> tags, so Claude reads it as data and your
 # own words after it as the question; files and pictures as their paths (quoted as a terminal quotes a dropped file),
 # which Claude reads itself. A picture is kept for a day in $XDG_RUNTIME_DIR/nightdrive/claude-send-images, where the
@@ -12,7 +17,8 @@ set -uo pipefail
 
 readonly IMAGES="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/claude-send-images"
 readonly SESSIONS="$HOME/.config/topbar/scripts/claude-sessions"
-readonly NEW_DIR="$HOME/Projects"   # a new session's folder when no files say otherwise, as terminal-or-claude's
+readonly NEW_DIR="$HOME/Projects"   # a new session's folder unless the files are in a trusted one, as terminal-or-claude's
+readonly CLAUDE_CONFIG="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"   # Claude Code's trusted folders (projects.*.hasTrustDialogAccepted)
 readonly TITLE_CHARS=200            # the window's title is cut at this length in the tag
 readonly FOCUS_WAIT=40              # × 0.05 s for the session's window to get the keyboard
 readonly NEW_WAIT=60                # × 0.5 s for a new session's window
@@ -21,8 +27,27 @@ readonly RESTORE_DELAY=0.8          # seconds before the clipboard gets its old 
 
 notify() { notify-send -a Claude -i claude "Send to Claude" "$1"; }
 
+# A folder Claude Code trusts, itself or by a folder above it, as Claude Code does
+trusted() {
+  jq -e --arg d "$1" '[(.projects // {}) | to_entries[] | select(.value.hasTrustDialogAccepted == true) | .key]
+    | any(.[]; . as $k | $d == $k or ($d | startswith($k + "/")))' "$CLAUDE_CONFIG" >/dev/null 2>&1
+}
+# Where a new session opens: the first file's folder (the folder itself when one was selected) if it's trusted
+session_dir() {
+  local f
+  if [[ $what == files && -s $dir/files ]]; then
+    f=$(head -n1 "$dir/files"); [[ -d $f ]] || f=${f%/*}
+    [[ -d $f ]] && trusted "$f" && { printf '%s' "$f"; return; }
+  fi
+  printf '%s' "$NEW_DIR"
+}
+
+if [[ ${1:-} == folder ]]; then
+  dir=${2:-}; what=files
+  session_dir; exit 0
+fi
 dir=${1:-}; what=${2:-}; target=${3:-}
-[[ -f $dir/meta.json && -n $what && -n $target ]] || { echo "usage: claude-send-paste DIR WHAT ADDR|new" >&2; exit 2; }
+[[ -f $dir/meta.json && -n $what && -n $target ]] || { echo "usage: claude-send-paste DIR WHAT ADDR|new, or folder DIR" >&2; exit 2; }
 umask 077
 
 # Text without control codes (a tab and a newline stay), the C1 ones included (U+0080–U+009F: 8-bit escapes)
@@ -96,11 +121,8 @@ title_of() { hyprctl -j clients 2>/dev/null | jq -r --arg a "$1" '.[] | select(.
 # prompt ready (Claude Code titles its window ✳ when it waits for you; before that a folder's trust question may be up,
 # which a paste must not answer)
 new_session() {
-  local cwd=$NEW_DIR before addr= f
-  if [[ $what == files ]]; then
-    f=$(head -n1 "$dir/files"); [[ -d $f ]] || f=${f%/*}
-    [[ -d $f ]] && cwd=$f
-  fi
+  local cwd before addr=
+  cwd=$(session_dir)
   before=$(addresses)
   "$HOME/.config/hypr/scripts/terminal-or-claude" --dir "$cwd" || return 1
   for _ in $(seq "$NEW_WAIT"); do

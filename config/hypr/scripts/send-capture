@@ -9,10 +9,10 @@
 #   primary.txt    the selected text (the primary selection: the clipboard stays as it is). The level tells an old
 #                  selection apart, as Claude writes does
 #   clipboard.png  the clipboard's picture, or clipboard.txt its text. A password manager's copy (they mark it secret) is
-#                  never read; text that looks like a password or a code is marked so (meta's clip "secret"), and the
-#                  level hides it until chosen
+#                  never read; text that looks like a password, a code or a card number is marked so (meta's clip
+#                  "secret"), and the level hides it until chosen
 #   window.png     a screenshot of the window
-#   meta.json      { addr, class, title, window: {x, y, w, h}, files, firstIsDir, primary, clip, clipChars, shot }
+#   meta.json      { addr, class, title, window: {x, y, w, h}, files, primary, clip, clipChars, shot }
 # The same apps are left out as in Claude writes: password managers, keyrings, private browser windows (claude-write
 # always) and your own (launcher › Settings › Claude writes › Not in these apps).
 set -uo pipefail
@@ -28,11 +28,25 @@ readonly SECRET_HINT='x-kde-passwordManagerHint'   # the type password managers 
 
 notify() { notify-send -a Nightdrive -i document-send "Send" "$1"; }
 
-# Text that may be a password or a one-time code: one word of up to 64 characters that is 4–8 digits, or 8 or more
-# characters mixing three of lower case, upper case, digits and symbols. Not a link or a path. A guess both ways: the
-# level only hides such text until it's chosen
+# A payment card's number: 13–19 digits, in groups with spaces or dashes or without, that pass the Luhn check (the
+# check digit every card number has, so a random run of digits seldom passes)
+is_card() {
+  local d=${1//[ -]/} sum=0 i n
+  [[ $1 =~ ^[0-9][0-9\ -]{11,22}[0-9]$ && $d =~ ^[0-9]{13,19}$ ]] || return 1
+  for ((i = 0; i < ${#d}; i++)); do
+    n=${d: -1-i:1}
+    (( i % 2 )) && { n=$((n * 2)); (( n > 9 )) && n=$((n - 9)); }
+    sum=$((sum + n))
+  done
+  (( sum % 10 == 0 ))
+}
+
+# Text that may be a password, a one-time code or a card number: a card's number (is_card), or one word of up to 64
+# characters that is 4–8 digits, or 8 or more characters mixing three of lower case, upper case, digits and symbols.
+# Not a link or a path. A guess both ways: the level only hides such text until it's chosen
 looks_secret() {
   local t=$1 kinds=0
+  is_card "$t" && return 0
   [[ $t == *[[:space:]]* || ${#t} -gt 64 || ${#t} -lt 4 ]] && return 1
   [[ $t == *://* || $t == /* || $t == '~/'* ]] && return 1
   [[ $t =~ ^[0-9]{4,8}$ ]] && return 0
@@ -128,11 +142,9 @@ fi
 rm -f "$WORK/.saved"
 
 primary=0; [[ -f $WORK/primary.txt ]] && primary=$(wc -m <"$WORK/primary.txt")
-# A new session opens in the first file's folder, or in the folder itself when that's what was selected
-firstdir=false; (( files )) && [[ -d $(head -n1 "$WORK/files") ]] && firstdir=true
 jq -n --arg addr "$addr" --arg class "$class" --arg title "$title" --argjson win "$win" --argjson files "$files" \
       --argjson primary "$primary" --arg clip "$clip" --argjson clipchars "$clipchars" --argjson shot "$shot" \
-      --argjson firstdir "$firstdir" '{ addr: ($addr | sub("^0x"; "")), class: $class, title: $title,
+      '{ addr: ($addr | sub("^0x"; "")), class: $class, title: $title,
          window: { x: $win.at[0], y: $win.at[1], w: $win.size[0], h: $win.size[1] },
-         files: $files, firstIsDir: $firstdir, primary: $primary, clip: $clip, clipChars: $clipchars, shot: $shot }' >"$WORK/meta.json"
+         files: $files, primary: $primary, clip: $clip, clipChars: $clipchars, shot: $shot }' >"$WORK/meta.json"
 qs ipc call launcher openLevel "$level" >/dev/null 2>&1 || notify "The launcher didn't open (is Quickshell running?)."
