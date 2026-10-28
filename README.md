@@ -10,8 +10,8 @@ developer, user interfaces and ease of use are at the core of what I do. So I bu
 desktop around what I wanted: windows managed and moved from the keyboard, one launcher for
 everything, a top bar that just works, fast and light. With Claude Code, the dream came true, evening by evening.
 
-> **Work in progress.** Nightdrive is my daily setup, published so others can use it or borrow from it. It's used every day on
-> a MacBook Pro 14″ (M2 Max), and tested on a PC and in a virtual machine.
+> **Work in progress.** Nightdrive is my daily setup, published so others can use it or borrow from it. It's made for a PC
+> and an Apple Silicon Mac: used every day on a MacBook Pro 14″ (M2 Max), and tested on PCs and in virtual machines.
 > Feedback, issues and ideas are very welcome.
 
 ## Why Nightdrive?
@@ -19,7 +19,7 @@ everything, a top bar that just works, fast and light. With Claude Code, the dre
 [Hyprland](https://hypr.land) is a great tiling compositor, but on its own it's a toolkit: no bar, launcher, theme or apps.
 Nightdrive puts all of that together into one opinionated desktop.
 
-- **⌘ is the main key.** ⌘ is the Super key: the Windows key on a PC, Command on a Mac.
+- **One main key, the Windows key on a PC or Command on a Mac.** This README writes it ⌘ (the Super key).
   ⌘C / ⌘V / ⌘X work in every app, including the terminal. ⌘S saves, ⌘W closes, ⌘Q quits, ⌘Space opens the Launcher.
 - **Caps Lock is Hyper, the app key.** Hyper + a letter opens an app or brings it to the front: Hyper B the browser,
   Hyper F Files, Hyper M music. No app uses Hyper itself, so the keys are yours: pick the app for any letter or digit
@@ -30,7 +30,7 @@ Nightdrive puts all of that together into one opinionated desktop.
   dictation, and sleep is tuned for Asahi.
 - **Everything is a keystroke away.** One launcher handles apps, passwords, clipboard history, emoji, screenshots, settings,
   installing packages and power. You rarely need a terminal for everyday things.
-- **Apps of its own.** Mail, Contacts, Deck and Ferry come with it, made for the keyboard and in the desktop's colours.
+- **Apps of its own.** Mail, Contacts, Deck, Garage and Ferry come with it, made for the keyboard and in the desktop's colours.
 - **Simple and readable.** Plain config files, a few small scripts, and comments that explain *why*.
 
 ## Highlights
@@ -54,6 +54,32 @@ It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and
 copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal comma in results* answers `3,5`.
 
 ![The Launcher](docs/screenshots/launcher.jpg)
+
+### Apps of its own
+
+Mail, Contacts, Deck and Ferry come with every install; Garage waits in Launcher › System › Install › Recommended. They're
+made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the sidebar steps aside; narrower
+still, the list and the message take turns.
+
+- **[Mail](plugins/mail/README.md)**: any IMAP account, quiet reading, notifications you can answer from
+- **[Contacts](plugins/contacts/README.md)**: iCloud, Google or CardDAV, in sync both ways; Mail and the Launcher find them
+- **[Deck](plugins/deck/README.md)**: Spotify (Premium) with your albums on a shelf, in the bar, the Launcher and the media keys
+- **[Garage](plugins/garage/README.md)**: virtual machines from a ready-made Fedora or an ISO, with snapshots to go back to
+- **[Ferry](plugins/ferry/README.md)**: a mailbox over Tailscale between your computers and your phone
+
+![Mail four ways: folders, list and message; list and message; and in a narrow window the list, then the message](docs/releases/0.6.0-mail-sizes.jpg)
+
+### Claude writes
+
+Select a rough draft or your notes in any app and press ⌘⇧C. Claude writes it out in a tone that fits the place, in the
+same language: Enter puts it in place of the selection, ⌘⇧C again writes another version, Esc cancels. With nothing
+selected, it asks what to write. In a Claude Code session it writes your prompt; in a terminal (turn it on in its
+settings) it writes the command, with a warning if it deletes, overwrites or needs root, and runs it only on Enter.
+
+It needs a Claude Pro or Max plan. Launcher › Settings › Claude writes sets the model and instructions of your own. What
+it sends is under [Good to know](#good-to-know).
+
+![Replying in Mail: a few careless words, ⌘⇧C, and Claude's reply goes in with Enter](docs/releases/0.6.0-claude-writes.gif)
 
 ### Menus you want to click
 
@@ -109,12 +135,6 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 
 - **Shelf**: drag a file to the top edge of the screen to park it, then drag it into another app.
 - **Dictation**: hold F5 or Fn on a Mac, Insert on a PC, speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
-- **Claude writes** (a Claude Pro or Max plan): select a rough draft or your notes in any app and press ⌘⇧C. Claude writes
-  it out in a tone that fits the place, in the same language: Enter puts it in place of the selection, ⌘⇧C again writes
-  another version, Esc cancels. With nothing selected, it asks what to write. In a Claude Code session it writes your
-  prompt; in a terminal (turn it on in its settings) it writes the command, with a warning if it deletes, overwrites or
-  needs root, and runs it only on Enter. Launcher › Settings › Claude writes sets the model and instructions of your own.
-  What it sends is under [Good to know](#good-to-know).
 - **Snippets**: Launcher › Tools › Snippets; Enter pastes one. With auto-expand on, typing a trigger anywhere replaces it
   with the text. A snippet can have several lines (Shift+Enter), like an email signature.
 - **From your phone**: [Ferry](plugins/ferry/README.md), one of Nightdrive's apps, is a mailbox over Tailscale between your
@@ -126,8 +146,6 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   these and video calls, asks in a themed window: the whole screen or one window.
 - **Themes**: seven colours that change the whole desktop at once, two synthwave wallpapers and your own (Settings ›
   Theme). GTK windows such as Files and the file picker follow the colour too.
-- **Screensavers**: a synthwave sunset and a falling-characters rain, both drawn in the terminal, and a big clock whose
-  digits slide up as the minutes change.
 - **Background apps**: ⌘W only hides chat apps and the music player, so they keep running. Their shortcut brings them straight back.
 - **Claude Code waits for you?** Its notification says which session and what it wants, and a permission request can
   be answered right there (Allow, Deny).
@@ -153,8 +171,6 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   lock screen too. Another user logs in from the text console (Ctrl+Alt+F3, with Fn on a Mac keyboard). If the lock
   screen ever dies, it comes back by itself, still locked; if it doesn't, ⌃⌥F3 starts it again.
 
-![Screensavers: synthwave sunset and rain](docs/screenshots/screensavers.jpg)
-
 ## What's included
 
 | | App | How it fits in |
@@ -179,7 +195,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) | `.md` files open in it, themed |
 | Web apps | Chromium app windows | your own, or ready-made ones with a key: WhatsApp, Slack, Teams, YouTube |
 | External display | Hyprland | workspaces 1–9 on the display, one on the laptop's screen (⌘0); with the lid closed only the display is used; where the laptop's screen is in Launcher › Settings › Display |
-| Lock and idle | the login screen as the lock, hypridle | screensaver after 10 min, lock after 30 min (Settings › Screensaver) |
+| Lock and idle | the login screen as the lock, hypridle | a screensaver after 10 min (a synthwave sunset, a falling-characters rain or a big clock), lock after 30 min (Settings › Screensaver) |
 | Smart home (optional) | [Home Assistant](plugins/home-assistant/README.md) | rooms, devices and scenes in the Launcher, pinned devices in the bar |
 | Mail, alternative (optional) | Thunderbird | themed, with a minimal toolbar ([details](docs/thunderbird.md)) |
 | [Mac Keyboard Shortcuts](plugins/keyd/README.md) (optional) | [keyd](https://github.com/rvaiya/keyd) | ⌥⌫ deletes a word, ⌘⌫ to the line start; in Files Enter renames, ⌘O opens |
@@ -423,7 +439,7 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | ⌘ ⇧ D | Put the window in the drawer, or take it back out |
 | ⌘ ⇧ V | Clipboard history |
 | ⌘ ⇧ E | Emoji |
-| ⌘ ⇧ C | Claude writes, in any app ([Little things](#little-things-that-add-up)) |
+| ⌘ ⇧ C | Claude writes, in any app ([Claude writes](#claude-writes)) |
 | ⌘ ⇧ S | Screenshot of a region, to the clipboard (Save in the notification keeps a copy) |
 | ⌘ ⌥ S / ⌘ ⌥ ⇧ S | Screenshot of a window / of the screen |
 | Hyper B / F / E / M / P | Browser / Files / Email / Music / 1Password |
