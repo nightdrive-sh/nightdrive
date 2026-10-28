@@ -8,11 +8,13 @@
 #   names.json   the snapshots' names, by tag ({ "s1761400000": "Before KDE update" }), as qemu-img can't rename one
 #   snapsizes.json  what each snapshot keeps on its own, in bytes, as of the disk's mtime (lib/snapsize.py)
 #   qmp.sock, qga.sock, pid, serial.log while it runs (qemu's monitor, the guest agent's channel)
+#   state, state.lock  booting or stopping, since when (lib/state.sh)
 #   firstboot/   a disk image's first boot: its user, until it has run (lib/firstboot.sh)
 # What differs between an Asahi Mac and a PC is lib/arch.sh's; qemu itself, its command line and its sockets, are
 # lib/qemu.sh's; the ready-made images are lib/images.sh's.
 #
-#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running, shown (its window on a workspace that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
+#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running (qemu is), state (lib/state.sh: stopped, booting, running, stopping), slow (stopping for long), acpi (stopping by the power button), shown (its window on a workspace that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
+#   garage-ctl states                        NAME STATE a line, cheaply (the top bar's icon)
 #   garage-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   garage-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
 #   garage-ctl fetch ID                      download one in the background (images shows how far)
@@ -89,6 +91,8 @@ read_conf() {
 
 # shellcheck source=../lib/arch.sh
 . "$(dirname "$(readlink -f "$0")")/../lib/arch.sh"
+# shellcheck source=../lib/state.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/state.sh"
 # shellcheck source=../lib/qemu.sh
 . "$(dirname "$(readlink -f "$0")")/../lib/qemu.sh"
 # shellcheck source=../lib/firstboot.sh
@@ -147,18 +151,20 @@ list() {
   echo -n "["
   for d in "$ROOT"/*/; do
     [[ -f $d/vm.conf ]] || continue
-    local name MEM CPUS ISO SSH_PORT SSH_USER run=false pid=""
+    local name MEM CPUS ISO SSH_PORT SSH_USER run=false pid="" st slow acpi
     name=$(basename "$d")
     # A folder made by hand with a name garage-ctl wouldn't take: the window and the menu would pass it back to it
     good_name "$name" || continue
     read_conf "$name"
     running "$name" && { run=true; pid=$(cat "$d/pid"); }
+    read -r st slow acpi < <(vm_state "$name")
     # -U reads the disk while qemu holds its lock
     local info; info=$(qemu-img info -U --output=json "$d/disk.qcow2")
     ((first)) || echo -n ","; first=0
     jq -nc --arg name "$name" --argjson mem "$MEM" --argjson cpus "$CPUS" --arg iso "$ISO" --argjson run "$run" \
        --argjson shown "$shown" --arg pid "$pid" --argjson info "$info" --arg ssh "$SSH_PORT" --arg user "$SSH_USER" --argjson names "$(cat "$d/names.json" 2>/dev/null || echo '{}')" \
-       --argjson sizes "$(snap_sizes "${d%/}")" '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run, shown: ($run and ($shown[$pid] // false)),
+       --argjson sizes "$(snap_sizes "${d%/}")" --arg state "$st" --argjson slow "$slow" --argjson acpi "$acpi" \
+       '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run, state: $state, slow: $slow, acpi: $acpi, shown: ($run and ($shown[$pid] // false)),
          ssh: (if $ssh == "" then null else ($ssh | tonumber) end), user: $user,
          disk: ($info["virtual-size"] / 1073741824 | floor),
          used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
@@ -251,6 +257,7 @@ isos() {
 
 case ${1:-} in
   list)     list ;;
+  states)   states ;;
   isos)     isos ;;
   create)   (($# >= 5)) || die "create NAME ISO MEM_GB DISK_GB [CPUS]"; create "${@:2}" ;;
   images)   images ;;

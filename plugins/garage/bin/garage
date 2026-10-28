@@ -55,7 +55,7 @@ uninstall_app() {
 
 # One line each for the terminal (garage-ctl's list is JSON, for the window)
 list() {
-  "$GARAGE_CTL" list | jq -r '.[] | [.name, (if .running then "running" else "stopped" end),
+  "$GARAGE_CTL" list | jq -r '.[] | [.name, ({ booting: "booting up", stopping: (if .slow then "not shutting down" else "shutting down" end) }[.state] // .state),
     "\(.mem / 1024 | floor) GB", "\(.cpus) CPUs", "\(.disk) GB disk", "\(.snapshots | length) snapshots"] | @tsv' \
     | column -t -s $'\t'
 }

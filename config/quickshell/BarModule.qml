@@ -25,10 +25,20 @@ Item {
     property int frame: 0
     readonly property string shownIcon: frames[frame % frames.length]
     Timer { running: mod.frames.length > 1; interval: 350; repeat: true; onTriggered: mod.frame++ }
-    Timer { running: mod.frames.length > 1; interval: 1000; repeat: true; onTriggered: TopBar.refresh(mod.name) }
+    Timer { running: mod.frames.length > 1 || mod.pulsing; interval: 1000; repeat: true; onTriggered: TopBar.refresh(mod.name) }
     readonly property string label: st && st.text ? st.text : ""
     readonly property string cls: st && st.class ? st.class : ""
-    readonly property bool active: cls === "active"
+    // "pulse" is active whose icon fades in and out, smoothly (a VM booting in Garage): asked for every second meanwhile too
+    readonly property bool pulsing: cls === "pulse"
+    readonly property bool active: cls === "active" || pulsing
+    property real pulse: 1
+    SequentialAnimation on pulse {
+        running: mod.pulsing
+        loops: Animation.Infinite
+        NumberAnimation { to: 0.3; duration: 700; easing.type: Easing.InOutSine }
+        NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine }
+        onRunningChanged: if (!running) mod.pulse = 1
+    }
     // present: it has something to show; tucked: it didn't fit and is in the "…" menu instead (Bar.qml lays out by
     // present, so tucking it away doesn't change the layout it came from)
     readonly property bool present: icon !== "" || label !== ""
@@ -69,7 +79,7 @@ Item {
             y: mod.snap((mod.height - height) / 2)
             sourceSize: Qt.size(Math.ceil(width * mod.dpr), Math.ceil(height * mod.dpr))
             source: TopBar.iconUrl(mod.shownIcon, mod.fg)
-            opacity: mod.fg.a * (mod.isMic ? 0.45 : 1)   // the microphone's level fills it at full colour
+            opacity: mod.fg.a * mod.pulse * (mod.isMic ? 0.45 : 1)   // the microphone's level fills it at full colour
             smooth: true
             cache: false
         }

@@ -21,12 +21,13 @@ Item {
     signal picked(string name)          // renamed: the window follows it to its new name
     signal settings()
 
-    // Its state, with what the window has asked of it and the list doesn't show yet (VmCtl's pending)
-    readonly property var pend: vm ? ctl.pending[vm.name] : undefined
-    readonly property bool running: !!vm && vm.running
-    readonly property bool stopping: running && !!pend && pend.what === "stopping"
-    readonly property bool starting: !running && !!pend && pend.what === "starting"
-    readonly property bool stopped: !!vm && !running && !starting
+    // Its state (VmCtl.stateOf: garage-ctl's, or what the window has just asked of it). running: qemu is, booting and
+    // shutting down too, so its display and Force off are there meanwhile
+    readonly property string vmState: ctl.stateOf(vm)
+    readonly property bool running: !!vm && vmState !== "stopped"
+    readonly property bool stopping: vmState === "stopping"
+    readonly property bool slow: stopping && !!vm.slow && !ctl.pending[vm.name]
+    readonly property bool stopped: !!vm && vmState === "stopped"
 
     // What the buttons and the keys do (shell.qml's s, d, x, ⇧X)
     function act(args) { root.ctl.run(args) }
@@ -34,7 +35,7 @@ Item {
     // d toggles: a window that shows goes out of sight with the VM running on (garage-ctl hide), else it comes forward
     readonly property bool shown: running && !!vm.shown
     function display() { if (root.running) root.act([root.shown ? "hide" : "display", root.vm.name]) }
-    function shutDown() { if (root.running && !root.stopping) root.ctl.power("stop", root.vm.name) }
+    function shutDown() { if (root.running && (!root.stopping || root.slow)) root.ctl.power("stop", root.vm.name) }
     function forceOff() { if (root.running) root.ctl.power("kill", root.vm.name) }
     function takeSnapshot() { snapshots.take() }
     function focusSnapshots() { snapshots.focusList() }
@@ -98,12 +99,7 @@ Item {
                 onClicked: root.renameVm()
             }
             Item { Layout.fillWidth: true }
-            Text {
-                text: root.stopping ? "◌  Shutting down…" : root.starting ? "◌  Starting…"
-                    : root.running ? "●  Running" : "○  Stopped"
-                color: root.running && !root.stopping ? root.c.primary : root.c.dim
-                font.family: root.c.font; font.pixelSize: 12
-            }
+            StateLine { c: root.c; vmState: root.vm ? root.vmState : "stopped"; slow: root.slow }
         }
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: root.c.divider }
 
@@ -134,12 +130,13 @@ Item {
                     onClicked: root.display()
                 }
                 AppButton {
-                    c: root.c; glyph: "power"; label: "Shut down"; keys: "x"; tip: "Ask it to power off"; tipAlign: "left"
-                    visible: root.running && !root.stopping
+                    c: root.c; glyph: "power"; label: root.slow ? "Ask again" : "Shut down"; keys: "x"; tipAlign: "left"
+                    tip: root.slow ? "It hasn't gone down yet" : "Ask it to power off"
+                    visible: root.running && (!root.stopping || root.slow)
                     onClicked: root.shutDown()
                 }
                 AppButton {
-                    c: root.c; glyph: "square"; label: "Force off"; strong: root.stopping; keys: "⇧X"; tip: "Pull the plug"; tipAlign: "left"
+                    c: root.c; glyph: "square"; label: "Force off"; strong: root.slow; keys: "⇧X"; tip: "Pull the plug"; tipAlign: "left"
                     visible: root.running
                     onClicked: root.forceOff()
                 }

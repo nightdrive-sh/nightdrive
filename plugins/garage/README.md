@@ -21,7 +21,8 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 | F2 | Rename a stopped VM |
 
 - A ready-made image (Fedora 44 Minimal on a Mac, Cloud Base on a PC) needs no installer: its first boot makes your user, with sudo and your ssh key. Or pick an ISO from Downloads (or ~/vm).
-- The top bar's garage icon lights up while a VM runs; a click lists your VMs to start or show.
+- The top bar's garage icon lights up while a VM runs, and blinks while one boots or shuts down; a click lists your VMs to start or show.
+- A VM is *Booting up* until its guest agent or sshd answers (at most two minutes), and *Shutting down* until qemu has gone. A shutdown that hasn't happened in a minute offers Force off.
 - Nightdrive in a VM follows its window's size, as in UTM and Parallels, at scale 2 until you pick another in its Settings › Display.
 - A snapshot's duplicate shares its space on the disk. Beside each snapshot is the space it alone keeps.
 - `ssh NAME` reaches a running VM: each has a port of its own, kept in ~/.ssh/config.d/garage (Garage adds `Include config.d/garage` to ~/.ssh/config).

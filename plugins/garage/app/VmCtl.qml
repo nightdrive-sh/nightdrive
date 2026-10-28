@@ -14,32 +14,44 @@ QtObject {
 
     function refresh() { if (!lister.running) lister.running = true }
 
-    // A VM on its way up or down, by name: { what: "starting" | "stopping", since, acpi }, until the list shows it there,
-    // so the page can say so meanwhile. A shutdown the guest ignores gives up after stopWait; acpi: it went to the power
-    // button, as the guest has no agent (garage-ctl stop), which says why.
-    readonly property int stopWait: 90000
+    // Each VM's state is garage-ctl's (lib/state.sh): stopped, booting, running or stopping (slow: for long, and the page
+    // offers Force off). Between a click and the list showing it, pending stands for it, by name: { what: "booting" |
+    // "stopping" | "stopped", since }, until the list has caught up, the call fails or pendingWait has passed.
+    readonly property int pendingWait: 30000
     property var pending: ({})
-    function setPending(name, what, acpi) {
+    function setPending(name, what) {
         const p = Object.assign({}, pending)
-        if (what) p[name] = { what: what, since: Date.now(), acpi: !!acpi }; else delete p[name]
+        if (what) p[name] = { what: what, since: Date.now() }; else delete p[name]
         pending = p
     }
+    function stateOf(v) {
+        if (!v) return "stopped"
+        const p = pending[v.name]
+        return p ? p.what : v.state || (v.running ? "running" : "stopped")
+    }
     function power(action, name) {
-        const what = action === "start" ? "starting" : "stopping"
-        setPending(name, what)
-        run([action, name], out => { if (out.trim() === "acpi") setPending(name, what, true) }, () => setPending(name, ""))
+        setPending(name, action === "start" ? "booting" : action === "stop" ? "stopping" : "stopped")
+        run([action, name], null, () => setPending(name, ""))
     }
     function settle() {
         for (const name in pending) {
-            const v = vms.find(x => x.name === name), p = pending[name]
-            if (!v || v.running === (p.what === "starting")) setPending(name, "")
-            else if (p.what === "stopping" && Date.now() - p.since > stopWait) {
-                setPending(name, "")
-                error = name + " didn't shut down" + (p.acpi ? " (no qemu-guest-agent in it, so it was its power button)" : "")
-                      + ": Force off (⇧X) pulls the plug"
-            }
+            const v = vms.find(x => x.name === name), p = pending[name], st = v ? v.state : "stopped"
+            const there = p.what === "booting" ? st !== "stopped"
+                        : p.what === "stopping" ? st === "stopping" || st === "stopped"
+                        : st === "stopped"
+            if (there || Date.now() - p.since > pendingWait) setPending(name, "")
         }
+        // A shutdown gone slow says why once, at the page's foot: the page's Force off is strong meanwhile
+        const slow = {}
+        for (const v of vms) if (v.slow) {
+            slow[v.name] = true
+            if (!slowSaid[v.name])
+                error = v.name + " hasn't shut down" + (v.acpi ? " (no qemu-guest-agent in it, so it was its power button)" : "")
+                      + ": Force off (⇧X) pulls the plug"
+        }
+        slowSaid = slow
     }
+    property var slowSaid: ({})
 
     // After the host has slept, the running VMs' clocks are behind by as long: a tick much later than the last one says
     // so, and their guest agents set them (garage-ctl synctime: quiet without one)

@@ -1,9 +1,14 @@
 #!/bin/bash
-# Garage's top bar module (module.jsonc): highlighted while a VM runs, dimmed otherwise. Reads the VMs' pid files
-# (bin/garage-ctl's folder layout) rather than `garage-ctl list`, which runs qemu-img on every disk: this runs every 3 s.
+# Garage's top bar module (module.jsonc): highlighted while a VM runs, dimmed otherwise, and pulsing while one boots or
+# shuts down. Reads the VMs' pid files (bin/garage-ctl's folder layout) rather than `garage-ctl list`, which runs
+# qemu-img on every disk: this runs every 3 s, and every second while it pulses (the bar asks). Only with one running
+# does it ask garage-ctl states (lib/state.sh), which reads no disks either.
 . ~/.config/topbar/scripts/emit
 ROOT=${GARAGE_ROOT:-$HOME/.local/share/nightdrive/garage}
 for f in "$ROOT"/*/pid; do
-  p=$(cat "$f" 2>/dev/null) && [[ -n $p ]] && kill -0 "$p" 2>/dev/null && { emit warehouse "" active; exit; }
+  p=$(cat "$f" 2>/dev/null) && [[ -n $p ]] && kill -0 "$p" 2>/dev/null || continue
+  if bin/garage-ctl states 2>/dev/null | grep -qE ' (booting|stopping)$'; then emit warehouse "" pulse
+  else emit warehouse "" active; fi
+  exit
 done
 emit warehouse "" off

@@ -95,6 +95,7 @@ start() {
   setsid -f "${QEMU_CMD[@]}" > "$d/qemu.log" 2>&1
   for _ in $(seq 50); do
     if running "$name"; then
+      boot_watch "$name"
       [[ -n ${GARAGE_HEADLESS:-} ]] || setsid -f flock -n "${XDG_RUNTIME_DIR:-/tmp}/nightdrive-garage-resizing.lock" \
         qs -p "$OVERLAY" >/dev/null 2>&1 || true
       return 0
@@ -109,13 +110,16 @@ start() {
 }
 
 # Shut down: the guest agent's, which works whatever the desktop in it does with the power button, else ACPI's power
-# button (with KDE logged in nothing happens, and Nightdrive shows its power menu). Prints "acpi" then, so the window
-# can say why, if it doesn't go down
+# button (with KDE logged in nothing happens, and Nightdrive shows its power menu). Its state says which (lib/state.sh:
+# stopping, acpi), and "acpi" is printed then, so the window can say why, if it doesn't go down
 stop() {
   need "$1"; running "$1" || return 0
   # The agent answering means the first boot's scripts have run (lib/firstboot.sh): their credentials can go
-  qga "$1" guest-shutdown '{"mode": "powerdown"}' >/dev/null 2>&1 && { rm -rf "$(dir "$1")/firstboot"; return 0; }
+  if qga "$1" guest-shutdown '{"mode": "powerdown"}' >/dev/null 2>&1; then
+    state_set "$1" stopping; rm -rf "$(dir "$1")/firstboot"; return 0
+  fi
   qmp "$1" system_powerdown >/dev/null
+  state_set "$1" stopping acpi
   echo acpi
 }
 
@@ -123,6 +127,7 @@ stop() {
 force_off() {
   need "$1"; running "$1" || return 0
   qmp "$1" quit >/dev/null 2>&1 || kill "$(cat "$(dir "$1")/pid")"
+  state_set "$1" ""
 }
 
 # The guest's clock to the host's, through its agent: after the host has slept, the guest's clock is behind by as
