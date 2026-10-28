@@ -1,0 +1,199 @@
+{
+  "tools": [
+    {
+      "name": "deck_now_playing",
+      "title": "What plays in Deck",
+      "description": "What plays in Deck, the user's Spotify player: running (false and nothing else when Deck isn't running), playing (false when paused), the track's title, artist and album, track_uri and album_uri, position_ms and duration_ms, liked (null when likes aren't available), queued (the track came from the queue), the queue (each track's uri, title, artist, duration_ms, album_uri), the genre radio playing (genre, name) and Deck's latest error. Makes no request to Spotify. Use it before changing what plays, and to answer what's playing.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["deck", "status", "--json"],
+      "class": "read",
+      "area": "deck"
+    },
+    {
+      "name": "deck_search",
+      "title": "Search Spotify in Deck",
+      "description": "Searches Spotify through Deck: artists (id, name), albums (uri, name, artist, year…) and songs (uri, name, artist, duration_ms, and its album). Each call is a request to Spotify, which blocks Deck for hours after too many: search once with good words (artist and album), not in a loop. Then deck_play_album or deck_play_song with the uris.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "title": "Search", "description": "An artist, an album or a song, e.g. \"Destroyer Kaputt\"", "minLength": 1}
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "command": ["deck", "search", "--json", "{query}"],
+      "class": "read",
+      "area": "deck"
+    },
+    {
+      "name": "deck_album",
+      "title": "An album's tracks",
+      "description": "An album and its tracks (uri, name, artist, duration_ms) from Spotify through Deck, by its spotify:album: uri. Use it to play or queue one song of an album (deck_play_song, deck_queue_song need the track's uri and the album's). One request to Spotify.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:"}
+        },
+        "required": ["album_uri"],
+        "additionalProperties": false
+      },
+      "command": ["deck", "album-tracks", "--json", "{album_uri}"],
+      "class": "read",
+      "area": "deck"
+    },
+    {
+      "name": "deck_artist_albums",
+      "title": "An artist's albums",
+      "description": "An artist's albums from Spotify through Deck, by the artist's id from deck_search. One request to Spotify.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "artist_id": {"type": "string", "title": "Artist", "description": "The artist's id from deck_search"}
+        },
+        "required": ["artist_id"],
+        "additionalProperties": false
+      },
+      "command": ["deck", "artist-albums", "--json", "{artist_id}"],
+      "class": "read",
+      "area": "deck"
+    },
+    {
+      "name": "deck_play_album",
+      "title": "Play an album in Deck",
+      "description": "Plays a whole album in Deck from its first track (Deck's player starts if it isn't running), in place of what plays; the queue stays. Returns what then plays. The user can undo it, back to what played before, where it was.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:"}
+        },
+        "required": ["album_uri"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/playback.py", "play-album", "{album_uri}"],
+      "before": ["python3", "lib/playback.py", "snapshot"],
+      "undo": ["python3", "lib/playback.py", "restore", "{snapshot}", "{playing}"],
+      "notice": "Deck plays {album} by {artist}",
+      "class": "change",
+      "area": "deck",
+      "timeout": 60
+    },
+    {
+      "name": "deck_play_song",
+      "title": "Play a song in Deck",
+      "description": "Plays a song in Deck, and its album on from it (Deck plays whole albums). Needs the track's uri and its album's (from deck_search or deck_album). Returns what then plays. The user can undo it, back to what played before.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "track_uri": {"type": "string", "title": "Song", "description": "spotify:track:…", "pattern": "^spotify:track:"},
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:… of the song", "pattern": "^spotify:album:"}
+        },
+        "required": ["track_uri", "album_uri"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/playback.py", "play-song", "{track_uri}", "{album_uri}"],
+      "before": ["python3", "lib/playback.py", "snapshot"],
+      "undo": ["python3", "lib/playback.py", "restore", "{snapshot}", "{playing}"],
+      "notice": "Deck plays {title} by {artist}",
+      "class": "change",
+      "area": "deck",
+      "timeout": 60
+    },
+    {
+      "name": "deck_queue_album",
+      "title": "Queue an album in Deck",
+      "description": "Adds an album's tracks to the end of Deck's queue, which plays before the album or radio goes on. Returns the queue's length. The user can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:"}
+        },
+        "required": ["album_uri"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/playback.py", "queue-album", "{album_uri}"],
+      "before": ["python3", "lib/playback.py", "snapshot"],
+      "undo": ["python3", "lib/playback.py", "unqueue", "{queue_length}"],
+      "class": "change",
+      "area": "deck",
+      "timeout": 60
+    },
+    {
+      "name": "deck_queue_song",
+      "title": "Queue a song in Deck",
+      "description": "Adds one song to the end of Deck's queue. Needs the track's uri and its album's. Returns the queue's length. The user can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "track_uri": {"type": "string", "title": "Song", "description": "spotify:track:…", "pattern": "^spotify:track:"},
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:… of the song", "pattern": "^spotify:album:"}
+        },
+        "required": ["track_uri", "album_uri"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/playback.py", "queue-song", "{track_uri}", "{album_uri}"],
+      "before": ["python3", "lib/playback.py", "snapshot"],
+      "undo": ["python3", "lib/playback.py", "unqueue", "{queue_length}"],
+      "class": "change",
+      "area": "deck",
+      "timeout": 60
+    },
+    {
+      "name": "deck_control",
+      "title": "Play, pause or skip in Deck",
+      "description": "Plays or pauses Deck, or goes to the next or previous track. Deck must be running (deck_now_playing says). Returns what then plays. The user can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {"type": "string", "title": "Action", "enum": ["play", "pause", "next", "previous"]}
+        },
+        "required": ["action"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/playback.py", "control", "{action}"],
+      "before": ["python3", "lib/playback.py", "snapshot"],
+      "undo": ["python3", "lib/playback.py", "undo-control", "{action}", "{snapshot}", "{playing}"],
+      "notice": "Deck: {action}",
+      "class": "change",
+      "area": "deck",
+      "timeout": 30
+    },
+    {
+      "name": "deck_like",
+      "title": "Like what plays in Deck",
+      "description": "Likes the track that plays in Deck (it goes in the user's Liked Songs on Spotify), or with liked false takes the like away. Nothing changes if it already is so. The user can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "liked": {"type": "boolean", "title": "Liked", "description": "true to like, false to unlike"}
+        },
+        "required": ["liked"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/playback.py", "like", "{liked}"],
+      "before": ["python3", "lib/playback.py", "snapshot"],
+      "undo": ["python3", "lib/playback.py", "like", "{liked}"],
+      "class": "change",
+      "area": "deck"
+    },
+    {
+      "name": "deck_pick",
+      "title": "Pick for me in Deck",
+      "description": "Deck's Pick for me: plays an album from the user's shelf, their Curated list (albums recommended for them) or either, one not played in a while. Returns what then plays. The user can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {"type": "string", "title": "From", "enum": ["any", "shelf", "curated"], "description": "any: the shelf or Curated"}
+        },
+        "required": ["source"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/playback.py", "pick", "{source}"],
+      "before": ["python3", "lib/playback.py", "snapshot"],
+      "undo": ["python3", "lib/playback.py", "restore", "{snapshot}", "{playing}"],
+      "notice": "Deck plays {album} by {artist}",
+      "class": "change",
+      "area": "deck",
+      "timeout": 60
+    }
+  ]
+}

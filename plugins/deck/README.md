@@ -54,6 +54,7 @@ Deck's first start offers Set up with Claude: Claude Code goes through what is m
 | `deck tui` | Deck's own screen in the terminal, when no other Deck runs |
 | `deck ctl pick` | Pick for me |
 | `deck curate` | A new Curated list |
+| `deck status --json` | What plays, the queue and the like, as JSON |
 | `deck-window quit` | Closes the window and stops the music |
 | `deck-window restart`, `log` | After a change to the window (`app/`), and its errors |
 
