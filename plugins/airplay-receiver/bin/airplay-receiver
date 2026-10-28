@@ -14,6 +14,53 @@ SERVICE=nightdrive-airplay.service
 UNIT=$(dirname "$(dirname "$(readlink -f "$0")")")/systemd/$SERVICE
 OFF=$HOME/.local/state/nightdrive/plugins-off/airplay-receiver   # nightdrive plugins off airplay-receiver
 PORT=50000   # UxPlay's TCP/UDP 50000-50002: inside the firewall's open range (its default ports aren't)
+# The PIN devices type to connect (pin below), and UxPlay's options file that hands it over (not argv, which any user
+# can read): in the runtime dir, so a new one comes with each login, and after sleep (watch_sleep below)
+RUN=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive
+PASSWORD=$RUN/airplay-password
+RC=$RUN/airplay.uxplayrc
+
+# UxPlay's output to the journal as before, and the PIN in the middle of the screen (quickshell/CodeDialog.qml) when a
+# device asks for it: a notification of it went unnoticed. UxPlay logs no line for that: a device without the PIN
+# connects, gets the password challenge and closes to ask, so a connection closed before "Client authentication
+# success" is one. Closed again once a device is in.
+# (qs ipc only finds a Quickshell with the same QT_QPA_PLATFORM as its own: Hyprland sets it, the service has none.)
+pin() {
+  local line asked=0
+  export QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-wayland;xcb}
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+    case $line in
+      Accepted*client*) asked=1 ;;
+      "Client authentication success"*)
+        asked=0
+        qs ipc call code close >/dev/null 2>&1 ;;
+      "Connection closed"*)
+        (( asked )) && qs ipc call code open airplay "AirPlay" "$(password)" "Type code below on your device." >/dev/null 2>&1
+        asked=0 ;;
+    esac
+  done
+}
+
+# The PIN: 6 digits, made the first time in a session. A device remembers it, so it's typed once per session.
+password() {
+  if [[ ! -s $PASSWORD ]]; then
+    mkdir -p "$RUN"
+    (umask 077; printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom) % 1000000 )) >"$PASSWORD")
+  fi
+  cat "$PASSWORD"
+}
+
+# A new PIN after sleep: a machine carried elsewhere doesn't keep the one a device there could have seen. The service
+# restarts with it, as the receiver can't change it while running.
+watch_sleep() {
+  gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 2>/dev/null |
+    while IFS= read -r line; do
+      [[ $line == *PrepareForSleep*false* ]] || continue
+      rm -f "$PASSWORD"
+      systemctl --user restart "$SERVICE"
+    done
+}
 
 name() {
   local n; n=$(hostnamectl --pretty 2>/dev/null)
@@ -25,15 +72,22 @@ case ${1:-status} in
   run)
     # -vs waylandsink: a native window, sharp on a scaled screen (the default sink goes through XWayland, upscaled 2x).
     # -h265 -avdec: 4K HEVC decoded with FFmpeg. -vsync no: no frames dropped for lateness (a dropped one smears).
+    # pw (in $RC): anyone on the network could otherwise mirror to this screen. A device asks for the session's PIN
+    # once and remembers it. Not -pin (UxPlay's own pairing, a PIN per device): it fails with the iPhone (AirPlay 960)
+    # in UxPlay 1.73.7 ("client_proof_len 20 invalid"). stdbuf: each line through the pipe at once, not when a buffer
+    # fills. -rc also means ~/.uxplayrc isn't read.
     # A crash comes back at once, even right after the start: an update or a channel switch reloads Hyprland a few
     # times in a row. Five crashes within a minute are something else: exit with it and let systemd (and FUMonitor)
     # handle it, as with any other exit. A crash within 5 s of a Hyprland config load (hyprland.lua leaves its time in
     # $XDG_RUNTIME_DIR) doesn't count: closing and opening the lid a few times reloads it twice each time.
     loaded=$XDG_RUNTIME_DIR/nightdrive-hypr-loaded
     crashes=()
+    watch_sleep &
     while true; do
-      uxplay -n "$(name)" -nh -p "$PORT" -fps 60 -h265 -avdec -vsync no -vs waylandsink
-      rc=$?
+      (umask 077; mkdir -p "$RUN"; echo "pw $(password)" >"$RC")
+      stdbuf -oL -eL uxplay -rc "$RC" -n "$(name)" -nh -p "$PORT" -fps 60 -h265 -avdec -vsync no \
+        -vs waylandsink 2>&1 | pin
+      rc=${PIPESTATUS[0]}
       (( rc == 139 )) || exit "$rc"
       sleep 1   # the load may be stamped a moment after the crash
       if [[ -e $loaded ]] && (( $(date +%s) - $(stat -c %Y "$loaded") <= 5 )); then continue; fi

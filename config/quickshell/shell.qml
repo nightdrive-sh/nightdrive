@@ -207,6 +207,8 @@ ShellRoot {
 
     PowerDialog {}
 
+    CodeDialog {}
+
     AirPodsSettings {}
 
     ThemeEditor {}
