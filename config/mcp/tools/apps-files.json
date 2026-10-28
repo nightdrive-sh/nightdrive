@@ -1,0 +1,135 @@
+{
+  "tools": [
+    {
+      "name": "windows_list",
+      "title": "Open windows",
+      "description": "The windows open on this desktop, the most recently used first: address, app, title, workspace (\"background\" for an app hidden in the background), whether it has the focus and whether it is on screen now. A window Send to Claude leaves out (a password manager, a private browser window, an app the user listed) is there as private, without its title. Use the address with windows_focus and windows_view.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "windows", "list", "--json"],
+      "class": "read",
+      "area": "apps-files"
+    },
+    {
+      "name": "windows_view",
+      "title": "See a window",
+      "description": "A picture of one window as it is on screen now, to read what it shows (a page, a document, an error). Only a window on screen: bring it forward first with windows_focus. Never of a window Send to Claude leaves out (password managers, private browser windows, the apps the user listed), nor with one of those over it; that is the user's choice, so don't try another way.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window": {"type": "string", "description": "Its address from windows_list, or an app's name (its most recently used window)"}
+        },
+        "required": ["window"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "windows", "shot", "{window}", "--json", "--inline"],
+      "image": "image",
+      "class": "read",
+      "area": "apps-files"
+    },
+    {
+      "name": "windows_focus",
+      "title": "Bring a window forward",
+      "description": "Brings a window forward and gives it the focus, switching to its workspace (one hidden in the background comes to the current one). Mind that the user may be typing: what they type goes to that window.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window": {"type": "string", "description": "Its address from windows_list, or an app's name (its most recently used window)"}
+        },
+        "required": ["window"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "windows", "focus", "{window}", "--json"],
+      "undo": ["nightdrive", "windows", "focus", "{previous}"],
+      "notice": "Brought {app} forward",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "apps_open",
+      "title": "Open an app",
+      "description": "Opens an app, as the Launcher does, by its name (\"Firefox\", \"Files\") or desktop id (org.gnome.Nautilus); one that is already open is brought forward instead. An unclear name returns the apps it could mean. Only the Launcher's apps, without arguments: open a file with files_open, an address with open_address.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "app": {"type": "string", "description": "The app's name or desktop id"}
+        },
+        "required": ["app"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "windows", "open", "--app", "{app}", "--json"],
+      "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}"],
+      "notice": "Opened {opened}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "open_address",
+      "title": "Open an address",
+      "description": "Opens a web address (http, https) in the default browser, or a mailto: link in the mail app's composer (nothing is sent). Opening an address sends it to that site, so the user allows it on screen first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string", "title": "Address", "description": "http://, https:// or mailto:"}
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "windows", "open", "--url", "{url}", "--json"],
+      "class": "act",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_recent",
+      "title": "Recent files",
+      "description": "The newest files in the user's Downloads, Pictures and Documents (and folders three levels below them), newest first: path, name, folder, size in bytes, modified (ISO 8601) and type. Use it for \"the PDF I just downloaded\" or \"my last screenshot\". Hidden files are left out.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folders": {"type": "array", "items": {"type": "string", "enum": ["downloads", "pictures", "documents"]}, "description": "Default: all three"},
+          "name": {"type": "string", "description": "Only names with this text in them (any case)"},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 50, "description": "How many, default 10"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "recent", "--json", ["--in", "{folders}"], ["--name", "{name}"], ["--limit", "{limit}"]],
+      "class": "read",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_open",
+      "title": "Open a file",
+      "description": "Opens a file or folder in the user's home folder in its default app (a PDF in the viewer, a folder in Files). Only documents, pictures, sound, video, text and folders: never a program, a script or a launcher, nor anything hidden (no part of the path starting with a dot) or outside home.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "description": "An absolute path, or one relative to home (~ works too)"}
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "open", "--json", "--", "{path}"],
+      "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}"],
+      "notice": "Opened {opened}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_trash",
+      "title": "Move to the trash",
+      "description": "Moves files or folders in the user's home folder to the trash, where Files shows them and can put them back; nothing is deleted for good (there is no tool for that). Not home's own folders (Downloads, Documents…), nothing hidden, nothing outside home. Several paths go together: all or none.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "Absolute paths, or relative to home"}
+        },
+        "required": ["paths"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "trash", "--json", "--", "{paths}"],
+      "undo": ["nightdrive", "files", "restore", "--", "{names}"],
+      "notice": "Moved {what} to the trash",
+      "class": "change",
+      "area": "apps-files"
+    }
+  ]
+}

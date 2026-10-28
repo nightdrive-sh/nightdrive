@@ -35,6 +35,8 @@ usage() {
   row "nightlight [on|off]"      "Night light's warm tint: status, on, off, toggle (--json)"
   row "appearance"               "Wallpaper, theme, night light and the top bar's look now, as JSON"
   row "notifications [COMMAND]"  "The latest notifications (--json), dnd [on|off], send SUMMARY [BODY], remove TAG"
+  row "windows [COMMAND]"        "The open windows (--json); focus WINDOW, shot WINDOW, open APP|URL, close ADDRESS"
+  row "files COMMAND"            "Newest in Downloads, Pictures, Documents: recent (--json); open PATH, trash PATH…, restore NAME…"
   row "topbar adjust"            "The top bar's icon and text sizes, live"
   row "topbar date [STYLE]"      "The clock's date order: auto, dmy, mdy or iso"
   row "snippets [COMMAND]"       "Text snippets: list, set, remove, status, enable, disable"
@@ -811,6 +813,7 @@ case ${1:-} in
   # topbar adjust: config/topbar/adjust.conf; software-catalog: config/quickshell/data/software.json
   platform|software-catalog|snippets) exec "$scripts/$1" "${@:2}" ;;
   theme|display|wallpaper|bar-style|notifications) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
+  windows|files) exec "$scripts/$1" "${@:2}" ;;                       # also Claude's apps and files tools
   nightlight|appearance) exec "$scripts/$1" "${@:2}" ;;                # Claude's appearance tools use them too
   sound|network) exec "$scripts/$1" "${@:2}" ;;                      # also Claude's sound and display tools
   brightness) exec "$scripts/brightness" screen "${@:2}" ;;

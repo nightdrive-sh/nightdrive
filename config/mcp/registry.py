@@ -109,6 +109,8 @@ def problem(spec, plugin):
         return f"{name}: {', '.join(sorted(unknown))} in its before isn't in inputSchema"
     if not isinstance(spec.get("notice", ""), str):
         return f"{name}: notice must be a string"
+    if not isinstance(spec.get("image", ""), str):
+        return f"{name}: image must be the name of a field in its output"
     timeout = spec.get("timeout", run.TIMEOUT)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 0 < timeout <= run.TIMEOUT_MAX:
         return f"{name}: timeout must be 1–{run.TIMEOUT_MAX} seconds"

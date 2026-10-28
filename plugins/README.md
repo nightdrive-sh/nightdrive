@@ -346,6 +346,7 @@ card, undo, timeouts).
 | `undo` | For `change`, required: the argv that undoes it. Its `{name}`s come from `before`'s JSON object, then the command's JSON output (its object's fields), then the arguments |
 | `before` | Optional, for `change`: argv that prints the state the tool changes as a JSON object (`{"path": "…"}`, the wallpaper set now), run first. If it fails, the tool isn't run: a change must be one the user can undo |
 | `notice` | Optional, for `change`: the notification's line, e.g. `"Changed the wallpaper to {path}"` (the output's fields, then the arguments). Default: `title` |
+| `image` | Optional: the field of the command's JSON output that holds a picture, `{"mimeType": "image/png", "data": "<base64>"}`. Claude gets it as an image, and the rest of the output as text (`windows_view`) |
 | `area` | The row in Settings › Claude › Access that turns it off or on: `mail`, `contacts`, `calendar`, `tasks`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `appearance`, `sound-display`, `apps-files`, `software`, or the plugin's own id |
 | `timeout` | Optional: seconds before it's stopped (30, at most 300) |
 

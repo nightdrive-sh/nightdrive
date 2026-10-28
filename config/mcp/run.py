@@ -149,11 +149,29 @@ def execute(tool, argv, stdin, timeout):
     return out, err, proc.returncode
 
 
-def result(out):
+def picture(body, field):
+    """A tool's `image`: the field of its JSON output that holds a picture ({mimeType, data} in base64), taken out of
+    the text and given as MCP's image content, which Claude sees. (body, [image content]) as they are without one."""
+    try:
+        data = json.loads(body)
+        image = data.pop(field)
+        content = {"type": "image", "data": image["data"], "mimeType": image["mimeType"]}
+    except (ValueError, AttributeError, KeyError, TypeError):
+        return body, []
+    return json.dumps(data, ensure_ascii=False), [content]
+
+
+def result(out, image=None):
     """stdout as MCP's tools/call result: the text, and a JSON object as structuredContent too."""
     body = out.strip()
     if not body:
         return {"content": [{"type": "text", "text": "Done."}]}
+    if image:
+        body, pictures = picture(body, image)
+        if pictures:
+            answer = result(body)
+            answer["content"] += pictures
+            return answer
     if len(body) > OUTPUT_MAX:
         cut = len(body) - OUTPUT_MAX
         return {"content": [{"type": "text", "text": body[:OUTPUT_MAX] + f"\n… ({cut} more characters left out)"}]}
@@ -193,7 +211,7 @@ def run(tool, arguments):
     if status != 0:
         message = (err.strip() or out.strip() or "no message")[-MESSAGE_MAX:]
         raise ToolError(f"{tool.name} failed ({Path(argv[0]).name} exited with {status}): {message}")
-    return result(out)
+    return result(out, tool.spec.get("image"))
 
 
 def undo_values(arguments, answer, before=None):

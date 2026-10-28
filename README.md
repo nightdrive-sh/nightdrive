@@ -427,6 +427,8 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
 | `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |
 | `nightdrive notifications` | The latest notifications (`--limit N`, `--json`); `dnd on` / `off` turns Do Not Disturb on or off, `send "Title" "Text"` shows one (`--app NAME`) and `remove TAG` takes it away again |
+| `nightdrive windows` | The open windows (`--json`); `focus WINDOW` brings one forward (an address or an app), `shot WINDOW` takes a picture of one on screen (never of one Send to Claude leaves out), `open firefox` opens an app or brings it forward, `open https://…` an address |
+| `nightdrive files recent` | The newest files in Downloads, Pictures and Documents (`--in downloads`, `--name TEXT`, `--json`); `open PATH` opens one in its default app, `trash PATH…` moves to the trash and `restore NAME…` puts back. Only in your home folder and nothing hidden; programs and scripts aren't opened |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
 | `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also Launcher › Settings › Top bar › Date format |
 | `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
