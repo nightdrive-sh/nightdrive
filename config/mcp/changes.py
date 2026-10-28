@@ -6,6 +6,7 @@ An entry: {id, time, tool, notice, arguments, before, do, stdin, undo, dir, time
     id         1, 2, 3…: what Claude names in undo_change
     before     the state the tool's `before` command reported (what undo puts back), {} without one
     do, stdin  the command as it ran, for redo; undo the argv that undoes it; both run in dir
+    remake     the tool's `undo` template, so a redo can rebuild undo from its own output (a new draft's new id)
     state      "done" or "undone", since `at`
 """
 
@@ -81,11 +82,12 @@ def get(entry_id):
     return next((e for e in read() if e["id"] == entry_id), None)
 
 
-def mark(entry_id, state):
-    """Sets an entry's state (done or undone) and when it got it."""
+def mark(entry_id, state, **fields):
+    """Sets an entry's state (done or undone) and when it got it, and any other fields given (a redo's new undo)."""
     with editing() as entries:
         for e in entries:
             if e["id"] == entry_id:
+                e.update(fields)
                 e["state"], e["at"] = state, now()
 
 

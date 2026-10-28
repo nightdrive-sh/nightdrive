@@ -11,7 +11,8 @@ registry.py calls, for a change tool:
                                              the notification
 The notification waits in a process of its own (`undo.py notice ID undo`), so its button still works once the server
 has gone. Undo runs the logged argv as run.py runs a tool: without a shell, in the tool's folder, with its timeout.
-The row then reads "Undid: …" with Redo, which runs the tool's command again; Claude's undo_change shows the same row.
+The row then reads "Undid: …" with Redo, which runs the tool's command again and rebuilds its undo from that run's
+output, as the first run's was (a new draft has a new id); Claude's undo_change shows the same row.
 
     python3 undo.py recent_changes | undo_change     Claude's tools (JSON on stdin, JSON out)
     python3 undo.py undo ID | redo ID                as the notification's buttons do
@@ -86,7 +87,7 @@ def offer(tool, arguments, answer, state=None):
     entry = changes.add({
         "tool": tool.name, "notice": notice_text(tool, now),
         "arguments": arguments, "before": state or {}, "do": argv, "stdin": stdin, "undo": undo,
-        "dir": str(tool.dir), "timeout": run.timeout_of(tool),
+        "remake": tool.spec["undo"], "dir": str(tool.dir), "timeout": run.timeout_of(tool),
     })
     show(entry["id"], "undo")
     answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: the user can undo it from the "
@@ -112,14 +113,28 @@ def perform(entry_id, action):
             now = "undone already" if want == "done" else "in place"
             raise ToolError(f"Change {entry_id} ({entry['notice']}) is {now}.")
         argv, stdin = (entry["undo"], None) if action == "undo" else (entry["do"], entry.get("stdin"))
+        if argv is None:
+            raise ToolError(f"Change {entry_id} ({entry['notice']}) can't be undone: its redo didn't report what "
+                            "undoing it needs.")
         where = SimpleNamespace(dir=Path(entry["dir"]), name=entry["tool"])
         out, err, status = run.execute(where, argv, stdin, entry["timeout"])
         if status != 0:
             why = (err.strip() or out.strip() or "no message")[-run.MESSAGE_MAX:]
             raise ToolError(f"{action.capitalize()} of change {entry_id} ({entry['notice']}) failed "
                             f"({Path(argv[0]).name} exited with {status}): {why}")
-        changes.mark(entry_id, then)
-        return entry
+        fields = {"undo": redone_undo(entry, out)} if action == "redo" and entry.get("remake") else {}
+        changes.mark(entry_id, then, **fields)
+        return {**entry, **fields}
+
+
+def redone_undo(entry, out):
+    """A redo's undo, built from its own output as offer() builds the first one's: running the tool again may make
+    something new (mail_draft: a new draft with a new Message-ID), and the first run's undo would miss it. None when
+    the output lacks what the undo needs; undoing then says so rather than acting on the old one."""
+    try:
+        return run.expand(entry["remake"], run.undo_values(entry["arguments"], run.result(out), entry["before"]))
+    except ToolError:
+        return None
 
 
 def icon():

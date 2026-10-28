@@ -351,7 +351,8 @@ card, undo, timeouts).
 
 A `change` tool's call shows a notification with Undo (it stays in the history for an hour) and goes in
 `~/.local/state/nightdrive/claude-changes.jsonl` (the last 100), from which Claude can undo it too when asked
-(`recent_changes`, `undo_change`). Undo runs the logged `undo` argv the way the tool ran, and Redo the command again.
+(`recent_changes`, `undo_change`). Undo runs the logged `undo` argv the way the tool ran, and Redo the command again,
+filling `undo` from that run's output (a new draft's new id).
 
 The command runs in the plugin's folder, with its `bin/` and Nightdrive's first in `PATH`. stdout is the result Claude
 reads (a JSON object also as structured content, at most 100 000 characters); an exit status other than 0 is an error
