@@ -148,7 +148,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   Theme). GTK windows such as Files and the file picker follow the colour too.
 - **Background apps**: ⌘W only hides chat apps and the music player, so they keep running. Their shortcut brings them straight back.
 - **Claude Code waits for you?** Its notification says which session and what it wants, and a permission request can
-  be answered right there (Allow, Deny).
+  be answered right there (Allow, Deny). Allow is offered only when the notification shows all it allows: a long
+  command, one run outside the sandbox, a file edit or an MCP tool is answered in its session.
 - **Closed by mistake?** ⌘⇧U opens the window you closed with ⌘W again, in the same place. A terminal comes back in the
   same folder, with Claude Code in the same conversation. Press again for the one before it.
 - **Battery ran out?** When the battery is low (under 20 % as the laptop goes to sleep, and each minute from 5 %), the open

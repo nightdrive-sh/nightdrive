@@ -20,7 +20,11 @@ Rectangle {
 
     property var row: ({})
     property var n: null
-    readonly property var actions: n ? Notifs.buttons(n) : []
+    // Actions the sender offers only while its whole text shows (hint x-nightdrive-whole: their ids, comma-separated):
+    // Claude's Allow answers for the whole command (hypr/scripts/claude-notify), so it goes when the text is cut here.
+    // Such a text is shown as it is, without the <…> taken out below, which could hide part of a command.
+    readonly property var whole: String(((n && n.hints) || {})["x-nightdrive-whole"] || "").split(",").filter(s => s)
+    readonly property var actions: n ? Notifs.buttons(n).filter(a => !(bodyText.truncated && whole.includes(a.identifier))) : []
     // The preview's file (file:// URI and path), "" when there's none
     readonly property string fileUri: {
         const i = row.preview ? row.image || "" : ""
@@ -225,13 +229,15 @@ Rectangle {
                     font { family: Theme.font; pointSize: 9.25; weight: Font.DemiBold }   // 1 px under mako's 10 pt
                 }
                 Text {
+                    id: bodyText
                     width: parent.width
                     visible: text !== ""
                     wrapMode: Text.Wrap
                     maximumLineCount: 6
                     elide: Text.ElideRight
                     textFormat: Text.PlainText
-                    text: (card.n ? Notifs.bodyOf(card.n) : card.row.body).replace(/<[^>]*>/g, "")
+                    readonly property string raw: card.n ? Notifs.bodyOf(card.n) : card.row.body
+                    text: card.whole.length ? raw : raw.replace(/<[^>]*>/g, "")
                     color: Theme.muted
                     font { family: Theme.font; pointSize: 8.875 }   // ≈ 11.8 px
                 }

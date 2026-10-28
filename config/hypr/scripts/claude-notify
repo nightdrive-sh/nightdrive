@@ -5,12 +5,22 @@
 # Claude icon gets its dot (Claude.qml). Nothing while you're in that window. Claude Code's own terminal notification
 # (kitty's, all alike) is turned off by link.sh.
 #   Notification: "Waiting for your input" and the like.
-#   PermissionRequest: what it wants to run or change, with Allow and Deny. The hook waits for the answer (Claude Code
-#   asks in the terminal at the same time): Allow or Deny answers for you; going to the window, Show session, closing
-#   the notification or the terminal's own answer leave it to the terminal.
+#   PermissionRequest: what it wants to run or change, with Deny, and Allow when it shows all it allows. The hook waits
+#   for the answer (Claude Code asks in the terminal at the same time): Allow or Deny answers for you; going to the
+#   window, Show session, closing the notification or the terminal's own answer leave it to the terminal.
 # Reads the hook's JSON on stdin: {hook_event_name, cwd, message | tool_name, tool_input, ...}.
 set -uo pipefail
 readonly WAIT=590   # seconds a permission notification waits; Claude Code gives a hook 600
+readonly SHOWN=300  # characters of the command or path the notification shows; a longer one gets no Allow
+# The tools whose permission notification can offer Allow: the keys of their input that it shows, or that don't change
+# what they do. Any other key set, or any other tool (Edit, Write, MCP tools: their content doesn't show), gets none.
+declare -rA SHOWN_KEYS=(
+  [Bash]="command description timeout run_in_background"
+  [Read]="file_path offset limit pages"
+  [Glob]="pattern path"
+  [Grep]="pattern path glob type output_mode -i -n -A -B -C context head_limit offset multiline"
+  [WebFetch]="url prompt"
+)
 
 in=$(cat)
 event=$(jq -r '.hook_event_name // "Notification"' <<<"$in")
@@ -47,15 +57,28 @@ close "$(cat "$idf" 2>/dev/null)"
 focus() { [[ -n $addr ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null; }
 
 if [[ $event == PermissionRequest ]]; then
-  # What it wants: the command, the file, or the tool's name
+  # What it wants: the command, the file (a search's folder too), or the tool's name
   tool=$(jq -r '.tool_name // "a tool"' <<<"$in")
-  what=$(jq -r '.tool_input | (.command // .file_path // .notebook_path // .url // .pattern // empty) | tostring' <<<"$in" | head -c 300)
+  full=$(jq -r '.tool_input | ((.command // .file_path // .notebook_path // .url // .pattern // empty) | tostring)
+                + (if .pattern and .path then " in \(.path)" else "" end)' <<<"$in")
+  what=${full:0:SHOWN}
   what=${what/#$HOME/\~}
   body="$tool${what:+: $what}${project:+ · $project}"
+  # Allow answers for the whole tool_input, so it's offered only when you can read all of it: for a tool whose input the
+  # text above is (SHOWN_KEYS; an edit's or an MCP tool's is not), with nothing else set (a command outside the
+  # sandbox), not cut and without characters that don't show (bidi overrides, zero-width, escapes). The card takes it
+  # away too when the text doesn't fit (x-nightdrive-whole, NotificationCard.qml). Otherwise Show session: you read it in
+  # the terminal.
+  allow=()
+  if [[ -n ${SHOWN_KEYS[$tool]-} ]] && (( ${#full} <= SHOWN )) && ! printf '%s' "$full" | LC_ALL=C.UTF-8 grep -qaP '[^\P{C}\t]' &&
+     jq -e --arg keys "${SHOWN_KEYS[$tool]}" '($keys | split(" ")) as $ks | .tool_input
+       | all(to_entries[]; .value == null or .value == false or (.key | IN($ks[])))' <<<"$in" >/dev/null; then
+    allow=(-A allow=Allow)
+  fi
   out=$(mktemp "$state/perm.XXXXXX")
   touch "$state/$addr.perm"
-  notify-send -a Claude -i "$icon" -p -A default=Open -A allow=Allow -A deny=Deny -A show="Show session" -w \
-    "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
+  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -A default=Open "${allow[@]}" -A deny=Deny \
+    -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
   ns=$!
   # The terminal's answer ends this hook early (Claude Code stops it): the notification goes with it
   cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm"; }
