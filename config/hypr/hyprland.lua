@@ -37,6 +37,9 @@ hl.monitor({
 -- <width>x<height>@<hz>" for a refresh rate other than the display's preferred one (a TV's is often 60 Hz though it does
 -- 120), and "builtin <side>" for where the laptop's own screen is next to the external one. A named output's rule wins
 -- over the "" rules above and in local.lua.
+-- A virtual screen (hyprctl output create headless: a phone or a tablet showing it over VNC) is not an external display:
+-- it takes neither workspaces 1–9 from the laptop's own screen nor the place beside it
+local function isVirtual(m) return m.name:match("^HEADLESS%-") ~= nil end
 local scales, modes, builtinSide = {}, {}, nil
 local state = io.open(HOME .. "/.local/state/nightdrive/display")
 if state then
@@ -55,7 +58,7 @@ local positions = {}
 do
     local builtin, ext
     for _, m in ipairs(hl.get_monitors()) do
-        if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext then ext = m end
+        if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext and not isVirtual(m) then ext = m end
     end
     if builtinSide and builtin and ext then
         local function size(m)
@@ -135,7 +138,7 @@ local function screens()
     local list = hl.get_monitors() or {}
     if #list == 0 then list = connectedScreens() end   -- none in a headless sandbox either: then no rules at all
     for _, m in ipairs(list) do
-        if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext then ext = m end
+        if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext and not isVirtual(m) then ext = m end
     end
     return builtin, ext
 end
