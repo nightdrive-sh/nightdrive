@@ -358,6 +358,11 @@ reads (a JSON object also as structured content, at most 100 000 characters); an
 Claude reads, with stderr as the message, so write that for a reader. A tool whose area is off in Access isn't listed at
 all. `python3 config/mcp/registry.py` lists what the server would give, and the files it left out and why.
 
+An `act` tool's call first waits on Nightdrive's confirmation card, which shows the tool's `title` and every argument
+as plain text, each labelled with its schema `title` (else its name): give the arguments a user can check (`to`,
+`body`, `entity`), not an id that says nothing. Enter allows; Esc, 60 s without an answer, or a card that can't be shown
+(Quickshell not running) refuse it, and Claude reads the refusal. `python3 config/mcp/confirm.py --demo mail` shows one.
+
 ## Trying it out
 
 ```sh

@@ -217,6 +217,8 @@ ShellRoot {
 
     ClaudeWrite {}
 
+    ClaudeConfirm {}
+
     Drawer {}
 
     Shelf {}
