@@ -1,0 +1,159 @@
+{
+  "tools": [
+    {
+      "name": "sound_status",
+      "title": "Sound",
+      "description": "The sound output now and its volume: volume (percent), muted, output {name, description}, and every output there is (outputs: name, description, current). The name is what sound_output takes; the description is what the user calls it (\"MacBook Pro Speakers\", a speaker's room).",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "sound"],
+      "class": "read",
+      "area": "sound-display"
+    },
+    {
+      "name": "sound_volume",
+      "title": "Set the volume",
+      "description": "Set the volume of the sound output now (0–100, as the volume keys: never louder than 100), mute or unmute it, or both. Answers with the volume and mute after.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "volume": {"type": "integer", "minimum": 0, "maximum": 100, "description": "Percent"},
+          "mute": {"type": "string", "enum": ["on", "off"], "description": "on mutes, off unmutes"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "sound", "volume", ["{volume}"], ["--mute", "{mute}"]],
+      "before": ["nightdrive", "sound", "volume"],
+      "undo": ["nightdrive", "sound", "volume", "{volume}", "--mute", "{mute}"],
+      "notice": "Set the volume to {volume} % (mute {mute})",
+      "class": "change",
+      "area": "sound-display"
+    },
+    {
+      "name": "sound_output",
+      "title": "Switch the sound output",
+      "description": "Play the desktop's sound on another output: the speakers, headphones, an AirPlay speaker, a screen. Give its name from sound_status. Bluetooth headphones must be connected first to be listed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "output": {"type": "string", "description": "The output's name, as sound_status gives it"}
+        },
+        "required": ["output"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "sound", "output", "{output}"],
+      "before": ["nightdrive", "sound", "output"],
+      "undo": ["nightdrive", "sound", "output", "{output}"],
+      "notice": "Switched the sound to {description}",
+      "class": "change",
+      "area": "sound-display"
+    },
+    {
+      "name": "display_status",
+      "title": "Displays",
+      "description": "Every screen now: name (eDP-1 is a laptop's own), description, resolution, refresh rate, scale, and what can be set: scales (the ones that keep text sharp) and resolutions. saved_scale and saved_mode are the user's own choices (null: the display's default). A laptop's own panel has its brightness (percent) too.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "display", "json"],
+      "class": "read",
+      "area": "sound-display"
+    },
+    {
+      "name": "display_brightness",
+      "title": "Set the screen brightness",
+      "description": "Set the laptop screen's brightness in percent (1–100; display_status has it now). An external screen sets its own, and then this fails.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brightness": {"type": "integer", "minimum": 1, "maximum": 100, "description": "Percent"}
+        },
+        "required": ["brightness"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "brightness", "{brightness}"],
+      "before": ["nightdrive", "brightness"],
+      "undo": ["nightdrive", "brightness", "{brightness}"],
+      "notice": "Set the screen brightness to {brightness} %",
+      "class": "change",
+      "area": "sound-display"
+    },
+    {
+      "name": "display_scale",
+      "title": "Change a display's scale",
+      "description": "Make everything on one screen bigger or smaller: one of the scales display_status lists for it (others blur text), or auto for the default. The user allows it on Nightdrive's card first; then the card asks whether to keep it, and it goes back by itself in 20 s unless they do, so a screen left unreadable comes back. Answers kept true or false.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "output": {"type": "string", "title": "Display", "description": "The screen's name from display_status (eDP-1)"},
+          "scale": {"type": "string", "title": "New scale", "description": "A number from its scales (\"1.5\", \"2\"), or auto"}
+        },
+        "required": ["output", "scale"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "display", "scale", "{output}", "{scale}", "--keep"],
+      "timeout": 120,
+      "class": "act",
+      "area": "sound-display"
+    },
+    {
+      "name": "display_resolution",
+      "title": "Change a display's resolution",
+      "description": "Set one screen's resolution: one of the resolutions display_status lists for it (WxH, at its highest refresh rate), or auto for the display's preferred one. The user allows it on Nightdrive's card first; then the card asks whether to keep it, and it goes back by itself in 20 s unless they do. Answers kept true or false.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "output": {"type": "string", "title": "Display", "description": "The screen's name from display_status"},
+          "resolution": {"type": "string", "title": "New resolution", "description": "WxH (2560x1440), WxH@HZ for another rate, or auto"}
+        },
+        "required": ["output", "resolution"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "display", "mode", "{output}", "{resolution}", "--keep"],
+      "timeout": 120,
+      "class": "act",
+      "area": "sound-display"
+    },
+    {
+      "name": "network_status",
+      "title": "Wi-Fi and network",
+      "description": "Whether networking and Wi-Fi are on, the active connections (name, type, device), the Wi-Fi network (ssid, signal %) and its link: band, Wi-Fi standard, rate, signal in dBm, IP address, router and the ping to it in ms.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "network"],
+      "class": "read",
+      "area": "sound-display"
+    },
+    {
+      "name": "network_off",
+      "title": "Turn the network off",
+      "description": "Turn Wi-Fi off (what: wifi), or all networking, wired too (what: all). Your own connection goes with it: the user allows it on Nightdrive's card first, then the card asks whether to keep it off, and it comes back on by itself in 20 s unless they do. Answers kept true or false; when kept, you may not be reachable until the user turns it on again.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "what": {"type": "string", "title": "Turn off", "enum": ["wifi", "all"], "description": "wifi: the Wi-Fi radio; all: all networking"}
+        },
+        "required": ["what"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "network", "{what}", "off", "--keep"],
+      "timeout": 120,
+      "class": "act",
+      "area": "sound-display"
+    },
+    {
+      "name": "bluetooth_status",
+      "title": "Bluetooth",
+      "description": "Whether Bluetooth is available and on, the devices connected now (name, mac, battery % when the device reports it: headphones, a mouse) and the paired ones.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "bluetooth"],
+      "class": "read",
+      "area": "sound-display"
+    },
+    {
+      "name": "battery_status",
+      "title": "Battery",
+      "description": "The laptop's battery: percent, state (charging, discharging, fully-charged, pending-charge), time_left to empty or to full, power_w being drawn, and health (capacity left of the original, %). present false on a desktop.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "battery"],
+      "class": "read",
+      "area": "sound-display"
+    }
+  ]
+}

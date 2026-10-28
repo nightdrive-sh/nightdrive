@@ -6,14 +6,32 @@
 #                             that divides the panel evenly (Hyprland adjusts any other value, which blurs text); a VM's
 #                             screen (Virtual-N) gets 1 to 2.5 whatever its size, as it takes its window's size cut to
 #                             one the scale divides (hypr/vm-display.lua)
-#   display scale <out> <s>   saves the scale for that output and reloads Hyprland
+#   display scale <out> <s>   saves the scale for that output (auto: the default again) and reloads Hyprland
 #   display rates             one line per output: name, current refresh rate, the chosen one (or auto: the display's
 #                             preferred mode, often 60 Hz on a TV that does 120), then every rate at its current resolution
 #   display rate <out> <hz>   saves that rate (at the current resolution) or auto for that output and reloads Hyprland
 #   display side [<side>]     where the laptop's own screen is next to the external one: left, right, above, below or
 #                             auto (Hyprland's choice: side by side); without one, prints the saved side
+#   display json              every output as JSON (Claude's tools, config/mcp/tools/sound-display.json): name,
+#                             description, resolution, refresh, scale, scales (as list's), resolutions (WxH, each at its
+#                             highest rate), the saved_scale and saved_mode (null: the default), and a laptop
+#                             panel's brightness (percent)
+#   display mode <out> <WxH>  the resolution (at its highest rate; WxH@HZ for another one, auto for the display's
+#                             preferred) for that output, saved like a scale
+# scale and mode take --keep last: then Nightdrive's card asks whether to keep it, and it goes back unless the user
+# does (config/mcp/keep.py), so a screen left unreadable comes back by itself
 set -euo pipefail
 state="$HOME/.local/state/nightdrive/display"
+here=$(dirname "$(readlink -f "$0")")
+
+saved() {   # saved <scale|mode> <out>: the saved value, or auto
+  awk -v k="$1" -v o="$2" '(k == "scale" && $1 == o) || (k == "mode" && $1 == "mode" && $2 == o) { v = $NF } END { print v ? v : "auto" }' "$state" 2>/dev/null || echo auto
+}
+# keep <what> <out> <new> <old>: ask whether to keep the new value; else set the old one again
+keep() {
+  exec python3 "$here/../../mcp/keep.py" --title "Keep this display $1?" --field Display "$2" \
+    --field "New $1" "$3" --field "Before" "$4" -- "$here/display" "$1" "$2" "$4"
+}
 
 case ${1:-} in
   list)
@@ -33,10 +51,41 @@ case ${1:-} in
     done ;;
   scale)
     out=${2:?output}; s=${3:?scale}
-    [[ $s =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "bad scale: $s" >&2; exit 1; }
+    [[ $s == auto || $s =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "bad scale: $s" >&2; exit 1; }
+    hyprctl -j monitors | jq -e --arg o "$out" 'any(.name == $o)' >/dev/null || { echo "no output: $out" >&2; exit 1; }
+    old=$(saved scale "$out")
     mkdir -p "${state%/*}"
-    { grep -v "^$out " "$state" 2>/dev/null || true; echo "$out $s"; } > "$state.tmp" && mv "$state.tmp" "$state"
-    hyprctl reload >/dev/null ;;
+    { grep -v "^$out " "$state" 2>/dev/null || true; [[ $s == auto ]] || echo "$out $s"; } > "$state.tmp" && mv "$state.tmp" "$state"
+    hyprctl reload >/dev/null
+    [[ ${4:-} == --keep && $old != "$s" ]] && keep scale "$out" "$s" "$old"
+    true ;;
+  mode)
+    out=${2:?output}; m=${3:?resolution}
+    hyprctl -j monitors | jq -e --arg o "$out" 'any(.name == $o)' >/dev/null || { echo "no output: $out" >&2; exit 1; }
+    modes=$(hyprctl -j monitors | jq -r --arg o "$out" '.[] | select(.name == $o) | .availableModes[] | sub("Hz$"; "")')
+    [[ -n $modes || $m == auto ]] || { echo "$out doesn't list the resolutions it takes (a virtual screen?)" >&2; exit 1; }
+    if [[ $m != auto && $m != *@* ]]; then
+      # The highest rate at that resolution
+      m=$(awk -F@ -v r="$m" '$1 == r && $2 + 0 > best { best = $2 + 0; m = $0 } END { print m }' <<<"$modes")
+      [[ -n $m ]] || { echo "$out has no resolution ${3}; it has: $(cut -d@ -f1 <<<"$modes" | sort -u | paste -sd' ')" >&2; exit 1; }
+    fi
+    [[ $m == auto ]] || grep -qxF "$m" <<<"$modes" || { echo "$out has no mode $m" >&2; exit 1; }
+    old=$(saved mode "$out")
+    mkdir -p "${state%/*}"
+    { grep -v "^mode $out " "$state" 2>/dev/null || true; [[ $m == auto ]] || echo "mode $out $m"; } > "$state.tmp" && mv "$state.tmp" "$state"
+    hyprctl reload >/dev/null
+    [[ ${4:-} == --keep && $old != "$m" ]] && keep mode "$out" "$m" "$old"
+    true ;;
+  json)
+    "$0" list | while IFS=$'\t' read -r name _ _ opts; do
+      printf '%s\t%s\t%s\t%s\n' "$name" "$(saved scale "$name")" "$(saved mode "$name")" "$opts"
+    done | jq -R 'split("\t") | {key: .[0], value: {saved_scale: (if .[1] == "auto" then null else (.[1] | tonumber) end),
+                  saved_mode: (if .[2] == "auto" then null else .[2] end), scales: (.[3:] | map(split(":")[0] | tonumber))}}' |
+      jq -sc 'from_entries' | jq -c --slurpfile mons <(hyprctl -j monitors) '. as $x | [$mons[0][] | {name,
+        description, resolution: "\(.width)x\(.height)", refresh: (.refreshRate * 100 | round / 100), scale, focused} +
+        ($x[.name] // {}) + {resolutions: ([.availableModes[] | sub("@.*"; "")] | unique)} +
+        (if .name | test("^(eDP|LVDS|DSI)-") then {brightness: $b.brightness} else {} end)]' \
+        --argjson b "$("$here/brightness" screen 2>/dev/null || echo '{"brightness": null}')" ;;
   rates)
     hyprctl -j monitors | jq -r --slurpfile chosen <(awk '$1 == "mode" { print "{\"" $2 "\": \"" $3 "\"}" }' "$state" 2>/dev/null || true) '
       ($chosen | add // {}) as $c | .[] | . as $m |
@@ -63,5 +112,5 @@ case ${1:-} in
     mkdir -p "${state%/*}"
     { grep -v "^builtin " "$state" 2>/dev/null || true; [[ $side == auto ]] || echo "builtin $side"; } > "$state.tmp" && mv "$state.tmp" "$state"
     hyprctl reload >/dev/null ;;
-  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

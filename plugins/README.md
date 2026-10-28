@@ -364,6 +364,9 @@ as plain text, each labelled with its schema `title` (else its name): give the a
 (Quickshell not running) refuse it, and Claude reads the refusal. `python3 config/mcp/confirm.py --demo mail` shows one.
 
 ## Trying it out
+An act that could leave the user without a usable screen or network can also go back by itself: its command ends with
+`config/mcp/keep.py`, which asks on the same card whether to keep it and runs the revert command unless they do
+(`display scale … --keep`, `network wifi off --keep`).
 
 ```sh
 nightdrive plugins install disk    # runs its installer in a terminal, then gathers its parts

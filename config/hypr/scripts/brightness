@@ -1,12 +1,30 @@
 #!/bin/bash
 # brightness <screen|kbd> <up|down>: adjusts brightness in even steps (screen 5 %, keyboard backlight 10 %) and shows an OSD toast.
 # Lower limit 0 % (the screen may go black). The current value is rounded to the nearest percent before stepping.
+# brightness <screen|kbd> [PCT]: prints {brightness} (percent) as JSON, after setting it to PCT when given (Claude's
+# tools, config/mcp/tools/sound-display.json; also `nightdrive brightness`). The screen never goes below 1 % this way.
 dev=$1 dir=$2
 args=()
 min=0
 step=5                                   # screen: 5 % step
 if [[ $dev == kbd ]]; then args=(-d "*kbd_backlight*"); step=10; fi   # backlight: 10 %; the name differs by machine (MacBook: kbd_backlight, ThinkPad: tpacpi::kbd_backlight)
-IFS=, read -r _ _ cur _ max < <(brightnessctl "${args[@]}" -m)
+[[ $dev == screen || $dev == kbd ]] || { echo "usage: brightness screen|kbd [up|down|PCT]" >&2; exit 1; }
+if ! IFS=, read -r _ _ cur _ max < <(brightnessctl "${args[@]}" -m 2>/dev/null) || [[ -z $max ]]; then
+  echo "This machine has no $([[ $dev == kbd ]] && echo "keyboard backlight" || echo "screen brightness") to set (an external screen sets its own)." >&2
+  exit 1
+fi
+if [[ -z $dir || $dir =~ ^[0-9]+$ ]]; then
+  if [[ -n $dir ]]; then
+    (( dir <= 100 )) || { echo "Brightness is a percent, 0 to 100 (not $dir)." >&2; exit 1; }
+    # 0 % turns the panel off, which a typed number shouldn't do; the keys may
+    [[ $dev == screen ]] && (( dir < 1 )) && dir=1
+    brightnessctl "${args[@]}" set "${dir}%" >/dev/null
+    qs ipc call osd "$([[ $dev == kbd ]] && echo kbd || echo brightness)" >/dev/null 2>&1
+    IFS=, read -r _ _ cur _ max < <(brightnessctl "${args[@]}" -m)
+  fi
+  echo "{\"brightness\": $(( (cur * 100 + max / 2) / max ))}"
+  exit 0
+fi
 new=$(awk -v c="$cur" -v m="$max" -v d="$dir" -v lo="$min" -v s="$step" 'BEGIN {
   p = int(c * 100 / m + 0.5)
   if (d == "up") n = (int(p / s) + 1) * s
