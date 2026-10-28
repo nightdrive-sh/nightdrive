@@ -484,6 +484,7 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   | `config/quickshell/local/` | `<Name>Menu.qml` bar menus, and `LauncherExtension.qml` for your own Launcher levels |
   | `config/fuzzel/apps-allow.local.txt` | more apps shown in the Launcher |
   | `config/kitty/local.conf`, `config/ghostty/local.ghostty`, `config/alacritty/local.toml`, `config/foot/local.ini` | your own kitty, Ghostty, Alacritty and foot settings (font, size, keys), over Nightdrive's |
+  | `config/firefox/user.local.js` | your own Firefox prefs (`user_pref(…)`, e.g. the Browser Toolbox), after Nightdrive's; written into the profile by `nightdrive update` |
   | `config/topbar/local.modules.jsonc`, `status.local`, `local.adjust.conf` | your own bar modules (at the left end of the icons), their status and icon sizes |
 
 ## How it fits together

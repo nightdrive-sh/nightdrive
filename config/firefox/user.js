@@ -12,9 +12,10 @@ user_pref("mousewheel.default.delta_multiplier_y", 100);   // the default, set e
 user_pref("apz.fling_friction", "0.0015");
 user_pref("apz.fling_accel_base_mult", "1.3");
 user_pref("apz.fling_accel_supplemental_mult", "1.2");
-// Developer mode: Browser Toolbox (Ctrl+Shift+Alt+I) for inspecting the UI's CSS
-user_pref("devtools.chrome.enabled", true);
-user_pref("devtools.debugger.remote-enabled", true);
-user_pref("devtools.debugger.prompt-connection", false);
+// Browser Toolbox off, with the debugger's connection prompt: Firefox's defaults, set explicitly so the values earlier
+// versions set (which prefs.js keeps) are reset. A developer turns it on in config/firefox/user.local.js.
+user_pref("devtools.chrome.enabled", false);
+user_pref("devtools.debugger.remote-enabled", false);
+user_pref("devtools.debugger.prompt-connection", true);
 // Default background of a blank page (about:blank) in dark mode: Nightdrive's violet (default #1c1b22)
 user_pref("browser.display.background_color.dark", "#1f2033");

@@ -19,4 +19,5 @@ config/kitty/local.conf
 config/ghostty/local.ghostty
 config/alacritty/local.toml
 config/foot/local.ini
+config/firefox/user.local.js
 config/easyeffects/headphones.local.tsv

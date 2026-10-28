@@ -1,7 +1,7 @@
 #!/bin/bash
 # Firefox's own settings (launcher › Settings › Browser): where links from other apps open, whether a window with one
 # tab shows the tab bar, and whether Firefox starts empty or with the last session's tabs. The choices live in ~/.config/nightdrive/firefox, outside the repo, and apply writes them into the
-# default profile: user.js (the repo's config/firefox/user.js with the choice after it: Firefox reads only one user.js,
+# default profile: user.js (the repo's config/firefox/user.js, the choice and user.local.js after it: Firefox reads only one user.js,
 # so it is a written file, not a link) and chrome/nightdrive-tabs.css (imported by userChrome.css). link.sh runs apply,
 # so a change to the repo's user.js reaches the profile with `nightdrive update`. Firefox reads both when it starts.
 #   firefox-prefs status            links=window|tab tabbar=auto|always startup=empty|restore, or none (no profile yet)
@@ -42,6 +42,12 @@ apply() {
       fi
       # Sync carries browser.startup.page between devices: keep this machine's choice off it, both ways
       echo 'user_pref("services.sync.prefs.sync.browser.startup.page", false);'
+      # Your own prefs (git-ignored), last so they win over Nightdrive's
+      if [[ -f $repo/config/firefox/user.local.js ]]; then
+        echo
+        echo "// config/firefox/user.local.js"
+        cat "$repo/config/firefox/user.local.js"
+      fi
     } | put "$p/user.js"
     mkdir -p "$p/chrome"
     if [[ $tabbar == always ]]; then
