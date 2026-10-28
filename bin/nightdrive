@@ -34,6 +34,7 @@ usage() {
   row "defaults [set KIND APP]"  "Default apps (browser, email, files…), e.g. nightdrive defaults set pdf org.gnome.Papers"
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
   row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --effort LEVEL, --background, --workspace WS)"
+  row "mcp"                      "Nightdrive's MCP server for Claude (stdio: Claude Code starts it)"
   row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
   section "Apps"
   row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage), and which are installed"
@@ -804,6 +805,7 @@ case ${1:-} in
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
   ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }
        exec "$scripts/terminal-or-claude" "${@:2}" ;;                   # what the launcher's ⌘⌥Enter runs
+  mcp) exec python3 "$repo/config/mcp/server.py" ;;                   # Dashboard #1761; Claude Code runs it
   welcome) exec "$repo/config/welcome/welcome" "${@:2}" ;;             # Welcome to Nightdrive (launcher › System › Set up Nightdrive)
   ""|help|-h|--help) usage ;;
   *) usage >&2; exit 1 ;;
