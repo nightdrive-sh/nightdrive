@@ -6,7 +6,8 @@ set -euo pipefail
 
 conf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/nightdrive/vnc-display
 
-command -v wayvnc >/dev/null && command -v ssh-keygen >/dev/null || sudo dnf install -y wayvnc openssh-clients
+command -v wayvnc >/dev/null && command -v ssh-keygen >/dev/null && command -v qrencode >/dev/null ||
+  sudo dnf install -y wayvnc openssh-clients qrencode   # qrencode: the QR code in Settings › Other displays
 (
   umask 077
   mkdir -p "$conf_dir"

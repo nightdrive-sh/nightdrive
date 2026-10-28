@@ -73,3 +73,4 @@ ClaudeWriteLevels 1.0 ClaudeWriteLevels.qml
 SendCapture 1.0 SendCapture.qml
 SendClaudeLevels 1.0 SendClaudeLevels.qml
 PolkitWatch 1.0 PolkitWatch.qml
+FieldBox 1.0 FieldBox.qml

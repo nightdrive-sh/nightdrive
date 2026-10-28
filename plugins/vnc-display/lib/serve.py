@@ -2,8 +2,8 @@
 """One device's screen, as nightdrive-vnc-display@NAME.service runs it (`vnc-display run NAME`).
 
 Makes the device's headless output (its size, place and workspace come from config/hypr/virtual-display.lua, which reads
-the same state file at the reload the new output brings), then runs wayvnc on it: one on the Tailscale address, and one
-on the home network's address while the computer is on that network, if the device was added with --home. Both are
+the same state file at the reload the new output brings), then runs wayvnc on it: one on each of the Tailscale addresses
+(IPv4 and IPv6: the computer's Tailscale name gives both, and a device may try either), and one on the home network's address while the computer is on that network, if the device was added with --home. Both are
 checked every TICK seconds, so a Tailscale that comes up later, or a move to another network, is followed.
 
 The output going away stops everything at once: wayvnc would otherwise move to the desk's own screen ("Selected output
@@ -53,8 +53,8 @@ def outputs():
         return set()
 
 
-def tailscale_address():
-    return out("tailscale", "ip", "-4").split("\n")[0]
+def tailscale_address(family):
+    return out("tailscale", "ip", family).split("\n")[0]
 
 
 def home_address(uuid):
@@ -69,7 +69,7 @@ def local(address):
     """The address is this computer's now: `tailscale ip` still gives it after `tailscale down`, and a wayvnc started on
     it would only exit."""
     try:
-        with socket.socket() as s:
+        with socket.socket(socket.AF_INET6 if ":" in address else socket.AF_INET) as s:
             s.bind((address, 0))
         return True
     except OSError:
@@ -174,7 +174,8 @@ def main(name):
             return 1
     log(f"{output} is there")
     kb = keyboard()
-    listeners = [(Listener(name, "tailscale", conf, True), tailscale_address),
+    listeners = [(Listener(name, "tailscale", conf, True), lambda: tailscale_address("-4")),
+                 (Listener(name, "tailscale6", conf, True), lambda: tailscale_address("-6")),
                  (Listener(name, "home", conf, False), lambda: home_address(conf.get("home", "")))]
     buf, due = b"", 0.0
     try:

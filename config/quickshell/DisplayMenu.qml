@@ -66,7 +66,8 @@ Column {
         id: displayProc
         script: '"$HOME/.config/hypr/scripts/display" list'
         onResult: text => {
-            m.displays = text.split("\n").map(l => l.split("\t")).filter(f => f.length >= 4).map(f => ({
+            // The desk's own: a virtual screen (HEADLESS-*, an iPad over VNC) has its size from its plugin
+            m.displays = text.split("\n").map(l => l.split("\t")).filter(f => f.length >= 4 && !/^HEADLESS-/.test(f[0])).map(f => ({
                 name: f[0], desc: f[1], scale: parseFloat(f[2]),
                 opts: f.slice(3).map(o => { const [v, size] = o.split(":"); return { value: parseFloat(v), size: size.replace("×", " × ") } }) }))
         }

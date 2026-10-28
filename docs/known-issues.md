@@ -10,7 +10,7 @@ the *Known issue* form.
 - **[Wi-Fi takes about a minute to connect after opening the lid (6 GHz)](https://github.com/nightdrive-sh/nightdrive/issues/2)**:
   keep that network on 5 GHz with `nmcli connection modify "<network>" 802-11-wireless.band a`.
 - **[AirPlay audio to an Apple TV or HomePod plays nothing (OS 27)](https://github.com/nightdrive-sh/nightdrive/issues/3)**:
-  an Apple bug; use Screen Mirroring (Settings › Display), which carries the sound too.
+  an Apple bug; use Screen Mirroring (Settings › Other displays), which carries the sound too.
 - **[The Space preview in Files flashes a zoomed picture as it opens (Sushi 50)](https://github.com/nightdrive-sh/nightdrive/issues/4)**:
   harmless; the image viewer (Loupe) opens a picture without the flash.
 - **[1Password's own keyboard shortcuts do nothing (Quick Access, Autofill)](https://github.com/nightdrive-sh/nightdrive/issues/5)**:

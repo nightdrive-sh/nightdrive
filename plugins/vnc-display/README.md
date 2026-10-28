@@ -1,44 +1,55 @@
 # VNC Display
 
-Use an iPad or iPhone as one more screen of this computer, as Sidecar does on a Mac. The device shows a screen of its own in a free VNC app, over Tailscale, at home or away, and each device has its own workspace on it.
+Use an iPad, an iPhone or any tablet, phone or computer with a VNC app as one more display of this computer, as Sidecar does on a Mac. The device shows a display of its own in a free VNC app, over Tailscale, at home or away, and each device has its own workspace on it.
 
 ## On the computer
 
-Add the device in a terminal. It prints the address, user name and password to type into the VNC app:
+Add the device in Settings › Other displays › Add a display: an iPad or iPhone, or Other device for the rest (an Android tablet, a laptop): its screen's width and height in pixels, and a scale shown as the size things look. Its row there turns its display on and off, and shows how to connect: Show QR code puts a code for the device's camera on your display, with the password beside it. The password shows only when you ask for it. Or in a terminal, which prints the address, user name and password:
 
-    vnc-display add ipad               # an iPad, beside your screens
-    vnc-display add iphone             # an iPhone, a screen for when you're away from the desk
+    vnc-display add ipad               # an iPad, beside your displays
+    vnc-display add iphone             # an iPhone, a display for when you're away from the desk
     vnc-display add ipad --home        # also on the home Wi-Fi, without Tailscale on the iPad
 
-- The first screen gets workspace 9 (⌘9), the next 8, then 7 and 6. The top bar shows it as a tablet or phone icon.
-- An iPad's screen is to the right of your screens: the pointer slides over the edge onto it. A phone's is far off, so the pointer never strays there.
-- The screen stays on, also after a login, until you turn it off. While it's on but no device shows it, its windows are out of sight: `vnc-display off ipad` when you don't use it, `vnc-display on ipad` to bring it back.
+- The first display gets workspace 9 (⌘9), the next 8, then 7 and 6: Workspace on its page in Settings › Other displays changes it, to any of 2–9 (1 stays on your main display). The top bar shows it as a tablet or phone icon.
+- An iPad's display is to the right of yours: the pointer slides over the edge onto it. A phone's is away, so the pointer never strays there. Place on its page in Settings › Other displays puts it on another side; several on one side go outwards in the order you added them.
+- The display stays on, also after a login, until you turn it off. While it's on but no device shows it, its windows are out of sight and the pointer can slip onto it: turn it off in Settings › Other displays when you don't use it (or `vnc-display off ipad`).
 - The device uses this computer's own pointer and keyboard: a tap on the iPad moves the pointer there.
 - Sizes: `ipad` (11-inch), `ipad-13`, `ipad-mini`, `iphone`, `iphone-max` (Pro Max), or your own in pixels and scale, e.g. `2752x2064@2`. A second device of the same kind needs a name: `vnc-display add ipad ipad2`.
 
 ## On the iPad or iPhone
 
-1. Install Tailscale from the App Store and sign in with the same account as on this computer.
-2. Install a VNC app, such as RealVNC Viewer (free).
-3. Add a connection in it with the address `vnc-display add` printed (`vnc-display show ipad` shows it again), then the user name and password. The first time, the app asks whether to trust the computer: yes.
+1. Install Tailscale from the App Store and sign in with the same account as on this computer. Leave it on: it also works on mobile data, away from home.
+2. Install RealVNC Viewer from the App Store (free; other VNC apps work too).
+3. Scan the QR code from Settings › Other displays with the camera, or add a connection by hand with the address, such as `nightdrive:5900` (this computer's Tailscale name). Type the user name and password, and let the app remember them. The first time, the app asks whether to trust the computer: yes.
 
-In RealVNC Viewer, Touch panel mode under the connection's settings makes your finger a touchpad, which is easier for small targets.
+In RealVNC Viewer, Touch panel mode under the connection's settings makes your finger a touchpad, which is easier for small targets. If the name doesn't connect (MagicDNS off in Tailscale), use the IP address Settings › Other displays shows.
+
+Another device works the same way with Tailscale and any VNC app: RealVNC Viewer on Android, Remmina or TigerVNC on a computer.
+
+## Limits
+
+- One pointer and keyboard for all the displays: while you use the iPad, the desk's pointer is there too.
+- No sound: it plays on this computer.
+- Over mobile data the picture lags more than on Wi-Fi, and it uses data: fine for a chat or notes, not for video.
 
 ## In a terminal
 
 | Command | What it does |
 | --- | --- |
-| `vnc-display add DEVICE [NAME]` | A new screen for a device, with a password of its own. `--home`: also on the home Wi-Fi. `--beside` or `--away` changes where it goes |
-| `vnc-display show NAME` | The addresses, user name and password |
+| `vnc-display add DEVICE [NAME]` | A new display for a device, with a password of its own. `--home`: also on the home Wi-Fi. `--beside` or `--away` changes where it goes |
+| `vnc-display show NAME` | The addresses, user name and password (`--json` for scripts) |
+| `vnc-display qr NAME` | The connection as a QR code (an SVG file) |
 | `vnc-display list` | The devices, their workspaces and whether they're on (`--json` for scripts) |
-| `vnc-display off NAME` | Turns the screen off: its windows go back to your screen, and nothing listens for it |
+| `vnc-display workspace NAME N` | Gives its display workspace N (2–9), its windows too: a device that has N takes this one's |
+| `vnc-display place NAME PLACE` | Puts its display right, left, above or below yours, or away (out of the pointer's reach) |
+| `vnc-display off NAME` | Turns the display off: its windows go back to yours, and nothing listens for it |
 | `vnc-display on NAME` | Turns it back on, with the same password |
-| `vnc-display remove NAME` | Forgets the device: its screen and its password |
+| `vnc-display remove NAME` | Forgets the device: its display and its password |
 
 ## Privacy
 
-- Nothing listens until you add a device. Each one has its own port, from 5900 up, and listens only on this computer's Tailscale address, which only your own devices can reach. With `--home`, also on the home Wi-Fi it was added on, and only while you're on that network.
-- Every device has its own random password; `remove` makes it useless. The passwords are kept in `~/.config/nightdrive/vnc-display`, readable only by you.
+- Nothing listens until you add a device. Each one has its own port, from 5900 up, and listens only on this computer's Tailscale addresses (IPv4 and IPv6), which only your own devices can reach. With `--home`, also on the home Wi-Fi it was added on, and only while you're on that network.
+- The QR code holds only the address. Every device has its own random password; `remove` makes it useless. The passwords are kept in `~/.config/nightdrive/vnc-display`, readable only by you.
 - The connection is encrypted (RSA-AES). Apps that use Apple's own login (such as Screens) are let in without it over Tailscale, which encrypts everything anyway, but not on the home Wi-Fi.
 
 Homepage: https://github.com/any1/wayvnc

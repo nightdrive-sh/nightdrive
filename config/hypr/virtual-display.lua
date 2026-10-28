@@ -6,16 +6,61 @@
 --     <name> <width>x<height>@<hz> <scale> <place> [<workspace>]
 --     HEADLESS-IPAD 2752x2064@60 2 beside 9
 --
--- The name starts with HEADLESS- (hyprland.lua's isVirtual: not an external display). <place> is "beside": next to the
--- desk's screens, so the pointer slides over the edge as with Sidecar (a tablet), or "away": far off, so it never strays
--- there (a phone, used away from the desk). Lines starting with # are skipped.
+-- The name starts with HEADLESS- (hyprland.lua's isVirtual: not an external display). <place> is the side of the desk's
+-- screens it is on, so the pointer slides over that edge as with Sidecar (a tablet): "right" (or "beside", the same),
+-- "left", "above" or "below"; or "away": far off, so it never strays there (a phone, used away from the desk). Lines
+-- starting with # are skipped.
 
 local STATE = os.getenv("HOME") .. "/.local/state/nightdrive/virtual-displays"
--- Workspaces from the top down: the first screen gets 9 (⌘9), the next 8, then 7 and 6. 1–5 always stay on the desk's
--- main screen, and the laptop's own screen has its own (LAPTOP_WORKSPACE, ⌘0), so a fifth virtual screen gets none.
-local FIRST_WORKSPACE, LAST_WORKSPACE = 9, 6
+-- Workspaces from the top down: the first screen gets 9 (⌘9), the next 8, then 7 and 6, so 1–5 stay on the desk's main
+-- screen, and the laptop's own screen has its own (LAPTOP_WORKSPACE, ⌘0): a fifth virtual screen gets none. One chosen
+-- in the file (vnc-display workspace) may be 2–9; never 1, the main screen's, where everything comes back to.
+local FIRST_WORKSPACE, LAST_WORKSPACE, LOWEST_WORKSPACE = 9, 6, 2
 -- "away": this far left of the desk, each next one a step further, so the pointer can't reach them by accident
 local FAR_X, FAR_STEP = -10000, -5000
+-- Hyprland's own placing for a side, only when there are no desk screens to count from (a headless sandbox)
+local SIDES = { beside = "auto-right", right = "auto-right", left = "auto-left", above = "auto-up", below = "auto-down" }
+
+-- The desk's screens' bounds in logical px, which the sides are counted from: where hyprland.lua has just put them
+-- (deskPlaces: output -> { pos = "XxY" }), not where they were, as the same reload may move them
+local function deskBounds(monitors, deskPlaces, scales)
+    local b
+    for _, m in ipairs(monitors) do
+        if not m.name:match("^HEADLESS%-") and not m.disabled then
+            local p = deskPlaces[m.name]
+            local x, y = m.x, m.y
+            if p then x, y = p.pos:match("^(-?%d+)x(-?%d+)$"); x, y = tonumber(x), tonumber(y) end
+            local s = scales[m.name] or m.scale
+            local w, h = m.width, m.height
+            if m.transform % 2 == 1 then w, h = h, w end
+            local x1, y1 = x + math.floor(w / s + 0.5), y + math.floor(h / s + 0.5)
+            if not b then b = { x0 = x, y0 = y, x1 = x1, y1 = y1 }
+            else b = { x0 = math.min(b.x0, x), y0 = math.min(b.y0, y), x1 = math.max(b.x1, x1), y1 = math.max(b.y1, y1) } end
+        end
+    end
+    return b
+end
+
+-- Each screen's place as exact coordinates, side by side outwards in the file's order (the first added is next to the
+-- desk). Not auto-left and the like: with two on one side Hyprland places one twice, and its top bar and wallpaper stay
+-- where it was first, leaving the screen grey.
+local function positions(list, bounds)
+    local out, used = {}, { right = 0, left = 0, above = 0, below = 0 }
+    for _, d in ipairs(list) do
+        local side = d.place == "beside" and "right" or d.place
+        local w, h = d.mode:match("^(%d+)x(%d+)")
+        if bounds and used[side] and w then
+            w, h = math.floor(tonumber(w) / d.scale + 0.5), math.floor(tonumber(h) / d.scale + 0.5)
+            if side == "right" then out[d.name] = (bounds.x1 + used.right) .. "x" .. bounds.y0; used.right = used.right + w
+            elseif side == "left" then used.left = used.left + w; out[d.name] = (bounds.x0 - used.left) .. "x" .. bounds.y0
+            elseif side == "above" then used.above = used.above + h; out[d.name] = bounds.x0 .. "x" .. (bounds.y0 - used.above)
+            else out[d.name] = bounds.x0 .. "x" .. (bounds.y1 + used.below); used.below = used.below + h end
+        else
+            out[d.name] = SIDES[d.place] or "auto-right"
+        end
+    end
+    return out
+end
 
 local function readState()
     local list = {}
@@ -34,13 +79,13 @@ local function readState()
     return list
 end
 
--- A workspace given in the file is kept if it is one of 6–9 and not taken; the others get the highest free one, in the
+-- A workspace given in the file is kept if it is one of 2–9 and not taken; the others get the highest free one, in the
 -- file's order (so the first screen added is 9, and one removed leaves the others where they were)
 local function assignWorkspaces(list)
     local taken = {}
     for _, d in ipairs(list) do
         local w = d.workspace
-        if w and w <= FIRST_WORKSPACE and w >= LAST_WORKSPACE and not taken[w] then taken[w] = true else d.workspace = nil end
+        if w and w <= FIRST_WORKSPACE and w >= LOWEST_WORKSPACE and not taken[w] then taken[w] = true else d.workspace = nil end
     end
     for _, d in ipairs(list) do
         if not d.workspace then
@@ -81,14 +126,16 @@ end
 -- Run at each load, after hyprland.lua's workspace rules: a later rule for the same workspace wins, so 9 and 8 leave the
 -- external display for the virtual screens. A workspace rule only for a screen that is there: once it is gone, its
 -- workspace goes back to the desk's main screen, and is no longer kept there once empty.
-return function()
+return function(deskPlaces, scales)
     displays = readState()
     assignWorkspaces(displays)
     local present = {}
-    for _, m in ipairs(hl.get_monitors()) do present[m.name] = true end
+    local monitors = hl.get_monitors() or {}
+    for _, m in ipairs(monitors) do present[m.name] = true end
+    local placed = positions(displays, deskBounds(monitors, deskPlaces or {}, scales or {}))
     local away = 0
     for _, d in ipairs(displays) do
-        local position = "auto-right"
+        local position = placed[d.name]
         if d.place == "away" then
             position = (FAR_X + away * FAR_STEP) .. "x0"
             away = away + 1

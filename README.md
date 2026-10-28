@@ -99,8 +99,8 @@ code or a card number stays hidden until you choose it.
 Click an icon and a small menu opens under it:
 
 - **Wi-Fi** (and Ethernet with your wired profiles) and **Bluetooth**
-- **Display**: brightness, night light, each screen's scale and refresh rate, and mirroring to a TV (Screen Mirroring
-  plugin)
+- **Display**: brightness, night light, each screen's scale and refresh rate. **Other displays**: mirroring to a TV
+  (Screen Mirroring plugin), an iPad or iPhone as a display of its own (VNC Display plugin)
 - **Battery**: time left and the battery's health
 - **System**: load, memory, temperatures and the heaviest processes
 - **Date and time**: a month's calendar with week numbers; ‹ › browse the months

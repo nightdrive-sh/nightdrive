@@ -24,9 +24,24 @@ Item {
     readonly property int brightStep: 5       // ←/→ on the brightness row, the same step as the brightness keys (hypr/scripts/brightness)
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
-    readonly property var levels: ["display", "battery"]
-    readonly property var titles: ({ display: "Settings › Display", battery: "Settings › Battery" })
-    readonly property var parents: ({ display: "settings", battery: "settings" })
+    readonly property var levels: ["display", "otherdisplays", "battery"]
+    readonly property var titles: ({ display: "Settings › Display", otherdisplays: "Settings › Other displays", battery: "Settings › Battery" })
+    readonly property var parents: ({ display: "settings", otherdisplays: "settings", battery: "settings" })
+
+    // Settings › Other displays: the screens beyond this computer's, by device, however they connect: AirPlay's
+    // (Screen Mirroring, SystemLevels.qml's mirrorRows, empty without doubletake) and a plugin's (displayRows: VNC
+    // Display's iPads), as macOS's "Mirror or extend to". Display is this computer's own screens only.
+    function others() {
+        const l = launcher
+        if (!l) return []
+        return [...l.mirrorRows(), ...[].concat(...l.pluginExts.map(e => e.displayRows ? e.displayRows() : []))].filter(r => r.kind !== "header")
+    }
+    function hasOthers() { return launcher !== null && (launcher.mirrorRows().length > 0 || launcher.pluginExts.some(e => e.displayRows)) }
+    // On Settings' row: what is in use now ("iPad, iPhone on"), else nothing
+    function othersSummary() {
+        const on = others().filter(r => r.active === true).map(r => r.name)
+        return on.length > 0 ? on.join(", ") + " on" : undefined
+    }
 
     // The brightness and night light rows' footers are Launcher.qml's: the root search has them too
     function footer(level, query) { return "" }
@@ -43,15 +58,16 @@ Item {
         if (level === "display") {
             // Brightness (slider rows for the screen and the keyboard, when they have a backlight, and night light), then Scale
             if (displays === null) return l.hint("Loading…")
+            // The desk's own: a virtual screen (HEADLESS-*, an iPad over VNC) has its size and place from its plugin
+            const desk = displays.filter(d => !/^HEADLESS-/.test(d.name))
             const out = bright < 0 ? [] : [{ kind: "brightness", key: "screen", name: "Screen", glyph: "sun", summary: Math.round(bright * 100) + "%" }]
             if (keys >= 0) out.push({ kind: "brightness", key: "keys", name: "Keyboard", glyph: "keyboard", summary: Math.round(keys * 100) + "%" })
             if (night !== "") out.push({ kind: "nightlight", name: "Night light", glyph: "moon", switchOn: night === "on" })
             if (out.length > 0) out.unshift({ kind: "header", name: "Brightness" })
             // Scales the panel divides evenly, shown as the resulting desktop size ("looks like" in macOS); current one marked
-            out.push(...l.mirrorRows())   // Screen Mirroring (AirPlay; SystemLevels.qml), empty without doubletake
             // Where the laptop's own screen is, so the pointer crosses where the screens meet: only with both on.
             // eDP is the connector of a laptop's panel (BUILTIN_DISPLAY in hyprland.lua)
-            if (side !== "" && displays.length > 1 && displays.some(d => /^eDP-/.test(d.name))) {
+            if (side !== "" && desk.length > 1 && desk.some(d => /^eDP-/.test(d.name))) {
                 out.push({ kind: "header", name: "Laptop screen" })
                 for (const [v, label, glyph] of [["below", "Below the display", "arrow-down"], ["above", "Above the display", "arrow-up"],
                                                  ["left", "Left of the display", "arrow-left"], ["right", "Right of the display", "arrow-right"],
@@ -61,8 +77,8 @@ Item {
                                summary: cur ? "current" : v === "auto" ? "side by side" : undefined })
                 }
             }
-            for (const d of displays) {
-                out.push({ kind: "header", name: "Scale" + (displays.length > 1 ? " · " + d.name + (d.desc !== "-" ? "  " + d.desc : "") : "") })
+            for (const d of desk) {
+                out.push({ kind: "header", name: "Scale" + (desk.length > 1 ? " · " + d.name + (d.desc !== "-" ? "  " + d.desc : "") : "") })
                 for (const o of d.opts) {
                     const cur = Math.abs(o.value - d.scale) < 0.01
                     out.push({ kind: "scale", output: d.name, value: o.value, name: o.size, glyph: cur ? "check" : "monitor",
@@ -71,7 +87,7 @@ Item {
                 // Refresh rates at its resolution, only with a choice: Automatic is the display's preferred mode
                 const r = rates[d.name]
                 if (r && r.hz.length > 1) {
-                    out.push({ kind: "header", name: "Refresh rate" + (displays.length > 1 ? " · " + d.name : "") })
+                    out.push({ kind: "header", name: "Refresh rate" + (desk.length > 1 ? " · " + d.name : "") })
                     for (const hz of r.hz) {
                         const cur = r.chosen !== "auto" && Math.abs(hz - r.chosen) < 0.01
                         out.push({ kind: "rate", output: d.name, value: String(hz), name: Math.round(hz) + " Hz", glyph: cur ? "check" : "monitor",
@@ -83,6 +99,12 @@ Item {
                 }
             }
             return out
+        }
+        if (level === "otherdisplays") {
+            // Hints (still looking for AirPlay devices) last
+            const o = others()
+            if (o.length === 0) return l.hint("Screen Mirroring and VNC Display add them: Install › Plugins")
+            return [...o.filter(r => r.kind !== "hint"), ...o.filter(r => r.kind === "hint")]
         }
         if (level === "battery") {
             // The same as the top bar's battery menu: charge and state, then the details

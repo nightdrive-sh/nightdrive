@@ -76,6 +76,19 @@ do
             positions[builtin.name] = { m = builtin, pos = at[1] .. "x" .. at[2] }
         end
     end
+    -- Otherwise side by side from 0,0, in Hyprland's order, as auto does, but written out: auto places a screen past
+    -- all the others, a virtual one too (virtual-display.lua), and the laptop's screen would move behind an iPhone set
+    -- to its right, leaving an iPad on its left unreachable
+    if next(positions) == nil then
+        local x = 0
+        for _, m in ipairs(hl.get_monitors()) do
+            if not isVirtual(m) and not m.disabled then
+                local s = scales[m.name] or m.scale
+                positions[m.name] = { m = m, pos = x .. "x0" }
+                x = x + math.floor((m.transform % 2 == 1 and m.height or m.width) / s + 0.5)
+            end
+        end
+    end
 end
 -- An output with only a rate keeps the scale it has (MONITOR_SCALE or local.lua's), since its own rule replaces those
 local current = {}
@@ -183,7 +196,7 @@ function NightdriveArrangeWorkspaces()
 end
 -- A tablet or a phone over VNC: a screen with a workspace of its own (virtual-display.lua). After the rules above, as
 -- its rules take 9, 8… from the external display.
-require("virtual-display")()
+require("virtual-display")(positions, scales)   -- the desk's screens' places as just set, which it counts from
 -- A screen that comes or goes: the rules again (reload), then the workspaces
 hl.on("monitor.added",   function ()
     hl.exec_cmd("hyprctl reload && hyprctl eval 'NightdriveArrangeWorkspaces(); NightdriveArrangeVirtual()'")
