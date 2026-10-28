@@ -56,7 +56,7 @@ usage() {
   row "sandbox COMMAND"          "Nightdrive in a headless container: up, check, shot, ipc, vnc, down"
   row "software-catalog"         "Rebuild Install › Software's lists from Flathub"
   row "agent-warn [\"WHAT\"]"    "For coding agents: warn before the Launcher or a menu opens"
-  row "release [patch|minor|major]" "Maintainers: release dev into stable, with notes (--dry-run shows what it would do)"
+  row "release [patch|minor|major]" "Maintainers: release dev into stable, with notes (--dry-run shows what it would do, --preview --notes FILE the website's page)"
   printf '\n'
 }
 

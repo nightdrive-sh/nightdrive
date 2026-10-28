@@ -1,31 +1,33 @@
 #!/bin/bash
 # A Nightdrive release (AGENTS.md › Branches), made from dev:
-#   nightdrive release [patch|minor|major] [--name NAME] [--dry-run] [--notes FILE] [--yes]
+#   nightdrive release [patch|minor|major] [--name NAME] [--dry-run] [--preview] [--notes FILE] [--yes]
 # It raises the plugins' versions (plugin-version bump), drafts the release's section of CHANGELOG.md from the commits
 # since the last release and opens it in the editor, checks that the website can build its docs from dev, and then, after
 # one question, commits, tags vX.Y.Z, moves main to it, pushes dev, main and the tag, and publishes the GitHub release
 # with the section as its notes. Last, the website's tools/publish.sh (if there is a checkout of it) waits for the
 # website's rebuild from the new main and publishes it on its server. --notes FILE takes the notes from a file instead of the editor, --yes answers the
-# question (both for an agent, with notes the maintainer has read). --dry-run only shows what it would do.
+# question (both for an agent, with notes the maintainer has read). --dry-run only shows what it would do, and with
+# --notes also opens the website's Changelog page with them on it in the browser (release-preview); --preview only that.
 # --name gives the release its name beside the number (Afterglow): the heading "## 0.6.0 Afterglow – date" and the GitHub
 # release "Nightdrive 0.6 Afterglow". The name is for people; the tag, nightdrive update and version keep the number.
 # A picture of what's new goes in the notes as a line of its own, ![What it shows](docs/releases/X.Y.Z-name.jpg): the
 # file is committed with the release, the website shows it on the Changelog page, GitHub's release from the tag.
 set -euo pipefail
 
-WEBSITE=$HOME/Projects/nightdrive-website   # the website's checkout, for the docs check and publishing (skipped without it)
+WEBSITE=$HOME/Projects/nightdrive-website   # the website's checkout, for the docs check, the preview and publishing (skipped without it)
 
 repo=$(cd "$(dirname "$(readlink -f "$0")")/../../.." && pwd)
 changelog=$repo/CHANGELOG.md
-step=patch dry=0 yes=0 notes_from="" name=""
+step=patch dry=0 preview=0 yes=0 notes_from="" name=""
 while (( $# )); do
   case $1 in
     patch|minor|major) step=$1 ;;
     --dry-run) dry=1 ;;
+    --preview) dry=1 preview=1 ;;
     --yes) yes=1 ;;
     --notes) notes_from=$(readlink -f "${2:?--notes needs a file}"); shift ;;
     --name) name=${2:?--name needs a name}; shift ;;
-    *) echo "Usage: nightdrive release [patch|minor|major] [--name NAME] [--dry-run] [--notes FILE] [--yes]" >&2; exit 2 ;;
+    *) echo "Usage: nightdrive release [patch|minor|major] [--name NAME] [--dry-run] [--preview] [--notes FILE] [--yes]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -34,19 +36,23 @@ die() { echo "$*: nothing changed." >&2; exit 1; }
 [[ -z $name || $name =~ ^[[:alnum:]]([[:alnum:] ]*[[:alnum:]])?$ ]] || die "A release's name is letters, digits and spaces ($name)"
 g() { git -C "$repo" "$@"; }
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+(( !preview )) || [[ -n $notes_from ]] || die "--preview shows the notes of --notes FILE"
 
-# Only someone who can push to origin releases: on anyone else's clone the commit, the tag and the moved main would stay
-# behind, and their stable channel would part from origin's. Asked from origin, so a fork's owner can release the fork.
-command -v gh >/dev/null || die "A release needs the GitHub CLI (gh)"
-slug=$(g remote get-url origin | sed -E 's#^(https://github\.com/|git@[^:]+:)##; s#\.git$##')
-[[ $(gh api "repos/$slug" --jq .permissions.push 2>/dev/null) == true ]] || die "Only a maintainer of $slug can release (no push access)"
+# --preview only reads the tags and builds a page: none of the checks a release needs
+if (( !preview )); then
+  # Only someone who can push to origin releases: on anyone else's clone the commit, the tag and the moved main would stay
+  # behind, and their stable channel would part from origin's. Asked from origin, so a fork's owner can release the fork.
+  command -v gh >/dev/null || die "A release needs the GitHub CLI (gh)"
+  slug=$(g remote get-url origin | sed -E 's#^(https://github\.com/|git@[^:]+:)##; s#\.git$##')
+  [[ $(gh api "repos/$slug" --jq .permissions.push 2>/dev/null) == true ]] || die "Only a maintainer of $slug can release (no push access)"
 
-[[ $(g branch --show-current) == dev ]] || die "A release is made from dev (this checkout is on $(g branch --show-current))"
-[[ -z $(g status --porcelain --untracked-files=no) ]] || die "dev has uncommitted changes"
-[[ ! -e $changelog ]] || g ls-files --error-unmatch CHANGELOG.md >/dev/null 2>&1 || die "CHANGELOG.md isn't committed"
-g fetch -q --tags origin dev main || die "Couldn't fetch origin"
-(( $(g rev-list --count HEAD..origin/dev) == 0 )) || die "dev is behind origin/dev (pull it first)"
-g merge-base --is-ancestor origin/main HEAD || die "origin/main isn't an earlier point of dev"
+  [[ $(g branch --show-current) == dev ]] || die "A release is made from dev (this checkout is on $(g branch --show-current))"
+  [[ -z $(g status --porcelain --untracked-files=no) ]] || die "dev has uncommitted changes"
+  [[ ! -e $changelog ]] || g ls-files --error-unmatch CHANGELOG.md >/dev/null 2>&1 || die "CHANGELOG.md isn't committed"
+  g fetch -q --tags origin dev main || die "Couldn't fetch origin"
+  (( $(g rev-list --count HEAD..origin/dev) == 0 )) || die "dev is behind origin/dev (pull it first)"
+  g merge-base --is-ancestor origin/main HEAD || die "origin/main isn't an earlier point of dev"
+fi
 
 last=$(g describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
 if [[ -n $last ]]; then
@@ -82,6 +88,28 @@ docs_check() {
   return $rc
 }
 
+# The notes without their comment (it ends on a line of its own) and the blank lines around the text, and CHANGELOG.md
+# with them as the new section on top, under the file's own introduction: in $tmp, for the release and its preview
+compose() {
+  awk '/^<!--/ { c = 1 } !c; /^-->$/ { c = 0 }' "$1" | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac > "$tmp/body"
+  [[ -s $tmp/body ]] || die "The notes are empty"
+  { printf '%s\n\n' "$heading"; cat "$tmp/body"; echo; } > "$tmp/section"
+  if [[ -e $changelog ]]; then cat "$changelog"
+  else printf '# Changelog\n\nWhat each release of Nightdrive changed, newest first.\n'; fi |
+    awk -v f="$tmp/section" '!done && /^## / { while ((getline l < f) > 0) print l; done = 1 } { print }
+      END { if (!done) { print ""; while ((getline l < f) > 0) print l } }' > "$tmp/changelog"
+}
+
+preview_notes() {
+  compose "$notes_from"
+  echo "==> Preview: the website's Changelog page"
+  "$repo/config/hypr/scripts/release-preview" "$repo" "$tmp/changelog" "$WEBSITE" || echo "    failed (see above)"
+}
+
+if (( preview )); then
+  echo "==> Names"; echo "    CHANGELOG.md: $heading"; echo "    GitHub: $title"
+  preview_notes; exit 0
+fi
 if (( dry )); then
   echo "==> Names"; echo "    CHANGELOG.md: $heading"; echo "    GitHub: $title"
   echo "==> Plugins"; "$repo/config/hypr/scripts/plugin-version" bump --dry-run | sed 's/^/    /'
@@ -89,6 +117,7 @@ if (( dry )); then
   docs_check || echo "    fails: the release would stop here"
   if [[ -x $WEBSITE/tools/publish.sh ]]; then echo "==> Website: published after its rebuild ($WEBSITE/tools/publish.sh)"
   else echo "==> Website: not published from here (no $WEBSITE/tools/publish.sh)"; fi
+  [[ -z $notes_from ]] || preview_notes
   exit 0
 fi
 docs_check || die "The website can't build its docs from dev (see above)"
@@ -113,16 +142,9 @@ else
   } > "$tmp/notes"
   ${VISUAL:-${EDITOR:-nano}} "$tmp/notes" </dev/tty >/dev/tty
 fi
-# Without the comment (it ends on a line of its own) and the blank lines around the text
-awk '/^<!--/ { c = 1 } !c; /^-->$/ { c = 0 }' "$tmp/notes" | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac > "$tmp/body"
-[[ -s $tmp/body ]] || die "The notes are empty"
+compose "$tmp/notes"
 
 echo "==> Plugins"; "$repo/config/hypr/scripts/plugin-version" bump | sed 's/^/    /'
-# The new section goes on top, under the file's own introduction
-[[ -e $changelog ]] || printf '# Changelog\n\nWhat each release of Nightdrive changed, newest first.\n' > "$changelog"
-{ printf '%s\n\n' "$heading"; cat "$tmp/body"; echo; } > "$tmp/section"
-awk -v f="$tmp/section" '!done && /^## / { while ((getline l < f) > 0) print l; done = 1 } { print }
-  END { if (!done) { print ""; while ((getline l < f) > 0) print l } }' "$changelog" > "$tmp/changelog"
 cat "$tmp/changelog" > "$changelog"
 
 echo; echo "==> CHANGELOG.md"; sed 's/^/    /' "$tmp/section"

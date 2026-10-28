@@ -1,0 +1,40 @@
+#!/bin/bash
+# The website's Changelog page with a release's notes on it, before the release (nightdrive release --notes FILE
+# --dry-run or --preview, AGENTS.md › Branches): release-preview REPO CHANGELOG WEBSITE
+# CHANGELOG is the CHANGELOG.md the release would write (the release script composes it, with its heading). It goes into a
+# shared clone of REPO's dev, with the pictures of docs/releases as they are on disk (the release commits them), and the
+# website's own tools/build-changelog.py builds its page in a shared clone of the WEBSITE checkout (its checked-out
+# branch). Neither checkout is touched, and nothing needs rights to either repo.
+# A local server shows it in the browser and stops by itself, removing the clones.
+set -euo pipefail
+
+SERVE_FOR=20m   # how long the preview stays up
+
+usage="usage: release-preview REPO CHANGELOG WEBSITE"
+repo=${1:?$usage} changelog=${2:?$usage} website=${3:?$usage}
+[[ -f $website/tools/build-changelog.py ]] || { echo "    skipped: no website checkout ($website)"; exit 0; }
+
+# Under the user's runtime dir (private to them, emptied at logout), not a guessable path in /tmp
+dir=$(mktemp -d -p "${XDG_RUNTIME_DIR:-/tmp}" nightdrive-preview.XXXXXX)
+served=0
+trap '(( served )) || rm -rf "$dir"' EXIT
+
+git clone -q --shared -b dev "$repo" "$dir/dotfiles"
+git clone -q --shared "$website" "$dir/website"
+cp "$changelog" "$dir/dotfiles/CHANGELOG.md"
+if [[ -d $repo/docs/releases ]]; then
+  mkdir -p "$dir/dotfiles/docs/releases"; cp -r "$repo/docs/releases/." "$dir/dotfiles/docs/releases/"
+fi
+# --ref worktree reads the files on disk, the composed CHANGELOG.md among them
+(cd "$dir/website" && python3 tools/build-changelog.py --repo "$dir/dotfiles" --ref worktree) | sed 's/^/    /'
+
+# A free port, asked from the system; the server binds only to this machine
+port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+# All of its output away from ours: a pipe it held open would keep the caller (nightdrive release … | less) waiting
+setsid -f bash -c 'timeout "$1" python3 -m http.server "$2" --bind 127.0.0.1 --directory "$3/website/public"
+  rm -rf "$3"' _ "$SERVE_FOR" "$port" "$dir" </dev/null >/dev/null 2>&1
+served=1
+url=http://127.0.0.1:$port/changelog/
+for _ in $(seq 50); do python3 -c "import urllib.request as u; u.urlopen('$url')" 2>/dev/null && break; sleep 0.1; done
+echo "    $url (for $SERVE_FOR)"
+command -v xdg-open >/dev/null && xdg-open "$url" >/dev/null 2>&1 || true

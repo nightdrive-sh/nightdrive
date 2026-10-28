@@ -36,7 +36,9 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
   GitHub release and, once the website has rebuilt, its publishing (its `tools/publish.sh`). `--dry-run` shows what it
   would do.
 - Release notes are for users, in plain words: what they can now do, what works better, what they need to do. Never
-  the commit messages as such. Write them from the commits (`--dry-run` lists them), let the user read them, then
+  the commit messages as such. Write them from the commits (`--dry-run` lists them), let the user read them, also as
+  the website's Changelog page (`nightdrive release … --notes FILE --preview`, or with `--dry-run`: built in throwaway
+  clones of dotfiles and the website's checkout, served on 127.0.0.1 for 20 minutes and opened in the browser), then
   `nightdrive release … --notes FILE --yes`. A release with a name (Afterglow) gets `--name NAME`: the heading
   `## 0.6.0 Afterglow – date` and the GitHub release "Nightdrive 0.6 Afterglow"; the tag and updates keep the number.
 - A big piece of work that shouldn't hold up or swell the next release (a new app: Calendar, Contacts) gets a branch of
