@@ -181,8 +181,13 @@ function NightdriveArrangeWorkspaces()
     if not (tw and tw.windows > 0) then target = 1 end
     if target then hl.dispatch(hl.dsp.focus({ workspace = target })) end
 end
+-- A tablet or a phone over VNC: a screen with a workspace of its own (virtual-display.lua). After the rules above, as
+-- its rules take 9, 8… from the external display.
+require("virtual-display")()
 -- A screen that comes or goes: the rules again (reload), then the workspaces
-hl.on("monitor.added",   function () hl.exec_cmd("hyprctl reload && hyprctl eval 'NightdriveArrangeWorkspaces()'") end)
+hl.on("monitor.added",   function ()
+    hl.exec_cmd("hyprctl reload && hyprctl eval 'NightdriveArrangeWorkspaces(); NightdriveArrangeVirtual()'")
+end)
 hl.on("monitor.removed", function () hl.exec_cmd("hyprctl reload") end)
 
 -------------------
