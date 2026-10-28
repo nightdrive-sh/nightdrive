@@ -185,8 +185,17 @@ Usage: nightmail [command]
   show ID        open Mail on a message (notmuch message id)
   reply ID       open Mail on a message and reply to it
   claude ID      the same, with Claude writing the reply
-  archive ID     archive a message, as Mail's a does
-  delete ID      move a message to Trash
+  archive ID…    archive from the inbox, as Mail's a does (ID: a message id, or thread:… for a thread)
+  unarchive ID…  back to the inbox
+  delete ID…     move from the inbox to Trash, as Mail's d does
+  search QUERY [LIMIT]  threads a notmuch query finds, as JSON (newest first, 20 by default)
+  unread [LIMIT] the unread threads in the inboxes, as JSON
+  thread ID      a thread's messages as JSON text (ID: thread:… or a message id)
+  accounts       the accounts, as JSON
+  draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body})
+  draft-show ID  a draft as it would be sent, as JSON
+  discard ID     throw a draft away
+  send ID        send a draft, through the account's SMTP server
   notify         notify of new mail (notmuch's post-new hook runs it)
   keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
   push           sync as soon as new mail comes to an inbox (IMAP IDLE; its service runs it)
@@ -219,13 +228,25 @@ case ${1:-open} in
     case $1 in show) fn=openMessage ;; reply) fn=replyTo ;; claude) fn=claudeReply ;; esac
     ipc "$fn" "$2"
     ;;
-  archive|delete)
-    # The same move as Mail's a and d: from the inbox to Archive or Trash (move.py keeps Gmail's All Mail as it is)
+  archive|unarchive|delete)
+    # The same moves as Mail's a and d: from the inbox to Archive or Trash (lib/inbox.py, move.py's)
     [[ -n ${2:-} ]] || { usage >&2; exit 2; }
-    [[ $1 == archive ]] && to=Archive || to=Trash
-    python3 "$APP_DIR/lib/move.py" "$to" "id:\"$2\"" INBOX >/dev/null && notmuch tag -inbox -- "id:\"$2\""
+    python3 "$APP_DIR/lib/inbox.py" "$@"; status=$?
     running && ipc refresh
+    exit $status
     ;;
+  search|unread|thread)
+    python3 "$APP_DIR/lib/browse.py" "$@" ;;
+  accounts)
+    python3 "$APP_DIR/lib/compose.py" accounts ;;
+  draft|discard|send)
+    # The window shows a new draft, and a draft gone, at once
+    python3 "$APP_DIR/lib/drafts.py" "$@"; status=$?
+    running && ipc refresh
+    exit $status
+    ;;
+  draft-show)
+    python3 "$APP_DIR/lib/drafts.py" show "${@:2}" ;;
   notify)    python3 "$APP_DIR/lib/notify.py" ;;
   fetch)     fetch "${@:2}" ;;
   keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
