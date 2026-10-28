@@ -216,9 +216,15 @@ local function once(flag)
     return true
 end
 
+-- Before the lock is secure at an autologin start, no key does anything: the session is open under no lock for that
+-- moment (up to LOCK_TIMEOUT), and a key could start a terminal. Keys typed then go to no window, as there is none yet.
+-- (catchall: every key, and a submap with no binding in it isn't registered)
+hl.define_submap("boot", function () hl.bind("catchall", function () end) end)
+
 -- The session: everything but the login apps. Runs under the lock at an autologin start (lock.qml calls it once secure).
 function NightdriveLocked()
     if not once(LOCKED_FLAG) then return end
+    hl.dispatch(hl.dsp.submap("reset"))   -- the keys again ("boot" above), the lock's own (volume, brightness) among them
     -- The keyring daemon that greetd's PAM started gets its secrets and pkcs11 parts (a desktop's login does this): without
     -- them the lock's PAM can't open the login keyring with the password, and an app asking for a secret started a
     -- second daemon that asked for the password again
@@ -268,6 +274,7 @@ hl.on("hyprland.start", function ()
         NightdriveLocked(); NightdriveUnlocked()
         return
     end
+    hl.dispatch(hl.dsp.submap("boot"))
     -- Through the lock script, which starts the lock again if it dies (a screen going away as it starts)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/lock --boot")
     hl.exec_cmd("sh -c 'sleep " .. LOCK_TIMEOUT .. "; [ -e \"" .. LOCKED_FLAG .. "\" ] || hyprctl dispatch \"hl.dsp.exit()\"'")
@@ -361,7 +368,9 @@ hl.config({
         disable_hyprland_logo   = true,
         background_color        = 0xff1a1b26,   -- background colour until swaybg draws the wallpaper (softens the flash after login)
         focus_on_activate       = true,   -- apps may request focus: e.g. opening a link → Firefox comes to the front (switches workspace)
-        -- A lock that crashed (lock.qml) can be started again from a text console instead of only logging out
+        -- A lock that crashed (lock.qml) is taken over by a new one (hypr/scripts/lock) instead of leaving the "lock
+        -- died" screen, whose way out is a text console. Turning it off wouldn't guard against anything: a program of
+        -- the user's own could turn it on with hyprctl, and without one at the keyboard nobody runs anything.
         allow_session_lock_restore = true,
         -- Until a new lock has drawn on every screen, Hyprland draws the desktop under it for this long: the desktop
         -- showed for a second after sleep (hypr/scripts/relock). At 0 it is black instead, or the "lock died" screen.
