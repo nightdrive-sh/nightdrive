@@ -154,11 +154,23 @@ ShellRoot {
             return q === "" ? folderQuery(folder) : "(" + folderQuery(folder) + ") and (" + q + ")"
         }
 
+        // A new array is a new model: the ListView starts again at the top with its currentIndex at 0, and current, often
+        // unchanged (the thread after an archived one has its index), doesn't set it back. stay: the same folder read
+        // anew (a sync, a move, read), so the list keeps its place; a folder or a search of its own starts at the top.
+        function setThreads(l, stay) {
+            const y = list.contentY
+            threads = l
+            if (!stay) return
+            list.currentIndex = Qt.binding(() => current)
+            list.contentY = Math.max(list.originY - list.topMargin,
+                                     Math.min(y, list.originY + list.contentHeight + list.bottomMargin - list.height))
+        }
+
         // keep: the open thread stays open; at: where to open one when it has gone (the one after a moved thread)
         function reload(keep, at) {
             const id = keep && current >= 0 && threads[current] ? threads[current].thread : ""
             nm.search(query(), list => {
-                threads = list
+                setThreads(list, keep || at !== undefined)
                 let i = list.findIndex(t => t.thread === id)
                 if (i < 0) i = list.length > 0 ? Math.min(at || 0, list.length - 1) : -1
                 // Threads picked stay picked through the sync's reload, and nothing opens (it would mark one read)
@@ -199,8 +211,8 @@ ShellRoot {
                 // read. The list is read again, and the thread with the same subject and date opens.
                 if (m.length === 0 && !again) {
                     nm.search(query(), list => {
-                        threads = list
-                        const j = list.findIndex(x => x.subject === t.subject && x.timestamp === t.timestamp)
+                        setThreads(list, true)
+                        const j =list.findIndex(x => x.subject === t.subject && x.timestamp === t.timestamp)
                         open(j >= 0 ? j : Math.min(i, list.length - 1), then, true)
                     })
                     return
@@ -404,7 +416,7 @@ ShellRoot {
             nm.move(to, q, from, r => {
                 if (r.error) { say(r.error); return }
                 const ids = (r.ids || []).map(i => "id:\"" + i + "\"").join(" or ")
-                if (ids) done({ text: text, undo: () => nm.move(back, ids, there, () => nm.tag(inbox(back), ids, () => reload(keep))) })
+                if (ids) done({ text: text, undo: () => nm.move(back, ids, there, () => nm.tag(inbox(back), ids, () => reload(keep, at))) })
                 nm.tag(inbox(to), to === "INBOX" && ids ? ids : tq, () => reload(keep, at))
             })
         }
