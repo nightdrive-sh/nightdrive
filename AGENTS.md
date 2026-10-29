@@ -22,7 +22,10 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
 - `pkill -f foo` matches its own shell: use `'[f]oo'`.
 - Hyprland's config is Lua: `hyprctl dispatch 'hl.dsp.…'`.
 - Quickshell's reload on save keeps the old version of a component in its own file (e.g. `TouchScroll.qml`, listed in
-  `qmldir`), and doesn't reload a plugin's menu at all: restart it to test a change there (`qs kill; setsid -f qs`).
+  `qmldir`), and doesn't reload a plugin's menu at all: restart it to test a change there with
+  `~/.config/hypr/scripts/desktop-shell restart`, never `qs kill; setsid -f qs`: it runs under a supervisor that starts
+  it again after a crash, and a `qs` started by hand has none. To stop it, `qs kill --any-display` (plain `qs kill` may
+  miss it and leave two bars). And never put `qs kill` in backticks in text that passes through a shell: it runs.
 
 **Branches**
 - `main` is stable: stable-channel users get it with `nightdrive update`. Every change is made in `dev`, a fix to what

@@ -59,9 +59,8 @@ compositor with xdg_wm_base v6 and wl_compositor v6: sway 1.11 and Weston 15 are
   instances with the same display connection.
 - `cursor.no_hardware_cursors` in the container's `local.lua`: KWin would draw the cursor outside Hyprland's frames, so moving
   it wouldn't update the VNC image. wayvnc runs with `-r` (the cursor drawn into the image): Remmina showed none without it.
-- wayvnc is Fedora's 0.9.1 rebuilt with one upstream change (first stage of the Containerfile): Hyprland fails a cursor
-  capture frame when the cursor changes shape, e.g. on a click, and 0.9.1 then exits, dropping the viewer. 0.10 only logs it,
-  but needs neatvnc/aml 1.x. The rebuild can go once Fedora ships 0.10.
+- wayvnc is 0.10 from Nightdrive's COPR, as VNC Display's: Hyprland fails a cursor capture frame when the cursor changes
+  shape, e.g. on a click, and Fedora 44's 0.9.1 then exits, dropping the viewer. 0.10 only logs it.
 - A file mounted inside the read-only repo needs a file to mount over, and Podman would create a missing one in the repo
   itself, owned by a subordinate uid. `up` makes an empty `local.lua` / `xdph.conf` instead when the repo has none, and
   `down` removes them again (only if still empty). They are git-ignored.

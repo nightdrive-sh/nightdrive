@@ -149,12 +149,12 @@ PanelWindow {
     readonly property var swCats: inst.swCats                          // Install › Software's categories (Default apps › Find more)
     function openCategory(key, name) { inst.openCategory(key, name) }
     readonly property var parents: Object.assign({ install: "system", screenshot: "tools", startup: "appsettings", appsettings: "settings" }, ...exts.map(e => e.parents))
-    // Search found nothing: hint below ⌘⌥⏎ (icons) → send the text to Claude
-    readonly property bool noHit: (level === "root" || level === "apps") && query.trim() !== "" && results.length === 0
     // The selected row is an app: ⌃Enter shows it in Apps (the list with an empty query) or hides it from there.
     // "Hide", not "remove": removing sounded like uninstalling.
     readonly property var selApp: { const c = results[list.currentIndex]; return (level === "apps" || level === "root") && c && c.kind === "app" ? c : null }
-    readonly property string footer: detail !== null ? details.footer
+    // The level's or the row's keys, then ⌘⌥Enter when the search looks like a request for Claude (AskClaudeHint.qml)
+    readonly property string footer: askHint.shows(level, query, results) ? [levelFooter, askHint.text].filter(f => f !== "").join("  ·  ") : levelFooter
+    readonly property string levelFooter: detail !== null ? details.footer
         : selApp ? "Enter: open  ·  Ctrl+Enter: " + (selApp.shown ? "hide from Apps" : "show in Apps")
                                               + "  ·  Alt+Enter: " + (autostartIds.indexOf(appId(selApp)) >= 0 ? "don’t start at login" : "start at login")
         : level === "startup" ? "Enter: start at login on/off  ·  background apps start hidden"
@@ -524,7 +524,7 @@ PanelWindow {
                 ...pluginExts.map(e => e.rootRows ? e.rootRows() : [])
             ]) all = all.concat(src)
             // Rows after the hits as they are, whatever was typed (rootTail: Deck's Search Spotify row, when Deck is in the search)
-            if (q !== "") tail = [].concat(...pluginExts.map(e => e.rootTail ? e.rootTail(q) : []))
+            if (q !== "") tail = [].concat(...pluginExts.map(e => e.rootTail ? e.rootTail(q) : [])).map(r => Object.assign({ tail: true }, r))
         } else if (level === "apps") {
             all = appEntries(q)
             if (q === "") all.sort((a, b) => a.text.localeCompare(b.text))
@@ -825,6 +825,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     ClaudeWriteLevels { id: cwrite; launcher: win }
     ClaudeAccessLevels { id: caccess; launcher: win }
     SendClaudeLevels { id: sendclaude; launcher: win }
+    AskClaudeHint { id: askHint; launcher: win }
     InstallLevels { id: inst; launcher: win }
     ToolsLevels { id: tools; launcher: win }
     AppearanceLevels { id: look; launcher: win }
@@ -1613,36 +1614,6 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         onPositionChanged: mouse => win.hover(cellArea, mouse, cell.index)
                         onClicked: win.activate(cell.modelData)
                     }
-                }
-            }
-
-            Row {
-                visible: win.noHit
-                anchors.right: parent.right
-                rightPadding: 6
-                spacing: 6
-                Repeater {
-                    model: ["command", "option", "corner-down-left"]
-                    Rectangle {
-                        required property string modelData
-                        width: 22; height: 19; radius: 5
-                        color: "transparent"
-                        border.color: Theme.dim
-                        border.width: 1
-                        Text {
-                            anchors.centerIn: parent
-                            text: Icons.g(parent.modelData)
-                            color: Theme.dim
-                            font { family: Icons.family; pixelSize: 12 }
-                        }
-                    }
-                }
-                Text {
-                    text: "Send to Claude"
-                    color: Theme.dim
-                    font { family: Theme.font; pixelSize: 12 }
-                    anchors.verticalCenter: parent.verticalCenter
-                    leftPadding: 3
                 }
             }
 

@@ -49,14 +49,18 @@ ShellRoot {
     // A reload on save or a restart only shows as the bar redrawing (an open menu closes), easy to miss: a short silent
     // popup says it happened. Not at login: qs's PID (the parent of this Process, not of an execDetached one) kept in the
     // runtime dir tells a reload (same PID) from a restart (another) from the session's first start (none). The sleep gives
-    // a restarted qs time to own the notification service again.
+    // a restarted qs time to own the notification service again. NIGHTDRIVE_QS_CRASHED: hypr/scripts/desktop-shell started
+    // this qs after a crash, and this is its one notice of it (it can't notify while qs, the service, is down).
     Sh {
         running: true
         command: ["bash", "-c", `
             prev=$(cat "$1" 2>/dev/null); echo "$PPID" > "$1"
             [ -n "$prev" ] || exit 0
-            [ "$prev" = "$PPID" ] && msg="The top bar reloaded" || msg="The top bar restarted"
-            sleep 1; notify-send -e -u low -a Quickshell "$msg"`, "_", Quickshell.env("XDG_RUNTIME_DIR") + "/nightdrive-qs.pid"]
+            urgency=low
+            if [ "$prev" = "$PPID" ]; then msg="The top bar reloaded"
+            elif [ -n "$NIGHTDRIVE_QS_CRASHED" ]; then msg="The top bar crashed and started again"; urgency=normal
+            else msg="The top bar restarted"; fi
+            sleep 1; notify-send -e -u $urgency -a Quickshell "$msg"`, "_", Quickshell.env("XDG_RUNTIME_DIR") + "/nightdrive-qs.pid"]
     }
     Connections {
         target: Quickshell

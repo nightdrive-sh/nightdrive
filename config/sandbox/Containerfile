@@ -1,39 +1,5 @@
 # The image of `nightdrive sandbox` (config/sandbox/sandbox builds it). Its build context is the repo root, so it installs
 # the repo's own package lists. The config itself isn't in the image: the repo is mounted read-only at run time.
-# wayvnc 0.9.1 (Fedora 44) exits when a cursor capture frame fails, and Hyprland fails it ("stopped") whenever the cursor
-# changes shape, e.g. on a click: the viewer drops. Upstream fixed it after 0.9.1 (0.10 logs it and carries on), but 0.10
-# needs neatvnc/aml 1.x, which Fedora 44 doesn't have, so the same change is backported onto Fedora's 0.9.1.
-# Once Fedora ships wayvnc 0.10, this first stage and the COPY --from=wayvnc below can go.
-FROM registry.fedoraproject.org/fedora:44 AS wayvnc
-RUN dnf -y install dnf-plugins-core meson gcc git && dnf -y builddep wayvnc && dnf clean all
-RUN git clone -q --depth 1 --branch v0.9.1 https://github.com/any1/wayvnc.git /src/wayvnc
-WORKDIR /src/wayvnc
-RUN python3 - <<'PY2'
-p = "src/main.c"; s = open(p).read()
-old = """static void on_cursor_capture_done(enum screencopy_result result,
-		struct wv_buffer* buffer, void* userdata)
-{
-	struct wayvnc* self = userdata;
-
-	switch (result) {
-	case SCREENCOPY_FATAL:
-		nvnc_log(NVNC_LOG_ERROR, "Fatal error while capturing. Exiting...");
-		wayvnc_exit(self);
-		break;"""
-new = """static void on_cursor_capture_done(enum screencopy_result result,
-		struct wv_buffer* buffer, void* userdata)
-{
-	struct wayvnc* self = userdata;
-
-	switch (result) {
-	case SCREENCOPY_FATAL:
-		nvnc_log(NVNC_LOG_ERROR, "Failed to capture cursor. The source probably went away");
-		break;"""
-assert s.count(old) == 1, "on_cursor_capture_done not found"
-open(p, "w").write(s.replace(old, new))
-PY2
-RUN meson setup build --prefix=/usr/local --buildtype=release && ninja -C build && DESTDIR=/out ninja -C build install
-
 FROM registry.fedoraproject.org/fedora:44
 
 # The same Hyprland COPR as install.sh (setup-hyprland-repo.sh: includepkgs keeps it from replacing Fedora's packages)
@@ -46,15 +12,14 @@ RUN pkgs() { grep -vE '^\s*(#|$)' "$1" | tr '\n' ' '; } \
  && dnf -y install --skip-unavailable $(pkgs /tmp/nd/packages.txt) \
  && dnf clean all
 
-# What the container needs on top: KWin (its virtual screen hosts the nested Hyprland, see config/sandbox/inside), software rendering, process tools, a VNC server, D-Bus for the session
+# What the container needs on top: KWin (its virtual screen hosts the nested Hyprland, see config/sandbox/inside), software rendering, process tools, a VNC server, D-Bus for the session.
+# wayvnc is 0.10 from the COPR (setup-hyprland-repo.sh): Fedora 44's 0.9.1 exits when Hyprland fails a cursor capture
+# frame, which it does whenever the cursor changes shape (a click), and the viewer drops.
 RUN dnf -y install kwin mesa-dri-drivers mesa-vulkan-drivers procps-ng psmisc strace dbus-daemon dbus-tools wayvnc \
      which findutils python3 unzip curl git sudo xorg-x11-server-Xwayland \
      xdg-user-dirs \
  && dnf clean all \
  && setcap -r /usr/bin/kwin_wayland   # cap_sys_nice: a rootless container can't exec it; --cap-add instead breaks bwrap (glycin image loaders)
-
-# The patched wayvnc (first stage) in /usr/local/bin, ahead of Fedora's in PATH (the package stays for its dependencies)
-COPY --from=wayvnc /out/usr/local/ /usr/local/
 
 # Nerd Fonts symbols, as install.sh does (system-wide here so the image is self-contained)
 RUN mkdir -p /usr/share/fonts/nerd /tmp/nf \

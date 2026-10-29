@@ -271,8 +271,8 @@ function NightdriveLocked()
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/lid watch")   -- the lid with an external display (DISPLAY above)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/vm-display watch")   -- in a VM, its screen follows its window (DISPLAY above)
     -- Theme colours (~/.cache/nightdrive, hypr/scripts/theme) first: Quickshell (the top bar, its menus and the notifications)
-    -- reads them on startup
-    hl.exec_cmd("sh -c '\"$HOME/.config/hypr/scripts/theme\" apply; exec qs'")
+    -- reads them on startup. hypr/scripts/desktop-shell runs qs and starts it again after a crash.
+    hl.exec_cmd("sh -c '\"$HOME/.config/hypr/scripts/theme\" apply; exec \"$HOME/.config/hypr/scripts/desktop-shell\" run'")
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/wallpaper restore")   -- swaybg with the remembered wallpaper (change: launcher › Settings › Background)
     hl.exec_cmd("env PATH=" .. HOME .. "/.local/bin:" .. os.getenv("PATH") .. " " .. HOME .. "/.config/hypr/scripts/dictate daemon")   -- speech to text (F5), Parakeet
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/idle start")   -- hypridle with the screensaver and screen-off times (launcher › Settings › Screensaver)
@@ -327,6 +327,14 @@ hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 -- which --no-kde removes, and even with it the apps are light unless Plasma's own colour scheme was set dark
 hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
 hl.env("MOZ_ENABLE_WAYLAND", "1")
+-- QML's JIT before Qt 6.12 leaves the setter's raw return value in the accumulator after a property assignment
+-- (`a.b = x`); a block that follows saves it into the JS stack, and a garbage collection then crashes on it. It took
+-- Quickshell down (the top bars, menus, notifications) as a display moved. The interpreter alone runs our QML well
+-- enough, so it's forced until Qt has the fix (6.12, qtdeclarative 4c1054b); an unknown version counts as unfixed.
+local qml = io.popen("readlink /usr/lib64/libQt6Qml.so.6 2>/dev/null")
+local qtMinor = qml and tonumber(((qml:read("*l") or ""):match("%.so%.6%.(%d+)")))
+if qml then qml:close() end
+if not qtMinor or qtMinor < 12 then hl.env("QV4_FORCE_INTERPRETER", "1") end
 -- NVIDIA's own driver (a PC, install.sh): video decoding and GLX through it (Hyprland wiki › NVIDIA). Checked at start
 -- rather than written by install.sh, so a driver added or removed later is followed.
 local nvidia = io.open("/proc/driver/nvidia/version")

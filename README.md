@@ -528,7 +528,8 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   under it. Icons are SVGs: Lucide by name, or `pack:name` from any [Iconify](https://icon-sets.iconify.design) set (fetched
   once). Sizes are in `config/topbar/adjust.conf`.
   Quickshell reloads when one of its files is saved, and a short popup says so ("The top bar reloaded", "restarted", or
-  "didn't reload" with the error), so it doesn't go unnoticed.
+  "didn't reload" with the error), so it doesn't go unnoticed. If it crashes, it starts again by itself and says so; after
+  three crashes in two minutes it stays off: `~/.config/hypr/scripts/desktop-shell restart` starts it.
 - The menus use ordinary command-line tools such as `wpctl`, `nmcli`, `bluetoothctl`, `upower`, `tailscale`, `cliphist` and `dnf`.
   There are no daemons of their own.
 - The theme script (`config/hypr/scripts/theme`) derives every shade from one colour. It writes a small file for Quickshell,
@@ -542,7 +543,7 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
 - **Hyprland comes from Nightdrive's own COPR.** Fedora's own repositories have no Hyprland, so on every machine the
   installer takes the Hyprland packages from [`@nightdrive/nightdrive`](https://copr.fedorainfracloud.org/coprs/g/nightdrive/nightdrive/)
   (aarch64 and x86_64; specs in [nightdrive-packages](https://github.com/nightdrive-sh/nightdrive-packages)) and limits
-  that repository to them. Ghostty comes from there too.
+  that repository to them. Ghostty comes from there too, and VNC Display's wayvnc (Fedora 44's is too old).
 - **The Claude menu** reads your plan's limits with Claude Code's own sign-in, so Claude Code must have been run once.
 - **Claude writes (⌘⇧C)** sends the selected text (or what you type in its card), and the window's class and title, to
   Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers
