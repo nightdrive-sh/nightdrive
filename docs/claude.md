@@ -5,10 +5,11 @@ play an album, set the wallpaper, tell you which key does what. You ask in plain
 in the Launcher, `nightdrive ask`, a terminal), and you decide in Settings how far it may go.
 
 **Ask Claude** is the quick way: type a request in the Launcher ("Open three Finnish news sites") and press ⌘⌥Enter.
-Claude Code does it in the background with Nightdrive's tools and nothing else (no shell, files or web pages of its
-own), so the card and Access below decide as always. A notification says it is working, with **Cancel**, and after
-5 minutes it is stopped. The answer comes as a notification; a click on it, or **Open in terminal**, goes on with the
-same conversation in Claude Code, where it has its usual tools again. Without the tools on, or without Claude Code,
+Claude Code does it in the background with Nightdrive's tools and nothing else (no shell, files, web pages, hooks or
+plugins of its own), so the card and Access below decide as always. A notification says it is working, with **Cancel**,
+and after 5 minutes it is stopped. The answer comes as a notification; a click on it, or **Open in terminal**, goes on
+with the same conversation in Claude Code, where it has its usual tools again. What the tools read in the background (a
+mail, a note) comes along, so look at what it asks then as in any session. Without the tools on, or without Claude Code,
 ⌘⌥Enter opens the terminal as ⌘⌃Enter does.
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has

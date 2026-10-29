@@ -94,6 +94,6 @@ setsid -f bash -c '
     [[ $ws =~ ^-?[0-9]+$ ]] && target=$ws || target="\"$ws\""
     [[ -n $at && $at != "$ws" ]] && hyprctl dispatch "hl.dsp.window.move({ workspace = $target, follow = false, window = \"address:$addr\" })" >/dev/null
   fi
-  action=$(notify-send -a Claude -i "$icon" -A default=Open -A show="Show session" -w "Claude session opened: $1" "$2")
+  action=$(notify-send -a Claude -i "$icon" -A default=Open -A show="Show session" -w -- "Claude session opened: $1" "$2")
   [[ $action == default || $action == show ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
 ' _ "${name:-${dir##*/}}" "${prompt:+$prompt · }$project" >/dev/null 2>&1 < /dev/null

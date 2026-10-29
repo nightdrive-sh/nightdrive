@@ -56,17 +56,23 @@ headings), in the language of the request. If it needs more than these tools can
 on with this conversation in a terminal from the notification."
 # --tools "" leaves out every built-in tool (Bash, Edit, Write, WebFetch, Task…), --strict-mcp-config every MCP server
 # but ours (the user's own, claude.ai's connectors), and dontAsk refuses whatever isn't allowed instead of asking, as
-# nobody could answer here. --disallowedTools only says the same again, in case a setting adds tools.
+# nobody could answer here. --restricted skips the user's and the project's settings files too, so no hook or plugin of
+# theirs runs on what the tools read (a mail can carry a prompt injection); only the model they chose is kept.
+# --disallowedTools only says the same again, in case managed settings add tools.
+model=$(jq -r '.model // empty | strings' "$HOME/.claude/settings.json" 2>/dev/null)
 (cd "$dir" && exec timeout "$LIMIT" "$claude_bin" -p --output-format json --session-id "$id" ${name:+-n "$name"} \
+   ${model:+--model "$model"} --restricted \
    --tools "" --strict-mcp-config --mcp-config "$run/mcp.json" --permission-mode dontAsk \
    --allowedTools "mcp__${SERVER}__*" --disallowedTools Bash Edit Write NotebookEdit WebFetch WebSearch \
    --append-system-prompt "$system" -- "$prompt") >"$run/out.json" 2>"$run/err" </dev/null &
 pid=$!
 
 # Working: critical, so it stays on screen until the answer, without the urgent sound; transient, so it leaves no row in
-# the history. Its click (default) only hides it; Cancel stops Claude, and the server's open card with it.
+# the history. Its click (default) only hides it; Cancel stops Claude, and the server's open card with it. Every
+# notify-send has -- before its texts: GLib reads options after them too, so an answer (or a request) that begins with
+# --app-name= or --icon= would change who the notification says it is from.
 ( notify-send -a Claude -i "$icon" -u critical -e -h boolean:suppress-sound:true -A default=Hide -A cancel=Cancel \
-    -p -w "Claude is working…" "$short" >"$run/working"
+    -p -w -- "Claude is working…" "$short" >"$run/working"
   [[ $(sed -n 2p "$run/working") == cancel ]] && { touch "$run/cancelled"; kill "$pid"; } ) 2>/dev/null &
 wait "$pid"; rc=$?
 nid=$(sed -n 1p "$run/working" 2>/dev/null)
@@ -74,7 +80,7 @@ nid=$(sed -n 1p "$run/working" 2>/dev/null)
   --method org.freedesktop.Notifications.CloseNotification "$nid" >/dev/null 2>&1
 
 if [[ -e $run/cancelled ]]; then
-  notify-send -a Claude -i "$icon" -e "Claude stopped" "$short"
+  notify-send -a Claude -i "$icon" -e -- "Claude stopped" "$short"
   exit 0
 fi
 answer=$(jq -r 'select(.is_error | not) | .result // empty' "$run/out.json" 2>/dev/null)
@@ -96,6 +102,6 @@ rm -rf "$run"; trap - EXIT
 # Claude Code has its usual tools and asks as usual. A session cut short by the limit can be continued too.
 term="$HOME/.config/hypr/scripts/terminal"   # the terminal chosen in Default apps
 setsid -f bash -c '
-  action=$(timeout "$1" notify-send -a Claude -i "$2" -A default="Open in terminal" -A open="Open in terminal" -w "$3" "$4")
+  action=$(timeout "$1" notify-send -a Claude -i "$2" -A default="Open in terminal" -A open="Open in terminal" -w -- "$3" "$4")
   [[ $action == default || $action == open ]] && exec "$5" --dir "$6" -- "$7" --resume "$8"
 ' _ "$OPEN_WAIT" "$icon" "$title" "$body" "$term" "$dir" "$claude_bin" "$id" >/dev/null 2>&1 </dev/null
