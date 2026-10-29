@@ -72,5 +72,6 @@ DetailCard 1.0 DetailCard.qml
 ClaudeWriteLevels 1.0 ClaudeWriteLevels.qml
 SendCapture 1.0 SendCapture.qml
 SendClaudeLevels 1.0 SendClaudeLevels.qml
+AskClaudeHint 1.0 AskClaudeHint.qml
 PolkitWatch 1.0 PolkitWatch.qml
 FieldBox 1.0 FieldBox.qml
