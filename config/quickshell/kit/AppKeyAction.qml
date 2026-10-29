@@ -11,7 +11,7 @@ Row {
     property int pixelSize: 12
     signal clicked()
     spacing: 8
-    KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: root.keys; tint: root.c.faint }
+    KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: root.keys }
     Text {
         anchors.verticalCenter: parent.verticalCenter
         text: root.label; font.family: root.c.font; font.pixelSize: root.pixelSize

@@ -26,7 +26,8 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppPanel` | A card over the dimmed window (settings, a question, a first start); a click outside comes out as a signal |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |
 | `Tip` | A button's tip: what it does and its key |
-| `KeyCap` | Keys in boxes: "⌘N  c" |
+| `KeyCap` | Keys as caps: "⌘N  c" is [⌘][N] [c] (`or`: a "/" between the alternatives); `tint` colours them |
+| `Key` | One key cap, Raycast's way: a square a little lighter than its ground, a name (esc, HYPER) wider. The launcher uses it too (`import qs.kit as Kit`) |
 | `KeySheet` | The window's keys, on ? and Ctrl+? |
 
 The app's command (`nightmail`, `deck-window`) sources `kit/app.sh` through the same link, after setting `QS_DIR`,

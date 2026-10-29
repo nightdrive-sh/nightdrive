@@ -22,6 +22,6 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 10
         Text { anchors.verticalCenter: parent.verticalCenter; text: root.text; color: root.c.text; font.family: root.c.font; font.pixelSize: 12 }
-        KeyCap { anchors.verticalCenter: parent.verticalCenter; visible: root.keys !== ""; c: root.c; keys: root.keys; tint: root.c.faint }
+        KeyCap { anchors.verticalCenter: parent.verticalCenter; visible: root.keys !== ""; c: root.c; keys: root.keys }
     }
 }

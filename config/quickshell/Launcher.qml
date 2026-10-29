@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
+import qs.kit as Kit
 
 // Launcher (⌘Space). A plugin's row above the search field (Deck's player: Ctrl+Space = play/pause). Root level: Apps, Passwords, Clipboard, Screenshot, Keybindings, Settings, Install, Remove, Update, Power. Enter opens an item, Esc/Backspace (with an empty query, not in a form's field) goes back,
 // at the root level Esc closes. Up/down arrows or Ctrl+N/P/J/K move the selection.
@@ -1340,7 +1341,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         spacing: 4
                         Repeater {
                             model: shortcut.keys.split(/\s+/).filter(k => k !== "")
-                            KeyCap { required property string modelData; key: modelData; dim: !row.current }
+                            Kit.Key { required property string modelData; key: modelData; dim: !row.current }
                         }
                     }
                     Row {            // Keybindings: a key's combinations as key caps like a row's shortcut (keyParts)
@@ -1358,7 +1359,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                                 spacing: 4
                                 Repeater {
                                     model: part.modelData.caps || []
-                                    KeyCap { required property string modelData; key: modelData; dim: !row.current }
+                                    Kit.Key { required property string modelData; key: modelData; dim: !row.current }
                                 }
                                 Text {
                                     visible: part.modelData.caps === undefined
@@ -1577,7 +1578,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 }
             }
 
-            Flow {     // footer: each action's key caps (KeyCap), then what it does; on a narrow card in more lines
+            Flow {     // footer: each action's key caps (Key), then what it does; on a narrow card in more lines
                 id: footerFlow
                 visible: win.footer !== ""
                 anchors.right: parent.right
@@ -1600,7 +1601,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         spacing: 4
                         Repeater {
                             model: part.modelData.keys
-                            KeyCap { required property string modelData; key: modelData; dim: !part.main }
+                            Kit.Key { required property string modelData; key: modelData; dim: !part.main }
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter

@@ -264,7 +264,7 @@ Item {
             anchors.centerIn: parent
             spacing: 8
             // In a narrow window the keys go: with them the buttons are wider than the form and push it past the edge
-            KeyCap { visible: root.width >= 560; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: a.hint; tint: root.c.faint }
+            KeyCap { visible: root.width >= 560; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: a.hint }
             Text { id: t; anchors.verticalCenter: parent.verticalCenter; color: a.tint; font.family: root.c.font; font.pixelSize: 12 }
         }
     }
@@ -524,7 +524,7 @@ Item {
                     spacing: 18
                     Row {
                         spacing: 8
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "r"; tint: root.c.faint }
+                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "r" }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: consent.more ? "Back" : "Read more"; color: moreHover.hovered ? root.c.accent : root.c.dim
@@ -535,12 +535,12 @@ Item {
                     }
                     Row {
                         spacing: 8; visible: !consent.more
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "↑ ↓  ⏎"; tint: root.c.faint }
+                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "↑ ↓  ⏎" }
                         Text { anchors.verticalCenter: parent.verticalCenter; text: "Choose"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 12 }
                     }
                     Row {
                         spacing: 8; visible: !consent.more
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc"; tint: root.c.faint }
+                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc" }
                         Text { anchors.verticalCenter: parent.verticalCenter; text: "Write without Claude"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 12 }
                     }
                 }

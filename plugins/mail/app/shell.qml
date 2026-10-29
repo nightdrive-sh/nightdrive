@@ -978,7 +978,7 @@ ShellRoot {
                                     spacing: 14
                                     Item {
                                         width: 44; height: cap.implicitHeight
-                                        KeyCap { id: cap; anchors.right: parent.right; c: win.look; keys: modelData[0]; tint: win.look.faint }
+                                        KeyCap { id: cap; anchors.right: parent.right; c: win.look; keys: modelData[0] }
                                     }
                                     Text { anchors.verticalCenter: parent.verticalCenter; text: modelData[1]; color: ph.hovered ? c.text : c.dim; font.family: c.font; font.pixelSize: 13 }
                                 }
@@ -1046,7 +1046,7 @@ ShellRoot {
             Row {
                 width: parent.width
                 Text { anchors.verticalCenter: parent.verticalCenter; text: "Settings"; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium; width: parent.width - escHint.width }
-                KeyCap { id: escHint; anchors.verticalCenter: parent.verticalCenter; c: win.look; keys: "esc"; tint: win.look.faint }
+                KeyCap { id: escHint; anchors.verticalCenter: parent.verticalCenter; c: win.look; keys: "esc" }
             }
             Repeater {
                 model: win.settingRows

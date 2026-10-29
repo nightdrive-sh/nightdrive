@@ -59,7 +59,7 @@ AppPanel {
     Row {
         width: parent.width
         Text { anchors.verticalCenter: parent.verticalCenter; width: parent.width - escHint.width; text: "Settings"; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium }
-        KeyCap { id: escHint; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc"; tint: root.c.faint }
+        KeyCap { id: escHint; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc" }
     }
 
     Column {

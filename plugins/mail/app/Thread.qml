@@ -475,7 +475,7 @@ Flickable {
                         id: draftRow
                         anchors.centerIn: parent
                         spacing: 8
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "⏎"; tint: c.faint }
+                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "⏎" }
                         Text { anchors.verticalCenter: parent.verticalCenter; text: "Continue writing"; color: c.accent; font.family: c.font; font.pixelSize: 12 }
                     }
                 }
