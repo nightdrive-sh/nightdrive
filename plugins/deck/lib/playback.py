@@ -16,6 +16,7 @@ Errors go to stderr in words for a reader, with exit status 1: Claude reads them
 """
 
 import json
+import re
 import subprocess
 import sys
 import time
@@ -25,6 +26,10 @@ SNAPSHOTS = Path.home() / ".local/state/nightdrive/deck-undo"
 SNAPSHOT_AGE = 6 * 3600   # seconds; the undo log offers Undo for an hour, so older copies are only clutter
 WAIT = 4.0                # seconds to wait for Deck to start what it was told, before answering without it
 HERE = Path(__file__).resolve().parent
+# What Claude's uris must be before they go to Deck (#1862): one that starts with - would be an option of its CLI
+URI = re.compile(r"spotify:(album|track):[A-Za-z0-9]+")
+URIS = {"play-album": ("album",), "queue-album": ("album",), "play-song": ("track", "album"),
+        "queue-song": ("track", "album")}   # pick takes a source, which the tool's enum keeps
 
 
 class Failed(Exception):
@@ -166,6 +171,10 @@ def like(value):
 
 
 def play(kind, *uris):
+    for uri, want in zip(uris, URIS.get(kind, ())):
+        m = URI.fullmatch(uri)
+        if not m or m.group(1) != want:
+            raise Failed(f"{uri!r} isn't a Spotify {want}'s uri (spotify:{want}:…).")
     start_player()
     st = status()
     album, track, queued = st.get("album_uri"), st.get("track_uri"), len(st.get("queue") or [])

@@ -146,7 +146,10 @@ def add(data):
 
 
 def event_file(cal, uid):
-    """The .ics holding uid: vdirsyncer names files by their UID mostly, but not always"""
+    """The .ics holding uid: vdirsyncer names files by their UID mostly, but not always. A uid that would name a file
+    elsewhere (a /, a leading .) is no event's: the file name is made from it (#1862)"""
+    if not uid or "/" in uid or "\0" in uid or uid.startswith("."):
+        return None
     folder = Path(cal["path"])
     direct = folder / f"{uid}.ics"
     if direct.is_file():

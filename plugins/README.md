@@ -345,7 +345,7 @@ card, undo, timeouts).
 | --- | --- |
 | `name` | `a-z`, `0-9` and `_`, at most 64, starting with the plugin's id (`disk_…`). A name already taken is left out, with a line in the log |
 | `title`, `description` | What Claude reads: what the tool does and returns, and when to use it |
-| `inputSchema` | The arguments as JSON Schema, an `object`. The server checks the top level (required, types, enums) before running anything |
+| `inputSchema` | The arguments as JSON Schema, an `object`. The server checks the top level (required, types, enums, `minLength`, `maxLength`, `pattern`, `minimum`, `maximum`, `minItems`, `maxItems`; a list's `items` too) before running anything, so the command can count on them |
 | `command` | Argv, run without a shell. `{name}` is that argument (a whole element or part of one; a list gives one element each). A nested list is optional: left out unless every argument in it is given. A boolean in one is the switch itself: `["--all", "{all}"]` gives `--all` when true |
 | `stdin` | Optional: `"json"` writes all the arguments as JSON on the command's stdin, `"{body}"` one argument's text (long text that doesn't fit argv) |
 | `class` | `read` runs at once. `change` runs at once and tells the user, who can undo it. `act` (sending, devices, installing) runs only after the user allows it on Nightdrive's card. Access may make any of them ask on the card too (below) |

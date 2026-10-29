@@ -96,6 +96,24 @@ def is_template(value, nested=False):
         isinstance(v, str) or (not nested and is_template(v, nested=True)) for v in value)
 
 
+LIMITS = ("minLength", "maxLength", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "minItems", "maxItems")
+
+
+def limits_problem(prop):
+    """What is wrong with the limits run.check keeps an argument to: numbers, and a pattern Python can compile."""
+    if not isinstance(prop, dict):
+        return None
+    for key in LIMITS:
+        if key in prop and (isinstance(prop[key], bool) or not isinstance(prop[key], (int, float))):
+            return f"{key} must be a number"
+    if "pattern" in prop:
+        try:
+            re.compile(prop["pattern"])
+        except (re.error, TypeError):
+            return "pattern must be a regular expression"
+    return None
+
+
 def problem(spec, plugin):
     """What is wrong with one tool's definition, in a few words; None when nothing is."""
     if not isinstance(spec, dict):
@@ -111,6 +129,10 @@ def problem(spec, plugin):
     schema = spec.get("inputSchema")
     if not isinstance(schema, dict) or schema.get("type") != "object" or not isinstance(schema.get("properties", {}), dict):
         return f"{name}: inputSchema must be an object schema"
+    for prop, sub in schema.get("properties", {}).items():
+        wrong = limits_problem(sub) or limits_problem(sub.get("items") if isinstance(sub, dict) else None)
+        if wrong:
+            return f"{name}: {prop}: {wrong}"
     if not is_template(spec.get("command")):
         return f"{name}: command must be a list of strings (and lists of them)"
     if spec.get("class") not in CLASSES:

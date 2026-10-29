@@ -29,6 +29,10 @@ WAIT = 280                                 # seconds: inside the tool's 300 s ti
 PREVIEW_TIMEOUT = 120                      # dnf's dry run refreshes its metadata first
 # dnf5's transaction table: a section title, then " name arch version repository size" rows
 SECTION = re.compile(r"^(Installing|Upgrading|Downgrading|Reinstalling|Removing)\b.*:$")
+# What an ID may be (#1862): dnf takes a URL, an .rpm's path or a glob in a name's place too (a read, preview, would
+# fetch the URL), and a Flatpak command takes one that starts with - as an option. pkg-info keeps to the same
+DNF_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
+FLATPAK_ID = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
 
 
 def fail(msg):
@@ -68,28 +72,37 @@ def dnf_preview(action, name):
 
 def flatpak_preview(action, app):
     if action == "remove":
-        p = run("flatpak", "info", "--user", app)
+        p = run("flatpak", "info", "--user", "--", app)
         if p.returncode:
             fail(f"{app} isn't one of your Flatpak apps (software installed lists them)")
         origin = re.search(r"^\s*Origin:\s*(\S+)", p.stdout, re.M)
         return {"packages": [f"{app} · {origin.group(1) if origin else 'flathub'}"], "space": ""}
-    if run("flatpak", "info", "--user", app).returncode == 0:
+    if run("flatpak", "info", "--user", "--", app).returncode == 0:
         fail(f"{app} is already installed")
-    p = run("flatpak", "remote-info", "--user", "flathub", app)
+    p = run("flatpak", "remote-info", "--user", "--", "flathub", app)
     if p.returncode:
         fail(p.stderr.strip() or f"Flathub has no app {app}")
     rows = [f"{app} · flathub"]
     runtime = re.search(r"^\s*Runtime:\s*(\S+)", p.stdout, re.M)
     # Its runtime comes along when no installation has it yet: often the bigger download
-    if runtime and run("flatpak", "info", runtime.group(1)).returncode:
+    if runtime and run("flatpak", "info", "--", runtime.group(1)).returncode:
         rows.append(f"{runtime.group(1)} · flathub · runtime")
     size = re.search(r"^\s*Download Size:\s*(.+)$", p.stdout, re.M)
     return {"packages": rows, "space": f"the app is a {size.group(1).strip()} download" if size else ""}
 
 
+def named(source, ident):
+    """Dies unless ident is a package's name (dnf) or an app's id (Flatpak), and nothing else dnf or flatpak would take"""
+    if source == "dnf" and (not DNF_NAME.fullmatch(ident) or ident.lower().endswith(".rpm")):
+        fail(f"{ident!r} isn't a package's name (letters, digits and . _ + -; no path, address or .rpm file)")
+    if source == "flatpak" and not FLATPAK_ID.fullmatch(ident):
+        fail(f"{ident!r} isn't a Flatpak app's id (org.gimp.GIMP)")
+
+
 def preview(action, source, ident):
     if action not in ("install", "remove") or source not in ("dnf", "flatpak"):
         fail("preview install|remove dnf|flatpak ID")
+    named(source, ident)
     out = dnf_preview(action, ident) if source == "dnf" else flatpak_preview(action, ident)
     out = {"action": action, "source": source, "id": ident, **out}
     no = refusal(action, source, ident, out["packages"])
@@ -170,9 +183,9 @@ def apply(action, source, ident, check, as_json, show=False):
     else:
         if action == "install":
             run("flatpak", "remote-add", "--user", "--if-not-exists", "flathub", FLATHUB)
-            rc, out = background(["flatpak", "install", "--user", "-y", "--noninteractive", "flathub", ident])
+            rc, out = background(["flatpak", "install", "--user", "-y", "--noninteractive", "--", "flathub", ident])
         else:
-            rc, out = background(["flatpak", "uninstall", "--user", "-y", "--noninteractive", ident])
+            rc, out = background(["flatpak", "uninstall", "--user", "-y", "--noninteractive", "--", ident])
     done = {"install": "installed", "remove": "removed"}[action]
     if rc is None:
         result = {"state": "running", "log": out,

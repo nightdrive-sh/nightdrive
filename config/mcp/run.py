@@ -58,9 +58,51 @@ def check(tool, arguments):
             raise ToolError(f"{tool.name}: {name} must be {prop['type']}, not {json_type(value)}.")
         if "enum" in prop and value not in prop["enum"]:
             raise ToolError(f"{tool.name}: {name} must be one of {', '.join(map(str, prop['enum']))}.")
+        wrong = beyond(prop, value)
+        if wrong:
+            raise ToolError(f"{tool.name}: {name} {wrong}.")
         items = prop.get("items")
-        if isinstance(value, list) and isinstance(items, dict) and not all(is_type(v, items.get("type")) for v in value):
-            raise ToolError(f"{tool.name}: each of {name} must be {items['type']}.")
+        if isinstance(value, list) and isinstance(items, dict):
+            for item in value:
+                if not is_type(item, items.get("type")):
+                    raise ToolError(f"{tool.name}: each of {name} must be {items['type']}.")
+                if "enum" in items and item not in items["enum"]:
+                    raise ToolError(f"{tool.name}: each of {name} must be one of "
+                                    f"{', '.join(map(str, items['enum']))}.")
+                wrong = beyond(items, item)
+                if wrong:
+                    raise ToolError(f"{tool.name}: each of {name} {wrong} ({json.dumps(item, ensure_ascii=False)}).")
+
+
+def beyond(prop, value):
+    """What of a schema's limits a value breaks, in words; None when none. The schema is a limit, not only a hint to
+    Claude: a plugin's command may count on its minLength or pattern having been kept (#1862)."""
+    if isinstance(value, str):
+        if len(value) < prop.get("minLength", 0):
+            return f"must be at least {prop['minLength']} characters"
+        if "maxLength" in prop and len(value) > prop["maxLength"]:
+            return f"must be at most {prop['maxLength']} characters"
+        if "pattern" in prop:
+            try:
+                if not re.search(prop["pattern"], value):
+                    return f"must match {prop['pattern']}"
+            except (re.error, TypeError):
+                return "can't be checked: its schema's pattern is broken"
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in prop and value < prop["minimum"]:
+            return f"must be at least {prop['minimum']}"
+        if "maximum" in prop and value > prop["maximum"]:
+            return f"must be at most {prop['maximum']}"
+        if "exclusiveMinimum" in prop and value <= prop["exclusiveMinimum"]:
+            return f"must be more than {prop['exclusiveMinimum']}"
+        if "exclusiveMaximum" in prop and value >= prop["exclusiveMaximum"]:
+            return f"must be less than {prop['exclusiveMaximum']}"
+    elif isinstance(value, list):
+        if len(value) < prop.get("minItems", 0):
+            return f"needs at least {prop['minItems']} item{'s' if prop['minItems'] != 1 else ''}"
+        if "maxItems" in prop and len(value) > prop["maxItems"]:
+            return f"takes at most {prop['maxItems']} items"
+    return None
 
 
 def is_type(value, wanted):
