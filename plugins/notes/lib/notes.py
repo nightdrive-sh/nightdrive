@@ -25,6 +25,7 @@ from store import NoteError
 
 LIST_LIMIT = 50       # list's default: the recent ones, which is what Claude and a terminal usually want
 SEARCH_LIMIT = 25
+TEXT_MAX = 1_000_000  # characters a create or append takes on stdin (Claude's are at most 100 000: config/mcp/run.py)
 MATCH_LINES = 3       # lines of a found note that show where the words are
 NIGHTDRIVE = Path(__file__).resolve().parents[3] / "bin/nightdrive"   # this checkout's, for its files trash
 
@@ -144,7 +145,13 @@ def options(rest, default_limit):
 
 
 def stdin_text():
-    return "" if sys.stdin.isatty() else sys.stdin.read()
+    """The text on stdin, at most TEXT_MAX characters: more is refused rather than read whole into memory (#1882)."""
+    if sys.stdin.isatty():
+        return ""
+    text = sys.stdin.read(TEXT_MAX + 1)
+    if len(text) > TEXT_MAX:
+        raise NoteError(f"The text is longer than {TEXT_MAX} characters: nothing was written.")
+    return text
 
 
 def main(argv):

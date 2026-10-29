@@ -46,6 +46,11 @@ Disturb back on, deleting an event Claude added) asks on the card too, and one t
 waits while you type: **Try again** on the notification runs it. Asked which changes it made, Claude sees what a change
 was made with (a draft's text) only for an area it may read now without asking, masked as that area's reads are.
 
+**How much:** an area takes 20 changes a minute without asking; past that each one asks on the card, which says how
+many there were. A call you refused on the card isn't shown to you again for two minutes (Claude is told to ask you in
+the chat), and a text Claude gives a tool is at most 100 000 characters. The last 20 changes keep their Undo button;
+an older one's notification says to ask Claude, who can still undo it.
+
 ## Settings › Claude › Access
 
 Launcher › Settings › Claude › *Access*, much like the privacy settings of a phone:

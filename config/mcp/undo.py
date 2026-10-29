@@ -9,8 +9,8 @@ registry.py calls, for a change tool:
                                              a change Claude makes must be one the user can undo
     offer(tool, arguments, result, state)    after it ran: the log entry (with its `undo` argv, run.undo_argv) and
                                              the notification
-The notification waits in a process of its own (`undo.py notice ID undo`), so its button still works once the server
-has gone. Undo runs the logged argv as run.py runs a tool: without a shell, in the tool's folder, with its timeout.
+The notification waits in a helper of its own (notices.py: one for all the rows, #1882), so its button still works once
+the server has gone. Undo runs the logged argv as run.py runs a tool: without a shell, in the tool's folder, with its timeout.
 The row then reads "Undid: …" with Redo, which runs the tool's command again and rebuilds its undo from that run's
 output, as the first run's was (a new draft has a new id); Claude's undo_change shows the same row.
 An undo that does what an act tool does (dnd_off's undo turns Do Not Disturb on, which only the card may allow), or
@@ -113,10 +113,9 @@ def offer(tool, arguments, answer, state=None):
 
 
 def show(entry_id, action):
-    """The notification for an entry, in a process of its own that waits for its button."""
-    subprocess.Popen([sys.executable, str(HERE / "undo.py"), "notice", str(entry_id), action],
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     start_new_session=True)
+    """The notification for an entry, from the helper that waits for the buttons (notices.py)."""
+    import notices   # only now: a call that changes nothing needs no helper
+    notices.show(entry_id, action)
 
 
 def server_id(pid):
@@ -293,19 +292,42 @@ def icon():
     return str(next((f for f in OWN_ICONS if f.is_file()), ICON))
 
 
+# The notify-send of each row that waits for its button, by entry: retire() ends one (notices.py's helper)
+WAITING = {}
+
+
 def notify(entry_id, summary, body="", button=None):
     """One row for the entry (a new one replaces the last, by its stack tag); the button's action when it's
-    pressed, else None once the row has gone (dismissed, replaced, expired)."""
+    pressed, else None once the row has gone (dismissed, replaced, expired, retired)."""
     cmd = ["notify-send", "-a", "Claude", "-i", icon(),
            "-h", f"string:x-dunst-stack-tag:claude-change-{entry_id}", "-h", f"int:x-nightdrive-expires:{NOTICE_FOR}"]
     if button:
         cmd += ["-A", f"{button[0]}={button[1]}", "-w"]
     try:
-        out = subprocess.run(cmd + ["--", summary, body], stdin=subprocess.DEVNULL, capture_output=True,
-                             text=True).stdout
+        proc = subprocess.Popen(cmd + ["--", summary, body], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, text=True)
     except OSError:
         return None  # no notify-send: the log still has it, for Claude
-    return out.strip() or None
+    WAITING[entry_id] = proc
+    try:
+        out = proc.communicate()[0]
+    finally:
+        if WAITING.get(entry_id) is proc:
+            del WAITING[entry_id]
+    return None if proc.returncode and proc.returncode < 0 else out.strip() or None
+
+
+def retire(entry_id):
+    """The entry's row gives up its button, for a newer change's (notices.ROWS_MAX): its wait ends, and the row says
+    Claude can still undo it, as the log keeps it."""
+    proc = WAITING.pop(entry_id, None)
+    if proc is not None:
+        proc.terminate()
+    entry = changes.get(entry_id)
+    if entry is not None and entry.get("state") == "done":
+        notify(entry_id, entry["notice"], f"Many changes at once: ask Claude to undo this one (change {entry_id}).")
+    elif entry is not None:
+        notify(entry_id, f"Undid: {entry['notice']}")
 
 
 def notice(entry_id, action):

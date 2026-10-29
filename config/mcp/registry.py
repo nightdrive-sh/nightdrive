@@ -9,6 +9,8 @@ format is left out with a line in the log; `python3 registry.py` shows what is l
 
 Each tool belongs to one right of its area (Tool.right: read, modify or delete; #1831), and Access gives that right
 Allow, Ask or No. No hides the tool; Ask, and an act tool always, runs it only once the user allows the call on the card.
+A change Access allows asks too once its area has had many in a minute, and a call the user just refused isn't shown
+to them again at once (pace.py, #1882).
 An area's own choices (access.Access.options, #1830) go to the tool too (Tool.keep): what one that is off takes away
 isn't in its schema, and its command gets them all to keep to, and another area's too when its mcp.json names that
 area in `options_from` (the latest notifications keep to Mail's blocked list: a notification would tell what it hides).
@@ -32,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import access  # noqa: E402  (after the path above)
 import mask  # noqa: E402
+import pace  # noqa: E402
 import run  # noqa: E402
 from run import ToolError  # noqa: E402,F401  (server.py takes both errors from here)
 
@@ -85,7 +88,7 @@ class Tool:
         if self.spec.get("title"):
             out["title"] = self.spec["title"]
         out["description"] = self.spec["description"]
-        out["inputSchema"] = self.spec["inputSchema"]
+        out["inputSchema"] = run.limited(self.spec["inputSchema"])
         out["annotations"] = {**self.spec.get("annotations", {}), **HINTS[self.cls]}
         return out
 
@@ -250,6 +253,7 @@ class Registry:
         self.logged = set()   # problems already in the log: it's read on every call
         self.confirm = optional("confirm")
         self.undo = optional("undo")
+        self.pace = pace.Pace()   # how much Claude changed unasked, and what the user refused on the card (#1882)
         self.rules = None     # the Access that visible() last read: call() decides by the same one it listed by
 
     def load(self):
@@ -291,12 +295,19 @@ class Registry:
             raise UnknownTool(name)
         run.check(tool, arguments)
         tool.said = None   # what a card said is this call's alone (confirm.facts sets it)
-        if self.rules.decide(tool.cls, tool.area, tool.right) == "ask":
+        decision = self.rules.decide(tool.cls, tool.area, tool.right)
+        paced = self.pace.due(tool, decision)
+        if decision == "ask" or paced:
             if self.confirm is None:
                 raise ToolError(f"{name} wasn't run: the user's Access asks before it, and this version doesn't "
                                 "have Nightdrive's confirmation card.")
-            if not self.confirm.ask(tool, arguments):
+            self.pace.check(tool, arguments)
+            with self.pace.noted(tool, paced):
+                allowed = self.confirm.ask(tool, arguments)
+            if not allowed:
+                self.pace.refused(tool, arguments)
                 raise ToolError(f"The user didn't allow {name} on screen, so it wasn't run. Don't try it another way.")
+        self.pace.ran(tool)
         undoable = tool.cls == "change" and self.undo is not None
         state = self.undo.before(tool, arguments) if undoable else None  # ToolError: nothing is changed
         answer = run.run(tool, arguments)

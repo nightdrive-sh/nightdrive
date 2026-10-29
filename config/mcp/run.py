@@ -11,6 +11,7 @@ import os
 import re
 import signal
 import subprocess
+import threading
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -18,6 +19,16 @@ TIMEOUT = 30          # seconds, when a tool doesn't say
 TIMEOUT_MAX = 300     # a tool can't ask for more: Claude Code waits on the call
 OUTPUT_MAX = 100_000  # characters of stdout Claude gets; a long listing would only fill its context
 MESSAGE_MAX = 4_000   # characters of stderr in an error
+# What a command's output may take in memory (#1882): stdout up to this, then the rest is read and dropped, so a command
+# that prints without end can't fill the server's memory. A picture (a tool's `image`, a screenshot in base64) is the
+# biggest output there is; stderr keeps only its end, which is what an error shows
+READ_MAX = 32 * 1024 * 1024
+ERR_MAX = 64 * 1024
+CHUNK = 64 * 1024
+# A text argument without a maxLength of its own is at most this long (a note, a mail's body, an event's notes), and
+# all of a call's arguments together at most ARGUMENTS_MAX characters as JSON: a command reads its stdin whole
+STRING_MAX = 100_000
+ARGUMENTS_MAX = 1_000_000
 
 PLACEHOLDER = re.compile(r"\{([a-z_][a-z0-9_]*)\}")
 
@@ -43,6 +54,8 @@ def check(tool, arguments):
     of a command that fails halfway. Deeper levels are the command's to check."""
     schema = tool.spec["inputSchema"]
     props = schema.get("properties", {})
+    if len(json.dumps(arguments, ensure_ascii=False)) > ARGUMENTS_MAX:
+        raise ToolError(f"{tool.name}: its arguments are longer than {ARGUMENTS_MAX} characters together.")
     missing = [n for n in schema.get("required", []) if n not in arguments]
     if missing:
         raise ToolError(f"{tool.name} needs {', '.join(missing)}.")
@@ -74,14 +87,31 @@ def check(tool, arguments):
                     raise ToolError(f"{tool.name}: each of {name} {wrong} ({json.dumps(item, ensure_ascii=False)}).")
 
 
+def limited(schema):
+    """The schema as tools/list shows it: a text argument without a maxLength of its own gets STRING_MAX's, so Claude
+    knows the limit check() keeps it to. A copy: the tool's own spec stays as its file has it."""
+    def bounded(prop):
+        if not isinstance(prop, dict):
+            return prop
+        types = prop.get("type") if isinstance(prop.get("type"), list) else [prop.get("type")]
+        out = {**prop, "maxLength": STRING_MAX} if "string" in types and "maxLength" not in prop else dict(prop)
+        if isinstance(prop.get("items"), dict):
+            out["items"] = bounded(prop["items"])
+        return out
+    props = schema.get("properties")
+    if not isinstance(props, dict):
+        return schema
+    return {**schema, "properties": {n: bounded(p) for n, p in props.items()}}
+
+
 def beyond(prop, value):
     """What of a schema's limits a value breaks, in words; None when none. The schema is a limit, not only a hint to
     Claude: a plugin's command may count on its minLength or pattern having been kept (#1862)."""
     if isinstance(value, str):
         if len(value) < prop.get("minLength", 0):
             return f"must be at least {prop['minLength']} characters"
-        if "maxLength" in prop and len(value) > prop["maxLength"]:
-            return f"must be at most {prop['maxLength']} characters"
+        if len(value) > prop.get("maxLength", STRING_MAX):
+            return f"must be at most {prop.get('maxLength', STRING_MAX)} characters"
         if "pattern" in prop:
             try:
                 if not re.search(prop["pattern"], value):
@@ -182,23 +212,61 @@ def environment(tool):
 
 def execute(tool, argv, stdin, timeout):
     """Runs argv; (stdout, stderr, exit status). Its own session, so a timeout stops what it started too, and stdin
-    never the server's: that is the protocol."""
+    never the server's: that is the protocol. Its output is read a chunk at a time and kept up to READ_MAX (stderr:
+    its last ERR_MAX), the rest read and dropped, so the command isn't stopped halfway for printing (#1882)."""
     try:
         proc = subprocess.Popen(argv, cwd=tool.dir, env=environment(tool), start_new_session=True,
                                 stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                text=True, encoding="utf-8", errors="replace")
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except FileNotFoundError:
         raise ToolError(f"{argv[0]} isn't installed on this machine (not found in PATH).")
     except PermissionError:
         raise ToolError(f"{argv[0]} can't be run (no permission).")
+    out, err = bytearray(), bytearray()
+    threads = [threading.Thread(target=drain, args=(proc.stdout, out, READ_MAX, False), daemon=True),
+               threading.Thread(target=drain, args=(proc.stderr, err, ERR_MAX, True), daemon=True)]
+    if stdin is not None:
+        threads.append(threading.Thread(target=feed, args=(proc.stdin, stdin.encode("utf-8")), daemon=True))
+    for t in threads:
+        t.start()
     try:
-        out, err = proc.communicate(stdin, timeout=timeout)
+        proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         os.killpg(proc.pid, signal.SIGKILL)
-        proc.communicate()
+        proc.wait()
         raise ToolError(f"{tool.name} didn't finish in {timeout} s and was stopped.")
-    return out, err, proc.returncode
+    finally:
+        for t in threads:
+            t.join(timeout=5)   # what it started may hold its output open; that isn't waited for
+    return out.decode("utf-8", "replace"), err.decode("utf-8", "replace"), proc.returncode
+
+
+def drain(pipe, kept, limit, tail):
+    """Reads a pipe to its end, keeping its first limit bytes (its last, with tail)."""
+    try:
+        while chunk := pipe.read1(CHUNK):
+            if tail:
+                kept += chunk
+                del kept[:-limit]
+            elif len(kept) < limit:
+                kept += chunk[:limit - len(kept)]
+    except (OSError, ValueError):
+        pass
+    finally:
+        pipe.close()
+
+
+def feed(pipe, data):
+    """Writes the call's stdin and closes it; a command that doesn't read it all isn't an error."""
+    try:
+        pipe.write(data)
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+    finally:
+        try:
+            pipe.close()
+        except OSError:
+            pass
 
 
 def picture(body, field):
