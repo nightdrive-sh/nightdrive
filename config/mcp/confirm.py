@@ -19,7 +19,7 @@ How it talks to the card:
 2. The answer stays in the card: `answer ID` is polled until it says allow, deny or timeout. There is no IPC call
    that allows, and no file to write: only a key or a click on the card does.
 
-`python3 confirm.py --demo mail|device|package [--timeout S]` shows a sample card and prints the answer.
+`python3 confirm.py --demo mail|device|package|long… [--timeout S]` shows a sample card and prints the answer.
 """
 
 import hashlib
@@ -160,6 +160,7 @@ def qs(*args):
 
 def show(request):
     """Shows the card: its id, or ToolError when it can't be shown as written."""
+    # mkdtemp makes the folder 700 and the file is 600: what the card shows (a mail's text) is the user's alone
     folder = Path(tempfile.mkdtemp(prefix="nightdrive-confirm-", dir=os.environ.get("XDG_RUNTIME_DIR") or None))
     try:
         path = folder / "request.json"
@@ -251,6 +252,13 @@ DEMOS = {
                  "inputSchema": {"type": "object", "properties": {
                      "package": {"type": "string"}, "source": {"type": "string"}, "options": {"type": "object"}}}},
                 {"package": "org.gimp.GIMP", "source": "flatpak", "options": {"system": False, "branch": "stable"}}),
+    # Longer than the screen: Allow counts only once scrolled to the end
+    "long": ({"title": "Install software", "class": "act", "area": "software",
+              "inputSchema": {"type": "object", "properties": {
+                  "package": {"type": "string"}, "installs": {"type": "array", "title": "Also installs"}}}},
+             {"package": "texlive-scheme-full",
+              "installs": [f"texlive-{n}-{i}" for i in range(1, 9) for n in
+                           ("collection", "fonts", "lang", "doc", "bin", "latex", "context", "metapost")]}),
 }
 
 

@@ -117,6 +117,18 @@ ShellRoot {
                     font { family: c.font; pixelSize: 12 }
                 }
 
+                Repeater {
+                    model: store.warnings
+                    Text {
+                        required property string modelData
+                        Layout.fillWidth: true
+                        text: modelData
+                        wrapMode: Text.Wrap
+                        color: c.danger
+                        font { family: c.font; pixelSize: 12 }
+                    }
+                }
+
                 // The columns' names, over the cells
                 Row {
                     Item { width: win.nameWidth + 12; height: 1 }

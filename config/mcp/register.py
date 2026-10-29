@@ -152,6 +152,29 @@ def allowed(allow):
     return RULE in allow or f"mcp__{NAME}" in allow
 
 
+# Claude Code's own permissions that make Nightdrive's limits moot: with them Claude Code runs any command without
+# asking, `nightmail send` or `nightdrive mcp access level open` among them (Dashboard #1837). Only the user's own
+# settings.json is read: a project's settings apply in that project alone.
+WHOLE_BASH = ("Bash", "Bash(*)")
+
+
+def wide_open(data):
+    """What in settings.json lets Claude Code past Nightdrive's limits, in plain words; [] when nothing does."""
+    perms = data.get("permissions")
+    if not isinstance(perms, dict):
+        return []
+    out, where = [], f"~/{SETTINGS.relative_to(HOME)}"
+    if perms.get("defaultMode") == "bypassPermissions":
+        out.append(f"Claude Code doesn't ask before anything (defaultMode bypassPermissions in {where}): it can run "
+                   "any command, and so get round these limits.")
+    allow = perms.get("allow")
+    rules = [r for r in allow if r in WHOLE_BASH] if isinstance(allow, list) else []
+    if rules:
+        out.append(f"Claude Code may run any command without asking ({rules[0]} allowed in {where}): it can get "
+                   "round these limits.")
+    return out
+
+
 def add_rule(data):
     allow = allow_list(data)
     if not allowed(allow):
@@ -297,15 +320,17 @@ def remove(args):
 def status(args):
     cmd, have, state = claude(), registered(), load_state()
     try:
-        allow = allow_list(read_settings()[1])
+        data = read_settings()[1]
+        allow = allow_list(data)
     except Refused:
-        allow = []
+        data, allow = {}, []
     info = {
         "claude": cmd,
         "server": [have["command"], *have["args"]] if have else None,
         "connection": connected(cmd) if cmd and have and not args.quick else None,
         "allowed": allowed(allow),
         "byInstall": {"server": bool(state.get("server")), "rule": bool(state.get("rule"))},
+        "warnings": wide_open(data),
     }
     if args.json:
         print(json.dumps(info, indent=2))
@@ -316,6 +341,8 @@ def status(args):
         else "not registered (nightdrive mcp install)")
     row("Its tools", f"allowed ({RULE} in {SETTINGS})" if info["allowed"]
         else "Claude Code asks before each one (nightdrive mcp install allows them)")
+    for w in info["warnings"]:
+        row("Warning", w)
     return 0
 
 

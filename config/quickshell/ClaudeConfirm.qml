@@ -8,7 +8,8 @@ import Quickshell.Wayland
 // Nightdrive's MCP server to do waits here for the user (config/mcp/confirm.py, Dashboard #1766), and so does any call
 // whose right the user set to Ask in Access (#1831): a read, a change, a delete, each with its own heading and a line
 // on what follows from allowing it. It shows the tool and every argument as plain text; Enter or Allow runs it, Esc or
-// Deny refuses, and so does the countdown running out.
+// Deny refuses, and so does the countdown running out. A card longer than the screen allows only once it has been
+// scrolled to the end (#1837): a mail's last lines or a package list's tail mustn't go unseen.
 // confirm.py treats anything but an allow as a refusal: a card that never opened, closed or reloaded without an answer.
 //   qs ipc call claudeConfirm open <file>   shows the request (confirm.py's JSON): "shown <md5 of what was read>", or
 //                                           "busy" while another card is up (confirm.py tries again)
@@ -29,6 +30,10 @@ PanelWindow {
     property bool armed: false                  // a click on Allow counts now
     property bool keyArmed: false               // Enter counts now
     property int left: 0                        // seconds until the countdown refuses
+    property bool scrolledToEnd: false          // a long card has been seen to its end (it stays so when scrolled back)
+    // Allow counts once everything has been on screen: a short card at once, a long one once scrolled to its end.
+    // Read when Allow or Enter is pressed, after armDelay, so the new card's height has been laid out by then
+    readonly property bool seenAll: scrolledToEnd || flick.atEnd
     property var verdicts: ({})                 // id → allow | deny | timeout, until confirm.py collects it
 
     function show(path) {
@@ -44,6 +49,7 @@ PanelWindow {
         screen = (f && Quickshell.screens.find(s => s.name === f.name)) || Quickshell.screens[0]
         grabbed = false; armed = false; keyArmed = false
         flick.contentY = 0
+        scrolledToEnd = false
         open = true
         armTimer.restart()
         return "shown " + Qt.md5(text)
@@ -107,7 +113,7 @@ PanelWindow {
         Keys.onPressed: e => {
             const page = flick.height - 40
             if (e.key === Qt.Key_Escape) win.decide("deny")
-            else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { if (!e.isAutoRepeat && win.keyArmed) win.decide("allow") }
+            else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { if (!e.isAutoRepeat && win.keyArmed && win.seenAll) win.decide("allow") }
             else if (e.key === Qt.Key_Down) flick.scrollBy(40)
             else if (e.key === Qt.Key_Up) flick.scrollBy(-40)
             else if (e.key === Qt.Key_PageDown || e.key === Qt.Key_Space) flick.scrollBy(page)
@@ -180,6 +186,10 @@ PanelWindow {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     function scrollBy(d) { contentY = Math.max(0, Math.min(contentHeight - height, contentY + d)) }
+                    readonly property bool atEnd: contentY + height >= contentHeight - 1
+                    // Only a scroll the user made counts (show() puts contentY back to 0 while the old card's height
+                    // may still be laid out). Not atEnd here: this handler can run before that binding is updated
+                    onContentYChanged: if (contentY > 0 && contentY + height >= contentHeight - 1) win.scrolledToEnd = true
                     Column {
                         id: fields
                         width: flick.width
@@ -239,7 +249,7 @@ PanelWindow {
                     elide: Text.ElideRight
                     // Not the keyboard yet after a moment: someone is typing elsewhere
                     text: (!win.grabbed && win.left < (win.req.timeout || 60) - 1 ? "Click or stop typing to answer · "
-                           : flick.contentHeight > flick.height ? "↓ more · " : "") + "Denied in " + win.left + " s"
+                           : !win.seenAll ? "Scroll to the end to allow · " : "") + "Denied in " + win.left + " s"
                     color: win.left <= 10 ? Theme.warning : Theme.dim
                     font { family: Theme.font; pixelSize: 11 }
                 }
@@ -247,8 +257,8 @@ PanelWindow {
                     id: allowButton
                     anchors { right: parent.right; bottom: parent.bottom }
                     keys: ["Enter"]; label: "Allow"; strong: true
-                    opacity: win.armed ? 1 : 0.4
-                    onClicked: if (win.armed) win.decide("allow")
+                    opacity: win.armed && win.seenAll ? 1 : 0.4
+                    onClicked: if (win.armed && win.seenAll) win.decide("allow")
                 }
             }
         }

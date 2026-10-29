@@ -53,9 +53,13 @@ def read():
 
 
 def write(entries):
-    """The whole log at once (a file beside it, renamed over it), so a reader never sees half of it."""
+    """The whole log at once (a file beside it, renamed over it), so a reader never sees half of it. Readable by the
+    user alone (600): it holds the tools' arguments, a draft's text say (#1837); a log from before gets it here too."""
     tmp = FILE.with_name(FILE.name + ".tmp")
-    tmp.write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in entries[-KEEP:]))
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)   # a .tmp left behind by a crash keeps its old mode through O_CREAT
+    with os.fdopen(fd, "w") as f:
+        f.write("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in entries[-KEEP:]))
     os.replace(tmp, FILE)
 
 

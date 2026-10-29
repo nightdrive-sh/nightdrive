@@ -35,6 +35,21 @@ QtObject {
         onFileChanged: store.refresh()
     }
 
+    // Claude Code's own permissions that let it past these limits (Bash allowed wholesale, bypassPermissions: #1837),
+    // from `nightdrive mcp status`, read again when Claude Code's settings change
+    property var warnings: []
+    property Process status: Process {
+        command: [store.nd, "mcp", "status", "--json", "--quick"]
+        stdout: StdioCollector {
+            onStreamFinished: { try { store.warnings = JSON.parse(text).warnings || [] } catch (e) { store.warnings = [] } }
+        }
+    }
+    property FileView claudeSettings: FileView {
+        path: Quickshell.env("HOME") + "/.claude/settings.json"
+        watchChanges: true; printErrors: false
+        onFileChanged: store.status.running = true
+    }
+
     // One write at a time: a second choice while the first runs isn't lost, nor done out of order
     property var queue: []
     property Process writer: Process {
@@ -67,5 +82,5 @@ QtObject {
         run(["level", level])
     }
 
-    Component.onCompleted: refresh()
+    Component.onCompleted: { refresh(); status.running = true }
 }

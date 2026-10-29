@@ -116,6 +116,8 @@ Item {
                      sub: serverBusy ? (serverOn ? "Turning off…" : "Turning on…")
                         : serverOn ? "Claude Code can use your desktop as allowed below" : "Off: Claude Code doesn't see your desktop" }]
                   .concat(serverError ? [{ kind: "note", name: serverError }] : [])
+                  // Claude Code's own permissions that let it past these limits (#1837)
+                  .concat((server.warnings || []).map(t => ({ kind: "note", name: t })))
             const changed = now.own
             const presetRows = presets.map(p => ({ kind: "capreset", value: p[0], name: p[1], sub: p[3],
                 glyph: p[0] === now.level ? "check" : p[2],
@@ -123,8 +125,9 @@ Item {
                        : changed ? "current, " + changed + " of your own" : "current" }))
             const open = { kind: "cawindow", name: "Areas: what Claude may read, modify and delete…", glyph: "app-window",
                            sub: "Each area Allow, Ask or No, in plain words, in a window of its own" }
+            const only = { kind: "note", name: "These cover only Nightdrive's tools: what Claude Code may do with its own (commands, files) is set in Claude Code" }
             return top.concat([{ kind: "header", name: "Level" }], presetRows, [{ kind: "header", name: "Areas" }], [open],
-                              now.problem ? [{ kind: "note", name: now.problem }] : [])
+                              now.problem ? [{ kind: "note", name: now.problem }] : [], [only])
         }
         return []
     }

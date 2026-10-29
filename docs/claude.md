@@ -21,7 +21,8 @@ Normal level, reading what is private (mail, contacts, calendar, notes, notifica
 delete do.
 
 **The card** shows exactly what will be done: the recipients and the text, the device and its new state, every package
-dnf would install. **Enter** allows, **Esc** refuses, and so does no answer in 60 seconds. The card is Nightdrive's, not
+dnf would install. **Enter** allows, **Esc** refuses, and so does no answer in 60 seconds. A card too long for the screen
+allows only once you have scrolled to its end. The card is Nightdrive's, not
 Claude Code's, so no Claude Code setting skips it, and a mail or a web page Claude reads can't send or switch anything
 without you seeing it first. A screen or network change also asks afterwards whether to keep it, and goes back by itself
 in 20 seconds unless you do.
@@ -62,8 +63,13 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   can't hide the oven.
 
 Sending, devices and installing **always ask**, whatever the level or your choice: where all of an area's Modify or
-Delete is such, the choice is only *Ask* or *No*. What Claude reads goes to Anthropic with its answer. These choices
-cover only Nightdrive's tools: what Claude Code may do with its own (commands, files) is set in Claude Code.
+Delete is such, the choice is only *Ask* or *No*. What Claude reads goes to Anthropic with its answer.
+
+**These choices cover only Nightdrive's tools.** What Claude Code may do with its own, running commands and editing
+files, is set in Claude Code, and a command can do what a tool here can't without asking: `nightmail` sends mail, `nightdrive
+mcp access level open` changes these choices. Keep Claude Code asking before commands: if your `~/.claude/settings.json`
+allows `Bash` as a whole or has `defaultMode` `bypassPermissions`, the Access window, its page in Settings and
+`nightdrive mcp status` warn you.
 
 A change applies at once: a session already open may still list a tool you set to *No*, but its use is refused; a new
 session sees the new list. Welcome to Nightdrive asks for the level once, at the first login, with *Off* picked.
