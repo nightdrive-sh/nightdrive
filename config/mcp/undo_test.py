@@ -326,5 +326,15 @@ class Tasks(unittest.TestCase):
         self.assertEqual(list(Path(self.env["NIGHTDRIVE_TASKS_DIR"]).rglob("*.ics")), [])
 
 
+class Notice(unittest.TestCase):
+    """The notification names what changed in words: a draft's recipients, not a JSON list of them (#1878)."""
+
+    def test_lists_of_texts(self):
+        tool = SimpleNamespace(name="mail_draft", spec={"notice": "Wrote a draft in Mail to {to}: {subject}"})
+        text = undo.notice_text(tool, {"to": ["Attacker <x@evil.example>", "b@c.d"], "subject": "Re: Reset"})
+        self.assertEqual(text, "Wrote a draft in Mail to Attacker <x@evil.example>, b@c.d: Re: Reset")
+        self.assertEqual(undo.notice_text(tool, {"to": [1, 2], "subject": "S"}), "Wrote a draft in Mail to [1, 2]: S")
+
+
 if __name__ == "__main__":
     unittest.main()

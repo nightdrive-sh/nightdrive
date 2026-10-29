@@ -63,6 +63,13 @@ def before(tool, arguments):
     return state
 
 
+def words(value):
+    """A value as the notice says it: a list of texts (a draft's recipients, mails' subjects) one after another."""
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return ", ".join(value)
+    return run.text(value)
+
+
 def notice_text(tool, values):
     """The notification's line: the tool's `notice` with its {name}s filled (what it is now: the output's fields, the
     arguments, then the state before), else its title."""
@@ -70,7 +77,7 @@ def notice_text(tool, values):
     template = tool.spec.get("notice")
     if not isinstance(template, str) or not run.placeholders(template) <= set(values):
         return fallback
-    text = run.PLACEHOLDER.sub(lambda m: run.text(values[m.group(1)]).replace(str(Path.home()), "~"), template)
+    text = run.PLACEHOLDER.sub(lambda m: words(values[m.group(1)]).replace(str(Path.home()), "~"), template)
     return text if len(text) <= NOTICE_MAX else text[:NOTICE_MAX - 1] + "…"
 
 

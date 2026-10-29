@@ -248,6 +248,8 @@ case ${1:-open} in
     ;;
   draft-show)
     python3 "$APP_DIR/lib/drafts.py" show "${@:2}" ;;
+  draft-card)   # mail_send's card: what goes out that Claude saw hidden
+    python3 "$APP_DIR/lib/drafts.py" card "${@:2}" ;;
   notify)    python3 "$APP_DIR/lib/notify.py" ;;
   blocked-notifications) python3 "$APP_DIR/lib/blocked.py" notifications ;;   # `nightdrive notifications` for Claude
   fetch)     fetch "${@:2}" ;;

@@ -6,6 +6,8 @@
                                     the message, unless given). Prints the draft as `show` does
     drafts.py show ID               a draft as it would be sent: {id, account, from, to, cc, subject, body, attachments}
     drafts.py discard ID            throws a draft away (only a draft: a message in an account's Drafts folder)
+    drafts.py card ID               mail_send's rows on Nightdrive's card: what goes out that Claude saw hidden
+                                    (unseen.py), or an error when it mustn't go from Claude's tools at all
     drafts.py send ID [--check]     sends a draft through the account's SMTP server (compose.py), files it in Sent and
                                     takes it out of Drafts
 
@@ -16,7 +18,6 @@ id, exactly (ids.py): never a query. A new draft gets the account's signature, a
 Failures go to stderr with exit status 1.
 """
 
-import importlib.util
 import json
 import os
 import smtplib
@@ -24,11 +25,11 @@ import ssl
 import subprocess
 import sys
 from email.utils import formataddr, getaddresses
-from pathlib import Path
 
 import blocked
 import compose
 import ids
+import unseen
 
 
 def notmuch(*args):
@@ -110,22 +111,16 @@ def discard(msgid):
 
 # Claude gets a draft with its secrets hidden (config/mcp/mask.py: a code or a login link in the mail a reply quotes,
 # #1861), and gives that copy back to send: the card then shows "[code hidden]" where the draft has the code, and the
-# draft goes out whole. Loaded by its path: this folder's modules mustn't be shadowed by the server's, nor theirs by these
-MASK = Path(__file__).resolve().parents[3] / "config/mcp/mask.py"
-
-
+# draft goes out whole. The card says so on a line of its own (card, unseen.py: #1878)
 def masked(text):
-    spec = importlib.util.spec_from_file_location("nightdrive_mask", MASK)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.mask(text)
+    return unseen.masked(text)
 
 
 def same(have, shown):
     """shown is the draft's text, or Claude's copy of it with the secrets hidden."""
     if lines(have) == lines(shown):
         return True
-    return MASK.exists() and lines(masked(have)) == lines(shown)
+    return unseen.MASK.exists() and lines(masked(have)) == lines(shown)
 
 
 def lines(text):
@@ -157,6 +152,7 @@ def send(msgid, shown=None):
         raise LookupError("Not sent: the draft has Bcc recipients, which Nightdrive Mail doesn't send (they would be "
                           "left out without a word). Send it from the app it was written in.")
     if shown is not None:
+        unseen.check(have, msg)   # what Claude saw hidden doesn't go to someone the mail it quotes wasn't for
         wrong = differences(have, shown)
         if wrong:
             raise LookupError(f"Not sent: the draft isn't what was shown for it ({', '.join(wrong)} differ). Read it "
@@ -172,17 +168,23 @@ def send(msgid, shown=None):
     return {"sent": result["id"], "from": have["from"], "to": have["to"], "cc": have["cc"], "subject": have["subject"]}
 
 
+def card(msgid):
+    """mail_send's rows on the card (confirm.facts): what the draft sends that Claude saw hidden."""
+    have, msg = read(msgid)
+    return unseen.check(have, msg)
+
+
 def main():
     cmd, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
     if cmd == "draft" and not args:
         result = draft(json.loads(sys.stdin.read() or "{}"))
-    elif cmd in ("show", "discard") and len(args) == 1:
-        result = show(args[0]) if cmd == "show" else discard(args[0])
+    elif cmd in ("show", "discard", "card") and len(args) == 1:
+        result = {"show": show, "discard": discard, "card": card}[cmd](args[0])
     elif cmd == "send" and len([a for a in args if a != "--check"]) == 1:
         check = "--check" in args
         result = send(next(a for a in args if a != "--check"), json.loads(sys.stdin.read() or "{}") if check else None)
     else:
-        sys.exit("usage: drafts.py draft < JSON | show ID | discard ID | send ID [--check < JSON]")
+        sys.exit("usage: drafts.py draft < JSON | show ID | discard ID | card ID | send ID [--check < JSON]")
     print(json.dumps(result, ensure_ascii=False))
 
 

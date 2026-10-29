@@ -92,7 +92,9 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. Invisible
   characters are taken out first and digits of other forms (`４`, `⁴`) read as 0–9, so a code split by them or spaced
   out (`4 8 2 9 1 3`) is hidden too. A reply Claude drafts comes back with its quote hidden the same way: the card that
-  sends it shows `[code hidden]` where the mail has the code, and the draft goes out whole. It goes by patterns, so a
+  sends it shows `[code hidden]` where the mail has the code, and the draft goes out whole: a line on the card says
+  what goes out so (*Hidden from Claude*), and such a reply goes only to you and those on the mail it answers (to
+  anyone else, send it from Mail). It goes by patterns, so a
   code written in an unusual way may get through, and now and then a number that isn't one is hidden.
   Turn it on for an area whose codes Claude should read (`nightdrive mcp access option mail secrets on`).
 
