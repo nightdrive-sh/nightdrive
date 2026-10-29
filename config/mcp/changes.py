@@ -6,24 +6,47 @@ An entry: {id, time, tool, notice, arguments, before, do, stdin, undo, dir, time
     id         1, 2, 3…: what Claude names in undo_change
     before     the state the tool's `before` command reported (what undo puts back), {} without one
     do, stdin  the command as it ran, for redo; undo the argv that undoes it; both run in dir
-    remake     the tool's `undo` template, so a redo can rebuild undo from its own output (a new draft's new id)
+    remake     the tool's `undo` template as it was (undo.py now rebuilds a redo's undo by the tool's own)
     state      "done" or "undone", since `at`
+    deletes    the tool removes something (files_trash): kept while its Undo is on screen (kept)
+    server     the MCP server that made it (undo.server_id): undo_change without an id undoes only its own
 """
 
 import fcntl
 import json
 import os
 import time
+from datetime import datetime
 from contextlib import contextmanager
 from pathlib import Path
 
 FILE = Path.home() / ".local/state/nightdrive/claude-changes.jsonl"
 # Older entries leave the log: by then what they changed has likely been changed again, and undoing it would surprise
 KEEP = 100
+HOLD = 3600       # seconds a change's notification offers Undo (undo.NOTICE_FOR)
+HOLD_MAX = 400    # older deletions kept for it at most: a flood of them can't grow the log without end
 
 
 def now():
     return time.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def age(entry):
+    """Seconds since the entry was made; None when its time can't be read."""
+    try:
+        return time.time() - datetime.strptime(entry["time"], "%Y-%m-%dT%H:%M:%S%z").timestamp()
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def kept(entries):
+    """What the log keeps: the last KEEP entries, and before them a deletion still in place whose notification still
+    offers Undo (#1881). Else a run of cheap changes (a hundred notes) pushes a trashed file's way back out of the log
+    while its button is on screen, and pressing it finds nothing."""
+    older, recent = entries[:-KEEP], entries[-KEEP:]
+    held = [e for e in older if e.get("deletes") is True and e.get("state") == "done"
+            and (a := age(e)) is not None and a < HOLD]
+    return held[-HOLD_MAX:] + recent
 
 
 @contextmanager
@@ -59,7 +82,7 @@ def write(entries):
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     os.fchmod(fd, 0o600)   # a .tmp left behind by a crash keeps its old mode through O_CREAT
     with os.fdopen(fd, "w") as f:
-        f.write("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in entries[-KEEP:]))
+        f.write("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in kept(entries)))
     os.replace(tmp, FILE)
 
 

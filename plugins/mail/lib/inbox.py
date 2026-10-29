@@ -3,7 +3,7 @@
 tools (mcp.json).
 
     inbox.py archive ID…             the inbox's copies to Archive, as Mail's a does
-    inbox.py unarchive ID…           back to the inbox (archive's undo)
+    inbox.py unarchive ID…           back to the inbox (archive's undo: the ids it printed, whatever they hold)
     inbox.py delete [--check] ID…    the inbox's copies to Trash, as Mail's d does
 
 An ID is a message's id, or a thread ("thread:0000000000000005"): then its messages in the inbox. Each must have
@@ -85,7 +85,9 @@ def main():
     idents = [a for a in args if a != "--check"]
     if cmd not in ("archive", "unarchive", "delete") or not idents or ("--check" in args and cmd != "delete"):
         sys.exit("usage: inbox.py archive ID… | unarchive ID… | delete [--check] ID…")
-    terms = [ids.one(i) for i in idents]   # before anything else: an id that isn't one stops it all
+    # Before anything else: an id that isn't one stops it all. unarchive is archive's undo, given the ids archive
+    # printed, as the database has them (ids.exact)
+    terms = [ids.exact(i) if cmd == "unarchive" else ids.one(i) for i in idents]
     if "--check" in args:
         check(idents, terms, json.loads(sys.stdin.read() or "{}").get("subjects") or [])
     asked = f"(or {' '.join(terms)})"

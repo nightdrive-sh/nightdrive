@@ -38,9 +38,11 @@ Claude Code's, so no Claude Code setting skips it, and a mail or a web page Clau
 without you seeing it first. A screen or network change also asks afterwards whether to keep it, and goes back by itself
 in 20 seconds unless you do.
 
-**Undo** is on the notification for an hour; then Redo undoes the undo. Claude keeps the last 100 changes, so you can
-also ask it later ("undo the wallpaper"). A change that couldn't be undone isn't offered as a change at all. An undo
-that does what only the card allows (Do Not Disturb back on) asks on the card too, and one that would move the focus
+**Undo** is on the notification for an hour; then Redo undoes the undo. Claude keeps the last 100 changes (and a
+deletion as long as its Undo is on screen), so you can also ask it later ("undo the wallpaper"); "undo that" is the
+conversation's own last change. Undo runs only what the change's tool would: a log edited by hand runs nothing else.
+A change that couldn't be undone isn't offered as a change at all. An undo that does what only the card allows (Do Not
+Disturb back on, deleting an event Claude added) asks on the card too, and one that would move the focus
 waits while you type: **Try again** on the notification runs it.
 
 ## Settings › Claude › Access

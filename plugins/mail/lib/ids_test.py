@@ -131,6 +131,32 @@ class Commands(unittest.TestCase):
         self.assertNotEqual(self.run_lib("browse.py", "thread", self.evil_id()).returncode, 0)
         self.assertEqual(self.run_lib("browse.py", "thread", self.thread_of(self.evil_id())).returncode, 0)
 
+    def test_unarchive_takes_back_what_archive_printed(self):
+        """Archive's undo gets the ids it printed, as the database has them: an odd Message-ID among them (a *,
+        parentheses, a quote) doesn't stop the rest from coming back (#1881)"""
+        odd = "odd*(x)@b.c"
+        path = self.root / "acc" / "INBOX" / "cur" / "odd:2,S"
+        path.write_text(mail(odd, "Odd"))
+        self.notmuch("new", "--quiet")
+        out = self.run_lib("inbox.py", "archive", self.thread_of(odd), self.thread_of(self.evil_id()),
+                           self.thread_of("m2@b.c"))
+        self.assertEqual(out.returncode, 0, out.stderr)
+        printed = json.loads(out.stdout)["ids"]
+        self.assertEqual(sorted(printed), sorted([odd, self.evil_id(), "m2@b.c"]))
+        back = self.run_lib("inbox.py", "unarchive", *printed)
+        self.assertEqual(back.returncode, 0, back.stderr)
+        self.assertEqual(json.loads(back.stdout)["moved"], 3)
+        self.assertEqual(sorted(self.notmuch("search", "--output=messages", "tag:inbox").split()),
+                         sorted(f"id:{i}" for i in ["m1@b.c", "m2@b.c", "m3@b.c", odd, self.evil_id()]))
+
+    def test_unarchive_is_never_a_query(self):
+        """Quoted, an id finds only the message that has it: a1@b.c in Archive stays for anything but its own id"""
+        before = self.mail_files()
+        for bad in ("a1@b.c*", "*", "a1@b.c or *", "(tag inbox)", "a1@b.c)", '"a1@b.c"', "id:a1@b.c", "a1@b.c "):
+            with self.subTest(id=bad):
+                self.refused(self.run_lib("inbox.py", "unarchive", bad), before)
+        self.assertEqual(self.run_lib("inbox.py", "unarchive", "a1@b.c").returncode, 0)
+
     def test_delete_check_still_works(self):
         out = self.run_lib("inbox.py", "delete", "--check", "m2@b.c", stdin='{"subjects": ["Bills"]}')
         self.assertEqual(out.returncode, 0, out.stderr)

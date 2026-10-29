@@ -55,7 +55,20 @@ def notmuch(*args):
 
 def one(ident, threads=True):
     """term(), for an id that finds exactly one message or thread: none is LookupError, more than one ValueError."""
-    query = term(ident, threads)
+    return single(ident, term(ident, threads), threads)
+
+
+def exact(ident):
+    """A message's id as the database gave it, quoted whatever it holds; a thread's as term() takes it. For an undo
+    that takes back what a command printed (archive's ids, #1881): a stranger's Message-ID may have a `*`, a quote or
+    parentheses, which term() refuses, and one such id mustn't keep a whole archiving from being undone. It still
+    finds exactly one message, so it is never a query."""
+    if not isinstance(ident, str) or not ident.strip() or ident.startswith("thread:"):
+        return one(ident)
+    return single(ident, f"(id {string(ident)})", threads=False)
+
+
+def single(ident, query, threads):
     output = "--output=threads" if query.startswith("(thread ") else "--output=messages"
     found = int(notmuch("count", output, "--exclude=false", "--query=sexp", query).strip() or 0)
     if not found:

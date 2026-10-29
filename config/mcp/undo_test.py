@@ -2,8 +2,10 @@
 """Undo that keeps to what the user allows (#1860): `python3 config/mcp/undo_test.py`. An undo that does what an act
 tool does asks on the card, from Claude and from the notification; an undo that refuses can be tried again; open's
 undo closes only the window it opened and not while the user types; Deck's unqueue takes off only what Claude queued;
-Tasks' restore doesn't write over an edit made since. Nothing here runs a real command or shows a card: the log is a
-file of its own, and the card, the commands and the desktop are stand-ins."""
+Tasks' restore doesn't write over an edit made since. A log written by something else runs nothing its tool wouldn't,
+undo_change without an id takes only its own server's change, and a deletion's Undo isn't pushed out of the log while
+it is on screen (#1881). Nothing here runs a real command or shows a card: the log is a file of its own, and the card,
+the commands and the desktop are stand-ins."""
 
 import json
 import os
@@ -75,7 +77,7 @@ class Log(unittest.TestCase):
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
-        self.cards, self.ran, self.rows = [], [], []
+        self.cards, self.ran, self.rows, self.wheres = [], [], [], []
         self.answer, self.status, self.pressed = True, [0], []
 
     def tearDown(self):
@@ -87,20 +89,23 @@ class Log(unittest.TestCase):
 
     def execute(self, where, argv, stdin, timeout):
         self.ran.append(argv)
+        self.wheres.append((where, timeout))
         return "", "refused for now", self.status.pop(0) if len(self.status) > 1 else self.status[0]
 
     def notify(self, entry_id, summary, body="", button=None):
         self.rows.append((summary, button))
         return self.pressed.pop(0) if self.pressed else None
 
-    def entry(self, tool, undo_argv, notice="A change"):
-        return changes.add({"tool": tool, "notice": notice, "arguments": {}, "before": {}, "do": ["true"],
+    def entry(self, tool, undo_argv, notice="A change", do=("true",), **more):
+        # This test's own server, as undo_change's parent is the server that logged the change
+        return changes.add({"tool": tool, "notice": notice, "arguments": {}, "before": {}, "do": list(do),
                             "stdin": None, "undo": undo_argv, "remake": undo_argv, "dir": str(HERE),
-                            "timeout": 5, "area": "notifications", "options_from": []})
+                            "timeout": 5, "area": "notifications", "options_from": [],
+                            "server": undo.server_id(os.getppid()), **more})
 
     def dnd(self):
         return self.entry("notifications_dnd_off", ["nightdrive", "notifications", "dnd", "on"],
-                          "Turned Do Not Disturb off")
+                          "Turned Do Not Disturb off", do=["nightdrive", "notifications", "dnd", "off", "--json"])
 
     def test_denied_on_the_card(self):
         e = self.dnd()
@@ -164,7 +169,8 @@ class Log(unittest.TestCase):
 
     def test_undo_asks(self):
         e = self.entry("x_set", ["x", "set", "1"])
-        fake = SimpleNamespace(cls="change", spec={"undo_asks": True, "command": ["x"]}, name="x_set")
+        fake = SimpleNamespace(cls="change", spec={"undo_asks": True, "command": ["x"], "undo": ["x", "set", "{n}"]},
+                               name="x_set", dir=HERE, area="notifications")
         with mock.patch.object(registry.Registry, "load", return_value=({"x_set": fake}, [])):
             undo.perform(e["id"], "undo")
         self.assertEqual(self.cards[0][1], {"does": "x set 1"})
@@ -193,6 +199,136 @@ class Log(unittest.TestCase):
         undo.notice(e["id"], "undo")
         self.assertEqual(len(self.ran), 1)
         self.assertEqual(changes.get(e["id"])["state"], "done")
+
+
+class Forged(Log):
+    """A log written by something other than the server (#1881): Undo and Redo run only what its tool would"""
+
+    WALL = ["nightdrive", "wallpaper", "set", "/x.png"]
+
+    def refused(self, e, action="undo"):
+        with self.assertRaises(ToolError) as said:
+            undo.perform(e["id"], action)
+        self.assertEqual(self.ran, [])
+        self.assertEqual(changes.get(e["id"])["state"], "done" if action == "undo" else "undone")
+        return str(said.exception)
+
+    def test_a_command_its_tool_has_not(self):
+        for argv in (["bash", "-c", "touch /tmp/owned"], ["nightdrive", "update"], ["nightdrive", "wallpaper"],
+                     self.WALL + ["--more"], ["nightdrive", "wallpaper", "set", "--evil"],
+                     ["nightdrive", "wallpaper", "set", "/x.png", "/y.png"][:3] + ["-x", "/y.png"]):
+            with self.subTest(argv=argv):
+                self.assertIn("isn't one appearance_wallpaper would run",
+                              self.refused(self.entry("appearance_wallpaper", argv)))
+
+    def test_a_tool_that_is_not_there_or_not_a_change(self):
+        for name in ("evil_tool", "notifications_dnd_on", "undo_change", "recent_changes"):
+            with self.subTest(name=name):
+                self.assertIn("isn't a change tool", self.refused(self.entry(name, self.WALL)))
+
+    def test_folder_and_timeout_are_the_tools_own(self):
+        e = self.entry("appearance_wallpaper", self.WALL, dir="/tmp/evil", timeout=100000)
+        undo.perform(e["id"], "undo")
+        where, timeout = self.wheres[0]
+        self.assertEqual(where.dir, HERE)
+        self.assertEqual(timeout, run.TIMEOUT)
+
+    def test_an_empty_list_at_the_end(self):
+        undo.perform(self.entry("deck_queue_song", ["python3", "lib/playback.py", "unqueue", "0"])["id"], "undo")
+        self.assertEqual(len(self.ran), 1)
+
+    def test_an_option_only_after_dashes(self):
+        undo.perform(self.entry("files_trash", ["nightdrive", "files", "restore", "--", "-odd name", "x"])["id"], "undo")
+        self.assertEqual(len(self.ran), 1)
+
+    def test_redo_runs_the_tools_command_with_its_arguments(self):
+        e = self.dnd()
+        changes.mark(e["id"], "undone", do=["bash", "-c", "true"])
+        self.assertIn("isn't one notifications_dnd_off would run", self.refused(e, "redo"))
+        e = self.entry("appearance_wallpaper", self.WALL, do=["nightdrive", "wallpaper", "set", "/y.png", "--json"],
+                       arguments={"path": "/y.png", "extra": 1})
+        changes.mark(e["id"], "undone")
+        self.refused(e, "redo")    # an argument its schema doesn't take
+        e = self.entry("appearance_wallpaper", self.WALL, do=["nightdrive", "wallpaper", "set", "/y.png", "--json"],
+                       arguments={"path": "/y.png"})
+        changes.mark(e["id"], "undone")
+        undo.perform(e["id"], "redo")
+        self.assertEqual(self.ran, [["nightdrive", "wallpaper", "set", "/y.png", "--json"]])
+
+    def test_a_redos_undo_is_built_by_the_tools_template(self):
+        e = self.entry("appearance_wallpaper", self.WALL, do=["nightdrive", "wallpaper", "set", "/y.png", "--json"],
+                       arguments={"path": "/y.png"}, before={"path": "/old.png"}, remake=["bash", "-c", "{path}"])
+        changes.mark(e["id"], "undone")
+        undo.perform(e["id"], "redo")
+        self.assertEqual(changes.get(e["id"])["undo"], ["nightdrive", "wallpaper", "set", "/old.png"])
+
+
+class Newest(Log):
+    """undo_change without an id: only this server's own newest change (#1881)"""
+
+    def test_another_servers_newest_needs_its_id(self):
+        mine = self.entry("appearance_wallpaper", Forged.WALL)
+        other = self.entry("appearance_wallpaper", Forged.WALL, server="1:1")
+        with self.assertRaises(ToolError) as said:
+            undo.undo_change({})
+        self.assertIn(f"{other['id']}, wasn't made in this conversation", str(said.exception))
+        self.assertNotIn("A change", str(said.exception))
+        self.assertEqual(self.ran, [])
+        undo.undo_change({"id": other["id"]})
+        undo.undo_change({})     # now its own is the newest in place
+        self.assertEqual(changes.get(mine["id"])["state"], "undone")
+
+    def test_an_entry_without_a_server(self):
+        e = self.entry("appearance_wallpaper", Forged.WALL)
+        changes.mark(e["id"], "done", server=None)
+        with self.assertRaises(ToolError):
+            undo.undo_change({})
+
+    def test_server_id(self):
+        self.assertEqual(undo.server_id(os.getpid()), undo.server_id(os.getpid()))
+        self.assertTrue(undo.server_id(os.getpid()).startswith(f"{os.getpid()}:"))
+        self.assertIsNone(undo.server_id(2 ** 31))
+
+
+class Calendar(unittest.TestCase):
+    def test_an_added_events_undo_asks(self):
+        """calendar_add's undo deletes the event, as calendar_delete does (its --check only checks the card)"""
+        tools = {t.name: t for t in registry.read_file(REPO / "plugins/calendar/mcp.json", REPO / "plugins/calendar",
+                                                        "calendar")[0]}
+        argv = run.expand(tools["calendar_add"].spec["undo"], {"calendar": "home", "uid": "abc"})
+        with mock.patch.object(registry.Registry, "load", return_value=(tools, [])):
+            self.assertEqual(undo.acts_like({"tool": "calendar_add"}, argv).name, "calendar_delete")
+
+
+class Kept(unittest.TestCase):
+    """A deletion's Undo stays in the log while its notification offers it (#1881)"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        p = mock.patch.object(changes, "FILE", Path(self.tmp.name) / "claude-changes.jsonl")
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_a_flood_does_not_push_it_out(self):
+        trashed = changes.add({"tool": "files_trash", "notice": "Trashed", "deletes": True})
+        undone = changes.add({"tool": "files_trash", "notice": "Trashed, undone", "deletes": True})
+        changes.mark(undone["id"], "undone")
+        old = changes.add({"tool": "files_trash", "notice": "Trashed long ago", "deletes": True})
+        changes.mark(old["id"], "done", time="2020-01-01T00:00:00+0000")
+        for _ in range(changes.KEEP + 20):
+            changes.add({"tool": "notes_create", "notice": "A note"})
+        ids = [e["id"] for e in changes.read()]
+        self.assertIn(trashed["id"], ids)
+        self.assertNotIn(undone["id"], ids)
+        self.assertNotIn(old["id"], ids)
+        self.assertEqual(len(ids), changes.KEEP + 1)
+
+    def test_held_ones_have_a_limit(self):
+        with mock.patch.object(changes, "HOLD_MAX", 3), mock.patch.object(changes, "KEEP", 5):
+            for _ in range(20):
+                changes.add({"tool": "files_trash", "notice": "Trashed", "deletes": True})
+            self.assertEqual(len(changes.read()), 8)
 
 
 class Windows(unittest.TestCase):

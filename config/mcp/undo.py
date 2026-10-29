@@ -16,12 +16,16 @@ output, as the first run's was (a new draft has a new id); Claude's undo_change 
 An undo that does what an act tool does (dnd_off's undo turns Do Not Disturb on, which only the card may allow), or
 whose tool says `"undo_asks": true`, runs only once the user allows it on the card, from the notification too (#1860).
 An undo that refuses for now (the user is typing) leaves Try again on the row.
+The log is a file of the user's, which what they run can write (Claude Code's own Write too), so an undo or redo runs
+only what the tool the entry names, as installed now, would: its undo template word for word, its command with the
+logged arguments, in its own folder (#1881). undo_change without an id undoes only this server's own newest change.
 
     python3 undo.py recent_changes | undo_change     Claude's tools (JSON on stdin, JSON out)
     python3 undo.py undo ID | redo ID                as the notification's buttons do
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -37,7 +41,7 @@ from run import ToolError  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 OWN = "undo_change"   # tools/changes.json: its row replaces the change's instead of being a change of its own
-NOTICE_FOR = 3600     # seconds the row (and its button) stays in the notification history; the log keeps it longer
+NOTICE_FOR = changes.HOLD  # seconds the row (and its button) stays in the notification history; the log keeps it longer
 NOTICE_MAX = 120      # characters of the notice: a long argument (a path, a text) is cut
 ICON = "lucide:bot"   # as claude-notify's: the user's own agent icon when there is one
 OWN_ICONS = [Path.home() / ".config/nightdrive" / f"agent-icon.{ext}" for ext in ("svg", "png")]
@@ -101,6 +105,7 @@ def offer(tool, arguments, answer, state=None):
         "arguments": arguments, "before": state or {}, "do": argv, "stdin": stdin, "undo": undo,
         "remake": tool.spec["undo"], "dir": str(tool.dir), "timeout": run.timeout_of(tool),
         "area": tool.area, "options_from": tool.spec.get("options_from", []),
+        "deletes": bool(tool.spec.get("deletes")), "server": server_id(os.getpid()),
     })
     show(entry["id"], "undo")
     answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: the user can undo it from the "
@@ -114,31 +119,41 @@ def show(entry_id, action):
                      start_new_session=True)
 
 
+def server_id(pid):
+    """A process as one run of it: its pid and when it started (/proc's starttime), as a pid is used again; None when
+    it can't be read."""
+    try:
+        return f"{pid}:{Path(f'/proc/{pid}/stat').read_text().rpartition(')')[2].split()[19]}"
+    except (OSError, IndexError):
+        return None
+
+
 def perform(entry_id, action):
     """Undo (or redo) an entry: its logged argv run as run.py runs a tool, and its state changed. Returns the entry;
     ToolError when it can't. An undo that asks waits for the card first, outside the lock: other undos and the log
     don't wait on the user, and the entry is checked again once they have answered."""
-    argv, _ = runnable(entry_id, action)
+    argv, _, _ = runnable(entry_id, action)
     if action == "undo":
         ask(entry_id, argv)
     with changes.serial():
-        argv, stdin = runnable(entry_id, action, shown=argv)
+        argv, stdin, tool = runnable(entry_id, action, shown=argv)
         entry = changes.get(entry_id)
         then = "undone" if action == "undo" else "done"
-        where = SimpleNamespace(dir=Path(entry["dir"]), name=entry["tool"], **choices(entry))
-        out, err, status = run.execute(where, argv, stdin, entry["timeout"])
+        # The tool's own folder, timeout and Access choices: none of them from the log
+        where = SimpleNamespace(dir=tool.dir, name=tool.name, **choices(tool))
+        out, err, status = run.execute(where, argv, stdin, run.timeout_of(tool))
         if status != 0:
             why = (err.strip() or out.strip() or "no message")[-run.MESSAGE_MAX:]
             raise ToolError(f"{action.capitalize()} of change {entry_id} ({entry['notice']}) failed "
                             f"({Path(argv[0]).name} exited with {status}): {why}")
-        fields = {"undo": redone_undo(entry, out)} if action == "redo" and entry.get("remake") else {}
+        fields = {"undo": redone_undo(tool, entry, out)} if action == "redo" else {}
         changes.mark(entry_id, then, **fields)
         return {**entry, **fields}
 
 
 def runnable(entry_id, action, shown=None):
-    """(argv, stdin) an undo or redo of the entry runs; ToolError when the entry isn't in a state for it, or its argv
-    isn't the one the card showed (shown)."""
+    """(argv, stdin, tool) an undo or redo of the entry runs; ToolError when the entry isn't in a state for it, its
+    argv isn't one its tool would run (registered), or isn't the one the card showed (shown)."""
     entry = changes.get(entry_id)
     if entry is None:
         raise ToolError(f"There's no change {entry_id} in the log (it keeps the last {changes.KEEP}).")
@@ -150,33 +165,74 @@ def runnable(entry_id, action, shown=None):
     if argv is None:
         raise ToolError(f"Change {entry_id} ({entry['notice']}) can't be undone: its redo didn't report what "
                         "undoing it needs.")
+    tool = registered(entry, action, argv, stdin)
     if shown is not None and argv != shown:
         raise ToolError(f"Change {entry_id} ({entry['notice']}) changed while the card was on screen: nothing was "
                         "done.")
-    return argv, stdin
+    return argv, stdin, tool
 
 
-def same_command(template, argv):
+def registered(entry, action, argv, stdin):
+    """The tool the entry names, as installed now, once the logged command is one it would run (#1881): an undo must
+    fit its `undo` template word for word (same_command, strict), a redo be its command with the logged arguments,
+    which its schema still takes. ToolError otherwise: what wrote the log can't have Undo run something else."""
+    what = f"Change {entry['id']} ({entry.get('notice')})"
+    try:
+        import registry   # here, not at the top: registry imports this module as its seam
+        tools, _ = registry.Registry().load()
+    except Exception as e:
+        raise ToolError(f"{what} wasn't {action}ne: its tool couldn't be read ({e}).")
+    tool = tools.get(entry.get("tool"))
+    if tool is None or tool.cls != "change" or tool.name == OWN or not is_template(tool.spec.get("undo")):
+        raise ToolError(f"{what} can't be {action}ne now: {entry.get('tool')!r} isn't a change tool that is "
+                        "installed and on.")
+    if action == "undo":
+        fits = same_command(tool.spec["undo"], argv, strict=True)
+    else:
+        try:
+            run.check(tool, entry.get("arguments") if isinstance(entry.get("arguments"), dict) else {})
+            fits = (argv, stdin) == run.prepare(tool, entry["arguments"])
+        except (ToolError, KeyError, TypeError):
+            fits = False
+    if not fits:
+        raise ToolError(f"{what} wasn't {action}ne: the log's command for it isn't one {tool.name} would run (the "
+                        "log was changed, or the tool since). Nothing was done.")
+    return tool
+
+
+def is_template(value):
+    return isinstance(value, list) and bool(value)
+
+
+# Words that change only how a command prints, or that it checks first what the card showed (calendar_delete's
+# --check): an undo without them still does what the act tool does, so it asks on the card too (#1881)
+QUIET = {"--json", "--check", "--card"}
+
+
+def same_command(template, argv, strict=False):
     """Whether argv is what a command template gives for some values: its words in order, a whole {name} one word or
-    more (a list's), a {name} inside a word any text, a group there or not. --json only changes how a command prints,
-    so it counts on neither side."""
-    def fits(t, a):
+    more (a list's), a {name} inside a word any text, a group there or not. QUIET's words count on neither side.
+    strict, for a logged undo checked against its own template (registered): every word counts, a whole {name} gives
+    at least one (but the last, an empty list's), and none of them starts with - unless a -- came before it, so a
+    value can't be an option the command didn't have, nor a missing one shift the next into its place."""
+    def fits(t, a, ended=False):
         if not t:
             return not a
         head, rest = t[0], t[1:]
         if isinstance(head, list):
-            return fits(head + rest, a) or fits(rest, a)
-        if head == "--json":
-            return fits(rest, a)
+            return fits(head + rest, a, ended) or fits(rest, a, ended)
+        if head in QUIET and not strict:
+            return fits(rest, a, ended)
         if run.PLACEHOLDER.fullmatch(head):   # an empty list gives no word: a match too, so a card rather than none
-            return any(fits(rest, a[n:]) for n in range(len(a) + 1))
+            return any(fits(rest, a[n:], ended) for n in range(1 if strict and rest else 0, len(a) + 1)
+                       if not strict or ended or not any(w.startswith("-") for w in a[:n]))
         if not a:
             return False
         if run.PLACEHOLDER.search(head):
             parts = run.PLACEHOLDER.split(head)[::2]   # split puts the names at the odd places
-            return bool(re.fullmatch(".*".join(map(re.escape, parts)), a[0], re.S)) and fits(rest, a[1:])
-        return head == a[0] and fits(rest, a[1:])
-    return fits(list(template), [w for w in argv if w != "--json"])
+            return bool(re.fullmatch(".*".join(map(re.escape, parts)), a[0], re.S)) and fits(rest, a[1:], ended)
+        return head == a[0] and fits(rest, a[1:], ended or head == "--")
+    return fits(list(template), list(argv) if strict else [w for w in argv if w not in QUIET])
 
 
 def acts_like(entry, argv):
@@ -202,7 +258,7 @@ def ask(entry_id, argv):
         return
     import confirm   # only now: the card needs Quickshell, a plain undo doesn't
     does = " ".join(argv) if act is True else act.spec.get("title") or act.name
-    area = entry.get("area") or "nightdrive"
+    area = getattr(registered(entry, "undo", argv, None), "area", None) or "nightdrive"
     card = SimpleNamespace(name=OWN, cls="act", right="modify", area=area, options={},
                            spec={"title": f"Undo: {entry['notice']}", "class": "act", "area": area,
                                  "inputSchema": {"type": "object", "properties": {"does": {"title": "That is"}}}})
@@ -211,24 +267,24 @@ def ask(entry_id, argv):
                         "wasn't undone. Don't try it another way.")
 
 
-def choices(entry):
+def choices(tool):
     """The Access choices an undo or redo runs with, as the tool's own call would now (run.environment): a redo keeps
     to what applies now (the folders Claude can use, #1849), and a command that gets none refuses what they allow."""
     try:
         rules = access.load()
     except Exception:  # the command then has no choices, and allows least
         return {}
-    area = entry.get("area")
-    return {"options": rules.options(area) if area else {},
-            "options_from": {a: rules.options(a) for a in entry.get("options_from", [])}}
+    return {"options": rules.options(tool.area),
+            "options_from": {a: rules.options(a) for a in tool.spec.get("options_from", [])}}
 
 
-def redone_undo(entry, out):
-    """A redo's undo, built from its own output as offer() builds the first one's: running the tool again may make
-    something new (mail_draft: a new draft with a new Message-ID), and the first run's undo would miss it. None when
-    the output lacks what the undo needs; undoing then says so rather than acting on the old one."""
+def redone_undo(tool, entry, out):
+    """A redo's undo, built from its own output as offer() builds the first one's, by the tool's own template (not
+    the log's remake): running the tool again may make something new (mail_draft: a new draft with a new Message-ID),
+    and the first run's undo would miss it. None when the output lacks what the undo needs; undoing then says so
+    rather than acting on the old one."""
     try:
-        return run.expand(entry["remake"], run.undo_values(entry["arguments"], run.result(out), entry["before"]))
+        return run.expand(tool.spec["undo"], run.undo_values(entry["arguments"], run.result(out), entry["before"]))
     except ToolError:
         return None
 
@@ -287,12 +343,20 @@ def recent_changes(args):
 
 
 def undo_change(args):
-    """Claude's undo: the change by id, else the newest one still in place."""
+    """Claude's undo: the change by id, else the newest one still in place, when this server made it (#1881). The log
+    is every session's: another conversation's newest change, or one an Ask Claude run made meanwhile, isn't "that"
+    in this one. This runs as the server's child, so its parent is the server that logged its own changes."""
     entry_id = args.get("id")
     if entry_id is None:
-        entry_id = next((e["id"] for e in reversed(changes.read()) if e["state"] == "done"), None)
-        if entry_id is None:
+        newest = next((e for e in reversed(changes.read()) if e["state"] == "done"), None)
+        if newest is None:
             raise ToolError("There's no change of Claude's in place to undo.")
+        mine = server_id(os.getppid())
+        if mine is None or newest.get("server") != mine:
+            # Its id alone: what it was is its area's, which recent_changes may not show (#1884)
+            raise ToolError(f"The newest change in place, {newest['id']}, wasn't made in this conversation: find the "
+                            "one the user means with recent_changes and give its id.")
+        entry_id = newest["id"]
     entry = perform(entry_id, "undo")
     return {"id": entry_id, "undone": entry["notice"], "tool": entry["tool"]}
 
