@@ -1,13 +1,19 @@
 #!/usr/bin/python3
 """One device's screen, as nightdrive-vnc-display@NAME.service runs it (`vnc-display run NAME`).
 
-Makes the device's headless output (its size, place and workspace come from config/hypr/virtual-display.lua, which reads
-the same state file at the reload the new output brings), then runs wayvnc on it: one on each of the Tailscale addresses
-(IPv4 and IPv6: the computer's Tailscale name gives both, and a device may try either), and one on the home network's address while the computer is on that network, if the device was added with --home. Both are
-checked every TICK seconds, so a Tailscale that comes up later, or a move to another network, is followed.
+Listens for the device on each of the Tailscale addresses (IPv4 and IPv6: the computer's Tailscale name gives both, and
+a device may try either), and on the home network's address while the computer is on that network, if the device was
+added with --home. The addresses are checked every TICK seconds, so a Tailscale that comes up later, or a move to another
+network, is followed.
 
-The output going away stops everything at once: wayvnc would otherwise move to the desk's own screen ("Selected output
-went away, rotating to previous output") and show it to the device. Hyprland's event socket tells us.
+The display is there only while the device is connected: a screen nobody watches would hide its windows and catch the
+pointer. So this listens itself (lib/listener.py), and when a device connects, makes the headless output (its size,
+place and workspace come from config/hypr/virtual-display.lua, which reads the same state file at the reload the new
+output brings), starts wayvnc on it and relays the connection to it. Once no connection is left for GRACE seconds,
+wayvnc stops, the windows on the display go to workspace 1, and the output is removed: its icon leaves the top bar.
+
+The output going away while it's in use stops wayvnc at once: it would otherwise move to the desk's own screen ("Selected
+output went away, rotating to previous output") and show it to the device. Hyprland's event socket tells us.
 """
 import json
 import os
@@ -18,10 +24,16 @@ import subprocess
 import sys
 import time
 
+from listener import Listener
+
 CONF_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "nightdrive", "vnc-display")
 RUN_DIR = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "nightdrive-vnc-display")
+STATE = os.path.expanduser("~/.local/state/nightdrive/virtual-displays")   # bin/vnc-display, virtual-display.lua
 KEY = os.path.join(CONF_DIR, "rsa_key.pem")   # install.sh makes it: the computer's identity, the same for every device
 TICK = 15    # seconds between the checks of the addresses
+GRACE = 5    # seconds the display waits for the device once its last connection is gone: a reconnect doesn't flicker it
+SETTLE = 0.3   # seconds after the display has its workspace before wayvnc starts on it (make_output)
+MAIN_WORKSPACE = 1   # where the display's windows go when it goes: the main screen's, as virtual-display.lua keeps it
 FPS = 60
 
 
@@ -65,17 +77,6 @@ def home_address(uuid):
     return out("nmcli", "-g", "IP4.ADDRESS", "connection", "show", uuid).split(" | ")[0].split("/")[0]
 
 
-def local(address):
-    """The address is this computer's now: `tailscale ip` still gives it after `tailscale down`, and a wayvnc started on
-    it would only exit."""
-    try:
-        with socket.socket(socket.AF_INET6 if ":" in address else socket.AF_INET) as s:
-            s.bind((address, 0))
-        return True
-    except OSError:
-        return False
-
-
 def keyboard():
     """The desk's layout: wayvnc types with a virtual keyboard of its own, and a different layout there would switch the
     desk's keymap too as it types."""
@@ -87,61 +88,6 @@ def keyboard():
         return v.split(",")[0].strip()
     # In wayvnc's config, not its -k LAYOUT-VARIANT: a layout's own name may have a "-" (fi-viivat)
     return {"xkb_layout": opt("kb_layout"), "xkb_variant": opt("kb_variant")}
-
-
-class Listener:
-    """One wayvnc on one address. relax: Apple's own login (Diffie-Hellman, used by e.g. the Screens app) then leaves the
-    picture unencrypted, which is fine inside Tailscale's encryption but not on the home network."""
-
-    def __init__(self, name, kind, conf, relax):
-        self.name, self.kind, self.conf, self.relax = name, kind, conf, relax
-        self.proc, self.address = None, ""
-
-    def path(self, ext):
-        return os.path.join(RUN_DIR, f"{self.name}-{self.kind}.{ext}")
-
-    def start(self, address, kb):
-        # wayvnc's own config, with the password: in the runtime folder, readable only by the user (0600 from the start)
-        fd = os.open(self.path("conf"), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(f"enable_auth=true\nusername={self.conf['username']}\npassword={self.conf['password']}\n"
-                    f"rsa_private_key_file={KEY}\nrelax_encryption={'true' if self.relax else 'false'}\n")
-            f.writelines(f"{k}={v}\n" for k, v in kb.items() if v)
-        # Not -r (the pointer drawn into the picture): with it, wayvnc dies ("Fatal error while capturing") as soon as the
-        # client moves the pointer onto this screen, as RealVNC does on connecting. Without it the client draws the
-        # pointer itself. -R keeps the size the device was added with: a client asking for another would fight
-        # virtual-display.lua.
-        cmd = ["wayvnc", "-C", self.path("conf"), "-o", self.conf["output"], "-R", "-f", str(FPS),
-               "-S", self.path("sock")]
-        self.proc, self.address = subprocess.Popen(cmd + [address, self.conf["port"]]), address
-        log(f"listening on {address}:{self.conf['port']} ({self.kind})")
-
-    def stop(self):
-        if self.proc:
-            self.proc.terminate()
-            try:
-                self.proc.wait(3)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
-                self.proc.wait()
-            log(f"stopped listening on {self.address}:{self.conf['port']} ({self.kind})")
-        self.proc, self.address = None, ""
-        for ext in ("conf", "sock"):
-            try:
-                os.remove(self.path(ext))
-            except FileNotFoundError:
-                pass
-
-    def follow(self, address, kb):
-        """Listens on address, or nowhere if it is "": moved when the address changed, started again if wayvnc died."""
-        if address and not local(address):
-            address = ""
-        if self.proc and (self.proc.poll() is not None or self.address != address):
-            if self.proc.poll() is not None:
-                log(f"wayvnc ({self.kind}) exited with {self.proc.returncode}")
-            self.stop()
-        if address and not self.proc:
-            self.start(address, kb)
 
 
 def events():
@@ -157,51 +103,139 @@ def removed(line, output):
     return (ev == "monitorremoved" and data == output) or (ev == "monitorremovedv2" and data.split(",")[1:2] == [output])
 
 
+def wanted(output):
+    """What the state file gives the output once Hyprland has set it up: (width, height, scale, workspace), or None."""
+    try:
+        with open(STATE) as f:
+            for line in f:
+                w = line.split()
+                if len(w) >= 5 and w[0] == output:
+                    width, height = w[1].split("@")[0].split("x")
+                    return int(width), int(height), float(w[2]), int(w[4])
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def current(output):
+    """The same as Hyprland has it now, or None while the output isn't there."""
+    try:
+        for m in json.loads(out("hyprctl", "-j", "monitors", "all")):
+            if m["name"] == output:
+                return m["width"], m["height"], float(m["scale"]), m["activeWorkspace"]["id"]
+    except (ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def make_output(output):
+    """The output, once Hyprland has settled it: a new output reloads the config and moves the workspaces
+    (hyprland.lua's monitor.added), and wayvnc capturing then, as the client moves its pointer, dies ("Fatal error while
+    capturing", #1801). A headless output also comes at a size of its own, the device's only after the reload. So
+    wayvnc waits for the output to have its size, scale and workspace, and SETTLE more; the device waits on the socket
+    meanwhile."""
+    start = time.monotonic()
+    if output not in outputs():
+        out("hyprctl", "output", "create", "headless", output)
+    want = wanted(output)
+    for _ in range(40):
+        now = current(output)
+        if now is not None and (want is None or now == want):
+            log(f"{output} set up in {time.monotonic() - start:.1f} s")
+            time.sleep(SETTLE)
+            return True
+        time.sleep(0.25)
+    log(f"{output} not as the state file has it after 10 s: {current(output)}, not {want}")
+    return output in outputs()   # better a display than none
+
+
+def remove_output(output):
+    """Its windows to the main screen's workspace first, quietly (the desk's focus stays): once the output is gone,
+    Hyprland would move its workspace to the desk's screen as a workspace of its own, with an icon in the bar."""
+    try:
+        here = {w["id"] for w in json.loads(out("hyprctl", "-j", "workspaces")) if w.get("monitor") == output}
+        windows = [c["address"] for c in json.loads(out("hyprctl", "-j", "clients"))
+                   if c.get("workspace", {}).get("id") in here]
+    except ValueError:
+        windows = []
+    for a in windows:
+        out("hyprctl", "dispatch",
+            f'hl.dsp.window.move({{ workspace = {MAIN_WORKSPACE}, follow = false, window = "address:{a}" }})')
+    if output in outputs():
+        out("hyprctl", "output", "remove", output)
+
+
 def main(name):
     conf = read_conf(name)
     output = conf["output"]
     os.makedirs(RUN_DIR, mode=0o700, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     ev = events()   # before the output is made, so its removal can't slip past
-    if output not in outputs():
-        out("hyprctl", "output", "create", "headless", output)
-        for _ in range(20):
-            if output in outputs():
-                break
-            time.sleep(0.25)
-        else:
-            log(f"couldn't make the output {output}")
-            return 1
-    log(f"{output} is there")
+    # Left over from a run that didn't end cleanly: the display comes only with a device
+    remove_output(output)
     kb = keyboard()
-    listeners = [(Listener(name, "tailscale", conf, True), lambda: tailscale_address("-4")),
-                 (Listener(name, "tailscale6", conf, True), lambda: tailscale_address("-6")),
-                 (Listener(name, "home", conf, False), lambda: home_address(conf.get("home", "")))]
+    listeners = [(Listener(name, "tailscale", conf, True, RUN_DIR, KEY, FPS), lambda: tailscale_address("-4")),
+                 (Listener(name, "tailscale6", conf, True, RUN_DIR, KEY, FPS), lambda: tailscale_address("-6")),
+                 (Listener(name, "home", conf, False, RUN_DIR, KEY, FPS), lambda: home_address(conf.get("home", "")))]
+    shown, last_seen = False, 0.0   # shown: the output is there
+
+    def hide(why):
+        nonlocal shown
+        for listener, _ in listeners:
+            listener.stop()   # before the output goes, or wayvnc moves to the desk's screen
+        remove_output(output)
+        shown = False
+        log(f"{why}: {output} is gone, its windows on workspace {MAIN_WORKSPACE}")
+
     buf, due = b"", 0.0
     try:
         while True:
             if time.monotonic() >= due:
                 for listener, address in listeners:
-                    listener.follow(address(), kb)
+                    listener.follow(address())
                 due = time.monotonic() + TICK
-            if not select.select([ev], [], [], min(1.0, max(0.0, due - time.monotonic())))[0]:
-                # A wayvnc that died is started again within a second, not at the next check: the device reconnects
-                if any(listener.proc and listener.proc.poll() is not None for listener, _ in listeners):
-                    due = 0.0
+            if shown:
+                if any(listener.open for listener, _ in listeners):
+                    last_seen = time.monotonic()
+                elif time.monotonic() - last_seen > GRACE:
+                    hide("the device disconnected")
+            socks = [listener.sock for listener, _ in listeners if listener.sock]
+            ready = select.select([ev] + socks, [], [], min(1.0, max(0.0, due - time.monotonic())))[0]
+            for listener, _ in listeners:
+                if not (listener.sock and listener.sock in ready):
+                    continue
+                client = listener.accept()
+                if not client:
+                    continue
+                if not shown:
+                    if not make_output(output):
+                        log(f"a device connected, but the output {output} couldn't be made")
+                        client.close()
+                        continue
+                    shown = True
+                    log(f"a device connected: {output} is there")
+                now = current(output)
+                # At scale 1 the blank picture lib/warmup.py is for already has the pixel size: no look needed
+                if listener.start(output, kb, now[:2] if now and now[2] != 1 else None):
+                    listener.relay(client)
+                else:
+                    log(f"wayvnc ({listener.kind}) didn't start")
+                    client.close()
+                last_seen = time.monotonic()
+            if ev not in ready:
                 continue
             data = ev.recv(65536)
             if not data:
                 log("Hyprland is gone")
                 return 0
             *lines, buf = (buf + data).split(b"\n")
-            if any(removed(line.decode(errors="replace"), output) for line in lines):
-                log(f"{output} went away: stopping before wayvnc moves to another screen")
-                return 1   # systemd starts it again, with a new output: `vnc-display off` is the way to end it
+            if shown and any(removed(line.decode(errors="replace"), output) for line in lines):
+                hide(f"{output} went away")
     finally:
         for listener, _ in listeners:
-            listener.stop()
-        if output in outputs():
-            out("hyprctl", "output", "remove", output)
+            listener.close()
+        if shown:
+            remove_output(output)
 
 
 if __name__ == "__main__":

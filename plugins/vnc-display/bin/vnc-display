@@ -2,18 +2,21 @@
 # VNC Display (plugins/vnc-display): an iPad or iPhone as a screen of its own, shown in a VNC app on the device.
 #
 #   vnc-display add DEVICE [NAME] [--home] [--beside|--away]
-#                                  a new screen for a device, with a password of its own; it stays on, also after a login
+#                                  a new screen for a device, with a password of its own: there while the device is
+#                                  connected, listening for it also after a login
 #   vnc-display show NAME [--json] how to connect: the addresses, the user name and the password
 #   vnc-display qr NAME            the connection as a QR code (an SVG file, its path printed) for the device's camera
 #   vnc-display network            the network the computer is on now, which --home would add
-#   vnc-display list [--json]      the devices: size, workspace, on or off, port
+#   vnc-display list [--json]      the devices: size, workspace, on or off, connected, port
 #   vnc-display workspace NAME N   its workspace, 2–9; a device that has N takes this one's
 #   vnc-display place NAME PLACE   where its screen is: right, left, above or below your screens, or away (out of reach)
-#   vnc-display on|off NAME        the screen on, or off (gone, nothing listening) while the device keeps its password
+#   vnc-display size NAME DEVICE   its display's size and scale (DEVICE as for add): a connected device reconnects
+#   vnc-display rename NAME NEW    its name, which is also the user name the device logs in with
+#   vnc-display on|off NAME        listening for the device, or off (nothing listening) while it keeps its password
 #   vnc-display remove NAME        forgets the device: its screen, its password
 #   vnc-display run NAME           the screen itself (nightdrive-vnc-display@NAME.service, lib/serve.py)
 #
-# DEVICE is a size: ipad, ipad-13, ipad-mini, iphone, iphone-max, or WIDTHxHEIGHT@SCALE in the device's pixels
+# DEVICE is a size: ipad, ipad-13, ipad-mini, iphone, iphone-max, macbook-16, display-4k, or WIDTHxHEIGHT@SCALE in the device's pixels
 # (2360x1640@2). Each device is a headless output, HEADLESS-<NAME>, with a line in the state file that
 # config/hypr/virtual-display.lua reads (its size, place and workspace), and wayvnc on it as a user service of its own.
 # wayvnc listens on the Tailscale address only, and with --home also on the home network (the Wi-Fi it was added on)
@@ -50,6 +53,8 @@ tailscale_name() {
 }
 # The address a device connects to over Tailscale: the name, or the IP without MagicDNS
 tailscale_host() { local n; n=$(tailscale_name "${1:-}"); if [[ -n $n ]]; then echo "$n"; else tailscale_ip; fi; }
+# A device is connected while its display is there: lib/serve.py makes it as one connects, removes it once none is
+connected() { hyprctl -j monitors all 2>/dev/null | jq -e --arg o "$(output_of "$1")" 'any(.[]; .name == $o)' >/dev/null; }
 # The device's line in the state file: <output> <mode> <scale> <place> <workspace>
 state_line() { [[ -f $state ]] && awk -v o="$(output_of "$1")" '$1 == o' "$state" | head -1; }
 
@@ -62,6 +67,11 @@ size_of() {
     ipad-mini) echo "2266x1488 2 beside" ;;
     iphone) echo "1179x2556 3 away" ;;         # iPhone 15, 16
     iphone-max) echo "1320x2868 3 away" ;;     # iPhone 16 Pro Max
+    # MacBook Pro 16-inch (2021 on): a full-screen window below the notch at macOS's default look (1728x1117 points),
+    # one pixel per point: TigerVNC on a Mac isn't Retina-aware, so the panel's own 3456x2234@2 showed a quarter of it
+    macbook-16) echo "1728x1080 1 beside" ;;
+    # A 4K display (a monitor or TV with a VNC app, or a computer driving one): 1920x1080 as things look, as on a 27-inch
+    display-4k) echo "3840x2160 2 beside" ;;
     *x*@*)
       local w=${1%%x*} rest=${1#*x} h s
       h=${rest%@*} s=${rest#*@}
@@ -142,8 +152,8 @@ cmd_add() {
     esac
     shift
   done
-  [[ -n $device ]] || die "which device? vnc-display add ipad (or iphone, ipad-13, ipad-mini, iphone-max, 2360x1640@2)"
-  size=$(size_of "$device") || die "unknown device $device: ipad, ipad-13, ipad-mini, iphone, iphone-max or WIDTHxHEIGHT@SCALE"
+  [[ -n $device ]] || die "which device? vnc-display add ipad (or iphone, ipad-13, ipad-mini, iphone-max, macbook-16, display-4k, 2360x1640@2)"
+  size=$(size_of "$device") || die "unknown device $device: ipad, ipad-13, ipad-mini, iphone, iphone-max, macbook-16, display-4k or WIDTHxHEIGHT@SCALE"
   read -r mode scale default_place <<<"$size"
   place=${place:-$default_place}
   [[ -n $name ]] || { name=${device%%-*}; [[ $name == *x*@* ]] && name=screen; }
@@ -174,7 +184,8 @@ cmd_show() {
   [[ ${2:-} == --json ]] && { show_json "$1"; return; }
   local n=$1 ts home port
   ts=$(tailscale_host) port=$(get "$n" port)
-  if systemctl --user -q is-active "$(unit "$n")"; then echo "$n is on, workspace $(state_line "$n" | awk '{ print $5 }')."
+  if systemctl --user -q is-active "$(unit "$n")"; then
+    echo "$n is on, workspace $(state_line "$n" | awk '{ print $5 }'): $(connected "$n" && echo connected || echo "its display comes when it connects")."
   else echo "$n is off: vnc-display on $n"; fi
   echo
   echo "In the VNC app on the device, add a connection:"
@@ -189,12 +200,13 @@ cmd_show() {
 
 # For the launcher (VncDisplayLevels.qml): what show prints, the password too
 show_json() {
-  local n=$1 on=false
+  local n=$1 on=false conn=false
   systemctl --user -q is-active "$(unit "$n")" && on=true
-  jq -n --arg name "$n" --argjson on "$on" --arg ws "$(state_line "$n" | awk '{ print $5 }')" --arg host "$(tailscale_host)" \
+  connected "$n" && conn=true
+  jq -n --arg name "$n" --argjson on "$on" --argjson connected "$conn" --arg ws "$(state_line "$n" | awk '{ print $5 }')" --arg host "$(tailscale_host)" \
     --arg ip "$(tailscale_ip)" --arg home "$(home_ip "$(get "$n" home)")" --arg home_name "$(get "$n" home_name)" \
     --arg port "$(get "$n" port)" --arg password "$(get "$n" password)" \
-    '{name: $name, on: $on, workspace: ($ws | tonumber? // null), tailscale: $host, tailscale_ip: $ip, port: ($port | tonumber),
+    '{name: $name, on: $on, connected: $connected, workspace: ($ws | tonumber? // null), tailscale: $host, tailscale_ip: $ip, port: ($port | tonumber),
       home: (if $home == "" then null else $home end), home_name: (if $home_name == "" then null else $home_name end),
       username: $name, password: $password}'
 }
@@ -214,27 +226,28 @@ cmd_qr() {
 }
 
 cmd_list() {
-  local n line on ts mode scale place ws json=0 first=1
+  local n line on conn ts mode scale place ws json=0 first=1
   [[ ${1:-} == --json ]] && json=1
   ts=$(tailscale_host)
   ((json)) && printf '['
   for n in $(names); do
     line=$(state_line "$n")
     systemctl --user -q is-active "$(unit "$n")" && on=true || on=false
+    connected "$n" && conn=true || conn=false
     read -r _ mode scale place ws <<<"$line"
     if ((json)); then
       ((first)) || printf ','
       first=0
       jq -cn --arg name "$n" --arg output "$(output_of "$n")" --arg size "${mode%@*}" --arg scale "$scale" \
-        --arg place "$place" --arg ws "$ws" --arg port "$(get "$n" port)" --argjson on "$on" --arg ts "$ts" \
+        --arg place "$place" --arg ws "$ws" --arg port "$(get "$n" port)" --argjson on "$on" --argjson connected "$conn" --arg ts "$ts" \
         --arg home "$(get "$n" home_name)" \
         '{name: $name, output: $output, size: $size, scale: ($scale | tonumber? // null), place: $place,
-          workspace: ($ws | tonumber? // null), port: ($port | tonumber), on: $on, tailscale: $ts,
+          workspace: ($ws | tonumber? // null), port: ($port | tonumber), on: $on, connected: $connected, tailscale: $ts,
           home: (if $home == "" then null else $home end)}' | tr -d '\n'
     else
       first=0
-      printf '%-12s %-10s ×%-4s %-7s ⌘%-2s %-4s %s\n' "$n" "${mode%@*}" "$scale" "$place" "$ws" \
-        "$([[ $on == true ]] && echo on || echo off)" "${ts:-tailscale off}:$(get "$n" port)$(
+      printf '%-12s %-10s ×%-4s %-7s ⌘%-2s %-9s %s\n' "$n" "${mode%@*}" "$scale" "$place" "$ws" \
+        "$([[ $conn == true ]] && echo connected || { [[ $on == true ]] && echo on || echo off; })" "${ts:-tailscale off}:$(get "$n" port)$(
           [[ -n $(get "$n" home_name) ]] && echo ", at home on $(get "$n" home_name)")"
     fi
   done
@@ -297,6 +310,43 @@ cmd_place() {
   esac
 }
 
+# The service makes the output at the size the state file has as the device connects (lib/serve.py), so a connected
+# device is let go and reconnects to the new size; one that isn't connected gets it next time
+cmd_size() {
+  known "${1:-}"
+  local n=$1 size mode scale line
+  size=$(size_of "${2:-}") || die "a size is a device (ipad, iphone, macbook-16, display-4k…) or WIDTHxHEIGHT@SCALE: vnc-display size $n 2560x1600@2"
+  read -r mode scale _ <<<"$size"
+  line=$(state_line "$n")
+  [[ -n $line ]] || die "$n has no display: vnc-display on $n"
+  set_state "$n" "$(awk -v m="${mode}@60" -v s="$scale" '{ $2 = m; $3 = s; print }' <<<"$line")"
+  if connected "$n"; then
+    systemctl --user restart "$(unit "$n")"
+    echo "$n is ${mode} at scale $scale: the device reconnects to it."
+  else echo "$n is ${mode} at scale $scale."; fi
+}
+
+# A new name is a new output and service: the old ones go, the password, port, workspace and place stay. The user
+# name is the device's name, so the VNC app needs the new one
+cmd_rename() {
+  known "${1:-}"
+  local n=$1 new=${2:-} was_on=0 line
+  [[ $new =~ ^[a-z0-9][a-z0-9-]{0,15}$ ]] || die "a name is lowercase letters, digits and -, at most 16: vnc-display rename $n ipad2"
+  [[ $new != "$n" ]] || return 0
+  [[ ! -e $(conf "$new") ]] || die "$new is already a device's name (vnc-display list)"
+  systemctl --user -q is-enabled "$(unit "$n")" 2>/dev/null && was_on=1
+  turn off "$n"
+  line=$(state_line "$n")
+  sed -e "s/^output=.*/output=$(output_of "$new")/" -e "s/^username=.*/username=$new/" -e "s/(vnc-display show $n)/(vnc-display show $new)/" \
+    "$(conf "$n")" > "$(conf "$new")"
+  chmod 600 "$(conf "$new")"
+  rm -f "$(conf "$n")"
+  # In its place in the file, which is its order on its side of the desk
+  [[ -z $line ]] || set_state "$n" "$(awk -v o="$(output_of "$new")" '{ $1 = o; print }' <<<"$line")"
+  ((was_on)) && turn on "$new"
+  echo "$n is now $new: in the VNC app, the user name is $new."
+}
+
 cmd_remove() {
   known "${1:-}"
   turn off "$1"
@@ -312,10 +362,12 @@ case ${1:-} in
   network) current_network | cut -f2 ;;
   list) cmd_list "${2:-}" ;;
   on) known "${2:-}"; turn on "$2"; cmd_show "$2" ;;
-  off) known "${2:-}"; turn off "$2"; echo "$2 is off: its display is gone and nothing listens for it (vnc-display on $2)." ;;
+  off) known "${2:-}"; turn off "$2"; echo "$2 is off: nothing listens for it (vnc-display on $2)." ;;
   workspace) cmd_workspace "${2:-}" "${3:-}" ;;
   place) cmd_place "${2:-}" "${3:-}" ;;
+  size) cmd_size "${2:-}" "${3:-}" ;;
+  rename) cmd_rename "${2:-}" "${3:-}" ;;
   remove) cmd_remove "${2:-}" ;;
   run) known "${2:-}"; exec python3 "$here/lib/serve.py" "$2" ;;
-  *) sed -n '4,14s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
+  *) sed -n '4,17s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
 esac

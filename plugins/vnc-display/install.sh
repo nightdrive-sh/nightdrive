@@ -6,8 +6,10 @@ set -euo pipefail
 
 conf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/nightdrive/vnc-display
 
-command -v wayvnc >/dev/null && command -v ssh-keygen >/dev/null && command -v qrencode >/dev/null ||
-  sudo dnf install -y wayvnc openssh-clients qrencode   # qrencode: the QR code in Settings › Other displays
+# qrencode: the QR code in Settings › Other displays; python3-cryptography: lib/warmup.py's login to wayvnc
+command -v wayvnc >/dev/null && command -v ssh-keygen >/dev/null && command -v qrencode >/dev/null &&
+  python3 -c "import cryptography" 2>/dev/null ||
+  sudo dnf install -y wayvnc openssh-clients qrencode python3-cryptography
 (
   umask 077
   mkdir -p "$conf_dir"

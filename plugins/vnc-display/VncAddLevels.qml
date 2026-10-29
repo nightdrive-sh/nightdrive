@@ -5,7 +5,8 @@ import qs
 // VNC Display's Add a display (plugin-parts lists it while the plugin is on; Settings › Other displays' Add a display row is
 // VncDisplayLevels.qml's): the sizes `vnc-display add` knows, and Other device, a small form for any other: its width
 // and height in pixels, a scale shown as the size things look (as Display's Scale), and a name. Once added, the device's
-// page (VncDisplayLevels.qml's vncdevice) opens.
+// page (VncDisplayLevels.qml's vncdevice) opens. The same form changes an added device's size and scale: its page's Size
+// opens it with `editing` set (edit()), without the name, which is a field on that page.
 // Launcher.qml asks it like its own level files (levels, titles, parents, items, activate, footer, entered).
 Item {
     id: a
@@ -19,7 +20,9 @@ Item {
         { device: "ipad-13", name: "iPad 13-inch", glyph: "tablet", summary: "Air 13, Pro 13" },
         { device: "ipad-mini", name: "iPad mini", glyph: "tablet" },
         { device: "iphone", name: "iPhone", glyph: "smartphone", summary: "15, 16" },
-        { device: "iphone-max", name: "iPhone Pro Max", glyph: "smartphone" }]
+        { device: "iphone-max", name: "iPhone Pro Max", glyph: "smartphone" },
+        { device: "macbook-16", name: "MacBook Pro 16-inch", glyph: "laptop", summary: "2021 and later" },
+        { device: "display-4k", name: "4K display", glyph: "monitor", summary: "3840 × 2160 · looks like 1920 × 1080" }]
     // Other device's form filled in one go: common screens
     readonly property var common: [
         { w: 2560, h: 1600, name: "tablet", label: "Android tablet", glyph: "tablet", summary: "Tab S9, Pixel" },
@@ -38,14 +41,17 @@ Item {
     property int formH: 0
     property real formScale: 0                // 0 = the suggested one (suggest)
     property string formName: ""              // "" = tablet, phone or laptop, from its shape
+    property string editing: ""               // the device whose size the form changes, "" = adding one
 
     readonly property var levels: ["vncadd", "vncother", "vncscale"]
     readonly property var inputs: ["vncother"]   // its fields: ⌘⇧V pastes into them (ClipPicker)
-    readonly property var titles: ({ vncadd: "Settings › Other displays › Add a display", vncother: "Settings › Other displays › Add a display › Other device",
-                                     vncscale: "Settings › Other displays › Add a display › Other device › Scale" })
-    readonly property var parents: ({ vncadd: "otherdisplays", vncother: "vncadd", vncscale: "vncother" })
+    readonly property string formTitle: editing !== "" ? "Settings › Other displays › " + label(editing) + " › Size"
+                                                       : "Settings › Other displays › Add a display › Other device"
+    readonly property var titles: ({ vncadd: "Settings › Other displays › Add a display", vncother: formTitle, vncscale: formTitle + " › Scale" })
+    readonly property var parents: ({ vncadd: "otherdisplays", vncother: editing !== "" ? "vncdevice" : "vncadd", vncscale: "vncother" })
 
-    function label(n) { return /^ip(ad|hone)/.test(n) ? n.replace(/^ipad/, "iPad").replace(/^iphone/, "iPhone") : n.charAt(0).toUpperCase() + n.slice(1) }
+    // The device page's spelling (iPad, MacBook), so both levels name a device alike
+    function label(n) { return display() ? display().label(n) : n }
     function display() { return launcher.pluginExts.find(e => e.levels.indexOf("vncdevice") >= 0) || null }
     // ipad, then ipad2, ipad3…: `add` refuses a name that's taken
     function freeName(base) {
@@ -64,9 +70,11 @@ Item {
     readonly property string useName: formName || (formW > 0 && formW < formH ? "phone" : "tablet")
     function looks(s) { return Math.round(formW / s) + " × " + Math.round(formH / s) }
 
-    function footer(level, query) {
+    function footer(level) {
         if (level === "vncadd") return "Enter: add, and turn its display on"
-        if (level === "vncother") return launcher.fieldRow ? (query.trim() !== "" ? "Enter: set" : "Type the value") : "Enter: change, or add the display"
+        // The same on a field's row: its box and caret say what to do, and an empty footer would hide the line, the card
+        // jumping as Tab goes from row to row
+        if (level === "vncother") return editing !== "" ? "Enter: change, or set the size" : "Enter: change, or add the display"
         return ""
     }
     function opened() { listProc.running = true }
@@ -75,12 +83,20 @@ Item {
         if (level === "vncadd") { netProc.running = true; listProc.running = true }
     }
     function shiftActivate(it) {}
-    // Leaving Add for Display: the next Add starts afresh
+    // Leaving Add for Display, or the size form for the device's page: the next form starts afresh
     Connections {
         target: a.launcher
         function onLevelChanged() {
-            if (a.launcher.level === "otherdisplays") { a.home = false; a.formW = 0; a.formH = 0; a.formScale = 0; a.formName = "" }
+            const l = a.launcher.level
+            if (l === "otherdisplays" || l === "vncdevice") { a.home = false; a.formW = 0; a.formH = 0; a.formScale = 0; a.formName = ""; a.editing = "" }
         }
+    }
+    // The device page's Size (VncDisplayLevels.qml): the form with what the device has now
+    function edit(d) {
+        const m = String(d.size || "").match(/^(\d+)x(\d+)/)
+        editing = d.name; error = ""
+        formW = m ? +m[1] : 0; formH = m ? +m[2] : 0; formScale = d.scale || 0
+        launcher.go("vncother")
     }
 
     function items(level, q) {
@@ -105,10 +121,10 @@ Item {
                            summary: formH ? formH + " px" : "", placeholder: "pixels" },
                          { kind: "nav", name: "Scale", glyph: "zoom-in", target: "vncscale",
                            summary: sized ? "looks like " + looks(useScale) + " · " + useScale : "–" },
-                         { kind: "vncfield", key: "name", field: true, name: "Name", glyph: "tag", summary: useName },
-                         { kind: "vncform", name: "Add the display", glyph: "plus", dimmed: !sized,
-                           summary: sized ? undefined : "its width and height first" },
-                         { kind: "header", name: "Common sizes" }]
+                         editing !== "" ? null : { kind: "vncfield", key: "name", field: true, name: "Name", glyph: "tag", summary: useName },
+                         { kind: "vncform", name: editing !== "" ? "Set the size" : "Add the display", glyph: editing !== "" ? "check" : "plus",
+                           dimmed: !sized, summary: sized ? undefined : "its width and height first" },
+                         { kind: "header", name: "Common sizes" }].filter(r => r !== null)
                 .concat(common.map(c => ({ kind: "vncfill", c: c, name: c.label, glyph: c.glyph,
                                            summary: (c.summary ? c.summary + " · " : "") + c.w + " × " + c.h }))))
         }
@@ -141,6 +157,7 @@ Item {
         }
         if (it.kind === "vncform") {
             if (!sized) { l.shakeNow(); return true }
+            if (editing !== "") { resize(); return true }
             add(formW + "x" + formH + "@" + useScale, formName ? formName : freeName(useName))
             return true
         }
@@ -167,9 +184,18 @@ Item {
         cmd.script = '"' + cmdPath + '" add ' + device + " " + name + (home ? " --home" : "")
         cmd.running = true
     }
+    // The device's new size, then back to its page; a connected device reconnects to it
+    function resize() {
+        if (cmd.running) return
+        launcher.keepSelection()
+        busy = "Changing the size…"; error = ""
+        cmd.added = ""
+        cmd.script = '"' + cmdPath + '" size ' + editing + " " + formW + "x" + formH + "@" + useScale
+        cmd.running = true
+    }
     Sh {
         id: cmd
-        property string added: ""
+        property string added: ""             // the device added, "" for a resize
         onResult: text => {
             const l = a.launcher
             l.keepSelection()
@@ -181,6 +207,7 @@ Item {
             }
             listProc.running = true
             const d = a.display()
+            if (cmd.added === "") { if (d) d.refresh(); if (l.level === "vncother") l.back(); return }
             if (d && (l.level === "vncadd" || l.level === "vncother")) { d.cur = cmd.added; d.refresh(); l.go("vncdevice") }
         }
     }
