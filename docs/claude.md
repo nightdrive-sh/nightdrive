@@ -52,7 +52,7 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   choice of your own; picking a level again puts them back to the level's (it asks first). An app's area shows while
   the app is installed.
 - **An area's own choices**, in its details (›), are on or off, and the level sets them too: off on Strict and Normal, on
-  on Open (but *Remove what Nightdrive needs*, off on every level). Space turns the picked one on or off;
+  on Open (but *Remove what Nightdrive needs*, off on every level, and Contacts' parts of a card, below). Space turns the picked one on or off;
   `nightdrive mcp access option home-assistant unlock on` in a terminal.
   Home Assistant has three:
   - *Unlock and open*: off, Claude only locks locks and closes covers (doors, gates, blinds). Opening is yours.
@@ -63,6 +63,13 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
 
   Its card also shows the device's name and room from Home Assistant beside the id Claude gave, so `switch.sonoff_…`
   can't hide the oven.
+
+  Contacts has a box for each part of a card beside the name: *Company*, *Job title*, *Email addresses* and *Phone
+  numbers*, on on Normal, as they are what Claude needs to write or call someone; *Street addresses*, *Birthday*, *Web
+  addresses* and *Note*, off on Normal, as they are other people's. A part that is off isn't given, nor searched or
+  looked up by: Claude can't find who a number or a street belongs to. A note, when on, comes with card numbers, codes
+  and passwords masked. Claude's search needs a word of two characters or more and gives at most 25 people, so the
+  address book isn't read a letter at a time.
 
   What's on screen has a list instead, empty on every level: *Apps it sees without asking*. Its rows are the apps open
   now, and Space or a click ticks one. Claude's picture of a window asks each time on Normal, and the card names the
@@ -103,7 +110,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | --- | --- | --- | --- |
 | Docs and status | the docs and keys of this version, the version, plugins, displays | undo Claude's own changes | |
 | Mail | **unread, search, threads, accounts** | a new draft, archive; send a draft † | **to Trash †** |
-| Contacts | **search, a card** | | |
+| Contacts | **search, a card** (company, title, emails, numbers; addresses, birthday, web addresses, note: choices) | | |
 | Calendar | **calendars, events** | add an event | **an event †** |
 | Tasks | lists and tasks | add, done, later | **to the trash** |
 | Notes | **list, search, read (`~/Notes`)** | a new note, add to the end of one | **to the trash** |

@@ -35,10 +35,20 @@ AppPanel {
         return out
     }
     property int pick: 0
+    readonly property int margin: 24    // the window's edge to the card when it scrolls
+    // The picked choice stays in view as ↑ ↓ move it
+    onPickChanged: Qt.callLater(() => {
+        const item = choiceRows.itemAt(pick)
+        if (!item) return
+        const y = item.mapToItem(body, 0, 0).y
+        if (y < scroll.contentY) scroll.contentY = y
+        else if (y + item.height > scroll.contentY + scroll.height)
+            scroll.contentY = Math.min(y + item.height - scroll.height, scroll.contentHeight - scroll.height)
+    })
     cardWidth: 580
     visible: area !== null
     onOutsideTapped: area = null
-    onAreaChanged: pick = Math.max(0, picks.findIndex(p => !p.note))
+    onAreaChanged: { pick = Math.max(0, picks.findIndex(p => !p.note)); scroll.contentY = 0 }
 
     OpenApps { id: openApps }
 
@@ -69,121 +79,139 @@ AppPanel {
         e.accepted = true
     }
 
-    Row {
-        spacing: 10
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.area ? Icons.g(root.area.glyph) : ""; color: root.c.accent
-            font { family: Icons.family; pixelSize: 18 }
-        }
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.area ? root.area.name : ""; color: root.c.title
-            font { family: root.c.font; pixelSize: 16; weight: Font.DemiBold }
-        }
-    }
+    // The card grows with what it holds up to the window's height, and scrolls past it: a short window (or Contacts'
+    // eight choices, #1789) would push the rights and the last choices out of sight, as the kit's panel doesn't scroll
+    Flickable {
+        id: scroll
+        width: parent.width
+        height: Math.min(body.implicitHeight, Math.max(160, root.height - 72 - 2 * root.margin))
+        contentHeight: body.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        TouchScroll { view: scroll }
 
-    Repeater {
-        model: root.area ? Words.RIGHTS.filter(r => root.area.rights[r]) : []
         Column {
-            id: right
-            required property string modelData
-            readonly property var info: root.area.rights[modelData]
-            width: parent.width
-            spacing: 4
-            Text {
-                text: Words.RIGHT_NAMES[right.modelData] + " · " + Words.state(right.modelData, right.info)
-                      + (right.info.own ? "  (your own; the level's is " + Words.VALUE_NAMES[right.info.preset] + ")" : "")
-                color: right.info.value === "ask" ? Theme.warning : root.c.text
-                font { family: root.c.font; pixelSize: 13; weight: Font.DemiBold }
+            id: body
+            width: scroll.width
+            spacing: 18
+            Row {
+                spacing: 10
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.area ? Icons.g(root.area.glyph) : ""; color: root.c.accent
+                    font { family: Icons.family; pixelSize: 18 }
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.area ? root.area.name : ""; color: root.c.title
+                    font { family: root.c.font; pixelSize: 16; weight: Font.DemiBold }
+                }
             }
-            Text {
-                visible: !!right.info.words
+
+            Repeater {
+                model: root.area ? Words.RIGHTS.filter(r => root.area.rights[r]) : []
+                Column {
+                    id: right
+                    required property string modelData
+                    readonly property var info: root.area.rights[modelData]
+                    width: parent.width
+                    spacing: 4
+                    Text {
+                        text: Words.RIGHT_NAMES[right.modelData] + " · " + Words.state(right.modelData, right.info)
+                              + (right.info.own ? "  (your own; the level's is " + Words.VALUE_NAMES[right.info.preset] + ")" : "")
+                        color: right.info.value === "ask" ? Theme.warning : root.c.text
+                        font { family: root.c.font; pixelSize: 13; weight: Font.DemiBold }
+                    }
+                    Text {
+                        visible: !!right.info.words
+                        width: parent.width
+                        text: "Claude " + right.info.words + "."
+                        wrapMode: Text.Wrap
+                        color: root.c.dim
+                        font { family: root.c.font; pixelSize: 12 }
+                    }
+                    Repeater {
+                        model: right.info.tools
+                        Text {
+                            required property var modelData
+                            x: 12
+                            width: right.width - 12
+                            text: "• " + modelData.title
+                                  + (modelData.asks ? "  — always asks" : modelData.undo ? "  — with Undo" : "")
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            color: root.c.text
+                            font { family: root.c.font; pixelSize: 12 }
+                        }
+                    }
+                }
+            }
+
+            // The area's own choices: what its tools may do within the rights above
+            Column {
+                visible: root.options.length > 0
                 width: parent.width
-                text: "Claude " + right.info.words + "."
+                spacing: 4
+                Text {
+                    text: "Choices"
+                    color: root.c.text
+                    font { family: root.c.font; pixelSize: 13; weight: Font.DemiBold }
+                }
+                Repeater {
+                    id: choiceRows
+                    model: root.picks
+                    Column {
+                        id: pickRow
+                        required property var modelData
+                        required property int index
+                        width: parent.width
+                        spacing: 2
+                        Text {
+                            visible: !!pickRow.modelData.heading
+                            width: parent.width
+                            topPadding: pickRow.index > 0 ? 8 : 0
+                            text: pickRow.modelData.heading ? pickRow.modelData.heading.name : ""
+                            color: root.c.text
+                            font { family: root.c.font; pixelSize: 13 }
+                        }
+                        Text {
+                            visible: !!pickRow.modelData.heading && !!pickRow.modelData.heading.words
+                            width: parent.width
+                            bottomPadding: 2
+                            text: pickRow.modelData.heading ? pickRow.modelData.heading.words || "" : ""
+                            wrapMode: Text.Wrap
+                            color: root.c.dim
+                            font { family: root.c.font; pixelSize: 12 }
+                        }
+                        Text {
+                            visible: !!pickRow.modelData.note
+                            x: 8
+                            width: parent.width - 8
+                            text: pickRow.modelData.note || ""
+                            wrapMode: Text.Wrap
+                            color: root.c.faint
+                            font { family: root.c.font; pixelSize: 12 }
+                        }
+                        OptionRow {
+                            visible: !pickRow.modelData.note
+                            width: parent.width
+                            c: root.c
+                            option: pickRow.modelData.row || ({})
+                            picked: pickRow.index === root.pick
+                            onToggled: root.toggle(pickRow.index)
+                        }
+                    }
+                }
+            }
+
+            Text {
+                visible: !!root.area && !!root.area.rights.read && root.area.rights.read.value !== "no"
+                width: parent.width
+                text: "What these read goes to Anthropic with Claude's answer."
                 wrapMode: Text.Wrap
                 color: root.c.dim
                 font { family: root.c.font; pixelSize: 12 }
             }
-            Repeater {
-                model: right.info.tools
-                Text {
-                    required property var modelData
-                    x: 12
-                    width: right.width - 12
-                    text: "• " + modelData.title
-                          + (modelData.asks ? "  — always asks" : modelData.undo ? "  — with Undo" : "")
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                    color: root.c.text
-                    font { family: root.c.font; pixelSize: 12 }
-                }
-            }
         }
-    }
-
-    // The area's own choices: what its tools may do within the rights above
-    Column {
-        visible: root.options.length > 0
-        width: parent.width
-        spacing: 4
-        Text {
-            text: "Choices"
-            color: root.c.text
-            font { family: root.c.font; pixelSize: 13; weight: Font.DemiBold }
-        }
-        Repeater {
-            model: root.picks
-            Column {
-                id: pickRow
-                required property var modelData
-                required property int index
-                width: parent.width
-                spacing: 2
-                Text {
-                    visible: !!pickRow.modelData.heading
-                    width: parent.width
-                    topPadding: pickRow.index > 0 ? 8 : 0
-                    text: pickRow.modelData.heading ? pickRow.modelData.heading.name : ""
-                    color: root.c.text
-                    font { family: root.c.font; pixelSize: 13 }
-                }
-                Text {
-                    visible: !!pickRow.modelData.heading && !!pickRow.modelData.heading.words
-                    width: parent.width
-                    bottomPadding: 2
-                    text: pickRow.modelData.heading ? pickRow.modelData.heading.words || "" : ""
-                    wrapMode: Text.Wrap
-                    color: root.c.dim
-                    font { family: root.c.font; pixelSize: 12 }
-                }
-                Text {
-                    visible: !!pickRow.modelData.note
-                    x: 8
-                    width: parent.width - 8
-                    text: pickRow.modelData.note || ""
-                    wrapMode: Text.Wrap
-                    color: root.c.faint
-                    font { family: root.c.font; pixelSize: 12 }
-                }
-                OptionRow {
-                    visible: !pickRow.modelData.note
-                    width: parent.width
-                    c: root.c
-                    option: pickRow.modelData.row || ({})
-                    picked: pickRow.index === root.pick
-                    onToggled: root.toggle(pickRow.index)
-                }
-            }
-        }
-    }
-
-    Text {
-        visible: !!root.area && !!root.area.rights.read && root.area.rights.read.value !== "no"
-        width: parent.width
-        text: "What these read goes to Anthropic with Claude's answer."
-        wrapMode: Text.Wrap
-        color: root.c.dim
-        font { family: root.c.font; pixelSize: 12 }
     }
 }

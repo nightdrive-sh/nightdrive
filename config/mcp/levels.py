@@ -39,6 +39,18 @@ OPTIONS = {
         "automations": {"strict": False, "normal": False, "open": True},
         "presence": {"strict": False, "normal": False, "open": True},
     },
+    # Contacts (log 3303): what finds the person and reaches them, as writing or calling is what Claude needs them
+    # for; where they live, their birthday and the note are other people's and stay out
+    "contacts": {
+        "company": {"strict": False, "normal": True, "open": True},
+        "title": {"strict": False, "normal": True, "open": True},
+        "emails": {"strict": False, "normal": True, "open": True},
+        "phones": {"strict": False, "normal": True, "open": True},
+        "addresses": {"strict": False, "normal": False, "open": True},
+        "birthday": {"strict": False, "normal": False, "open": True},
+        "urls": {"strict": False, "normal": False, "open": True},
+        "note": {"strict": False, "normal": False, "open": True},
+    },
     # Software (log 3302): Fedora's own repositories and Flathub's verified apps only, as a name one letter off or an
     # unknown publisher is how a bad package gets in; never removing what the desktop runs on, not even on Open (the
     # user may turn it on); Nightdrive's own plugins only, as another's installer runs its code
