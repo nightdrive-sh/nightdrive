@@ -43,18 +43,22 @@ end
 
 -- Each screen's place as exact coordinates, side by side outwards in the file's order (the first added is next to the
 -- desk). Not auto-left and the like: with two on one side Hyprland places one twice, and its top bar and wallpaper stay
--- where it was first, leaving the screen grey.
-local function positions(list, bounds)
+-- where it was first, leaving the screen grey. Only the screens there now take a slot: one exists only while its device
+-- is connected, and an empty slot between the desk and the next one out would keep the pointer from crossing to it. One
+-- not there gets the place just past them, where it would come; its coming or going reloads this, moving the others.
+local function positions(list, bounds, present)
     local out, used = {}, { right = 0, left = 0, above = 0, below = 0 }
     for _, d in ipairs(list) do
         local side = d.place == "beside" and "right" or d.place
         local w, h = d.mode:match("^(%d+)x(%d+)")
         if bounds and used[side] and w then
             w, h = math.floor(tonumber(w) / d.scale + 0.5), math.floor(tonumber(h) / d.scale + 0.5)
-            if side == "right" then out[d.name] = (bounds.x1 + used.right) .. "x" .. bounds.y0; used.right = used.right + w
-            elseif side == "left" then used.left = used.left + w; out[d.name] = (bounds.x0 - used.left) .. "x" .. bounds.y0
-            elseif side == "above" then used.above = used.above + h; out[d.name] = bounds.x0 .. "x" .. (bounds.y0 - used.above)
-            else out[d.name] = bounds.x0 .. "x" .. (bounds.y1 + used.below); used.below = used.below + h end
+            local u = used[side]
+            if side == "right" then out[d.name] = (bounds.x1 + u) .. "x" .. bounds.y0; u = u + w
+            elseif side == "left" then u = u + w; out[d.name] = (bounds.x0 - u) .. "x" .. bounds.y0
+            elseif side == "above" then u = u + h; out[d.name] = bounds.x0 .. "x" .. (bounds.y0 - u)
+            else out[d.name] = bounds.x0 .. "x" .. (bounds.y1 + u); u = u + h end
+            if present[d.name] then used[side] = u end
         else
             out[d.name] = SIDES[d.place] or "auto-right"
         end
@@ -132,7 +136,7 @@ return function(deskPlaces, scales)
     local present = {}
     local monitors = hl.get_monitors() or {}
     for _, m in ipairs(monitors) do present[m.name] = true end
-    local placed = positions(displays, deskBounds(monitors, deskPlaces or {}, scales or {}))
+    local placed = positions(displays, deskBounds(monitors, deskPlaces or {}, scales or {}), present)
     local away = 0
     for _, d in ipairs(displays) do
         local position = placed[d.name]
