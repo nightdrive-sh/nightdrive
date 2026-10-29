@@ -9,7 +9,8 @@ apart (plan: Dashboard #1761, the model #1831; Normal is the security review's d
 Whatever the level, a tool with consequences (sending, devices, installing: class act) is at most Ask: Allow for its
 right still shows the card, since that card is all that stands between a mail Claude read and one it sends.
 
-An area's own choices (areas.py's options: Home Assistant's locks, #1830) are on or off by level too: OPTIONS.
+An area's own choices (areas.py's options: Home Assistant's locks, #1830; Software's sources, #1835) are on or off by
+level too: OPTIONS.
 """
 
 from areas import RIGHTS
@@ -37,6 +38,14 @@ OPTIONS = {
         "unlock": {"strict": False, "normal": False, "open": True},
         "automations": {"strict": False, "normal": False, "open": True},
         "presence": {"strict": False, "normal": False, "open": True},
+    },
+    # Software (log 3302): Fedora's own repositories and Flathub's verified apps only, as a name one letter off or an
+    # unknown publisher is how a bad package gets in; never removing what the desktop runs on, not even on Open (the
+    # user may turn it on); Nightdrive's own plugins only, as another's installer runs its code
+    "software": {
+        "any_source": {"strict": False, "normal": False, "open": True},
+        "nightdrive_packages": {"strict": False, "normal": False, "open": False},
+        "any_plugin": {"strict": False, "normal": False, "open": True},
     },
 }
 

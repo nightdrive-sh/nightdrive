@@ -3,7 +3,7 @@
     {
       "name": "software_search",
       "title": "Search software",
-      "description": "Find software to install, as the Launcher's Install › Software does: apps (from Fedora's packages, source dnf, or Flathub, source flatpak; Fedora's first when both have it, Flathub's then in also) and command-line tools (dnf), each with name, summary, source, id and whether it's installed. Use software_info for one's details, software_preview before installing.",
+      "description": "Find software to install, as the Launcher's Install › Software does: apps (from Fedora's packages, source dnf, or Flathub, source flatpak; Fedora's first when both have it, Flathub's then in also) and command-line tools (dnf), each with name, summary, source, id and whether it's installed. One you can't install (the user's Access: Fedora's own repositories and Flathub's verified apps only, unless they allow more) has claude_can_install false and why: the user installs that one from the Launcher. Use software_info for one's details, software_preview before installing.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -57,7 +57,7 @@
     {
       "name": "software_preview",
       "title": "What installing or removing would do",
-      "description": "What installing or removing a package or Flatpak app would change, without changing anything: packages, the list of every package it would install, upgrade or remove (\"name · repository\"; with dnf, its dependencies, and for a removal the packages that need it), and the disk space. Show the user this list, then give it as is to software_install or software_remove. Look closely at a removal's list: removing one package can take others the user needs along.",
+      "description": "What installing or removing a package or Flatpak app would change, without changing anything: packages, the list of every package it would install, upgrade or remove (\"name · repository\"; with dnf, its dependencies, and for a removal the packages that need it), and the disk space. When the user's Access doesn't let you make the change, it says so (claude_can_install or claude_can_remove false, and why): tell the user that instead of trying. Otherwise show the user this list, then give it as is to software_install or software_remove. Look closely at a removal's list: removing one package can take others the user needs along.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -76,7 +76,7 @@
     {
       "name": "software_install",
       "title": "Install software",
-      "description": "Install a package from Fedora's repositories (dnf) or an app from Flathub (flatpak, for this user), once the user allows it on Nightdrive's card. packages must be software_preview's list as it gave it: if it no longer is what would be installed, nothing is. dnf then asks for the password in the system's own dialog (polkit): never ask the user for it yourself. Returns state installed, or running when a big download takes more than a few minutes (software_info tells when it's done).",
+      "description": "Install a package from Fedora's repositories (dnf) or an app from Flathub (flatpak, for this user), once the user allows it on Nightdrive's card, which shows where it comes from. Unless the user's Access allows more, every package of it must come from Fedora's own repositories (or Nightdrive's), and a Flathub app's publisher must be verified: anything else the user installs from the Launcher. packages must be software_preview's list as it gave it: if it no longer is what would be installed, nothing is. dnf then asks for the password in the system's own dialog (polkit): never ask the user for it yourself. Returns state installed, or running when a big download takes more than a few minutes (software_info tells when it's done).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -89,6 +89,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "software", "install", "{source}", "{id}", "--check", "--json"],
+      "card": ["nightdrive", "software", "install", "{source}", "{id}", "--card", "--json"],
       "stdin": "json",
       "class": "act",
       "timeout": 300,
@@ -97,7 +98,7 @@
     {
       "name": "software_remove",
       "title": "Remove software",
-      "description": "Remove a package (dnf) or one of the user's Flatpak apps, once the user allows it on Nightdrive's card. packages must be software_preview's list as it gave it, with everything that goes along: if it no longer is what would be removed, nothing is. dnf then asks for the password in the system's own dialog (polkit): never ask the user for it yourself. A Flatpak app's own data in ~/.var/app stays.",
+      "description": "Remove a package (dnf) or one of the user's Flatpak apps, once the user allows it on Nightdrive's card. packages must be software_preview's list as it gave it, with everything that goes along: if it no longer is what would be removed, nothing is. dnf then asks for the password in the system's own dialog (polkit): never ask the user for it yourself. A Flatpak app's own data in ~/.var/app stays. Unless the user's Access allows it, nothing is removed whose list has a package Nightdrive installs (Hyprland, Quickshell, PipeWire, Firefox…): the desktop runs on them.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -110,6 +111,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "software", "remove", "{source}", "{id}", "--check", "--json"],
+      "card": ["nightdrive", "software", "remove", "{source}", "{id}", "--card", "--json"],
       "stdin": "json",
       "class": "act",
       "timeout": 300,
@@ -119,7 +121,7 @@
     {
       "name": "software_plugin_install",
       "title": "Install a Nightdrive plugin",
-      "description": "Install one of Nightdrive's plugins or apps (software_plugins), once the user allows it on Nightdrive's card: its installer opens in a terminal window, as from the Launcher's Install › Plugins, and asks the user there for what it needs (the password, tokens, choices); you wait until it's done. from must be where software_plugins says it comes from. Tell the user to look at the terminal window.",
+      "description": "Install one of Nightdrive's plugins or apps (software_plugins), once the user allows it on Nightdrive's card: its installer opens in a terminal window, as from the Launcher's Install › Plugins, and asks the user there for what it needs (the password, tokens, choices); you wait until it's done. from must be where software_plugins says it comes from: Nightdrive, unless the user's Access lets you install other repositories' plugins too. Tell the user to look at the terminal window.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -130,6 +132,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "software", "plugin-install", "{plugin}", "--check", "--json"],
+      "card": ["nightdrive", "software", "plugin-install", "{plugin}", "--card", "--json"],
       "stdin": "json",
       "class": "act",
       "timeout": 300,

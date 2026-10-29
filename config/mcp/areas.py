@@ -82,7 +82,24 @@ AREAS = {
     "software": {"name": "Software", "glyph": "package",
                  "read": "searches software, its details and what an install would change",
                  "modify": "installs packages, Flatpaks and Nightdrive's plugins",
-                 "delete": "removes packages and Flatpaks"},
+                 "delete": "removes packages and Flatpaks",
+                 "options": [
+                     {"id": "any_source", "name": "Install from any source",
+                      "on": "Claude may also install from repositories you added (RPM Fusion, COPRs, others) and "
+                            "Flathub apps whose publisher Flathub hasn't verified, on the card.",
+                      "off": "Claude installs only from Fedora's own repositories (and Nightdrive's) and Flathub's "
+                             "verified apps: the rest is yours to install from the Launcher."},
+                     {"id": "nightdrive_packages", "name": "Remove what Nightdrive needs",
+                      "on": "Claude may also remove a package Nightdrive installs (Hyprland, Quickshell, PipeWire, "
+                            "Firefox…), on the card: the desktop could stop working.",
+                      "off": "Claude can't remove a package Nightdrive installs, nor anything whose removal would "
+                             "take one along."},
+                     {"id": "any_plugin", "name": "Plugins from other repositories",
+                      "on": "Claude may also install a plugin from someone else's repository, on the card: its "
+                            "installer runs their code.",
+                      "off": "Claude installs only Nightdrive's own plugins: another repository's are yours to "
+                             "install."},
+                 ]},
 }
 
 

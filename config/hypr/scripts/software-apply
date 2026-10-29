@@ -4,14 +4,25 @@ software_remove in config/mcp/tools/software.json).
   software-apply preview install|remove dnf|flatpak ID [--json]   what it would install or remove (nothing changes)
   software-apply install|remove dnf|flatpak ID [--check] [--json]
   software-apply plugin-install ID [--check] [--json]   a plugin's installer, in a terminal window (it asks things there)
+  software-apply install|remove dnf|flatpak ID --card, plugin-install ID --card   changes nothing: what Claude's
+      confirmation card shows of it, as JSON (where it comes from), or an error when Access doesn't allow it
 dnf runs through pkexec: the password goes to the system's own dialog (polkit), never through this command or its
 caller. Flatpak apps go to the user's own installation and need none. On a terminal it asks first; --check reads on stdin
 what the caller showed the user ({"packages": [...]} as preview gives it, or {"from": ...} for a plugin) and does nothing
 unless it is still what would happen, so Claude's confirmation card shows the real change.
-Waits WAIT seconds at most: a longer install goes on, and the answer says it is still running."""
+Waits WAIT seconds at most: a longer install goes on, and the answer says it is still running.
+Claude's calls keep to Settings › Claude › Access › Software (software-claude): its preview says what Claude can't
+install or remove, its card stops there, and install and remove refuse it again."""
 import json, os, re, subprocess, sys, tempfile, time
+from importlib.machinery import SourceFileLoader
+from importlib.util import module_from_spec, spec_from_loader
 
 HERE = os.path.dirname(os.path.realpath(__file__))
+# software-claude: what Access lets Claude install and remove (no .py: loaded by its path, no __pycache__ in the repo)
+sys.dont_write_bytecode = True
+_loader = SourceFileLoader("software_claude", os.path.join(HERE, "software-claude"))
+claude = module_from_spec(spec_from_loader("software_claude", _loader))
+_loader.exec_module(claude)
 NIGHTDRIVE = os.path.realpath(os.path.join(HERE, "../../../bin/nightdrive"))
 FLATHUB = "https://dl.flathub.org/repo/flathub.flatpakrepo"
 WAIT = 280                                 # seconds: inside the tool's 300 s timeout (run.py), the dialog's wait included
@@ -80,7 +91,31 @@ def preview(action, source, ident):
     if action not in ("install", "remove") or source not in ("dnf", "flatpak"):
         fail("preview install|remove dnf|flatpak ID")
     out = dnf_preview(action, ident) if source == "dnf" else flatpak_preview(action, ident)
-    return {"action": action, "source": source, "id": ident, **out}
+    out = {"action": action, "source": source, "id": ident, **out}
+    no = refusal(action, source, ident, out["packages"])
+    if no:                                    # Claude's: said before it asks the user anything
+        out.update({f"claude_can_{action}": False, "why": no})
+    return out
+
+
+def refusal(action, source, ident, packages):
+    """Why Access doesn't let Claude make this change; None when it does, or when it isn't Claude's"""
+    if action == "install":
+        return claude.install_refusal(source, ident, packages)
+    return claude.remove_refusal(packages)
+
+
+def card(plan):
+    """What Claude's confirmation card shows above its arguments: where it comes from, in words Claude didn't write"""
+    if plan["source"] == "flatpak":
+        who = claude.flathub({plan["id"]}).get(plan["id"])
+        out = {"From": f"Flathub, verified: {who}" if who else "Flathub, publisher not verified"}
+    else:
+        repos = sorted({claude.repo_name(r) for _, r in claude.rows(plan["packages"])})
+        out = {"From" if plan["action"] == "install" else "Installed from": ", ".join(repos)}
+    if plan["space"]:
+        out["Disk"] = plan["space"]
+    return out
 
 
 def checked(shown, now):
@@ -119,8 +154,13 @@ def tail(text, n=6):
     return "\n".join(lines[-n:])
 
 
-def apply(action, source, ident, check, as_json):
+def apply(action, source, ident, check, as_json, show=False):
     plan = preview(action, source, ident)
+    if plan.get("why"):                       # Access doesn't let Claude: preview() said why
+        fail(plan["why"])
+    if show:
+        print(json.dumps(card(plan), ensure_ascii=False))
+        return
     if check:
         checked(json.load(sys.stdin).get("packages"), plan["packages"])
     elif not asked(f"{action.capitalize()}:\n  " + "\n  ".join(plan["packages"]) + (f"\n{plan['space']}" if plan["space"] else "")):
@@ -150,7 +190,7 @@ def apply(action, source, ident, check, as_json):
     print(json.dumps(result, ensure_ascii=False) if as_json else f"{ident}: {result['state']}")
 
 
-def plugin_install(ident, check, as_json):
+def plugin_install(ident, check, as_json, show=False):
     found = json.loads(subprocess.run([os.path.join(HERE, "software"), "plugins", "--json"], capture_output=True,
                                       text=True).stdout or '{"plugins": []}')["plugins"]
     p = next((x for x in found if x["id"] == ident), None)
@@ -158,6 +198,12 @@ def plugin_install(ident, check, as_json):
         fail(f"No plugin {ident} (software plugins lists them)")
     if p["installed"] and p["on"]:
         fail(f"{p['name']} is already installed and on")
+    no = claude.plugin_refusal(p["name"], p["from"])
+    if no:
+        fail(no)
+    if show:
+        print(json.dumps({"Plugin": p["name"], "Comes from": p["from"]}, ensure_ascii=False))
+        return
     if check and json.load(sys.stdin).get("from") != p["from"]:
         fail(f"Nothing was done: {p['name']} comes from {p['from']}, not from what was shown. Ask again with that.")
     if not os.environ.get("WAYLAND_DISPLAY"):
@@ -185,8 +231,8 @@ def plugin_install(ident, check, as_json):
 
 
 def main(argv):
-    check, as_json = "--check" in argv, "--json" in argv
-    args = [a for a in argv if a not in ("--check", "--json")]
+    check, as_json, show = "--check" in argv, "--json" in argv, "--card" in argv
+    args = [a for a in argv if a not in ("--check", "--json", "--card")]
     if len(args) == 4 and args[0] == "preview":
         r = preview(*args[1:])
         if as_json:
@@ -194,11 +240,11 @@ def main(argv):
         else:
             print("\n".join(r["packages"]) + (f"\n{r['space']}" if r["space"] else ""))
     elif len(args) == 3 and args[0] in ("install", "remove") and args[1] in ("dnf", "flatpak"):
-        apply(args[0], args[1], args[2], check, as_json)
+        apply(args[0], args[1], args[2], check, as_json, show)
     elif len(args) == 2 and args[0] == "plugin-install":
-        plugin_install(args[1], check, as_json)
+        plugin_install(args[1], check, as_json, show)
     else:
-        print("\n".join(__doc__.split("\n")[2:5]), file=sys.stderr)
+        print("\n".join(__doc__.split("\n")[2:7]), file=sys.stderr)
         sys.exit(2)
 
 

@@ -51,7 +51,8 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   choice of your own; picking a level again puts them back to the level's (it asks first). An app's area shows while
   the app is installed.
 - **An area's own choices**, in its details (›), are on or off, and the level sets them too: off on Strict and Normal, on
-  on Open. Space turns the picked one on or off; `nightdrive mcp access option home-assistant unlock on` in a terminal.
+  on Open (but *Remove what Nightdrive needs*, off on every level). Space turns the picked one on or off;
+  `nightdrive mcp access option home-assistant unlock on` in a terminal.
   Home Assistant has three:
   - *Unlock and open*: off, Claude only locks locks and closes covers (doors, gates, blinds). Opening is yours.
   - *Turn automations on or off*: off, Claude can run an automation but not stop one from running by itself (a leak
@@ -61,6 +62,17 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
 
   Its card also shows the device's name and room from Home Assistant beside the id Claude gave, so `switch.sonoff_…`
   can't hide the oven.
+
+  Software has three. What they leave out you install or remove yourself: the Launcher's Install and Remove are as
+  they were.
+  - *Install from any source*: off, every package of an install, dependencies too, comes from Fedora's own
+    repositories, Nightdrive's COPR or, on a Mac, Fedora Asahi Remix's; a Flathub app's publisher is verified. Not RPM
+    Fusion, other COPRs or repositories you added. Claude's search marks what it can't install.
+  - *Remove what Nightdrive needs*: off, nothing goes that Nightdrive installs (Hyprland, Quickshell, PipeWire, Firefox,
+    kitty…, the lists `install.sh` uses), nor what would take one along.
+  - *Plugins from other repositories*: off, Claude installs only Nightdrive's own plugins.
+
+  Its card says where the software comes from (Fedora, Flathub and whom it verified).
 
 Sending, devices and installing **always ask**, whatever the level or your choice: where all of an area's Modify or
 Delete is such, the choice is only *Ask* or *No*. What Claude reads goes to Anthropic with its answer.
@@ -96,7 +108,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output, brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** | | |
 | Apps and files | windows, newest files | open an app or a file, bring a window forward; open a web address † | **files to the trash** |
-| Software | search, details, what an install would change | install a package, Flatpak or plugin † | **remove a package or Flatpak †** |
+| Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
 
 ## What Claude never gets
 
