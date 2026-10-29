@@ -24,6 +24,7 @@ import cards
 
 LIMIT = 25      # find's default, and the most Claude gets: enough to pick from, short enough to read
 SHORTEST = 2    # Claude's search needs a word at least this long
+SHORTEST_NUMBER = 3   # …or a number of this many digits: "+3" is in every Finnish number, as a letter is in most names
 FIELDS = ("company", "title", "emails", "phones", "addresses", "birthday", "urls", "note")   # Access's choices
 CHOICE = {"org": "company"}   # a key of the JSON named apart from its choice; keys that are no choice always go
 
@@ -91,9 +92,14 @@ def whole(p):
 
 def find(query, limit):
     words = [needle(w) for w in query.lower().split()]
-    if SHOWN is not None and max(map(len, words), default=0) < SHORTEST:
+    def enough(w):
+        if re.fullmatch(r"\+?\d*", w):
+            return len(w.lstrip("+")) >= SHORTEST_NUMBER
+        return len(w) >= SHORTEST
+    if SHOWN is not None and not any(map(enough, words)):
         # A letter (or 0, which a number's needle drops) finds most of the book: Claude searches for someone
-        raise LookupError(f"Search with a name or a word of at least {SHORTEST} characters, not single letters.")
+        raise LookupError(f"Search with a name or a word of at least {SHORTEST} characters, or {SHORTEST_NUMBER} "
+                          "digits of a number, not single letters.")
     found = [p for p in everyone() if all(w in haystack(p) for w in words)]
     return {"query": query, "count": len(found), "people": [brief(p) for p in found[:limit]]}
 

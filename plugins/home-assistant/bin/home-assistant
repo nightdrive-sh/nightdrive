@@ -72,6 +72,9 @@ SET = {**{d: {"on": (d, "turn_on"), "off": (d, "turn_off")} for d in SWITCHED},
        "scene": {"run": ("scene", "turn_on")}, "script": {"run": ("script", "turn_on")},
        "button": {"run": ("button", "press")}, "input_button": {"run": ("input_button", "press")}}
 SET["automation"]["run"] = ("automation", "trigger")
+# automation.trigger skips the automation's conditions unless told not to: run as it would run by itself, so "only
+# when someone is home" or "only at night" still hold (#1866)
+SERVICE_DATA = {("automation", "trigger"): {"skip_condition": False}}
 
 # What each of Access's Home Assistant choices allows Claude (config/mcp/areas.py): (domain, state) → option
 NEEDS = {("lock", "unlock"): "unlock", ("cover", "open"): "unlock",
@@ -81,6 +84,10 @@ NEEDS = {("lock", "unlock"): "unlock", ("cover", "open"): "unlock",
 # home, the Wi-Fi it's on, whether its owner walks or drives), by the ids the app gives them
 PRESENCE = {"presence", "occupancy", "motion"}
 WHEREABOUTS = re.compile(r"_(geocoded_location|distance|ssid|bssid|activity|direction_of_travel)(_\d+)?$")
+# …and those that say it by their name, without a class: a template binary_sensor.jari_home, "Someone home" (#1866).
+# A word of the id or the name; a sensor's "home" is a place's (sensor.home_temperature), so not counted there
+PRESENCE_WORDS = {"presence", "occupancy", "occupied", "motion", "away", "location", "whereabouts", "someone",
+                  "anyone", "nobody", "läsnä", "läsnäolo", "kotona", "poissa", "liike", "paikalla", "sijainti"}
 ENTITY = re.compile(r"[a-z_]+\.[a-z0-9_]+")
 
 
@@ -102,9 +109,11 @@ def allowed(option):
 
 
 def presence(domain, eid, attrs):
+    name = attrs.get("friendly_name") if isinstance(attrs.get("friendly_name"), str) else ""
+    words = set(re.split(r"[\W_]+", f"{eid.partition('.')[2]} {name}".lower())) - {""}
     if domain == "binary_sensor":
-        return attrs.get("device_class") in PRESENCE
-    return domain == "sensor" and bool(WHEREABOUTS.search(eid))
+        return attrs.get("device_class") in PRESENCE or bool(words & (PRESENCE_WORDS | {"home"}))
+    return domain == "sensor" and (bool(WHEREABOUTS.search(eid)) or bool(words & PRESENCE_WORDS))
 
 
 def die(msg, code=1):
@@ -383,7 +392,7 @@ def set_state(c, eid, state, check=False):
         card(c, eid, before)
         return
     svc = choices[state]
-    changed = c.call("POST", f"/api/services/{svc[0]}/{svc[1]}", {"entity_id": eid})
+    changed = c.call("POST", f"/api/services/{svc[0]}/{svc[1]}", {"entity_id": eid, **SERVICE_DATA.get(svc, {})})
     # The service answers with the states it changed; one that changes later (a cover moving) isn't there yet
     now = next((s for s in changed if s.get("entity_id") == eid), None) if isinstance(changed, list) else None
     now = now or c.call("GET", "/api/states/" + eid) or before

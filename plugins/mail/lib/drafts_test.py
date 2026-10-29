@@ -6,6 +6,7 @@ that copy sends the draft, but a copy that says anything else in the code's plac
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -47,6 +48,36 @@ class Differences(unittest.TestCase):
 
     def test_missing_fields(self):
         self.assertEqual(drafts.differences(HAVE, {"from": HAVE["from"], "to": HAVE["to"]}), ["subject", "body"])
+
+
+class Bcc(unittest.TestCase):
+    """A draft another app wrote with Bcc isn't sent without them (#1866)."""
+
+    def send(self, headers):
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        for k, v in headers.items():
+            msg[k] = v
+        sent = []
+        with mock.patch.object(drafts, "read", lambda mid: (dict(HAVE, account="acc"), msg)), \
+                mock.patch.object(drafts.compose, "resume", lambda mid, m: {"body": BODY}), \
+                mock.patch.object(drafts.compose, "send", lambda f: sent.append(f) or {"id": "s@x.y"}):
+            try:
+                drafts.send("d1@x.y", dict(HAVE))
+            except LookupError as e:
+                return sent, str(e)
+        return sent, ""
+
+    def test_refused(self):
+        for bcc in ("boss@x.y", "Boss <boss@x.y>, b@c.d"):
+            sent, why = self.send({"To": "maija@b.c", "Bcc": bcc})
+            self.assertEqual(sent, [])
+            self.assertIn("Bcc", why)
+
+    def test_without(self):
+        for headers in ({"To": "maija@b.c"}, {"To": "maija@b.c", "Bcc": " "}):
+            sent, why = self.send(headers)
+            self.assertEqual((len(sent), why), (1, ""))
 
 
 if __name__ == "__main__":

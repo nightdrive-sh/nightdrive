@@ -67,7 +67,7 @@
     {
       "name": "open_address",
       "title": "Open an address",
-      "description": "Opens a web address (http, https) in the default browser, or a mailto: link in the mail app's composer (nothing is sent). Opening an address sends it to that site, so the user allows it on screen first. Not while the user is typing, as windows_focus.",
+      "description": "Opens a web address (http, https) in the default browser, or a mailto: link in the mail app's composer (nothing is sent; it may set to, cc, subject and body, nothing else). Opening an address sends it to that site, so the user allows it on screen first. Not while the user is typing, as windows_focus.",
       "inputSchema": {
         "type": "object",
         "properties": {

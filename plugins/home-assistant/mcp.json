@@ -19,7 +19,7 @@
     {
       "name": "home_assistant_set",
       "title": "Switch a Home Assistant device",
-      "description": "Put one Home Assistant device in a state: on or off (lights, switches, fans, climate, media players), close (covers), lock (locks), run (a scene, a script, a button; triggers an automation). The user's Access decides whether Claude may also open a cover, unlock a lock or turn an automation on or off: the states it allows are the ones listed, and the command refuses the rest. The user allows each call on Nightdrive's confirmation card first, which shows the device's name and room from Home Assistant and the new state; a refusal there is their answer. Find the device's id with home_assistant_states. Answers with the device's state afterwards.",
+      "description": "Put one Home Assistant device in a state: on or off (lights, switches, fans, climate, media players), close (covers), lock (locks), run (a scene, a script, a button; triggers an automation, whose conditions still apply). The user's Access decides whether Claude may also open a cover, unlock a lock or turn an automation on or off: the states it allows are the ones listed, and the command refuses the rest. The user allows each call on Nightdrive's confirmation card first, which shows the device's name and room from Home Assistant and the new state; a refusal there is their answer. Find the device's id with home_assistant_states. Answers with the device's state afterwards.",
       "inputSchema": {
         "type": "object",
         "properties": {

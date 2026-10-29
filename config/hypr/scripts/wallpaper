@@ -52,6 +52,12 @@ case ${1:-} in
         [[ $2 == /* ]] || { echo "an absolute path, please: $2" >&2; exit 1; }
         "$(dirname "$0")/files" check -- "$2" >/dev/null || exit 1
       fi
+      # By what it holds too, not its name alone: a key or a document renamed .png isn't copied into Pictures (#1866),
+      # checked after Claude's folders (no hint of what lies outside them). By the formats' own first bytes (JPEG
+      # ff d8 ff, PNG 89 50 4e 47, WebP RIFF….WEBP), so no `file` is needed
+      magic=$(head -c 12 -- "$f" 2>/dev/null | od -An -tx1 | tr -d ' \n')
+      [[ $magic == ffd8ff* || $magic == 89504e470d0a1a0a* || ( $magic == 52494646* && ${magic:16:8} == 57454250 ) ]] ||
+        { echo "not an image swaybg shows (its content isn't jpg, png or webp): $f" >&2; exit 1; }
       mkdir -p "$own"
       dst="$own/$(basename "$f")"; n=1
       while [[ -e $dst ]] && ! cmp -s "$f" "$dst"; do dst="$own/${f##*/}"; dst="${dst%.*}-$((++n)).${f##*.}"; done

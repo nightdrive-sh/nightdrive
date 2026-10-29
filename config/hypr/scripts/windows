@@ -14,15 +14,18 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
                                    refuses
   windows shot WINDOW [--out FILE] [--json] [--inline] [--check]
                                    a picture of a window on screen (PNG, at most MAX_EDGE px on its long side), never
-                                   of one Send to Claude leaves out, nor with one of those over it. Default FILE:
+                                   of one Send to Claude leaves out, nor with one of those or a layer surface (a menu,
+                                   a notification: not OWN_LAYERS) over it. Default FILE:
                                    $XDG_RUNTIME_DIR/nightdrive/windows/shot.png. --inline puts it in the JSON
                                    ({image: {mimeType, data}}, base64) instead of a file. --check takes none: it says
-                                   for Claude's card which window it would be ({App, Title}), and "ask": false when
+                                   for Claude's card which window it would be ({App, Title, Window}: the run refuses
+                                   when it would be another, NIGHTDRIVE_MCP_CARD), and "ask": false when
                                    the app is on the user's list of apps Claude sees without asking (Access › What's
                                    on screen; NIGHTDRIVE_MCP_OPTIONS's apps, from the MCP server)
   windows open [--app|--url] APP|URL [--json] [--unless-typing]
                                    an app (its name or desktop id, as the Launcher lists it; an open one is brought
-                                   forward) or an address (http, https, mailto: nothing else) in its default app.
+                                   forward) or an address (http, https, mailto: nothing else; a mailto: sets only
+                                   to, cc, subject and body) in its default app.
                                    Without --app or --url, an address is told by its scheme
   windows open --file PATH [--json]   a file or folder in its default app (files open checks the path first)
                                    --json: {kind, opened, launched, new, address, previous}: new is the window it
@@ -34,6 +37,7 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
 """
 import argparse, base64, configparser, json, os, re, subprocess, sys, time
 from pathlib import Path
+from urllib.parse import parse_qsl
 
 SCRIPTS = Path(__file__).resolve().parent
 WRITE = SCRIPTS / "claude-write"            # `claude-write blocked CLASS TITLE`: the windows nothing is sent from
@@ -45,6 +49,10 @@ POLL = 0.25
 QUIET = 2              # s without a key before Claude's tools move the focus (--unless-typing)
 QUIET_WAIT = 5         # s to wait for that quiet before refusing
 SCHEMES = ("http://", "https://", "mailto:")
+MAILTO_FIELDS = {"to", "cc", "subject", "body"}   # a mailto:'s query may set these, not attach= or bcc= (#1866)
+# Layer surfaces that are always mapped, mostly empty, and hold nothing of the user's: any other over a window (a menu,
+# a notification, the Wi-Fi password field, the launcher) stops a picture of it, as grim would take it along (#1866)
+OWN_LAYERS = {"wallpaper", "nightdrive-bar", "nightdrive-drawer", "nightdrive-garage-resizing", "claude-confirm"}
 BACKGROUND = "special:bg"
 
 
@@ -244,9 +252,36 @@ def listed(c, apps):
     return any(isinstance(v, str) and v.lower() in mine for v in listing)
 
 
+def layer_over(x, y, w, h):
+    """The namespace of a layer surface above windows (Top, Overlay) over the rectangle, not one of OWN_LAYERS."""
+    for monitor in (hypr("layers") or {}).values():
+        for level, layers in (monitor.get("levels") or {}).items():
+            if str(level) not in ("2", "3"):
+                continue
+            for l in layers:
+                lx, ly, lw, lh = (l.get(k, 0) for k in ("x", "y", "w", "h"))
+                if l.get("namespace") not in OWN_LAYERS and lx < x + w and x < lx + lw and ly < y + h and y < ly + lh:
+                    return l.get("namespace") or "a layer"
+    return None
+
+
+def card_said():
+    """What Claude's card said for this call (the MCP server's NIGHTDRIVE_MCP_CARD), or {}."""
+    try:
+        said = json.loads(os.environ.get("NIGHTDRIVE_MCP_CARD") or "{}")
+    except ValueError:
+        return {}
+    return said if isinstance(said, dict) else {}
+
+
 def cmd_shot(a):
     wins = clients()
     c = find_window(a.window, wins)
+    # By an app's name, the window is its latest: the card named one, and the user may have used another since
+    shown = card_said().get("Window")
+    if not a.check and shown and shown != c["address"]:
+        die(f"The window the card showed ({shown}) isn't {a.window}'s latest any more: no picture was taken. Ask "
+            "again with the window's address.")
     visible = on_screen_workspaces()
     if blocked(c):
         die("That window is left out, as Send to Claude leaves it out (a password manager, a private window, or an "
@@ -260,9 +295,13 @@ def cmd_shot(a):
         ox, oy = o["at"]; ow, oh = o["size"]
         if ox < x + w and x < ox + ow and oy < y + h and y < oy + oh and blocked(o):
             die("A window that is left out (a password manager, a private window…) is over it: no picture was taken.")
+    over = layer_over(x, y, w, h)
+    if over:
+        die(f"Something of the desktop's is over it ({over}: a menu, a notification, the launcher): no picture was "
+            "taken. Try again once it has gone.")
     if a.check:
         apps = entries()
-        card = {"App": app_name(c["class"], apps), "Title": c["title"] or "(no title)"}
+        card = {"App": app_name(c["class"], apps), "Title": c["title"] or "(no title)", "Window": c["address"]}
         print(json.dumps({**card, **({"ask": False} if listed(c, apps) else {})}, ensure_ascii=False))
         return
     scale = next((m["scale"] for m in hypr("monitors") if m["id"] == c.get("monitor")), 1)
@@ -334,6 +373,12 @@ def cmd_open(a):
     elif a.url or (not a.app and a.target.lower().startswith(SCHEMES)):
         if not a.target.lower().startswith(SCHEMES):  # no file://, javascript: or an app's own scheme that acts
             die(f"Only http, https and mailto addresses are opened, not {a.target!r}.")
+        if a.target.lower().startswith("mailto:"):
+            fields = {k.lower() for k, _ in parse_qsl(a.target.partition("?")[2], keep_blank_values=True)}
+            if fields - MAILTO_FIELDS:
+                die(f"A mailto: address may set {', '.join(sorted(MAILTO_FIELDS))}, not "
+                    f"{', '.join(sorted(fields - MAILTO_FIELDS))}: a composer could attach a file or add a hidden "
+                    "recipient by them.")
         out.update(kind="address", opened=a.target)
         launch(["gio", "open", a.target])
         print(json.dumps(out, ensure_ascii=False) if a.json else f"Opened {a.target}")

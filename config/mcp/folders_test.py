@@ -165,6 +165,18 @@ class Files(unittest.TestCase):
         self.assertEqual(self.run_files("trash", "--check", self.path("Lataukset/id.txt"), folders=self.NORMAL)[0], 0)
         self.assertEqual(self.run_files("check", self.path("Lataukset/id.txt"))[0], 0)
 
+    def test_wallpaper_by_content(self):
+        """A key renamed .png in Downloads isn't copied into Pictures as a wallpaper (#1866)."""
+        (self.home / ".local/share/wallpapers").mkdir(parents=True)
+        for name, data in (("key.png", b"-----BEGIN OPENSSH PRIVATE KEY-----\n"), ("x.webp", b"RIFF\0\0\0\0WAVE"),
+                           ("empty.jpg", b"")):
+            img = self.home / "Lataukset" / name
+            img.write_bytes(data)
+            status, _, err = self.run_files("set", str(img), folders=self.NORMAL, own=False, script="wallpaper")
+            self.assertNotEqual(status, 0)
+            self.assertIn("its content isn't jpg, png or webp", err)
+            self.assertFalse((self.home / "Kuvat/Wallpapers" / name).exists())
+
     def test_wallpaper_from_outside_refused(self):
         """Only the refusal: an allowed one would change the real wallpaper."""
         img = self.home / "Projects/x.png"

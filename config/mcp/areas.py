@@ -139,7 +139,8 @@ AREAS = {
                           SECRETS,
                           {"id": "apps", "name": "Apps whose notifications Claude doesn't see", "list": True,
                            "hides": True, "offer": "notifications", "item_words": "an app's name",
-                           "words": "Their notifications aren't among the latest Claude reads. Mail's of the mail "
+                           "words": "Their notifications aren't among the latest Claude reads: the name a "
+                                    "notification shows, exactly (a web app's may vary). Mail's of the mail "
                                     "Access › Mail blocks aren't either.",
                            "on": "Claude doesn't see its notifications.",
                            "off": "Claude sees its notifications."},
@@ -156,7 +157,8 @@ AREAS = {
                    {"id": "apps", "name": "Apps it sees without asking", "list": True, "offer": "windows",
                     "item_words": "a window class",
                     "words": "When reading asks, Claude takes a picture of these apps' windows without the card. "
-                             "Password managers and private windows never, listed or not.",
+                             "Password managers and private windows never, listed or not; a password manager's "
+                             "browser popup is part of a listed browser's window.",
                     "on": "Claude sees its windows without asking.",
                     "off": "Claude asks first."},
                ]},
@@ -170,7 +172,8 @@ AREAS = {
                         "item": FOLDER_ENTRY, "item_words": "a folder in home (~/Projects)",
                         "words": "Claude opens, finds, trashes and sends files (Ferry, a new wallpaper) only in "
                                  "these folders and those inside them, wherever a link points; hidden files never. "
-                                 "~/Projects isn't on Normal's: code and its keys. Notes and Mail keep their own.",
+                                 "~/Projects isn't on Normal's: code and its keys. Notes and Mail keep their own. "
+                                 "Ferry and the wallpaper keep to it also when Apps and files is No.",
                         "on": "Claude may use the files in it.",
                         "off": "Claude can't use its files."},
                    ]},

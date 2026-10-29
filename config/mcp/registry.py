@@ -290,6 +290,7 @@ class Registry:
         if tool is None:
             raise UnknownTool(name)
         run.check(tool, arguments)
+        tool.said = None   # what a card said is this call's alone (confirm.facts sets it)
         if self.rules.decide(tool.cls, tool.area, tool.right) == "ask":
             if self.confirm is None:
                 raise ToolError(f"{name} wasn't run: the user's Access asks before it, and this version doesn't "

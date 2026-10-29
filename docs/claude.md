@@ -62,9 +62,10 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   Home Assistant has three:
   - *Unlock and open*: off, Claude only locks locks and closes covers (doors, gates, blinds). Opening is yours.
   - *Turn automations on or off*: off, Claude can run an automation but not stop one from running by itself (a leak
-    alarm).
+    alarm). One Claude runs keeps its conditions ("only at night").
   - *Presence and location*: off, Claude doesn't get presence, occupancy or motion sensors, nor where your phones are
-    (Home Assistant's app: address, distance, Wi-Fi), which tell whether anyone is home.
+    (Home Assistant's app: address, distance, Wi-Fi), which tell whether anyone is home; nor a sensor whose name says
+    it (`binary_sensor.jari_home`, "Someone home").
 
   Its card also shows the device's name and room from Home Assistant beside the id Claude gave, so `switch.sonoff_…`
   can't hide the oven.
@@ -74,8 +75,8 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   addresses* and *Note*, off on Normal, as they are other people's. A part that is off isn't given, nor searched or
   looked up by: Claude can't find who a number or a street belongs to. A note, when on, and the company, title and
   nickname (a shared address book's are anyone's text) come with card numbers, codes and passwords masked. Claude's
-  search needs a word of two characters or more and gives at most 25 people, so the address book isn't read a letter
-  at a time.
+  search needs a word of two characters or more (a number three digits) and gives at most 25 people, so the address
+  book isn't read a letter at a time.
 
   Mail, Calendar, Notes, Ferry and Notifications have *Codes, card numbers and passwords*, off on every level: what
   Claude reads there comes with them hidden, before it leaves your computer. One-time codes and meeting passcodes
@@ -91,18 +92,23 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   What's on screen has a list instead, empty on every level: *Apps it sees without asking*. Its rows are the apps open
   now, and Space or a click ticks one. Claude's picture of a window asks each time on Normal, and the card names the
   app and the window's title; a ticked app's windows Claude sees without the card. Password managers and private
-  windows never, ticked or not. In a terminal: `nightdrive mcp access option screen apps add kitty` (a window class or
-  the app's name), `remove` to take it off.
+  windows never, ticked or not, nor a window with a menu, a notification or the launcher over it. A password manager's
+  browser extension pops up inside the browser's window, though: a picture of the browser shows it. The list of
+  windows names a private window's app (not its title), so Claude can tell a password manager is open. Asked for an
+  app's window by name, Claude gets the one the card showed, or none. In a terminal: `nightdrive mcp access option
+  screen apps add kitty` (a window class or the app's name), `remove` to take it off.
 
   Mail has a list too, empty at first: *Mail Claude never gets*. Type an address (`maija@example.com`), a domain
   (`bank.fi`, which takes `mail.bank.fi` along) or a tag (`tag:health`) in the field under it and press Enter; Space
   takes the picked one off. Mail from or to an address or domain on it, and mail with a tag on it, isn't in Claude's
-  unread, searches or threads: a thread shows only its other messages, and a draft can't answer one. Its
+  unread, searches or threads: a thread shows only its other messages, and a draft can't answer one. Claude can send or
+  throw away a draft you wrote too (the card shows all of it), but not one with Bcc, which Mail doesn't send. Its
   notifications are left out of the latest notifications as well, as they name the sender and the subject. Your own
   `nightmail` in a terminal still shows everything. `nightdrive mcp access option mail blocked add bank.fi`.
 
   Notifications has *Apps whose notifications Claude doesn't see*, empty at first: its rows are the apps in the
-  notification history. `nightdrive mcp access option notifications apps add Signal` (the name a notification shows).
+  notification history. `nightdrive mcp access option notifications apps add Signal` (the name a notification shows,
+  exactly: a web app whose notifications name it differently each time isn't caught).
 
   A list that hides can't be read (edited by hand, say): its area's Read goes to *No* until it is fixed.
 
@@ -115,8 +121,11 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   its own tools.
   The rows are home's own folders and those at its top, Space ticks one; type a deeper one (`~/Work/Invoices`) in the
   field. A refusal names the folders and this place. Notes, Mail, Calendar, Tasks and the wallpapers keep their own,
-  and Claude Code's own commands aren't limited by it. `nightdrive mcp access option apps-files folders add
-  ~/Projects`. A list that can't be read gives Claude no folder.
+  and Claude Code's own commands aren't limited by it. Ferry and the wallpaper keep to it even when Apps and files is
+  *No*. A new wallpaper must be a picture by its content too, not just its name. `nightdrive mcp access option
+  apps-files folders add ~/Projects`. A list that can't be read gives Claude no folder. A file is checked just before
+  it is opened or sent, so a program of yours that swaps it in that moment could get past the check; Claude's tools
+  can't.
 
   Software has three. What they leave out you install or remove yourself: the Launcher's Install and Remove are as
   they were.
@@ -127,7 +136,8 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
     kitty…, the lists `install.sh` uses), nor what would take one along.
   - *Plugins from other repositories*: off, Claude installs only Nightdrive's own plugins.
 
-  Its card says where the software comes from (Fedora, Flathub and whom it verified).
+  Its card says where the software comes from (Fedora, Flathub and whom it verified). Looking at what an install would
+  change asks Flathub about the app, as a search does.
 
 Sending, devices, installing and turning Do Not Disturb on (it hides alerts) **always ask**, whatever the level or
 your choice: where all of an area's Modify or Delete is such, the choice is only *Ask* or *No*. Turning it off is a

@@ -173,6 +173,10 @@ def environment(tool):
     # …and those of the areas its mcp.json names in options_from ({"mail": {"blocked": […]}}): what another area hides
     # mustn't come out through this one (#1789)
     env["NIGHTDRIVE_MCP_OPTIONS_FROM"] = json.dumps(getattr(tool, "options_from", None) or {})
+    # What its `card` command said for this call (confirm.facts), for the command to check it acts on that (#1866)
+    said = getattr(tool, "said", None)
+    if isinstance(said, dict):
+        env["NIGHTDRIVE_MCP_CARD"] = json.dumps(said, ensure_ascii=False)
     return env
 
 

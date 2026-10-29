@@ -151,6 +151,11 @@ def differences(have, shown):
 
 def send(msgid, shown=None):
     have, msg = read(msgid)
+    # A draft from another app may have Bcc, which Nightdrive Mail doesn't keep (compose.resume, build): it would go
+    # out without them, and the card wouldn't show that either (#1866)
+    if str(msg.get("Bcc", "")).strip():
+        raise LookupError("Not sent: the draft has Bcc recipients, which Nightdrive Mail doesn't send (they would be "
+                          "left out without a word). Send it from the app it was written in.")
     if shown is not None:
         wrong = differences(have, shown)
         if wrong:

@@ -139,6 +139,9 @@ def facts(tool, arguments):
     ask = rows.pop("ask", True) if isinstance(rows, dict) else True
     if not isinstance(rows, dict) or not all(isinstance(v, str) for v in rows.values()) or not isinstance(ask, bool):
         raise ToolError(f"{tool.name} wasn't run: its card command didn't print a JSON object of texts.")
+    # What the card said goes to the command that runs (run.environment: NIGHTDRIVE_MCP_CARD), which refuses when it
+    # would act on something else now: windows_view by an app's name, whose latest window changed meanwhile (#1866)
+    tool.said = dict(rows)
     by = tool.spec.get("unasked_by")
     chosen = (getattr(tool, "options", None) or {}).get(by) if isinstance(by, str) else None
     listed = kind(tool) not in ("act", "act-delete") and isinstance(chosen, list) and bool(chosen)
