@@ -18,7 +18,11 @@
                                    automation). Claude's home_assistant_set (mcp.json), after the user allows it
       --check                      changes nothing: checks the call and prints what the card shows of the device,
                                    {Device, Room, Now} from Home Assistant (mcp.json's card)
-  home-assistant brightness ID PCT sets a light's brightness, 0–100 (0 turns it off)
+  home-assistant brightness ID PCT sets a light's brightness, 0–100 (0 turns it off). Claude's home_assistant_brightness:
+                                   its calls take dimmable lights only and print {id, name, state, brightness}
+      --check                      changes nothing: {Device, Room, Now, New} for the card
+      --before                     changes nothing: {was_brightness} now, 0 when off (its undo sets that back)
+      --asks                       "yes": a device's change always asks on the card (mcp.json's asks_if)
   home-assistant fav ID [on|off]   pins a device to the top bar's Home menu (no on/off: flips it)
   home-assistant bar               the top bar module's state line (modules.jsonc format)
   home-assistant open              opens the Home Assistant webapp (focuses it if already open)
@@ -405,7 +409,7 @@ def area_of(c, eid):
     return area.strip() if isinstance(area, str) else ""
 
 
-def card(c, eid, now):
+def card(c, eid, now, extra=None):
     """The confirmation card's rows for this device, from Home Assistant: its name, room and state now. They stand
     beside the id Claude gave, so the user sees that switch.sonoff_1000a is the oven."""
     domain = eid.split(".", 1)[0]
@@ -425,7 +429,7 @@ def card(c, eid, now):
         # What it does can't be read, only what it's called: a script or a relay may open a door, which Access's
         # unlock choice covers for locks and covers alone (#1880)
         out["Note"] = "Its name says a door, gate or lock: this may open or unlock it"
-    print(json.dumps(out, ensure_ascii=False))
+    print(json.dumps({**out, **(extra or {})}, ensure_ascii=False))
 
 
 def set_state(c, eid, state, check=False):
@@ -463,12 +467,55 @@ def set_state(c, eid, state, check=False):
     print(json.dumps(out, ensure_ascii=False))
 
 
-def brightness(c, eid, pct):
+def percent(s):
+    """A light's brightness now, 0–100, as Home Assistant has it (0 when off)"""
+    b = s.get("attributes", {}).get("brightness") if s.get("state") == "on" else 0
+    return round((b or 0) / 2.55)
+
+
+def dimmable_light(c, eid):
+    """The light's state now, or a refusal in words for Claude: only a light with a brightness can be dimmed"""
+    if not ENTITY.fullmatch(eid):
+        die(f"{eid!r} isn't a Home Assistant id (light.kitchen): `home-assistant states` lists them")
+    if not eid.startswith("light."):
+        die(f"{eid} isn't a light: only a dimmable light has a brightness. home_assistant_set turns it on or off")
+    try:
+        now = c.call("GET", "/api/states/" + eid)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            die(f"Home Assistant has no {eid}: `home-assistant states` lists the devices")
+        raise
+    if now.get("state") in ("unavailable", "unknown"):
+        die(f"{eid} is {now['state']} in Home Assistant: its brightness can't be set now")
+    if not dimmable("light", now.get("attributes", {})):
+        die(f"{eid} can't be dimmed: it only turns on and off (home_assistant_set does that)")
+    return now
+
+
+def brightness(c, eid, pct, mode=None):
+    if mode == "--asks":   # no request: whatever the light, Claude dims it only once the user allows it
+        print("yes")
+        return
     pct = max(0, min(100, round(float(pct))))
+    # The launcher's drags go straight through; Claude's calls (and the card's and undo's reads) are checked first
+    now = dimmable_light(c, eid) if mode or claude_options() is not None else None
+    if mode == "--before":
+        print(json.dumps({"was_brightness": percent(now)}))
+        return
+    if mode == "--check":
+        card(c, eid, now, {"New": f"{pct}%" if pct else "off"})
+        return
     if pct == 0:
         c.call("POST", "/api/services/light/turn_off", {"entity_id": eid})
     else:
         c.call("POST", "/api/services/light/turn_on", {"entity_id": eid, "brightness_pct": pct})
+    if now is None:
+        return   # the launcher's: it reads the states again itself
+    # What was set, not what Home Assistant answers: a light reports its new brightness a moment later, so the
+    # service's answer (and a read right after) still has the old one (#1900)
+    out = {"id": eid, "name": now.get("attributes", {}).get("friendly_name") or eid, "state": "on" if pct else "off",
+           "brightness": pct}
+    print(json.dumps(out, ensure_ascii=False))
 
 
 def set_fav(eid, on):
@@ -528,8 +575,10 @@ def main():
         toggle(Client(), a[1])
     elif cmd == "set" and len(a) in (3, 4) and a[3:] in ([], ["--check"]):
         set_state(Client(), a[1], a[2], check=len(a) == 4)
-    elif cmd == "brightness" and len(a) == 3:
-        brightness(Client(), a[1], a[2])
+    elif cmd == "brightness" and len(a) in (3, 4) and a[3:] in ([], ["--check"], ["--before"], ["--asks"]):
+        if not re.fullmatch(r"\d+(\.\d+)?", a[2]):
+            die(f"{a[2]!r} isn't a brightness: 0–100", 2)
+        brightness(None if a[3:] == ["--asks"] else Client(), a[1], a[2], a[3] if len(a) == 4 else None)
     elif cmd == "fav" and len(a) in (2, 3):
         set_fav(a[1], None if len(a) == 2 else a[2] == "on")
     elif cmd == "bar":

@@ -34,6 +34,28 @@
       "options": {"unlock": {"state": ["unlock", "open"]}},
       "class": "act",
       "area": "home-assistant"
+    },
+    {
+      "name": "home_assistant_brightness",
+      "title": "Dim a Home Assistant light",
+      "description": "Sets a dimmable light's brightness in percent; a light that is off turns on at it. Lights that only turn on and off, and other devices, refuse: home_assistant_states shows a light's brightness in its detail while it's on. To turn a light off, home_assistant_set. The user allows each call on Nightdrive's confirmation card first, which shows the light's name and room from Home Assistant, its brightness now and the new one; a refusal there is their answer. The user can undo it, back to the brightness it had (or off). Answers with the light's state afterwards.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {"type": "string", "title": "Id", "description": "The light's id, as home_assistant_states gives it (light.kitchen)", "pattern": "^light\\.[a-z0-9_]+$"},
+          "brightness": {"type": "integer", "title": "New brightness (%)", "minimum": 1, "maximum": 100}
+        },
+        "required": ["entity", "brightness"],
+        "additionalProperties": false
+      },
+      "command": ["home-assistant", "brightness", "{entity}", "{brightness}"],
+      "card": ["home-assistant", "brightness", "{entity}", "{brightness}", "--check"],
+      "asks_if": ["home-assistant", "brightness", "{entity}", "{brightness}", "--asks"],
+      "before": ["home-assistant", "brightness", "{entity}", "0", "--before"],
+      "undo": ["home-assistant", "brightness", "{entity}", "{was_brightness}"],
+      "notice": "{name} at {brightness}%",
+      "class": "change",
+      "area": "home-assistant"
     }
   ]
 }

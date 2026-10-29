@@ -6,6 +6,8 @@
 - Without the unlock choice a scene that sets a lock or a cover (or a group of one) isn't run, and a script, button or
   switch whose name says a door, gate or lock is marked on its card; an input_boolean that says whether anyone is
   home is presence (#1880).
+- Claude dims only a dimmable light; the card shows its brightness now and the new one, and the undo's state is what
+  it had, 0 when off (#1900).
 Home Assistant is a stand-in: nothing is sent anywhere."""
 
 import importlib.machinery
@@ -192,6 +194,56 @@ class Listing(unittest.TestCase):
         self.assertNotIn("input_boolean.someone_home", self.ids("{}"))
         self.assertIn("input_boolean.guest_mode", self.ids("{}"))
         self.assertIn("input_boolean.someone_home", self.ids(json.dumps({"presence": True})))
+
+
+class Brightness(unittest.TestCase):
+    STATES = {
+        "light.desk": {"state": "on", "attributes": {"friendly_name": "Desk", "brightness": 178,
+                                                     "supported_color_modes": ["brightness"]}},
+        "light.hall": {"state": "off", "attributes": {"friendly_name": "Hall", "supported_color_modes": ["color_temp"]}},
+        "light.plain": {"state": "on", "attributes": {"friendly_name": "Plain", "supported_color_modes": ["onoff"]}},
+        "light.gone": {"state": "unavailable", "attributes": {}},
+        "switch.kettle": {"state": "off", "attributes": {"friendly_name": "Kettle"}},
+    }
+
+    def run_(self, eid, pct, mode=None, env=CLAUDE):
+        house = House(self.STATES)
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, env), redirect_stdout(out):
+            ha.brightness(house, eid, pct, mode)
+        return house, out.getvalue()
+
+    def test_the_card(self):
+        _, out = self.run_("light.desk", "40", "--check")
+        self.assertEqual(json.loads(out), {"Device": "Desk", "Now": "on · 70%", "New": "40%"})
+        _, out = self.run_("light.hall", "25", "--check")
+        self.assertEqual(json.loads(out), {"Device": "Hall", "Now": "off", "New": "25%"})
+
+    def test_before_is_what_undo_sets_back(self):
+        self.assertEqual(json.loads(self.run_("light.desk", "0", "--before")[1]), {"was_brightness": 70})
+        self.assertEqual(json.loads(self.run_("light.hall", "0", "--before")[1]), {"was_brightness": 0})
+
+    def test_claude_dims_and_undo_turns_off(self):
+        house, out = self.run_("light.desk", "40")
+        self.assertEqual(house.posts, [("/api/services/light/turn_on", {"entity_id": "light.desk", "brightness_pct": 40})])
+        self.assertEqual(json.loads(out), {"id": "light.desk", "name": "Desk", "state": "on", "brightness": 40})
+        house, _ = self.run_("light.hall", "0")
+        self.assertEqual(house.posts, [("/api/services/light/turn_off", {"entity_id": "light.hall"})])
+
+    def test_only_dimmable_lights(self):
+        for eid in ("light.plain", "light.gone", "switch.kettle", "light.none"):
+            for mode in ("--check", "--before", None):
+                with self.subTest(eid=eid, mode=mode), self.assertRaises(SystemExit), \
+                        mock.patch("sys.stderr", io.StringIO()):
+                    self.run_(eid, "40", mode)   # dies before any service is called
+
+    def test_the_launchers_drag_is_as_before(self):
+        house, out = self.run_("light.desk", "55", env={"NIGHTDRIVE_MCP": ""})
+        self.assertEqual(house.posts, [("/api/services/light/turn_on", {"entity_id": "light.desk", "brightness_pct": 55})])
+        self.assertEqual(out, "")
+
+    def test_it_always_asks(self):
+        self.assertEqual(self.run_("light.desk", "40", "--asks")[1].strip(), "yes")
 
 
 if __name__ == "__main__":

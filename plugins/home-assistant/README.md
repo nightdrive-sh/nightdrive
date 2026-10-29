@@ -25,10 +25,12 @@ An `http://` address sends the token as plain text, and the addresses are tried 
 | `home-assistant states` | The devices and their states as JSON; `--search TEXT` only those whose name, area or id has it, `--sensors` adds the sensors |
 | `home-assistant set ID STATE` | Puts a device in a state, whatever it is now: `on`/`off`, `open`/`close` (covers), `lock`/`unlock`, `run` (scenes, scripts, buttons) |
 | `home-assistant toggle ID` | Switches a device the other way, as Enter in the Launcher does |
+| `home-assistant brightness ID PCT` | Sets a light's brightness, 0–100 (0 turns it off) |
 
 Claude (Settings › Claude › Access › Home Assistant) can read the states, and switch a device only after you allow it on
 Nightdrive's confirmation card, which shows the device's name and room from Home Assistant beside its id, and the new
-state. Unless you turn them on in Access › Home Assistant › (they are on only on the Open level), Claude may not:
+state. It dims a dimmable light on the card too (its brightness now and the new one), with Undo back to what it was.
+Unless you turn them on in Access › Home Assistant › (they are on only on the Open level), Claude may not:
 
 - unlock a lock or open a cover (a door, a gate, blinds): it only locks and closes, and runs no scene that sets one,
 - turn an automation on or off: it can run one, but not stop one that guards (a leak alarm),
