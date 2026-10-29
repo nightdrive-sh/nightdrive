@@ -40,7 +40,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "windows", "focus", "{window}", "--json", "--unless-typing"],
-      "undo": ["nightdrive", "windows", "focus", "{previous}"],
+      "undo": ["nightdrive", "windows", "focus", "{previous}", "--unless-typing"],
       "notice": "Brought {app} forward",
       "class": "change",
       "area": "apps-files"
@@ -58,7 +58,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "windows", "open", "--app", "{app}", "--json", "--unless-typing"],
-      "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}"],
+      "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}", "--unless-typing"],
       "notice": "Opened {opened}",
       "class": "change",
       "area": "apps-files"
@@ -109,7 +109,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "files", "open", "--json", "--unless-typing", "--", "{path}"],
-      "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}"],
+      "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}", "--unless-typing"],
       "notice": "Opened {opened}",
       "class": "change",
       "area": "apps-files"

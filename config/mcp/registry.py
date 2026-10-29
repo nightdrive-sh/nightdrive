@@ -172,6 +172,8 @@ def problem(spec, plugin):
         return f"{name}: {', '.join(sorted(unknown))} in its command isn't in inputSchema"
     if spec["class"] == "change" and not is_template(spec.get("undo")):
         return f"{name}: a change tool needs undo (the command that undoes it); one that can't be undone is act"
+    if not isinstance(spec.get("undo_asks", False), bool):
+        return f"{name}: undo_asks must be true or false"
     if "before" in spec and not is_template(spec["before"]):
         return f"{name}: before must be a list of strings (and lists of them)"
     unknown = run.placeholders(spec.get("before") or []) - set(schema.get("properties", {}))

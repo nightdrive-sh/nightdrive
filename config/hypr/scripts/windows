@@ -26,8 +26,11 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
                                    Without --app or --url, an address is told by its scheme
   windows open --file PATH [--json]   a file or folder in its default app (files open checks the path first)
                                    --json: {kind, opened, launched, new, address, previous}: new is the window it
-                                   opened ("" when none came in WAIT s), previous the one that had the focus
-  windows close [ADDRESS] [--focus PREVIOUS]   closes a window, then focuses another: what undoes open ("" skips)
+                                   opened ("" when none came in WAIT s), previous the one that had the focus. New
+                                   is only ever a window of the app it started (the file's type's default app), so
+                                   the undo can't close another app's window that came meanwhile (#1860)
+  windows close [ADDRESS] [--focus PREVIOUS] [--unless-typing]   closes a window, then focuses another: what undoes
+                                   open ("" skips). --unless-typing as focus's
 """
 import argparse, base64, configparser, json, os, re, subprocess, sys, time
 from pathlib import Path
@@ -280,15 +283,32 @@ def cmd_shot(a):
     print(json.dumps(info, ensure_ascii=False) if a.json else info.get("path", "(inline)"))
 
 
-def wait_new(before):
-    """The first window that wasn't there before, within WAIT s; None if none came."""
+def wait_new(before, app):
+    """The first window of app ((id, entry)) that wasn't there before, within WAIT s; None if none came, or app is
+    None (what opened it isn't known). Another app's window that opens meanwhile isn't it: open's undo closes it."""
     end = time.monotonic() + WAIT
-    while time.monotonic() < end:
+    while app and time.monotonic() < end:
         time.sleep(POLL)
-        new = [c for c in clients() if c["address"] not in before]
+        new = [c for c in app_windows(*app, clients()) if c["address"] not in before]
         if new:
             return new[0]
     return None
+
+
+def handler(path):
+    """(id, entry) of the app gio open opens path in: its type's default app (gio's own answer, as gio open asks it);
+    None when it can't say."""
+    try:
+        info = subprocess.run(["gio", "info", "-a", "standard::content-type", "--", str(path)], capture_output=True,
+                              text=True, timeout=10, env={**os.environ, "LC_ALL": "C"}).stdout
+        mime = re.search(r"standard::content-type: (\S+)", info)
+        said = subprocess.run(["gio", "mime", "--", mime.group(1)], capture_output=True, text=True, timeout=10,
+                              env={**os.environ, "LC_ALL": "C"}).stdout if mime else ""
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    default = re.search(r"^Default application for .*: (\S+)\.desktop$", said, re.M)
+    apps = entries()
+    return (default.group(1), apps[default.group(1)]) if default and default.group(1) in apps else None
 
 
 def launch(argv):
@@ -303,11 +323,13 @@ def cmd_open(a):
     wins = clients()
     before = {c["address"] for c in wins}
     out = {"previous": previous, "launched": False, "new": "", "address": ""}
+    app = None
     if a.file:
         path = Path(a.target).expanduser()
         if not path.exists():
             die(f"{a.target} doesn't exist.")
         out.update(kind="file", opened=str(path))
+        app = handler(path)
         launch(["gio", "open", str(path)])
     elif a.url or (not a.app and a.target.lower().startswith(SCHEMES)):
         if not a.target.lower().startswith(SCHEMES):  # no file://, javascript: or an app's own scheme that acts
@@ -327,7 +349,8 @@ def cmd_open(a):
             return
         launch(["gtk-launch", eid + ".desktop"])
         out["launched"] = True
-    new = wait_new(before)
+        app = (eid, entry)
+    new = wait_new(before, app)
     if new:
         show(new)
         out.update(new=new["address"], address=new["address"])
@@ -335,6 +358,8 @@ def cmd_open(a):
 
 
 def cmd_close(a):
+    if a.unless_typing and (a.address or a.focus):
+        not_typing()
     wins = {c["address"]: c for c in clients()}
     if a.address and a.address in wins:
         dispatch(f'hl.dsp.window.close({{ window = "address:{a.address}" }})')
@@ -359,7 +384,8 @@ def main():
     p.add_argument("--json", action="store_true"); p.add_argument("--unless-typing", action="store_true")
     p.set_defaults(fn=cmd_open)
     p = sub.add_parser("close"); p.add_argument("address", nargs="?", default="")
-    p.add_argument("--focus", default=""); p.set_defaults(fn=cmd_close)
+    p.add_argument("--focus", default=""); p.add_argument("--unless-typing", action="store_true")
+    p.set_defaults(fn=cmd_close)
     argv = sys.argv[1:]
     if not argv or argv[0] not in sub.choices and argv[0].startswith("-"):
         argv = ["list", *argv]

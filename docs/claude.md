@@ -29,7 +29,9 @@ without you seeing it first. A screen or network change also asks afterwards whe
 in 20 seconds unless you do.
 
 **Undo** is on the notification for an hour; then Redo undoes the undo. Claude keeps the last 100 changes, so you can
-also ask it later ("undo the wallpaper"). A change that couldn't be undone isn't offered as a change at all.
+also ask it later ("undo the wallpaper"). A change that couldn't be undone isn't offered as a change at all. An undo
+that does what only the card allows (Do Not Disturb back on) asks on the card too, and one that would move the focus
+waits while you type: **Try again** on the notification runs it.
 
 ## Settings › Claude › Access
 

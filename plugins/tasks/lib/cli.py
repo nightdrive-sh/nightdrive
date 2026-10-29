@@ -103,6 +103,7 @@ def text_row(r):
 
 
 def changed(lst, task, sid, a, verb):
+    store.settle(sid)
     r = dict(row(lst, task, datetime.now().replace(second=0, microsecond=0)), undo=sid)
     return r if a.json else f"{verb}: {text_row(r)}"
 

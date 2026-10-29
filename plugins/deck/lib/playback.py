@@ -6,7 +6,8 @@ Deck's own commands do the work (`deck ctl …`, `deck status --json`); this add
   file `deck ctl save` writes, the queue's length, the like), which the undo's {name}s come from.
 - restore SNAPSHOT PLAYING: back to that state (`deck ctl restore`, which loads it paused, then play if it played);
   with no snapshot, nothing played before, so it pauses.
-- unqueue LENGTH: what was queued after the queue had LENGTH tracks comes off it.
+- unqueue LENGTH URI…: the tracks a queue-album or queue-song put at the end of a queue LENGTH long come off it, and
+  nothing else: not one the user queued since, nor one already played (#1860).
 - control ACTION / undo-control ACTION SNAPSHOT PLAYING: play, pause, next, previous, and back.
 - like true|false: the like as asked (Deck's own `like` toggles it).
 - play-album, play-song, queue-album, queue-song, pick: Deck's, started first if no Deck runs, waiting a moment for
@@ -134,11 +135,26 @@ def restore(path, was_playing):
     return {"restored": True}
 
 
-def unqueue(length):
-    st = status()
-    for _ in range(max(0, len(st.get("queue") or []) - int(length))):
-        ctl("unqueue", str(length))   # each one removes the track at that position, so the next moves up into it
-    return {}
+def unqueue(length, *queued):
+    """The run of queued tracks where it is now: from LENGTH, or nearer the front as the queue has played on (what
+    has played of it is gone already, so its tail at the front counts too). Nothing is removed unless it is found."""
+    queued, length = list(queued), int(length)
+    if not queued:
+        raise Failed("This undo doesn't say which tracks were queued, so nothing was taken off the queue.")
+    uris = [t.get("uri") for t in status().get("queue") or []]
+    for at in sorted(range(len(uris)), key=lambda i: (i > length, abs(i - length))):
+        if uris[at:at + len(queued)] == queued:
+            start, count = at, len(queued)
+            break
+    else:
+        tail = next((n for n in range(len(queued) - 1, 0, -1) if uris[:n] == queued[-n:]), 0)
+        if not tail:
+            raise Failed("The tracks Claude queued aren't in the queue any more (played, or changed since), so "
+                         "nothing was taken off.")
+        start, count = 0, tail
+    for _ in range(count):
+        ctl("unqueue", str(start))   # each one removes the track at that position, so the next moves up into it
+    return {"unqueued": count}
 
 
 def control(action):
@@ -189,13 +205,15 @@ def play(kind, *uris):
         return playing(wait_for(lambda st: st.get("album_uri") != album and st.get("track_uri") != track
                                 and st.get("playing")))
     st = wait_for(lambda st: len(st.get("queue") or []) > queued)
-    return {"queue_length": len(st.get("queue") or [])}
+    queue = st.get("queue") or []
+    # What the undo takes off: these tracks, found by their uris, not whatever stands after the old length then
+    return {"queue_length": len(queue), "queued": [t.get("uri") for t in queue[queued:]]}
 
 
 COMMANDS = {
     "snapshot": (0, snapshot),
     "restore": (2, restore),
-    "unqueue": (1, unqueue),
+    "unqueue": (-1, unqueue),   # LENGTH, then the URIs (an undo logged before them has none: it refuses)
     "control": (1, control),
     "undo-control": (3, undo_control),
     "like": (1, like),
@@ -208,7 +226,8 @@ COMMANDS = {
 
 
 def main(argv):
-    if not argv or argv[0] not in COMMANDS or len(argv) - 1 != COMMANDS[argv[0]][0]:
+    want = COMMANDS.get(argv[0], (None,))[0] if argv else None
+    if want is None or (len(argv) - 1 < -want if want < 0 else len(argv) - 1 != want):
         print("usage: playback.py " + " | ".join(COMMANDS), file=sys.stderr)
         return 2
     try:

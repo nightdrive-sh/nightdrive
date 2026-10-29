@@ -112,7 +112,7 @@
       },
       "command": ["python3", "lib/playback.py", "queue-album", "{album_uri}"],
       "before": ["python3", "lib/playback.py", "snapshot"],
-      "undo": ["python3", "lib/playback.py", "unqueue", "{queue_length}"],
+      "undo": ["python3", "lib/playback.py", "unqueue", "{queue_length}", "{queued}"],
       "class": "change",
       "area": "deck",
       "timeout": 60
@@ -132,7 +132,7 @@
       },
       "command": ["python3", "lib/playback.py", "queue-song", "{track_uri}", "{album_uri}"],
       "before": ["python3", "lib/playback.py", "snapshot"],
-      "undo": ["python3", "lib/playback.py", "unqueue", "{queue_length}"],
+      "undo": ["python3", "lib/playback.py", "unqueue", "{queue_length}", "{queued}"],
       "class": "change",
       "area": "deck",
       "timeout": 60

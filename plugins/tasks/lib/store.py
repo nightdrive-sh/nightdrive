@@ -2,8 +2,8 @@
 """The tasks on disk: a vdir (a folder per list, an .ics file per task, the list's name in its `displayname` file), the
 layout vdirsyncer keeps a CalDAV calendar in, so a sync can be pointed at it later as it is.
 
-Every change keeps what it changed first (snapshot()), and restore() puts that back: the undo of Claude's changes
-(mcp.json) and of the command's. A task moved to the trash goes to the state folder, out of the vdir, where a sync
+Every change keeps what it changed first (snapshot()) and what it left (settle()), and restore() puts the first back,
+only while the files are still as the change left them: the undo of Claude's changes (mcp.json) and of the command's. A task moved to the trash goes to the state folder, out of the vdir, where a sync
 wouldn't see it as a task any more.
 """
 
@@ -115,12 +115,29 @@ def snapshot(paths, made=None):
     return sid
 
 
+def settle(sid):
+    """After the change: the files as it left them (None for one it removed), so restore() can tell an edit made since"""
+    snap = UNDO / f"{sid}.json"
+    data = json.loads(snap.read_text(encoding="utf-8"))
+    for f in data["files"]:
+        if Path(f["path"]).name != "displayname":
+            p = DATA / f["path"]
+            f["after"] = p.read_text(encoding="utf-8") if p.is_file() else None
+    write(snap, json.dumps(data, ensure_ascii=False))
+
+
 def restore(sid):
     """Puts the files of a snapshot back as they were: a task added goes away, one done or moved is as before, one
-    trashed comes back. Returns the paths."""
+    trashed comes back. Returns the paths. Refuses, changing nothing, when a file isn't as the change left it: an undo
+    an hour later mustn't write over what the user did since (#1860)."""
     if not re.fullmatch(r"[0-9a-f]+", sid or "") or not (UNDO / f"{sid}.json").is_file():
         raise NotFound(f"Nothing to undo with {sid!r}: it is done already, or too old.")
     files = json.loads((UNDO / f"{sid}.json").read_text(encoding="utf-8"))["files"]
+    for f in files:
+        p = DATA / f["path"]
+        if "after" in f and (p.read_text(encoding="utf-8") if p.is_file() else None) != f["after"]:
+            raise NotFound("The task has changed since, so the undo would lose that: nothing was changed. "
+                           "Change it back by hand if need be.")
     out = []
     for f in files:
         p = DATA / f["path"]

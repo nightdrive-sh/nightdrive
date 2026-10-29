@@ -13,12 +13,16 @@ The notification waits in a process of its own (`undo.py notice ID undo`), so it
 has gone. Undo runs the logged argv as run.py runs a tool: without a shell, in the tool's folder, with its timeout.
 The row then reads "Undid: …" with Redo, which runs the tool's command again and rebuilds its undo from that run's
 output, as the first run's was (a new draft has a new id); Claude's undo_change shows the same row.
+An undo that does what an act tool does (dnd_off's undo turns Do Not Disturb on, which only the card may allow), or
+whose tool says `"undo_asks": true`, runs only once the user allows it on the card, from the notification too (#1860).
+An undo that refuses for now (the user is typing) leaves Try again on the row.
 
     python3 undo.py recent_changes | undo_change     Claude's tools (JSON on stdin, JSON out)
     python3 undo.py undo ID | redo ID                as the notification's buttons do
 """
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -105,19 +109,15 @@ def show(entry_id, action):
 
 def perform(entry_id, action):
     """Undo (or redo) an entry: its logged argv run as run.py runs a tool, and its state changed. Returns the entry;
-    ToolError when it can't."""
+    ToolError when it can't. An undo that asks waits for the card first, outside the lock: other undos and the log
+    don't wait on the user, and the entry is checked again once they have answered."""
+    argv, _ = runnable(entry_id, action)
+    if action == "undo":
+        ask(entry_id, argv)
     with changes.serial():
+        argv, stdin = runnable(entry_id, action, shown=argv)
         entry = changes.get(entry_id)
-        if entry is None:
-            raise ToolError(f"There's no change {entry_id} in the log (it keeps the last {changes.KEEP}).")
-        want, then = ("done", "undone") if action == "undo" else ("undone", "done")
-        if entry["state"] != want:
-            now = "undone already" if want == "done" else "in place"
-            raise ToolError(f"Change {entry_id} ({entry['notice']}) is {now}.")
-        argv, stdin = (entry["undo"], None) if action == "undo" else (entry["do"], entry.get("stdin"))
-        if argv is None:
-            raise ToolError(f"Change {entry_id} ({entry['notice']}) can't be undone: its redo didn't report what "
-                            "undoing it needs.")
+        then = "undone" if action == "undo" else "done"
         where = SimpleNamespace(dir=Path(entry["dir"]), name=entry["tool"], **choices(entry))
         out, err, status = run.execute(where, argv, stdin, entry["timeout"])
         if status != 0:
@@ -127,6 +127,81 @@ def perform(entry_id, action):
         fields = {"undo": redone_undo(entry, out)} if action == "redo" and entry.get("remake") else {}
         changes.mark(entry_id, then, **fields)
         return {**entry, **fields}
+
+
+def runnable(entry_id, action, shown=None):
+    """(argv, stdin) an undo or redo of the entry runs; ToolError when the entry isn't in a state for it, or its argv
+    isn't the one the card showed (shown)."""
+    entry = changes.get(entry_id)
+    if entry is None:
+        raise ToolError(f"There's no change {entry_id} in the log (it keeps the last {changes.KEEP}).")
+    want = "done" if action == "undo" else "undone"
+    if entry["state"] != want:
+        now = "undone already" if want == "done" else "in place"
+        raise ToolError(f"Change {entry_id} ({entry['notice']}) is {now}.")
+    argv, stdin = (entry["undo"], None) if action == "undo" else (entry["do"], entry.get("stdin"))
+    if argv is None:
+        raise ToolError(f"Change {entry_id} ({entry['notice']}) can't be undone: its redo didn't report what "
+                        "undoing it needs.")
+    if shown is not None and argv != shown:
+        raise ToolError(f"Change {entry_id} ({entry['notice']}) changed while the card was on screen: nothing was "
+                        "done.")
+    return argv, stdin
+
+
+def same_command(template, argv):
+    """Whether argv is what a command template gives for some values: its words in order, a whole {name} one word or
+    more (a list's), a {name} inside a word any text, a group there or not. --json only changes how a command prints,
+    so it counts on neither side."""
+    def fits(t, a):
+        if not t:
+            return not a
+        head, rest = t[0], t[1:]
+        if isinstance(head, list):
+            return fits(head + rest, a) or fits(rest, a)
+        if head == "--json":
+            return fits(rest, a)
+        if run.PLACEHOLDER.fullmatch(head):   # an empty list gives no word: a match too, so a card rather than none
+            return any(fits(rest, a[n:]) for n in range(len(a) + 1))
+        if not a:
+            return False
+        if run.PLACEHOLDER.search(head):
+            parts = run.PLACEHOLDER.split(head)[::2]   # split puts the names at the odd places
+            return bool(re.fullmatch(".*".join(map(re.escape, parts)), a[0], re.S)) and fits(rest, a[1:])
+        return head == a[0] and fits(rest, a[1:])
+    return fits(list(template), [w for w in argv if w != "--json"])
+
+
+def acts_like(entry, argv):
+    """What makes undoing the entry need the card: the act tool whose command the undo is (dnd_off's undo is
+    dnd_on's), or True when its own tool says undo_asks or the tools can't be read (an undo that might act doesn't run
+    unasked); None when nothing does."""
+    try:
+        import registry   # here, not at the top: registry imports this module as its seam
+        tools, _ = registry.Registry().load()
+    except Exception:
+        return True
+    own = tools.get(entry["tool"])
+    if own is not None and own.spec.get("undo_asks") is True:
+        return True
+    return next((t for t in tools.values() if t.cls == "act" and same_command(t.spec["command"], argv)), None)
+
+
+def ask(entry_id, argv):
+    """The card for an undo that acts (acts_like): returns once the user allowed it, else ToolError."""
+    entry = changes.get(entry_id)
+    act = acts_like(entry, argv)
+    if act is None:
+        return
+    import confirm   # only now: the card needs Quickshell, a plain undo doesn't
+    does = " ".join(argv) if act is True else act.spec.get("title") or act.name
+    area = entry.get("area") or "nightdrive"
+    card = SimpleNamespace(name=OWN, cls="act", right="modify", area=area, options={},
+                           spec={"title": f"Undo: {entry['notice']}", "class": "act", "area": area,
+                                 "inputSchema": {"type": "object", "properties": {"does": {"title": "That is"}}}})
+    if not confirm.ask(card, {"does": does}):
+        raise ToolError(f"The user didn't allow undoing change {entry_id} ({entry['notice']}) on screen, so it "
+                        "wasn't undone. Don't try it another way.")
 
 
 def choices(entry):
@@ -183,11 +258,16 @@ def notice(entry_id, action):
             pressed = notify(entry_id, f"Undid: {entry['notice']}", button=("redo", "Redo"))
         if pressed != action:
             return
-        try:
-            perform(entry_id, action)
-        except ToolError as e:
-            notify(entry_id, f"Couldn't {action}: {entry['notice']}", str(e))
-            return
+        while True:
+            try:
+                perform(entry_id, action)
+                break
+            except ToolError as e:
+                # Try again: an undo that refused for now (the user was typing, #1860) can be run once they stop
+                again = notify(entry_id, f"Couldn't {action}: {entry['notice']}", str(e),
+                               button=(action, "Try again"))
+                if again != action:
+                    return
         action = "redo" if action == "undo" else "undo"
 
 
