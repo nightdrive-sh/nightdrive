@@ -10,6 +10,8 @@
 #   vnc-display list [--json]      the devices: size, workspace, on or off, connected, port
 #   vnc-display workspace NAME N   its workspace, 2–9; a device that has N takes this one's
 #   vnc-display place NAME PLACE   where its screen is: right, left, above or below your screens, or away (out of reach)
+#   vnc-display size NAME DEVICE   its display's size and scale (DEVICE as for add): a connected device reconnects
+#   vnc-display rename NAME NEW    its name, which is also the user name the device logs in with
 #   vnc-display on|off NAME        listening for the device, or off (nothing listening) while it keeps its password
 #   vnc-display remove NAME        forgets the device: its screen, its password
 #   vnc-display run NAME           the screen itself (nightdrive-vnc-display@NAME.service, lib/serve.py)
@@ -308,6 +310,43 @@ cmd_place() {
   esac
 }
 
+# The service makes the output at the size the state file has as the device connects (lib/serve.py), so a connected
+# device is let go and reconnects to the new size; one that isn't connected gets it next time
+cmd_size() {
+  known "${1:-}"
+  local n=$1 size mode scale line
+  size=$(size_of "${2:-}") || die "a size is a device (ipad, iphone, macbook-16, display-4k…) or WIDTHxHEIGHT@SCALE: vnc-display size $n 2560x1600@2"
+  read -r mode scale _ <<<"$size"
+  line=$(state_line "$n")
+  [[ -n $line ]] || die "$n has no display: vnc-display on $n"
+  set_state "$n" "$(awk -v m="${mode}@60" -v s="$scale" '{ $2 = m; $3 = s; print }' <<<"$line")"
+  if connected "$n"; then
+    systemctl --user restart "$(unit "$n")"
+    echo "$n is ${mode} at scale $scale: the device reconnects to it."
+  else echo "$n is ${mode} at scale $scale."; fi
+}
+
+# A new name is a new output and service: the old ones go, the password, port, workspace and place stay. The user
+# name is the device's name, so the VNC app needs the new one
+cmd_rename() {
+  known "${1:-}"
+  local n=$1 new=${2:-} was_on=0 line
+  [[ $new =~ ^[a-z0-9][a-z0-9-]{0,15}$ ]] || die "a name is lowercase letters, digits and -, at most 16: vnc-display rename $n ipad2"
+  [[ $new != "$n" ]] || return 0
+  [[ ! -e $(conf "$new") ]] || die "$new is already a device's name (vnc-display list)"
+  systemctl --user -q is-enabled "$(unit "$n")" 2>/dev/null && was_on=1
+  turn off "$n"
+  line=$(state_line "$n")
+  sed -e "s/^output=.*/output=$(output_of "$new")/" -e "s/^username=.*/username=$new/" -e "s/(vnc-display show $n)/(vnc-display show $new)/" \
+    "$(conf "$n")" > "$(conf "$new")"
+  chmod 600 "$(conf "$new")"
+  rm -f "$(conf "$n")"
+  # In its place in the file, which is its order on its side of the desk
+  [[ -z $line ]] || set_state "$n" "$(awk -v o="$(output_of "$new")" '{ $1 = o; print }' <<<"$line")"
+  ((was_on)) && turn on "$new"
+  echo "$n is now $new: in the VNC app, the user name is $new."
+}
+
 cmd_remove() {
   known "${1:-}"
   turn off "$1"
@@ -326,7 +365,9 @@ case ${1:-} in
   off) known "${2:-}"; turn off "$2"; echo "$2 is off: nothing listens for it (vnc-display on $2)." ;;
   workspace) cmd_workspace "${2:-}" "${3:-}" ;;
   place) cmd_place "${2:-}" "${3:-}" ;;
+  size) cmd_size "${2:-}" "${3:-}" ;;
+  rename) cmd_rename "${2:-}" "${3:-}" ;;
   remove) cmd_remove "${2:-}" ;;
   run) known "${2:-}"; exec python3 "$here/lib/serve.py" "$2" ;;
-  *) sed -n '4,15s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
+  *) sed -n '4,17s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
 esac

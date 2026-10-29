@@ -4,7 +4,7 @@ import qs
 
 // VNC Display's part of the launcher (plugin-parts lists it while the plugin is on): its rows in Settings › Other displays
 // (displayRows: each device, on or off, and Add a display, whose pages are VncAddLevels.qml's), and a device's page (its
-// screen on or off, its workspace and place, how to connect, remove). bin/vnc-display does the work; this reads
+// screen on or off, its workspace, place, size (VncAddLevels.qml's form) and name, how to connect, remove). bin/vnc-display does the work; this reads
 // `list --json` and `show NAME --json`.
 // The password stays out of the rows until asked for (Enter on its row, or the QR card: VncDisplayCard.qml), so a
 // screenshot of the launcher doesn't give it away.
@@ -23,6 +23,7 @@ Item {
     property string error: ""                 // the last command's complaint
 
     readonly property var levels: ["vncdevice", "vncws", "vncplace"]
+    readonly property var inputs: ["vncdevice"]   // its Name field: ⌘⇧V pastes into it (ClipPicker)
     // virtual-display.lua's places: a side of the desk's screens, or out of the pointer's reach
     // "your display", or "displays" with more than one at the desk: the side is counted from all of them
     readonly property string yours: Quickshell.screens.filter(s => !s.name.startsWith("HEADLESS-")).length > 1 ? "your displays" : "your display"
@@ -84,6 +85,9 @@ Item {
             const rows = [{ kind: "vncswitch", name: "Display", glyph: phone(dev()) ? "smartphone" : "tablet", switchOn: i.on },   // the workspace is on its own row
                           { kind: "nav", name: "Workspace", glyph: "layout-grid", target: "vncws", summary: "⌘" + i.workspace },
                           { kind: "nav", name: "Place", glyph: "move", target: "vncplace", summary: placeName(dev().place) },
+                          { kind: "vncsize", name: "Size", glyph: "scaling", summary: sizeName(dev()) },
+                          // Typed into in place (FieldBox.qml), set with Enter or by leaving the row: rename
+                          { kind: "vncname", key: "name", field: true, name: "Name", glyph: "tag", summary: cur },
                           { kind: "header", name: "Connect" },
                           { kind: "vncqr", name: "Show QR code", glyph: "qr-code" },
                           { kind: "stat", name: "Address", glyph: "globe", summary: addr(i.tailscale, i.port),
@@ -128,6 +132,14 @@ Item {
         return []
     }
     function dev() { return devices.find(d => d.name === cur) || {} }
+    // "2360 × 1640 · looks like 1180 × 820": the pixels, and the size things look at its scale, as Add a display shows it
+    function sizeName(d) {
+        const m = String(d.size || "").match(/^(\d+)x(\d+)/)
+        if (!m) return ""
+        const s = d.scale || 1
+        return m[1] + " × " + m[2] + " · looks like " + Math.round(m[1] / s) + " × " + Math.round(m[2] / s)
+    }
+    function adder() { return launcher.pluginExts.find(e => e.levels.indexOf("vncother") >= 0) || null }
 
     function activate(it) {
         const l = launcher
@@ -146,6 +158,15 @@ Item {
             run("Moving…", ["place", cur, it.place], () => { if (l.level === "vncplace") l.back() })
             return true
         }
+        if (it.kind === "vncsize") { if (adder()) adder().edit(dev()); return true }
+        if (it.kind === "vncname") {   // Enter: rename to what was typed
+            // The row kept first: run()'s busy row resets the list's selection at once, so later it would keep that
+            l.keepSelection()
+            const text = l.query
+            l.clearQuery()
+            if (text.trim() !== "") commitField(it, text)
+            return true
+        }
         if (it.kind === "vncpass") { l.keepSelection(); reveal = true; return true }
         if (it.kind === "vncqr") { card.show(info); l.open = false; return true }
         if (it.kind === "vncremove") {
@@ -155,6 +176,16 @@ Item {
             return true
         }
         return false
+    }
+    // The Name field's value, on Enter or on leaving its row (Launcher.qml's leaveField): a name as `rename` takes it.
+    // The page follows the device to its new name
+    function commitField(it, text) {
+        const t = text.trim().toLowerCase()
+        if (!/^[a-z0-9][a-z0-9-]{0,15}$/.test(t)) { launcher.shakeNow(); return false }
+        if (t === cur) return true
+        if (devices.some(d => d.name === t)) { error = label(t) + " is already a device's name"; return false }
+        run("Renaming…", ["rename", cur, t], () => { cur = t })
+        return true
     }
     property var after: null                  // what to do once the running command has succeeded
     function run(what, args, then) {
