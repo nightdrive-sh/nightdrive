@@ -985,14 +985,17 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         // ⌘⇧V (clipboard) over a text field (a level in a Levels file's `inputs`) opens Clipboard as a picker for it
         function openLevel(level: string): void { if (level === "clipboard" && tools.picker.begin()) return; win.open = true; win.go(level); win.keyLevel = level }
         function setQuery(text: string): void { input.text = text }
-        // askClaude: ⌘⌥Enter with the launcher open and a non-empty query → sends the text to Claude Code (hypr/scripts/terminal-or-claude). Returns "ok" or "".
-        function askClaude(): string {
+        // askClaude background|terminal: with the launcher open and a non-empty query, sends the text to Claude Code:
+        // ⌘⌥Enter in the background, the answer a notification (hypr/scripts/ask-claude), ⌘⌃Enter in a terminal
+        // (hypr/scripts/terminal-or-claude). Returns "ok" or "".
+        function askClaude(how: string): string {
             const q = win.query.trim()
             if (!win.open || q === "" || (win.level !== "root" && win.level !== "apps")) return ""
             win.open = false
             // the session's name (claude -n) is the question's start, to find it again in the Claude menu and /resume
             const name = q.length > 40 ? q.slice(0, 40).replace(/\s+\S*$/, "") + "…" : q
-            Quickshell.execDetached([win.scripts + "/terminal-or-claude", "--name", name, "--", q])
+            const script = how === "background" ? "/ask-claude" : "/terminal-or-claude"
+            Quickshell.execDetached([win.scripts + script, "--name", name, "--", q])
             return "ok"
         }
         // rows: the open level's title, footer, selected index and rows as JSON, primitive fields only (automated testing)

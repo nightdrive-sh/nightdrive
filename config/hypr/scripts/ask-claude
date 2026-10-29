@@ -1,0 +1,101 @@
+#!/bin/bash
+# ⌘⌥Enter, Ask Claude: what was typed in the launcher goes to Claude Code in the background (claude -p), with Nightdrive's
+# tools only (Dashboard #1876). No shell, files or web: what it does goes through Nightdrive's MCP server, so its card
+# and Settings › Claude › Access decide, as in any session. A notification shows it working, with Cancel; the answer
+# comes as a notification too, whose click (or Open in terminal) continues the same session in a terminal.
+# ⌘⌃Enter (terminal-or-claude) sends the text to Claude Code in a terminal instead, as ⌘⌥Enter did before.
+#   ask-claude                        the key: the launcher's text (askClaude in Launcher.qml), else as ⌘⌃Enter
+#   ask-claude [--name NAME] [--] PROMPT   ask in the background; in a terminal when Claude Code or the server is missing
+readonly LIMIT=300        # seconds Claude gets for one request, cards included; then it is stopped
+readonly SHOWN=1500       # characters of the answer the notification gets; the rest is in the terminal
+readonly OPEN_WAIT=1800   # seconds the answer's buttons are waited on
+readonly SERVER=nightdrive   # the server's name here, so its tools are mcp__nightdrive__* whatever it's registered as
+scripts=$(dirname "$(readlink -f "$0")")
+claude_bin="$HOME/.local/bin/claude"   # where terminal-or-claude runs it too
+
+name=
+while (( $# )); do
+  case $1 in
+    --name) name=${2:-}; shift 2 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+if (( ! $# )); then
+  [ "$(qs ipc call launcher askClaude background 2>/dev/null)" = "ok" ] && exit 0
+  exec "$scripts/terminal-or-claude"
+fi
+prompt=$*
+
+# Nightdrive's server as Claude Code has it (nightdrive mcp install: "nightdrive"; a checkout of one's own may have
+# registered `…/bin/nightdrive mcp` under another name): {command, args}, or nothing when the tools are off
+server() {
+  jq -c '(.mcpServers // {}) | (.nightdrive // (to_entries | map(.value)
+           | first(.[] | select((.command // "" | test("/nightdrive$")) and .args == ["mcp"])))) // empty
+         | { type: "stdio", command, args }' "$HOME/.claude.json" 2>/dev/null
+}
+srv=$( [[ -x $claude_bin ]] && server )
+[[ -n $srv ]] || exec "$scripts/terminal-or-claude" ${name:+--name "$name"} -- "$prompt"
+
+# A child session's variables would make claude think it runs inside another one
+for v in $(compgen -e | grep '^CLAUDE'); do unset "$v"; done
+dir="$HOME/Projects"; [[ -d $dir ]] || dir=$HOME   # terminal-or-claude's, so --resume finds the session from there
+id=$(cat /proc/sys/kernel/random/uuid)
+run="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/ask-claude/$id"
+mkdir -p -m 700 "$run" || exit 1
+trap 'rm -rf "$run"' EXIT
+jq -n --arg s "$SERVER" --argjson v "$srv" '{ mcpServers: { ($s): $v } }' >"$run/mcp.json"
+icon=lucide:bot
+for f in "$HOME"/.config/nightdrive/agent-icon.{svg,png}; do [[ -f $f ]] && { icon=$f; break; }; done
+short=${prompt%%$'\n'*}; (( ${#short} > 120 )) && short="${short:0:120}…"
+
+system="You run in the background from the user's launcher (Nightdrive's Ask Claude): they typed one request and will \
+see your last message as a desktop notification. Your only tools are Nightdrive's: no shell, no files, no web pages. \
+Do what the request asks with them, then answer in one to three short sentences of plain text (no Markdown, lists or \
+headings), in the language of the request. If it needs more than these tools can do, say so briefly: the user can go \
+on with this conversation in a terminal from the notification."
+# --tools "" leaves out every built-in tool (Bash, Edit, Write, WebFetch, Task…), --strict-mcp-config every MCP server
+# but ours (the user's own, claude.ai's connectors), and dontAsk refuses whatever isn't allowed instead of asking, as
+# nobody could answer here. --disallowedTools only says the same again, in case a setting adds tools.
+(cd "$dir" && exec timeout "$LIMIT" "$claude_bin" -p --output-format json --session-id "$id" ${name:+-n "$name"} \
+   --tools "" --strict-mcp-config --mcp-config "$run/mcp.json" --permission-mode dontAsk \
+   --allowedTools "mcp__${SERVER}__*" --disallowedTools Bash Edit Write NotebookEdit WebFetch WebSearch \
+   --append-system-prompt "$system" -- "$prompt") >"$run/out.json" 2>"$run/err" </dev/null &
+pid=$!
+
+# Working: critical, so it stays on screen until the answer, without the urgent sound; transient, so it leaves no row in
+# the history. Its click (default) only hides it; Cancel stops Claude, and the server's open card with it.
+( notify-send -a Claude -i "$icon" -u critical -e -h boolean:suppress-sound:true -A default=Hide -A cancel=Cancel \
+    -p -w "Claude is working…" "$short" >"$run/working"
+  [[ $(sed -n 2p "$run/working") == cancel ]] && { touch "$run/cancelled"; kill "$pid"; } ) 2>/dev/null &
+wait "$pid"; rc=$?
+nid=$(sed -n 1p "$run/working" 2>/dev/null)
+[[ $nid =~ ^[0-9]+$ ]] && gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications \
+  --method org.freedesktop.Notifications.CloseNotification "$nid" >/dev/null 2>&1
+
+if [[ -e $run/cancelled ]]; then
+  notify-send -a Claude -i "$icon" -e "Claude stopped" "$short"
+  exit 0
+fi
+answer=$(jq -r 'select(.is_error | not) | .result // empty' "$run/out.json" 2>/dev/null)
+if (( rc == 124 )); then
+  title="Claude ran out of time"; body="Stopped after $(( LIMIT / 60 )) minutes: $short"
+elif [[ -z ${answer//[[:space:]]/} ]]; then
+  title="Claude couldn't answer"
+  body=$(jq -r '.result // empty' "$run/out.json" 2>/dev/null)
+  [[ -n $body ]] || body=$(grep -v '^[[:space:]]*$' "$run/err" | tail -n1)
+  [[ -n $body ]] || body="No answer to: $short"
+else
+  # The notification shows plain text: Markdown's bold and code marks would show as they are
+  title="Claude: $short"; body=$(sed -e 's/\*\*//g' -e 's/`//g' <<<"$answer")
+  (( ${#body} > SHOWN )) && body="${body:0:SHOWN}…"
+fi
+rm -rf "$run"; trap - EXIT
+
+# The answer, waited on in the background so this returns: a click or Open in terminal goes on in a terminal, where
+# Claude Code has its usual tools and asks as usual. A session cut short by the limit can be continued too.
+term="$HOME/.config/hypr/scripts/terminal"   # the terminal chosen in Default apps
+setsid -f bash -c '
+  action=$(timeout "$1" notify-send -a Claude -i "$2" -A default="Open in terminal" -A open="Open in terminal" -w "$3" "$4")
+  [[ $action == default || $action == open ]] && exec "$5" --dir "$6" -- "$7" --resume "$8"
+' _ "$OPEN_WAIT" "$icon" "$title" "$body" "$term" "$dir" "$claude_bin" "$id" >/dev/null 2>&1 </dev/null

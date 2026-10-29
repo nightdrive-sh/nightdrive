@@ -47,8 +47,9 @@ Nightdrive puts all of that together into one opinionated desktop.
 - **Power**: lock, sleep, log out, restart and shut down
 - **Music**: while it plays, a player row above the list
 
-Type a question and press ⌘⌥Enter to send it to Claude Code. Search "Rename current space" to name the workspace you're
-on in the bar.
+Type a request and press ⌘⌥Enter: Claude does it in the background with [Nightdrive's tools](docs/claude.md) and
+answers in a notification (⌘⌃Enter sends it to Claude Code in a terminal instead). Search "Rename current space" to name
+the workspace you're on in the bar.
 
 It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and the answer is the first row; Enter
 copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal comma in results* answers `3,5`.
@@ -203,7 +204,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own) | a mailbox both ways with your phone and other computers, over Tailscale |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
 | Passwords (optional) | [1Password](plugins/1password/README.md) and its `op` CLI | Passwords level in the Launcher, SSH agent |
-| AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘⌥Enter, ask from the Launcher, Claude writes (⌘⇧C), sessions and usage limits in the bar |
+| AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘⌥Enter asks from the Launcher, ⌘⌃Enter in a terminal, Claude writes (⌘⇧C), sessions and usage limits in the bar |
 | Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet, offline) | hold F5 or Fn (Mac), Insert (PC) to talk |
 | Network | NetworkManager, BlueZ, [Tailscale](plugins/tailscale/README.md) | Wi-Fi, Bluetooth and Tailscale menus |
 | Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 %), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
@@ -440,7 +441,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |
 | `nightdrive software search gimp` | Fedora's packages and Flathub's apps, as System › Install › Software finds them; `info dnf ID` (or `flatpak`, `plugin`), `installed` and `plugins` tell more (`--json`). `install dnf ID` or `install flatpak ID` installs one, `remove` removes it, `preview install …` shows first what would change; dnf asks for the password in the system's own dialog |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the Launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
-| `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS` |
+| `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌃Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS` |
 | `nightdrive mcp access open` | Claude's access, the window of Launcher › Settings › Claude › *Access*: each area's Read, Modify and Delete, `Allow`, `Ask` or `No`. `level strict` (`normal`, `open`) sets them all, `set mail read allow` one, and `nightdrive mcp access` alone shows what applies. `nightdrive mcp install` gives Claude Code the tools, `remove` takes them away |
 | `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck, Ferry… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
@@ -453,7 +454,8 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 |---|---|
 | ⌘ Space | Launcher |
 | ⌘ Enter | Terminal |
-| ⌘ ⌥ Enter | Claude Code (with text typed in the Launcher: sends it as the prompt) |
+| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, answered in the background with Nightdrive's tools only, the answer a notification (Claude Code without text) |
+| ⌘ ⌃ Enter | Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt) |
 | ⌘ C / ⌘ V / ⌘ X | Copy, paste, cut, in every app |
 | ⌘ S | Save |
 | ⌘ W | Close (background apps are only hidden) |

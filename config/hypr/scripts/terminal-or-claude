@@ -1,5 +1,6 @@
 #!/bin/bash
-# ⌘⌥Enter: if the launcher is open with text typed in it, send that to Claude Code; otherwise open an empty Claude.
+# ⌘⌃Enter: if the launcher is open with text typed in it, send that to Claude Code; otherwise open an empty Claude.
+# (⌘⌥Enter asks in the background: ask-claude, which comes here without the text, or when it can't.)
 # terminal-or-claude [--dir DIR] [--name NAME] [--effort LEVEL] [--background] [--workspace WS] [--] [PROMPT…]: start Claude Code with
 # that prompt, in DIR (~/Projects unless given), the session named NAME (claude -n, as /rename), at effort LEVEL
 # (claude --effort). --background opens its window without the keyboard, so typing elsewhere isn't cut off (a session
@@ -7,7 +8,7 @@
 # notification says it opened, a click on it going to the window. It opens on the workspace of the window it was called
 # from (found up the process chain: the project manager's terminal), even if the user has moved to another one since;
 # called from no window, on the active one. --workspace WS (a number or special:NAME) names the workspace instead.
-# The launcher's askClaude, crash reports and `nightdrive ask` call this.
+# The launcher's askClaude, ask-claude, crash reports and `nightdrive ask` call this.
 readonly BG_CLASS=claude-background   # hyprland.lua's rule, and TERMINAL_CLASSES in bindings.lua
 readonly BG_WAIT=15                   # seconds to wait for the window before giving up on the notification
 dir="$HOME/Projects"; name=; effort=; bg=0; ws=; bare=$(( $# == 0 ))
@@ -38,7 +39,7 @@ claude=("$HOME/.local/bin/claude")
 [[ -n $effort ]] && claude+=(--effort "$effort")
 (( $# )) && claude+=(-- "$*")
 if (( bare )); then
-  [ "$(qs ipc call launcher askClaude 2>/dev/null)" = "ok" ] && exit 0
+  [ "$(qs ipc call launcher askClaude terminal 2>/dev/null)" = "ok" ] && exit 0
   exec "$term" --dir "$dir" -- "${claude[@]}"
 fi
 bg_windows() {   # the addresses of the background sessions' windows (Ghostty's class has a prefix: scripts/terminal)
