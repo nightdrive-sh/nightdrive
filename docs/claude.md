@@ -161,9 +161,15 @@ change with Undo. What Claude reads goes to Anthropic with its answer.
 **These choices cover only Nightdrive's tools.** What Claude Code may do with its own, running commands and editing
 files, is set in Claude Code, and a command can do what a tool here can't without asking: `nightmail` sends mail, `nightdrive
 mcp access level open` changes these choices. Keep Claude Code asking before commands: if your `~/.claude/settings.json`
-or `settings.local.json` allows any command (`Bash`, `Bash(*)`, or any arguments to a shell, an interpreter or
-`nightdrive`: `Bash(nightdrive *)`) or has `defaultMode` `bypassPermissions`, the Access window, its page in Settings
-and `nightdrive mcp status` warn you. A project's own `.claude/settings` aren't read: look at them yourself.
+or `settings.local.json` allows any command (`Bash`, `Bash(*)`, or any arguments to a shell, an interpreter,
+`nightdrive` or a command that runs or writes anything: `Bash(nightdrive *)`, `Bash(timeout *)`, `Bash(find *)`,
+`Bash(cp *)`, `Bash(uv run *)`), lets Edit or Write change these settings or Claude Code's own (`Edit`,
+`Edit(~/.config/**)`, `Write(~/.claude*)`), or has `defaultMode` `bypassPermissions` or `acceptEdits`, the Access
+window, its page in Settings and `nightdrive mcp status` warn you. A project's own `.claude/settings` aren't read: look
+at them yourself.
+
+The choices are in `~/.config/nightdrive/claude-access.json`, which `nightdrive mcp install` writes at *Normal* when
+there is none. Once it has, a missing file means *Strict*, as a broken one does, until you choose a level again.
 
 A change applies at once: a session already open may still list a tool you set to *No*, but its use is refused; a new
 session sees the new list. Welcome to Nightdrive asks for the level once, at the first login, with *Off* picked.

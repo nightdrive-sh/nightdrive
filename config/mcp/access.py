@@ -49,6 +49,9 @@ VERSION = 2
 # switch) is already the user's choice. A file that can't be read gives Strict: a typo mustn't open everything.
 UNCHOSEN = "normal"
 BROKEN = "strict"
+# `nightdrive mcp install`'s note of what it added (register.py's STATE). Install writes the file, so once it has run
+# a missing file is one taken away (a sync, a clean-up, a command), and that is Strict too, not Normal (#1885)
+INSTALL_STATE = Path.home() / ".local/state/nightdrive/mcp-install.json"
 AREA_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
 LIST_ITEM = re.compile(r"[^\x00-\x1f\x7f]{1,200}")   # a list's entry without a pattern of its own: one line of text
 
@@ -155,10 +158,24 @@ def from_v1(data, path):
     return own, problem
 
 
-def load(path=FILE):
+def installed():
+    """Whether `nightdrive mcp install` has put the server or its rule in place; a note that can't be read says yes."""
+    try:
+        state = json.loads(INSTALL_STATE.read_text())
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError):
+        return True
+    return not isinstance(state, dict) or bool(state.get("server") or state.get("rule"))
+
+
+def load(path=None):
+    path = FILE if path is None else path   # FILE when called, not when defined: tests point it elsewhere
     try:
         data = json.loads(Path(path).read_text())
     except FileNotFoundError:
+        if Path(path) == FILE and installed():
+            return Access(BROKEN, problem=f"{path} is missing: Strict until you choose a level")
         return Access()
     except (OSError, ValueError) as e:
         return Access(BROKEN, problem=f"{path} can't be read ({e}): Strict until it's fixed")
@@ -225,9 +242,9 @@ def load(path=FILE):
     return Access(level, own, problem, own_options)
 
 
-def save(data, path=FILE):
+def save(data, path=None):
     """Atomic (a temporary file renamed over it): the server may read it at any moment"""
-    path = Path(path)
+    path = Path(FILE if path is None else path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".claude-access.", suffix=".tmp")
     try:
@@ -239,7 +256,7 @@ def save(data, path=FILE):
         raise
 
 
-def write(now, path=FILE):
+def write(now, path=None):
     """The file from an Access, as version 2 with only what differs from the level. A broken or missing file starts
     from its level (Strict, Normal), not from nothing."""
     data = {"version": VERSION, "level": now.level}

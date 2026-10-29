@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """`nightdrive mcp status`'s warning about Claude Code's own permissions (#1837, #1865):
 `python3 config/mcp/register_test.py`. A rule that lets Claude Code run any command, in the user's settings.json or
-settings.local.json, gets round Nightdrive's limits and is named; one command, or one subcommand, isn't."""
+settings.local.json, gets round Nightdrive's limits and is named; one command, or one subcommand, isn't. So is one
+that runs or writes anything through a wrapper (timeout, find -exec, cp, hyprctl dispatch), and an Edit or Write
+rule that reaches the Access file, Claude Code's settings or this checkout (#1885)."""
 
 import json
 import sys
@@ -17,9 +19,24 @@ import register  # noqa: E402
 ANY = ["Bash", "Bash(*)", "Bash(*:*)", "Bash(:*)", " Bash(* ) ", "Bash(nightdrive *)", "Bash(nightdrive:*)",
        "Bash(~/.local/bin/nightdrive *)", "Bash(/home/u/dotfiles/bin/nightdrive *)", "Bash(nightmail *)",
        "Bash(python3:*)", "Bash(python3.14 *)", "Bash(bash *)", "Bash(sh:*)", "Bash(sudo *)", "Bash(env *)",
-       "Bash(xargs:*)", "Bash(home-assistant *)", "Bash(software-claude *)"]
+       "Bash(xargs:*)", "Bash(home-assistant *)", "Bash(software-claude *)",
+       # #1885: what runs another command, writes any file or starts things on the desktop
+       "Bash(find *)", "Bash(awk *)", "Bash(sed *)", "Bash(git *)", "Bash(git:*)", "Bash(make *)", "Bash(npx *)",
+       "Bash(uv run *)", "Bash(uv run:*)", "Bash(timeout *)", "Bash(nohup *)", "Bash(setsid *)", "Bash(cp *)",
+       "Bash(tee *)", "Bash(hyprctl *)", "Bash(hyprctl dispatch *)", "Bash(qs *)", "Bash(qs -p *)", "Bash(gio *)",
+       "Bash(gio launch *)", "Bash(xdg-open *)", "Bash(/usr/bin/timeout *)", "Bash(curl *)", "Bash(git -c *)",
+       "Bash(find ~/Notes -name *)", "Bash(sed -n *)", "Bash(xargs -0 *)", "Bash(npm exec *)", "Bash(flatpak run *)"]
 NOT_ANY = ["Bash(nightdrive release *)", "Bash(nightdrive mcp status)", "Bash(git status)", "Bash(ls:*)", "Read(*)",
-           "Bash(python3 tools/build.py *)", "mcp__nightdrive", "Bashful", "WebFetch(*)", None, 42, ["Bash"]]
+           "Bash(python3 tools/build.py *)", "mcp__nightdrive", "Bashful", "WebFetch(*)", None, 42, ["Bash"],
+           "Bash(git add:*)", "Bash(git log *)", "Bash(uv run pytest *)", "Bash(npm run build)", "Bash(hyprctl clients)",
+           "Bash(find . -name x)", "Bash(qs ipc call launcher rows)", "Bash(jq *)", "Bash(grep *)", "Bash(rg:*)",
+           "Bash(cat *)"]
+# Edit and Write rules that reach Nightdrive's settings, Claude Code's or the server's code; and ones that don't
+EDITS = ["Edit", "Write", "Edit(*)", "Write(**)", "Edit(/**)", "Edit(//**)", "Edit(~/**)", "Edit(~/.config/**)",
+         "Edit(~/.config/nightdrive/*)", "Edit(~/.claude*)", "Edit(~/.claude/**)", "Write(~/.claude.json)",
+         "Edit(~/.local/state/**)", "MultiEdit(.config/**)", "Edit(//home/**)", "Edit(~/.config)", "Edit(~/.c*/**)"]
+NOT_EDITS = ["Edit(~/Notes/**)", "Write(~/Downloads/*)", "Edit(src/**)", "Read(~/.config/**)", "Bash(cp *)", "Edit(",
+             None, "Edit(~/.config/kitty/**)", "Edit(//tmp/**)"]
 
 
 class Rules(unittest.TestCase):
@@ -32,6 +49,22 @@ class Rules(unittest.TestCase):
         for rule in NOT_ANY:
             with self.subTest(rule=rule):
                 self.assertFalse(register.any_command(rule))
+
+    def test_edits_that_reach_the_settings(self):
+        home = Path("/home/u")
+        with mock.patch.object(register, "HOME", home), mock.patch.object(register, "REPO", home / "dotfiles"):
+            for rule in EDITS + ["Edit(~/dotfiles/**)", "Edit(//home/u/dotfiles/config/mcp/*.py)"]:
+                with self.subTest(rule=rule):
+                    self.assertTrue(register.edits_guarded(rule))
+            for rule in NOT_EDITS + ["Edit(~/dotfiles/docs/**)"]:
+                with self.subTest(rule=rule):
+                    self.assertFalse(register.edits_guarded(rule))
+            out = register.wide_open({"permissions": {"allow": ["Read(*)", "Edit(~/.config/**)"]}}, "settings.json")
+            self.assertEqual(len(out), 1)
+            self.assertIn("Edit(~/.config/**) allowed in settings.json", out[0])
+
+    def test_accept_edits_mode(self):
+        self.assertIn("acceptEdits", register.wide_open({"permissions": {"defaultMode": "acceptEdits"}})[0])
 
     def test_bypass_mode(self):
         self.assertIn("bypassPermissions", register.wide_open({"permissions": {"defaultMode": "bypassPermissions"}})[0])

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Registers Nightdrive's MCP server in Claude Code: `nightdrive mcp install|remove|status` (plan: Dashboard #1761).
 
-install does two things, and says what before doing them:
+install does these, and says what before doing them:
 - `claude mcp add -s user nightdrive -- …/nightdrive mcp`, so every Claude Code session sees the server (the launcher's
   ⌘⌥Enter and `nightdrive ask` included). Claude writes and Mail's replies run `claude -p --strict-mcp-config`, which
   leaves user servers out, so they stay without it.
 - `mcp__nightdrive__*` in permissions.allow of ~/.claude/settings.json, so Claude Code doesn't ask about each tool: the
   server asks itself, on its own card, for what has consequences. Asking twice would only teach the user to say yes.
+- Settings › Claude › Access's file at Normal when there is none yet (a level chosen in Welcome is there already):
+  once install has run, a missing file is Strict (access.py, #1885), so it must not start missing.
 
 What install added is written down (STATE), and remove takes away exactly that: a rule or a server the user had before
 stays. Without Claude Code there is nothing to register, and that isn't an error.
@@ -25,7 +27,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import changes  # noqa: E402  (after the path above)
+import access  # noqa: E402  (after the path above)
+import changes  # noqa: E402
 
 NAME = "nightdrive"                                   # the name in Claude Code: its tools are mcp__nightdrive__…
 RULE = f"mcp__{NAME}__*"
@@ -162,15 +165,40 @@ def allowed(allow):
 # settings.json and settings.local.json, which hold for every session (the second for those started in home too);
 # another project's own .claude/settings apply in that project alone, and aren't looked into.
 SETTINGS_LOCAL = HOME / ".claude" / "settings.local.json"
-# Commands that run any other, or Nightdrive's own: a rule that lets them run with any arguments lets everything
-ANY_COMMAND = re.compile(r"(?:ba|z|da|fi)?sh|python[\d.]*|perl|ruby|node|deno|bun|lua|php|env|xargs|exec|eval|sudo|"
-                         r"doas|pkexec|systemd-run|flatpak-spawn|nightdrive|nightmail|contacts|calendar|notes|tasks|"
-                         r"ferry|home-assistant|software-\w+")
+# Commands that run any other, or Nightdrive's own: a rule that lets them run with any arguments lets everything.
+# Besides shells and interpreters: what runs a command it is given (timeout, nohup, find -exec, awk's system(), sed's
+# e, git -c core.pager=…, make, npx), what writes any file (cp, tee, dd, curl -o: claude-access.json too), and what
+# starts things on the desktop (hyprctl dispatch exec, qs with a config of its own, gio launch, xdg-open a .desktop
+# file) (#1885)
+ANY_COMMAND = re.compile(r"(?:ba|z|da|fi|k|c|tc)?sh|python[\d.]*|perl|ruby|node|deno|bun|lua|php|tclsh|env|xargs|exec|"
+                         r"eval|command|builtin|source|sudo|doas|pkexec|run0|su|systemd-run|flatpak-spawn|flatpak|"
+                         r"timeout|nohup|setsid|nice|ionice|stdbuf|chrt|taskset|time|watch|script|strace|ltrace|gdb|"
+                         r"unshare|nsenter|chroot|bwrap|firejail|parallel|find|fd|awk|[gm]awk|g?sed|git|make|cmake|"
+                         r"just|npx|npm|pnpm|yarn|uvx?|pipx?|poetry|cargo|go|docker|podman|toolbox|distrobox|ssh|"
+                         r"cp|mv|install|ln|tee|dd|rsync|tar|unzip|curl|wget|truncate|vim?|nvim|emacs|"
+                         r"hyprctl|qs|quickshell|gio|xdg-open|gtk-launch|kitty|foot|ghostty|alacritty|wezterm|tmux|"
+                         r"screen|systemctl|dbus-send|gdbus|busctl|"
+                         r"nightdrive|nightmail|contacts|calendar|notes|tasks|ferry|home-assistant|software-\w+")
+# One subcommand that runs whatever follows it: Bash(uv run *) is as open as Bash(uv *)
+ANY_SUBCOMMAND = re.compile(r"(?:uv (?:tool )?run|npm (?:exec|x)|pnpm (?:exec|dlx)|yarn dlx|poetry run|pipx run|"
+                            r"git -c|hyprctl dispatch|flatpak run|docker run|podman run|gio (?:launch|open)|"
+                            r"qs (?:-p|--path|-c|--config))[\s:]*\*.*")
+# Commands that take one to run anywhere in their arguments (find -exec, sed's e, xargs): with a * at the end, what
+# Claude adds there is theirs, so Bash(find ~/Notes -name *) runs anything too
+EXEC_ANYWHERE = re.compile(r"find|fd|xargs|parallel|g?sed")
+# What Claude Code may change with Edit or Write that raises Nightdrive's limits or Claude Code's own: the Access file
+# and the install's note (#1885), Claude Code's settings, and the server's code (this checkout). A rule whose path
+# covers one of them (Edit, Write(**), Edit(~/.config/**), Edit(~/.claude*)) is named like a rule that runs anything.
+GUARDED_FILES = (".config/nightdrive/claude-access.json", ".local/state/nightdrive/mcp-install.json",
+                 ".claude/settings.json", ".claude/settings.local.json", ".claude.json")
+EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 
 
 def any_command(rule):
     """Whether one permissions.allow rule lets Claude Code run any command: Bash, Bash(*), Bash(*:*), or any arguments
-    to a shell, an interpreter or one of Nightdrive's own commands (Bash(nightdrive *), Bash(python3:*))."""
+    to a shell, an interpreter, a command that runs or writes anything, or one of Nightdrive's own commands
+    (Bash(nightdrive *), Bash(python3:*), Bash(timeout *)), a subcommand that runs anything (Bash(uv run *)), or a *
+    at the end for one that takes a command anywhere (Bash(find . -name *))."""
     m = re.fullmatch(r"Bash(?:\((.*)\))?", rule.strip()) if isinstance(rule, str) else None
     if not m:
         return False
@@ -180,7 +208,50 @@ def any_command(rule):
     # Any arguments to the command itself; not one subcommand of it (Bash(nightdrive release *)) nor one command as it
     # is (Bash(nightdrive mcp status))
     first = re.split(r"[\s:]", inner, maxsplit=1)[0]
-    return inner[len(first):].lstrip(" :").startswith("*") and bool(ANY_COMMAND.fullmatch(Path(first).name))
+    name, rest = Path(first).name, inner[len(first):].lstrip(" :")
+    if rest.startswith("*"):
+        return bool(ANY_COMMAND.fullmatch(name))
+    return bool(ANY_SUBCOMMAND.fullmatch(f"{name} {rest}")) or (bool(EXEC_ANYWHERE.fullmatch(name))
+                                                                and inner.endswith("*"))
+
+
+def glob_regex(pattern):
+    """A permission rule's path as a regex over absolute paths, the way Claude Code reads it (gitignore's): ** any
+    folders, * and ? within one name. //x is /x, ~/x is in home, and a path of its own (x, ./x, /x) is taken from
+    home, as a session started there sees it."""
+    if pattern.startswith("//"):
+        pattern = pattern[1:]
+    elif pattern.startswith("~/"):
+        pattern = f"{HOME}/{pattern[2:]}"
+    else:
+        pattern = f"{HOME}/{pattern.removeprefix('./').lstrip('/')}"
+    out, i = "", 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif pattern.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif pattern[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif pattern[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(pattern[i]), i + 1
+    return re.compile(out.rstrip("/"))
+
+
+def edits_guarded(rule):
+    """Whether one permissions.allow rule lets Claude Code change a GUARDED_FILES file or this checkout without
+    asking: Edit or Write alone, or with a path that covers one (a folder covers what is in it)."""
+    m = re.fullmatch(r"(\w+)(?:\((.*)\))?", rule.strip()) if isinstance(rule, str) else None
+    if not m or m.group(1) not in EDIT_TOOLS:
+        return False
+    inner = (m.group(2) or "").strip()
+    if inner in ("", "*", "**", "/**", "//**", "~/**"):
+        return True
+    regex = glob_regex(inner)
+    targets = [HOME / f for f in GUARDED_FILES] + [REPO / "config/mcp/access.py"]
+    return any(regex.fullmatch(str(p)) for t in targets for p in (t, *t.parents))
 
 
 def wide_open(data, where=None):
@@ -192,11 +263,18 @@ def wide_open(data, where=None):
     if perms.get("defaultMode") == "bypassPermissions":
         out.append(f"Claude Code doesn't ask before anything (defaultMode bypassPermissions in {where}): it can run "
                    "any command, and so get round these limits.")
+    if perms.get("defaultMode") == "acceptEdits":
+        out.append(f"Claude Code changes files without asking (defaultMode acceptEdits in {where}): a session started "
+                   "in your home folder can change Nightdrive's settings, and so get round these limits.")
     allow = perms.get("allow")
     rules = [r for r in allow if any_command(r)] if isinstance(allow, list) else []
     if rules:
         out.append(f"Claude Code may run any command without asking ({rules[0]} allowed in {where}): it can get "
                    "round these limits.")
+    edits = [r for r in allow if edits_guarded(r)] if isinstance(allow, list) else []
+    if edits:
+        out.append(f"Claude Code may change Nightdrive's settings or its own without asking ({edits[0]} allowed in "
+                   f"{where}): it can get round these limits.")
     return out
 
 
@@ -277,12 +355,14 @@ def install(args):
         raise Refused(f"Claude Code already has a server called {NAME}: {' '.join(have_cmd)}\n"
                       f"Nothing was changed. To replace it: claude mcp remove {NAME} -s user, then install again.")
     text, data = read_settings()
-    register, allow = have_cmd != want, not allowed(allow_list(data))
-    if not register and not allow:
+    register, allow, level = have_cmd != want, not allowed(allow_list(data)), not access.FILE.exists()
+    if not register and not allow and not level:
         print(f"Already installed: {' '.join(want)}, its tools allowed in {SETTINGS}.")
         return 0
 
     steps = []
+    if level:
+        steps.append(f"Choose the level Normal in Settings › Claude › Access, as none is chosen yet:\n  {access.FILE}")
     if register:
         instead = f" (in place of {' '.join(have_cmd)})" if have else ""
         steps.append(f"Register the server in Claude Code, for all your projects{instead}:\n"
@@ -293,6 +373,9 @@ def install(args):
     if not confirm("\n\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1)), args):
         return 0
 
+    # The level before anything that counts as installed: from then on a missing file would be Strict
+    if level and not access.FILE.exists():
+        access.write(access.Access(access.UNCHOSEN))
     # settings.json first: a `claude mcp add` may rewrite the file, and after ours it keeps the rule
     text, data = read_settings()
     if allow and not allowed(allow_list(data)):   # the user may have allowed it meanwhile, and then it is theirs

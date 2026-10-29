@@ -38,8 +38,16 @@ Item {
         onLoaded: { try { w.fileLevel = JSON.parse(text()).level || "" } catch (e) { w.fileLevel = "" } }
         onLoadFailed: w.fileLevel = ""
     }
-    // Without a file the server uses Normal (access.py's UNCHOSEN)
-    readonly property string summary: presetName(fileLevel || "normal")
+    // Without a file the server uses Normal (access.py's UNCHOSEN), but Strict once `nightdrive mcp install` has run
+    // (its note, access.py's INSTALL_STATE): install writes the file, so missing then means taken away (#1885)
+    property bool installed: false
+    FileView {
+        path: Quickshell.env("HOME") + "/.local/state/nightdrive/mcp-install.json"; watchChanges: true; printErrors: false
+        onFileChanged: reload()
+        onLoaded: { try { const s = JSON.parse(text()); w.installed = !!(s.server || s.rule) } catch (e) { w.installed = true } }
+        onLoadFailed: w.installed = false
+    }
+    readonly property string summary: presetName(fileLevel || (installed ? "strict" : "normal"))
 
     property bool failed: false              // `nightdrive mcp access` gave no summary
     Sh {
