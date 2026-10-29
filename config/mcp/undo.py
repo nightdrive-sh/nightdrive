@@ -337,9 +337,39 @@ def notice(entry_id, action):
 def recent_changes(args):
     """Claude's view of the log, newest first."""
     limit = args.get("limit", 10)
-    rows = [{k: e.get(k) for k in ("id", "time", "notice", "tool", "arguments", "state", "at")}
-            for e in reversed(changes.read())]
+    try:
+        rules = access.load()
+    except Exception:  # then no area is known to be readable: only what each change was
+        rules = None
+    rows = [listed(e, rules) for e in reversed(changes.read())]
     return {"changes": rows[:limit], "total": len(rows)}
+
+
+def listed(entry, rules):
+    """One change as recent_changes gives it. Its arguments and notice are its area's (a draft's text, a note's): an
+    area Claude may not read now without asking, or at all, gives only the tool and its state, as the Nightdrive row
+    is read even on Strict (#1884); one whose codes Claude doesn't read gets them masked, as its own reads would."""
+    row = {k: entry.get(k) for k in ("id", "time", "notice", "tool", "arguments", "state", "at")}
+    area = entry.get("area")
+    if rules is None or not area or rules.decide("read", area, "read") != "allow":
+        row["notice"] = f"A change made with {entry.get('tool')}"
+        row.pop("arguments")
+        return row
+    if any(o["id"] == "secrets" for o in access.areas.options(area)) and not rules.option(area, "secrets"):
+        import mask   # only now: most rows don't need it
+        row["notice"] = mask.mask(row["notice"])
+        row["arguments"] = masked(row["arguments"], mask.mask)
+    return row
+
+
+def masked(value, how):
+    if isinstance(value, str):
+        return how(value)
+    if isinstance(value, list):
+        return [masked(v, how) for v in value]
+    if isinstance(value, dict):
+        return {k: masked(v, how) for k, v in value.items()}
+    return value
 
 
 def undo_change(args):

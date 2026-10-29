@@ -31,6 +31,11 @@ LEVELS = {
              "areas": {}},
 }
 
+# The names password managers and authenticators give their notifications (notify-send's app name, any case)
+VAULTS = ("1Password", "Bitwarden", "KeePassXC", "Proton Pass", "Enpass", "Secrets", "Passwords and Keys",
+          "KWalletManager", "Authenticator", "Ente Auth", "Aegis", "Authy", "Google Authenticator",
+          "Microsoft Authenticator", "2FAS", "Dashlane", "NordPass", "LastPass")
+
 # An area's own choices, on (allowed) or off per level. Normal is the security review's (log 3295): Claude locks and
 # closes but doesn't unlock or open, as a card allowed while tired mustn't open the front door; runs an automation but
 # doesn't turn one off, a silent danger (the leak alarm stops); leaves out the sensors that tell whether anyone is home
@@ -55,7 +60,13 @@ OPTIONS = {
     # Masking (logs 3300, 3301, 3304, 3306): codes, login links and card numbers are what an injection wants most and
     # what Claude doesn't need, so they stay hidden on Open too; the user may show them area by area
     **{area: {"secrets": {"strict": False, "normal": False, "open": False}}
-       for area in ("mail", "calendar", "notes", "ferry", "notifications")},
+       for area in ("mail", "calendar", "notes", "ferry", "tasks")},
+    # The apps whose notifications are a code or a vault's (#1884), as claude-write's BLOCKED_CLASSES are the windows
+    # nothing is sent from: by the name a notification shows, on every level, the user may take one off
+    "notifications": {
+        "secrets": {"strict": False, "normal": False, "open": False},
+        "apps": {level: list(VAULTS) for level in ("strict", "normal", "open")},
+    },
     # Software (log 3302): Fedora's own repositories and Flathub's verified apps only, as a name one letter off or an
     # unknown publisher is how a bad package gets in; never removing what the desktop runs on, not even on Open (the
     # user may turn it on); Nightdrive's own plugins only, as another's installer runs its code

@@ -11,8 +11,9 @@ without pictures, so nothing is written. Without --json they print text for a te
 Claude's calls (NIGHTDRIVE_MCP=1, from Nightdrive's MCP server) get only the parts of a card the user ticks in Settings ›
 Claude › Access › Contacts (NIGHTDRIVE_MCP_OPTIONS, #1789; config/mcp/areas.py): one that is off isn't given, searched
 or looked up by, so a number Claude has can't name its owner either. Its search needs a word of 2 characters and gives
-at most LIMIT people, so the address book can't be read a letter at a time. The note, when given, is masked by the
-server (mcp.json's mask).
+at most LIMIT people, so the address book can't be read a letter at a time, and find and card together give at most
+given.PER_HOUR different people an hour, so not two letters at a time either (#1884). The note, when given, is masked
+by the server (mcp.json's mask).
 """
 
 import json
@@ -21,6 +22,7 @@ import re
 import sys
 
 import cards
+import given
 
 LIMIT = 25      # find's default, and the most Claude gets: enough to pick from, short enough to read
 SHORTEST = 2    # Claude's search needs a word at least this long
@@ -101,6 +103,8 @@ def find(query, limit):
         raise LookupError(f"Search with a name or a word of at least {SHORTEST} characters, or {SHORTEST_NUMBER} "
                           "digits of a number, not single letters.")
     found = [p for p in everyone() if all(w in haystack(p) for w in words)]
+    if SHOWN is not None:
+        given.take([p["id"] for p in found[:limit]])   # past the hour's limit: LookupError, nothing given
     return {"query": query, "count": len(found), "people": [brief(p) for p in found[:limit]]}
 
 
@@ -115,6 +119,8 @@ def card(who):
              if shown("emails") else None)
          or (next((x for x in people if any(re.sub(r"\D", "", n["value"])[-9:] == digits for n in x["phones"])), None)
              if is_number and shown("phones") else None))
+    if p and SHOWN is not None:
+        given.take([p["id"]])
     return whole(p) if p else None
 
 
@@ -173,7 +179,10 @@ def main(argv):
             sys.exit(str(e))
         print(json.dumps(result, ensure_ascii=False) if as_json else text_find(result))
         return
-    p = card(query)
+    try:
+        p = card(query)
+    except LookupError as e:
+        sys.exit(str(e))
     # Looked up by a part Access leaves out: say so, as "not in your contacts" would be untrue
     hidden = next((words for f, words, looks in (("emails", "email addresses", "@" in query),
                                                  ("phones", "phone numbers", len(re.sub(r"\D", "", query)) >= 5))

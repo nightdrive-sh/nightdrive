@@ -160,7 +160,7 @@ def labelled(text, found):
 
 
 # --- Card numbers ---------------------------------------------------------------------------------------------------
-CARD = re.compile(r"(?<![\w+.,/#-])[2-6](?:[ -]?\d){12,18}(?![\w])(?![.,/-]\d)")
+CARD = re.compile(r"(?<![\w+.,/#-])[2-6](?:[ ._-]?\d){12,18}(?![\w])(?![.,/-]\d)")   # 4111.1111…, 4111_1111… too
 CARD_GROUPS = ([4, 6, 5], [4, 6, 4])   # American Express, Diners; the rest are fours
 LABELLED_CVV = re.compile(r"(?<![\w-])(CVV2?|CVC2?|CID|CSC|security code|card code|turvakoodi|tarkistusnumero|"
                           r"varmistusnumero)(\W{0,3})(\d{3,4})(?!\d)", re.I)
@@ -184,7 +184,7 @@ def card_number(text):
     digits = re.sub(r"\D", "", text)
     if not 13 <= len(digits) <= 19 or not luhn(digits) or len(set(digits)) < 2:
         return None
-    groups = [len(g) for g in re.split(r"[ -]", text)]
+    groups = [len(g) for g in re.split(r"[ ._-]", text)]
     if len(groups) == 1:
         return digits if len(digits) in (15, 16) else None
     fours = all(g == 4 for g in groups[:-1]) and 1 <= groups[-1] <= 4
@@ -195,7 +195,7 @@ def cards(text, found):
     def one(m):
         # The longest start of it that is a card: "4242 4242 4242 4242 2027" is a card and then a year
         s = m.group(0)
-        for end in [len(s)] + [i for i in range(len(s) - 1, 0, -1) if s[i] in " -"]:
+        for end in [len(s)] + [i for i in range(len(s) - 1, 0, -1) if s[i] in " ._-"]:
             digits = card_number(s[:end])
             if digits:
                 return found.mark("•••• " + digits[-4:], "card") + s[end:]
@@ -264,9 +264,11 @@ NOT_CODE = re.compile(r"postal|post|zip|area|country|qr|source|error|status|prom
                       r"asiakas|booking|varaus", re.I)
 NOT_CODE_AFTER = re.compile(r"reviews?|of|editor|block|snippet|style|quality|changes?|commits?|repo(?:sitory)?|signing|"
                             r"base|owners?", re.I)
-# A code as one number, or as digits spaced out one or two at a time ("4 8 2 9 1 3", "48-29-13"): read aloud the same
-DIGITS = re.compile(r"(?<![\w.,:/+#€$£-])(?<!\d[ -])(?:G-)?(\d{4,8}|\d{3}[ -]\d{3}|\d{4}[ -]\d{4}|"
-                    r"\d(?:[ -]\d){3,7}|\d\d(?:[ -]\d\d){1,3})"
+# A code as one number, or as digits spaced out one or two at a time ("4 8 2 9 1 3", "48-29-13"): read aloud the same.
+# One at a time also with underscores ("4_8_2_9_1_3", #1884) or dots, five or more ("4.8.2.9.1.3": 1.2.3.4 is a
+# version); two at a time, not: 12.10.26 is a date
+DIGITS = re.compile(r"(?<![\w.,:/+#€$£-])(?<!\d[ -])(?:G-)?(\d{4,8}|\d{3}[ _-]\d{3}|\d{4}[ _-]\d{4}|"
+                    r"\d(?:[ -]\d){3,7}|\d(?:\.\d){4,7}|\d(?:_\d){3,7}|\d\d(?:[ -]\d\d){1,3})"
                     r"(?![\w%€$£]|[.,:/-]\d|[ -]\d)")
 LETTERS_AND_DIGITS = re.compile(r"(?<![\w-])(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9]{2,8}(?:-[A-Z0-9]{2,8}){0,2}"
                                 r"(?![\w-])")
@@ -274,6 +276,16 @@ NOT_A_CODE_TOKEN = {"2FA", "MFA", "OTP", "PIN", "PUK", "SMS", "G-", "4G", "5G", 
 SENTENCE = re.compile(r"(?<=[.!?])(?=\s)|(?<=\n)")   # where re.split cuts a text into sentences and lines
 LONE_CODE = re.compile(r"\s*(?:G-)?(?:\d{4,8}|\d{3}[ -]\d{3}|\d(?:[ -]\d){3,7}|\d\d(?:[ -]\d\d){1,3}|"
                        r"(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]{4,12})\s*")
+# A number to use to sign in, with no code word: "Use 482913 to log in to Acme", "Sign in with 482913" (#1884). Only
+# right after use/enter and before the sign-in, or after "sign in with": "Order 482913 shipped, log in to track it"
+# and "Use 2024 budget, then log in" keep their numbers
+SIGN_IN = r"(?:log(?:ging)?|sign(?:ing)?)[- ]?in|kirjaudu\w*|kirjautu\w*"
+LOGIN_NUMBER = r"(?:G-)?(?:\d{4,8}|\d{3}[ -]\d{3})(?![\w.,/-]\d|\w)"
+LOGIN_CODE = [re.compile(r"(?<!\w)(?:use|enter|type|input|käytä|syötä)\s+(?:the\s+)?(" + LOGIN_NUMBER +
+                         r")(?=[ \t]*,?[ \t]*(?:(?:to|for|when|while|as|and|kun|ja)[ \t]+){0,2}(?:" + SIGN_IN +
+                         r")(?!\w))", re.I),
+              re.compile(r"(?<!\w)(?:" + SIGN_IN + r")\s+(?:with|using|by entering|by typing)\s+(" + LOGIN_NUMBER + ")",
+                         re.I)]
 DIAL_PASSCODE = re.compile(r"(,,\d{6,12}#(?:,,+)?\*?)(\d{4,10})(#)")   # a dial-in string's passcode: ,,845…#,,,,*123456#
 
 
@@ -322,6 +334,9 @@ def codes_in(sentence, words, found):
 
 def one_time_codes(text, found):
     text = DIAL_PASSCODE.sub(lambda m: m.group(1) + found.mark(CODE) + m.group(3), text)
+    for pattern in LOGIN_CODE:
+        text = pattern.sub(lambda m: m.group(0)[:m.start(1) - m.start()] + found.mark(CODE) +
+                           m.group(0)[m.end(1) - m.start():], text)
     out, carry = [], False
     for sentence in SENTENCE.split(text):
         words = list(code_words(sentence))
@@ -364,8 +379,8 @@ def lone_passwords(text, found):
 # A model reads 482913 in "48<zero-width space>29<zero-width space>13" and in keycap emoji digits, but no rule above
 # would see a number there, and an injection can ask a sender to write a code so (Dashboard #1861). So before the
 # rules: format characters (zero-width spaces, soft hyphens, direction marks, the invisible tag letters of "ASCII
-# smuggling") go, marks on a digit go, and digits of other forms (fullwidth, superscript, circled, mathematical)
-# become 0-9. Only Claude's copy changes. A zero-width joiner or non-joiner between two letters of another script
+# smuggling") go, marks on a digit go, digits of other forms (fullwidth, superscript, circled, mathematical)
+# become 0-9, and spaces of other widths a space. Only Claude's copy changes. A zero-width joiner or non-joiner between two letters of another script
 # stays: emoji families and Persian or Indic words need it.
 JOINERS = "\u200c\u200d"
 DIGIT_MARK = re.compile(r"(?<=[0-9])[\u0300-\u036f\u20d0-\u20ff\ufe00-\ufe0f]+")   # 4 + FE0F + 20E3, a keycap
@@ -380,6 +395,8 @@ def visible(text):
             continue
         if not c.isascii() and unicodedata.digit(c, None) is not None:
             c = str(unicodedata.digit(c))
+        elif c != " " and unicodedata.category(c) == "Zs":
+            c = " "   # a thin or no-break space between digits is a space: "482 913" (U+2009) is a code (#1884)
         out.append(c)
     return DIGIT_MARK.sub("", "".join(out))
 

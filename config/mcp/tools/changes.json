@@ -3,7 +3,7 @@
     {
       "name": "recent_changes",
       "title": "Claude's recent changes",
-      "description": "The changes you (Claude) have made on this desktop with Nightdrive's tools, newest first: id, time, what it was (notice), the tool and its arguments, and state (done, or undone). Use it when the user asks to undo something, to find which change they mean.",
+      "description": "The changes you (Claude) have made on this desktop with Nightdrive's tools, newest first: id, time, what it was (notice), the tool and its arguments (not for an area you may not read now), and state (done, or undone). Use it when the user asks to undo something, to find which change they mean.",
       "inputSchema": {
         "type": "object",
         "properties": {

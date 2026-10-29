@@ -17,7 +17,7 @@ them for now.
 
 - Today has what is due today and what is late (in red); Scheduled every task with a date, by day; Done the last 100 done.
 - A task due on a day without a time is notified at 9:00 that day. Later moves it on an hour, or a day without a time, and it comes again then. Done ticks it off.
-- Ask Claude: "remind me to call the dentist tomorrow at 10", "what's due this week?", "move the bread to Saturday". Every change Claude makes shows a notification with Undo.
+- Ask Claude: "remind me to call the dentist tomorrow at 10", "what's due this week?", "move the bread to Saturday". Every change Claude makes shows a notification with Undo. A code, PIN or password in a task reaches Claude hidden (`[code hidden]`), unless Access › Tasks › *Codes, card numbers and passwords* is on.
 
 ## In a terminal
 

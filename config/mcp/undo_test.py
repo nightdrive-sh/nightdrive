@@ -472,5 +472,53 @@ class Notice(unittest.TestCase):
         self.assertEqual(undo.notice_text(tool, {"to": [1, 2], "subject": "S"}), "Wrote a draft in Mail to [1, 2]: S")
 
 
+class Recent(unittest.TestCase):
+    """recent_changes gives what changes were made with only for an area Claude may read now (#1884): mail set to No
+    after a draft doesn't hand the draft's text back through the Nightdrive row, which is read even on Strict."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        p = mock.patch.object(changes, "FILE", Path(self.tmp.name) / "claude-changes.jsonl")
+        p.start()
+        self.addCleanup(p.stop)
+        for tool, area, args, notice in (
+                ("mail_draft", "mail", {"to": ["a@b.c"], "body": "Door code: 4829, card 4242 4242 4242 4242"},
+                 "Wrote a draft in Mail to a@b.c: Code 482913"),
+                ("tasks_add", "tasks", {"title": "PIN 4829", "note": "Password: Tr0ub4dor&3"}, "Added the task PIN 4829"),
+                ("appearance_theme", "appearance", {"theme": "nord"}, "Changed the theme to nord"),
+                ("old_tool", None, {"text": "secret plans"}, "Something")):
+            changes.add({"tool": tool, "notice": notice, "arguments": args, "before": {}, "do": ["true"],
+                         "stdin": None, "undo": ["true"], "remake": ["true"], "dir": str(HERE), "timeout": 5,
+                         **({"area": area} if area else {}), "options_from": []})
+
+    def rows(self, own=None, options=None):
+        rules = undo.access.Access("normal", own=own or {}, own_options=options or {})
+        with mock.patch.object(undo.access, "load", lambda: rules):
+            return {r["tool"]: r for r in undo.recent_changes({"limit": 10})["changes"]}
+
+    def test_read_no_or_ask(self):
+        for value in ("no", "ask"):
+            rows = self.rows(own={"mail": {"read": value}})
+            self.assertNotIn("arguments", rows["mail_draft"])
+            self.assertNotIn("482913", json.dumps(rows["mail_draft"]))
+            self.assertEqual(rows["mail_draft"]["notice"], "A change made with mail_draft")
+            self.assertEqual(rows["appearance_theme"]["arguments"], {"theme": "nord"})
+
+    def test_masked_as_the_area_reads(self):
+        rows = self.rows(own={"mail": {"read": "allow"}})
+        self.assertEqual(rows["mail_draft"]["arguments"]["body"], "Door code: [code hidden], card •••• 4242")
+        self.assertEqual(rows["mail_draft"]["notice"], "Wrote a draft in Mail to a@b.c: Code [code hidden]")
+        self.assertEqual(rows["tasks_add"]["arguments"], {"title": "PIN [code hidden]", "note": "Password: [password hidden]"})
+        rows = self.rows(own={"mail": {"read": "allow"}}, options={"mail": {"secrets": True}})
+        self.assertIn("4829", rows["mail_draft"]["arguments"]["body"])
+
+    def test_no_area_or_no_access(self):
+        self.assertNotIn("arguments", self.rows()["old_tool"])
+        with mock.patch.object(undo.access, "load", side_effect=ValueError("broken")):
+            rows = undo.recent_changes({})["changes"]
+        self.assertTrue(all("arguments" not in r for r in rows))
+
+
 if __name__ == "__main__":
     unittest.main()

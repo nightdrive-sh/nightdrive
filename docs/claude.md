@@ -43,7 +43,8 @@ deletion as long as its Undo is on screen), so you can also ask it later ("undo 
 conversation's own last change. Undo runs only what the change's tool would: a log edited by hand runs nothing else.
 A change that couldn't be undone isn't offered as a change at all. An undo that does what only the card allows (Do Not
 Disturb back on, deleting an event Claude added) asks on the card too, and one that would move the focus
-waits while you type: **Try again** on the notification runs it.
+waits while you type: **Try again** on the notification runs it. Asked which changes it made, Claude sees what a change
+was made with (a draft's text) only for an area it may read now without asking, masked as that area's reads are.
 
 ## Settings › Claude › Access
 
@@ -87,16 +88,17 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   addresses* and *Note*, off on Normal, as they are other people's. A part that is off isn't given, nor searched or
   looked up by: Claude can't find who a number or a street belongs to. A note, when on, and the company, title and
   nickname (a shared address book's are anyone's text) come with card numbers, codes and passwords masked. Claude's
-  search needs a word of two characters or more (a number three digits) and gives at most 25 people, so the address
-  book isn't read a letter at a time.
+  search needs a word of two characters or more (a number three digits) and gives at most 25 people, and searches and
+  cards give it at most 100 different people an hour, so the address book isn't read a letter or two at a time.
 
-  Mail, Calendar, Notes, Ferry and Notifications have *Codes, card numbers and passwords*, off on every level: what
-  Claude reads there comes with them hidden, before it leaves your computer. One-time codes and meeting passcodes
+  Mail, Calendar, Notes, Tasks, Ferry and Notifications have *Codes, card numbers and passwords*, off on every level:
+  what Claude reads there comes with them hidden, before it leaves your computer. One-time codes and meeting passcodes
   (`[code hidden]`), login and password reset links (`[login link hidden]`), card numbers with their expiry and CVV
   (`•••• 4242`), IBANs (`FI •••• 0785`), Finnish identity codes, passwords and API keys; a Ferry text that is a code or
   a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. Invisible
   characters are taken out first and digits of other forms (`４`, `⁴`) read as 0–9, so a code split by them or spaced
-  out (`4 8 2 9 1 3`) is hidden too. A reply Claude drafts comes back with its quote hidden the same way: the card that
+  out (`4 8 2 9 1 3`, `4.8.2.9.1.3`, a thin space) is hidden too, as is a number to sign in with ("Use 482913 to log
+  in"). A reply Claude drafts comes back with its quote hidden the same way: the card that
   sends it shows `[code hidden]` where the mail has the code, and the draft goes out whole: a line on the card says
   what goes out so (*Hidden from Claude*), and such a reply goes only to you and those on the mail it answers (to
   anyone else, send it from Mail). It goes by patterns, so a
@@ -108,9 +110,10 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   app and the window's title; a ticked app's windows Claude sees without the card. Password managers and private
   windows never, ticked or not, nor a window with a menu, a notification or the launcher over it. A password manager's
   browser extension pops up inside the browser's window, though: a picture of the browser shows it. The list of
-  windows names a private window's app (not its title), so Claude can tell a password manager is open. Asked for an
-  app's window by name, Claude gets the one the card showed, or none. In a terminal: `nightdrive mcp access option
-  screen apps add kitty` (a window class or the app's name), `remove` to take it off.
+  windows names a private window's app (not its title), so Claude can tell a password manager is open. Claude gets the
+  window the card showed with the title it showed, or none (a tab switched meanwhile), and a ticked app's window
+  showing a title Claude hasn't pictured before asks again: the bank tab after Wikipedia. In a terminal: `nightdrive
+  mcp access option screen apps add kitty` (a window class or the app's name), `remove` to take it off.
 
   Mail has a list too, empty at first: *Mail Claude never gets*. Type an address (`maija@example.com`), a domain
   (`bank.fi`, which takes `mail.bank.fi` along) or a tag (`tag:health`) in the field under it and press Enter; Space
@@ -120,8 +123,8 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   notifications are left out of the latest notifications as well, as they name the sender and the subject. Your own
   `nightmail` in a terminal still shows everything. `nightdrive mcp access option mail blocked add bank.fi`.
 
-  Notifications has *Apps whose notifications Claude doesn't see*, empty at first: its rows are the apps in the
-  notification history. `nightdrive mcp access option notifications apps add Signal` (the name a notification shows,
+  Notifications has *Apps whose notifications Claude doesn't see*, at first the password managers and authenticators
+  (1Password, Bitwarden, KeePassXC, Authenticator, Aegis…): its rows are the apps in the notification history. `nightdrive mcp access option notifications apps add Signal` (the name a notification shows,
   exactly: a web app whose notifications name it differently each time isn't caught).
 
   A list that hides can't be read (edited by hand, say): its area's Read goes to *No* until it is fixed.

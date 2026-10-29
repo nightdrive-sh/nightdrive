@@ -81,7 +81,7 @@ Google's CardDAV with an app password works, but Google's own documentation asks
 
 ## Claude
 
-With Nightdrive's tools for Claude on (Settings › Claude › Access › Contacts), Claude can search your contacts and read a card, but not change them. It gets the name and the parts of a card you tick in Access › Contacts: company, job title, email addresses and phone numbers on the Normal level; street addresses, birthday, web addresses and the note only if you turn them on (the note, company, title and nickname with card numbers, codes and passwords masked). What is off isn't searched or looked up by either. Its search needs a word of at least two characters (a number three digits) and gives at most 25 people. On Normal, reading asks you each time. These hold for Claude's calls only: `contacts find` and `contacts card` in a terminal give everything.
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Contacts), Claude can search your contacts and read a card, but not change them. It gets the name and the parts of a card you tick in Access › Contacts: company, job title, email addresses and phone numbers on the Normal level; street addresses, birthday, web addresses and the note only if you turn them on (the note, company, title and nickname with card numbers, codes and passwords masked). What is off isn't searched or looked up by either. Its search needs a word of at least two characters (a number three digits) and gives at most 25 people, and searches and cards give it at most 100 different people an hour. On Normal, reading asks you each time. These hold for Claude's calls only: `contacts find` and `contacts card` in a terminal give everything.
 
 ## In a terminal
 

@@ -122,5 +122,31 @@ class NotifySend(Home):
             self.assert_text_after_dashes(argv, title, title)
 
 
+class TasksMasked(Home):
+    """A task's title or note is a door code or a PIN as often as a note is: Claude gets it masked, as the fields the
+    tools' mcp.json names (#1884)."""
+
+    def test_list_and_changes(self):
+        sys.path.insert(0, str(HERE))
+        import mask
+        tools = {t["name"]: t for t in json.loads((REPO / "plugins/tasks/mcp.json").read_text())["tools"]}
+        env = {**self.mcp(), "NIGHTDRIVE_TASKS_DIR": str(self.home / "tasks"), "XDG_STATE_HOME": str(self.home / "s")}
+        tasks = [sys.executable, str(REPO / "plugins/tasks/lib/cli.py")]
+
+        def run(*argv):
+            p = subprocess.run(tasks + list(argv), capture_output=True, text=True, env=env)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            return json.loads(p.stdout)
+
+        made = run("add", "--json", "--note", "Card 4242 4242 4242 4242, CVV 123", "--", "Door: PIN 4829")
+        listed = mask.apply(run("list", "--json"), tools["tasks_list"]["mask"])
+        self.assertEqual([(t["title"], t["note"]) for t in listed["tasks"]],
+                         [("Door: PIN [code hidden]", "Card •••• 4242, CVV [CVV hidden]")])
+        done = mask.apply(run("done", "--json", "--", made["id"]), tools["tasks_done"]["mask"])
+        self.assertEqual((done["title"], done["note"]), ("Door: PIN [code hidden]", "Card •••• 4242, CVV [CVV hidden]"))
+        for name in ("tasks_snooze", "tasks_trash"):
+            self.assertEqual(tools[name]["mask"], ["title", "note"])
+
+
 if __name__ == "__main__":
     unittest.main()

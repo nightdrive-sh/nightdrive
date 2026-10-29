@@ -21,7 +21,9 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
                                    for Claude's card which window it would be ({App, Title, Window}: the run refuses
                                    when it would be another, NIGHTDRIVE_MCP_CARD), and "ask": false when
                                    the app is on the user's list of apps Claude sees without asking (Access › What's
-                                   on screen; NIGHTDRIVE_MCP_OPTIONS's apps, from the MCP server)
+                                   on screen; NIGHTDRIVE_MCP_OPTIONS's apps, from the MCP server), unless the window's
+                                   title isn't one pictured of that app before (SEEN): a tab switched to, the card
+                                   asks. The run refuses when the title isn't the card's any more
   windows open [--app|--url] APP|URL [--json] [--unless-typing]
                                    an app (its name or desktop id, as the Launcher lists it; an open one is brought
                                    forward) or an address (http, https, mailto: nothing else; a mailto: sets only
@@ -43,6 +45,8 @@ SCRIPTS = Path(__file__).resolve().parent
 WRITE = SCRIPTS / "claude-write"            # `claude-write blocked CLASS TITLE`: the windows nothing is sent from
 LAUNCH = SCRIPTS / "launch-or-focus"        # brings a window back from the background (special:bg)
 SHOT = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "nightdrive/windows/shot.png"
+SEEN = SHOT.parent / "seen.json"              # the titles of each app's windows pictured this session (#1884)
+SEEN_MAX = 30                                 # titles kept for one app: the latest
 MAX_EDGE = 1568        # px: a bigger picture only costs Claude more, it doesn't see more
 WAIT = 8               # s an opened app or file has to show a window
 POLL = 0.25
@@ -274,14 +278,46 @@ def card_said():
     return said if isinstance(said, dict) else {}
 
 
+def seen():
+    """{app's class: [titles pictured]}: a listed app's window with a title not among them gets a card (#1884)."""
+    try:
+        data = json.loads(SEEN.read_text())
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def remember(c):
+    data = seen()
+    key = c.get("class", "").lower()
+    titles = [t for t in data.get(key, []) if isinstance(t, str) and t != c["title"]] + [c["title"]]
+    data[key] = titles[-SEEN_MAX:]
+    SEEN.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    tmp = SEEN.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False))
+    tmp.replace(SEEN)
+
+
+def new_title(c):
+    """A window of an app pictured before, showing what wasn't pictured then: Wikipedia was, the bank tab the user
+    has switched to since wasn't. The user's list of apps Claude sees without asking was for what they had seen."""
+    titles = seen().get(c.get("class", "").lower())
+    return isinstance(titles, list) and bool(titles) and c["title"] not in titles
+
+
 def cmd_shot(a):
     wins = clients()
     c = find_window(a.window, wins)
     # By an app's name, the window is its latest: the card named one, and the user may have used another since
-    shown = card_said().get("Window")
+    said = card_said()
+    shown = said.get("Window")
     if not a.check and shown and shown != c["address"]:
         die(f"The window the card showed ({shown}) isn't {a.window}'s latest any more: no picture was taken. Ask "
             "again with the window's address.")
+    # …and the same window may show something else now: a browser's tab, switched after the card said Wikipedia
+    if not a.check and "Title" in said and said["Title"] != (c["title"] or "(no title)"):
+        die(f"The window's title changed after the card showed it ({said['Title']!r}, now another): no picture was "
+            "taken. Ask again if the user wants it.")
     visible = on_screen_workspaces()
     if blocked(c):
         die("That window is left out, as Send to Claude leaves it out (a password manager, a private window, or an "
@@ -302,7 +338,8 @@ def cmd_shot(a):
     if a.check:
         apps = entries()
         card = {"App": app_name(c["class"], apps), "Title": c["title"] or "(no title)", "Window": c["address"]}
-        print(json.dumps({**card, **({"ask": False} if listed(c, apps) else {})}, ensure_ascii=False))
+        unasked = listed(c, apps) and not new_title(c)
+        print(json.dumps({**card, **({"ask": False} if unasked else {})}, ensure_ascii=False))
         return
     scale = next((m["scale"] for m in hypr("monitors") if m["id"] == c.get("monitor")), 1)
     scale = min(scale, MAX_EDGE / max(w, h, 1))
@@ -312,6 +349,11 @@ def cmd_shot(a):
                        capture_output=True, text=True, timeout=10)
     if p.returncode != 0:
         die("grim couldn't take the picture: " + (p.stderr.strip() or "no message"))
+    if os.environ.get("NIGHTDRIVE_MCP"):
+        try:
+            remember(c)
+        except OSError:
+            pass   # the picture is taken: a title not kept only means a card next time
     info = {"address": c["address"], "app": app_name(c["class"], entries()), "class": c["class"], "title": c["title"],
             "width": round(w * scale), "height": round(h * scale)}
     if a.inline:

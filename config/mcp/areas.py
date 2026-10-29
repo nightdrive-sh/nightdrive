@@ -25,8 +25,8 @@ one), or none: typed (`typed`).
 
 RIGHTS = ("read", "modify", "delete")
 
-# What a stranger may write, or the user keep, in mail, notifications, Ferry's box, notes and invitations: hidden from
-# Claude (mask.py) unless the user turns this on for the area. Contacts' note is masked always (#1789)
+# What a stranger may write, or the user keep, in mail, notifications, Ferry's box, notes, tasks and invitations:
+# hidden from Claude (mask.py) unless the user turns this on for the area. Contacts' note is masked always (#1789)
 SECRETS = {"id": "secrets", "name": "Codes, card numbers and passwords",
            "on": "Claude reads them as they are: one-time codes, login and password reset links, card numbers, IBANs, "
                  "identity codes, passwords and keys go to Anthropic too.",
@@ -99,7 +99,8 @@ AREAS = {
     "tasks": {"name": "Tasks", "glyph": "list-checks", "app": True,
               "read": "reads your lists and tasks",
               "modify": "adds tasks, marks them done, moves them later",
-              "delete": "moves tasks to the trash"},
+              "delete": "moves tasks to the trash",
+              "options": [SECRETS]},   # a task's title or note is a door code or a PIN as often as a note is (#1884)
     "notes": {"name": "Notes", "glyph": "notebook-pen", "app": True,
               "read": "lists, searches and reads your notes in ~/Notes",
               "modify": "writes new notes and adds to the end of one",

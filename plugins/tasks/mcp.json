@@ -14,6 +14,7 @@
         "additionalProperties": false
       },
       "command": ["tasks", "list", "--json", ["--view", "{view}"], ["--list", "{list}"], ["--query", "{query}"]],
+      "mask": ["tasks.title", "tasks.note"],
       "class": "read",
       "area": "tasks"
     },
@@ -52,6 +53,7 @@
         "additionalProperties": false
       },
       "command": ["tasks", "done", "--json", "--", "{id}"],
+      "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Marked {title} done",
       "class": "change",
@@ -71,6 +73,7 @@
         "additionalProperties": false
       },
       "command": ["tasks", "snooze", "--json", ["--until", "{until}"], "--", "{id}"],
+      "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Moved {title} to {due_label}",
       "class": "change",
@@ -89,6 +92,7 @@
         "additionalProperties": false
       },
       "command": ["tasks", "trash", "--json", "--", "{id}"],
+      "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Moved the task {title} to the trash",
       "class": "change",

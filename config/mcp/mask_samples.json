@@ -104,7 +104,18 @@
     ["Card 4242\u200b4242\u200b4242\u200b4242", "Card •••• 4242"],
     ["Visa \uff14\uff12\uff14\uff12 4242 4242 4242", "Visa •••• 4242"],
     ["Your code\udb40\udc20\udb40\udc69\udb40\udc73 482913", "Your code [code hidden]"],
-    ["Perhe \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67, koodi 48\u200b2913", "Perhe \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67, koodi [code hidden]"]
+    ["Perhe \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67, koodi 48\u200b2913", "Perhe \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67, koodi [code hidden]"],
+    ["Code: 4.8.2.9.1.3", "Code: [code hidden]"],
+    ["Your code: 4_8_2_9_1_3", "Your code: [code hidden]"],
+    ["Your code is 482\u2009913", "Your code is [code hidden]"],
+    ["Your code is 482\u202f913.", "Your code is [code hidden]."],
+    ["Code 48\u200a29\u200a13", "Code [code hidden]"],
+    ["Use 482913 to log in to Acme", "Use [code hidden] to log in to Acme"],
+    ["Enter the 482913 when signing in.", "Enter the [code hidden] when signing in."],
+    ["Sign in with 482-913", "Sign in with [code hidden]"],
+    ["Käytä 482913 kirjautuessasi", "Käytä [code hidden] kirjautuessasi"],
+    ["4111.1111.1111.1111", "•••• 1111"],
+    ["Card 4111_1111_1111_1111", "Card •••• 1111"]
   ],
   "kept": [
     "Tilausnumero 1234567890123 on lähetetty.",
@@ -160,6 +171,15 @@
     "Call 0 4 0 1 2 3 or 040 123 4567.",
     "Code expires 12 10 2026",
     "Family \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67 at the cottage",
-    "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645"
+    "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645",
+    "Version 4.8.2.9 released",
+    "Call 040.123.4567",
+    "Price 1.299.000 €",
+    "Log in at 10:30 on 12.10.2026",
+    "Order 482913 shipped, log in to track it",
+    "Use 2024 budget, then log in",
+    "Code expires 12.10.26",
+    "Use 50 GB, log in",
+    "Release 1.2.3.4 of the code"
   ]
 }
