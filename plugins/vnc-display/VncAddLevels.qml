@@ -20,7 +20,8 @@ Item {
         { device: "ipad-mini", name: "iPad mini", glyph: "tablet" },
         { device: "iphone", name: "iPhone", glyph: "smartphone", summary: "15, 16" },
         { device: "iphone-max", name: "iPhone Pro Max", glyph: "smartphone" },
-        { device: "macbook-16", name: "MacBook Pro 16-inch", glyph: "laptop", summary: "2021 and later" }]
+        { device: "macbook-16", name: "MacBook Pro 16-inch", glyph: "laptop", summary: "2021 and later" },
+        { device: "display-4k", name: "4K display", glyph: "monitor", summary: "3840 × 2160 · looks like 1920 × 1080" }]
     // Other device's form filled in one go: common screens
     readonly property var common: [
         { w: 2560, h: 1600, name: "tablet", label: "Android tablet", glyph: "tablet", summary: "Tab S9, Pixel" },
@@ -66,9 +67,11 @@ Item {
     readonly property string useName: formName || (formW > 0 && formW < formH ? "phone" : "tablet")
     function looks(s) { return Math.round(formW / s) + " × " + Math.round(formH / s) }
 
-    function footer(level, query) {
+    function footer(level) {
         if (level === "vncadd") return "Enter: add, and turn its display on"
-        if (level === "vncother") return launcher.fieldRow ? (query.trim() !== "" ? "Enter: set" : "Type the value") : "Enter: change, or add the display"
+        // The same on a field's row: its box and caret say what to do, and an empty footer would hide the line, the card
+        // jumping as Tab goes from row to row
+        if (level === "vncother") return "Enter: change, or add the display"
         return ""
     }
     function opened() { listProc.running = true }

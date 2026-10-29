@@ -4,7 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
 
-// Launcher (⌘Space). A plugin's row above the search field (Deck's player: Ctrl+Space = play/pause). Root level: Apps, Passwords, Clipboard, Screenshot, Keybindings, Settings, Install, Remove, Update, Power. Enter opens an item, Esc/Backspace (with an empty query) goes back,
+// Launcher (⌘Space). A plugin's row above the search field (Deck's player: Ctrl+Space = play/pause). Root level: Apps, Passwords, Clipboard, Screenshot, Keybindings, Settings, Install, Remove, Update, Power. Enter opens an item, Esc/Backspace (with an empty query, not in a form's field) goes back,
 // at the root level Esc closes. Up/down arrows or Ctrl+N/P/J/K move the selection.
 // Apps: with an empty query, the allow-listed apps; when searching, also those hidden by sync-apps (hidden-apps.sh). See fuzzel/sync-apps, apps-allow.txt.
 // ⌃Enter shows the selected app in Apps or hides it from there; a hidden app is still found by searching, and nothing is
@@ -79,11 +79,23 @@ PanelWindow {
     function clearQuery() { holdIndex = true; input.text = ""; holdIndex = false }
     function leaveField() {
         if (fieldAt >= 0 && fieldAt !== list.currentIndex && input.text !== "") {
-            const row = results[fieldAt], t = extOf(level)
-            if (row && row.field === true && t && t.commitField) t.commitField(row, input.text)
+            const row = results[fieldAt], t = extOf(level), text = input.text
+            // Cleared before the commit: a value that changes the rows resets the list's selection, which calls this
+            // again, and with the text still there it committed twice, its keepSelection() keeping the reset row
             clearQuery()
+            if (row && row.field === true && t && t.commitField) t.commitField(row, text)
         }
         fieldAt = fieldRow ? list.currentIndex : -1
+    }
+    // Tab / ⇧Tab in a form: on to the next / previous field row, round the end (leaving the row hands over what was typed).
+    // False on a level without fields, where Tab does what it did before
+    function stepField(dir) {
+        const n = results.length
+        for (let k = 1; k <= n; k++) {
+            const i = ((list.currentIndex + dir * k) % n + n) % n
+            if (results[i].field === true) { if (i !== list.currentIndex) list.currentIndex = i; return true }
+        }
+        return false
     }
     readonly property var detail: details.item   // Install / Remove: the row whose details are shown (DetailCard.qml), null = none
     readonly property int detailWidth: 860    // the card's width while showing them
@@ -1125,7 +1137,11 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         // Delete: removes your own wallpaper in Background, the selected snippet in Snippets (empty search). ⌘⌫
                         // arrives as ⇧Home + Delete with the keyd plugin (plugins/keyd/app.conf), so it does the same
                         else if (event.key === Qt.Key_Delete && win.extDelete()) event.accepted = true
-                        // Backspace with an empty search goes back; Ctrl+⌫ (⌥⌫ with keyd: delete a word) doesn't
+                        // Tab / ⇧Tab: a form's next / previous field
+                        else if ((event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) && win.stepField(event.key === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier) ? 1 : -1)) event.accepted = true
+                        // Backspace with an empty search goes back; Ctrl+⌫ (⌥⌫ with keyd: delete a word) doesn't. In a form's
+                        // field it only deletes: one Backspace too many after clearing a value mustn't leave the form
+                        else if (event.key === Qt.Key_Backspace && !ctrl && text === "" && win.fieldRow) event.accepted = true
                         else if (event.key === Qt.Key_Backspace && !ctrl && text === "" && win.level !== "root") { win.back(); event.accepted = true }
                         // ⌥← / ⌥→ move by word, like in macOS (Hyprland sends them as Alt+arrows); ⇧ selects
                         else if ((event.modifiers & Qt.AltModifier) && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {

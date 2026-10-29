@@ -14,7 +14,7 @@
 #   vnc-display remove NAME        forgets the device: its screen, its password
 #   vnc-display run NAME           the screen itself (nightdrive-vnc-display@NAME.service, lib/serve.py)
 #
-# DEVICE is a size: ipad, ipad-13, ipad-mini, iphone, iphone-max, macbook-16, or WIDTHxHEIGHT@SCALE in the device's pixels
+# DEVICE is a size: ipad, ipad-13, ipad-mini, iphone, iphone-max, macbook-16, display-4k, or WIDTHxHEIGHT@SCALE in the device's pixels
 # (2360x1640@2). Each device is a headless output, HEADLESS-<NAME>, with a line in the state file that
 # config/hypr/virtual-display.lua reads (its size, place and workspace), and wayvnc on it as a user service of its own.
 # wayvnc listens on the Tailscale address only, and with --home also on the home network (the Wi-Fi it was added on)
@@ -68,6 +68,8 @@ size_of() {
     # MacBook Pro 16-inch (2021 on): a full-screen window below the notch at macOS's default look (1728x1117 points),
     # one pixel per point: TigerVNC on a Mac isn't Retina-aware, so the panel's own 3456x2234@2 showed a quarter of it
     macbook-16) echo "1728x1080 1 beside" ;;
+    # A 4K display (a monitor or TV with a VNC app, or a computer driving one): 1920x1080 as things look, as on a 27-inch
+    display-4k) echo "3840x2160 2 beside" ;;
     *x*@*)
       local w=${1%%x*} rest=${1#*x} h s
       h=${rest%@*} s=${rest#*@}
@@ -148,8 +150,8 @@ cmd_add() {
     esac
     shift
   done
-  [[ -n $device ]] || die "which device? vnc-display add ipad (or iphone, ipad-13, ipad-mini, iphone-max, macbook-16, 2360x1640@2)"
-  size=$(size_of "$device") || die "unknown device $device: ipad, ipad-13, ipad-mini, iphone, iphone-max, macbook-16 or WIDTHxHEIGHT@SCALE"
+  [[ -n $device ]] || die "which device? vnc-display add ipad (or iphone, ipad-13, ipad-mini, iphone-max, macbook-16, display-4k, 2360x1640@2)"
+  size=$(size_of "$device") || die "unknown device $device: ipad, ipad-13, ipad-mini, iphone, iphone-max, macbook-16, display-4k or WIDTHxHEIGHT@SCALE"
   read -r mode scale default_place <<<"$size"
   place=${place:-$default_place}
   [[ -n $name ]] || { name=${device%%-*}; [[ $name == *x*@* ]] && name=screen; }

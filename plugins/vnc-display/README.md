@@ -4,7 +4,7 @@ Use an iPad, an iPhone or any tablet, phone or computer with a VNC app as one mo
 
 ## On the computer
 
-Add the device in Settings › Other displays › Add a display: an iPad, iPhone or MacBook Pro 16-inch, or Other device for the rest (an Android tablet, a laptop): its screen's width and height in pixels, and a scale shown as the size things look. Its row there turns its display on and off, and shows how to connect: Show QR code puts a code for the device's camera on your display, with the password beside it. The password shows only when you ask for it. Or in a terminal, which prints the address, user name and password:
+Add the device in Settings › Other displays › Add a display: an iPad, iPhone, MacBook Pro 16-inch or 4K display, or Other device for the rest (an Android tablet, a laptop): its screen's width and height in pixels, and a scale shown as the size things look (Tab and ⇧Tab move between the fields). Its row there turns its display on and off, and shows how to connect: Show QR code puts a code for the device's camera on your display, with the password beside it. The password shows only when you ask for it. Or in a terminal, which prints the address, user name and password:
 
     vnc-display add ipad               # an iPad, beside your displays
     vnc-display add iphone             # an iPhone, a display for when you're away from the desk
@@ -14,7 +14,7 @@ Add the device in Settings › Other displays › Add a display: an iPad, iPhone
 - An iPad's display is to the right of yours: the pointer slides over the edge onto it. A phone's is away, so the pointer never strays there. Place on its page in Settings › Other displays puts it on another side; several on one side go outwards in the order you added them.
 - The display is there while the device is connected. When the device disconnects, the display goes, its windows move to workspace 1 and its icon leaves the top bar; it comes back when the device connects again. While its row is on, this computer waits for the device, also after a login: turn it off in Settings › Other displays (or `vnc-display off ipad`) and nothing listens for it.
 - The device uses this computer's own pointer and keyboard: a tap on the iPad moves the pointer there.
-- Sizes: `ipad` (11-inch), `ipad-13`, `ipad-mini`, `iphone`, `iphone-max` (Pro Max), `macbook-16` (MacBook Pro 16-inch), or your own in pixels and scale, e.g. `2752x2064@2`. A second device of the same kind needs a name: `vnc-display add ipad ipad2`.
+- Sizes: `ipad` (11-inch), `ipad-13`, `ipad-mini`, `iphone`, `iphone-max` (Pro Max), `macbook-16` (MacBook Pro 16-inch), `display-4k` (3840 × 2160 at scale 2), or your own in pixels and scale, e.g. `2752x2064@2`. A second device of the same kind needs a name: `vnc-display add ipad ipad2`.
 
 ## On the iPad or iPhone
 

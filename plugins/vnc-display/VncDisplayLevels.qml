@@ -48,7 +48,7 @@ Item {
     function displayRows() {
         const r = []
         for (const d of devices)
-            r.push({ kind: "vncopen", dev: d.name, name: label(d.name), glyph: phone(d) ? "smartphone" : /^macbook/.test(d.name) ? "laptop" : "tablet",
+            r.push({ kind: "vncopen", dev: d.name, name: label(d.name), glyph: phone(d) ? "smartphone" : /^macbook/.test(d.name) ? "laptop" : /^display/.test(d.name) ? "monitor" : "tablet",
                      summary: !d.on ? "off" : d.connected ? "connected · workspace " + d.workspace : "on · waiting for the device",
                      active: d.on })
         r.push({ kind: "nav", name: "Add a display", glyph: "plus", target: "vncadd",

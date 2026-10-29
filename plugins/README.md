@@ -204,7 +204,8 @@ into the field.
 A form's field is a row with `field: true` (`summary` its value, `placeholder` while empty, `unit` after a typed value):
 while it is selected, typing goes into a box on the row (`config/quickshell/FieldBox.qml`) instead of the search line;
 `activate()` reads `launcher.query` on Enter and calls `launcher.clearQuery()`, and `commitField(row, text)` takes it
-when ↑/↓ leaves the row (VNC Display's
+when ↑/↓ or Tab leaves the row. Tab and ⇧Tab go to the form's next and previous field, and Backspace in an empty field
+doesn't go back a page (VNC Display's
 [VncAddLevels.qml](vnc-display/VncAddLevels.qml): Other device).
 Deck's [MusicLevels.qml](deck/MusicLevels.qml) has most of them, Keep Awake's [KeepAwakeLevels.qml](keep-awake/KeepAwakeLevels.qml)
 is a small one to copy. The same restart applies.
