@@ -68,12 +68,14 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   parts of a card, below). Space turns the picked one on or off;
   `nightdrive mcp access option home-assistant unlock on` in a terminal.
   Home Assistant has three:
-  - *Unlock and open*: off, Claude only locks locks and closes covers (doors, gates, blinds). Opening is yours.
+  - *Unlock and open*: off, Claude only locks locks and closes covers (doors, gates, blinds), and runs no scene that
+    sets one. Opening is yours. A script, button or switch whose name says a door, gate or lock gets a warning on
+    its card: what it does, Home Assistant doesn't tell.
   - *Turn automations on or off*: off, Claude can run an automation but not stop one from running by itself (a leak
     alarm). One Claude runs keeps its conditions ("only at night").
   - *Presence and location*: off, Claude doesn't get presence, occupancy or motion sensors, nor where your phones are
-    (Home Assistant's app: address, distance, Wi-Fi), which tell whether anyone is home; nor a sensor whose name says
-    it (`binary_sensor.jari_home`, "Someone home").
+    (Home Assistant's app: address, distance, Wi-Fi), which tell whether anyone is home; nor a sensor or
+    `input_boolean` whose name says it (`binary_sensor.jari_home`, "Someone home", `input_boolean.away_mode`).
 
   Its card also shows the device's name and room from Home Assistant beside the id Claude gave, so `switch.sonoff_…`
   can't hide the oven.
