@@ -31,11 +31,11 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 caldav-url = https://caldav.example.com/
 ```
 
-- In the same file, `read-only = yes` in an account's section makes its sync only download, and `read-only = Family, Work` keeps Calendar from adding to or deleting from those calendars. `off = yes` leaves the account's calendars out.
+- In the same file, `read-only = yes` in an account's section makes its sync only download, and `read-only = Family, Work` keeps Calendar from adding to or deleting from those calendars. `shared = Family` (or `yes`, the whole account) marks the calendars others see: Claude asks on Nightdrive's card before adding to them, as what it adds goes to those people too. `off = yes` leaves the account's calendars out.
 
 ## Claude
 
-With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add an event (you can undo it from the notification), and delete one after you allow it on Nightdrive's card. It doesn't delete recurring events, nor change anything in a read-only calendar.
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add an event (you can undo it from the notification; to a `shared` calendar only after you allow it on Nightdrive's card), and delete one after you allow it on Nightdrive's card. It doesn't delete recurring events, nor change anything in a read-only calendar.
 
 ## In a terminal
 

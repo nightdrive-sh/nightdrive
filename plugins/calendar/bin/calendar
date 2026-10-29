@@ -142,6 +142,7 @@ case ${1:-open} in
   month|week) open_ready; ipc setView "$1" ;;
   calendars) python3 "$LIB/calendars.py" "${@:2}" ;;
   events)    python3 "$LIB/events.py" "${@:2}" ;;
+  shared)    exec python3 "$LIB/write.py" "$@" ;;   # Claude's calendar_add: whether it asks first
   add|delete)
     python3 "$LIB/write.py" "$@"; status=$?
     ((status == 0)) && running && ipc refresh >/dev/null 2>&1

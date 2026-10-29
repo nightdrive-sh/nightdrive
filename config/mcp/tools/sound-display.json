@@ -31,7 +31,7 @@
     {
       "name": "sound_output",
       "title": "Switch the sound output",
-      "description": "Play the desktop's sound on another output: the speakers, headphones, an AirPlay speaker, a screen. Give its name from sound_status. Bluetooth headphones must be connected first to be listed.",
+      "description": "Play the desktop's sound on another output: the speakers, headphones, an AirPlay speaker, a screen. Give its name from sound_status. Bluetooth headphones must be connected first to be listed. A speaker on the network (AirPlay) may be in another room, so the user allows that on screen first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -41,6 +41,8 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "sound", "output", "{output}"],
+      "asks_if": ["nightdrive", "sound", "remote", "{output}"],
+      "card": ["nightdrive", "sound", "card", "{output}"],
       "before": ["nightdrive", "sound", "output"],
       "undo": ["nightdrive", "sound", "output", "{output}"],
       "notice": "Switched the sound to {description}",

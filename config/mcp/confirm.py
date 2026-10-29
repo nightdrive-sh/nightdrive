@@ -56,9 +56,9 @@ LONG = 80            # characters: a longer value, or one with a newline, gets a
 CANCELLED = threading.Event()
 
 # What could make the text on the card read differently from what runs: control characters, and the ones that
-# reorder (bidi) or hide (zero-width) text. They are shown as ⟨U+202E⟩ instead. ZWJ/ZWNJ stay: scripts and emoji
-# need them.
-HIDDEN = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f؜​‎‏‪-‮⁠⁦-⁩﻿]")
+# reorder (bidi) or hide (zero-width) text, and the line and paragraph separators Qt breaks a line at, which would
+# split one value into two (#1887). They are shown as ⟨U+202E⟩ instead. ZWJ/ZWNJ stay: scripts and emoji need them.
+HIDDEN = re.compile("[\u2028\u2029\x00-\x08\x0b-\x1f\x7f-\x9f؜​‎‏‪-‮⁠⁦-⁩﻿]")
 
 
 def visible(text):
@@ -85,7 +85,8 @@ def field(name, prop, value):
     elif isinstance(value, str):
         text = value
     elif isinstance(value, list) and all(isinstance(v, (str, int, float)) and not isinstance(v, bool) for v in value):
-        text = "\n".join(v if isinstance(v, str) else json.dumps(v) for v in value)   # recipients: one a line
+        # recipients: one a line, so a line end inside one is spelled out: "a@x\nb@y" is one entry, not two (#1887)
+        text = "\n".join(v.replace("\n", "⟨U+000A⟩") if isinstance(v, str) else json.dumps(v) for v in value)
     elif value is None:
         text = "(none)"
     else:

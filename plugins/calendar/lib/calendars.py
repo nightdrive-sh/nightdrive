@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The calendars on this computer, as the sync has left them in DATA_DIR, and khal's config written from them.
 
-    calendars.py [--json]     the calendars: id, name, colour, source, read_only, events
+    calendars.py [--json]     the calendars: id, name, colour, source, read_only, shared, events
 
 A calendar is a folder DATA_DIR/<source>/<collection> (vdir: one .ics per event). Its id is "<source>/<collection>";
 its name and colour are the files vdirsyncer's metasync writes beside the events (displayname, color), an ICS
@@ -43,7 +43,8 @@ def color(text):
 
 
 def calendars():
-    """[{id, name, color, source, read_only, events, path}], the sources' order, then by name"""
+    """[{id, name, color, source, read_only, shared, events, path}], the sources' order, then by name. shared: others
+    see it (calendars.conf's `shared`), so what goes in it goes to them too"""
     out = []
     for s in sources.sources():
         base = sources.DATA_DIR / s["name"]
@@ -59,6 +60,7 @@ def calendars():
             found.append({"id": f"{s['name']}/{folder.name}", "name": name, "color": color(s.get("color") or read(folder / "color")),
                           "source": s["name"],
                           "read_only": s["read_only"] or name.lower() in s.get("read_only_calendars", []),
+                          "shared": s.get("shared", False) or name.lower() in s.get("shared_calendars", []),
                           "events": sum(1 for _ in folder.glob("*.ics")), "path": str(folder)})
         out += sorted(found, key=lambda c: c["name"].lower())
     return out

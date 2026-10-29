@@ -117,8 +117,9 @@ def main(q):
     dnf = subprocess.Popen(["dnf", "repoquery", "--available", "-q", "--latest-limit=1",
                             "--queryformat", "%{name}|%{summary}\n", f"*{q}*"], stdin=subprocess.DEVNULL,
                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-    fp = subprocess.Popen(["flatpak", "search", "--columns=application,name,description,remotes", q], stdin=subprocess.DEVNULL,
-                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    # -- : a search for "--columns=…" or "-h" is a word to look for, not an option (Claude's software_search too)
+    fp = subprocess.Popen(["flatpak", "search", "--columns=application,name,description,remotes", "--", q],
+                          stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     rpms = subprocess.Popen(["rpm", "-qa", "--qf", "%{NAME}\n"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     fpl = subprocess.Popen(["flatpak", "list", "--app", "--user", "--columns=application"],
                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)

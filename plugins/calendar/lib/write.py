@@ -5,6 +5,8 @@
         --calendar ID --title T --start S [--end E] [--location L] [--notes N]
     write.py delete [--check] CALENDAR UID   --check: stdin's JSON must name the event (title, start), as Claude's
                                              confirmation card showed it, or nothing is deleted
+    write.py shared [--calendar ID]          yes when add would put the event in a calendar others see (calendars.conf's
+                                             `shared`), so Claude's calendar_add asks on the card first; no otherwise
 
 start and end are local times, "YYYY-MM-DDTHH:MM", or days, "YYYY-MM-DD", for an all-day event; an all-day event's
 end is its last day (not iCalendar's day after). Without end: an hour, or the one day.
@@ -197,8 +199,12 @@ def options(argv):
 
 
 def main(argv):
-    if not argv or argv[0] not in ("add", "delete"):
+    if not argv or argv[0] not in ("add", "delete", "shared"):
         sys.exit(__doc__)
+    if argv[0] == "shared":
+        # The calendar add would take, or its reason why none (which add would give too)
+        print("yes" if writable((options(argv[1:]).get("calendar") or "").strip())["shared"] else "no")
+        return
     as_json = "--json" in argv
     args = [a for a in argv[1:] if a != "--json"]
     if argv[0] == "add":

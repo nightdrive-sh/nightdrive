@@ -1,0 +1,31 @@
+#!/usr/bin/python3 -I
+"""The card's row for ferry_send_text and ferry_send_files (mcp.json `card`): the device a send goes to, as Ferry
+picks it from what Claude gave (#1887). The card shows Claude's own text too, which can be anything ("phone", an id);
+this says, in Ferry's words, which device that is: its name, kind and whether it is online. A device that isn't there
+stops the call before the card.
+
+  device DEVICE        {"Goes to": "iphone (phone, online)"}
+"""
+import json, subprocess, sys
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.exit(__doc__)
+    want = sys.argv[1]
+    try:
+        out = subprocess.run(["ferry", "list", "--json"], capture_output=True, text=True, timeout=20)
+        devices = json.loads(out.stdout).get("devices") or []
+    except (OSError, ValueError, AttributeError, subprocess.TimeoutExpired):
+        sys.exit("Ferry's devices couldn't be read: nothing was sent.")
+    # As Ferry's own --to does (bin/ferry pick_device): the first whose id or name it is
+    dev = next((d for d in devices if isinstance(d, dict) and want in (d.get("id"), d.get("name"))), None)
+    if not dev:
+        sys.exit(f"No device {want}: ferry_status lists them.")
+    state = "online" if dev.get("online") else "offline"
+    print(json.dumps({"Goes to": f"{dev.get('name') or dev.get('id')} ({dev.get('kind') or 'device'}, {state})"},
+                     ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

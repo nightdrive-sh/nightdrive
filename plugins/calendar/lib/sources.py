@@ -80,8 +80,10 @@ def caldav(name, values, extra):
     if not url or extra.get("off", "").lower() in YES:
         return None
     whole, some = read_only(extra.get("read-only"))
+    # shared: the calendars others see (family, a colleague's), in the same form; Claude's calendar_add asks for them
+    shared, shared_some = read_only(extra.get("shared"))
     return {"name": name, "kind": "caldav", "url": url, "user": values["address"], "password_cmd": values["password-cmd"],
-            "read_only": whole, "read_only_calendars": some}
+            "read_only": whole, "read_only_calendars": some, "shared": shared, "shared_calendars": shared_some}
 
 
 def sources():

@@ -107,7 +107,7 @@
           "opacity": {"type": "integer", "minimum": 0, "maximum": 100, "description": "The background's opacity in per cent (default 100)"},
           "icons": {"type": "string", "enum": ["light", "dark"]},
           "highlight": {"type": "string", "enum": ["theme", "white", "black"]},
-          "icon_opacity": {"type": "integer", "minimum": 0, "maximum": 100, "description": "The icons' and text's opacity in per cent (default 85)"}
+          "icon_opacity": {"type": "integer", "minimum": 20, "maximum": 100, "description": "The icons' and text's opacity in per cent (default 85; at least 20, so the bar stays visible)"}
         },
         "additionalProperties": false
       },

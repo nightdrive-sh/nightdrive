@@ -7,6 +7,9 @@
 #                                  prints {volume, muted, mute} after (mute is "on"/"off", what --mute takes back)
 #   sound output [NAME]            makes the output with that node name (from `sound`) the default; prints {output}
 #                                  before the change, then the new one (the name is what undoes it)
+#   sound remote NAME              yes when that output plays elsewhere, over the network (AirPlay, ROC, a tunnel):
+#                                  Claude's sound_output asks on the card first (#1887); no otherwise, unknown too
+#   sound card NAME                that output for the card: {"Plays on": description, "Where": …}
 # The outputs leave out EasyEffects' virtual sink, as the menu does: it isn't a device.
 set -euo pipefail
 
@@ -18,7 +21,8 @@ outputs() {
       select(.key == "default.audio.sink") | .value.name] | first) as $def |
     .[] | select(.type == "PipeWire:Interface:Node") | (.info.props // {}) as $p |
     select($p["media.class"] == "Audio/Sink" and ($p["node.name"] | test("^easyeffects_") | not)) |
-    {id, name: $p["node.name"], description: ($p["node.description"] // $p["node.name"]), current: ($p["node.name"] == $def)}'
+    {id, name: $p["node.name"], description: ($p["node.description"] // $p["node.name"]), current: ($p["node.name"] == $def),
+     remote: ($p["node.network"] == true or ($p["node.name"] | test("^(raop|roc|tunnel|snapcast|rtp|pulse-tunnel)"; "i")))}'
 }
 
 # The default output's volume in percent and whether it is muted: "40 false"
@@ -67,5 +71,14 @@ case ${1:-} in
       list=$(dump | outputs)
     fi
     jq -sc 'map(select(.current)) | first | {output: (.name // null), description: (.description // null)}' <<<"$list" ;;
-  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  remote|card)
+    [[ -n ${2:-} ]] || { echo "usage: sound $1 NAME" >&2; exit 1; }
+    out=$(dump | outputs | jq -sc --arg n "$2" 'map(select(.name == $n)) | first // {}')
+    if [[ $1 == remote ]]; then
+      jq -r 'if .remote then "yes" else "no" end' <<<"$out"
+    else
+      jq -c 'if .name == null then {"Plays on": "an output not found"} else {"Plays on": .description,
+               Where: (if .remote then "On the network: a speaker that may be in another room" else "This computer" end)} end' <<<"$out"
+    fi ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

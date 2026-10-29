@@ -104,6 +104,25 @@ def limited(schema):
     return {**schema, "properties": {n: bounded(p) for n, p in props.items()}}
 
 
+def ecma(pattern):
+    """A schema's pattern as JSON Schema (ECMA-262) means it: $ outside a [class] is the end of the text. Python's $
+    also matches before a last line end, so "^[a-z]+$" took "firefox\\n" (#1887)."""
+    out, i, in_class = [], 0, False
+    while i < len(pattern):
+        c = pattern[i]
+        if c == "\\":
+            out.append(pattern[i:i + 2])
+            i += 2
+            continue
+        if c == "[":
+            in_class = True
+        elif c == "]":
+            in_class = False
+        out.append(r"\Z" if c == "$" and not in_class else c)
+        i += 1
+    return "".join(out)
+
+
 def beyond(prop, value):
     """What of a schema's limits a value breaks, in words; None when none. The schema is a limit, not only a hint to
     Claude: a plugin's command may count on its minLength or pattern having been kept (#1862)."""
@@ -114,7 +133,7 @@ def beyond(prop, value):
             return f"must be at most {prop.get('maxLength', STRING_MAX)} characters"
         if "pattern" in prop:
             try:
-                if not re.search(prop["pattern"], value):
+                if not re.search(ecma(prop["pattern"]), value):
                     return f"must match {prop['pattern']}"
             except (re.error, TypeError):
                 return "can't be checked: its schema's pattern is broken"

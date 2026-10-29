@@ -32,7 +32,7 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:"}
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:[0-9A-Za-z]{22}$"}
         },
         "required": ["album_uri"],
         "additionalProperties": false
@@ -48,7 +48,7 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "artist_id": {"type": "string", "title": "Artist", "description": "The artist's id from deck_search"}
+          "artist_id": {"type": "string", "title": "Artist", "description": "The artist's id from deck_search", "pattern": "^[0-9A-Za-z]{22}$"}
         },
         "required": ["artist_id"],
         "additionalProperties": false
@@ -64,7 +64,7 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:"}
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:[0-9A-Za-z]{22}$"}
         },
         "required": ["album_uri"],
         "additionalProperties": false
@@ -84,8 +84,8 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "track_uri": {"type": "string", "title": "Song", "description": "spotify:track:…", "pattern": "^spotify:track:"},
-          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:… of the song", "pattern": "^spotify:album:"}
+          "track_uri": {"type": "string", "title": "Song", "description": "spotify:track:…", "pattern": "^spotify:track:[0-9A-Za-z]{22}$"},
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:… of the song", "pattern": "^spotify:album:[0-9A-Za-z]{22}$"}
         },
         "required": ["track_uri", "album_uri"],
         "additionalProperties": false
@@ -105,7 +105,7 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:"}
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:…", "pattern": "^spotify:album:[0-9A-Za-z]{22}$"}
         },
         "required": ["album_uri"],
         "additionalProperties": false
@@ -124,8 +124,8 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "track_uri": {"type": "string", "title": "Song", "description": "spotify:track:…", "pattern": "^spotify:track:"},
-          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:… of the song", "pattern": "^spotify:album:"}
+          "track_uri": {"type": "string", "title": "Song", "description": "spotify:track:…", "pattern": "^spotify:track:[0-9A-Za-z]{22}$"},
+          "album_uri": {"type": "string", "title": "Album", "description": "spotify:album:… of the song", "pattern": "^spotify:album:[0-9A-Za-z]{22}$"}
         },
         "required": ["track_uri", "album_uri"],
         "additionalProperties": false

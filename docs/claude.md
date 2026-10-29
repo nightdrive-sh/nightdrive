@@ -36,7 +36,8 @@ the card closes then, so nothing is allowed that Claude no longer waits for. A c
 allows only once you have scrolled to its end. The card is Nightdrive's, not
 Claude Code's, so no Claude Code setting skips it, and a mail or a web page Claude reads can't send or switch anything
 without you seeing it first. A screen or network change also asks afterwards whether to keep it, and goes back by itself
-in 20 seconds unless you do.
+in 20 seconds unless you do; a screen's new scale or resolution is saved only once you keep it, so a restart in between
+brings back the one before.
 
 **Undo** is on the notification for an hour; then Redo undoes the undo. Claude keeps the last 100 changes (and a
 deletion as long as its Undo is on screen), so you can also ask it later ("undo the wallpaper"); "undo that" is the
@@ -195,7 +196,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Docs and status | the docs and keys of this version, the version, plugins, displays | undo Claude's own changes | |
 | Mail | **unread, search, threads, accounts** (without the senders, domains and tags you block) | a new draft, archive; send a draft † | **to Trash †** |
 | Contacts | **search, a card** (company, title, emails, numbers; addresses, birthday, web addresses, note: choices) | | |
-| Calendar | **calendars, events** | add an event | **an event †** |
+| Calendar | **calendars, events** | add an event (to a calendar marked shared: †) | **an event †** |
 | Tasks | lists and tasks | add, done, later | **to the trash** |
 | Notes | **list, search, read (`~/Notes`)** | a new note, add to the end of one | **to the trash** |
 | Deck | what plays, search, albums | play, queue, pause and skip, like, Pick for me | |
@@ -203,7 +204,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Home Assistant | devices and sensors (presence and location: a choice) | switch a device, lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
 | Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail) | send one, Do Not Disturb off; on † | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
-| Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output, brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
+| Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
 | Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; open a web address † | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |

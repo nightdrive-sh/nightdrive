@@ -5,7 +5,10 @@ dialog does. Enter keeps it; Esc, no answer in time, or a card that can't be sho
 command. (MCP 13, Dashboard #1774; `display … --keep` and `network … --keep` call it, Claude's act tools in
 config/mcp/tools/sound-display.json pass --keep.)
 
-    keep.py --title TEXT [--field LABEL VALUE]... [--seconds N] [--with JSON] -- REVERT ARGV...
+    keep.py --title TEXT [--field LABEL VALUE]... [--seconds N] [--with JSON] [--kept JSON] -- REVERT ARGV...
+
+--kept's JSON array is a command run once the user keeps it (`display` makes the new value last past a restart only
+then, #1887): the change is on trial until then, and what a hard restart on a black screen finds is the old one.
 
 The question waits in a process of its own session: whatever happens to the caller (Claude's call cancelled, the
 terminal closed), the change still goes back unless the user keeps it. The caller waits for the answer and prints
@@ -40,7 +43,7 @@ class Question:
 
 
 def parse(args):
-    title, fields, seconds, extra = None, [], SECONDS, {}
+    title, fields, seconds, extra, kept = None, [], SECONDS, {}, None
     while args and args[0] != "--":
         flag = args.pop(0)
         if flag == "--title" and args:
@@ -51,15 +54,29 @@ def parse(args):
             seconds = int(args.pop(0))
         elif flag == "--with" and args:
             extra = json.loads(args.pop(0))
+        elif flag == "--kept" and args:
+            kept = json.loads(args.pop(0))
+            if not isinstance(kept, list) or not kept or not all(isinstance(a, str) for a in kept):
+                sys.exit("keep.py: --kept takes a JSON array of strings, the command")
         else:
             sys.exit(f"keep.py: unknown or incomplete {flag} (see its docstring)")
     revert = args[1:]
     if not title or not revert:
-        sys.exit("usage: keep.py --title TEXT [--field LABEL VALUE]... [--seconds N] [--with JSON] -- REVERT ARGV...")
-    return title, fields, seconds, extra, revert
+        sys.exit("usage: keep.py --title TEXT [--field LABEL VALUE]... [--seconds N] [--with JSON] [--kept JSON] -- "
+                 "REVERT ARGV...")
+    return title, fields, seconds, extra, kept, revert
 
 
-def watch(title, fields, seconds, _extra, revert):
+def attempt(argv):
+    """A command's failure in words, or None when it ran."""
+    try:
+        done = subprocess.run(argv, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=REVERT_TIMEOUT)
+        return done.returncode != 0 and (done.stderr.strip() or f"exit {done.returncode}") or None
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return str(e)
+
+
+def watch(title, fields, seconds, _extra, kept_cmd, revert):
     """The detached half: ask, and go back unless kept. Its one line of stdout is the answer for the caller."""
     time.sleep(SETTLE)
     # The card's own words are an act tool's (Allow, "Denied in 20 s"): this row says what they mean here
@@ -71,14 +88,13 @@ def watch(title, fields, seconds, _extra, revert):
         # The card's message is written for an act tool ("… wasn't run: …. Ask them …"): its first sentence is why
         kept, reason = False, str(e).replace("keep wasn't run: ", "").split(". ")[0]
     if kept:
+        # Here, not in the caller: a call cancelled meanwhile still keeps what the user kept
         answer = {"kept": True}
+        failed = kept_cmd and attempt(kept_cmd)
+        if failed:
+            answer["keep_failed"] = failed
     else:
-        try:
-            done = subprocess.run(revert, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                                  timeout=REVERT_TIMEOUT)
-            failed = done.returncode != 0 and (done.stderr.strip() or f"exit {done.returncode}")
-        except (OSError, subprocess.TimeoutExpired) as e:
-            failed = str(e)
+        failed = attempt(revert)
         answer = {"kept": False, "reason": reason}
         if failed:
             answer["revert_failed"] = failed

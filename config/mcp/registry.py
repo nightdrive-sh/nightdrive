@@ -11,6 +11,8 @@ Each tool belongs to one right of its area (Tool.right: read, modify or delete; 
 Allow, Ask or No. No hides the tool; Ask, and an act tool always, runs it only once the user allows the call on the card.
 A change Access allows asks too once its area has had many in a minute, and a call the user just refused isn't shown
 to them again at once (pace.py, #1882).
+So does a call whose `asks_if` command says yes though Access allows the tool (asks): one that reaches further than
+its right says, sound to a speaker on the network or an event into a calendar others see (#1887).
 An area's own choices (access.Access.options, #1830) go to the tool too (Tool.keep): what one that is off takes away
 isn't in its schema, and its command gets them all to keep to, and another area's too when its mcp.json names that
 area in `options_from` (the latest notifications keep to Mail's blocked list: a notification would tell what it hides).
@@ -167,6 +169,11 @@ def problem(spec, plugin, external=False):
     unknown = run.placeholders(spec.get("card") or []) - set(schema.get("properties", {}))
     if unknown:
         return f"{name}: {', '.join(sorted(unknown))} in its card isn't in inputSchema"
+    if "asks_if" in spec and (spec["class"] != "change" or not is_template(spec["asks_if"])):
+        return f"{name}: asks_if is a change tool's, a list of strings (and lists of them); an act tool always asks"
+    unknown = run.placeholders(spec.get("asks_if") or []) - set(schema.get("properties", {}))
+    if unknown:
+        return f"{name}: {', '.join(sorted(unknown))} in its asks_if isn't in inputSchema"
     if not isinstance(spec.get("deletes", False), bool):
         return f"{name}: deletes must be true or false"
     if spec.get("deletes") and spec["class"] == "read":
@@ -246,6 +253,18 @@ def optional(module):
         return None
 
 
+def asks(tool, arguments):
+    """Whether a call asks on the card though Access allows its tool: its asks_if command prints yes or no. One that
+    fails, or says anything else, stops the call before anything runs, with its message."""
+    out, err, status = run.execute(tool, run.expand(tool.spec["asks_if"], arguments), None, run.timeout_of(tool))
+    if status != 0:
+        why = (err.strip() or out.strip() or f"exit status {status}")[-run.MESSAGE_MAX:]
+        raise ToolError(f"{tool.name} wasn't run: {why}")
+    if out.strip() not in ("yes", "no"):
+        raise ToolError(f"{tool.name} wasn't run: its asks_if command didn't say yes or no.")
+    return out.strip() == "yes"
+
+
 class Registry:
     def __init__(self, core=CORE, active=ACTIVE, access_file=access.FILE, log=None):
         self.core, self.active, self.access_file = Path(core), Path(active), access_file
@@ -296,6 +315,8 @@ class Registry:
         run.check(tool, arguments)
         tool.said = None   # what a card said is this call's alone (confirm.facts sets it)
         decision = self.rules.decide(tool.cls, tool.area, tool.right)
+        if decision == "allow" and tool.spec.get("asks_if") and asks(tool, arguments):
+            decision = "ask"
         paced = self.pace.due(tool, decision)
         if decision == "ask" or paced:
             if self.confirm is None:

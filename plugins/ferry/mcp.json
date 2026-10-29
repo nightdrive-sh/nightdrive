@@ -42,6 +42,7 @@
         "additionalProperties": false
       },
       "command": ["./send-files", "--to", "{to}", "--sends", "{sends}", "--", "{paths}"],
+      "card": ["./device", "{to}"],
       "class": "act",
       "area": "ferry",
       "options_from": ["apps-files"],
@@ -61,6 +62,7 @@
         "additionalProperties": false
       },
       "command": ["ferry", "text", "--to", "{to}", "{text}"],
+      "card": ["./device", "{to}"],
       "class": "act",
       "area": "ferry",
       "timeout": 60
