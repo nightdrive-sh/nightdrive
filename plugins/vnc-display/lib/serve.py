@@ -214,7 +214,9 @@ def main(name):
                         continue
                     shown = True
                     log(f"a device connected: {output} is there")
-                if listener.start(output, kb):
+                now = current(output)
+                # At scale 1 the blank picture lib/warmup.py is for already has the pixel size: no look needed
+                if listener.start(output, kb, now[:2] if now and now[2] != 1 else None):
                     listener.relay(client)
                 else:
                     log(f"wayvnc ({listener.kind}) didn't start")

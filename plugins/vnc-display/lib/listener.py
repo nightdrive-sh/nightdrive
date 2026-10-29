@@ -5,7 +5,8 @@ The connections are taken here and relayed to wayvnc on a unix socket of its own
 socket: a client that is there as wayvnc starts makes it die ("ext-image-copy-capture: Failed!", then "Fatal error while
 capturing"), as wayvnc begins capturing the pointer before its first capture of the screen is set up. A client that comes
 ~0.15 s later is fine, and the device knocks before the display, and so wayvnc, even exists. So a connection waits
-here until wayvnc has had READY seconds.
+here until wayvnc has had READY seconds, and with wayvnc 0.10 until lib/warmup.py has had a look, so the device's first
+size is the display's own.
 """
 import functools
 import os
@@ -15,10 +16,16 @@ import subprocess
 import threading
 import time
 
+try:
+    from warmup import warm_up
+except ImportError:   # python3-cryptography missing (install.sh installs it): the device's first size stays wayvnc's
+    warm_up = None
+
 READY = 0.5      # seconds wayvnc gets after its socket appears before a client is let through (measured: 0.15 is enough)
 START_WAIT = 5   # seconds to wait for wayvnc's socket
 CHUNK = 1 << 18
 DES_SINCE = (0, 10)   # the first wayvnc with the old VNC password (allow_broken_crypto); 0.9 stops at an unknown key
+WARM_SINCE = (0, 10)  # the first wayvnc whose blank picture has the logical size (lib/warmup.py)
 
 
 def log(msg):
@@ -26,15 +33,20 @@ def log(msg):
 
 
 @functools.cache
-def has_des():
-    """macOS's Screen Sharing speaks RFB 3.3 to a server that isn't Apple's, and there only the old VNC password (DES):
-    wayvnc 0.9 (neatvnc 0.9) knows neither, and the Mac says the software is incompatible (#1812)."""
+def version():
+    """wayvnc's (major, minor), or (0, 0) when it can't be told."""
     try:
         v = subprocess.run(["wayvnc", "--version"], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.TimeoutExpired):
-        return False
+        return (0, 0)
     m = re.search(r"wayvnc: v?(\d+)\.(\d+)", v)   # "wayvnc: 0.9.1", or "wayvnc: v0.10.2-bb83745 (HEAD)" from git
-    return bool(m) and (int(m[1]), int(m[2])) >= DES_SINCE
+    return (int(m[1]), int(m[2])) if m else (0, 0)
+
+
+def has_des():
+    """macOS's Screen Sharing speaks RFB 3.3 to a server that isn't Apple's, and there only the old VNC password (DES):
+    wayvnc 0.9 (neatvnc 0.9) knows neither, and the Mac says the software is incompatible (#1812)."""
+    return version() >= DES_SINCE
 
 
 def local(address):
@@ -71,6 +83,7 @@ class Listener:
         self.name, self.kind, self.conf, self.relax = name, kind, conf, relax
         self.run_dir, self.key, self.fps = run_dir, key, fps
         self.sock, self.proc, self.address, self.since = None, None, "", 0.0
+        self.warm = False   # lib/warmup.py has had its look at this wayvnc
         self.lock = threading.Lock()
         self.open = 0   # connections being relayed now, by their threads
 
@@ -106,8 +119,11 @@ class Listener:
     def running(self):
         return self.proc is not None and self.proc.poll() is None
 
-    def start(self, output, kb):
-        """wayvnc on the display, on its unix socket: True once it is there and has had READY seconds."""
+    def start(self, output, kb, size):
+        """wayvnc on the display, on its unix socket: True once it is there and has had READY seconds. size: the
+        output's (width, height) in pixels for lib/warmup.py, or None when no look is needed. The look is a client
+        that comes and goes, and that is best kept to when it helps: once (#1820), as the device came right after it,
+        wayvnc died of a clipboard event ("not a valid new object id ... data_offer")."""
         if self.proc and not self.running():
             log(f"wayvnc ({self.kind}) exited with {self.proc.returncode}")
             self.stop()
@@ -136,6 +152,11 @@ class Listener:
         if not self.running() or not os.path.exists(self.path("vnc")):
             return False
         time.sleep(max(0.0, self.since + READY - time.monotonic()))
+        if size and warm_up and not self.warm and version() >= WARM_SINCE:
+            # Once per wayvnc: it keeps the picture after the look, also for the device's reconnects
+            self.warm = True
+            seen = warm_up(self.path("vnc"), self.conf["username"], self.conf["password"], size)
+            log(f"wayvnc ({self.kind}) size before the device: {seen}")
         return True
 
     def stop(self):
@@ -146,7 +167,7 @@ class Listener:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
                 self.proc.wait()
-        self.proc = None
+        self.proc, self.warm = None, False
         for ext in ("conf", "sock", "vnc"):
             try:
                 os.remove(self.path(ext))
