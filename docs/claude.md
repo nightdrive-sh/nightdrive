@@ -107,8 +107,10 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   Apps and files has *Folders Claude can use*: Claude finds, opens, trashes and sends (Ferry) files, and takes a new
   wallpaper, only in these folders and those inside them. Strict has none, Normal Downloads, Documents, Pictures and
   Desktop, wherever they are (`~/Lataukset` in Finnish), Open the whole home. A path counts where it really is: a link
-  can't lead into one of them or out of one. Hidden files never, whatever the list. `~/Projects` isn't on Normal's on
-  purpose: it holds code, repositories and settings with their keys, and Claude Code reaches it with its own tools.
+  can't lead into one of them or out of one, and a hard link (a file with another name too, which could be anywhere)
+  isn't opened or sent, nor read as a note: copy it instead. Hidden files never, whatever the list. `~/Projects` isn't
+  on Normal's on purpose: it holds code, repositories and settings with their keys, and Claude Code reaches it with
+  its own tools.
   The rows are home's own folders and those at its top, Space ticks one; type a deeper one (`~/Work/Invoices`) in the
   field. A refusal names the folders and this place. Notes, Mail, Calendar, Tasks and the wallpapers keep their own,
   and Claude Code's own commands aren't limited by it. `nightdrive mcp access option apps-files folders add

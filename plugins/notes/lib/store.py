@@ -39,8 +39,17 @@ def all_paths():
 
 
 def inside(path):
-    """A link that leads out of the folder isn't a note: an id must never reach a file elsewhere."""
-    return path.resolve().is_relative_to(ROOT.resolve())
+    """A link that leads out of the folder isn't a note: an id must never reach a file elsewhere. For Claude
+    (NIGHTDRIVE_MCP) nor is a hard link: its other name may be anywhere (~/.ssh/id_ed25519 as Notes/key.md), and
+    nothing says where (#1864)."""
+    if not path.resolve().is_relative_to(ROOT.resolve()):
+        return False
+    if not os.environ.get("NIGHTDRIVE_MCP"):
+        return True
+    try:
+        return os.stat(path).st_nlink <= 1
+    except OSError:
+        return False
 
 
 def note_id(path):

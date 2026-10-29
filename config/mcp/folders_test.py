@@ -141,6 +141,30 @@ class Files(unittest.TestCase):
         self.assertNotIn("~/Lataukset", rows)   # offered once, by its name
         self.assertNotIn("~/.ssh", rows)
 
+    def test_hard_link_to_a_key(self):
+        """A hard link in Downloads to ~/.ssh/id is the key itself, and resolve() doesn't tell (#1864)."""
+        os.link(self.home / ".ssh/id", self.home / "Lataukset/id.txt")
+        os.link(self.home / ".ssh/id", self.home / "Lataukset/dir/id.txt")   # in a folder sent
+        for folders in (self.NORMAL, ["~"]):
+            for args in (("check", self.path("Lataukset/id.txt")), ("check", self.path("Lataukset/dir")),
+                         ("open", self.path("Lataukset/id.txt"))):
+                with self.subTest(folders=folders, args=args):
+                    self.assert_refused(self.run_files(*args, folders=folders), "hard link")
+        # Nor through a symbolic link to it, nor as a wallpaper
+        (self.home / "Lataukset/sub/to-id").symlink_to(self.home / "Lataukset/id.txt")
+        self.assert_refused(self.run_files("check", self.path("Lataukset/sub/to-id"), folders=self.NORMAL),
+                            "hard link")
+        img = self.home / "Lataukset/x.png"
+        os.link(self.home / ".ssh/id", img)
+        (self.home / ".local/share/wallpapers").mkdir(parents=True)
+        status, _, err = self.run_files("set", str(img), folders=self.NORMAL, own=False, script="wallpaper")
+        self.assertNotEqual(status, 0)
+        self.assertIn("hard link", err)
+        self.assertFalse((self.home / "Kuvat/Wallpapers/x.png").exists())
+        # Trashing moves just the one name; your own use isn't limited
+        self.assertEqual(self.run_files("trash", "--check", self.path("Lataukset/id.txt"), folders=self.NORMAL)[0], 0)
+        self.assertEqual(self.run_files("check", self.path("Lataukset/id.txt"))[0], 0)
+
     def test_wallpaper_from_outside_refused(self):
         """Only the refusal: an allowed one would change the real wallpaper."""
         img = self.home / "Projects/x.png"

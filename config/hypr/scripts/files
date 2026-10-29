@@ -15,8 +15,9 @@ file tools keep:
 - Claude (NIGHTDRIVE_MCP, run.py) also keeps to the folders Settings › Claude › Access › Apps and files lets it use
   (#1849; areas.py's apps-files `folders`, given to the tool's command as its own or its options_from): a path, where
   it lies and where it points, is in one of them or below it, so a link can't lead into one or out of one. Without
-  that list (a tool that doesn't get it, one that can't be read) Claude may use none. Your own use has no such limit,
-  nor has restore: it only ever puts back, where it was, what a trash moved after this check (its undo).
+  that list (a tool that doesn't get it, one that can't be read) Claude may use none. Nor does it open or send a hard
+  link (a file with another name too, which nothing says where: one_name). Your own use has no such limit, nor has
+  restore: it only ever puts back, where it was, what a trash moved after this check (its undo).
 
   files recent [--in downloads|pictures|documents …] [--name TEXT] [--limit N] [--json]
                                    the newest files first (default 10, at most 50), in those folders and DEPTH levels
@@ -35,7 +36,7 @@ file tools keep:
   files folders [--json]           what the Access window offers for the folders Claude can use: home's own (by
                                    xdg-user-dir) and the folders at its top; --json: [{item, path}]
 """
-import argparse, datetime, json, mimetypes, os, subprocess, sys
+import argparse, datetime, json, mimetypes, os, stat, subprocess, sys
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -131,6 +132,20 @@ def refuse_outside(arg, folders):
     die(f"{arg} is outside {allowed}. The user can change them in {WHERE_TO_CHANGE}.")
 
 
+def one_name(path, arg):
+    """Claude's: a file with another name too (a hard link) isn't opened or sent. Its other name may be in a hidden
+    folder or outside Claude's folders (Downloads/key and ~/.ssh/id_ed25519 are one file), and nothing tells where:
+    resolve() follows a symbolic link, not a hard one (#1864). Only someone with a shell makes one (the user, Claude
+    Code's own commands), so it is refused rather than looked for; a trash moves just the one name, and is let be."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return
+    if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+        die(f"{arg} is a hard link: the same file has another name too, which may be anywhere, so Claude doesn't open "
+            "or send it. Copy it (cp) and give the copy.")
+
+
 def checked(arg, moving=False, sending=False):
     """The path a PATH argument means, by the rules above; dies with the reason otherwise. Its folder is resolved
     (no link leads it out), the last part is kept as it is: trashing a link moves the link, not what it points to."""
@@ -163,6 +178,8 @@ def checked(arg, moving=False, sending=False):
         # may use isn't trashed itself (taking it away isn't using what is in it)
         if not within(path, folders, below=moving) or (not moving and not within(path.resolve(), folders)):
             refuse_outside(arg, folders)
+        if not moving:
+            one_name(path.resolve(), arg)
     return path
 
 
@@ -258,6 +275,8 @@ def sendable(arg):
                 die(f"{p} is a link that leads out of your home folder (or into a hidden one): {arg} isn't sent.")
             if folders is not None and not within(real, folders):
                 refuse_outside(f"{p} (a link in {arg})", folders)
+            if folders is not None:
+                one_name(real, f"{p} (in {arg})")
             if real.is_file():
                 out.append(real)
     if not out:
