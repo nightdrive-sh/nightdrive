@@ -1,0 +1,485 @@
+#!/usr/bin/python3 -I
+"""Your files from the command line: the newest in Downloads, Pictures and Documents, opening one in its default app,
+moving files to the trash and back, and checking what may be sent. `nightdrive files …` runs it; Claude's tools are
+config/mcp/tools/apps-files.json (and Ferry's ferry_send_files, through check), so these are also the rules Claude's
+file tools keep:
+
+- Only files in your home folder, and none hidden (no part of the path starts with a dot: settings, keys, the trash).
+  A link counts where it points: one that leads out of home (or into a hidden folder) isn't opened.
+- Home itself and its usual folders (Downloads, Documents…) are never moved or sent whole.
+- What is sent goes by where it points: a link that leads out of home, or into a hidden folder, stops the send, also
+  one inside a folder being sent. A folder sends its files, leaving out hidden ones and folders linked into it.
+- The trash is the desktop's (Files shows it, and puts things back): nothing is ever deleted for good.
+- Only what opens to be looked at: documents, pictures, sound, video, text and folders, never a program, a script
+  or a launcher (an executable file, a .desktop file).
+- Claude (NIGHTDRIVE_MCP, run.py) also keeps to the folders Settings › Claude › Access › Apps and files lets it use
+  (#1849; areas.py's apps-files `folders`, given to the tool's command as its own or its options_from): a path, where
+  it lies and where it points, is in one of them or below it, so a link can't lead into one or out of one. Without
+  that list (a tool that doesn't get it, one that can't be read) Claude may use none. Nor does it open or send a hard
+  link (a file with another name too, which nothing says where: one_name), nor open what does something as it opens
+  (a web page, an SVG, XML, an event or a contact file: ACTIVE), nor trash anything in your mail, notes or projects,
+  a mail folder or a git repository (GUARDED). Your own use has no such limit, nor has restore: it only ever puts
+  back, where it was, what a trash moved after this check (its undo).
+
+  files recent [--in downloads|pictures|documents …] [--name TEXT] [--limit N] [--json]
+                                   the newest files first (default 10, at most 50), in those folders and DEPTH levels
+                                   below. --json: {files: [{path, name, folder, size, modified, type}]}
+  files open PATH [--json] [--unless-typing]
+                                   in its default app (windows open --file, whose JSON it prints; --unless-typing: not
+                                   while the user types, as there)
+  files trash PATH… [--json]       to the trash; --json: {trashed: [paths], names: [their names in the trash], what:
+                                   the one's name or how many}
+  files trash --check PATH…        moves nothing: what would go, for Claude's card (#1832): {"To the trash": a line per
+                                   path, a folder with how many files are in it (hidden ones too, as they go with it)
+                                   and their size}
+  files restore NAME…              back from the trash to where they were (the names trash gives)
+  files check PATH… [--json]       the files PATHs would send (a folder: its files), each where it really is, or the
+                                   reason none may go; --json: {files: [paths], size: their bytes}
+  files folders [--json]           what the Access window offers for the folders Claude can use: home's own (by
+                                   xdg-user-dir) and the folders at its top; --json: [{item, path}]
+"""
+import argparse, datetime, json, mimetypes, os, stat, subprocess, sys
+from pathlib import Path
+from urllib.parse import quote, unquote
+
+SCRIPTS = Path(__file__).resolve().parent
+HOME = Path.home().resolve()
+TRASH = Path(os.environ.get("XDG_DATA_HOME", str(HOME / ".local/share"))) / "Trash"
+FOLDERS = {"downloads": "DOWNLOAD", "pictures": "PICTURES", "documents": "DOCUMENTS"}   # xdg-user-dir's names
+USUAL = ("DESKTOP", "DOWNLOAD", "TEMPLATES", "PUBLICSHARE", "DOCUMENTS", "MUSIC", "PICTURES", "VIDEOS")
+DEPTH = 3             # folder levels below Downloads etc. that recent looks into (Pictures/Screenshots/2026)
+LIMIT, LIMIT_MAX = 10, 50
+COUNT_MAX = 100_000   # files counted in a folder for the trash's card; past it the card says "over"
+# Types that open to be looked at (gio's content type, a prefix); anything else isn't opened
+OPENABLE = ("text/", "image/", "audio/", "video/", "inode/directory", "application/pdf", "application/epub+zip",
+            "application/vnd.oasis.opendocument.", "application/vnd.openxmlformats-officedocument.",
+            "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint", "application/rtf",
+            "application/json", "application/xml", "application/zip", "application/x-tar", "application/gzip",
+            "application/x-compressed-tar", "application/x-7z-compressed", "application/vnd.rar")
+NOT_OPENED = ("text/x-shellscript", "text/x-python", "text/x-perl", "text/x-ruby", "application/x-desktop")
+# Not opened for Claude (#1883): what does something as it opens. A web page or an SVG opens in the browser, whose
+# requests (images, scripts, a form sent by itself) go out with no card; XML can fetch too; an event or a contact
+# file opens an import
+ACTIVE = ("text/html", "application/xhtml+xml", "image/svg+xml", "text/xml", "application/xml", "text/calendar",
+          "text/vcard", "text/x-vcard", "text/directory")
+# Where Claude's trash never reaches, whatever folders it may use (#1883): the mail store, whose next sync deletes on
+# the server what went from here (mbsync's Expunge Both); the notes; code. Also any mail folder (cur, new and tmp)
+# elsewhere, and any git repository, Nightdrive's own among them (its undo runs from it)
+GUARDED = {"Mail": "your mail", "Projects": "your projects"}
+NOTES = Path(os.environ.get("NOTES_DIR") or HOME / "Notes")   # plugins/notes/lib/store.py's ROOT
+# The folders Claude can use: Access's apps-files `folders` (config/mcp/areas.py). Its entries are ~, ~/A/B or one of
+# these, home's own folders by their English names, which xdg-user-dir finds wherever they are (~/Lataukset)
+ACCESS_AREA, ACCESS_OPTION = "apps-files", "folders"
+STANDARD = {"Desktop": "DESKTOP", "Documents": "DOCUMENTS", "Downloads": "DOWNLOAD", "Music": "MUSIC",
+            "Pictures": "PICTURES", "Videos": "VIDEOS"}
+WHERE_TO_CHANGE = "Settings › Claude › Access › Apps and files › Folders Claude can use"
+
+
+def die(msg, code=1):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def user_dir(name):
+    try:
+        out = subprocess.run(["xdg-user-dir", name], capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        out = ""
+    fallback = {key: word for word, key in STANDARD.items()}.get(name)
+    if out and Path(out).resolve() != HOME:   # xdg-user-dir answers home for a folder that isn't set
+        return Path(out).resolve()
+    return HOME / fallback if fallback else None
+
+
+def inside_home(p):
+    """A resolved path in home and not hidden (no part starting with a dot)."""
+    try:
+        rel = p.relative_to(HOME)
+    except ValueError:
+        return False
+    return not any(part.startswith(".") for part in rel.parts)
+
+
+# --- the folders Claude can use (#1849) ---------------------------------------------------------------------------
+
+def folder_of(entry):
+    """One entry of the list as the folder it means, resolved; None for one that isn't a folder in home."""
+    if entry in STANDARD:
+        folder = user_dir(STANDARD[entry])
+    elif entry == "~" or entry.startswith("~/"):
+        folder = (HOME / entry[2:]).resolve()
+    else:
+        return None
+    return folder if folder and folder.is_dir() and (folder == HOME or inside_home(folder)) else None
+
+
+def claude_folders():
+    """None for your own use; Claude's: the folders it may use, resolved (a link in the list counts where it leads).
+    What can't be read gives none: the list only ever lets more through."""
+    if not os.environ.get("NIGHTDRIVE_MCP"):
+        return None
+    entries = None
+    for var, area in (("NIGHTDRIVE_MCP_OPTIONS_FROM", ACCESS_AREA), ("NIGHTDRIVE_MCP_OPTIONS", None)):
+        try:
+            options = json.loads(os.environ.get(var) or "{}")
+            options = options.get(area, {}) if area else options
+            entries = options.get(ACCESS_OPTION, entries) if isinstance(options, dict) else entries
+        except ValueError:
+            pass
+        if entries is not None:
+            break
+    if not isinstance(entries, list):
+        return []
+    return list(dict.fromkeys(f for e in entries if isinstance(e, str) for f in [folder_of(e)] if f))
+
+
+def within(path, folders, below=False):
+    """Whether a resolved path is in one of the folders (below=True: inside it, not the folder itself)."""
+    return any(f in path.parents or (path == f and not below) for f in folders)
+
+
+def refuse_outside(arg, folders):
+    named = ", ".join(shown(f) if f != HOME else "~" for f in folders)
+    allowed = f"the folders Claude may use ({named})" if folders else "any folder: Claude may use none now"
+    die(f"{arg} is outside {allowed}. The user can change them in {WHERE_TO_CHANGE}.")
+
+
+def one_name(path, arg):
+    """Claude's: a file with another name too (a hard link) isn't opened or sent. Its other name may be in a hidden
+    folder or outside Claude's folders (Downloads/key and ~/.ssh/id_ed25519 are one file), and nothing tells where:
+    resolve() follows a symbolic link, not a hard one (#1864). Only someone with a shell makes one (the user, Claude
+    Code's own commands), so it is refused rather than looked for; a trash moves just the one name, and is let be."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return
+    if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+        die(f"{arg} is a hard link: the same file has another name too, which may be anywhere, so Claude doesn't open "
+            "or send it. Copy it (cp) and give the copy.")
+
+
+def guarded(path):
+    """What of Claude's trash's no-go places (GUARDED) a path is in, in words; None when it is in none."""
+    places = {(HOME / name).resolve(): what for name, what in GUARDED.items()}
+    places[NOTES.resolve()] = "your notes"
+    for p in (path, *path.parents):
+        if p == HOME:
+            return None   # home itself in git (a dotfiles repo) doesn't guard all of it
+        if p in places:
+            return places[p]
+        if os.path.lexists(p / ".git"):
+            return "a git repository"
+        if all((p / d).is_dir() for d in ("cur", "new", "tmp")):
+            return "a mail folder"
+    return None
+
+
+def checked(arg, moving=False, sending=False):
+    """The path a PATH argument means, by the rules above; dies with the reason otherwise. Its folder is resolved
+    (no link leads it out), the last part is kept as it is: trashing a link moves the link, not what it points to."""
+    p = Path(arg).expanduser()
+    p = p if p.is_absolute() else HOME / p
+    folders = claude_folders()
+    # Claude's folders first, so a refusal doesn't tell whether something exists outside them
+    if folders is not None and not within(p.parent.resolve() / p.name, folders, below=moving):
+        refuse_outside(arg, folders)
+    # Out of home or hidden by where it would be, before anything about whether it is there: ~/.ssh/id_rsa and
+    # ~/.ssh/nothing get the same answer (Open's folders are the whole home, #1883)
+    if p.name in ("", ".", "..") or not inside_home(p.parent.resolve() / p.name):
+        die(f"{arg}: only files in your home folder, and none hidden (settings, keys, the trash).")
+    try:
+        folder = p.parent.resolve(strict=True)
+    except OSError:
+        die(f"{arg}: no such folder.")
+    path = folder / p.name
+    if not os.path.lexists(path):
+        die(f"{arg} doesn't exist.")
+    if not inside_home(path):
+        die(f"{arg}: only files in your home folder, and none hidden (settings, keys, the trash).")
+    verb = "moved" if moving else "sent whole" if sending else "opened"
+    if moving or sending:
+        usual = {user_dir(n) for n in USUAL}
+        # A link is sent as what it points to, so that is checked too (a link in Downloads to home); trash moves links
+        whole = {path, path.resolve()} if sending else {path}
+        if whole & ({HOME} | usual):
+            die(f"{arg} is one of your home's own folders: it isn't {verb}.")
+    if not moving and not inside_home(path.resolve()):
+        die(f"{arg} is a link that leads out of your home folder (or into a hidden one): it isn't {verb.split()[0]}.")
+    if folders is not None:
+        # Where it lies (above) and, as it is opened or sent as what it points to, where it leads; a folder Claude
+        # may use isn't trashed itself (taking it away isn't using what is in it)
+        if not within(path, folders, below=moving) or (not moving and not within(path.resolve(), folders)):
+            refuse_outside(arg, folders)
+        if not moving:
+            one_name(path.resolve(), arg)
+        elif guarded(path):
+            die(f"{arg} is in {guarded(path)}: Claude doesn't move anything there to the trash. The user can, in Files.")
+    return path
+
+
+def content_type(path):
+    """gio's content type, which is what gio open picks the app by, and whether it can be run."""
+    try:
+        out = subprocess.run(["gio", "info", "-a", "standard::content-type,access::can-execute", str(path)],
+                             capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        die("gio couldn't read the file's type.")
+    attrs = dict(line.strip().split(": ", 1) for line in out.splitlines() if line.startswith("  ") and ": " in line)
+    return attrs.get("standard::content-type", ""), attrs.get("access::can-execute") == "TRUE"
+
+
+# --- recent ------------------------------------------------------------------------------------------------------
+
+def walk(folder, depth):
+    """The files under folder, DEPTH levels down, leaving out hidden ones and links (none leads out of home)."""
+    try:
+        with os.scandir(folder) as it:
+            for e in it:
+                if e.name.startswith(".") or e.is_symlink():
+                    continue
+                if e.is_dir(follow_symlinks=False):
+                    if depth > 0:
+                        yield from walk(e.path, depth - 1)
+                elif e.is_file(follow_symlinks=False):
+                    yield e
+    except OSError:
+        return
+
+
+def cmd_recent(a):
+    names = a.into or list(FOLDERS)
+    found, folders = [], claude_folders()
+    for key in dict.fromkeys(names):
+        root = user_dir(FOLDERS[key])
+        if not root or not root.is_dir() or not inside_home(root):
+            continue
+        # Claude's: only what is in its folders (a whole one, or a folder of it the user listed alone)
+        if folders is not None and not within(root, folders) and not any(root in f.parents for f in folders):
+            continue
+        for e in walk(root, DEPTH):   # no links: a path here is where the file really is
+            if a.name and a.name.lower() not in e.name.lower():
+                continue
+            if folders is not None and not within(Path(e.path), folders):
+                continue
+            st = e.stat(follow_symlinks=False)
+            found.append((st.st_mtime, e, st.st_size, key))
+    found.sort(key=lambda f: f[0], reverse=True)
+    rows = [{"path": e.path, "name": e.name, "folder": key, "size": size,
+             "modified": datetime.datetime.fromtimestamp(mtime).astimezone().isoformat(timespec="seconds"),
+             "type": mimetypes.guess_type(e.name)[0] or ""}
+            for mtime, e, size, key in found[:min(a.limit, LIMIT_MAX)]]
+    if a.json:
+        print(json.dumps({"files": rows}, ensure_ascii=False))
+        return
+    for r in rows:
+        print(f"{r['modified'][:16].replace('T', ' ')}  {r['path']}")
+
+
+# --- open --------------------------------------------------------------------------------------------------------
+
+def cmd_open(a):
+    path = checked(a.path, moving=False)
+    ctype, runnable = content_type(path.resolve())
+    if (runnable and not path.is_dir()) or ctype.startswith(NOT_OPENED) or not ctype.startswith(OPENABLE):
+        die(f"{a.path} is {'a program or script' if runnable else ctype or 'of an unknown type'}: only documents, "
+            "pictures, sound, video, text and folders are opened.")
+    if claude_folders() is not None and ctype in ACTIVE:
+        die(f"{a.path} is {ctype}, which does something as it opens (a web page loads from the internet): Claude "
+            "doesn't open it. The user can, in Files.")
+    os.execv(str(SCRIPTS / "windows"), ["windows", "open", "--file", str(path), *(["--json"] if a.json else []),
+                                        *(["--unless-typing"] if a.unless_typing else [])])
+
+
+# --- check (what a send may take: Ferry's ferry_send_files runs it first, plugins/ferry/send-files) --------------------
+
+def sendable(arg):
+    """The files one PATH argument sends, resolved (what is sent is what they point to); dies with the reason when
+    any of them may not go, so a send goes whole or not at all."""
+    top = checked(arg, sending=True).resolve()
+    if top.is_file():
+        return [top]
+    if not top.is_dir():
+        die(f"{arg} isn't a file or a folder: it isn't sent.")
+    out, folders = [], claude_folders()
+    for root, dirs, names in os.walk(top):   # doesn't follow links to folders: they are left out, as Ferry does
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        for n in sorted(names):
+            if n.startswith("."):
+                continue
+            p = Path(root, n)
+            real = p.resolve()
+            if not inside_home(real):
+                die(f"{p} is a link that leads out of your home folder (or into a hidden one): {arg} isn't sent.")
+            if folders is not None and not within(real, folders):
+                refuse_outside(f"{p} (a link in {arg})", folders)
+            if folders is not None:
+                one_name(real, f"{p} (in {arg})")
+            if real.is_file():
+                out.append(real)
+    if not out:
+        die(f"{arg} has no files to send (hidden ones aren't sent).")
+    return out
+
+
+def cmd_check(a):
+    files = list(dict.fromkeys(f for arg in a.paths for f in sendable(arg)))   # every one checked before any is said
+    if a.json:
+        print(json.dumps({"files": [str(f) for f in files], "size": sum(f.stat().st_size for f in files)},
+                         ensure_ascii=False))
+    else:
+        print("\n".join(map(str, files)))
+
+
+# --- folders (what the Access window offers to add: AccessFolders.qml) --------------------------------------------
+
+def cmd_folders(a):
+    rows = [{"item": word, "path": str(user_dir(key))} for word, key in STANDARD.items()]
+    own = {r["path"] for r in rows}
+    try:
+        top = sorted(e.path for e in os.scandir(HOME)
+                     if not e.name.startswith(".") and e.is_dir(follow_symlinks=False) and e.path not in own)
+    except OSError:
+        top = []
+    rows += [{"item": "~/" + Path(p).name, "path": p} for p in top] + [{"item": "~", "path": str(HOME)}]
+    print(json.dumps(rows, ensure_ascii=False) if a.json else "\n".join(f"{r['item']}\t{r['path']}" for r in rows))
+
+
+# --- trash and restore (the freedesktop.org trash: Trash/files + Trash/info/NAME.trashinfo) ----------------------------
+
+def trash_one(path):
+    """Moves one path to the trash; its name there."""
+    (TRASH / "files").mkdir(parents=True, exist_ok=True, mode=0o700)
+    (TRASH / "info").mkdir(parents=True, exist_ok=True, mode=0o700)
+    if path.lstat().st_dev != (TRASH / "files").stat().st_dev:
+        die(f"{path} is on another disk than your home's trash: it isn't moved.")
+    stem, suffix = (path.stem, path.suffix) if not path.is_dir() else (path.name, "")
+    when = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    for n in range(1, 1000):
+        name = path.name if n == 1 else f"{stem}.{n}{suffix}"
+        info = TRASH / "info" / f"{name}.trashinfo"
+        try:  # the info file claims the name (the spec's way, so two at once don't take the same)
+            fd = os.open(info, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            continue
+        with os.fdopen(fd, "w") as f:
+            f.write(f"[Trash Info]\nPath={quote(str(path), safe='/')}\nDeletionDate={when}\n")
+        if os.path.lexists(TRASH / "files" / name):
+            info.unlink(); continue
+        try:
+            os.rename(path, TRASH / "files" / name)
+        except OSError as e:
+            info.unlink()
+            raise e
+        return name
+    die(f"{path}: the trash has too many by that name.")
+
+
+def trashed_at(name):
+    """Where a name in the trash came from; dies when it can't go back there."""
+    if not name or "/" in name or name in (".", ".."):
+        die(f"{name!r} isn't a name in the trash.")
+    info = TRASH / "info" / f"{name}.trashinfo"
+    try:
+        line = next(l for l in info.read_text().splitlines() if l.startswith("Path="))
+    except (OSError, StopIteration):
+        die(f"{name} isn't in the trash (any more).")
+    target = Path(unquote(line[5:]))
+    if HOME not in target.parents:
+        die(f"{name} was in {target}, outside your home folder: it stays in the trash (Files puts it back).")
+    if os.path.lexists(target):
+        die(f"Something new is at {target}: {name} stays in the trash.")
+    return target
+
+
+def restore_one(name, target=None):
+    """Puts one thing back from the trash; where it went."""
+    target = target or trashed_at(name)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.rename(TRASH / "files" / name, target)
+    except OSError as e:
+        die(f"{name} couldn't be put back in {target} ({e.strerror}).")
+    (TRASH / "info" / f"{name}.trashinfo").unlink()
+    return str(target)
+
+
+def size_text(n):
+    for unit in ("bytes", "kB", "MB", "GB"):
+        if n < 1000 or unit == "GB":
+            return f"{n} {unit}" if unit == "bytes" else f"{n:.1f} {unit}"
+        n /= 1000
+
+
+def shown(path):
+    """A path as the card shows it: ~ for home, and a newline in a name spelled out, so a name can't pass for lines
+    of its own (confirm.py spells out what hides or reorders text)."""
+    rel = path.relative_to(HOME)
+    return ("~/" + str(rel)).replace("\n", "\\n").replace("\r", "\\r")
+
+
+def what_goes(path):
+    """One path for the card: a file and its size, a link, or a folder with everything in it, as all of it goes."""
+    if path.is_symlink():
+        return f"{shown(path)}  (a link: only the link goes)"
+    if not path.is_dir():
+        return f"{shown(path)}  ({size_text(path.lstat().st_size)})"
+    files, size = 0, 0
+    for root, dirs, names in os.walk(path):   # links to folders aren't followed: the link goes, not what it points to
+        for n in names + [d for d in dirs if os.path.islink(os.path.join(root, d))]:
+            files += 1
+            try:
+                size += os.lstat(os.path.join(root, n)).st_size
+            except OSError:
+                pass
+            if files >= COUNT_MAX:
+                return f"{shown(path)}  (a folder of over {COUNT_MAX:,} files)"
+    count = "an empty folder" if not files else f"a folder of {files} file{'s' * (files != 1)}, {size_text(size)}"
+    return f"{shown(path)}  ({count})"
+
+
+def cmd_trash(a):
+    paths = [checked(p, moving=True) for p in a.paths]   # every one checked before any is moved
+    if a.check:
+        print(json.dumps({"To the trash": "\n".join(what_goes(p) for p in dict.fromkeys(paths))}, ensure_ascii=False))
+        return
+    names = []
+    for path in paths:
+        try:
+            names.append(trash_one(path))
+        except OSError as e:
+            for n in reversed(names):   # all or none: what went already comes back
+                restore_one(n)
+            die(f"{path} couldn't be moved to the trash ({e.strerror}); nothing was.")
+    folders = sum(p.is_dir() and not p.is_symlink() for p in paths)
+    kinds = "folders" if folders == len(paths) else "files" if not folders else "files and folders"
+    what = paths[0].name if len(paths) == 1 else f"{len(paths)} {kinds}"
+    out = {"trashed": [str(p) for p in paths], "names": names, "what": what}
+    print(json.dumps(out, ensure_ascii=False) if a.json else "\n".join(f"Trashed {p}" for p in out["trashed"]))
+
+
+def cmd_restore(a):
+    targets = [trashed_at(n) for n in a.names]   # every one can go back, or none goes
+    for name, target in zip(a.names, targets):
+        print(f"Restored {restore_one(name, target)}")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="nightdrive files", description="Your files: recent, open, trash, restore, check, folders.")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("recent"); p.add_argument("--in", dest="into", action="extend", nargs="+", choices=list(FOLDERS))
+    p.add_argument("--name"); p.add_argument("--limit", type=int, default=LIMIT)
+    p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_recent)
+    p = sub.add_parser("open"); p.add_argument("path"); p.add_argument("--json", action="store_true")
+    p.add_argument("--unless-typing", action="store_true"); p.set_defaults(fn=cmd_open)
+    p = sub.add_parser("trash"); p.add_argument("paths", nargs="+"); p.add_argument("--json", action="store_true")
+    p.add_argument("--check", action="store_true"); p.set_defaults(fn=cmd_trash)
+    p = sub.add_parser("restore"); p.add_argument("names", nargs="+"); p.set_defaults(fn=cmd_restore)
+    p = sub.add_parser("check"); p.add_argument("paths", nargs="+"); p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_check)
+    p = sub.add_parser("folders"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_folders)
+    a = ap.parse_args()
+    a.fn(a)
+
+
+if __name__ == "__main__":
+    main()

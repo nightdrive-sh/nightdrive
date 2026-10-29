@@ -18,5 +18,25 @@ The installer asks for your Home Assistant addresses and a long-lived access tok
 
 An `http://` address sends the token as plain text, and the addresses are tried wherever you are: on another network, whatever answers `homeassistant.local` gets it. Use an `https://` address or Tailscale where you can (the installer warns about the others).
 
+## From a terminal, and Claude
+
+| Command | What it does |
+| --- | --- |
+| `home-assistant states` | The devices and their states as JSON; `--search TEXT` only those whose name, area or id has it, `--sensors` adds the sensors |
+| `home-assistant set ID STATE` | Puts a device in a state, whatever it is now: `on`/`off`, `open`/`close` (covers), `lock`/`unlock`, `run` (scenes, scripts, buttons) |
+| `home-assistant toggle ID` | Switches a device the other way, as Enter in the Launcher does |
+
+Claude (Settings › Claude › Access › Home Assistant) can read the states, and switch a device only after you allow it on
+Nightdrive's confirmation card, which shows the device's name and room from Home Assistant beside its id, and the new
+state. Unless you turn them on in Access › Home Assistant › (they are on only on the Open level), Claude may not:
+
+- unlock a lock or open a cover (a door, a gate, blinds): it only locks and closes, and runs no scene that sets one,
+- turn an automation on or off: it can run one, but not stop one that guards (a leak alarm),
+- read presence, occupancy or motion sensors, an `input_boolean` that says whether anyone is home (`someone_home`, `away_mode`), or where your phones are (the companion app's location, distance, Wi-Fi and activity sensors).
+
+These hold for Claude's calls only: the Launcher, the Home menu and `home-assistant` in a terminal do as before. A door
+Home Assistant has as a `switch` is a switch to it, and a script may do anything: the card warns when one's name says a
+door, gate or lock, but keep such a relay or script out of Claude's reach in Home Assistant itself.
+
 Homepage: https://www.home-assistant.io
 Needs: a Home Assistant server

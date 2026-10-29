@@ -1,0 +1,12 @@
+# Calendar's sync (plugins/calendar): syncs the calendars of Contacts' accounts and of ~/.config/calendar/calendars.conf
+# with ~/.local/share/calendar, by vdirsyncer. Run by nightdrive-calendar-sync.timer and `calendar sync`.
+[Unit]
+Description=Nightdrive Calendar: sync calendars (vdirsyncer)
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Skip the round while the login keyring is locked: a password-cmd's secret-tool would otherwise pop up gnome-keyring's
+# own password prompt (as Contacts' sync)
+ExecCondition=/bin/sh -c '! %h/.local/bin/calendar keyring-locked'
+ExecStart=%h/.local/bin/calendar sync

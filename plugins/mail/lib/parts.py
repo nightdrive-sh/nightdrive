@@ -25,6 +25,8 @@ import subprocess
 import sys
 import urllib.parse
 
+import ids
+
 PARTS = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "nightmail", "parts")
 # The HTML pages: in memory (tmpfs), the user's alone, gone at logout. Never in /tmp, where another user could make
 # the folder first and read the mail.
@@ -80,7 +82,8 @@ def write(cmd, msgid, part, name):
 
 
 def raw(msgid, part=None):
-    args = ["notmuch", "show", "--format=raw"] + (["--part=" + part] if part else []) + [f'id:"{msgid}"']
+    args = (["notmuch", "show", "--format=raw"] + (["--part=" + part] if part else [])
+            + ["--query=sexp", ids.message(msgid)])
     return subprocess.run(args, capture_output=True, check=True).stdout
 
 

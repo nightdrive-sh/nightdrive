@@ -26,19 +26,35 @@ usage() {
   section "Desktop"
   row "theme COMMAND"            "The theme colour, e.g. nightdrive theme color teal"
   row "wallpaper COMMAND"        "The background: list, set, add, remove"
-  row "display COMMAND"          "Screen scale: list, scale OUTPUT SCALE"
+  row "display COMMAND"          "Screens: list, json, scale OUTPUT SCALE, mode OUTPUT WxH (--keep asks)"
+  row "sound [COMMAND]"          "Volume and output as JSON: volume [PCT] [--mute on|off], output [NAME]"
+  row "brightness [PCT]"         "Screen brightness in percent (JSON), set when given"
+  row "network [COMMAND]"        "Wi-Fi and network state as JSON; wifi|all on|off [--keep]"
+  row "bluetooth|battery"        "Bluetooth devices or the battery as JSON"
   row "bar-style COMMAND"        "The top bar's look: opacity, icons, highlight, icon-opacity"
+  row "nightlight [on|off]"      "Night light's warm tint: status, on, off, toggle (--json)"
+  row "appearance"               "Wallpaper, theme, night light and the top bar's look now, as JSON"
+  row "notifications [COMMAND]"  "The latest notifications (--json), dnd [on|off], send SUMMARY [BODY], remove TAG"
+  row "windows [COMMAND]"        "The open windows (--json); focus WINDOW, shot WINDOW, open APP|URL, close ADDRESS"
+  row "files COMMAND"            "Newest in Downloads, Pictures, Documents: recent (--json); open PATH, trash PATH…, restore NAME…"
   row "topbar adjust"            "The top bar's icon and text sizes, live"
   row "topbar date [STYLE]"      "The clock's date order: auto, dmy, mdy or iso"
   row "snippets [COMMAND]"       "Text snippets: list, set, remove, status, enable, disable"
   row "defaults [set KIND APP]"  "Default apps (browser, email, files…), e.g. nightdrive defaults set pdf org.gnome.Papers"
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
   row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --effort LEVEL, --background, --workspace WS)"
+  row "mcp"                      "Nightdrive's MCP server for Claude (stdio: Claude Code starts it)"
+  row "mcp install|remove"       "Register it in Claude Code and allow its tools, or take that away (asks first; --dry-run shows)"
+  row "mcp status"               "Whether Claude Code has it, and its tools are allowed (--json)"
+  row "mcp access [open|level|set|option]" "What Claude may use: open (the window), level strict|normal|open, set AREA read|modify|delete allow|ask|no, option AREA ID on|off (a list: add|remove ITEM)"
   row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
   section "Apps"
   row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage), and which are installed"
   row "apps install NAME"        "Install one, or again after removing it, e.g. nightdrive apps install garage"
   row "apps off|on NAME"         "Hide an installed one from the desktop and stop its services, or bring it back"
+  section "Software"
+  row "software search QUERY"    "Fedora's packages and Flathub's apps; info dnf|flatpak|plugin ID, installed, plugins (--json)"
+  row "software install SRC ID"  "Install a package (SRC dnf or flatpak; dnf asks for the password in the system's dialog); remove, preview install|remove"
   section "Plugins"
   row "plugins [list]"           "Optional parts, and which are installed, on or off"
   row "plugins install NAME"     "Install one, e.g. nightdrive plugins install home-assistant"
@@ -813,11 +829,24 @@ case ${1:-} in
   minimal) exec "$repo/config/minimal/minimal" "${@:2}" ;;             # README › Install (Installed on Fedora KDE?)
   # topbar adjust: config/topbar/adjust.conf; software-catalog: config/quickshell/data/software.json
   platform|software-catalog|snippets) exec "$scripts/$1" "${@:2}" ;;
-  theme|display|wallpaper|bar-style) exec "$scripts/$1" "${@:2}" ;;    # the desktop's own scripts (hypr/scripts)
+  theme|display|wallpaper|bar-style|notifications) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
+  windows|files) exec "$scripts/$1" "${@:2}" ;;                       # also Claude's apps and files tools
+  nightlight|appearance) exec "$scripts/$1" "${@:2}" ;;                # Claude's appearance tools use them too
+  sound|network) exec "$scripts/$1" "${@:2}" ;;                      # also Claude's sound and display tools
+  brightness) exec "$scripts/brightness" screen "${@:2}" ;;
+  bluetooth|battery) exec "$scripts/devices" "$1" ;;
+  software) exec "$scripts/software" "${@:2}" ;;                       # Install/Remove › Software without the launcher
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
   ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }
        exec "$scripts/terminal-or-claude" "${@:2}" ;;                   # what the launcher's ⌘⌥Enter runs
+  mcp) case ${2:-} in
+        "") exec python3 "$repo/config/mcp/server.py" ;;               # Dashboard #1761; Claude Code runs it
+        install|remove|status) exec python3 "$repo/config/mcp/register.py" "${@:2}" ;;
+        access) [[ ${3:-} == open ]] && exec "$repo/config/claude-access/claude-access" "${@:4}"  # the window
+                exec python3 "$repo/config/mcp/access.py" "${@:3}" ;;  # Settings › Claude › Access
+        *) usage >&2; exit 1 ;;
+      esac ;;
   welcome) exec "$repo/config/welcome/welcome" "${@:2}" ;;             # Welcome to Nightdrive (launcher › System › Set up Nightdrive)
   ""|help|-h|--help) usage ;;
   *) usage >&2; exit 1 ;;

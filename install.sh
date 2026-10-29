@@ -39,8 +39,9 @@ set -euo pipefail
 repo=$(cd "$(dirname "$0")" && pwd)
 # Part of Nightdrive like Claude Code, so not asked: Tailscale is quiet until it's logged in, Apostrophe opens the .md
 # files (Welcome's do-it-yourself path shows the apps' READMEs in it). Nightdrive's own apps (group app in plugin.conf:
-# Mail, Contacts, Deck, Ferry) are too, Mail and Contacts quiet until their accounts are set up, Ferry until Tailscale
-# is (its server listens on 127.0.0.1 only). Folders in plugins/, so their packages and services stay out of the core.
+# Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) are too, Mail, Contacts and Calendar quiet until their accounts
+# are set up, Ferry until Tailscale is (its server listens on 127.0.0.1 only). Folders in plugins/, so their packages
+# and services stay out of the core.
 ALWAYS=(tailscale apostrophe)
 machine=""; nvidia=1; secureboot=0; greeter=1; autologin=1; splash=1; dry=0; choose=0; remove=1   # machine: "" = detected
 base=""; with=""; without=""; keyboard=""   # base: all | none | defaults, "" = the defaults

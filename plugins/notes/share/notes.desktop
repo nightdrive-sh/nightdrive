@@ -1,0 +1,13 @@
+[Desktop Entry]
+# `notes install` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH
+# may not have ~/.local/bin), and the icon to ~/.local/share/icons/hicolor/scalable/apps.
+Type=Application
+Name=Notes
+GenericName=Nightdrive Notes
+Comment=Your Markdown notes in ~/Notes, to read; Apostrophe writes them
+Keywords=notes;markdown;notebook;memo;
+Icon=nightdrive-notes
+Exec=notes
+Terminal=false
+Categories=Office;Utility;
+StartupNotify=false

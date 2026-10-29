@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Calendar's app icon: Lucide's calendar-days as a neon sign, made like Mail's and Contacts' (near black, a glow
+       under the line) in red and pink, apart from Mail's cool colours, Contacts' green and Ferry's sunset -->
+  <defs>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a6b"/><stop offset=".5" stop-color="#ff3d8b"/><stop offset="1" stop-color="#c25bff"/></linearGradient>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="#16141f"/>
+  <g transform="translate(76 76) scale(15)" fill="none" stroke="url(#neon)" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="2.2" filter="url(#glow)">
+      <path d="M8 2v4M16 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/>
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+    </g>
+    <g stroke-width="1.5">
+      <path d="M8 2v4M16 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/>
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+    </g>
+  </g>
+</svg>

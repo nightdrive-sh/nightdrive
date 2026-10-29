@@ -52,6 +52,22 @@ if state then
     end
     state:close()
 end
+-- A scale or resolution on trial (display … --keep): Claude's change while the card asks whether to keep it, over the
+-- saved one. It is in the runtime dir, which a restart empties, so a hard restart on a black screen comes back with the
+-- saved value; Keep saves it (#1887). "auto" there is the default again.
+local trial = io.open((os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/nightdrive/display-trial")
+if trial then
+    for line in trial:lines() do
+        local mo, mode = line:match("^mode%s+(%S+)%s+(%S+)$")
+        if mo then
+            modes[mo] = mode ~= "auto" and mode or nil
+        else
+            local output, scale = line:match("^(%S+)%s+(%S+)$")
+            if output then scales[output] = tonumber(scale) end
+        end
+    end
+    trial:close()
+end
 -- The side: the external screen at 0,0 and the laptop's centred along its edge, in layout pixels (after the scale), so the
 -- pointer crosses where the screens really meet. Without one, or alone, Hyprland places them itself (auto: side by side).
 local positions = {}
@@ -483,6 +499,7 @@ hl.gesture({ fingers = 3, direction = "down", action = function() drawer_gesture
 require("bindings")
 require("scroll")
 require("float-link")   -- ⌃⌘ + click on a link: the window it opens floats
+require("last-key")     -- when the last key was pressed: Claude doesn't move the focus while you type
 
 -----------------------
 ---- WINDOW RULES ----

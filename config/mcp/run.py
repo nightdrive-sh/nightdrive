@@ -1,0 +1,364 @@
+"""Runs one tool's command for Nightdrive's MCP server (registry.py calls it; the format is plugins/README.md › Tools
+for Claude: mcp.json).
+
+A tool is a command a plugin already has: argv from its `command` template, with the call's arguments in place of
+the `{name}` placeholders, run without a shell in the tool's folder, with a timeout. stdout comes back as the result
+Claude reads; a failure comes back as a ToolError in plain words, which the server hands Claude as an error result.
+"""
+
+import json
+import os
+import re
+import signal
+import subprocess
+import threading
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+TIMEOUT = 30          # seconds, when a tool doesn't say
+TIMEOUT_MAX = 300     # a tool can't ask for more: Claude Code waits on the call
+OUTPUT_MAX = 100_000  # characters of stdout Claude gets; a long listing would only fill its context
+MESSAGE_MAX = 4_000   # characters of stderr in an error
+# What a command's output may take in memory (#1882): stdout up to this, then the rest is read and dropped, so a command
+# that prints without end can't fill the server's memory. A picture (a tool's `image`, a screenshot in base64) is the
+# biggest output there is; stderr keeps only its end, which is what an error shows
+READ_MAX = 32 * 1024 * 1024
+ERR_MAX = 64 * 1024
+CHUNK = 64 * 1024
+# A text argument without a maxLength of its own is at most this long (a note, a mail's body, an event's notes), and
+# all of a call's arguments together at most ARGUMENTS_MAX characters as JSON: a command reads its stdin whole
+STRING_MAX = 100_000
+ARGUMENTS_MAX = 1_000_000
+
+PLACEHOLDER = re.compile(r"\{([a-z_][a-z0-9_]*)\}")
+
+TYPES = {
+    "string": str, "boolean": bool, "object": dict, "array": list, "null": type(None),
+    "number": (int, float), "integer": int,
+}
+
+
+class ToolError(Exception):
+    """The tool ran and failed, or couldn't run; the message is for Claude to read."""
+
+
+def placeholders(template):
+    """The argument names a command template (or one string of it) uses."""
+    if isinstance(template, str):
+        return set(PLACEHOLDER.findall(template))
+    return set().union(*(placeholders(t) for t in template)) if template else set()
+
+
+def check(tool, arguments):
+    """The arguments against the top level of the tool's inputSchema: Claude gets a message it can correct instead
+    of a command that fails halfway. Deeper levels are the command's to check."""
+    schema = tool.spec["inputSchema"]
+    props = schema.get("properties", {})
+    if len(json.dumps(arguments, ensure_ascii=False)) > ARGUMENTS_MAX:
+        raise ToolError(f"{tool.name}: its arguments are longer than {ARGUMENTS_MAX} characters together.")
+    missing = [n for n in schema.get("required", []) if n not in arguments]
+    if missing:
+        raise ToolError(f"{tool.name} needs {', '.join(missing)}.")
+    if schema.get("additionalProperties") is False:
+        extra = sorted(set(arguments) - set(props))
+        if extra:
+            raise ToolError(f"{tool.name} has no argument {', '.join(extra)} (it takes: {', '.join(props) or 'none'}).")
+    for name, value in arguments.items():
+        prop = props.get(name)
+        if not isinstance(prop, dict):
+            continue
+        if not is_type(value, prop.get("type")):
+            raise ToolError(f"{tool.name}: {name} must be {prop['type']}, not {json_type(value)}.")
+        if "enum" in prop and value not in prop["enum"]:
+            raise ToolError(f"{tool.name}: {name} must be one of {', '.join(map(str, prop['enum']))}.")
+        wrong = beyond(prop, value)
+        if wrong:
+            raise ToolError(f"{tool.name}: {name} {wrong}.")
+        items = prop.get("items")
+        if isinstance(value, list) and isinstance(items, dict):
+            for item in value:
+                if not is_type(item, items.get("type")):
+                    raise ToolError(f"{tool.name}: each of {name} must be {items['type']}.")
+                if "enum" in items and item not in items["enum"]:
+                    raise ToolError(f"{tool.name}: each of {name} must be one of "
+                                    f"{', '.join(map(str, items['enum']))}.")
+                wrong = beyond(items, item)
+                if wrong:
+                    raise ToolError(f"{tool.name}: each of {name} {wrong} ({json.dumps(item, ensure_ascii=False)}).")
+
+
+def limited(schema):
+    """The schema as tools/list shows it: a text argument without a maxLength of its own gets STRING_MAX's, so Claude
+    knows the limit check() keeps it to. A copy: the tool's own spec stays as its file has it."""
+    def bounded(prop):
+        if not isinstance(prop, dict):
+            return prop
+        types = prop.get("type") if isinstance(prop.get("type"), list) else [prop.get("type")]
+        out = {**prop, "maxLength": STRING_MAX} if "string" in types and "maxLength" not in prop else dict(prop)
+        if isinstance(prop.get("items"), dict):
+            out["items"] = bounded(prop["items"])
+        return out
+    props = schema.get("properties")
+    if not isinstance(props, dict):
+        return schema
+    return {**schema, "properties": {n: bounded(p) for n, p in props.items()}}
+
+
+def ecma(pattern):
+    """A schema's pattern as JSON Schema (ECMA-262) means it: $ outside a [class] is the end of the text. Python's $
+    also matches before a last line end, so "^[a-z]+$" took "firefox\\n" (#1887)."""
+    out, i, in_class = [], 0, False
+    while i < len(pattern):
+        c = pattern[i]
+        if c == "\\":
+            out.append(pattern[i:i + 2])
+            i += 2
+            continue
+        if c == "[":
+            in_class = True
+        elif c == "]":
+            in_class = False
+        out.append(r"\Z" if c == "$" and not in_class else c)
+        i += 1
+    return "".join(out)
+
+
+def beyond(prop, value):
+    """What of a schema's limits a value breaks, in words; None when none. The schema is a limit, not only a hint to
+    Claude: a plugin's command may count on its minLength or pattern having been kept (#1862)."""
+    if isinstance(value, str):
+        if len(value) < prop.get("minLength", 0):
+            return f"must be at least {prop['minLength']} characters"
+        if len(value) > prop.get("maxLength", STRING_MAX):
+            return f"must be at most {prop.get('maxLength', STRING_MAX)} characters"
+        if "pattern" in prop:
+            try:
+                if not re.search(ecma(prop["pattern"]), value):
+                    return f"must match {prop['pattern']}"
+            except (re.error, TypeError):
+                return "can't be checked: its schema's pattern is broken"
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in prop and value < prop["minimum"]:
+            return f"must be at least {prop['minimum']}"
+        if "maximum" in prop and value > prop["maximum"]:
+            return f"must be at most {prop['maximum']}"
+        if "exclusiveMinimum" in prop and value <= prop["exclusiveMinimum"]:
+            return f"must be more than {prop['exclusiveMinimum']}"
+        if "exclusiveMaximum" in prop and value >= prop["exclusiveMaximum"]:
+            return f"must be less than {prop['exclusiveMaximum']}"
+    elif isinstance(value, list):
+        if len(value) < prop.get("minItems", 0):
+            return f"needs at least {prop['minItems']} item{'s' if prop['minItems'] != 1 else ''}"
+        if "maxItems" in prop and len(value) > prop["maxItems"]:
+            return f"takes at most {prop['maxItems']} items"
+    return None
+
+
+def is_type(value, wanted):
+    if wanted is None:
+        return True
+    if isinstance(wanted, list):
+        return any(is_type(value, w) for w in wanted)
+    if wanted in ("number", "integer") and isinstance(value, bool):
+        return False  # True is an int in Python, not in JSON
+    if wanted == "integer" and isinstance(value, float):
+        return value.is_integer()
+    return isinstance(value, TYPES.get(wanted, object))
+
+
+def json_type(value):
+    return next((t for t, py in TYPES.items() if is_type(value, t) and t != "integer"), "something else")
+
+
+def text(value):
+    """One argument as command-line text: JSON's own spelling for what isn't a string."""
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+
+
+def given(value):
+    return value is not None and value is not False
+
+
+def expand(template, values, group=False):
+    """A command template with the values in place: a whole-element placeholder of a list gives one element per item,
+    a nested list (a group) is left out unless all its values are given, and a boolean in a group is the switch
+    itself (its other elements are what it turns on)."""
+    out = []
+    for item in template:
+        if isinstance(item, list):
+            if all(given(values.get(n)) for n in placeholders(item)):
+                out += expand(item, values, group=True)
+            continue
+        whole = PLACEHOLDER.fullmatch(item)
+        if whole:
+            name = whole.group(1)
+            if name not in values:
+                raise ToolError(f"needs {name}.")
+            value = values[name]
+            if isinstance(value, bool) and group:
+                continue
+            out += [text(v) for v in value] if isinstance(value, list) else [text(value)]
+            continue
+        for name in placeholders(item):
+            if name not in values:
+                raise ToolError(f"needs {name}.")
+        out.append(PLACEHOLDER.sub(lambda m: text(values[m.group(1)]), item))
+    return out
+
+
+def environment(tool):
+    """The server's environment, with the tool's commands first in PATH: the plugin's bin/ and this checkout's, so a
+    worktree's server runs the worktree's commands; ~/.local/bin last, which a client may start us without."""
+    env = dict(os.environ)
+    path = [p for p in env.get("PATH", "/usr/bin:/bin").split(os.pathsep) if p]
+    first = [str(d) for d in (tool.dir / "bin", REPO / "bin") if d.is_dir()]
+    local = str(Path.home() / ".local/bin")
+    env["PATH"] = os.pathsep.join(first + [p for p in path if p not in first] + ([] if local in path else [local]))
+    env["NIGHTDRIVE_MCP"] = "1"
+    env["NIGHTDRIVE_MCP_TOOL"] = tool.name
+    # Its area's own choices in Access ({"unlock": false}), for the command to keep to: the schema already leaves out
+    # what they take away, and a command that checks too can't be talked past (#1830)
+    env["NIGHTDRIVE_MCP_OPTIONS"] = json.dumps(getattr(tool, "options", None) or {})
+    # …and those of the areas its mcp.json names in options_from ({"mail": {"blocked": […]}}): what another area hides
+    # mustn't come out through this one (#1789)
+    env["NIGHTDRIVE_MCP_OPTIONS_FROM"] = json.dumps(getattr(tool, "options_from", None) or {})
+    # What its `card` command said for this call (confirm.facts), for the command to check it acts on that (#1866)
+    said = getattr(tool, "said", None)
+    if isinstance(said, dict):
+        env["NIGHTDRIVE_MCP_CARD"] = json.dumps(said, ensure_ascii=False)
+    return env
+
+
+def execute(tool, argv, stdin, timeout):
+    """Runs argv; (stdout, stderr, exit status). Its own session, so a timeout stops what it started too, and stdin
+    never the server's: that is the protocol. Its output is read a chunk at a time and kept up to READ_MAX (stderr:
+    its last ERR_MAX), the rest read and dropped, so the command isn't stopped halfway for printing (#1882)."""
+    try:
+        proc = subprocess.Popen(argv, cwd=tool.dir, env=environment(tool), start_new_session=True,
+                                stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError:
+        raise ToolError(f"{argv[0]} isn't installed on this machine (not found in PATH).")
+    except PermissionError:
+        raise ToolError(f"{argv[0]} can't be run (no permission).")
+    out, err = bytearray(), bytearray()
+    threads = [threading.Thread(target=drain, args=(proc.stdout, out, READ_MAX, False), daemon=True),
+               threading.Thread(target=drain, args=(proc.stderr, err, ERR_MAX, True), daemon=True)]
+    if stdin is not None:
+        threads.append(threading.Thread(target=feed, args=(proc.stdin, stdin.encode("utf-8")), daemon=True))
+    for t in threads:
+        t.start()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        raise ToolError(f"{tool.name} didn't finish in {timeout} s and was stopped.")
+    finally:
+        for t in threads:
+            t.join(timeout=5)   # what it started may hold its output open; that isn't waited for
+    return out.decode("utf-8", "replace"), err.decode("utf-8", "replace"), proc.returncode
+
+
+def drain(pipe, kept, limit, tail):
+    """Reads a pipe to its end, keeping its first limit bytes (its last, with tail)."""
+    try:
+        while chunk := pipe.read1(CHUNK):
+            if tail:
+                kept += chunk
+                del kept[:-limit]
+            elif len(kept) < limit:
+                kept += chunk[:limit - len(kept)]
+    except (OSError, ValueError):
+        pass
+    finally:
+        pipe.close()
+
+
+def feed(pipe, data):
+    """Writes the call's stdin and closes it; a command that doesn't read it all isn't an error."""
+    try:
+        pipe.write(data)
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+    finally:
+        try:
+            pipe.close()
+        except OSError:
+            pass
+
+
+def picture(body, field):
+    """A tool's `image`: the field of its JSON output that holds a picture ({mimeType, data} in base64), taken out of
+    the text and given as MCP's image content, which Claude sees. (body, [image content]) as they are without one."""
+    try:
+        data = json.loads(body)
+        image = data.pop(field)
+        content = {"type": "image", "data": image["data"], "mimeType": image["mimeType"]}
+    except (ValueError, AttributeError, KeyError, TypeError):
+        return body, []
+    return json.dumps(data, ensure_ascii=False), [content]
+
+
+def result(out, image=None):
+    """stdout as MCP's tools/call result: the text, and a JSON object as structuredContent too."""
+    body = out.strip()
+    if not body:
+        return {"content": [{"type": "text", "text": "Done."}]}
+    if image:
+        body, pictures = picture(body, image)
+        if pictures:
+            answer = result(body)
+            answer["content"] += pictures
+            return answer
+    if len(body) > OUTPUT_MAX:
+        cut = len(body) - OUTPUT_MAX
+        return {"content": [{"type": "text", "text": body[:OUTPUT_MAX] + f"\n… ({cut} more characters left out)"}]}
+    answer = {"content": [{"type": "text", "text": body}]}
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return answer
+    if isinstance(data, dict):
+        answer["structuredContent"] = data
+    return answer
+
+
+def prepare(tool, arguments):
+    """The argv and stdin text (None for none) of a call: what run() runs, and undo.py keeps for redo."""
+    spec = tool.spec
+    try:
+        argv = expand(spec["command"], arguments)
+        stdin = spec.get("stdin")
+        if stdin == "json":
+            stdin = json.dumps(arguments, ensure_ascii=False)
+        elif stdin is not None:
+            stdin = "".join(expand([stdin], arguments))
+    except ToolError as e:
+        raise ToolError(f"{tool.name} {e}")
+    return argv, stdin
+
+
+def timeout_of(tool):
+    return min(tool.spec.get("timeout", TIMEOUT), TIMEOUT_MAX)
+
+
+def run(tool, arguments):
+    """One call: the tool's command with these (checked) arguments; MCP's tools/call result, or ToolError."""
+    argv, stdin = prepare(tool, arguments)
+    out, err, status = execute(tool, argv, stdin, timeout_of(tool))
+    if status != 0:
+        message = (err.strip() or out.strip() or "no message")[-MESSAGE_MAX:]
+        raise ToolError(f"{tool.name} failed ({Path(argv[0]).name} exited with {status}): {message}")
+    return result(out, tool.spec.get("image"))
+
+
+def undo_values(arguments, answer, before=None):
+    """What a change tool's `undo` fills its {name}s from: the fields of its `before` command's JSON
+    (the state it changed), then of its own JSON output, then the call's arguments."""
+    return {**arguments, **(answer.get("structuredContent") or {}), **(before or {})}
+
+
+def undo_argv(tool, arguments, answer, before=None):
+    """The argv that undoes a change tool's call (undo.py keeps it and runs it on Undo)."""
+    return expand(tool.spec["undo"], undo_values(arguments, answer, before))

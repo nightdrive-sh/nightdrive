@@ -30,7 +30,8 @@ Nightdrive puts all of that together into one opinionated desktop.
   dictation, and sleep is tuned for Asahi.
 - **Everything is a keystroke away.** One launcher handles apps, passwords, clipboard history, emoji, screenshots, settings,
   installing packages and power. You rarely need a terminal for everyday things.
-- **Apps of its own.** Mail, Contacts, Deck, Garage and Ferry come with it, made for the keyboard and in the desktop's colours.
+- **Apps of its own.** Mail, Contacts, Calendar, Tasks, Notes, Deck, Garage and Ferry come with it, made for the keyboard
+  and in the desktop's colours.
 - **Simple and readable.** Plain config files, a few small scripts, and comments that explain *why*.
 
 ## Highlights
@@ -47,8 +48,9 @@ Nightdrive puts all of that together into one opinionated desktop.
 - **Power**: lock, sleep, log out, restart and shut down
 - **Music**: while it plays, a player row above the list
 
-Type a question and press ⌘⌥Enter to send it to Claude Code. Search "Rename current space" to name the workspace you're
-on in the bar.
+Type a request and press ⌘⌥Enter: Claude does it in the background with [Nightdrive's tools](docs/claude.md) and
+answers in a notification (⌘⌃Enter sends it to Claude Code in a terminal instead). Search "Rename current space" to name
+the workspace you're on in the bar.
 
 It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and the answer is the first row; Enter
 copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal comma in results* answers `3,5`.
@@ -57,15 +59,19 @@ copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal 
 
 ### Apps of its own
 
-Mail, Contacts, Deck and Ferry come with every install; Garage waits in Launcher › System › Install › Recommended. They're
-made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the sidebar steps aside; narrower
-still, the list and the message take turns.
+Mail, Contacts, Deck, Ferry, Notes, Tasks and Calendar come with every install; Garage waits in Launcher › System ›
+Install › Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the
+sidebar steps aside; narrower still, the list and the message take turns.
 
 - **[Mail](plugins/mail/README.md)**: any IMAP account, quiet reading, notifications you can answer from
 - **[Contacts](plugins/contacts/README.md)**: iCloud, Google or CardDAV, in sync both ways; Mail and the Launcher find them
 - **[Deck](plugins/deck/README.md)**: Spotify (Premium) with your albums on a shelf, in the bar, the Launcher and the media keys
 - **[Garage](plugins/garage/README.md)**: virtual machines from a ready-made Fedora or an ISO, with snapshots to go back to
 - **[Ferry](plugins/ferry/README.md)**: a mailbox over Tailscale between your computers and your phone
+- **[Notes](plugins/notes/README.md)**, **[Tasks](plugins/tasks/README.md)** and **[Calendar](plugins/calendar/README.md)**:
+  new, and simple for now. Their windows show your Markdown notes, your tasks (a notification when one comes due) and
+  your iCloud and Google calendars, and you add and change things with their commands or by asking Claude
+  ([Claude and your desktop](docs/claude.md))
 
 ![Mail four ways: folders, list and message; list and message; and in a narrow window the list, then the message](docs/releases/0.6.0-mail-sizes.jpg)
 
@@ -127,8 +133,9 @@ fit go into a **…** menu, the ones farthest from the clock first.
 details before installing (Tab there takes Flathub's when both have it). Browse has the 100 most popular apps and
 categories. System › Remove takes software and web apps away; Ctrl+Enter there removes one without asking.
 
-Nightdrive's own apps (Mail, Contacts, Deck, Ferry) and Tailscale come with every install; Garage, Nightdrive's app for
-virtual machines, waits in System › Install › Recommended. The rest are optional parts, under System › Install:
+Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) and Tailscale come with every install;
+Garage, Nightdrive's app for virtual machines, waits in System › Install › Recommended. The rest are optional parts,
+under System › Install:
 
 - **Recommended**: apps Nightdrive sets up for you (1Password, Home Assistant…)
 - **Webapp**: ready-made web apps with a key, or any site of your own
@@ -199,7 +206,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own) | a mailbox both ways with your phone and other computers, over Tailscale |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
 | Passwords (optional) | [1Password](plugins/1password/README.md) and its `op` CLI | Passwords level in the Launcher, SSH agent |
-| AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘⌥Enter, ask from the Launcher, Claude writes (⌘⇧C), sessions and usage limits in the bar |
+| AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘⌥Enter asks from the Launcher, ⌘⌃Enter in a terminal, Claude writes (⌘⇧C), sessions and usage limits in the bar |
 | Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet, offline) | hold F5 or Fn (Mac), Insert (PC) to talk |
 | Network | NetworkManager, BlueZ, [Tailscale](plugins/tailscale/README.md) | Wi-Fi, Bluetooth and Tailscale menus |
 | Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 %), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
@@ -264,9 +271,10 @@ A minimal Fedora gets what a desktop edition would have: it boots to the login s
 AirPlay in as on Fedora KDE, and SSH stays off until you turn on Remote login (Launcher › Settings), unless you install
 over ssh.
 
-Claude Code, Tailscale, Mail, Contacts, Deck and Ferry come with every install and stay quiet until you set them up. The
-optional parts that are on by default (Apostrophe, YouTube) come too; the rest can be added later from the Launcher
-(System › Install) or with `nightdrive plugins install ID` (`nightdrive apps install garage` for an app).
+Claude Code, Tailscale and Nightdrive's apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) come with every
+install and stay quiet until you set them up. The optional parts that are on by default (Apostrophe, YouTube) come too;
+the rest can be added later from the Launcher (System › Install) or with `nightdrive plugins install ID`
+(`nightdrive apps install garage` for an app).
 
 **Trying it on the system you already use?** Nightdrive doesn't remove your apps: on a Mac only the services listed
 under [Installer options](#installer-options) go (`--choose` unticks them). Your configs in `~/.config` are moved aside to
@@ -299,8 +307,8 @@ Give them to `./install.sh`, or after `--` in the curl line (`bash -s -- --choos
 | `--vm` | The virtual machine settings, if the VM isn't detected as one ([docs/vm.md](docs/vm.md)) |
 | `--no-nvidia` | On a PC, leaves an NVIDIA card's driver alone instead of installing RPM Fusion's ([docs/pc.md](docs/pc.md)) |
 | `--with 1password,slack` | These optional parts on top of the defaults (`--dry-run` lists the ids) |
-| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail, Contacts, Deck or Ferry too |
-| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale, Mail, Contacts, Deck and Ferry come with each |
+| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale or one of Nightdrive's apps (`mail`, `tasks`…) too |
+| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale and Nightdrive's apps come with each |
 | `--dry-run` | Shows the optional parts, the packages and system settings it would add and what it would remove, then stops |
 
 To pick the optional parts yourself, run `./install.sh --choose`: it lists them first (a number toggles one, Enter
@@ -341,8 +349,9 @@ reports) and other Wi-Fi chips' firmware, listed in `packages-remove-asahi.txt`.
 
 At your first login, **Welcome to Nightdrive** opens and asks whether you have Claude Code (a Pro or Max plan).
 
-- **With Claude**, sign in there first. Then Claude sets up Tailscale, Mail, Contacts, Deck and Ferry with you, each in
-  a session of its own that does only that one thing.
+- **With Claude**, sign in there first, and choose how much Claude may use of your desktop (*Claude's access*, see
+  [Claude and your desktop](docs/claude.md)). Then Claude sets up Tailscale, Mail, Contacts, Calendar, Tasks, Deck and
+  Ferry with you, each in a session of its own that does only that one thing.
 - **Without**, it shows each one's steps right there, one at a time in plain words.
 - **I'll do it myself** lists the apps, each opening its README in Apostrophe.
 
@@ -387,8 +396,9 @@ You can also update any time from the Launcher (**Update**) or a terminal:
 nightdrive update
 ```
 
-An install without one of Nightdrive's apps (Mail, Contacts, Deck, Ferry) gets it with the next update, once. Remove
-one, and it stays removed: Launcher › System › Install › Recommended or `nightdrive apps install mail` brings it back.
+An install without one of Nightdrive's apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) gets it with the next
+update, once. Remove one, and it stays removed: Launcher › System › Install › Recommended or
+`nightdrive apps install mail` brings it back.
 Settings › Apps › Nightdrive apps turns one off or on.
 
 It never overwrites your own edits: a repo with uncommitted changes is skipped with a note. On an install older than the
@@ -416,16 +426,27 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive theme color teal` | Theme colour: violet, blue, teal, green, amber, rose or graphite; aerc (if you use it) gets it too, unless you have picked a styleset of your own |
 | `nightdrive theme set background '#181722'` | The look: the terminals', the Launcher's, Firefox's and Thunderbird's background and opacity, the window borders and shadows; `nightdrive theme look` lists the settings, `default` puts one back (also Theme Editor, Launcher › Settings › Theme) |
 | `nightdrive theme save "My theme"` | Saves the colour and the look as a theme of your own; `nightdrive theme themes` lists them, `use ID` switches, `delete ID` removes one, `reset` goes back to Default |
-| `nightdrive wallpaper set <image>` | Changes the wallpaper; `nightdrive wallpaper current` prints it |
-| `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one |
+| `nightdrive wallpaper set <image>` | Changes the wallpaper (an image from elsewhere, such as Downloads, is copied to your own backgrounds first); `nightdrive wallpaper current` prints it |
+| `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one, `mode eDP-1 2560x1440` the resolution (`auto` for either goes back to the default). With `--keep` last, a card asks whether to keep it and it goes back in 20 s unless you do. `display json` gives it all as JSON |
+| `nightdrive sound` | Volume and outputs as JSON; `sound volume 40` sets the volume (`--mute on`/`off`), `sound output NAME` the output |
+| `nightdrive brightness 60` | The screen's brightness in percent; without a number, prints it |
+| `nightdrive network` | Wi-Fi and the network as JSON; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |
+| `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
+| `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
+| `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |
+| `nightdrive notifications` | The latest notifications (`--limit N`, `--json`); `dnd on` / `off` turns Do Not Disturb on or off, `send "Title" "Text"` shows one (`--app NAME`) and `remove TAG` takes it away again |
+| `nightdrive windows` | The open windows (`--json`); `focus WINDOW` brings one forward (an address or an app), `shot WINDOW` takes a picture of one on screen (never of one Send to Claude leaves out), `open firefox` opens an app or brings it forward, `open https://…` an address |
+| `nightdrive files recent` | The newest files in Downloads, Pictures and Documents (`--in downloads`, `--name TEXT`, `--json`); `open PATH` opens one in its default app, `trash PATH…` moves to the trash, `restore NAME…` puts back and `check PATH…` lists what a send (Claude's Ferry tool) would take. Only in your home folder and nothing hidden; programs and scripts aren't opened. Claude's tools keep also to the folders in Access (docs/claude.md); `folders` lists those it offers |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
 | `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also Launcher › Settings › Top bar › Date format |
-| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
+| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage, Notes, Tasks, Calendar) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
 | `nightdrive plugins` | Optional parts and whether each is installed and on; `nightdrive plugins install home-assistant` runs one's installer |
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |
+| `nightdrive software search gimp` | Fedora's packages and Flathub's apps, as System › Install › Software finds them; `info dnf ID` (or `flatpak`, `plugin`), `installed` and `plugins` tell more (`--json`). `install dnf ID` or `install flatpak ID` installs one, `remove` removes it, `preview install …` shows first what would change; dnf asks for the password in the system's own dialog |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the Launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
-| `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS` |
+| `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌃Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS` |
+| `nightdrive mcp access open` | Claude's access, the window of Launcher › Settings › Claude › *Access*: each area's Read, Modify and Delete, `Allow`, `Ask` or `No`. `level strict` (`normal`, `open`) sets them all, `set mail read allow` one, and `nightdrive mcp access` alone shows what applies. `nightdrive mcp install` gives Claude Code the tools, `remove` takes them away |
 | `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck, Ferry… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
 ## Keys
@@ -437,7 +458,8 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 |---|---|
 | ⌘ Space | Launcher |
 | ⌘ Enter | Terminal |
-| ⌘ ⌥ Enter | Claude Code (with text typed in the Launcher: sends it as the prompt) |
+| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, answered in the background with Nightdrive's tools only, the answer a notification (Claude Code without text) |
+| ⌘ ⌃ Enter | Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt) |
 | ⌘ C / ⌘ V / ⌘ X | Copy, paste, cut, in every app |
 | ⌘ S | Save |
 | ⌘ W | Close (background apps are only hidden) |
@@ -531,6 +553,13 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers
   or claude.ai connectors, and nothing is saved as a session. Its text goes in only after you've seen it, the clipboard
   gets its own content back, and the text isn't kept in the clipboard history.
+- **Claude and your desktop.** With Nightdrive's tools on in Claude Code (Launcher › Settings › Claude › *Access*, or
+  `nightdrive mcp install`), any Claude Code session can use your desktop as far as Access allows. Each area (Mail,
+  Appearance…) has Read, Modify and Delete, each *Allow*, *Ask* (Nightdrive's own card asks you each time) or *No* (not
+  there for Claude at all). *Strict* gives only Nightdrive's docs and status; *Normal* asks before reading what is
+  private (mail, contacts, calendar, notes, notifications, the screen) and before deleting; *Open* allows the rest.
+  Sending, installing and devices always ask; passwords are never there. What each area gives, and how to turn it off:
+  [docs/claude.md](docs/claude.md).
 - **No credentials are stored in this repo.** Tokens stay with each app (Deck, Claude Code) or in 1Password.
 
 ## Want to participate?

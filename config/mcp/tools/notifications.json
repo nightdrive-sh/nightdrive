@@ -1,0 +1,62 @@
+{
+  "tools": [
+    {
+      "name": "notifications_recent",
+      "title": "Recent notifications",
+      "description": "The latest notifications the user has had on this desktop, newest first: app, summary, body and time (ISO 8601), and whether Do Not Disturb is on (dnd). left_out counts the notifications the user's Access keeps from Claude (some apps', Mail's of mail it blocks): don't look for them another way. Use it when the user asks what they missed, or what a notification said.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {"type": "integer", "minimum": 1, "maximum": 50, "description": "How many, default 10 (the history keeps 50)"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "notifications", "list", "--json", ["--limit", "{limit}"]],
+      "mask": ["notifications.summary", "notifications.body"],
+      "options_from": ["mail"],
+      "class": "read",
+      "area": "notifications"
+    },
+    {
+      "name": "notifications_send",
+      "title": "Send a notification",
+      "description": "Show the user a notification on this desktop, from Claude: a reminder or a result they should see when they look up (\"tell me when the build is done\"). It stays in the notification history; the same text again replaces it instead of adding another. Do Not Disturb hides the popup but not the row.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {"type": "string", "description": "The title line, short"},
+          "body": {"type": "string", "description": "The text under it, a sentence or two"}
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "notifications", "send", "--app", "Claude", "--icon", "lucide:bot", "--json", "--",
+                  "{summary}", ["{body}"]],
+      "class": "change",
+      "undo": ["nightdrive", "notifications", "remove", "--app", "Claude", "{tag}"],
+      "notice": "Sent a notification: {summary}",
+      "area": "notifications"
+    },
+    {
+      "name": "notifications_dnd_on",
+      "title": "Turn Do Not Disturb on",
+      "description": "Turn Do Not Disturb on: notifications stop popping up and chiming (they still go into the history), and the popups on screen now go. It hides alerts, so the user allows it on Nightdrive's card: turn it on only when the user asked to. notifications_recent shows whether it's on.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "notifications", "dnd", "on", "--json"],
+      "class": "act",
+      "area": "notifications"
+    },
+    {
+      "name": "notifications_dnd_off",
+      "title": "Turn Do Not Disturb off",
+      "description": "Turn Do Not Disturb off: notifications pop up and chime again. notifications_recent shows whether it's on.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "notifications", "dnd", "off", "--json"],
+      "before": ["nightdrive", "notifications", "dnd", "--json"],
+      "undo": ["nightdrive", "notifications", "dnd", "{state}"],
+      "notice": "Turned Do Not Disturb off",
+      "class": "change",
+      "area": "notifications"
+    }
+  ]
+}

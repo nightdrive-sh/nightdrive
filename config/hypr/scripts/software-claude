@@ -1,0 +1,228 @@
+#!/usr/bin/python3 -I
+"""What Claude may install and remove (Settings › Claude › Access › Software, #1835; the decisions: logs 3302, 3332).
+software and software-apply load it (SourceFileLoader); run alone, it prints the packages Nightdrive needs.
+
+Claude's calls come from Nightdrive's MCP server (NIGHTDRIVE_MCP=1), with the area's choices in NIGHTDRIVE_MCP_OPTIONS
+({"any_source": false}; one that isn't there is off, as they only ever allow more). The launcher's and a terminal's
+own calls don't set it, so what the user does themselves is as it was.
+  any_source           off: only Fedora's own repositories, Nightdrive's COPR (the desktop itself comes from it, and
+                       includepkgs keeps it to its own packages) and on a Mac Fedora Asahi Remix's, and Flathub apps
+                       whose publisher Flathub verified. Every row of the transaction counts, dependencies and upgrades
+                       too: a Fedora package can't bring one from RPM Fusion along
+  nightdrive_packages  off: no removal whose transaction takes a package Nightdrive installs (install.sh's lists)
+  any_plugin           off: only Nightdrive's own plugins, not one from another repository
+The transaction dnf then runs is its own, worked out again as root: dnf_options keeps it to what the card showed (#1879).
+"""
+import glob, json, os, re, subprocess, sys
+import xml.etree.ElementTree as ET
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+REPO = os.path.realpath(os.path.join(HERE, "../../.."))
+# What install.sh installs, the one list of what Nightdrive needs: every machine's, as a Mac's list in a PC's check
+# costs nothing. flatpaks.txt is Flathub's (empty now)
+NEEDED = ("packages.txt", "packages-hyprland.txt", "packages-pc.txt", "packages-asahi.txt", "flatpaks.txt")
+# Fedora's own repositories as dnf names them (fedora-cisco-openh264 is Fedora's, fedora-repos enables it), and
+# Nightdrive's COPR (setup-hyprland-repo.sh)
+FEDORA = {"fedora", "updates", "fedora-cisco-openh264", "copr:copr.fedorainfracloud.org:group_nightdrive:nightdrive"}
+# Fedora Asahi Remix's own, on a Mac: its kernel and mesa come from them, and many installs bring a mesa upgrade along
+ASAHI = re.compile(r"(copr:copr\.fedorainfracloud\.org:group_asahi:[\w.+-]+|fedora-asahi-remix-hotfixes)")
+# What the desktop needs that install.sh doesn't list: Fedora installs them, or they come as a dependency (#1879)
+SYSTEM = ("linux-firmware", "xorg-x11-server-Xwayland")
+APPSTREAM = "~/.local/share/flatpak/appstream/flathub/*/active/appstream.xml"
+VERIFY = "flathub::verification::"
+ACCESS = "the user's Access (Settings › Claude › Access › Software)"
+YOURSELF = "Tell the user they can install it themselves (Launcher › Install › Software); don't try it another way."
+
+
+def options():
+    """Access's choices for Claude's call, {option: on}; None when this isn't Claude's (no limits). What can't be read
+    is {}: every choice off."""
+    if os.environ.get("NIGHTDRIVE_MCP") != "1":
+        return None
+    try:
+        found = json.loads(os.environ.get("NIGHTDRIVE_MCP_OPTIONS", ""))
+    except ValueError:
+        return {}
+    return found if isinstance(found, dict) else {}
+
+
+def allowed(option):
+    found = options()
+    return found is None or found.get(option) is True
+
+
+def needed():
+    """The packages (and Flatpak app ids) install.sh installs, an @group's members among them (#1862): the group's
+    name is never a row of a removal, its members are. SYSTEM's too"""
+    names, groups = set(SYSTEM), set()
+    for name in NEEDED:
+        try:
+            with open(os.path.join(REPO, name)) as fh:
+                for line in (l.strip() for l in fh):
+                    if line.startswith("@"):
+                        groups.add(line[1:])
+                    elif line and not line.startswith("#"):
+                        names.add(line)
+        except OSError:
+            pass
+    for group in sorted(groups):
+        names |= group_members(group)
+    return names
+
+
+def group_members(group):
+    """The packages dnf installs with a group: its mandatory and default ones (optional ones only when asked)"""
+    try:
+        p = subprocess.run(["dnf", "-q", "group", "info", "--", group], capture_output=True, text=True, timeout=60,
+                           stdin=subprocess.DEVNULL, env={**os.environ, "LC_ALL": "C"})
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    out, section = set(), None
+    for line in p.stdout.splitlines():
+        key, sep, value = line.partition(" : ")
+        if not sep:
+            section = None
+            continue
+        if key.strip():
+            section = key.strip()
+        if section in ("Mandatory packages", "Default packages") and value.strip():
+            out.add(value.strip())
+    return out
+
+
+def mac():
+    p = subprocess.run([os.path.join(HERE, "platform"), "name"], capture_output=True, text=True)
+    return p.stdout.strip() == "asahi"
+
+
+def fedora_repo(repo, on_mac):
+    return repo in FEDORA or (on_mac and bool(ASAHI.fullmatch(repo)))
+
+
+def repo_name(repo):
+    """A repository as the card says it: Fedora's own by name, a COPR as owner/project, the rest by dnf's id"""
+    if repo in ("fedora", "updates", "fedora-cisco-openh264"):
+        return "Fedora"
+    copr = re.fullmatch(r"copr:copr\.fedorainfracloud\.org:(group_)?([^:]+):(.+)", repo)
+    if copr:
+        return f"COPR {'@' if copr.group(1) else ''}{copr.group(2)}/{copr.group(3)}"
+    return repo
+
+
+def flathub(ids=None):
+    """Flathub's verification of its apps, from the appstream data flatpak keeps (Install › Software's too):
+    {id: who Flathub verified, "" when it didn't}. ids limits it to those (one pass over the file either way)."""
+    out = {}
+    for path in glob.glob(os.path.expanduser(APPSTREAM)):
+        try:
+            for _, el in ET.iterparse(path):
+                if el.tag != "component":
+                    continue
+                app = (el.findtext("id") or "").strip()
+                if app and (ids is None or app in ids):
+                    keys = {v.get("key", "").removeprefix(VERIFY): (v.text or "").strip()
+                            for v in el.iterfind("custom/value") if v.get("key", "").startswith(VERIFY)}
+                    who = keys.get("website") or keys.get("login_name") or el.findtext("developer/name") \
+                        or el.findtext("developer_name") or "its developer"
+                    out[app] = who.strip() if keys.get("verified") == "true" else ""
+                el.clear()
+        except (OSError, ET.ParseError):
+            continue
+    return out
+
+
+def rows(packages):
+    """software-apply's "name · repository[ · what]" rows as (name, repository)"""
+    out = []
+    for r in packages:
+        f = [x.strip() for x in r.split("·")]
+        out.append((f[0], f[1] if len(f) > 1 else ""))
+    return out
+
+
+def install_refusal(source, ident, packages):
+    """Why Access doesn't let Claude install this, in words for Claude; None when it does"""
+    if allowed("any_source"):
+        return None
+    if source == "flatpak":
+        if flathub({ident}).get(ident):
+            return None
+        return (f"{ident} wasn't installed: Flathub hasn't verified its publisher, and {ACCESS} lets Claude install "
+                f"only Flathub's verified apps (and Fedora's own packages). {YOURSELF}")
+    on_mac = mac()
+    other = [f"{n} (from {r})" for n, r in rows(packages) if not fedora_repo(r, on_mac)]
+    if not other:
+        return None
+    return (f"{ident} wasn't installed: {', '.join(other)} isn't from Fedora's own repositories, and {ACCESS} lets "
+            f"Claude install only from those (and Flathub's verified apps). {YOURSELF}")
+
+
+def remove_refusal(packages):
+    """Why Access doesn't let Claude remove these, in words for Claude; None when it does"""
+    if allowed("nightdrive_packages"):
+        return None
+    hit = sorted({n for n, _ in rows(packages)} & needed())
+    if not hit:
+        return None
+    return (f"Nothing was removed: it would take {', '.join(hit)} along, which Nightdrive needs, and {ACCESS} doesn't "
+            "let Claude remove those (the desktop could stop working). The user can do it themselves (Launcher › "
+            "Remove › Software) if they're sure; don't try it another way.")
+
+
+def dnf_options(action, packages):
+    """What keeps the transaction dnf runs (as root, worked out again) to the one the card showed: Claude's call only.
+    An install draws only on the repositories of its rows, so one whose metadata changed meanwhile can't add a row from
+    another (RPM Fusion's, say). No repository's signing key is imported: the card doesn't show one, and -y would say
+    yes to it, so a package only a key not yet imported can verify fails instead. And what Nightdrive needs dnf itself
+    won't remove (protected_packages adds to dnf's own list), whatever the transaction comes to by then."""
+    if options() is None:
+        return []
+    out = ["--setopt=*.gpgkey="]
+    if action == "install":
+        out += [f"--repo={r}" for r in sorted({r for _, r in rows(packages) if r})]
+    if not allowed("nightdrive_packages"):
+        out.append("--setopt=protected_packages=" + ",".join(sorted(needed())))
+    return out
+
+
+def plugin_refusal(name, origin):
+    if origin == "Nightdrive" or allowed("any_plugin"):
+        return None
+    return (f"{name} wasn't installed: it comes from {origin}, not Nightdrive, and {ACCESS} lets Claude install only "
+            "Nightdrive's own plugins. Tell the user they can install it themselves (Launcher › Install › Plugins); "
+            "don't try it another way.")
+
+
+def marks(rows_):
+    """software search's rows (and their also), marked when Claude can't install one: claude_can_install false and
+    why. Nothing when this isn't Claude's call, or Access allows any source."""
+    if allowed("any_source"):
+        return rows_
+    on_mac = mac()
+    dnf = sorted({r["id"] for r in rows_ if r["source"] == "dnf"})
+    repos = {}
+    if dnf:
+        # The newest of each, as dnf would install it; one query for them all
+        p = subprocess.run(["dnf", "repoquery", "--available", "-q", "--latest-limit=1", "--queryformat",
+                            "%{name}|%{repoid}\n", "--", *dnf], stdin=subprocess.DEVNULL, capture_output=True,
+                           text=True, timeout=60)
+        for line in p.stdout.splitlines():
+            name, _, repo = line.partition("|")
+            repos.setdefault(name, repo)
+    apps = flathub({r["id"] for r in rows_ if r["source"] == "flatpak"})
+    for r in rows_:
+        if r.get("installed"):
+            continue
+        if r["source"] == "dnf":
+            repo = repos.get(r["id"], "")
+            if repo and not fedora_repo(repo, on_mac):
+                r.update(claude_can_install=False, why=f"from {repo}: the user installs it from the Launcher")
+        elif not apps.get(r["id"]):
+            r.update(claude_can_install=False, why="Flathub hasn't verified its publisher: the user installs it from the Launcher")
+    return rows_
+
+
+if __name__ == "__main__":
+    if sys.argv[1:]:
+        sys.exit(__doc__)
+    print("\n".join(sorted(needed())))

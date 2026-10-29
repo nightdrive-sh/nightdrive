@@ -86,7 +86,8 @@ end
 
 -- Programs
 hl.bind(mod .. " + RETURN",      hl.dsp.exec_cmd(terminal))
-hl.bind(mod .. " + ALT + RETURN", hl.dsp.exec_cmd(scripts .. "/terminal-or-claude"))   -- Claude Code; text typed in the launcher becomes the prompt
+hl.bind(mod .. " + ALT + RETURN", hl.dsp.exec_cmd(scripts .. "/ask-claude"))   -- Ask Claude: the launcher's text in the background, the answer a notification
+hl.bind(mod .. " + CTRL + RETURN", hl.dsp.exec_cmd(scripts .. "/terminal-or-claude"))   -- Claude Code in a terminal; the launcher's text becomes the prompt
 hl.bind(mod .. " + SPACE",       hl.dsp.exec_cmd("qs ipc call launcher toggle"))   -- Quickshell launcher
 hl.bind("XF86Search",               hl.dsp.exec_cmd("qs ipc call launcher toggle"))   -- F4 (magnifier): launcher, like ⌘Space
 hl.bind("XF86LaunchA",              hl.dsp.exec_cmd("qs ipc call menu toggle notifications"))   -- F3 (Mission Control, KEY_SCALE): notification centre
@@ -107,7 +108,7 @@ hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = tru
 -- parts' apps below and in the plugins' bindings.lua (Deck M, 1Password P). ⌘ stays for the desktop and the apps' own keys.
 -- These are defaults: your own keys (appKeys, above) replace them.
 hl.bind("MOD3 + B",              hl.dsp.exec_cmd(browser))
-hl.bind(mod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(browser))   -- next to ⌘Enter (terminal) and ⌘⌥Enter (Claude Code)
+hl.bind(mod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(browser))   -- next to ⌘Enter (terminal) and ⌘⌥Enter (Ask Claude)
 hl.bind("MOD3 + F",              hl.dsp.exec_cmd(fileManager))
 hl.bind("MOD3 + E",              hl.dsp.exec_cmd(email))
 ownKey = true

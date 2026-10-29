@@ -34,6 +34,7 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | `systemd/` | User units, linked to `~/.config/systemd/user` | — (LocalSend's [nightdrive-localsend.service](localsend/systemd/nightdrive-localsend.service)) |
 | `bin/` | Commands, linked to `~/.local/bin` | — (LocalSend's [localsend](localsend/bin/localsend)) |
 | `nautilus-python/` | Files extensions, linked to `~/.local/share/nautilus-python/extensions` | — (LocalSend's [localsend.py](localsend/nautilus-python/localsend.py)) |
+| `mcp.json` | Its tools for Claude (see [below](#tools-for-claude-mcpjson)) | — |
 | anything else | Whatever it needs, used by its own files | [install.sh](ferry/install.sh) (installs the Ferry release pinned in [release.conf](ferry/release.conf), checked by its sha256), [hook](ferry/hook) (Ferry runs it when its box changes) |
 
 `link.sh` links `bin/`, `systemd/` and `nautilus-python/` whether the plugin is installed or not, so its installer can
@@ -71,6 +72,7 @@ author=@jarilehtinen
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
 | `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
+| `repos` | The package repositories the installer adds, separated by spaces: a repo's address, or `copr:owner/project`. Claude's card for installing the plugin shows them (`nightdrive plugin check` asks for it when the installer adds one) |
 | `units` | User units the installer set up outside the folder, space-separated (Ferry's `ferry.service`, which Ferry's own install writes): `nightdrive plugins off` stops them with the folder's `systemd/` ones |
 | `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up), `webapp`, or `app`: one of Nightdrive's own apps (below) |
 | `bundled` | For an `app`: `yes` (default) comes with every install; `no` doesn't (below) |
@@ -316,6 +318,72 @@ tests for that. Enable a unit by its path in the folder (`systemctl --user enabl
 `localsend enable` does): `systemctl --user disable` removes a linked unit's link too, and the path links it again. Name them
 so they can't clash: `nightdrive-<id>.service`, a command named after the plugin. A Files extension runs whether the
 plugin is on or not, so it checks that itself (LocalSend's tests its unit and `~/.local/state/nightdrive/plugins-off/<id>`).
+
+## Tools for Claude: mcp.json
+
+`nightdrive mcp`, Nightdrive's MCP server, gives Claude the tools in the `mcp.json` of every plugin that is installed and
+on, after the core's own (`config/mcp/tools/*.json`, the same format). A tool is a command the plugin already has, usually
+with `--json` output: the file only says how Claude calls it, and the server does the rest (Access, the confirmation
+card, undo, timeouts).
+
+```json
+{
+  "tools": [
+    {
+      "name": "disk_usage",
+      "title": "Disk usage",
+      "description": "Free and used space on each disk (or the one holding path), as df prints it.",
+      "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}, "additionalProperties": false},
+      "command": ["df", "--output=target,size,used,avail", ["{path}"]],
+      "class": "read",
+      "area": "disk"
+    }
+  ]
+}
+```
+
+| Field | What it is |
+| --- | --- |
+| `name` | `a-z`, `0-9` and `_`, at most 64, starting with the plugin's id (`disk_…`). A name already taken is left out, with a line in the log |
+| `title`, `description` | What Claude reads: what the tool does and returns, and when to use it |
+| `inputSchema` | The arguments as JSON Schema, an `object`. The server checks the top level (required, types, enums, `minLength`, `maxLength`, `pattern`, `minimum`, `maximum`, `minItems`, `maxItems`; a list's `items` too) before running anything, so the command can count on them |
+| `command` | Argv, run without a shell. `{name}` is that argument (a whole element or part of one; a list gives one element each). A nested list is optional: left out unless every argument in it is given. A boolean in one is the switch itself: `["--all", "{all}"]` gives `--all` when true |
+| `stdin` | Optional: `"json"` writes all the arguments as JSON on the command's stdin, `"{body}"` one argument's text (long text that doesn't fit argv) |
+| `class` | `read` runs at once. `change` runs at once and tells the user, who can undo it. `act` (sending, devices, installing) runs only after the user allows it on Nightdrive's card. Access may make any of them ask on the card too (below) |
+| `deletes` | Optional: `true` for a tool that removes something (to the trash, a mail, an event): it then comes under the area's Delete in Access instead of Modify |
+| `undo` | For `change`, required: the argv that undoes it. Its `{name}`s come from `before`'s JSON object, then the command's JSON output (its object's fields), then the arguments |
+| `undo_asks` | Optional, for `change`: `true` when undoing it does something only the card may allow. An undo whose argv is an `act` tool's command (dnd_off's undo is dnd_on's) asks without it |
+| `before` | Optional, for `change`: argv that prints the state the tool changes as a JSON object (`{"path": "…"}`, the wallpaper set now), run first. If it fails, the tool isn't run: a change must be one the user can undo |
+| `notice` | Optional, for `change`: the notification's line, e.g. `"Changed the wallpaper to {path}"` (the output's fields, then the arguments). Default: `title` |
+| `card` | Optional: argv that prints, as a JSON object of label → text, what the confirmation card shows above the arguments, from what the tool acts on (`{"Device": "Oven", "Room": "Kitchen"}` for `switch.sonoff_1000a`). Run before the card; if it fails, the call stops there with its message. `"ask": false` in it lets the call past the card: only for a tool that names the list in `unasked_by`, when that list isn't empty and the tool isn't `act` |
+| `unasked_by` | Optional, with `card`: the area's list choice whose entries need no card (`"apps"`: windows_view's apps the user ticked). Only then does the card command's `"ask": false` count |
+| `asks_if` | Optional, a `change` tool's: argv that prints `yes` when this call asks on the card though Access allows the tool, as it reaches further than its right says (`sound remote {output}`: a speaker on the network; `calendar shared`: a calendar others see), `no` otherwise. Anything else, or a failure, stops the call with its message |
+| `options` | Optional: values an area's own choice in Access allows (Home Assistant's `unlock`): `{"unlock": {"state": ["unlock", "open"]}}` takes them out of the argument's `enum` while the choice is off. The command gets the area's choices too, in `NIGHTDRIVE_MCP_OPTIONS` (`{"unlock": false}`, with `NIGHTDRIVE_MCP=1`), and should refuse what they don't allow: one missing is off. A list choice (What's on screen's apps, Mail's `blocked`) comes as a list (`{"apps": ["kitty"]}`) and takes nothing away from the schema: the command keeps to it. The choices themselves are core's (`config/mcp/areas.py`, their levels in `levels.py`) |
+| `options_from` | Optional: other areas whose choices the command gets too, in `NIGHTDRIVE_MCP_OPTIONS_FROM` (`{"mail": {"blocked": […]}}`), when what it gives could show what they hide: notifications_recent leaves out Mail's notifications of blocked mail. A tool that takes a path names `apps-files` and runs `nightdrive files check` on it, which keeps to the folders Claude can use (Ferry's sends, the wallpaper) |
+| `mask` | Optional, for a tool whose output has text others wrote or secrets may be in (a read, or a draft that quotes a mail): the fields of its JSON output to mask, `["messages.text", "subject"]` (a list on the way is taken item by item). One-time codes, login links, card numbers, IBANs, identity codes, passwords and keys in them are hidden before Claude gets them (`config/mcp/mask.py`), unless the area's choice `secrets` is on; in an object with `"secret": true` the field is hidden whole. Leave out ids that other tools take |
+| `image` | Optional: the field of the command's JSON output that holds a picture, `{"mimeType": "image/png", "data": "<base64>"}`. Claude gets it as an image, and the rest of the output as text (`windows_view`) |
+| `area` | The row in Settings › Claude › Access it belongs to: `mail`, `contacts`, `calendar`, `tasks`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `appearance`, `sound-display`, `screen`, `apps-files`, `software`, or the plugin's own id. A plugin from outside this repository: its own id only |
+| `timeout` | Optional: seconds before it's stopped (30, at most 300) |
+
+A `change` tool's call shows a notification with Undo (it stays in the history for an hour) and goes in
+`~/.local/state/nightdrive/claude-changes.jsonl` (the last 100), from which Claude can undo it too when asked
+(`recent_changes`, `undo_change`). Undo runs the logged `undo` argv the way the tool ran, and Redo the command again,
+filling `undo` from that run's output (a new draft's new id).
+
+The command runs in the plugin's folder, with its `bin/` and Nightdrive's first in `PATH`. stdout is the result Claude
+reads (a JSON object also as structured content, at most 100 000 characters); an exit status other than 0 is an error
+Claude reads, with stderr as the message, so write that for a reader. In Access each area's Read (the `read` tools),
+Modify (`change` and `act`) and Delete (`deletes`) is Allow, Ask or No: No leaves the tool out of the list, Ask shows the
+card before each call, and an `act` tool asks whatever the choice. `python3 config/mcp/registry.py` lists what the
+server would give, and the files it left out and why.
+
+An `act` tool's call first waits on Nightdrive's confirmation card, which shows the tool's `title` and every argument
+as plain text, each labelled with its schema `title` (else its name): give the arguments a user can check (`to`,
+`body`, `entity`), not an id that says nothing. Enter allows; Esc, 60 s without an answer, or a card that can't be shown
+(Quickshell not running) refuse it, and Claude reads the refusal. `python3 config/mcp/confirm.py --demo mail` shows one.
+An act that could leave the user without a usable screen or network can also go back by itself: its command ends with
+`config/mcp/keep.py`, which asks on the same card whether to keep it and runs the revert command unless they do
+(`display scale … --keep`, `network wifi off --keep`).
 
 ## Trying it out
 

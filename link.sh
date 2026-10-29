@@ -114,7 +114,7 @@ units=(nightdrive-update-check.service nightdrive-update-check.timer nightdrive-
        nightdrive-crash-reports.service)
 for u in "${units[@]}"; do link "$repo/config/systemd/user/$u" "$HOME/.config/systemd/user/$u"; done
 
-# ⌘Enter (terminal) and ⌘⌥Enter (Claude Code) open in ~/Projects, and kitty fails to start in a folder that doesn't exist
+# ⌘Enter (terminal) and ⌘⌃Enter (Claude Code) open in ~/Projects, and kitty fails to start in a folder that doesn't exist
 mkdir -p "$HOME/Projects"
 
 # Claude Code's notifications come from "Claude" with the session's topic, a click goes to its window, and a permission

@@ -1,0 +1,3 @@
+-- Notes' key (plugins/README.md › Keys): its window, started if it isn't running, or brought forward
+local p = ...
+hl.bind("MOD3 + N", hl.dsp.exec_cmd(p.dir .. "/bin/notes"))

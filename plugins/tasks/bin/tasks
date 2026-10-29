@@ -1,0 +1,80 @@
+#!/bin/bash
+# tasks: Nightdrive Tasks, the tasks kept as VTODO files on this computer (plugins/tasks, README.md): the window, the
+# commands Claude's tools run (mcp.json), and the notifications of tasks that come due.
+set -u
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+DUE_TIMER=nightdrive-tasks-due.timer                    # systemd/: due tasks' notifications, every minute
+QS_DIR=$APP_DIR/app                                     # Tasks' own Quickshell config, apart from the desktop's shell
+
+APP_TITLE=Tasks
+APP_IPC=tasks
+. "$QS_DIR/kit/app.sh"
+
+cli() { python3 "$APP_DIR/lib/cli.py" "$@"; }
+
+# A change shows in the open window at once (its own timer reads the files again each minute too)
+change() {
+  cli "$@"; local status=$?
+  ((status == 0)) && running && ipc refresh
+  return $status
+}
+
+# Puts Tasks among the desktop's apps (share/tasks.desktop); link.sh has put `tasks` in ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/tasks.svg" "$icons/nightdrive-tasks.svg"
+  sed "s|^Exec=tasks|Exec=$HOME/.local/bin/tasks|" "$APP_DIR/share/tasks.desktop" > "$apps/nightdrive-tasks.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  echo "Installed: $apps/nightdrive-tasks.desktop"
+}
+
+enable() {
+  install_app
+  systemctl --user link "$APP_DIR/systemd/${DUE_TIMER%.timer}.service" >/dev/null
+  systemctl --user enable --now "$APP_DIR/systemd/$DUE_TIMER"
+}
+disable() {
+  systemctl --user disable --now "$DUE_TIMER" 2>/dev/null
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  rm -f "$data/applications/nightdrive-tasks.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-tasks.svg"
+  echo "Due tasks aren't notified any more. Your tasks stay in ${XDG_DATA_HOME:-$HOME/.local/share}/nightdrive/tasks."
+}
+
+usage() {
+  cat <<USAGE
+Usage: tasks [command]
+
+  (none), open   open Tasks, or bring it forward if it is open
+  lists          the lists and how many open tasks each has (--json)
+  list           the open tasks (--json; --list NAME; --view today|scheduled|done|all; --query TEXT)
+  add TITLE      a new task (--list NAME, a new list if there is none; --due WHEN; --note TEXT; --priority high|low)
+  done ID        mark a task done (ID: from list, or the start of one)
+  snooze ID      move a task on: an hour, or a day without a time (--until WHEN for another time)
+  trash ID       move a task to the trash
+  restore UNDO   undo a change: UNDO is the id a change's --json gives
+  due            notify the tasks that have come due (the timer runs it every minute)
+  enable         Tasks among the desktop's apps, and its notifications on (the installer)
+  disable        take them away again (your tasks stay)
+  restart, quit, log
+  help           this text
+
+WHEN: YYYY-MM-DD, YYYY-MM-DD HH:MM, HH:MM, today, tomorrow (with HH:MM or not), +30m, +2h, +3d.
+USAGE
+}
+
+case ${1:-open} in
+  lists|list) cli "$@" ;;
+  add|done|snooze|trash|restore) change "$@" ;;
+  due)        python3 "$APP_DIR/lib/due.py" check ;;
+  enable)     enable ;;
+  disable)    disable ;;
+  help|-h|--help) usage ;;
+  *)
+    app_command "$@"; status=$?        # open (the default), restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac

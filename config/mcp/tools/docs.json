@@ -1,0 +1,56 @@
+{
+  "tools": [
+    {
+      "name": "docs_search",
+      "title": "Search Nightdrive's docs",
+      "description": "Search Nightdrive's own documentation as installed on this machine: the README, docs/*.md, every plugin's README and the keyboard shortcut lists. Use it before guessing how something in Nightdrive works, where a setting is or which command does what. Returns the best-matching sections (heading trail, path, section, excerpt); read one whole with docs_read.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "A few words, e.g. \"wallpaper\", \"update channel\", \"clipboard history\""},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 20, "description": "How many sections, default 8"}
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "docs.py", "docs_search"],
+      "stdin": "json",
+      "class": "read",
+      "area": "nightdrive"
+    },
+    {
+      "name": "docs_read",
+      "title": "Read a Nightdrive doc",
+      "description": "Read one section of Nightdrive's documentation (with its subsections), by the path and section docs_search showed. Without section: a short file whole, a long one as its list of sections.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "description": "The doc's path as docs_search shows it, e.g. README.md or plugins/mail/README.md"},
+          "section": {"type": "string", "description": "The section's heading, e.g. \"Updating\", or its trail \"Install › Updating\" when a heading repeats"}
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "docs.py", "docs_read"],
+      "stdin": "json",
+      "class": "read",
+      "area": "nightdrive"
+    },
+    {
+      "name": "shortcuts",
+      "title": "Keyboard shortcuts",
+      "description": "Nightdrive's keyboard shortcuts as this desktop has them: only the installed plugins' keys, with the user's own app keys. With query, only the lines that contain all its words (e.g. \"workspace\", \"screenshot\").",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Words to filter the lines by; leave out for the whole list"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["python3", "docs.py", "shortcuts"],
+      "stdin": "json",
+      "class": "read",
+      "area": "nightdrive"
+    }
+  ]
+}

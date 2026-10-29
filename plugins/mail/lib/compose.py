@@ -52,6 +52,8 @@ import sys
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, getaddresses, make_msgid, parseaddr, parsedate_to_datetime
 
+import ids
+
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "nightmail", "account.conf")
 PARTS = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "nightmail", "parts")
 SMTP_TIMEOUT = 30  # seconds
@@ -92,7 +94,7 @@ def account(name=None):
 def account_id(msgid):
     """The account a message belongs to: the one whose folder under ~/Mail holds its file."""
     root = subprocess.run(["notmuch", "config", "get", "database.path"], capture_output=True, text=True).stdout.strip()
-    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", f'id:"{msgid}"'],
+    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", "--query=sexp", ids.message(msgid)],
                            capture_output=True, text=True, check=True).stdout.split("\n")
     accs = accounts()
     for path in filter(None, files):
@@ -144,7 +146,7 @@ def reply(msgid, to_all):
     aid = account_id(msgid)
     acc = account(aid)
     out = subprocess.run(["notmuch", "reply", "--format=json", "--reply-to=" + ("all" if to_all else "sender"),
-                          "id:" + msgid], capture_output=True, text=True, check=True).stdout
+                          "--query=sexp", ids.message(msgid)], capture_output=True, text=True, check=True).stdout
     data = json.loads(out)
     h, orig = data["reply-headers"], data["original"]
     when = parsedate_to_datetime(orig["headers"]["Date"]).strftime("%a %d %b %Y, %H:%M") if orig["headers"].get("Date") else ""
@@ -170,7 +172,7 @@ def signed(acc):
 
 def parsed(msgid):
     """The message as an email.message.EmailMessage, read from its file."""
-    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", f'id:"{msgid}"'],
+    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", "--query=sexp", ids.message(msgid)],
                            capture_output=True, text=True, check=True).stdout.split("\n")
     with open(next(p for p in files if p and os.path.exists(p)), "rb") as fh:
         return email.message_from_binary_file(fh, policy=email.policy.default)
@@ -211,8 +213,9 @@ def forward(msgid):
     }
 
 
-def resume(msgid):
-    msg = parsed(msgid)
+def resume(msgid, msg=None):
+    """msg: the draft already read (drafts.py sends the copy it compared), else it is read from its file."""
+    msg = parsed(msgid) if msg is None else msg
     return {
         "to": str(msg.get("To", "")),
         "cc": str(msg.get("Cc", "")),
@@ -280,7 +283,7 @@ def drop(msgid):
     """Removes an earlier saved draft (replaced by a newer save, or sent)."""
     if not msgid:
         return
-    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", f'id:"{msgid}"'],
+    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", "--query=sexp", ids.message(msgid)],
                            capture_output=True, text=True, check=True).stdout.split("\n")
     for path in filter(None, files):
         if os.path.exists(path):
@@ -298,7 +301,7 @@ def draft(f):
 
 
 def thread_text(msgid):
-    out = subprocess.run(["notmuch", "show", "--format=json", "--entire-thread=true", "id:" + msgid],
+    out = subprocess.run(["notmuch", "show", "--format=json", "--entire-thread=true", "--query=sexp", ids.message(msgid)],
                          capture_output=True, text=True, check=True).stdout
     msgs = []
 

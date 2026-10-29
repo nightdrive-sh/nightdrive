@@ -69,9 +69,12 @@ RemoveLevels 1.0 RemoveLevels.qml
 PasswordLevels 1.0 PasswordLevels.qml
 ThemeLevels 1.0 ThemeLevels.qml
 DetailCard 1.0 DetailCard.qml
+ClaudeAccessLevels 1.0 ClaudeAccessLevels.qml
 ClaudeWriteLevels 1.0 ClaudeWriteLevels.qml
 SendCapture 1.0 SendCapture.qml
 SendClaudeLevels 1.0 SendClaudeLevels.qml
 AskClaudeHint 1.0 AskClaudeHint.qml
 PolkitWatch 1.0 PolkitWatch.qml
+ClaudeConfirm 1.0 ClaudeConfirm.qml
+ClaudeConfirmField 1.0 ClaudeConfirmField.qml
 FieldBox 1.0 FieldBox.qml

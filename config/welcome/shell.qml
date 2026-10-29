@@ -5,8 +5,9 @@ import qs
 import qs.kit
 
 // Welcome to Nightdrive: what a new install still needs from you (Tailscale, Mail, Deck…). First a question (Question):
-// Claude Code? Then the list (TaskList): with Claude, signing in first and each thing set up in a Claude session of its
-// own; without, each by hand here, a step at a time (StepView); or "I'll do it myself", each app's README in Apostrophe.
+// Claude Code? Then the list (TaskList): with Claude, signing in first, how much Claude may use (AccessView) and each
+// thing set up in a Claude session of its own; without, each by hand here, a step at a time (StepView); or "I'll do it
+// myself", each app's README in Apostrophe.
 // The list is `tasks`, a plugin's steps its steps.md (`steps`); `welcome` opens this at the first login and owns its
 // state, the answer too (`path`).
 ShellRoot {
@@ -34,11 +35,15 @@ ShellRoot {
         property var path: null
         readonly property bool manual: path === "manual"
         readonly property bool selfPath: path === "self"
-        readonly property var rows: manual || selfPath ? tasks.filter(t => t.id !== "claude") : tasks
+        // by hand there is no Claude to sign in to or give access to
+        readonly property var rows: manual ? tasks.filter(t => !t.id.startsWith("claude"))
+                                  : selfPath ? tasks.filter(t => t.id !== "claude") : tasks
         readonly property bool claudeIn: tasks.length > 0 && tasks[0].id === "claude" && tasks[0].done
         readonly property bool finished: rows.length > 0 && rows.every(t => t.done || t.mark === "skipped")
         property string openId: ""                      // the task whose steps are on show
-        readonly property string view: path === null ? "" : path === "" ? "question" : openId !== "" ? "steps" : "list"
+        property bool accessOpen: false                 // Claude's access is being chosen
+        readonly property string view: path === null ? "" : path === "" ? "question" : accessOpen ? "access"
+                                     : openId !== "" ? "steps" : "list"
 
         Process {
             id: lister
@@ -75,6 +80,7 @@ ShellRoot {
         function choose(p) {
             path = p
             openId = ""
+            accessOpen = false
             current = firstOpen()
             Quickshell.execDetached([dir + "/welcome", "path", p || "none"])
         }
@@ -85,6 +91,7 @@ ShellRoot {
             if (!t) return
             current = i
             if (t.id === "claude" && t.done) return
+            if (t.id === "claude-access") { accessOpen = true; return }     // on every path: it's asked here
             if (selfPath) run(t.readme ? [dir + "/welcome", "readme", t.readme] : ["xdg-open", t.help])
             else if (t.running) run([setupCmd, "focus", t.id])
             else if (t.id !== "claude" && (manual || !claudeIn)) {
@@ -119,6 +126,8 @@ ShellRoot {
             function choose(path: string): void { win.choose(path) }
             function back(): void { win.choose("") }
             function steps(id: string): void { win.openId = id }
+            function access(): void { win.accessOpen = true }
+            function chooseAccess(n: int): void { accessView.choose(n) }    // 0 Strict, 1 Normal, 2 Open, 3 Off
             function go(n: int): void { stepView.go(n) }
             function fill(key: string, text: string): void { stepView.setValue(key, text) }
         }
@@ -133,7 +142,7 @@ ShellRoot {
                     if (e.key === Qt.Key_Q || e.key === Qt.Key_W) Qt.quit()     // later: the next login reminds
                     return
                 }
-                const v = win.view === "question" ? question : win.view === "list" ? list : win.view === "steps" ? stepView : null
+                const v = ({ question: question, list: list, steps: stepView, access: accessView })[win.view] || null
                 e.accepted = v !== null && v.key(e)
             }
 
@@ -149,6 +158,13 @@ ShellRoot {
                 anchors.fill: parent
                 visible: win.view === "list"
                 app: win; c: win.look
+            }
+            AccessView {
+                id: accessView
+                anchors.fill: parent
+                visible: win.view === "access"
+                app: win; c: win.look
+                onDone: { win.accessOpen = false; win.takeKeys() }
             }
             StepView {
                 id: stepView

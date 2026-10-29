@@ -1,0 +1,21 @@
+#!/bin/bash
+# claude-access [open | area AREA | details AREA | restart | quit | log]: Claude's access, the window of Settings ›
+# Claude › Access (Dashboard #1831): per area Read, Modify and Delete, each Allow, Ask or No, and the level.
+# `nightdrive mcp access open` and the launcher's Settings › Claude › Access open it; `area mail` opens it on Mail's
+# row, `details screen` on What's on screen's details (its own choices: the apps Claude sees without asking). What it
+# shows and writes is config/mcp/access.py's (`nightdrive mcp access`).
+
+set -u
+
+QS_DIR=$(dirname "$(readlink -f "$0")")                 # this folder: the window's own Quickshell config
+
+# The window: started, brought forward and stopped by the apps' kit (kit/app.sh)
+APP_TITLE="Claude's access"
+APP_IPC=claudeAccess
+. "$QS_DIR/kit/app.sh"
+
+case ${1:-open} in
+  area) open_ready && ipc area "${2:?usage: claude-access area AREA}" ;;
+  details) open_ready && ipc details "${2:?usage: claude-access details AREA}" ;;
+  *)    app_command "$@"; [[ $? == 2 ]] && { echo "usage: claude-access [open | area AREA | details AREA | restart | quit | log]" >&2; exit 2; } ;;
+esac

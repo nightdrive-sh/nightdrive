@@ -24,7 +24,7 @@ import Quickshell.Wayland
 // - Expired: hint x-nightdrive-expires (int, seconds: `-h int:x-nightdrive-expires:3600`) removes the row that long after.
 // - Transient (`notify-send -e`, "Copied" and the like): only the popup, never a row.
 //   qs ipc call notifications toggleDnd     → "true" when do not disturb is now on (hypr/scripts/dnd, F6)
-//   qs ipc call notifications dismissAll | clear | count
+//   qs ipc call notifications dismissAll | clear | count | rows | removeTag APP TAG   (nightdrive notifications)
 Singleton {
     id: s
 
@@ -361,7 +361,14 @@ Singleton {
         function dismissAll(): void { s.dismissAll() }
         function clear(): void { s.history = [] }
         function count(): int { return s.history.length }
-        // For testing: the rows as JSON (app, summary, body, tag, expires)
-        function rows(): string { return JSON.stringify(s.history.map(h => ({ app: h.app, summary: h.summary, body: h.body, tag: h.tag, expires: h.expires }))) }
+        // The rows as JSON (app, summary, body, time, tag, expires): tests, and `nightdrive notifications list`
+        function rows(): string { return JSON.stringify(s.history.map(h => ({ app: h.app, summary: h.summary, body: h.body, time: h.time, tag: h.tag, expires: h.expires }))) }
+        // Takes away what an app sent with this stack tag, popup and row; how many (`nightdrive notifications remove`:
+        // the undo of Claude's notifications_send)
+        function removeTag(app: string, stack: string): int {
+            const gone = s.history.filter(h => h.tag === app + "\n" + stack)
+            for (const h of gone) { s.remove(h.uid); s.forget(h.uid) }
+            return gone.length
+        }
     }
 }

@@ -1,0 +1,164 @@
+#!/bin/bash
+# calendar: open Nightdrive Calendar, read and add events, and look after its sync (plugins/calendar, README.md).
+set -u
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+LIB=$APP_DIR/lib
+CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/calendar
+CALENDARS=$CONFIG_DIR/calendars.conf                    # Calendar's own additions (README.md › Your calendars)
+VDIRSYNCER_CONFIG=$CONFIG_DIR/vdirsyncer                # written by lib/sources.py
+DATA_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/calendar  # the events, a folder per source and calendar
+SYNC_UNIT=nightdrive-calendar-sync.service              # systemd/, `calendar enable`
+SYNC_LOCK=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/calendar-sync.lock
+KEYRING_SERVICE=nightdrive-calendar                     # an ICS address's keyring entry: service … ics NAME
+QS_DIR=$APP_DIR/app                                     # Calendar's own Quickshell config, apart from the desktop's
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+APP_TITLE=Calendar
+APP_IPC=calendar
+. "$QS_DIR/kit/app.sh"
+
+vds() { vdirsyncer -c "$VDIRSYNCER_CONFIG" "$@"; }
+
+# sync [--force-delete] [NAME…]: every source's calendars (or these: a source, or one CalDAV calendar as SOURCE/ID) in
+# step with DATA_DIR, one sync at a time (the timer's, yours and calendar add's wait for each other): the CalDAV accounts
+# by vdirsyncer, the ICS addresses by lib/feeds.py. --force-delete: a calendar emptied here empties the server's too
+# (calendar delete passes it when it deleted the last event of one; vdirsyncer won't otherwise).
+sync_now() {
+  local -a force=()
+  [[ ${1:-} == --force-delete ]] && { force=(--force-delete); shift; }
+  mkdir -p "$(dirname "$SYNC_LOCK")"
+  exec 9>"$SYNC_LOCK"
+  flock 9
+  local out name status=0
+  local -a caldav=() ics=()
+  out=$(python3 "$LIB/sources.py" write) || return 1
+  [[ -n $out ]] && mapfile -t caldav <<<"$out"
+  out=$(python3 "$LIB/sources.py" names ics) || return 1
+  [[ -n $out ]] && mapfile -t ics <<<"$out"
+  if (($#)); then
+    local -a want_caldav=() want_ics=()
+    for name in "$@"; do
+      if [[ " ${caldav[*]} " == *" ${name%%/*} "* ]]; then want_caldav+=("$name")
+      elif [[ " ${ics[*]} " == *" $name "* ]]; then want_ics+=("$name")
+      else echo "No source $name: calendar calendars lists them." >&2; return 1
+      fi
+    done
+    caldav=("${want_caldav[@]}") ics=("${want_ics[@]}")
+  fi
+  ((${#caldav[@]} + ${#ics[@]})) || { echo "No calendars to sync: README.md › Your calendars." >&2; return 1; }
+  if ((${#caldav[@]})); then
+    # discover finds an account's calendars (and new ones later); it asks before making their folders, so say yes
+    local -a pairs=()
+    for name in "${caldav[@]}"; do [[ " ${pairs[*]} " == *" ${name%%/*} "* ]] || pairs+=("${name%%/*}"); done
+    if yes | vds discover "${pairs[@]}" >/dev/null 2>&1 && vds sync "${force[@]}" "${caldav[@]}"; then
+      vds metasync "${pairs[@]}" >/dev/null 2>&1 || true   # names and colours: only looks
+      # Which of the new collections take events (iCloud lists its Reminders lists too)
+      python3 "$LIB/components.py" "${pairs[@]}"
+    else
+      status=1
+    fi
+  fi
+  ((${#ics[@]})) && { python3 "$LIB/feeds.py" "${ics[@]}" || status=1; }
+  return $status
+}
+
+# subscribe NAME [TITLE]: a calendar read from its private ICS address (Google: the calendar's settings › Secret
+# address in iCal format). The address goes into the login keyring, asked for here without echo, never into a file.
+subscribe() {
+  local name=${1:-} title=${2:-${1:-}}
+  [[ $name =~ ^[a-z0-9][a-z0-9_]*$ ]] || { echo "Usage: calendar subscribe NAME [TITLE]   (NAME: a-z, 0-9 and _)" >&2; return 2; }
+  if grep -q "^\[ics $name\]" "$CALENDARS" 2>/dev/null; then
+    echo "[ics $name] is in $CALENDARS already: secret-tool store again changes its address." >&2
+    return 1
+  fi
+  echo "Paste the calendar's private ICS address (it isn't shown):"
+  secret-tool store --label="Calendar: $title" service "$KEYRING_SERVICE" ics "$name" || return 1
+  mkdir -p "$CONFIG_DIR"
+  printf '\n[ics %s]\nname = %s\nurl-cmd = secret-tool lookup service %s ics %s\n' \
+    "$name" "$title" "$KEYRING_SERVICE" "$name" >> "$CALENDARS"
+  echo "Added $title. calendar sync $name fetches it."
+}
+
+# Puts Calendar among the desktop's apps (share/calendar.desktop); link.sh has put `calendar` in ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/calendar.svg" "$icons/nightdrive-calendar.svg"
+  sed "s|^Exec=calendar|Exec=$HOME/.local/bin/calendar|" "$APP_DIR/share/calendar.desktop" > "$apps/nightdrive-calendar.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  echo "Installed: $apps/nightdrive-calendar.desktop"
+}
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  rm -f "$data/applications/nightdrive-calendar.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-calendar.svg"
+}
+
+# The sync's units in the plugin's folder, enabled by their path (as Contacts': that links them again after a disable)
+enable() {
+  install_app
+  systemctl --user link "$APP_DIR/systemd/$SYNC_UNIT" >/dev/null
+  systemctl --user enable --now "$APP_DIR/systemd/${SYNC_UNIT%.service}.timer"
+}
+disable() {
+  systemctl --user disable --now "${SYNC_UNIT%.service}.timer" 2>/dev/null
+  uninstall_app
+  echo "The sync is off. Your events stay in $DATA_DIR."
+}
+
+usage() {
+  cat <<USAGE
+Usage: calendar [command]
+
+  (none), open   open Calendar, or bring it forward if it is open
+  show [DAY]     open Calendar on DAY (YYYY-MM-DD; today without one)
+  month, week    open Calendar on the month or the week
+  calendars      the calendars on this computer (--json)
+  events FROM TO the events from FROM up to TO (YYYY-MM-DD; TO not included), recurring ones as each time
+                 (--json; --calendar ID, --search TEXT)
+  add            a new event (--calendar ID --title T --start S [--end E] [--location L] [--notes N], or JSON on
+                 stdin): S and E are YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day (--json)
+  delete CALENDAR UID
+                 delete an event (not a recurring one) here and on the server
+  sync [NAME…]   sync every account's calendars (or these: an account, or a calendar as ACCOUNT/ID) now
+                 (--force-delete first: a calendar emptied here empties the server's too)
+  subscribe NAME [TITLE]
+                 a calendar read from its private ICS address (Google's), kept in the login keyring
+  enable         Calendar among the desktop's apps, and the sync every 15 minutes (the installer)
+  disable        take them away again (your events stay)
+  restart        close and open again (after a change to the app)
+  quit           close Calendar
+  log            follow the app's log (QML errors show up here)
+  keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
+  vdirsyncer …   vdirsyncer with Calendar's config, for a closer look
+  khal …         khal with Calendar's config
+  help           this text
+USAGE
+}
+
+case ${1:-open} in
+  show)      open_ready; ipc showDay "${2:-$(date +%F)}" ;;
+  month|week) open_ready; ipc setView "$1" ;;
+  calendars) python3 "$LIB/calendars.py" "${@:2}" ;;
+  events)    python3 "$LIB/events.py" "${@:2}" ;;
+  shared)    exec python3 "$LIB/write.py" "$@" ;;   # Claude's calendar_add: whether it asks first
+  add|delete)
+    python3 "$LIB/write.py" "$@"; status=$?
+    ((status == 0)) && running && ipc refresh >/dev/null 2>&1
+    exit $status ;;
+  sync)      sync_now "${@:2}"; status=$?; running && ipc refresh >/dev/null 2>&1; exit $status ;;
+  subscribe) subscribe "${@:2}" ;;
+  enable)    enable ;;
+  disable)   disable ;;
+  # The same check as Contacts' (its lib/keyring.py says why it isn't a bare busctl)
+  keyring-locked) python3 "$APP_DIR/../contacts/lib/keyring.py" ;;
+  vdirsyncer) python3 "$LIB/sources.py" write >/dev/null && vds "${@:2}" ;;
+  khal)      khal -c "$(python3 "$LIB/events.py" --config)" "${@:2}" ;;
+  help|-h|--help) usage ;;
+  *)
+    app_command "$@"; status=$?        # open (the default), settings, restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac
