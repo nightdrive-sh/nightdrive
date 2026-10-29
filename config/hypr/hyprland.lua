@@ -255,8 +255,8 @@ function NightdriveLocked()
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/lid watch")   -- the lid with an external display (DISPLAY above)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/vm-display watch")   -- in a VM, its screen follows its window (DISPLAY above)
     -- Theme colours (~/.cache/nightdrive, hypr/scripts/theme) first: Quickshell (the top bar, its menus and the notifications)
-    -- reads them on startup
-    hl.exec_cmd("sh -c '\"$HOME/.config/hypr/scripts/theme\" apply; exec qs'")
+    -- reads them on startup. hypr/scripts/desktop-shell runs qs and starts it again after a crash.
+    hl.exec_cmd("sh -c '\"$HOME/.config/hypr/scripts/theme\" apply; exec \"$HOME/.config/hypr/scripts/desktop-shell\" run'")
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/wallpaper restore")   -- swaybg with the remembered wallpaper (change: launcher › Settings › Background)
     hl.exec_cmd("env PATH=" .. HOME .. "/.local/bin:" .. os.getenv("PATH") .. " " .. HOME .. "/.config/hypr/scripts/dictate daemon")   -- speech to text (F5), Parakeet
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/idle start")   -- hypridle with the screensaver and screen-off times (launcher › Settings › Screensaver)

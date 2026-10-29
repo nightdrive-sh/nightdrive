@@ -193,7 +193,7 @@ Column {
 ```
 
 A change to a plugin's menu doesn't reload on save like the core menus: restart Quickshell to see
-it (`qs kill; setsid -f qs`).
+it (`~/.config/hypr/scripts/desktop-shell restart`).
 
 **Pages in the Launcher.** A `<Name>Levels.qml` is a Launcher level file like the core's (`config/quickshell/*Levels.qml`;
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also

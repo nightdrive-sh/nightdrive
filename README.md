@@ -510,7 +510,8 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   under it. Icons are SVGs: Lucide by name, or `pack:name` from any [Iconify](https://icon-sets.iconify.design) set (fetched
   once). Sizes are in `config/topbar/adjust.conf`.
   Quickshell reloads when one of its files is saved, and a short popup says so ("The top bar reloaded", "restarted", or
-  "didn't reload" with the error), so it doesn't go unnoticed.
+  "didn't reload" with the error), so it doesn't go unnoticed. If it crashes, it starts again by itself and says so; after
+  three crashes in two minutes it stays off: `~/.config/hypr/scripts/desktop-shell restart` starts it.
 - The menus use ordinary command-line tools such as `wpctl`, `nmcli`, `bluetoothctl`, `upower`, `tailscale`, `cliphist` and `dnf`.
   There are no daemons of their own.
 - The theme script (`config/hypr/scripts/theme`) derives every shade from one colour. It writes a small file for Quickshell,

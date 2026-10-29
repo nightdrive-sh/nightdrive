@@ -1,0 +1,100 @@
+#!/bin/bash
+# The desktop's Quickshell (the top bars, their menus, the launcher, the notifications) under a small supervisor that
+# starts it again after a crash: without one, a crash left the session with no bar at all (#1826).
+#   desktop-shell run       the supervisor: hyprland.lua starts it at login instead of plain qs
+#   desktop-shell restart   a fresh qs, the supervised way: for agents and `nightdrive update` (not `qs kill; setsid -f qs`)
+#
+# Why not a systemd unit: the user manager doesn't have Hyprland's environment (QV4_FORCE_INTERPRETER while Qt is older
+# than 6.12, QT_QPA_PLATFORM, the display), and the sandbox has no user manager. Started from Hyprland, this has both.
+#
+# What counts as a crash: qs exits on its own with an error or a signal. Not one:
+# - a clean exit (`qs kill`, Quickshell.quit()) or SIGTERM / SIGINT / SIGHUP (pkill, logout): the supervisor ends with it
+# - `qs kill` that segfaults on its way out (Quickshell 0.2.1, see HARMLESS in crash-report): told apart by the
+#   crashing thread's top frame in the core dump, which systemd-coredump records within a second or two
+# - Hyprland gone (the session ended): nothing to draw on
+# Never two bars: the supervisor runs once (a lock), `run` stops an unsupervised qs before starting its own, and a crash
+# isn't restarted if another qs of the desktop's config came up meanwhile (someone started one by hand).
+set -u
+
+RUNTIME=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+LOCK=$RUNTIME/nightdrive-desktop-shell.lock
+RESTART_FLAG=$RUNTIME/nightdrive-desktop-shell.restart   # `restart` asked for this exit: start again at once, quietly
+RESTART_DELAY=2       # seconds after a crash before the next start
+CRASH_LIMIT=3         # this many crashes …
+CRASH_WINDOW=120      # … within this many seconds and it stays down (a crash loop), with a notice
+GIVE_UP_NOTICE_MS=60000
+COREDUMP_WAIT=10      # seconds to wait for systemd-coredump's record of a crash
+KILL_FRAME=IpcServerConnection11onReadyRead   # `qs kill`'s segfault (crash-report's HARMLESS)
+
+running() { qs list --any-display 2>/dev/null | grep -q '^Instance '; }
+hyprland_up() { timeout 3 hyprctl version >/dev/null 2>&1; }
+
+# Stops every instance of the desktop's config, on any display (without --any-display `qs kill` only sees the ones
+# started with the caller's display variables: on 29.10.2026 that left an old bar running beside a new one)
+stop_all() {
+  qs kill --any-display >/dev/null 2>&1
+  for _ in $(seq 50); do running || return 0; sleep 0.1; done
+  pkill -x -f 'qs' 2>/dev/null; sleep 0.5   # still there after 5 s: plain `qs` processes only, not apps' `qs -p …`
+}
+
+# The crash was `qs kill`'s segfault: the crashing thread's top frame in the core dump of PID (started at epoch SINCE)
+killed_by_ipc() {
+  local pid=$1 since=$2 info
+  command -v coredumpctl >/dev/null || return 1
+  for _ in $(seq $((COREDUMP_WAIT * 2))); do
+    info=$(coredumpctl -q --no-pager --since "@$since" info "$pid" 2>/dev/null)
+    if grep -q '#0 ' <<<"$info"; then
+      grep -m1 '#0 ' <<<"$info" | grep -q "$KILL_FRAME"; return
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+supervise() {
+  exec 9>"$LOCK"
+  flock -n 9 || exit 0   # one supervisor: another one runs the bar already
+  running && stop_all
+  rm -f "$RESTART_FLAG"
+  local crashes=() crashed="" pid rc started now t
+  while :; do
+    started=$(date +%s)
+    # 9>&-: the lock is the supervisor's, a qs left behind mustn't hold it. NIGHTDRIVE_QS_CRASHED: shell.qml's popup
+    # says the bar crashed (notify-send here would wait for the notification service, which is qs itself).
+    NIGHTDRIVE_QS_CRASHED=$crashed qs 9>&- &
+    pid=$!
+    wait "$pid"; rc=$?
+    if [[ -e $RESTART_FLAG ]]; then rm -f "$RESTART_FLAG"; crashed=""; continue; fi
+    case $rc in 0|129|130|143) exit 0 ;; esac
+    hyprland_up || exit 0
+    sleep "$RESTART_DELAY"
+    (( rc == 139 )) && killed_by_ipc "$pid" "$started" && exit 0   # 139: SIGSEGV, the only way `qs kill` crashes
+    running && exit 0   # someone started one by hand meanwhile: that one is the bar
+    now=$(date +%s)
+    local recent=()
+    for t in "${crashes[@]}"; do (( now - t < CRASH_WINDOW )) && recent+=("$t"); done
+    crashes=("${recent[@]}" "$now")
+    if (( ${#crashes[@]} >= CRASH_LIMIT )); then
+      # Hyprland's own notice: notify-send needs the notification service, which is qs
+      hyprctl notify 0 "$GIVE_UP_NOTICE_MS" 0 "The top bar crashed ${#crashes[@]} times in $((CRASH_WINDOW / 60)) minutes and stays off. Start it: ~/.config/hypr/scripts/desktop-shell restart" >/dev/null 2>&1
+      exit 1
+    fi
+    crashed=1
+  done
+}
+
+case ${1:-} in
+  run) supervise ;;
+  restart)
+    if ! flock -n "$LOCK" true 2>/dev/null; then
+      # The supervisor runs: it starts the next qs itself, with Hyprland's environment
+      touch "$RESTART_FLAG"
+      qs kill --any-display >/dev/null 2>&1
+    else
+      [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] || { echo "desktop-shell: no Hyprland session here" >&2; exit 1; }
+      stop_all
+      # Through Hyprland, not from here: the shell gets the session's environment, not this caller's
+      hyprctl dispatch "hl.dsp.exec_cmd(\"$HOME/.config/hypr/scripts/desktop-shell run\")" >/dev/null
+    fi ;;
+  *) echo "usage: desktop-shell run|restart" >&2; exit 2 ;;
+esac
