@@ -12,6 +12,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "notifications", "list", "--json", ["--limit", "{limit}"]],
+      "mask": ["notifications.summary", "notifications.body"],
       "class": "read",
       "area": "notifications"
     },

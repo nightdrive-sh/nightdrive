@@ -19,6 +19,14 @@ the same way, and its `card` command may let a call on it past the card (confirm
 
 RIGHTS = ("read", "modify", "delete")
 
+# What a stranger may write, or the user keep, in mail, notifications, Ferry's box, notes and invitations: hidden from
+# Claude (mask.py) unless the user turns this on for the area. Contacts' note is masked always (#1789)
+SECRETS = {"id": "secrets", "name": "Codes, card numbers and passwords",
+           "on": "Claude reads them as they are: one-time codes, login and password reset links, card numbers, IBANs, "
+                 "identity codes, passwords and keys go to Anthropic too.",
+           "off": "Claude reads them hidden (•••• 4242, [code hidden], [login link hidden]): the rest of the text, "
+                  "order and phone numbers, dates and links, as it is."}
+
 AREAS = {
     "nightdrive": {"name": "Nightdrive's docs and status", "glyph": "book-open",
                    "read": "reads the docs and keys of this version, the version, plugins and displays",
@@ -26,7 +34,8 @@ AREAS = {
     "mail": {"name": "Mail", "glyph": "mail", "app": True,
              "read": "searches and reads your mail: unread, whole threads, your accounts",
              "modify": "writes new drafts and archives; sends a draft",
-             "delete": "moves mail to Trash"},
+             "delete": "moves mail to Trash",
+             "options": [SECRETS]},
     "contacts": {"name": "Contacts", "glyph": "contact", "app": True,
                  "read": "finds people by name and reads the parts of their cards you tick in its choices",
                  # The parts of a card beside the name (#1789): what is off isn't searched or given, so a street or a
@@ -60,7 +69,8 @@ AREAS = {
     "calendar": {"name": "Calendar", "glyph": "calendar", "app": True,
                  "read": "reads your calendars and their events, invitations included",
                  "modify": "adds events (without guests, so no invitation goes out)",
-                 "delete": "deletes events"},
+                 "delete": "deletes events",
+                 "options": [SECRETS]},
     "tasks": {"name": "Tasks", "glyph": "list-checks", "app": True,
               "read": "reads your lists and tasks",
               "modify": "adds tasks, marks them done, moves them later",
@@ -68,13 +78,15 @@ AREAS = {
     "notes": {"name": "Notes", "glyph": "notebook-pen", "app": True,
               "read": "lists, searches and reads your notes in ~/Notes",
               "modify": "writes new notes and adds to the end of one",
-              "delete": "moves notes to the trash"},
+              "delete": "moves notes to the trash",
+              "options": [SECRETS]},
     "deck": {"name": "Deck", "glyph": "disc-3", "app": True,
              "read": "sees what plays, searches music and albums (the search words go to Spotify)",
              "modify": "plays, queues, pauses and skips, likes songs"},
     "ferry": {"name": "Ferry", "glyph": "smartphone", "app": True,
               "read": "sees whether Ferry is on, your devices and the box",
-              "modify": "sends files or a text to your devices"},
+              "modify": "sends files or a text to your devices",
+              "options": [SECRETS]},
     "home-assistant": {"name": "Home Assistant", "glyph": "house", "app": True,
                        "read": "reads your devices and sensors",
                        "modify": "switches devices, runs scenes and automations",
@@ -97,7 +109,8 @@ AREAS = {
                        ]},
     "notifications": {"name": "Notifications", "glyph": "bell-ring",
                       "read": "reads the latest notifications of every app",
-                      "modify": "sends you a notification, turns Do Not Disturb on or off"},
+                      "modify": "sends you a notification, turns Do Not Disturb on or off",
+                      "options": [SECRETS]},
     "appearance": {"name": "Appearance", "glyph": "palette",
                    "read": "sees your wallpaper and theme",
                    "modify": "changes the wallpaper, theme, colour, night light and bar style"},

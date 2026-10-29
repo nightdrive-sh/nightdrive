@@ -6,6 +6,7 @@
       "description": "Ferry, the user's mailbox between their phone and computers over Tailscale: on (the server runs), tailscale, url (the phone's address), setup (what's missing, or null), devices (id, name, kind phone or computer, online) and the box's items, newest last: what came to this computer (to \"computer\", from a device: a text, or a file with its path in ~/Downloads) and what was sent from here (to \"phone\", for a device). Use it to read what the user sent from their phone, and for a device's id before ferry_send_files or ferry_send_text.",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
       "command": ["ferry", "list", "--json"],
+      "mask": ["items.text"],
       "class": "read",
       "area": "ferry"
     },

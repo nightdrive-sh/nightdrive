@@ -10,7 +10,8 @@ format is left out with a line in the log; `python3 registry.py` shows what is l
 Each tool belongs to one right of its area (Tool.right: read, modify or delete; #1831), and Access gives that right
 Allow, Ask or No. No hides the tool; Ask, and an act tool always, runs it only once the user allows the call on the card.
 An area's own choices (access.Access.options, #1830) go to the tool too (Tool.keep): what one that is off takes away
-isn't in its schema, and its command gets them all to keep to.
+isn't in its schema, and its command gets them all to keep to. What a read tool gives passes through mask.py on its way
+to Claude (#1789): the fields its mcp.json names in `mask`, unless its area's choice `secrets` is on.
 
 The steps of phase 3 slot in as modules beside this one, found by name:
     confirm.ask(tool, arguments) -> bool     the card that allows a call (MCP 5, #1766). Without it, what asks is
@@ -28,6 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import access  # noqa: E402  (after the path above)
+import mask  # noqa: E402
 import run  # noqa: E402
 from run import ToolError  # noqa: E402,F401  (server.py takes both errors from here)
 
@@ -149,6 +151,9 @@ def problem(spec, plugin):
         return f"{name}: {', '.join(sorted(unknown))} in its before isn't in inputSchema"
     if not isinstance(spec.get("notice", ""), str):
         return f"{name}: notice must be a string"
+    paths = spec.get("mask", [])
+    if not isinstance(paths, list) or not all(isinstance(p, str) and p.strip(".") for p in paths):
+        return f"{name}: mask must be a list of fields of its output (\"messages.text\")"
     if not isinstance(spec.get("image", ""), str):
         return f"{name}: image must be the name of a field in its output"
     timeout = spec.get("timeout", run.TIMEOUT)
@@ -258,6 +263,8 @@ class Registry:
         undoable = tool.cls == "change" and self.undo is not None
         state = self.undo.before(tool, arguments) if undoable else None  # ToolError: nothing is changed
         answer = run.run(tool, arguments)
+        if tool.spec.get("mask") and not tool.options.get("secrets"):
+            answer = mask.answer(answer, tool.spec["mask"])
         if undoable:
             try:
                 self.undo.offer(tool, arguments, answer, state)

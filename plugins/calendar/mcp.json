@@ -26,6 +26,7 @@
         "additionalProperties": false
       },
       "command": ["calendar", "events", "--json", ["--calendar", "{calendar}"], ["--search", "{search}"], ["--limit", "{limit}"], "{from}", "{to}"],
+      "mask": ["events.title", "events.notes", "events.location"],
       "class": "read",
       "area": "calendar"
     },

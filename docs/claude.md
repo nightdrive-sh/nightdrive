@@ -52,7 +52,8 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   choice of your own; picking a level again puts them back to the level's (it asks first). An app's area shows while
   the app is installed.
 - **An area's own choices**, in its details (›), are on or off, and the level sets them too: off on Strict and Normal, on
-  on Open (but *Remove what Nightdrive needs*, off on every level, and Contacts' parts of a card, below). Space turns the picked one on or off;
+  on Open (but *Remove what Nightdrive needs* and *Codes, card numbers and passwords*, off on every level, and Contacts'
+  parts of a card, below). Space turns the picked one on or off;
   `nightdrive mcp access option home-assistant unlock on` in a terminal.
   Home Assistant has three:
   - *Unlock and open*: off, Claude only locks locks and closes covers (doors, gates, blinds). Opening is yours.
@@ -70,6 +71,14 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   looked up by: Claude can't find who a number or a street belongs to. A note, when on, comes with card numbers, codes
   and passwords masked. Claude's search needs a word of two characters or more and gives at most 25 people, so the
   address book isn't read a letter at a time.
+
+  Mail, Calendar, Notes, Ferry and Notifications have *Codes, card numbers and passwords*, off on every level: what
+  Claude reads there comes with them hidden, before it leaves your computer. One-time codes and meeting passcodes
+  (`[code hidden]`), login and password reset links (`[login link hidden]`), card numbers with their expiry and CVV
+  (`•••• 4242`), IBANs (`FI •••• 0785`), Finnish identity codes, passwords and API keys; a Ferry text that is a code or
+  a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. It goes by
+  patterns, so a code written in an unusual way may get through, and now and then a number that isn't one is hidden.
+  Turn it on for an area whose codes Claude should read (`nightdrive mcp access option mail secrets on`).
 
   What's on screen has a list instead, empty on every level: *Apps it sees without asking*. Its rows are the apps open
   now, and Space or a click ticks one. Claude's picture of a window asks each time on Normal, and the card names the

@@ -9,8 +9,8 @@ apart (plan: Dashboard #1761, the model #1831; Normal is the security review's d
 Whatever the level, a tool with consequences (sending, devices, installing: class act) is at most Ask: Allow for its
 right still shows the card, since that card is all that stands between a mail Claude read and one it sends.
 
-An area's own choices (areas.py's options: Home Assistant's locks, #1830; Software's sources, #1835) are on or off by
-level too: OPTIONS.
+An area's own choices (areas.py's options: Home Assistant's locks, #1830; Software's sources, #1835; the masking of
+secrets, #1789) are on or off by level too: OPTIONS.
 """
 
 from areas import RIGHTS
@@ -51,6 +51,10 @@ OPTIONS = {
         "urls": {"strict": False, "normal": False, "open": True},
         "note": {"strict": False, "normal": False, "open": True},
     },
+    # Masking (logs 3300, 3301, 3304, 3306): codes, login links and card numbers are what an injection wants most and
+    # what Claude doesn't need, so they stay hidden on Open too; the user may show them area by area
+    **{area: {"secrets": {"strict": False, "normal": False, "open": False}}
+       for area in ("mail", "calendar", "notes", "ferry", "notifications")},
     # Software (log 3302): Fedora's own repositories and Flathub's verified apps only, as a name one letter off or an
     # unknown publisher is how a bad package gets in; never removing what the desktop runs on, not even on Open (the
     # user may turn it on); Nightdrive's own plugins only, as another's installer runs its code

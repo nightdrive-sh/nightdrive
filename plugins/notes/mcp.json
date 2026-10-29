@@ -12,6 +12,7 @@
         "additionalProperties": false
       },
       "command": ["notes", "list", "--json", ["--limit", "{limit}"]],
+      "mask": ["notes.title", "notes.excerpt"],
       "class": "read",
       "area": "notes"
     },
@@ -29,6 +30,7 @@
         "additionalProperties": false
       },
       "command": ["notes", "search", "--json", ["--limit", "{limit}"], "{query}"],
+      "mask": ["notes.title", "notes.excerpt", "notes.lines"],
       "class": "read",
       "area": "notes"
     },
@@ -45,6 +47,7 @@
         "additionalProperties": false
       },
       "command": ["notes", "read", "--json", "{note}"],
+      "mask": ["title", "excerpt", "text"],
       "class": "read",
       "area": "notes"
     },
