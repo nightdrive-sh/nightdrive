@@ -1,0 +1,25 @@
+#!/usr/bin/python3 -I
+"""Claude's ferry_send_files (mcp.json): `ferry add` for only what Nightdrive's file rules let go. `nightdrive files
+check` (config/hypr/scripts/files) turns the paths into the files they send, resolved, or refuses the whole send with
+the reason: nothing outside home, nothing hidden, no link that leads out, not home or its own folders whole. Ferry
+then gets those files, not the folders, so its own walk of a folder never sees a link the check didn't.
+
+  send-files --to DEVICE -- PATH…
+"""
+import json, os, subprocess, sys
+
+
+def main():
+    a = sys.argv[1:]
+    if len(a) < 4 or a[0] != "--to" or a[2] != "--":
+        sys.exit("usage: send-files --to DEVICE -- PATH…")
+    device, paths = a[1], a[3:]
+    check = subprocess.run(["nightdrive", "files", "check", "--json", "--", *paths], capture_output=True, text=True)
+    if check.returncode != 0:   # fail closed: the reason, and nothing sent
+        sys.exit(check.stderr.strip() or "The files couldn't be checked: nothing was sent.")
+    files = json.loads(check.stdout)["files"]
+    os.execvp("ferry", ["ferry", "add", "--to", device, *files])
+
+
+if __name__ == "__main__":
+    main()

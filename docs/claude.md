@@ -68,7 +68,7 @@ read`, `act on|off`.
 
 - Passwords and the keyring, and the windows Send to Claude leaves out (password managers, private browser windows, the
   apps you list there): Claude sees no title of theirs and no picture.
-- Hidden files and folders (`~/.ssh`, `~/.config`…): not listed, opened or trashed.
+- Hidden files and folders (`~/.ssh`, `~/.config`…): not listed, opened, trashed or sent with Ferry.
 - Anything that can't be taken back without asking: no permanent delete (mail goes to Trash, files and notes to the
   trash), no recurring events deleted, no attachments Claude adds to a mail (your own draft's go, and the card names them).
 - Shutting down, users, the clipboard history.

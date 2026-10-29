@@ -12,17 +12,17 @@
     {
       "name": "ferry_send_files",
       "title": "Send files with Ferry",
-      "description": "Sends files (a folder: its files) from this computer to one of the user's devices with Ferry: to a phone into its box, with a notification; to another computer straight into its Downloads. The user allows it on screen first. Fails with the reason when the device is asleep or the files aren't there.",
+      "description": "Sends files (a folder: its files) from this computer to one of the user's devices with Ferry: to a phone into its box, with a notification; to another computer straight into its Downloads. Only files in the user's home folder: nothing hidden (no part of the path starting with a dot, and a folder's hidden files are left out), no link that leads out of home, and not home or its own folders (Downloads, Documents…) whole; one path that breaks this stops the whole send, and that is the user's rule, so don't try another way. The user allows it on screen first. Fails with the reason when the device is asleep or the files aren't there.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "paths": {"type": "array", "items": {"type": "string"}, "minItems": 1, "title": "Files", "description": "Absolute paths of files or folders"},
+          "paths": {"type": "array", "items": {"type": "string"}, "minItems": 1, "title": "Files", "description": "Absolute paths of files or folders in home (~ works too)"},
           "to": {"type": "string", "title": "Device", "description": "The device's id or name from ferry_status's devices"}
         },
         "required": ["paths", "to"],
         "additionalProperties": false
       },
-      "command": ["ferry", "add", "--to", "{to}", "{paths}"],
+      "command": ["./send-files", "--to", "{to}", "--", "{paths}"],
       "class": "act",
       "area": "ferry",
       "timeout": 300

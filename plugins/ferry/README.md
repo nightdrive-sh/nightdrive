@@ -52,6 +52,8 @@ A new Ferry release reaches Nightdrive once `plugins/ferry/pin` has written its 
 
 With Nightdrive's tools for Claude on (Settings › Claude › Access › Ferry), Claude can read what's in the box and which devices there are, and send files or a text to a device only after you allow it on Nightdrive's card, which names the device. It doesn't delete anything.
 
+Claude sends only files in your home folder, by the same rules as its file tools: nothing hidden (no part of the path starting with a dot, so not `~/.ssh` or settings), no link that leads out of home or into a hidden folder, and not home itself or its own folders (Downloads, Documents…) whole. A folder sends its files, leaving out hidden ones and folders linked into it. One path that breaks a rule stops the whole send, with the reason. `nightdrive files check PATH…` lists what a send would take.
+
 ## Privacy
 
 Only you can get in. The page isn't on the internet (tailscale serve, not Funnel), and it answers only the Tailscale user who owns the computer. Nothing that arrives is opened or run by itself. The phone is the key: if it's lost unlocked, remove it in Tailscale's admin console. Ferry suits a computer that is yours alone, and its tailnet name (computer.tailXXXX.ts.net) shows in public certificate logs.

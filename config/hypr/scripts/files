@@ -1,11 +1,14 @@
 #!/usr/bin/python3 -I
 """Your files from the command line: the newest in Downloads, Pictures and Documents, opening one in its default app,
-and moving files to the trash and back. `nightdrive files …` runs it; Claude's tools are
-config/mcp/tools/apps-files.json, so these are also the rules Claude's file tools keep:
+moving files to the trash and back, and checking what may be sent. `nightdrive files …` runs it; Claude's tools are
+config/mcp/tools/apps-files.json (and Ferry's ferry_send_files, through check), so these are also the rules Claude's
+file tools keep:
 
 - Only files in your home folder, and none hidden (no part of the path starts with a dot: settings, keys, the trash).
   A link counts where it points: one that leads out of home (or into a hidden folder) isn't opened.
-- Home itself and its usual folders (Downloads, Documents…) are never moved.
+- Home itself and its usual folders (Downloads, Documents…) are never moved or sent whole.
+- What is sent goes by where it points: a link that leads out of home, or into a hidden folder, stops the send, also
+  one inside a folder being sent. A folder sends its files, leaving out hidden ones and folders linked into it.
 - The trash is the desktop's (Files shows it, and puts things back): nothing is ever deleted for good.
 - Only what opens to be looked at: documents, pictures, sound, video, text and folders, never a program, a script
   or a launcher (an executable file, a .desktop file).
@@ -17,6 +20,8 @@ config/mcp/tools/apps-files.json, so these are also the rules Claude's file tool
   files trash PATH… [--json]       to the trash; --json: {trashed: [paths], names: [their names in the trash], what:
                                    the one's name or how many}
   files restore NAME…              back from the trash to where they were (the names trash gives)
+  files check PATH… [--json]       the files PATHs would send (a folder: its files), each where it really is, or the
+                                   reason none may go; --json: {files: [paths], size: their bytes}
 """
 import argparse, datetime, json, mimetypes, os, subprocess, sys
 from pathlib import Path
@@ -63,7 +68,7 @@ def inside_home(p):
     return not any(part.startswith(".") for part in rel.parts)
 
 
-def checked(arg, moving):
+def checked(arg, moving=False, sending=False):
     """The path a PATH argument means, by the rules above; dies with the reason otherwise. Its folder is resolved
     (no link leads it out), the last part is kept as it is: trashing a link moves the link, not what it points to."""
     p = Path(arg).expanduser()
@@ -77,12 +82,15 @@ def checked(arg, moving):
         die(f"{arg} doesn't exist.")
     if not inside_home(path):
         die(f"{arg}: only files in your home folder, and none hidden (settings, keys, the trash).")
-    if moving:
+    verb = "moved" if moving else "sent whole" if sending else "opened"
+    if moving or sending:
         usual = {user_dir(n) for n in USUAL}
-        if path == HOME or path in usual:
-            die(f"{arg} is one of your home's own folders: it isn't moved.")
-    elif not inside_home(path.resolve()):
-        die(f"{arg} is a link that leads out of your home folder (or into a hidden one): it isn't opened.")
+        # A link is sent as what it points to, so that is checked too (a link in Downloads to home); trash moves links
+        whole = {path, path.resolve()} if sending else {path}
+        if whole & ({HOME} | usual):
+            die(f"{arg} is one of your home's own folders: it isn't {verb}.")
+    if not moving and not inside_home(path.resolve()):
+        die(f"{arg} is a link that leads out of your home folder (or into a hidden one): it isn't {verb.split()[0]}.")
     return path
 
 
@@ -148,6 +156,42 @@ def cmd_open(a):
         die(f"{a.path} is {'a program or script' if runnable else ctype or 'of an unknown type'}: only documents, "
             "pictures, sound, video, text and folders are opened.")
     os.execv(str(SCRIPTS / "windows"), ["windows", "open", "--file", str(path), *(["--json"] if a.json else [])])
+
+
+# --- check (what a send may take: Ferry's ferry_send_files runs it first, plugins/ferry/send-files) --------------------
+
+def sendable(arg):
+    """The files one PATH argument sends, resolved (what is sent is what they point to); dies with the reason when
+    any of them may not go, so a send goes whole or not at all."""
+    top = checked(arg, sending=True).resolve()
+    if top.is_file():
+        return [top]
+    if not top.is_dir():
+        die(f"{arg} isn't a file or a folder: it isn't sent.")
+    out = []
+    for root, dirs, names in os.walk(top):   # doesn't follow links to folders: they are left out, as Ferry does
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        for n in sorted(names):
+            if n.startswith("."):
+                continue
+            p = Path(root, n)
+            real = p.resolve()
+            if not inside_home(real):
+                die(f"{p} is a link that leads out of your home folder (or into a hidden one): {arg} isn't sent.")
+            if real.is_file():
+                out.append(real)
+    if not out:
+        die(f"{arg} has no files to send (hidden ones aren't sent).")
+    return out
+
+
+def cmd_check(a):
+    files = list(dict.fromkeys(f for arg in a.paths for f in sendable(arg)))   # every one checked before any is said
+    if a.json:
+        print(json.dumps({"files": [str(f) for f in files], "size": sum(f.stat().st_size for f in files)},
+                         ensure_ascii=False))
+    else:
+        print("\n".join(map(str, files)))
 
 
 # --- trash and restore (the freedesktop.org trash: Trash/files + Trash/info/NAME.trashinfo) ----------------------------
@@ -233,7 +277,7 @@ def cmd_restore(a):
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="nightdrive files", description="Your files: recent, open, trash, restore.")
+    ap = argparse.ArgumentParser(prog="nightdrive files", description="Your files: recent, open, trash, restore, check.")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("recent"); p.add_argument("--in", dest="into", action="extend", nargs="+", choices=list(FOLDERS))
     p.add_argument("--name"); p.add_argument("--limit", type=int, default=LIMIT)
@@ -243,6 +287,8 @@ def main():
     p = sub.add_parser("trash"); p.add_argument("paths", nargs="+"); p.add_argument("--json", action="store_true")
     p.set_defaults(fn=cmd_trash)
     p = sub.add_parser("restore"); p.add_argument("names", nargs="+"); p.set_defaults(fn=cmd_restore)
+    p = sub.add_parser("check"); p.add_argument("paths", nargs="+"); p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_check)
     a = ap.parse_args()
     a.fn(a)
 
