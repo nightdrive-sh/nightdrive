@@ -10,7 +10,8 @@ Whatever the level, a tool with consequences (sending, devices, installing: clas
 right still shows the card, since that card is all that stands between a mail Claude read and one it sends.
 
 An area's own choices (areas.py's options: Home Assistant's locks, #1830; Software's sources, #1835; the masking of
-secrets, #1789) are on or off by level too: OPTIONS.
+secrets, #1789) are on or off by level too: OPTIONS. A list choice is empty at every level unless OPTIONS gives it
+its entries (the folders Claude can use, #1849).
 """
 
 from areas import RIGHTS
@@ -63,6 +64,11 @@ OPTIONS = {
         "nightdrive_packages": {"strict": False, "normal": False, "open": False},
         "any_plugin": {"strict": False, "normal": False, "open": True},
     },
+    # The folders Claude can use (#1849), a list: on Normal where what you download, write and keep as pictures is,
+    # not the rest of home (projects, mail exports, backups); on Open the whole home, hidden files never
+    "apps-files": {
+        "folders": {"strict": [], "normal": ["Downloads", "Documents", "Pictures", "Desktop"], "open": ["~"]},
+    },
 }
 
 
@@ -73,8 +79,10 @@ def preset(level, area, right):
 
 
 def option_preset(level, area, option):
-    """Whether a level turns one of an area's own choices on; one it doesn't know is off."""
-    return OPTIONS.get(area, {}).get(option, {}).get(level, False)
+    """Whether a level turns one of an area's own choices on; one it doesn't know is off. A list's: what is on it
+    (a copy, so a change to the user's own doesn't change the level's)."""
+    value = OPTIONS.get(area, {}).get(option, {}).get(level, False)
+    return list(value) if isinstance(value, list) else value
 
 
 assert all(set(LEVELS[l]["default"]) == set(RIGHTS) for l in LEVELS)

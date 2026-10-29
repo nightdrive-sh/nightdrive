@@ -9,8 +9,8 @@ import "Words.js" as Words
 // #1789, #1830, #1832) go in this panel, under the rights: on or off each (OptionRow), ↑ ↓ and Space. A list choice
 // is a row per entry: those on it ticked, and under them what areas.py's `offer` finds to add (the open apps for the
 // apps whose windows Claude sees without asking, those in the notification history for the ones whose notifications
-// it doesn't), so Space or a click puts one on or takes it off; a typed list (Mail's blocked senders) ends in a field
-// to add one (AddItemRow).
+// it doesn't, home's folders for the folders Claude can use: #1849), so Space or a click puts one on or takes it off;
+// a typed list (Mail's blocked senders, a folder deeper in home) ends in a field to add one (AddItemRow).
 AppPanel {
     id: root
     property var area: null             // the row's area as it was when the panel opened
@@ -23,15 +23,17 @@ AppPanel {
         let out = []
         for (const o of options) {
             if (!o.list) { out.push({ option: o, row: o }); continue }
-            const label = v => o.offer === "windows" ? openApps.name(v) : v
+            const label = v => o.offer === "windows" ? openApps.name(v) : o.offer === "folders" ? homeFolders.label(v) : v
             const on = o.value.map(v => ({ option: o, item: v, row: { name: label(v), value: true, on: o.on } }))
             const listed = o.value.map(v => v.toLowerCase())
-            const offered = o.offer === "windows" ? openApps.classes : o.offer === "notifications" ? notifApps.names : []
+            const offered = o.offer === "windows" ? openApps.classes : o.offer === "notifications" ? notifApps.names
+                          : o.offer === "folders" ? homeFolders.items : []
             const off = offered.filter(v => listed.indexOf(v.toLowerCase()) < 0)
                 .map(v => ({ option: o, item: v, row: { name: label(v), value: false, off: o.off } }))
-                .sort((a, b) => a.row.name.localeCompare(b.row.name))
+            // Folders stay as `files folders` gives them: home's own, then its top, then home whole
+            if (o.offer !== "folders") off.sort((a, b) => a.row.name.localeCompare(b.row.name))
             const rows = on.concat(off)
-            if (o.offer === "typed") rows.push({ option: o, add: true })
+            if (o.offer === "typed" || o.offer === "folders") rows.push({ option: o, add: true })
             if (!rows.length) rows.push({ option: o, note: o.offer === "notifications"
                 ? "None listed: an app shows here to add once it has sent a notification."
                 : "None listed: open an app and it shows here to add." })
@@ -60,10 +62,12 @@ AppPanel {
         pick = Math.max(0, picks.findIndex(p => !p.note && !p.add)); scroll.contentY = 0
         // The area's own: `options` may not have followed it yet here
         if (area && (area.options || []).some(o => o.offer === "notifications")) notifApps.refresh()
+        if (area && (area.options || []).some(o => o.offer === "folders")) homeFolders.refresh()
     }
 
     OpenApps { id: openApps }
     NotifApps { id: notifApps; nd: root.access ? root.access.nd : "" }
+    HomeFolders { id: homeFolders; nd: root.access ? root.access.nd : "" }
 
     function toggle(i) {
         const p = picks[i]

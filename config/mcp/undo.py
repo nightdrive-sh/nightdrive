@@ -26,7 +26,8 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import changes  # noqa: E402  (after the path above)
+import access  # noqa: E402  (after the path above)
+import changes  # noqa: E402
 import run  # noqa: E402
 from run import ToolError  # noqa: E402
 
@@ -88,6 +89,7 @@ def offer(tool, arguments, answer, state=None):
         "tool": tool.name, "notice": notice_text(tool, now),
         "arguments": arguments, "before": state or {}, "do": argv, "stdin": stdin, "undo": undo,
         "remake": tool.spec["undo"], "dir": str(tool.dir), "timeout": run.timeout_of(tool),
+        "area": tool.area, "options_from": tool.spec.get("options_from", []),
     })
     show(entry["id"], "undo")
     answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: the user can undo it from the "
@@ -116,7 +118,7 @@ def perform(entry_id, action):
         if argv is None:
             raise ToolError(f"Change {entry_id} ({entry['notice']}) can't be undone: its redo didn't report what "
                             "undoing it needs.")
-        where = SimpleNamespace(dir=Path(entry["dir"]), name=entry["tool"])
+        where = SimpleNamespace(dir=Path(entry["dir"]), name=entry["tool"], **choices(entry))
         out, err, status = run.execute(where, argv, stdin, entry["timeout"])
         if status != 0:
             why = (err.strip() or out.strip() or "no message")[-run.MESSAGE_MAX:]
@@ -125,6 +127,18 @@ def perform(entry_id, action):
         fields = {"undo": redone_undo(entry, out)} if action == "redo" and entry.get("remake") else {}
         changes.mark(entry_id, then, **fields)
         return {**entry, **fields}
+
+
+def choices(entry):
+    """The Access choices an undo or redo runs with, as the tool's own call would now (run.environment): a redo keeps
+    to what applies now (the folders Claude can use, #1849), and a command that gets none refuses what they allow."""
+    try:
+        rules = access.load()
+    except Exception:  # the command then has no choices, and allows least
+        return {}
+    area = entry.get("area")
+    return {"options": rules.options(area) if area else {},
+            "options_from": {a: rules.options(a) for a in entry.get("options_from", [])}}
 
 
 def redone_undo(entry, out):

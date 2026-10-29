@@ -13,7 +13,7 @@
     {
       "name": "ferry_preview_files",
       "title": "What a Ferry send takes",
-      "description": "How many files and how much the paths would send with ferry_send_files (a folder: its files, its hidden ones left out): count, size in bytes, and sends, the text to give ferry_send_files unchanged, so its card shows the user how much goes. Fails with the reason when a path may not be sent (outside home, hidden, a link that leads out, home or one of its own folders whole).",
+      "description": "How many files and how much the paths would send with ferry_send_files (a folder: its files, its hidden ones left out): count, size in bytes, and sends, the text to give ferry_send_files unchanged, so its card shows the user how much goes. Fails with the reason when a path may not be sent (outside home or the folders the user lets Claude use, hidden, a link that leads out, home or one of its own folders whole).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -24,12 +24,13 @@
       },
       "command": ["./send-files", "--preview", "--", "{paths}"],
       "class": "read",
-      "area": "ferry"
+      "area": "ferry",
+      "options_from": ["apps-files"]
     },
     {
       "name": "ferry_send_files",
       "title": "Send files with Ferry",
-      "description": "Sends files (a folder: its files) from this computer to one of the user's devices with Ferry: to a phone into its box, with a notification; to another computer straight into its Downloads. Only files in the user's home folder: nothing hidden (no part of the path starting with a dot, and a folder's hidden files are left out), no link that leads out of home, and not home or its own folders (Downloads, Documents…) whole; one path that breaks this stops the whole send, and that is the user's rule, so don't try another way. Call ferry_preview_files first and give its sends unchanged: the card shows it, and if the paths no longer send that, nothing is sent. The user allows it on screen first. Fails with the reason when the device is asleep or the files aren't there.",
+      "description": "Sends files (a folder: its files) from this computer to one of the user's devices with Ferry: to a phone into its box, with a notification; to another computer straight into its Downloads. Only files in the folders the user lets Claude use (Settings › Claude › Access › Apps and files; a link counts where it points): nothing hidden (no part of the path starting with a dot, and a folder's hidden files are left out), no link that leads out of home, and not home or its own folders (Downloads, Documents…) whole; one path that breaks this stops the whole send, and that is the user's rule, so don't try another way. Call ferry_preview_files first and give its sends unchanged: the card shows it, and if the paths no longer send that, nothing is sent. The user allows it on screen first. Fails with the reason when the device is asleep or the files aren't there.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -43,6 +44,7 @@
       "command": ["./send-files", "--to", "{to}", "--sends", "{sends}", "--", "{paths}"],
       "class": "act",
       "area": "ferry",
+      "options_from": ["apps-files"],
       "timeout": 300
     },
     {

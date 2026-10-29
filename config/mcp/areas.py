@@ -13,12 +13,14 @@ An area may have choices of its own beside its rights (#1830), each on or off: `
 in a sentence each. A level sets them (levels.OPTIONS), the user may set one apart, and the tool keeps to them: its
 mcp.json `options` takes values out of its arguments, and its command gets them (run.environment) and refuses.
 A choice with `"list": True` is a list the user keeps instead (window classes: the apps whose windows Claude sees
-without asking, #1832), empty at every level, with what being on it means (`on`) and not (`off`). Its command gets it
+without asking, #1832), empty at every level unless levels.OPTIONS fills it (the folders Claude can use, #1849), with
+what being on it means (`on`) and not (`off`). Its command gets it
 the same way, and its `card` command may let a call on it past the card (confirm.facts). One with `"hides": True` takes
 away instead (Mail's blocked senders, the apps whose notifications Claude doesn't see: #1789), so one that can't be read
 closes the area's Read rather than opening it (access.load). `item` is the pattern of one entry and `item_words` what it
 is in words, `offer` where the Access window finds entries to tick: the open apps (`windows`), the apps in the
-notification history (`notifications`), or none: typed (`typed`).
+notification history (`notifications`), home's own folders and those at its top (`folders`, which also takes a typed
+one), or none: typed (`typed`).
 """
 
 RIGHTS = ("read", "modify", "delete")
@@ -34,6 +36,11 @@ SECRETS = {"id": "secrets", "name": "Codes, card numbers and passwords",
 # Mail's blocked list: an address, a domain or tag:NAME, with nothing that could leave a notmuch query's string
 # (plugins/mail/lib/blocked.py checks the same)
 MAIL_ENTRY = r'(?:tag:[^\s"()\\]{1,100}|(?:[^\s"()\\@<>]{0,64}@)?[^\s"()\\@<>.]{1,63}(?:\.[^\s"()\\@<>.]{1,63})+)'
+
+# A folder Claude can use: ~ (the whole home), ~/A/B (no part hidden: no ., .., .ssh), or one of home's own folders by
+# its xdg-user-dir name in English, which is found wherever it is (Downloads is ~/Lataukset in Finnish)
+STANDARD_FOLDERS = ("Desktop", "Documents", "Downloads", "Music", "Pictures", "Videos")
+FOLDER_ENTRY = r'(?:~(?:/[^/.\x00-\x1f\x7f][^/\x00-\x1f\x7f]{0,254})*|' + "|".join(STANDARD_FOLDERS) + ")"
 
 AREAS = {
     "nightdrive": {"name": "Nightdrive's docs and status", "glyph": "book-open",
@@ -156,7 +163,17 @@ AREAS = {
     "apps-files": {"name": "Apps and files", "glyph": "folder",
                    "read": "lists your open windows and the newest files in your folders",
                    "modify": "opens apps, files and web addresses, brings a window forward",
-                   "delete": "moves files to the trash"},
+                   "delete": "moves files to the trash",
+                   "options": [
+                       # #1849: the one limit every tool with a path keeps (config/hypr/scripts/files › checked)
+                       {"id": "folders", "name": "Folders Claude can use", "list": True, "offer": "folders",
+                        "item": FOLDER_ENTRY, "item_words": "a folder in home (~/Projects)",
+                        "words": "Claude opens, finds, trashes and sends files (Ferry, a new wallpaper) only in "
+                                 "these folders and those inside them, wherever a link points; hidden files never. "
+                                 "~/Projects isn't on Normal's: code and its keys. Notes and Mail keep their own.",
+                        "on": "Claude may use the files in it.",
+                        "off": "Claude can't use its files."},
+                   ]},
     "software": {"name": "Software", "glyph": "package",
                  "read": "searches software, its details and what an install would change",
                  "modify": "installs packages, Flatpaks and Nightdrive's plugins",

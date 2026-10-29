@@ -45,6 +45,13 @@ case ${1:-} in
     [[ ${f,,} =~ \.(jpe?g|png|webp)$ ]] || { echo "not an image swaybg shows (jpg, png, webp): $f" >&2; exit 1; }
     # From elsewhere: kept as an own image (the same name taken by another image gets a number)
     if [[ $f != "$dir"/* && $f != "$(readlink -f "$own")"/* ]]; then
+      # Claude's (appearance_wallpaper) keeps its file rules and folders, as the copy would bring the image into
+      # Pictures (#1849); the wallpaper folders are this command's own, as appearance_wallpapers lists them
+      # (an absolute path only: files reads a relative one from home, this script from where it runs)
+      if [[ -n ${NIGHTDRIVE_MCP:-} ]]; then
+        [[ $2 == /* ]] || { echo "an absolute path, please: $2" >&2; exit 1; }
+        "$(dirname "$0")/files" check -- "$2" >/dev/null || exit 1
+      fi
       mkdir -p "$own"
       dst="$own/$(basename "$f")"; n=1
       while [[ -e $dst ]] && ! cmp -s "$f" "$dst"; do dst="$own/${f##*/}"; dst="${dst%.*}-$((++n)).${f##*.}"; done

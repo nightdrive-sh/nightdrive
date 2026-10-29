@@ -11,7 +11,8 @@ areas    the user's own: per area, read / modify / delete, each allow, ask or no
 options  the user's own of an area's own choices (areas.options: Home Assistant's locks, #1830), true or false, the
          same way. What can't be read is off: these only ever allow more. A list choice (the apps whose windows Claude
          sees without asking, #1832) is a list of window classes: {"screen": {"apps": ["kitty"]}}; levels leave it
-         empty. A list that hides (Mail's blocked senders, #1789) keeps what of it can be read, and closes the area's
+         empty, but for the folders Claude can use (#1849), whose whole list is written once it differs from the
+         level's. A list that hides (Mail's blocked senders, #1789) keeps what of it can be read, and closes the area's
          Read until it is fixed
 A tool belongs to one right of its area (registry.Tool.right). No: it isn't listed and can't be called. Ask: it runs
 only after the user allows that call on Nightdrive's card. Allow: it runs (a change with Undo). A tool with
@@ -58,10 +59,13 @@ def list_item(option):
 
 
 def option_default(level, area, option):
-    """What a level gives one of an area's own choices: on or off, or an empty list for a list (no level fills the
-    user's own list)."""
+    """What a level gives one of an area's own choices: on or off, or a list's entries (empty unless the level fills
+    it: the folders Claude can use)."""
     known = next((o for o in areas.options(area) if o["id"] == option), {})
-    return [] if known.get("list") else option_preset(level, area, option)
+    value = option_preset(level, area, option)
+    if known.get("list"):
+        return value if isinstance(value, list) else []
+    return value
 
 
 class Access:

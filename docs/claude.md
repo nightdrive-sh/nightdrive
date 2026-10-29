@@ -98,6 +98,16 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
 
   A list that hides can't be read (edited by hand, say): its area's Read goes to *No* until it is fixed.
 
+  Apps and files has *Folders Claude can use*: Claude finds, opens, trashes and sends (Ferry) files, and takes a new
+  wallpaper, only in these folders and those inside them. Strict has none, Normal Downloads, Documents, Pictures and
+  Desktop, wherever they are (`~/Lataukset` in Finnish), Open the whole home. A path counts where it really is: a link
+  can't lead into one of them or out of one. Hidden files never, whatever the list. `~/Projects` isn't on Normal's on
+  purpose: it holds code, repositories and settings with their keys, and Claude Code reaches it with its own tools.
+  The rows are home's own folders and those at its top, Space ticks one; type a deeper one (`~/Work/Invoices`) in the
+  field. A refusal names the folders and this place. Notes, Mail, Calendar, Tasks and the wallpapers keep their own,
+  and Claude Code's own commands aren't limited by it. `nightdrive mcp access option apps-files folders add
+  ~/Projects`. A list that can't be read gives Claude no folder.
+
   Software has three. What they leave out you install or remove yourself: the Launcher's Install and Remove are as
   they were.
   - *Install from any source*: off, every package of an install, dependencies too, comes from Fedora's own
@@ -143,7 +153,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output, brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
-| Apps and files | windows, newest files | open an app or a file, bring a window forward; open a web address † | **files to the trash** |
+| Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; open a web address † | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
 
 Claude doesn't bring a window forward while you type, nor open an app, a file or an address: after a key it waits for
@@ -153,7 +163,7 @@ two quiet seconds, five at most, and otherwise gives up, so what you type doesn'
 
 - Passwords and the keyring, and the windows Send to Claude leaves out (password managers, private browser windows, the
   apps you list there): Claude sees no title of theirs and no picture.
-- Hidden files and folders (`~/.ssh`, `~/.config`…): not listed, opened, trashed or sent with Ferry.
+- Hidden files and folders (`~/.ssh`, `~/.config`…): not listed, opened, trashed or sent with Ferry, on any level.
 - Anything that can't be taken back without asking: no permanent delete (mail goes to Trash, files and notes to the
   trash), no recurring events deleted, no attachments Claude adds to a mail (your own draft's go, and the card names them).
 - Shutting down, users, the clipboard history.

@@ -12,6 +12,11 @@ file tools keep:
 - The trash is the desktop's (Files shows it, and puts things back): nothing is ever deleted for good.
 - Only what opens to be looked at: documents, pictures, sound, video, text and folders, never a program, a script
   or a launcher (an executable file, a .desktop file).
+- Claude (NIGHTDRIVE_MCP, run.py) also keeps to the folders Settings › Claude › Access › Apps and files lets it use
+  (#1849; areas.py's apps-files `folders`, given to the tool's command as its own or its options_from): a path, where
+  it lies and where it points, is in one of them or below it, so a link can't lead into one or out of one. Without
+  that list (a tool that doesn't get it, one that can't be read) Claude may use none. Your own use has no such limit,
+  nor has restore: it only ever puts back, where it was, what a trash moved after this check (its undo).
 
   files recent [--in downloads|pictures|documents …] [--name TEXT] [--limit N] [--json]
                                    the newest files first (default 10, at most 50), in those folders and DEPTH levels
@@ -27,6 +32,8 @@ file tools keep:
   files restore NAME…              back from the trash to where they were (the names trash gives)
   files check PATH… [--json]       the files PATHs would send (a folder: its files), each where it really is, or the
                                    reason none may go; --json: {files: [paths], size: their bytes}
+  files folders [--json]           what the Access window offers for the folders Claude can use: home's own (by
+                                   xdg-user-dir) and the folders at its top; --json: [{item, path}]
 """
 import argparse, datetime, json, mimetypes, os, subprocess, sys
 from pathlib import Path
@@ -47,6 +54,12 @@ OPENABLE = ("text/", "image/", "audio/", "video/", "inode/directory", "applicati
             "application/json", "application/xml", "application/zip", "application/x-tar", "application/gzip",
             "application/x-compressed-tar", "application/x-7z-compressed", "application/vnd.rar")
 NOT_OPENED = ("text/x-shellscript", "text/x-python", "text/x-perl", "text/x-ruby", "application/x-desktop")
+# The folders Claude can use: Access's apps-files `folders` (config/mcp/areas.py). Its entries are ~, ~/A/B or one of
+# these, home's own folders by their English names, which xdg-user-dir finds wherever they are (~/Lataukset)
+ACCESS_AREA, ACCESS_OPTION = "apps-files", "folders"
+STANDARD = {"Desktop": "DESKTOP", "Documents": "DOCUMENTS", "Downloads": "DOWNLOAD", "Music": "MUSIC",
+            "Pictures": "PICTURES", "Videos": "VIDEOS"}
+WHERE_TO_CHANGE = "Settings › Claude › Access › Apps and files › Folders Claude can use"
 
 
 def die(msg, code=1):
@@ -59,7 +72,7 @@ def user_dir(name):
         out = subprocess.run(["xdg-user-dir", name], capture_output=True, text=True, timeout=5).stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
         out = ""
-    fallback = {"DOWNLOAD": "Downloads", "PICTURES": "Pictures", "DOCUMENTS": "Documents"}.get(name)
+    fallback = {key: word for word, key in STANDARD.items()}.get(name)
     if out and Path(out).resolve() != HOME:   # xdg-user-dir answers home for a folder that isn't set
         return Path(out).resolve()
     return HOME / fallback if fallback else None
@@ -74,11 +87,59 @@ def inside_home(p):
     return not any(part.startswith(".") for part in rel.parts)
 
 
+# --- the folders Claude can use (#1849) ---------------------------------------------------------------------------
+
+def folder_of(entry):
+    """One entry of the list as the folder it means, resolved; None for one that isn't a folder in home."""
+    if entry in STANDARD:
+        folder = user_dir(STANDARD[entry])
+    elif entry == "~" or entry.startswith("~/"):
+        folder = (HOME / entry[2:]).resolve()
+    else:
+        return None
+    return folder if folder and folder.is_dir() and (folder == HOME or inside_home(folder)) else None
+
+
+def claude_folders():
+    """None for your own use; Claude's: the folders it may use, resolved (a link in the list counts where it leads).
+    What can't be read gives none: the list only ever lets more through."""
+    if not os.environ.get("NIGHTDRIVE_MCP"):
+        return None
+    entries = None
+    for var, area in (("NIGHTDRIVE_MCP_OPTIONS_FROM", ACCESS_AREA), ("NIGHTDRIVE_MCP_OPTIONS", None)):
+        try:
+            options = json.loads(os.environ.get(var) or "{}")
+            options = options.get(area, {}) if area else options
+            entries = options.get(ACCESS_OPTION, entries) if isinstance(options, dict) else entries
+        except ValueError:
+            pass
+        if entries is not None:
+            break
+    if not isinstance(entries, list):
+        return []
+    return list(dict.fromkeys(f for e in entries if isinstance(e, str) for f in [folder_of(e)] if f))
+
+
+def within(path, folders, below=False):
+    """Whether a resolved path is in one of the folders (below=True: inside it, not the folder itself)."""
+    return any(f in path.parents or (path == f and not below) for f in folders)
+
+
+def refuse_outside(arg, folders):
+    named = ", ".join(shown(f) if f != HOME else "~" for f in folders)
+    allowed = f"the folders Claude may use ({named})" if folders else "any folder: Claude may use none now"
+    die(f"{arg} is outside {allowed}. The user can change them in {WHERE_TO_CHANGE}.")
+
+
 def checked(arg, moving=False, sending=False):
     """The path a PATH argument means, by the rules above; dies with the reason otherwise. Its folder is resolved
     (no link leads it out), the last part is kept as it is: trashing a link moves the link, not what it points to."""
     p = Path(arg).expanduser()
     p = p if p.is_absolute() else HOME / p
+    folders = claude_folders()
+    # Claude's folders first, so a refusal doesn't tell whether something exists outside them
+    if folders is not None and not within(p.parent.resolve() / p.name, folders, below=moving):
+        refuse_outside(arg, folders)
     try:
         folder = p.parent.resolve(strict=True)
     except OSError:
@@ -97,6 +158,11 @@ def checked(arg, moving=False, sending=False):
             die(f"{arg} is one of your home's own folders: it isn't {verb}.")
     if not moving and not inside_home(path.resolve()):
         die(f"{arg} is a link that leads out of your home folder (or into a hidden one): it isn't {verb.split()[0]}.")
+    if folders is not None:
+        # Where it lies (above) and, as it is opened or sent as what it points to, where it leads; a folder Claude
+        # may use isn't trashed itself (taking it away isn't using what is in it)
+        if not within(path, folders, below=moving) or (not moving and not within(path.resolve(), folders)):
+            refuse_outside(arg, folders)
     return path
 
 
@@ -131,13 +197,18 @@ def walk(folder, depth):
 
 def cmd_recent(a):
     names = a.into or list(FOLDERS)
-    found = []
+    found, folders = [], claude_folders()
     for key in dict.fromkeys(names):
         root = user_dir(FOLDERS[key])
         if not root or not root.is_dir() or not inside_home(root):
             continue
-        for e in walk(root, DEPTH):
+        # Claude's: only what is in its folders (a whole one, or a folder of it the user listed alone)
+        if folders is not None and not within(root, folders) and not any(root in f.parents for f in folders):
+            continue
+        for e in walk(root, DEPTH):   # no links: a path here is where the file really is
             if a.name and a.name.lower() not in e.name.lower():
+                continue
+            if folders is not None and not within(Path(e.path), folders):
                 continue
             st = e.stat(follow_symlinks=False)
             found.append((st.st_mtime, e, st.st_size, key))
@@ -175,7 +246,7 @@ def sendable(arg):
         return [top]
     if not top.is_dir():
         die(f"{arg} isn't a file or a folder: it isn't sent.")
-    out = []
+    out, folders = [], claude_folders()
     for root, dirs, names in os.walk(top):   # doesn't follow links to folders: they are left out, as Ferry does
         dirs[:] = sorted(d for d in dirs if not d.startswith("."))
         for n in sorted(names):
@@ -185,6 +256,8 @@ def sendable(arg):
             real = p.resolve()
             if not inside_home(real):
                 die(f"{p} is a link that leads out of your home folder (or into a hidden one): {arg} isn't sent.")
+            if folders is not None and not within(real, folders):
+                refuse_outside(f"{p} (a link in {arg})", folders)
             if real.is_file():
                 out.append(real)
     if not out:
@@ -199,6 +272,20 @@ def cmd_check(a):
                          ensure_ascii=False))
     else:
         print("\n".join(map(str, files)))
+
+
+# --- folders (what the Access window offers to add: AccessFolders.qml) --------------------------------------------
+
+def cmd_folders(a):
+    rows = [{"item": word, "path": str(user_dir(key))} for word, key in STANDARD.items()]
+    own = {r["path"] for r in rows}
+    try:
+        top = sorted(e.path for e in os.scandir(HOME)
+                     if not e.name.startswith(".") and e.is_dir(follow_symlinks=False) and e.path not in own)
+    except OSError:
+        top = []
+    rows += [{"item": "~/" + Path(p).name, "path": p} for p in top] + [{"item": "~", "path": str(HOME)}]
+    print(json.dumps(rows, ensure_ascii=False) if a.json else "\n".join(f"{r['item']}\t{r['path']}" for r in rows))
 
 
 # --- trash and restore (the freedesktop.org trash: Trash/files + Trash/info/NAME.trashinfo) ----------------------------
@@ -321,7 +408,7 @@ def cmd_restore(a):
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="nightdrive files", description="Your files: recent, open, trash, restore, check.")
+    ap = argparse.ArgumentParser(prog="nightdrive files", description="Your files: recent, open, trash, restore, check, folders.")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("recent"); p.add_argument("--in", dest="into", action="extend", nargs="+", choices=list(FOLDERS))
     p.add_argument("--name"); p.add_argument("--limit", type=int, default=LIMIT)
@@ -333,6 +420,7 @@ def main():
     p = sub.add_parser("restore"); p.add_argument("names", nargs="+"); p.set_defaults(fn=cmd_restore)
     p = sub.add_parser("check"); p.add_argument("paths", nargs="+"); p.add_argument("--json", action="store_true")
     p.set_defaults(fn=cmd_check)
+    p = sub.add_parser("folders"); p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_folders)
     a = ap.parse_args()
     a.fn(a)
 

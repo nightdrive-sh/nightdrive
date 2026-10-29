@@ -82,7 +82,7 @@
     {
       "name": "files_recent",
       "title": "Recent files",
-      "description": "The newest files in the user's Downloads, Pictures and Documents (and folders three levels below them), newest first: path, name, folder, size in bytes, modified (ISO 8601) and type. Use it for \"the PDF I just downloaded\" or \"my last screenshot\". Hidden files are left out.",
+      "description": "The newest files in the user's Downloads, Pictures and Documents (and folders three levels below them) that are in the folders the user lets Claude use, newest first: path, name, folder, size in bytes, modified (ISO 8601) and type. Use it for \"the PDF I just downloaded\" or \"my last screenshot\". Hidden files are left out.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -99,7 +99,7 @@
     {
       "name": "files_open",
       "title": "Open a file",
-      "description": "Opens a file or folder in the user's home folder in its default app (a PDF in the viewer, a folder in Files). Only documents, pictures, sound, video, text and folders: never a program, a script or a launcher, nor anything hidden (no part of the path starting with a dot) or outside home. Not while the user is typing, as windows_focus.",
+      "description": "Opens a file or folder in the user's home folder in its default app (a PDF in the viewer, a folder in Files). Only documents, pictures, sound, video, text and folders: never a program, a script or a launcher, nor anything hidden (no part of the path starting with a dot), outside home or outside the folders the user lets Claude use (a link counts where it points). Not while the user is typing, as windows_focus.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -117,7 +117,7 @@
     {
       "name": "files_trash",
       "title": "Move to the trash",
-      "description": "Moves files or folders in the user's home folder to the trash, where Files shows them and can put them back; nothing is deleted for good (there is no tool for that). Not home's own folders (Downloads, Documents…), nothing hidden, nothing outside home. Several paths go together: all or none. The user is usually asked on screen first, with every path and how many files each folder holds, so trash what belongs together in one call.",
+      "description": "Moves files or folders in the user's home folder to the trash, where Files shows them and can put them back; nothing is deleted for good (there is no tool for that). Not home's own folders (Downloads, Documents…), nothing hidden, nothing outside home or the folders the user lets Claude use. Several paths go together: all or none. The user is usually asked on screen first, with every path and how many files each folder holds, so trash what belongs together in one call.",
       "inputSchema": {
         "type": "object",
         "properties": {

@@ -21,7 +21,7 @@
     {
       "name": "appearance_wallpaper",
       "title": "Change the wallpaper",
-      "description": "Set the desktop's wallpaper to an image file (jpg, png or webp; an absolute path). An image from outside the wallpaper folders, such as Downloads, is copied to ~/Pictures/Wallpapers first, so it shows in Settings › Background and stays when the original is deleted. Returns the path it set.",
+      "description": "Set the desktop's wallpaper to an image file (jpg, png or webp; an absolute path). An image from outside the wallpaper folders, such as Downloads, is copied to ~/Pictures/Wallpapers first, so it shows in Settings › Background and stays when the original is deleted; such an image must be in the folders the user lets Claude use, by the same rules as files_open. Returns the path it set.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -35,7 +35,8 @@
       "undo": ["nightdrive", "wallpaper", "set", "{path}"],
       "notice": "Changed the wallpaper to {path}",
       "class": "change",
-      "area": "appearance"
+      "area": "appearance",
+      "options_from": ["apps-files"]
     },
     {
       "name": "appearance_theme",
