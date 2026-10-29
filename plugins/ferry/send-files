@@ -1,23 +1,54 @@
 #!/usr/bin/python3 -I
-"""Claude's ferry_send_files (mcp.json): `ferry add` for only what Nightdrive's file rules let go. `nightdrive files
-check` (config/hypr/scripts/files) turns the paths into the files they send, resolved, or refuses the whole send with
-the reason: nothing outside home, nothing hidden, no link that leads out, not home or its own folders whole. Ferry
-then gets those files, not the folders, so its own walk of a folder never sees a link the check didn't.
+"""Claude's ferry_preview_files and ferry_send_files (mcp.json): `ferry add` for only what Nightdrive's file rules let
+go. `nightdrive files check` (config/hypr/scripts/files) turns the paths into the files they send, resolved, or
+refuses the whole send with the reason: nothing outside home, nothing hidden, no link that leads out, not home or its
+own folders whole. Ferry then gets those files, not the folders, so its own walk of a folder never sees a link the
+check didn't.
 
-  send-files --to DEVICE -- PATH…
+The card shows only the arguments, and a folder's path doesn't say how much is in it. So a send names what it sends
+("3 files, 4.2 MB", the preview's text) as an argument the card shows, and nothing goes when that is no longer true:
+the user allows what they saw, as with software_preview and software_install.
+
+  send-files --preview -- PATH…               {count, size, sends}
+  send-files --to DEVICE --sends TEXT -- PATH…
 """
 import json, os, subprocess, sys
 
 
+def checked(paths):
+    """The files the paths send; exits with the check's reason when any may not go (fail closed)."""
+    check = subprocess.run(["nightdrive", "files", "check", "--json", "--", *paths], capture_output=True, text=True)
+    if check.returncode != 0:
+        sys.exit(check.stderr.strip() or "The files couldn't be checked: nothing was sent.")
+    out = json.loads(check.stdout)
+    return out["files"], out["size"]
+
+
+def human(size):
+    """Bytes as Files shows them (decimal units, one decimal)."""
+    for unit in ("bytes", "kB", "MB", "GB"):
+        if size < 999.95 or unit == "GB":   # not "1000.0 kB"
+            return f"{size} {unit}" if unit == "bytes" else f"{size:.1f} {unit}"
+        size /= 1000
+
+
+def sends(files, size):
+    return f"{len(files)} file{'s' if len(files) != 1 else ''}, {human(size)}"
+
+
 def main():
     a = sys.argv[1:]
-    if len(a) < 4 or a[0] != "--to" or a[2] != "--":
-        sys.exit("usage: send-files --to DEVICE -- PATH…")
-    device, paths = a[1], a[3:]
-    check = subprocess.run(["nightdrive", "files", "check", "--json", "--", *paths], capture_output=True, text=True)
-    if check.returncode != 0:   # fail closed: the reason, and nothing sent
-        sys.exit(check.stderr.strip() or "The files couldn't be checked: nothing was sent.")
-    files = json.loads(check.stdout)["files"]
+    if a[:2] == ["--preview", "--"] and len(a) > 2:
+        files, size = checked(a[2:])
+        print(json.dumps({"count": len(files), "size": size, "sends": sends(files, size)}))
+        return
+    if len(a) < 6 or a[0] != "--to" or a[2] != "--sends" or a[4] != "--":
+        sys.exit("usage: send-files --preview -- PATH… | send-files --to DEVICE --sends TEXT -- PATH…")
+    device, said, paths = a[1], a[3], a[5:]
+    files, size = checked(paths)
+    if said != sends(files, size):
+        sys.exit(f"Nothing was sent: the card said {said!r}, but these paths now send {sends(files, size)}. "
+                 "Preview them again with ferry_preview_files.")
     os.execvp("ferry", ["ferry", "add", "--to", device, *files])
 
 
