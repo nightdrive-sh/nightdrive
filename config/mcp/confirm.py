@@ -5,10 +5,12 @@ whose right the user set to Ask in Access (#1831): a read, a change, a delete. T
 line says what follows from allowing it: a read goes to Anthropic, a change can be undone, a delete maybe not.
 
 The card is Quickshell's (config/quickshell/ClaudeConfirm.qml, IPC target claudeConfirm). It shows exactly what will
-be done: the tool, and every argument Claude gave it, as plain text. Enter or Allow allows, Esc or Deny refuses, and
-so does everything else: no answer in TIMEOUT seconds, a card that can't be shown (no Quickshell), a card that goes
-away before answering (a crash, a reload), a request that changed on its way. It is the server's, so no Claude Code
-setting skips it, and text Claude read (a mail, a web page) can't send anything without the user seeing it first.
+be done: the tool, and every argument Claude gave it, as plain text, after what the tool's `card` command says of
+them in words Claude didn't write (Home Assistant's name and room for a device's id, #1830). Enter or Allow allows,
+Esc or Deny refuses, and so does everything else: no answer in TIMEOUT seconds, a card that can't be shown (no
+Quickshell), a card that goes away before answering (a crash, a reload), a request that changed on its way. It is the
+server's, so no Claude Code setting skips it, and text Claude read (a mail, a web page) can't send anything without the
+user seeing it first.
 
 How it talks to the card:
 1. The request goes to a file in a private folder in XDG_RUNTIME_DIR, as ASCII JSON, and `qs ipc call claudeConfirm
@@ -35,6 +37,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import areas  # noqa: E402  (after the path above)
+import run  # noqa: E402
 from run import ToolError  # noqa: E402
 
 TIMEOUT = 60         # seconds the card waits for an answer; then it is a refusal
@@ -106,9 +109,29 @@ def kind(tool):
     return right
 
 
+def facts(tool, arguments):
+    """The rows a tool's `card` command adds, from what it acts on: Home Assistant's name and room for an id that says
+    nothing (`switch.sonoff_1000a`), which Claude can't word. It prints a JSON object, label → text. A command that
+    fails stops the call before any card, with its message: a device that isn't there, a state Access doesn't allow."""
+    template = tool.spec.get("card")
+    if not template:
+        return []
+    out, err, status = run.execute(tool, run.expand(template, arguments), None, run.timeout_of(tool))
+    if status != 0:
+        why = (err.strip() or out.strip() or f"exit status {status}")[-run.MESSAGE_MAX:]
+        raise ToolError(f"{tool.name} wasn't run: {why}")
+    try:
+        rows = json.loads(out)
+    except ValueError:
+        rows = None
+    if not isinstance(rows, dict) or not all(isinstance(v, str) for v in rows.values()):
+        raise ToolError(f"{tool.name} wasn't run: its card command didn't print a JSON object of texts.")
+    return [field(name, {"title": name}, text) for name, text in rows.items()]
+
+
 def card(tool, arguments, timeout=TIMEOUT):
-    """What the card shows: the tool, where it is from, and every argument, in the schema's order and then any
-    others. Nothing is left out: what the user doesn't see, they didn't allow."""
+    """What the card shows: the tool, where it is from, what its `card` command says (facts), and every argument, in
+    the schema's order and then any others. Nothing is left out: what the user doesn't see, they didn't allow."""
     props = tool.spec["inputSchema"].get("properties", {})
     names = [n for n in props if n in arguments] + [n for n in arguments if n not in props]
     title = tool.spec.get("title") or tool.name
@@ -120,7 +143,7 @@ def card(tool, arguments, timeout=TIMEOUT):
         "heading": heading,
         "note": note,
         "glyph": glyph,
-        "fields": [field(n, props.get(n), arguments[n]) for n in names],
+        "fields": facts(tool, arguments) + [field(n, props.get(n), arguments[n]) for n in names],
         "timeout": timeout,
     }
 

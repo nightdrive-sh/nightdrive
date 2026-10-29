@@ -8,6 +8,10 @@ Each area has up to three rights, each Allow, Ask or No (levels.py has the prese
              installing, which never runs without the card, so at most Ask)
     delete   what Claude can remove (a tool with "deletes": true)
 The words below finish "Claude …" in the Access window; a right an area has no tools for isn't shown at all.
+
+An area may have choices of its own beside its rights (#1830), each on or off: `options`, with what on and off mean
+in a sentence each. A level sets them (levels.OPTIONS), the user may set one apart, and the tool keeps to them: its
+mcp.json `options` takes values out of its arguments, and its command gets them (run.environment) and refuses.
 """
 
 RIGHTS = ("read", "modify", "delete")
@@ -42,7 +46,24 @@ AREAS = {
               "modify": "sends files or a text to your devices"},
     "home-assistant": {"name": "Home Assistant", "glyph": "house", "app": True,
                        "read": "reads your devices and sensors",
-                       "modify": "switches devices, runs scenes and automations"},
+                       "modify": "switches devices, runs scenes and automations",
+                       "options": [
+                           {"id": "unlock", "name": "Unlock and open",
+                            "on": "Claude may also unlock a lock and open a cover (a door, a gate, blinds), on "
+                                  "the card.",
+                            "off": "Claude only locks and closes: unlocking and opening are yours to do."},
+                           {"id": "automations", "name": "Turn automations on or off",
+                            "on": "Claude may also turn an automation on or off: one turned off stops running by "
+                                  "itself.",
+                            "off": "Claude runs an automation but can't turn one on or off, so one that guards (a "
+                                   "leak alarm) keeps working."},
+                           {"id": "presence", "name": "Presence and location",
+                            "on": "Claude reads presence, occupancy and motion sensors too, and where your phones "
+                                  "are (Home Assistant's app: address, distance, Wi-Fi): whether anyone is home goes "
+                                  "to Anthropic.",
+                            "off": "Claude doesn't get presence, occupancy or motion sensors, nor where your phones "
+                                   "are: they tell whether anyone is home."},
+                       ]},
     "notifications": {"name": "Notifications", "glyph": "bell-ring",
                       "read": "reads the latest notifications of every app",
                       "modify": "sends you a notification, turns Do Not Disturb on or off"},
@@ -77,3 +98,8 @@ def glyph(area):
 
 def words(area, right):
     return AREAS.get(area, {}).get(right, "")
+
+
+def options(area):
+    """The area's own choices: [{id, name, on, off}]."""
+    return AREAS.get(area, {}).get("options", [])

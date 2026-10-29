@@ -3,8 +3,9 @@ import Quickshell
 import Quickshell.Io
 
 // What applies, and the writes: `nightdrive mcp access` (config/mcp/access.py owns claude-access.json) gives the level
-// and every area's rights with their tools; a choice runs `nightdrive mcp access set AREA RIGHT VALUE` or `level L`,
-// one at a time and in order, and then reads back what applies (a value put back to the level's follows the level).
+// and every area's rights with their tools and own choices; a choice runs `nightdrive mcp access set AREA RIGHT VALUE`,
+// `option AREA ID on|off` or `level L`, one at a time and in order, and then reads back what applies (a value put back
+// to the level's follows the level).
 // The file is watched too: the launcher, a terminal or Welcome may change it while the window is open.
 QtObject {
     id: store
@@ -52,6 +53,14 @@ QtObject {
         const a = copy.areas.find(x => x.id === areaId)
         if (a && a.rights[right]) { a.rights[right].value = value; now = copy }
         run(["set", areaId, right, value])
+    }
+    // One of an area's own choices (areas.py's options: Home Assistant's locks), on or off
+    function setOption(areaId, option, on) {
+        const copy = JSON.parse(JSON.stringify(now))
+        const a = copy.areas.find(x => x.id === areaId)
+        const o = a && (a.options || []).find(x => x.id === option)
+        if (o) { o.value = on; now = copy }
+        run(["option", areaId, option, on ? "on" : "off"])
     }
     function setLevel(level) {
         now = Object.assign({}, now, { level: level })

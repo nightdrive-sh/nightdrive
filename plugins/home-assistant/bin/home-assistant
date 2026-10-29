@@ -6,7 +6,9 @@
   home-assistant states            the controllable devices as JSON: [{id, name, domain, state, on, area, fav, detail,
                                    dimmable, bright}] (bright 0..1, 0 when off; dimmable: a light with brightness)
       --search TEXT                only those whose name, area or id has TEXT (any case)
-      --sensors                    sensors and binary sensors too (temperature, a door's contact), after the devices
+      --sensors                    sensors and binary sensors too (temperature, a door's contact), after the devices;
+                                   for Claude without presence, occupancy and motion, nor a phone's whereabouts,
+                                   unless Access allows them
       --brief                      only {id, name, state} and area and detail when they say something (for Claude:
                                    a home's whole list is long)
   home-assistant toggle ID         turns a device on/off, runs a scene / script / automation, presses a button
@@ -14,6 +16,8 @@
                                    state, detail}: on|off (lights, switches, fans, climate, media players, automations),
                                    open|close (covers), lock|unlock (locks), run (scenes, scripts, buttons; triggers an
                                    automation). Claude's home_assistant_set (mcp.json), after the user allows it
+      --check                      changes nothing: checks the call and prints what the card shows of the device,
+                                   {Device, Room, Now} from Home Assistant (mcp.json's card)
   home-assistant brightness ID PCT sets a light's brightness, 0–100 (0 turns it off)
   home-assistant fav ID [on|off]   pins a device to the top bar's Home menu (no on/off: flips it)
   home-assistant bar               the top bar module's state line (modules.jsonc format)
@@ -26,8 +30,14 @@ Config: ~/.config/nightdrive/home-assistant (KEY=value, mode 600):
   HA_TOKEN=…               a long-lived access token (HA › Profile › Security), or
   HA_TOKEN_CMD="op read op://Private/Home Assistant/token"   a command that prints it
 Pinned devices: ~/.local/state/nightdrive/home-favorites, one entity id per line.
+
+Claude's calls (NIGHTDRIVE_MCP=1, from Nightdrive's MCP server) keep to Settings › Claude › Access › Home Assistant,
+which the server gives in NIGHTDRIVE_MCP_OPTIONS (#1830): unlock (unlock locks, open covers), automations (turn one on
+or off), presence (presence, occupancy and motion sensors, and a phone's whereabouts from the companion app). One that
+isn't there is off. The launcher and the bar don't
+set it, so the user's own controls are as they were.
 """
-import json, os, shlex, subprocess, sys, time, urllib.error, urllib.request
+import json, os, re, shlex, subprocess, sys, time, urllib.error, urllib.request
 
 HOME = os.environ["HOME"]
 CONFIG = f"{HOME}/.config/nightdrive/home-assistant"
@@ -62,6 +72,39 @@ SET = {**{d: {"on": (d, "turn_on"), "off": (d, "turn_off")} for d in SWITCHED},
        "scene": {"run": ("scene", "turn_on")}, "script": {"run": ("script", "turn_on")},
        "button": {"run": ("button", "press")}, "input_button": {"run": ("input_button", "press")}}
 SET["automation"]["run"] = ("automation", "trigger")
+
+# What each of Access's Home Assistant choices allows Claude (config/mcp/areas.py): (domain, state) → option
+NEEDS = {("lock", "unlock"): "unlock", ("cover", "open"): "unlock",
+         ("automation", "on"): "automations", ("automation", "off"): "automations"}
+# What tells whether anyone is home, which Claude gets only with the presence choice: binary sensors of these classes,
+# and the sensors of Home Assistant's phone app that say where a phone is (its street address, its distance from
+# home, the Wi-Fi it's on, whether its owner walks or drives), by the ids the app gives them
+PRESENCE = {"presence", "occupancy", "motion"}
+WHEREABOUTS = re.compile(r"_(geocoded_location|distance|ssid|bssid|activity|direction_of_travel)(_\d+)?$")
+ENTITY = re.compile(r"[a-z_]+\.[a-z0-9_]+")
+
+
+def claude_options():
+    """Access's choices for Claude's call, {option: on}; None when this isn't Claude's (no limits). What can't be read
+    is {}: every choice off, as they only ever allow more."""
+    if os.environ.get("NIGHTDRIVE_MCP") != "1":
+        return None
+    try:
+        options = json.loads(os.environ.get("NIGHTDRIVE_MCP_OPTIONS", ""))
+    except ValueError:
+        return {}
+    return options if isinstance(options, dict) else {}
+
+
+def allowed(option):
+    options = claude_options()
+    return options is None or options.get(option) is True
+
+
+def presence(domain, eid, attrs):
+    if domain == "binary_sensor":
+        return attrs.get("device_class") in PRESENCE
+    return domain == "sensor" and bool(WHEREABOUTS.search(eid))
 
 
 def die(msg, code=1):
@@ -243,6 +286,8 @@ def states(c, search="", sensors=False):
         domain = eid.split(".", 1)[0]
         if domain not in domains:
             continue
+        if domain in SENSORS and presence(domain, eid, s.get("attributes", {})) and not allowed("presence"):
+            continue
         name = s.get("attributes", {}).get("friendly_name") or eid
         area = areas.get(eid, "") if isinstance(areas, dict) else ""
         # "Olohuone Olohuoneen valo" reads badly: drop the area from the name's start when it's there
@@ -278,19 +323,65 @@ def toggle(c, eid):
     c.call("POST", f"/api/services/{svc[0]}/{svc[1]}", {"entity_id": eid})
 
 
-def set_state(c, eid, state):
+def refusal(domain, eid, state):
+    """Why Access doesn't let Claude put this device in this state, in words for Claude; None when it does."""
+    option = NEEDS.get((domain, state))
+    if not option or allowed(option):
+        return None
+    why = {"unlock": "lets Claude only lock locks and close covers",
+           "automations": "lets Claude run an automation but not turn one on or off"}[option]
+    return (f"{eid} wasn't set to {state}: the user's Access (Settings › Claude › Access › Home Assistant) {why}. "
+            "That is theirs to do; don't try it another way.")
+
+
+def area_of(c, eid):
+    """The device's area in Home Assistant, "" if none. The id goes in as a template variable, never into the
+    template's text."""
+    try:
+        area = c.call("POST", "/api/template", {"template": "{{ area_name(eid) or '' }}", "variables": {"eid": eid}})
+    except Exception:
+        return ""
+    return area.strip() if isinstance(area, str) else ""
+
+
+def card(c, eid, now):
+    """The confirmation card's rows for this device, from Home Assistant: its name, room and state now. They stand
+    beside the id Claude gave, so the user sees that switch.sonoff_1000a is the oven."""
+    domain = eid.split(".", 1)[0]
+    name = now.get("attributes", {}).get("friendly_name") or eid
+    room = area_of(c, eid)
+    if room and name.lower().startswith(room.lower() + " "):
+        name = name[len(room) + 1:]
+    out = {"Device": name}
+    if room:
+        out["Room"] = room
+    state, said = now.get("state", ""), detail(domain, now)
+    if domain not in ONE_SHOT:   # a scene's state is when it last ran
+        out["Now"] = state if said in ("", state) else said if said.startswith(state) else f"{state} · {said}"
+    print(json.dumps(out, ensure_ascii=False))
+
+
+def set_state(c, eid, state, check=False):
     domain = eid.split(".", 1)[0]
     choices = SET.get(domain)
+    if not ENTITY.fullmatch(eid):
+        die(f"{eid!r} isn't a Home Assistant id (light.kitchen): `home-assistant states` lists them")
     if not choices:
         die(f"{eid}: set handles {', '.join(SET)}; a {domain} has no state to set")
     if state not in choices:
         die(f"{eid} is a {domain}: its states are {' and '.join(choices)}, not {state}")
+    no = refusal(domain, eid, state)
+    if no:
+        die(no)
     try:
         before = c.call("GET", "/api/states/" + eid)
     except urllib.error.HTTPError as e:
         if e.code == 404:
             die(f"Home Assistant has no {eid}: `home-assistant states` lists the devices")
         raise
+    if check:
+        card(c, eid, before)
+        return
     svc = choices[state]
     changed = c.call("POST", f"/api/services/{svc[0]}/{svc[1]}", {"entity_id": eid})
     # The service answers with the states it changed; one that changes later (a cover moving) isn't there yet
@@ -365,8 +456,8 @@ def main():
         print(json.dumps(out, ensure_ascii=False))
     elif cmd == "toggle" and len(a) == 2:
         toggle(Client(), a[1])
-    elif cmd == "set" and len(a) == 3:
-        set_state(Client(), a[1], a[2])
+    elif cmd == "set" and len(a) in (3, 4) and a[3:] in ([], ["--check"]):
+        set_state(Client(), a[1], a[2], check=len(a) == 4)
     elif cmd == "brightness" and len(a) == 3:
         brightness(Client(), a[1], a[2])
     elif cmd == "fav" and len(a) in (2, 3):

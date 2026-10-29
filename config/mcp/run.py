@@ -125,6 +125,9 @@ def environment(tool):
     env["PATH"] = os.pathsep.join(first + [p for p in path if p not in first] + ([] if local in path else [local]))
     env["NIGHTDRIVE_MCP"] = "1"
     env["NIGHTDRIVE_MCP_TOOL"] = tool.name
+    # Its area's own choices in Access ({"unlock": false}), for the command to keep to: the schema already leaves out
+    # what they take away, and a command that checks too can't be talked past (#1830)
+    env["NIGHTDRIVE_MCP_OPTIONS"] = json.dumps(getattr(tool, "options", None) or {})
     return env
 
 

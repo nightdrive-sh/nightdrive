@@ -10,6 +10,9 @@ QtObject {
             ["⏎  Space", "Choose (or the details, on ›)"],
             ["1  2  3", "Allow, Ask, No"],
             ["i", "The area's details"]] },
+        { title: "An area's details", keys: [
+            ["↑ ↓  Space", "Pick one of its choices, turn it on or off"],
+            ["⏎  Esc  ←", "Back to the areas"]] },
         { title: "Level", keys: [
             ["⌘1  ⌘2  ⌘3", "Strict, Normal, Open"]] },
         { title: "Window", keys: [

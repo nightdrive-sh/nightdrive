@@ -8,6 +8,8 @@ apart (plan: Dashboard #1761, the model #1831; Normal is the security review's d
     open     everything allowed
 Whatever the level, a tool with consequences (sending, devices, installing: class act) is at most Ask: Allow for its
 right still shows the card, since that card is all that stands between a mail Claude read and one it sends.
+
+An area's own choices (areas.py's options: Home Assistant's locks, #1830) are on or off by level too: OPTIONS.
 """
 
 from areas import RIGHTS
@@ -27,6 +29,17 @@ LEVELS = {
              "areas": {}},
 }
 
+# An area's own choices, on (allowed) or off per level. Normal is the security review's (log 3295): Claude locks and
+# closes but doesn't unlock or open, as a card allowed while tired mustn't open the front door; runs an automation but
+# doesn't turn one off, a silent danger (the leak alarm stops); leaves out the sensors that tell whether anyone is home
+OPTIONS = {
+    "home-assistant": {
+        "unlock": {"strict": False, "normal": False, "open": True},
+        "automations": {"strict": False, "normal": False, "open": True},
+        "presence": {"strict": False, "normal": False, "open": True},
+    },
+}
+
 
 def preset(level, area, right):
     """The value a level gives one right of one area."""
@@ -34,4 +47,10 @@ def preset(level, area, right):
     return rules["areas"].get(area, {}).get(right) or rules["default"][right]
 
 
+def option_preset(level, area, option):
+    """Whether a level turns one of an area's own choices on; one it doesn't know is off."""
+    return OPTIONS.get(area, {}).get(option, {}).get(level, False)
+
+
 assert all(set(LEVELS[l]["default"]) == set(RIGHTS) for l in LEVELS)
+assert all(set(v) == set(LEVELS) for o in OPTIONS.values() for v in o.values())

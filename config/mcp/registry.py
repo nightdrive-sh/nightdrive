@@ -9,6 +9,8 @@ format is left out with a line in the log; `python3 registry.py` shows what is l
 
 Each tool belongs to one right of its area (Tool.right: read, modify or delete; #1831), and Access gives that right
 Allow, Ask or No. No hides the tool; Ask, and an act tool always, runs it only once the user allows the call on the card.
+An area's own choices (access.Access.options, #1830) go to the tool too (Tool.keep): what one that is off takes away
+isn't in its schema, and its command gets them all to keep to.
 
 The steps of phase 3 slot in as modules beside this one, found by name:
     confirm.ask(tool, arguments) -> bool     the card that allows a call (MCP 5, #1766). Without it, what asks is
@@ -58,6 +60,19 @@ class Tool:
         self.right = "delete" if spec.get("deletes") else "read" if self.cls == "read" else "modify"
         self.dir = folder         # where its command runs: the plugin's folder, config/mcp for the core's
         self.source = source      # the file, for the log
+        self.options = {}         # its area's own choices as Access has them now: {id: on}
+
+    def keep(self, options):
+        """Its area's own choices: its command gets them (run.environment), and the values that one that is off takes
+        away (its mcp.json `options`) go from its schema, so Claude isn't offered them and run.check refuses them.
+        The spec is this load's own copy, read from its file a moment ago."""
+        self.options = options
+        for option, props in self.spec.get("options", {}).items():
+            if options.get(option):
+                continue
+            for prop, values in props.items():
+                schema = self.spec["inputSchema"]["properties"][prop]
+                schema["enum"] = [v for v in schema["enum"] if v not in values]
 
     def listing(self):
         """The tool as tools/list shows it."""
@@ -98,6 +113,22 @@ def problem(spec, plugin):
     area = spec.get("area")
     if area not in access.AREAS and area != plugin:
         return f"{name}: unknown area {area!r} (Access's rows, or the plugin's id)"
+    options = spec.get("options", {})
+    if not isinstance(options, dict):
+        return f"{name}: options must be an object"
+    known = [o["id"] for o in access.areas.options(area)]
+    for option, props in options.items():
+        if option not in known:
+            return f"{name}: its area has no option {option!r}" + (f" ({', '.join(known)})" if known else "")
+        if not isinstance(props, dict) or not all(
+                isinstance(v, list) and isinstance(schema.get("properties", {}).get(p), dict)
+                and isinstance(schema["properties"][p].get("enum"), list) for p, v in props.items()):
+            return f"{name}: options.{option} must give, per argument with an enum, the values it takes away"
+    if "card" in spec and not is_template(spec["card"]):
+        return f"{name}: card must be a list of strings (and lists of them)"
+    unknown = run.placeholders(spec.get("card") or []) - set(schema.get("properties", {}))
+    if unknown:
+        return f"{name}: {', '.join(sorted(unknown))} in its card isn't in inputSchema"
     if not isinstance(spec.get("deletes", False), bool):
         return f"{name}: deletes must be true or false"
     if spec.get("deletes") and spec["class"] == "read":
@@ -205,7 +236,10 @@ class Registry:
                 self.logged.add(text)
                 self.log(text)
         self.rules = rules
-        return {n: t for n, t in tools.items() if rules.decide(t.cls, t.area, t.right) != "no"}
+        shown = {n: t for n, t in tools.items() if rules.decide(t.cls, t.area, t.right) != "no"}
+        for t in shown.values():
+            t.keep(rules.options(t.area))
+        return shown
 
     def list(self):
         return [t.listing() for t in self.visible().values()]

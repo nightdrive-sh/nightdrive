@@ -3,7 +3,7 @@
     {
       "name": "home_assistant_states",
       "title": "Home Assistant devices",
-      "description": "The user's smart home devices in Home Assistant and their states now: lights (detail: brightness), switches, fans, covers, climate, media players, locks, scenes, scripts, automations and buttons, as JSON [{id, name, state, area, detail}]. The whole home is a long list: give search (a room, a device's name, part of an id) when you know what you are looking for. sensors adds temperatures, humidity, motion and door contacts; use it only with search (\"temperature\", \"lämpötila\", a room), as a home has hundreds of them. The id is what home_assistant_set takes.",
+      "description": "The user's smart home devices in Home Assistant and their states now: lights (detail: brightness), switches, fans, covers, climate, media players, locks, scenes, scripts, automations and buttons, as JSON [{id, name, state, area, detail}]. The whole home is a long list: give search (a room, a device's name, part of an id) when you know what you are looking for. sensors adds temperatures, humidity and door contacts (presence, occupancy and motion only if the user's Access allows them); use it only with search (\"temperature\", \"lämpötila\", a room), as a home has hundreds of them. The id is what home_assistant_set takes.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -19,17 +19,19 @@
     {
       "name": "home_assistant_set",
       "title": "Switch a Home Assistant device",
-      "description": "Put one Home Assistant device in a state: on or off (lights, switches, fans, climate, media players; an automation is enabled or disabled), open or close (covers), lock or unlock (locks), run (a scene, a script, a button; triggers an automation). The user allows it on Nightdrive's confirmation card first, which shows the device and the state; a refusal there is their answer. Find the device's id with home_assistant_states. Answers with the device's state afterwards.",
+      "description": "Put one Home Assistant device in a state: on or off (lights, switches, fans, climate, media players), close (covers), lock (locks), run (a scene, a script, a button; triggers an automation). The user's Access decides whether Claude may also open a cover, unlock a lock or turn an automation on or off: the states it allows are the ones listed, and the command refuses the rest. The user allows each call on Nightdrive's confirmation card first, which shows the device's name and room from Home Assistant and the new state; a refusal there is their answer. Find the device's id with home_assistant_states. Answers with the device's state afterwards.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "entity": {"type": "string", "title": "Device", "description": "The device's id, as home_assistant_states gives it (light.kitchen)"},
+          "entity": {"type": "string", "title": "Id", "description": "The device's id, as home_assistant_states gives it (light.kitchen)"},
           "state": {"type": "string", "title": "New state", "enum": ["on", "off", "open", "close", "lock", "unlock", "run"]}
         },
         "required": ["entity", "state"],
         "additionalProperties": false
       },
       "command": ["home-assistant", "set", "{entity}", "{state}"],
+      "card": ["home-assistant", "set", "{entity}", "{state}", "--check"],
+      "options": {"unlock": {"state": ["unlock", "open"]}},
       "class": "act",
       "area": "home-assistant"
     }

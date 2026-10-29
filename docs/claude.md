@@ -49,6 +49,17 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   The picked row says in plain words what its choices let Claude do, and › lists every tool in the area. A dot marks a
   choice of your own; picking a level again puts them back to the level's (it asks first). An app's area shows while
   the app is installed.
+- **An area's own choices**, in its details (›), are on or off, and the level sets them too: off on Strict and Normal, on
+  on Open. Space turns the picked one on or off; `nightdrive mcp access option home-assistant unlock on` in a terminal.
+  Home Assistant has three:
+  - *Unlock and open*: off, Claude only locks locks and closes covers (doors, gates, blinds). Opening is yours.
+  - *Turn automations on or off*: off, Claude can run an automation but not stop one from running by itself (a leak
+    alarm).
+  - *Presence and location*: off, Claude doesn't get presence, occupancy or motion sensors, nor where your phones are
+    (Home Assistant's app: address, distance, Wi-Fi), which tell whether anyone is home.
+
+  Its card also shows the device's name and room from Home Assistant beside the id Claude gave, so `switch.sonoff_…`
+  can't hide the oven.
 
 Sending, devices and installing **always ask**, whatever the level or your choice: where all of an area's Modify or
 Delete is such, the choice is only *Ask* or *No*. What Claude reads goes to Anthropic with its answer. These choices
@@ -73,7 +84,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Notes | **list, search, read (`~/Notes`)** | a new note, add to the end of one | **to the trash** |
 | Deck | what plays, search, albums | play, queue, pause and skip, like, Pick for me | |
 | Ferry | whether it's on, devices, the box | send files or a text to a device † | |
-| Home Assistant | devices and sensors | switch a device, run a scene or an automation † | |
+| Home Assistant | devices and sensors (presence and location: a choice) | switch a device, lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
 | Notifications | **the latest** | send one, Do Not Disturb | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output, brightness; a screen's scale or resolution, Wi-Fi or networking off † | |

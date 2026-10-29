@@ -6,19 +6,37 @@ import "Words.js" as Words
 // An area in full (› on its row): each right's choice and every tool under it in plain words, with which ones always
 // ask and which come with Undo, so nothing Claude can do here is hidden behind a summary. The area's own finer
 // choices (Contacts' fields, Mail's block list, the apps whose windows Claude may see, Home Assistant's: Dashboard
-// #1789, #1830, #1832) go in this panel, under the rights.
+// #1789, #1830, #1832) go in this panel, under the rights: on or off each (OptionRow), ↑ ↓ and Space.
 AppPanel {
     id: root
-    property var area: null
+    property var area: null             // the row's area as it was when the panel opened
+    property QtObject access: null      // the window's Store: the choices below follow what applies after a write
+    readonly property var live: area && access ? access.area(area.id) || area : area
+    readonly property var options: live && live.options ? live.options : []
+    property int pick: 0
     cardWidth: 580
     visible: area !== null
     onOutsideTapped: area = null
+    onAreaChanged: pick = 0
+
+    function toggle(i) {
+        const o = options[i]
+        if (o && access) { pick = i; access.setOption(live.id, o.id, !o.value) }
+    }
 
     Keys.onPressed: e => {
         if (e.key === Qt.Key_Escape || e.key === Qt.Key_Left || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
             area = null
-            e.accepted = true
+        } else if ((e.key === Qt.Key_Down || e.key === Qt.Key_J) && options.length) {
+            pick = Math.min(pick + 1, options.length - 1)
+        } else if ((e.key === Qt.Key_Up || e.key === Qt.Key_K) && options.length) {
+            pick = Math.max(pick - 1, 0)
+        } else if (e.key === Qt.Key_Space) {
+            toggle(pick)
+        } else {
+            return
         }
+        e.accepted = true
     }
 
     Row {
@@ -70,6 +88,30 @@ AppPanel {
                     color: root.c.text
                     font { family: root.c.font; pixelSize: 12 }
                 }
+            }
+        }
+    }
+
+    // The area's own choices: what its tools may do within the rights above
+    Column {
+        visible: root.options.length > 0
+        width: parent.width
+        spacing: 4
+        Text {
+            text: "Choices"
+            color: root.c.text
+            font { family: root.c.font; pixelSize: 13; weight: Font.DemiBold }
+        }
+        Repeater {
+            model: root.options
+            OptionRow {
+                required property var modelData
+                required property int index
+                width: parent.width
+                c: root.c
+                option: modelData
+                picked: index === root.pick
+                onToggled: root.toggle(index)
             }
         }
     }

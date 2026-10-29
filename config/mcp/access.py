@@ -3,10 +3,13 @@
 the model #1831).
 
 ~/.config/nightdrive/claude-access.json (the Access window and Welcome write it, through this file only):
-    {"version": 2, "level": "normal", "areas": {"mail": {"read": "allow"}, "software": {"modify": "no"}}}
+    {"version": 2, "level": "normal", "areas": {"mail": {"read": "allow"}, "software": {"modify": "no"}},
+     "options": {"home-assistant": {"unlock": true}}}
 level    strict, normal or open (levels.py): what every area's rights are to begin with
 areas    the user's own: per area, read / modify / delete, each allow, ask or no. Only what differs from the level is
          written, so a right put back to the level's value follows the level again
+options  the user's own of an area's own choices (areas.options: Home Assistant's locks, #1830), true or false, the
+         same way. What can't be read is off: these only ever allow more
 A tool belongs to one right of its area (registry.Tool.right). No: it isn't listed and can't be called. Ask: it runs
 only after the user allows that call on Nightdrive's card. Allow: it runs (a change with Undo). A tool with
 consequences (class act) is at most Ask. The server reads this file on every tools/list and tools/call, so a change
@@ -19,6 +22,7 @@ the private areas); change → the level's; act is gone, the card's Ask is built
     access.py                                  what applies, as JSON (the Access window and the launcher read it)
     access.py level strict|normal|open         a level: your own values go back to it
     access.py set AREA read|modify|delete allow|ask|no
+    access.py option AREA OPTION on|off
 """
 
 import json
@@ -32,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import areas  # noqa: E402  (after the path above)
 from areas import AREAS, RIGHTS  # noqa: E402,F401  (registry.py checks a tool's area against AREAS)
-from levels import LEVELS, VALUES, preset  # noqa: E402
+from levels import LEVELS, VALUES, option_preset, preset  # noqa: E402
 
 FILE = Path.home() / ".config/nightdrive/claude-access.json"
 VERSION = 2
@@ -44,9 +48,10 @@ AREA_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
 
 
 class Access:
-    def __init__(self, level=UNCHOSEN, own=None, problem=None):
+    def __init__(self, level=UNCHOSEN, own=None, problem=None, own_options=None):
         self.level = level
         self.own = own or {}          # {area: {right: value}}: the user's, apart from the level
+        self.own_options = own_options or {}   # {area: {option: bool}}: the same for the areas' own choices
         self.problem = problem        # why the file wasn't used as such, for the log
 
     def preset(self, area, right):
@@ -62,8 +67,19 @@ class Access:
         value = self.value(area, right)
         return "ask" if value == "allow" and cls == "act" else value
 
+    def option(self, area, option):
+        """Whether one of an area's own choices is on: the user's, else the level's."""
+        own = self.own_options.get(area, {}).get(option)
+        return own if own is not None else option_preset(self.level, area, option)
+
+    def options(self, area):
+        """All of an area's own choices as {id: bool}: what its tools' commands get (run.environment)."""
+        return {o["id"]: self.option(area, o["id"]) for o in areas.options(area)}
+
     def count_own(self):
-        return sum(len(v) for v in self.own.values())
+        own = sum(len(v) for v in self.own.values())
+        return own + sum(on != option_preset(self.level, area, option)
+                         for area, chosen in self.own_options.items() for option, on in chosen.items())
 
     def summary(self, tools=()):
         """What applies now, for the Access window and the launcher: every area that has tools, with its rights, and
@@ -91,7 +107,11 @@ class Access:
                     "tools": [{"name": t.name, "title": t.spec.get("title") or t.name,
                                "asks": t.cls == "act", "undo": t.cls == "change"} for t in found],
                 }
-            rows.append({"id": a, "name": areas.name(a), "glyph": areas.glyph(a), "rights": rights})
+            options = [{**o, "value": self.option(a, o["id"]), "preset": option_preset(self.level, a, o["id"]),
+                        "own": self.option(a, o["id"]) != option_preset(self.level, a, o["id"])}
+                       for o in areas.options(a)]
+            rows.append({"id": a, "name": areas.name(a), "glyph": areas.glyph(a), "rights": rights,
+                         "options": options})
         return {"file": str(FILE), "chosen": FILE.exists(), "level": self.level, "levels": list(LEVELS),
                 "own": self.count_own(), "areas": rows, **({"problem": self.problem} if self.problem else {})}
 
@@ -148,8 +168,20 @@ def load(path=FILE):
             else:
                 own.setdefault(name, {})[right] = "no"
                 bad.append(f"{name}.{right}")
+    own_options = {}
+    rows = data.get("options", {})
+    for name, chosen in (rows.items() if isinstance(rows, dict) else []):
+        for option, value in (chosen.items() if isinstance(chosen, dict) else []):
+            if isinstance(value, bool):
+                own_options.setdefault(name, {})[option] = value
+            else:
+                own_options.setdefault(name, {})[option] = False   # off: an option only ever allows more
+                bad.append(f"{name}.{option}")
+        if not isinstance(chosen, dict):
+            own_options[name] = {o["id"]: False for o in areas.options(name)}
+            bad.append(name)
     problem = f"{path}: unknown value for {', '.join(bad)}: No" if bad else None
-    return Access(level, own, problem)
+    return Access(level, own, problem, own_options)
 
 
 def save(data, path=FILE):
@@ -177,6 +209,13 @@ def write(now, path=FILE):
             own[area] = {r: kept[r] for r in RIGHTS if r in kept}
     if own:
         data["areas"] = own
+    options = {}
+    for area, chosen in sorted(now.own_options.items()):
+        kept = {o: v for o, v in sorted(chosen.items()) if v != option_preset(now.level, area, o)}
+        if kept:
+            options[area] = kept
+    if options:
+        data["options"] = options
     save(data, path)
 
 
@@ -198,6 +237,17 @@ def set_value(area, right, value, path=FILE):
     write(now, path)
 
 
+def set_option(area, option, value, path=FILE):
+    known = [o["id"] for o in areas.options(area)]
+    if option not in known:
+        raise ValueError(f"{area} has no option {option!r}" + (f": {', '.join(known)}" if known else ""))
+    if value not in ("on", "off"):
+        raise ValueError(f"unknown value {value!r}: on, off")
+    now = load(path)
+    now.own_options.setdefault(area, {})[option] = value == "on"
+    write(now, path)
+
+
 def installed_tools():
     """The tools of the core and the installed plugins (registry.py knows them); none if it can't say."""
     try:
@@ -208,7 +258,8 @@ def installed_tools():
 
 
 def main(argv):
-    usage = "usage: access.py [level strict|normal|open | set AREA read|modify|delete allow|ask|no]"
+    usage = ("usage: access.py [level strict|normal|open | set AREA read|modify|delete allow|ask|no | "
+             "option AREA OPTION on|off]")
     try:
         if not argv:
             json.dump(load().summary(installed_tools()), sys.stdout, ensure_ascii=False, indent=2)
@@ -217,6 +268,8 @@ def main(argv):
             set_level(argv[1])
         elif argv[0] == "set" and len(argv) == 4:
             set_value(*argv[1:])
+        elif argv[0] == "option" and len(argv) == 4:
+            set_option(*argv[1:])
         else:
             print(usage, file=sys.stderr)
             return 2

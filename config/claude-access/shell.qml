@@ -190,6 +190,7 @@ ShellRoot {
         AreaPanel {
             id: panel
             c: win.look
+            access: store
             behind: page
             onAreaChanged: if (area === null) list.forceActiveFocus()
         }

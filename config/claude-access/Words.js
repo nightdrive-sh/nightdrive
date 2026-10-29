@@ -57,5 +57,10 @@ function lines(area) {
         if (right === "read" && r.value !== "no") text += " What Claude reads goes to Anthropic."
         out.push(text)
     }
+    // The area's own choices (Home Assistant's locks), on or off: what they mean is in its details (›)
+    const options = area.options || []
+    if (options.length)
+        out.push("Choices · " + options.map(o => o.name + ": " + (o.value ? "on" : "off")).join(", ")
+                 + ". › says what they mean.")
     return out
 }
