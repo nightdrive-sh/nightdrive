@@ -19,7 +19,8 @@ Item {
         { device: "ipad-13", name: "iPad 13-inch", glyph: "tablet", summary: "Air 13, Pro 13" },
         { device: "ipad-mini", name: "iPad mini", glyph: "tablet" },
         { device: "iphone", name: "iPhone", glyph: "smartphone", summary: "15, 16" },
-        { device: "iphone-max", name: "iPhone Pro Max", glyph: "smartphone" }]
+        { device: "iphone-max", name: "iPhone Pro Max", glyph: "smartphone" },
+        { device: "macbook-16", name: "MacBook Pro 16-inch", glyph: "laptop", summary: "2021 and later" }]
     // Other device's form filled in one go: common screens
     readonly property var common: [
         { w: 2560, h: 1600, name: "tablet", label: "Android tablet", glyph: "tablet", summary: "Tab S9, Pixel" },
@@ -45,7 +46,8 @@ Item {
                                      vncscale: "Settings › Other displays › Add a display › Other device › Scale" })
     readonly property var parents: ({ vncadd: "otherdisplays", vncother: "vncadd", vncscale: "vncother" })
 
-    function label(n) { return /^ip(ad|hone)/.test(n) ? n.replace(/^ipad/, "iPad").replace(/^iphone/, "iPhone") : n.charAt(0).toUpperCase() + n.slice(1) }
+    // The device page's spelling (iPad, MacBook), so both levels name a device alike
+    function label(n) { return display() ? display().label(n) : n }
     function display() { return launcher.pluginExts.find(e => e.levels.indexOf("vncdevice") >= 0) || null }
     // ipad, then ipad2, ipad3…: `add` refuses a name that's taken
     function freeName(base) {

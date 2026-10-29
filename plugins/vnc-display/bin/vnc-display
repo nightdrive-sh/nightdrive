@@ -14,7 +14,7 @@
 #   vnc-display remove NAME        forgets the device: its screen, its password
 #   vnc-display run NAME           the screen itself (nightdrive-vnc-display@NAME.service, lib/serve.py)
 #
-# DEVICE is a size: ipad, ipad-13, ipad-mini, iphone, iphone-max, or WIDTHxHEIGHT@SCALE in the device's pixels
+# DEVICE is a size: ipad, ipad-13, ipad-mini, iphone, iphone-max, macbook-16, or WIDTHxHEIGHT@SCALE in the device's pixels
 # (2360x1640@2). Each device is a headless output, HEADLESS-<NAME>, with a line in the state file that
 # config/hypr/virtual-display.lua reads (its size, place and workspace), and wayvnc on it as a user service of its own.
 # wayvnc listens on the Tailscale address only, and with --home also on the home network (the Wi-Fi it was added on)
@@ -65,6 +65,7 @@ size_of() {
     ipad-mini) echo "2266x1488 2 beside" ;;
     iphone) echo "1179x2556 3 away" ;;         # iPhone 15, 16
     iphone-max) echo "1320x2868 3 away" ;;     # iPhone 16 Pro Max
+    macbook-16) echo "3456x2234 2 beside" ;;   # MacBook Pro 16-inch (2021 on): its Retina panel at its default look
     *x*@*)
       local w=${1%%x*} rest=${1#*x} h s
       h=${rest%@*} s=${rest#*@}
@@ -145,8 +146,8 @@ cmd_add() {
     esac
     shift
   done
-  [[ -n $device ]] || die "which device? vnc-display add ipad (or iphone, ipad-13, ipad-mini, iphone-max, 2360x1640@2)"
-  size=$(size_of "$device") || die "unknown device $device: ipad, ipad-13, ipad-mini, iphone, iphone-max or WIDTHxHEIGHT@SCALE"
+  [[ -n $device ]] || die "which device? vnc-display add ipad (or iphone, ipad-13, ipad-mini, iphone-max, macbook-16, 2360x1640@2)"
+  size=$(size_of "$device") || die "unknown device $device: ipad, ipad-13, ipad-mini, iphone, iphone-max, macbook-16 or WIDTHxHEIGHT@SCALE"
   read -r mode scale default_place <<<"$size"
   place=${place:-$default_place}
   [[ -n $name ]] || { name=${device%%-*}; [[ $name == *x*@* ]] && name=screen; }

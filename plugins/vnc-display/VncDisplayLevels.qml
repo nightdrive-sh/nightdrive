@@ -36,7 +36,7 @@ Item {
     readonly property var parents: ({ vncdevice: "otherdisplays", vncws: "vncdevice", vncplace: "vncdevice" })
 
     function label(n) {
-        if (/^ip(ad|hone)/.test(n)) return n.replace(/^ipad/, "iPad").replace(/^iphone/, "iPhone")
+        if (/^(ip(ad|hone)|macbook)/.test(n)) return n.replace(/^ipad/, "iPad").replace(/^iphone/, "iPhone").replace(/^macbook/, "MacBook")
         return n.charAt(0).toUpperCase() + n.slice(1)
     }
     // Taller than wide: a phone's icon
@@ -48,7 +48,7 @@ Item {
     function displayRows() {
         const r = []
         for (const d of devices)
-            r.push({ kind: "vncopen", dev: d.name, name: label(d.name), glyph: phone(d) ? "smartphone" : "tablet",
+            r.push({ kind: "vncopen", dev: d.name, name: label(d.name), glyph: phone(d) ? "smartphone" : /^macbook/.test(d.name) ? "laptop" : "tablet",
                      summary: !d.on ? "off" : d.connected ? "connected · workspace " + d.workspace : "on · waiting for the device",
                      active: d.on })
         r.push({ kind: "nav", name: "Add a display", glyph: "plus", target: "vncadd",
