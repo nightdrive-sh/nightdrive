@@ -4,8 +4,8 @@ import Quickshell.Io
 
 // What applies, and the writes: `nightdrive mcp access` (config/mcp/access.py owns claude-access.json) gives the level
 // and every area's rights with their tools and own choices; a choice runs `nightdrive mcp access set AREA RIGHT VALUE`,
-// `option AREA ID on|off` or `level L`, one at a time and in order, and then reads back what applies (a value put back
-// to the level's follows the level).
+// `option AREA ID on|off` (a list's `add|remove ITEM`) or `level L`, one at a time and in order, and then reads back
+// what applies (a value put back to the level's follows the level).
 // The file is watched too: the launcher, a terminal or Welcome may change it while the window is open.
 QtObject {
     id: store
@@ -76,6 +76,17 @@ QtObject {
         const o = a && (a.options || []).find(x => x.id === option)
         if (o) { o.value = on; now = copy }
         run(["option", areaId, option, on ? "on" : "off"])
+    }
+    // An item of a list choice (a window class on the apps Claude sees without asking), put on or taken off
+    function setListItem(areaId, option, item, add) {
+        const copy = JSON.parse(JSON.stringify(now))
+        const a = copy.areas.find(x => x.id === areaId)
+        const o = a && (a.options || []).find(x => x.id === option)
+        if (o) {
+            o.value = o.value.filter(v => v.toLowerCase() !== item.toLowerCase()).concat(add ? [item] : [])
+            now = copy
+        }
+        run(["option", areaId, option, add ? "add" : "remove", item])
     }
     function setLevel(level) {
         now = Object.assign({}, now, { level: level })

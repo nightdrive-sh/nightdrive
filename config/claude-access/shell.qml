@@ -80,6 +80,8 @@ ShellRoot {
             function refresh(): void { store.refresh() }
             // Opens on an area: Settings or a card could point here (`ipc call claudeAccess area mail`)
             function area(id: string): void { const i = win.areas.findIndex(a => a.id === id); if (i >= 0) win.pickRow(i) }
+            // …and on its details (›): its own choices, the apps Claude sees without asking (`details screen`)
+            function details(id: string): void { area(id); if (win.areas[win.cur] && win.areas[win.cur].id === id) win.open(win.cur, 3) }
         }
 
         Shortcut { sequences: ["Ctrl+Q", "Meta+Q"]; onActivated: Qt.quit() }

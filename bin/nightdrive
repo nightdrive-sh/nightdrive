@@ -46,7 +46,7 @@ usage() {
   row "mcp"                      "Nightdrive's MCP server for Claude (stdio: Claude Code starts it)"
   row "mcp install|remove"       "Register it in Claude Code and allow its tools, or take that away (asks first; --dry-run shows)"
   row "mcp status"               "Whether Claude Code has it, and its tools are allowed (--json)"
-  row "mcp access [open|level|set|option]" "What Claude may use: open (the window), level strict|normal|open, set AREA read|modify|delete allow|ask|no, option AREA ID on|off"
+  row "mcp access [open|level|set|option]" "What Claude may use: open (the window), level strict|normal|open, set AREA read|modify|delete allow|ask|no, option AREA ID on|off (a list: add|remove ITEM)"
   row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
   section "Apps"
   row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage), and which are installed"

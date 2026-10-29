@@ -60,7 +60,8 @@ function lines(area) {
     // The area's own choices (Home Assistant's locks), on or off: what they mean is in its details (›)
     const options = area.options || []
     if (options.length)
-        out.push("Choices · " + options.map(o => o.name + ": " + (o.value ? "on" : "off")).join(", ")
+        out.push("Choices · " + options.map(o => o.name + ": " + (o.list ? (o.value.length ? o.value.join(", ") : "none")
+                                                                    : o.value ? "on" : "off")).join(", ")
                  + ". › says what they mean.")
     return out
 }

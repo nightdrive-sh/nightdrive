@@ -21,7 +21,8 @@ Normal level, reading what is private (mail, contacts, calendar, notes, notifica
 delete do.
 
 **The card** shows exactly what will be done: the recipients and the text, the device and its new state, every package
-dnf would install. **Enter** allows, **Esc** refuses, and so does no answer in 60 seconds. A card too long for the screen
+dnf would install, every path a trash takes (a folder with how many files are in it), the app and title of the window
+Claude wants to see. **Enter** allows, **Esc** refuses, and so does no answer in 60 seconds. A card too long for the screen
 allows only once you have scrolled to its end. The card is Nightdrive's, not
 Claude Code's, so no Claude Code setting skips it, and a mail or a web page Claude reads can't send or switch anything
 without you seeing it first. A screen or network change also asks afterwards whether to keep it, and goes back by itself
@@ -62,6 +63,12 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
 
   Its card also shows the device's name and room from Home Assistant beside the id Claude gave, so `switch.sonoff_…`
   can't hide the oven.
+
+  What's on screen has a list instead, empty on every level: *Apps it sees without asking*. Its rows are the apps open
+  now, and Space or a click ticks one. Claude's picture of a window asks each time on Normal, and the card names the
+  app and the window's title; a ticked app's windows Claude sees without the card. Password managers and private
+  windows never, ticked or not. In a terminal: `nightdrive mcp access option screen apps add kitty` (a window class or
+  the app's name), `remove` to take it off.
 
   Software has three. What they leave out you install or remove yourself: the Launcher's Install and Remove are as
   they were.
@@ -106,9 +113,12 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Notifications | **the latest** | send one, Do Not Disturb | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output, brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
-| What's on screen | **a picture of a window** | | |
+| What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
 | Apps and files | windows, newest files | open an app or a file, bring a window forward; open a web address † | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
+
+Claude doesn't bring a window forward while you type, nor open an app, a file or an address: after a key it waits for
+two quiet seconds, five at most, and otherwise gives up, so what you type doesn't land in another window.
 
 ## What Claude never gets
 

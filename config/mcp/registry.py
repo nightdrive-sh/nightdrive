@@ -116,10 +116,10 @@ def problem(spec, plugin):
     options = spec.get("options", {})
     if not isinstance(options, dict):
         return f"{name}: options must be an object"
-    known = [o["id"] for o in access.areas.options(area)]
+    known = [o["id"] for o in access.areas.options(area) if not o.get("list")]   # a list takes no values away
     for option, props in options.items():
         if option not in known:
-            return f"{name}: its area has no option {option!r}" + (f" ({', '.join(known)})" if known else "")
+            return f"{name}: its area has no on-or-off option {option!r}" + (f" ({', '.join(known)})" if known else "")
         if not isinstance(props, dict) or not all(
                 isinstance(v, list) and isinstance(schema.get("properties", {}).get(p), dict)
                 and isinstance(schema["properties"][p].get("enum"), list) for p, v in props.items()):

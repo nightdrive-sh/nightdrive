@@ -12,6 +12,9 @@ The words below finish "Claude …" in the Access window; a right an area has no
 An area may have choices of its own beside its rights (#1830), each on or off: `options`, with what on and off mean
 in a sentence each. A level sets them (levels.OPTIONS), the user may set one apart, and the tool keeps to them: its
 mcp.json `options` takes values out of its arguments, and its command gets them (run.environment) and refuses.
+A choice with `"list": True` is a list the user keeps instead (window classes: the apps whose windows Claude sees
+without asking, #1832), empty at every level, with what being on it means (`on`) and not (`off`). Its command gets it
+the same way, and its `card` command may let a call on it past the card (confirm.facts).
 """
 
 RIGHTS = ("read", "modify", "delete")
@@ -74,7 +77,14 @@ AREAS = {
                       "read": "reads the volume, outputs, screens, network, Bluetooth and battery",
                       "modify": "sets the volume, output and brightness; a screen's scale or resolution, the network off"},
     "screen": {"name": "What's on screen", "glyph": "scan-eye",
-               "read": "takes a picture of a window on screen and looks at it"},
+               "read": "takes a picture of a window on screen and looks at it",
+               "options": [
+                   {"id": "apps", "name": "Apps it sees without asking", "list": True,
+                    "words": "When reading asks, Claude takes a picture of these apps' windows without the card. "
+                             "Password managers and private windows never, listed or not.",
+                    "on": "Claude sees its windows without asking.",
+                    "off": "Claude asks first."},
+               ]},
     "apps-files": {"name": "Apps and files", "glyph": "folder",
                    "read": "lists your open windows and the newest files in your folders",
                    "modify": "opens apps, files and web addresses, brings a window forward",
@@ -118,5 +128,5 @@ def words(area, right):
 
 
 def options(area):
-    """The area's own choices: [{id, name, on, off}]."""
+    """The area's own choices: [{id, name, on, off}], and list: True for a list."""
     return AREAS.get(area, {}).get("options", [])

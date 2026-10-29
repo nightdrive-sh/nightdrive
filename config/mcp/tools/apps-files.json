@@ -12,7 +12,7 @@
     {
       "name": "windows_view",
       "title": "See a window",
-      "description": "A picture of one window as it is on screen now, to read what it shows (a page, a document, an error). Only a window on screen: bring it forward first with windows_focus. Never of a window Send to Claude leaves out (password managers, private browser windows, the apps the user listed), nor with one of those over it; that is the user's choice, so don't try another way.",
+      "description": "A picture of one window as it is on screen now, to read what it shows (a page, a document, an error). Only a window on screen: bring it forward first with windows_focus. The user is usually asked on screen first, with the app and the window's title (not for the apps they let you see without asking), so take one picture of what you need rather than several. Never of a window Send to Claude leaves out (password managers, private browser windows, the apps the user listed), nor with one of those over it; that is the user's choice, so don't try another way.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -22,6 +22,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "windows", "shot", "{window}", "--json", "--inline"],
+      "card": ["nightdrive", "windows", "shot", "{window}", "--check"],
       "image": "image",
       "class": "read",
       "area": "screen"
@@ -29,7 +30,7 @@
     {
       "name": "windows_focus",
       "title": "Bring a window forward",
-      "description": "Brings a window forward and gives it the focus, switching to its workspace (one hidden in the background comes to the current one). Mind that the user may be typing: what they type goes to that window.",
+      "description": "Brings a window forward and gives it the focus, switching to its workspace (one hidden in the background comes to the current one). Not while the user is typing: it waits a few seconds for a pause, then refuses, so what they type doesn't go to another window. Then try again a little later, or ask them.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -38,7 +39,7 @@
         "required": ["window"],
         "additionalProperties": false
       },
-      "command": ["nightdrive", "windows", "focus", "{window}", "--json"],
+      "command": ["nightdrive", "windows", "focus", "{window}", "--json", "--unless-typing"],
       "undo": ["nightdrive", "windows", "focus", "{previous}"],
       "notice": "Brought {app} forward",
       "class": "change",
@@ -47,7 +48,7 @@
     {
       "name": "apps_open",
       "title": "Open an app",
-      "description": "Opens an app, as the Launcher does, by its name (\"Firefox\", \"Files\") or desktop id (org.gnome.Nautilus); one that is already open is brought forward instead. An unclear name returns the apps it could mean. Only the Launcher's apps, without arguments: open a file with files_open, an address with open_address.",
+      "description": "Opens an app, as the Launcher does, by its name (\"Firefox\", \"Files\") or desktop id (org.gnome.Nautilus); one that is already open is brought forward instead. An unclear name returns the apps it could mean. Only the Launcher's apps, without arguments: open a file with files_open, an address with open_address. Not while the user is typing, as windows_focus.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -56,7 +57,7 @@
         "required": ["app"],
         "additionalProperties": false
       },
-      "command": ["nightdrive", "windows", "open", "--app", "{app}", "--json"],
+      "command": ["nightdrive", "windows", "open", "--app", "{app}", "--json", "--unless-typing"],
       "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}"],
       "notice": "Opened {opened}",
       "class": "change",
@@ -65,7 +66,7 @@
     {
       "name": "open_address",
       "title": "Open an address",
-      "description": "Opens a web address (http, https) in the default browser, or a mailto: link in the mail app's composer (nothing is sent). Opening an address sends it to that site, so the user allows it on screen first.",
+      "description": "Opens a web address (http, https) in the default browser, or a mailto: link in the mail app's composer (nothing is sent). Opening an address sends it to that site, so the user allows it on screen first. Not while the user is typing, as windows_focus.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -74,7 +75,7 @@
         "required": ["url"],
         "additionalProperties": false
       },
-      "command": ["nightdrive", "windows", "open", "--url", "{url}", "--json"],
+      "command": ["nightdrive", "windows", "open", "--url", "{url}", "--json", "--unless-typing"],
       "class": "act",
       "area": "apps-files"
     },
@@ -98,7 +99,7 @@
     {
       "name": "files_open",
       "title": "Open a file",
-      "description": "Opens a file or folder in the user's home folder in its default app (a PDF in the viewer, a folder in Files). Only documents, pictures, sound, video, text and folders: never a program, a script or a launcher, nor anything hidden (no part of the path starting with a dot) or outside home.",
+      "description": "Opens a file or folder in the user's home folder in its default app (a PDF in the viewer, a folder in Files). Only documents, pictures, sound, video, text and folders: never a program, a script or a launcher, nor anything hidden (no part of the path starting with a dot) or outside home. Not while the user is typing, as windows_focus.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -107,7 +108,7 @@
         "required": ["path"],
         "additionalProperties": false
       },
-      "command": ["nightdrive", "files", "open", "--json", "--", "{path}"],
+      "command": ["nightdrive", "files", "open", "--json", "--unless-typing", "--", "{path}"],
       "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}"],
       "notice": "Opened {opened}",
       "class": "change",
@@ -116,7 +117,7 @@
     {
       "name": "files_trash",
       "title": "Move to the trash",
-      "description": "Moves files or folders in the user's home folder to the trash, where Files shows them and can put them back; nothing is deleted for good (there is no tool for that). Not home's own folders (Downloads, Documents…), nothing hidden, nothing outside home. Several paths go together: all or none.",
+      "description": "Moves files or folders in the user's home folder to the trash, where Files shows them and can put them back; nothing is deleted for good (there is no tool for that). Not home's own folders (Downloads, Documents…), nothing hidden, nothing outside home. Several paths go together: all or none. The user is usually asked on screen first, with every path and how many files each folder holds, so trash what belongs together in one call.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -126,6 +127,7 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "files", "trash", "--json", "--", "{paths}"],
+      "card": ["nightdrive", "files", "trash", "--check", "--", "{paths}"],
       "undo": ["nightdrive", "files", "restore", "--", "{names}"],
       "notice": "Moved {what} to the trash",
       "class": "change",

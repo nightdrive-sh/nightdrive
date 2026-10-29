@@ -9,7 +9,8 @@ level    strict, normal or open (levels.py): what every area's rights are to beg
 areas    the user's own: per area, read / modify / delete, each allow, ask or no. Only what differs from the level is
          written, so a right put back to the level's value follows the level again
 options  the user's own of an area's own choices (areas.options: Home Assistant's locks, #1830), true or false, the
-         same way. What can't be read is off: these only ever allow more
+         same way. What can't be read is off: these only ever allow more. A list choice (the apps whose windows Claude
+         sees without asking, #1832) is a list of window classes: {"screen": {"apps": ["kitty"]}}; levels leave it empty
 A tool belongs to one right of its area (registry.Tool.right). No: it isn't listed and can't be called. Ask: it runs
 only after the user allows that call on Nightdrive's card. Allow: it runs (a change with Undo). A tool with
 consequences (class act) is at most Ask. The server reads this file on every tools/list and tools/call, so a change
@@ -23,6 +24,7 @@ the private areas); change → the level's; act is gone, the card's Ask is built
     access.py level strict|normal|open         a level: your own values go back to it
     access.py set AREA read|modify|delete allow|ask|no
     access.py option AREA OPTION on|off
+    access.py option AREA OPTION add|remove VALUE      a list choice
 """
 
 import json
@@ -45,6 +47,14 @@ VERSION = 2
 UNCHOSEN = "normal"
 BROKEN = "strict"
 AREA_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
+LIST_ITEM = re.compile(r"[^\x00-\x1f\x7f]{1,200}")   # a window class: one line of text
+
+
+def option_default(level, area, option):
+    """What a level gives one of an area's own choices: on or off, or an empty list for a list (no level fills the
+    user's own list)."""
+    known = next((o for o in areas.options(area) if o["id"] == option), {})
+    return [] if known.get("list") else option_preset(level, area, option)
 
 
 class Access:
@@ -68,9 +78,9 @@ class Access:
         return "ask" if value == "allow" and cls == "act" else value
 
     def option(self, area, option):
-        """Whether one of an area's own choices is on: the user's, else the level's."""
+        """Whether one of an area's own choices is on (a list: what is on it): the user's, else the level's."""
         own = self.own_options.get(area, {}).get(option)
-        return own if own is not None else option_preset(self.level, area, option)
+        return own if own is not None else option_default(self.level, area, option)
 
     def options(self, area):
         """All of an area's own choices as {id: bool}: what its tools' commands get (run.environment)."""
@@ -78,7 +88,7 @@ class Access:
 
     def count_own(self):
         own = sum(len(v) for v in self.own.values())
-        return own + sum(on != option_preset(self.level, area, option)
+        return own + sum(on != option_default(self.level, area, option)
                          for area, chosen in self.own_options.items() for option, on in chosen.items())
 
     def summary(self, tools=()):
@@ -107,8 +117,8 @@ class Access:
                     "tools": [{"name": t.name, "title": t.spec.get("title") or t.name,
                                "asks": t.cls == "act", "undo": t.cls == "change"} for t in found],
                 }
-            options = [{**o, "value": self.option(a, o["id"]), "preset": option_preset(self.level, a, o["id"]),
-                        "own": self.option(a, o["id"]) != option_preset(self.level, a, o["id"])}
+            options = [{**o, "value": self.option(a, o["id"]), "preset": option_default(self.level, a, o["id"]),
+                        "own": self.option(a, o["id"]) != option_default(self.level, a, o["id"])}
                        for o in areas.options(a)]
             rows.append({"id": a, "name": areas.name(a), "glyph": areas.glyph(a), "rights": rights,
                          "options": options})
@@ -171,14 +181,21 @@ def load(path=FILE):
     own_options = {}
     rows = data.get("options", {})
     for name, chosen in (rows.items() if isinstance(rows, dict) else []):
+        lists = {o["id"] for o in areas.options(name) if o.get("list")}
         for option, value in (chosen.items() if isinstance(chosen, dict) else []):
-            if isinstance(value, bool):
+            if option in lists:
+                # A list only ever lets more through, so one that can't be read is empty
+                ok = isinstance(value, list) and all(isinstance(v, str) and LIST_ITEM.fullmatch(v) for v in value)
+                own_options.setdefault(name, {})[option] = value if ok else []
+                if not ok:
+                    bad.append(f"{name}.{option}")
+            elif isinstance(value, bool):
                 own_options.setdefault(name, {})[option] = value
             else:
                 own_options.setdefault(name, {})[option] = False   # off: an option only ever allows more
                 bad.append(f"{name}.{option}")
         if not isinstance(chosen, dict):
-            own_options[name] = {o["id"]: False for o in areas.options(name)}
+            own_options[name] = {o["id"]: [] if o.get("list") else False for o in areas.options(name)}
             bad.append(name)
     problem = f"{path}: unknown value for {', '.join(bad)}: No" if bad else None
     return Access(level, own, problem, own_options)
@@ -211,7 +228,7 @@ def write(now, path=FILE):
         data["areas"] = own
     options = {}
     for area, chosen in sorted(now.own_options.items()):
-        kept = {o: v for o, v in sorted(chosen.items()) if v != option_preset(now.level, area, o)}
+        kept = {o: v for o, v in sorted(chosen.items()) if v != option_default(now.level, area, o)}
         if kept:
             options[area] = kept
     if options:
@@ -237,14 +254,23 @@ def set_value(area, right, value, path=FILE):
     write(now, path)
 
 
-def set_option(area, option, value, path=FILE):
-    known = [o["id"] for o in areas.options(area)]
+def set_option(area, option, value, item=None, path=FILE):
+    """One of an area's own choices on or off; a list's item added or removed (any case, so kitty and Kitty are one)."""
+    known = {o["id"]: o for o in areas.options(area)}
     if option not in known:
         raise ValueError(f"{area} has no option {option!r}" + (f": {', '.join(known)}" if known else ""))
-    if value not in ("on", "off"):
-        raise ValueError(f"unknown value {value!r}: on, off")
     now = load(path)
-    now.own_options.setdefault(area, {})[option] = value == "on"
+    if known[option].get("list"):
+        if value not in ("add", "remove") or item is None:
+            raise ValueError(f"{area} {option} is a list: add VALUE, remove VALUE")
+        if not LIST_ITEM.fullmatch(item):
+            raise ValueError(f"not a window class: {item!r}")
+        kept = [v for v in now.option(area, option) if v.lower() != item.lower()]
+        now.own_options.setdefault(area, {})[option] = kept + ([item] if value == "add" else [])
+    else:
+        if value not in ("on", "off") or item is not None:
+            raise ValueError(f"unknown value {value!r}: on, off")
+        now.own_options.setdefault(area, {})[option] = value == "on"
     write(now, path)
 
 
@@ -259,7 +285,7 @@ def installed_tools():
 
 def main(argv):
     usage = ("usage: access.py [level strict|normal|open | set AREA read|modify|delete allow|ask|no | "
-             "option AREA OPTION on|off]")
+             "option AREA OPTION on|off | option AREA LIST add|remove VALUE]")
     try:
         if not argv:
             json.dump(load().summary(installed_tools()), sys.stdout, ensure_ascii=False, indent=2)
@@ -268,7 +294,7 @@ def main(argv):
             set_level(argv[1])
         elif argv[0] == "set" and len(argv) == 4:
             set_value(*argv[1:])
-        elif argv[0] == "option" and len(argv) == 4:
+        elif argv[0] == "option" and len(argv) in (4, 5):
             set_option(*argv[1:])
         else:
             print(usage, file=sys.stderr)

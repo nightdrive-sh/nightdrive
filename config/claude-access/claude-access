@@ -1,8 +1,10 @@
 #!/bin/bash
-# claude-access [open | area AREA | restart | quit | log]: Claude's access, the window of Settings › Claude › Access
-# (Dashboard #1831): per area Read, Modify and Delete, each Allow, Ask or No, and the level. `nightdrive mcp access
-# open` and the launcher's Settings › Claude › Access open it; `area mail` opens it on Mail's row. What it shows and
-# writes is config/mcp/access.py's (`nightdrive mcp access`).
+# claude-access [open | area AREA | details AREA | restart | quit | log]: Claude's access, the window of Settings ›
+# Claude › Access (Dashboard #1831): per area Read, Modify and Delete, each Allow, Ask or No, and the level.
+# `nightdrive mcp access open` and the launcher's Settings › Claude › Access open it; `area mail` opens it on Mail's
+# row, `details screen` on What's on screen's details (its own choices: the apps Claude sees without asking). What it
+# shows and writes is config/mcp/access.py's (`nightdrive mcp access`).
+
 set -u
 
 QS_DIR=$(dirname "$(readlink -f "$0")")                 # this folder: the window's own Quickshell config
@@ -14,5 +16,6 @@ APP_IPC=claudeAccess
 
 case ${1:-open} in
   area) open_ready && ipc area "${2:?usage: claude-access area AREA}" ;;
-  *)    app_command "$@"; [[ $? == 2 ]] && { echo "usage: claude-access [open | area AREA | restart | quit | log]" >&2; exit 2; } ;;
+  details) open_ready && ipc details "${2:?usage: claude-access details AREA}" ;;
+  *)    app_command "$@"; [[ $? == 2 ]] && { echo "usage: claude-access [open | area AREA | details AREA | restart | quit | log]" >&2; exit 2; } ;;
 esac

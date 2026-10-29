@@ -16,9 +16,14 @@ file tools keep:
   files recent [--in downloads|pictures|documents …] [--name TEXT] [--limit N] [--json]
                                    the newest files first (default 10, at most 50), in those folders and DEPTH levels
                                    below. --json: {files: [{path, name, folder, size, modified, type}]}
-  files open PATH [--json]         in its default app (windows open --file, whose JSON it prints)
+  files open PATH [--json] [--unless-typing]
+                                   in its default app (windows open --file, whose JSON it prints; --unless-typing: not
+                                   while the user types, as there)
   files trash PATH… [--json]       to the trash; --json: {trashed: [paths], names: [their names in the trash], what:
                                    the one's name or how many}
+  files trash --check PATH…        moves nothing: what would go, for Claude's card (#1832): {"To the trash": a line per
+                                   path, a folder with how many files are in it (hidden ones too, as they go with it)
+                                   and their size}
   files restore NAME…              back from the trash to where they were (the names trash gives)
   files check PATH… [--json]       the files PATHs would send (a folder: its files), each where it really is, or the
                                    reason none may go; --json: {files: [paths], size: their bytes}
@@ -34,6 +39,7 @@ FOLDERS = {"downloads": "DOWNLOAD", "pictures": "PICTURES", "documents": "DOCUME
 USUAL = ("DESKTOP", "DOWNLOAD", "TEMPLATES", "PUBLICSHARE", "DOCUMENTS", "MUSIC", "PICTURES", "VIDEOS")
 DEPTH = 3             # folder levels below Downloads etc. that recent looks into (Pictures/Screenshots/2026)
 LIMIT, LIMIT_MAX = 10, 50
+COUNT_MAX = 100_000   # files counted in a folder for the trash's card; past it the card says "over"
 # Types that open to be looked at (gio's content type, a prefix); anything else isn't opened
 OPENABLE = ("text/", "image/", "audio/", "video/", "inode/directory", "application/pdf", "application/epub+zip",
             "application/vnd.oasis.opendocument.", "application/vnd.openxmlformats-officedocument.",
@@ -155,7 +161,8 @@ def cmd_open(a):
     if (runnable and not path.is_dir()) or ctype.startswith(NOT_OPENED) or not ctype.startswith(OPENABLE):
         die(f"{a.path} is {'a program or script' if runnable else ctype or 'of an unknown type'}: only documents, "
             "pictures, sound, video, text and folders are opened.")
-    os.execv(str(SCRIPTS / "windows"), ["windows", "open", "--file", str(path), *(["--json"] if a.json else [])])
+    os.execv(str(SCRIPTS / "windows"), ["windows", "open", "--file", str(path), *(["--json"] if a.json else []),
+                                        *(["--unless-typing"] if a.unless_typing else [])])
 
 
 # --- check (what a send may take: Ferry's ferry_send_files runs it first, plugins/ferry/send-files) --------------------
@@ -253,8 +260,45 @@ def restore_one(name, target=None):
     return str(target)
 
 
+def size_text(n):
+    for unit in ("bytes", "kB", "MB", "GB"):
+        if n < 1000 or unit == "GB":
+            return f"{n} {unit}" if unit == "bytes" else f"{n:.1f} {unit}"
+        n /= 1000
+
+
+def shown(path):
+    """A path as the card shows it: ~ for home, and a newline in a name spelled out, so a name can't pass for lines
+    of its own (confirm.py spells out what hides or reorders text)."""
+    rel = path.relative_to(HOME)
+    return ("~/" + str(rel)).replace("\n", "\\n").replace("\r", "\\r")
+
+
+def what_goes(path):
+    """One path for the card: a file and its size, a link, or a folder with everything in it, as all of it goes."""
+    if path.is_symlink():
+        return f"{shown(path)}  (a link: only the link goes)"
+    if not path.is_dir():
+        return f"{shown(path)}  ({size_text(path.lstat().st_size)})"
+    files, size = 0, 0
+    for root, dirs, names in os.walk(path):   # links to folders aren't followed: the link goes, not what it points to
+        for n in names + [d for d in dirs if os.path.islink(os.path.join(root, d))]:
+            files += 1
+            try:
+                size += os.lstat(os.path.join(root, n)).st_size
+            except OSError:
+                pass
+            if files >= COUNT_MAX:
+                return f"{shown(path)}  (a folder of over {COUNT_MAX:,} files)"
+    count = "an empty folder" if not files else f"a folder of {files} file{'s' * (files != 1)}, {size_text(size)}"
+    return f"{shown(path)}  ({count})"
+
+
 def cmd_trash(a):
     paths = [checked(p, moving=True) for p in a.paths]   # every one checked before any is moved
+    if a.check:
+        print(json.dumps({"To the trash": "\n".join(what_goes(p) for p in dict.fromkeys(paths))}, ensure_ascii=False))
+        return
     names = []
     for path in paths:
         try:
@@ -283,9 +327,9 @@ def main():
     p.add_argument("--name"); p.add_argument("--limit", type=int, default=LIMIT)
     p.add_argument("--json", action="store_true"); p.set_defaults(fn=cmd_recent)
     p = sub.add_parser("open"); p.add_argument("path"); p.add_argument("--json", action="store_true")
-    p.set_defaults(fn=cmd_open)
+    p.add_argument("--unless-typing", action="store_true"); p.set_defaults(fn=cmd_open)
     p = sub.add_parser("trash"); p.add_argument("paths", nargs="+"); p.add_argument("--json", action="store_true")
-    p.set_defaults(fn=cmd_trash)
+    p.add_argument("--check", action="store_true"); p.set_defaults(fn=cmd_trash)
     p = sub.add_parser("restore"); p.add_argument("names", nargs="+"); p.set_defaults(fn=cmd_restore)
     p = sub.add_parser("check"); p.add_argument("paths", nargs="+"); p.add_argument("--json", action="store_true")
     p.set_defaults(fn=cmd_check)

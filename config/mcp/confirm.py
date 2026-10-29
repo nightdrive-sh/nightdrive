@@ -6,7 +6,9 @@ line says what follows from allowing it: a read goes to Anthropic, a change can 
 
 The card is Quickshell's (config/quickshell/ClaudeConfirm.qml, IPC target claudeConfirm). It shows exactly what will
 be done: the tool, and every argument Claude gave it, as plain text, after what the tool's `card` command says of
-them in words Claude didn't write (Home Assistant's name and room for a device's id, #1830). Enter or Allow allows,
+them in words Claude didn't write (Home Assistant's name and room for a device's id, #1830; a window's app and title,
+the files a trash takes, #1832). A call on a list the user keeps in Access (the apps whose windows Claude sees without
+asking) needs no card: the card command says so, from the list it gets (facts). Enter or Allow allows,
 Esc or Deny refuses, and so does everything else: no answer in TIMEOUT seconds, a card that can't be shown (no
 Quickshell), a card that goes away before answering (a crash, a reload), a request that changed on its way. It is the
 server's, so no Claude Code setting skips it, and text Claude read (a mail, a web page) can't send anything without the
@@ -112,10 +114,13 @@ def kind(tool):
 def facts(tool, arguments):
     """The rows a tool's `card` command adds, from what it acts on: Home Assistant's name and room for an id that says
     nothing (`switch.sonoff_1000a`), which Claude can't word. It prints a JSON object, label → text. A command that
-    fails stops the call before any card, with its message: a device that isn't there, a state Access doesn't allow."""
+    fails stops the call before any card, with its message: a device that isn't there, a state Access doesn't allow.
+    (rows, ask): `"ask": false` in the object says the call is on a list the user keeps in Access (windows_view's apps,
+    #1832), so it runs without the card. It counts only for a tool whose area has such a list and it isn't empty, and
+    never for an act tool: a card command can't wave a call through that the user listed nothing for."""
     template = tool.spec.get("card")
     if not template:
-        return []
+        return [], True
     out, err, status = run.execute(tool, run.expand(template, arguments), None, run.timeout_of(tool))
     if status != 0:
         why = (err.strip() or out.strip() or f"exit status {status}")[-run.MESSAGE_MAX:]
@@ -124,9 +129,12 @@ def facts(tool, arguments):
         rows = json.loads(out)
     except ValueError:
         rows = None
-    if not isinstance(rows, dict) or not all(isinstance(v, str) for v in rows.values()):
+    ask = rows.pop("ask", True) if isinstance(rows, dict) else True
+    if not isinstance(rows, dict) or not all(isinstance(v, str) for v in rows.values()) or not isinstance(ask, bool):
         raise ToolError(f"{tool.name} wasn't run: its card command didn't print a JSON object of texts.")
-    return [field(name, {"title": name}, text) for name, text in rows.items()]
+    listed = kind(tool) not in ("act", "act-delete") and any(
+        isinstance(v, list) and v for v in (getattr(tool, "options", None) or {}).values())
+    return [field(name, {"title": name}, text) for name, text in rows.items()], ask or not listed
 
 
 def card(tool, arguments, timeout=TIMEOUT):
@@ -136,6 +144,7 @@ def card(tool, arguments, timeout=TIMEOUT):
     names = [n for n in props if n in arguments] + [n for n in arguments if n not in props]
     title = tool.spec.get("title") or tool.name
     heading, note, glyph = KINDS[kind(tool)]
+    rows, ask = facts(tool, arguments)
     return {
         "title": visible(str(title)),
         "source": visible(areas.name(tool.area)),
@@ -143,8 +152,9 @@ def card(tool, arguments, timeout=TIMEOUT):
         "heading": heading,
         "note": note,
         "glyph": glyph,
-        "fields": facts(tool, arguments) + [field(n, props.get(n), arguments[n]) for n in names],
+        "fields": rows + [field(n, props.get(n), arguments[n]) for n in names],
         "timeout": timeout,
+        **({} if ask else {"unasked": True}),
     }
 
 
@@ -222,6 +232,8 @@ def ask(tool, arguments, timeout=TIMEOUT):
     """registry.py's seam: True only when the user allowed this call of an act tool on the card. A refusal is False;
     a card that couldn't ask raises ToolError with the reason, so Claude can tell the user why nothing happened."""
     request = card(tool, arguments, timeout)
+    if request.get("unasked"):
+        return True   # on the user's own list in Access: they said this one needs no card
     request["id"] = secrets.token_hex(8)
     cid = show(request)
     return wait(cid, tool.name, timeout)
