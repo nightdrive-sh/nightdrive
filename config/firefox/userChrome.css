@@ -12,7 +12,7 @@
 
 /* ===== Nightdrive's colours (from Tokyo Night) ===== */
 :root {
-  --jn-bg: var(--nd-bg, #171822);  --jn-bg-dark: #14141b;  --jn-bg-hl: #292e42;  --jn-bg-hl2: #3b4261;
+  --jn-bg: var(--nd-bg, #171822);  --jn-bg-dark: #14141b;  --jn-urlbar: #121218;  /* address bar: --jn-bg-dark 10% darker */  --jn-bg-hl: #292e42;  --jn-bg-hl2: #3b4261;
   --jn-fg: #c0caf5;  --jn-fg-dim: #787c99;   --jn-border: #292e42;  --jn-accent: #7aa2f7;
 
   --toolbar-bgcolor: var(--jn-bg) !important;                 /* nav-bar, bookmarks, selected tab */
@@ -23,7 +23,7 @@
   --lwt-tab-line-color: var(--jn-accent) !important;
   --tab-selected-bgcolor: #2a2e45 !important;
   --tab-selected-textcolor: var(--jn-fg) !important;
-  --toolbar-field-background-color: var(--jn-bg-dark) !important;   /* address bar */
+  --toolbar-field-background-color: var(--jn-urlbar) !important;   /* address bar */
   --toolbar-field-color: var(--jn-fg) !important;
   --toolbar-field-border-color: var(--jn-border) !important;
   --toolbar-field-focus-background-color: var(--jn-bg-dark) !important;
@@ -61,13 +61,15 @@
 .tabbrowser-tab:hover > .tab-stack > .tab-background:not([selected]) { background: #222537 !important; }
 .tabbrowser-tab[selected] .tab-label { color: var(--jn-fg) !important; }
 .tabbrowser-tab:not([selected]) .tab-label { color: #8a90b5 !important; }
-#urlbar-background { background: var(--jn-bg-dark) !important; border-color: var(--jn-border) !important; }
+#urlbar-background { background: var(--jn-urlbar) !important; border-color: var(--jn-border) !important; }
 #urlbar[focused="true"] > #urlbar-background { border-color: var(--jn-accent) !important; box-shadow: none !important; }
 .urlbarView-row[selected] { background: var(--jn-bg-hl2) !important; }
 
 /* Rounded rectangles instead of pills (tabs, address bar) */
 :root { --tab-border-radius: 8px !important; --urlbar-margin-inline: 0px; --urlbar-background-border-radius: 8px !important; }
 .tab-background { border-radius: 8px !important; }
+/* Tabs 1px lower at the top and bottom: Firefox's own height (Nova, normal density) is 32px */
+:root { --tab-min-height: 30px !important; }
 #urlbar, #urlbar-background, #searchbar, #urlbar-input-container { --urlbar-border-radius: 8px; --urlbar-background-border-radius: 8px; border-radius: 8px !important; }
 #urlbar-searchmode-switcher, .urlbar-page-action, #identity-box, #tracking-protection-icon-container { border-radius: 6px !important; }
 
@@ -107,6 +109,8 @@
 
 /* Address bar left padding */
 #urlbar-input-container { padding-inline-start: 8px !important; }
+/* Empty: 6px more, so the placeholder and the cursor don't sit at the edge (typed text and URLs keep 8px) */
+#urlbar-input:placeholder-shown { padding-inline-start: 6px !important; }
 
 /* The address bar background is the class .urlbar-background (not an id): no border, rounded rectangle */
 .urlbar-background, #urlbar[focused="true"] > .urlbar-background, #urlbar[open] > .urlbar-background {
