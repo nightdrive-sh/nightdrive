@@ -1,0 +1,62 @@
+import QtQuick
+import Quickshell
+import Quickshell.Io
+
+// What applies, and the writes: `nightdrive mcp access` (config/mcp/access.py owns claude-access.json) gives the level
+// and every area's rights with their tools; a choice runs `nightdrive mcp access set AREA RIGHT VALUE` or `level L`,
+// one at a time and in order, and then reads back what applies (a value put back to the level's follows the level).
+// The file is watched too: the launcher, a terminal or Welcome may change it while the window is open.
+QtObject {
+    id: store
+    // this checkout's nightdrive, as the window is this checkout's (a worktree's window writes with its own access.py)
+    readonly property string nd: Quickshell.shellDir + "/../../bin/nightdrive"
+    property var now: null              // access.py's summary: { level, levels, own, areas: [...], problem?, chosen }
+    property bool failed: false
+    readonly property var areas: now ? now.areas : []
+
+    function area(id) { return areas.find(a => a.id === id) || null }
+
+    property Process reader: Process {
+        property bool again: false      // asked while running: a write may have landed after this read began
+        command: [store.nd, "mcp", "access"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { store.now = JSON.parse(text); store.failed = false } catch (e) { store.failed = store.now === null }
+            }
+        }
+        onRunningChanged: if (!running && again) { again = false; running = true }
+    }
+    function refresh() { if (reader.running) reader.again = true; else reader.running = true }
+
+    property FileView file: FileView {
+        path: Quickshell.env("HOME") + "/.config/nightdrive/claude-access.json"
+        watchChanges: true; printErrors: false
+        onFileChanged: store.refresh()
+    }
+
+    // One write at a time: a second choice while the first runs isn't lost, nor done out of order
+    property var queue: []
+    property Process writer: Process {
+        onRunningChanged: if (!running) { if (store.queue.length) store.next(); else store.refresh() }
+    }
+    function run(args) { queue = queue.concat([args]); if (!writer.running) next() }
+    function next() {
+        writer.command = [nd, "mcp", "access"].concat(queue[0])
+        queue = queue.slice(1)
+        writer.running = true
+    }
+
+    // The choice shows at once; what applies is read back after the write
+    function set(areaId, right, value) {
+        const copy = JSON.parse(JSON.stringify(now))
+        const a = copy.areas.find(x => x.id === areaId)
+        if (a && a.rights[right]) { a.rights[right].value = value; now = copy }
+        run(["set", areaId, right, value])
+    }
+    function setLevel(level) {
+        now = Object.assign({}, now, { level: level })
+        run(["level", level])
+    }
+
+    Component.onCompleted: refresh()
+}

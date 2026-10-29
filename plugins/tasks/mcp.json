@@ -92,7 +92,8 @@
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Moved the task {title} to the trash",
       "class": "change",
-      "area": "tasks"
+      "area": "tasks",
+      "deletes": true
     }
   ]
 }

@@ -441,7 +441,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive software search gimp` | Fedora's packages and Flathub's apps, as System › Install › Software finds them; `info dnf ID` (or `flatpak`, `plugin`), `installed` and `plugins` tell more (`--json`). `install dnf ID` or `install flatpak ID` installs one, `remove` removes it, `preview install …` shows first what would change; dnf asks for the password in the system's own dialog |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the Launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
 | `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS` |
-| `nightdrive mcp access level normal` | How much Claude may use of your desktop: `strict`, `normal` or `open`; `area mail read` sets one area (`off`, `read`, `change`), `act on` the actions with consequences, and `nightdrive mcp access` alone shows what applies (Launcher › Settings › Claude › *Access*). `nightdrive mcp install` gives Claude Code the tools, `remove` takes them away |
+| `nightdrive mcp access open` | Claude's access, the window of Launcher › Settings › Claude › *Access*: each area's Read, Modify and Delete, `Allow`, `Ask` or `No`. `level strict` (`normal`, `open`) sets them all, `set mail read allow` one, and `nightdrive mcp access` alone shows what applies. `nightdrive mcp install` gives Claude Code the tools, `remove` takes them away |
 | `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck, Ferry… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
 ## Keys
@@ -547,11 +547,12 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   or claude.ai connectors, and nothing is saved as a session. Its text goes in only after you've seen it, the clipboard
   gets its own content back, and the text isn't kept in the clipboard history.
 - **Claude and your desktop.** With Nightdrive's tools on in Claude Code (Launcher › Settings › Claude › *Access*, or
-  `nightdrive mcp install`), any Claude Code session can use your desktop as far as Access allows. *Strict* gives only
-  Nightdrive's docs and status, *Normal* reading and changes you can undo, *Open* also sending, installing and devices,
-  each only after your Enter on Nightdrive's own card. Each area (Mail, Appearance…) can be set apart: off, reads, or
-  reads and changes. An area that is off isn't there for Claude at all; passwords never are. What each area gives, and
-  how to turn it off: [docs/claude.md](docs/claude.md).
+  `nightdrive mcp install`), any Claude Code session can use your desktop as far as Access allows. Each area (Mail,
+  Appearance…) has Read, Modify and Delete, each *Allow*, *Ask* (Nightdrive's own card asks you each time) or *No* (not
+  there for Claude at all). *Strict* gives only Nightdrive's docs and status; *Normal* asks before reading what is
+  private (mail, contacts, calendar, notes, notifications, the screen) and before deleting; *Open* allows the rest.
+  Sending, installing and devices always ask; passwords are never there. What each area gives, and how to turn it off:
+  [docs/claude.md](docs/claude.md).
 - **No credentials are stored in this repo.** Tokens stay with each app (Deck, Claude Code) or in 1Password.
 
 ## Want to participate?

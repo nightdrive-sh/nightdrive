@@ -73,7 +73,8 @@
       "stdin": "json",
       "class": "act",
       "timeout": 120,
-      "area": "calendar"
+      "area": "calendar",
+      "deletes": true
     }
   ]
 }

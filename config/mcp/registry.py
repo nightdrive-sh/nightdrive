@@ -7,9 +7,12 @@ This is server.py's tool provider: list() and call(name, arguments). The files a
 plugin turned on or off, or an Access change, applies without restarting the server. A file or tool that breaks the
 format is left out with a line in the log; `python3 registry.py` shows what is listed, what is hidden and why.
 
+Each tool belongs to one right of its area (Tool.right: read, modify or delete; #1831), and Access gives that right
+Allow, Ask or No. No hides the tool; Ask, and an act tool always, runs it only once the user allows the call on the card.
+
 The steps of phase 3 slot in as modules beside this one, found by name:
-    confirm.ask(tool, arguments) -> bool     the card that allows an act tool's call (MCP 5, #1766). Without it,
-                                             act tools are refused: nothing with consequences runs unasked
+    confirm.ask(tool, arguments) -> bool     the card that allows a call (MCP 5, #1766). Without it, what asks is
+                                             refused: nothing runs unasked that the user wanted to be asked about
     undo.before(tool, arguments) -> dict     the state a change tool's call will change, read first (MCP 6, #1767)
     undo.offer(tool, arguments, result, state)  the log entry and the notification that undo the call
 """
@@ -51,6 +54,8 @@ class Tool:
         self.name = spec["name"]
         self.cls = spec["class"]
         self.area = spec["area"]
+        # The right of its area it needs: a read is Read, what removes something Delete, every other change Modify
+        self.right = "delete" if spec.get("deletes") else "read" if self.cls == "read" else "modify"
         self.dir = folder         # where its command runs: the plugin's folder, config/mcp for the core's
         self.source = source      # the file, for the log
 
@@ -93,6 +98,10 @@ def problem(spec, plugin):
     area = spec.get("area")
     if area not in access.AREAS and area != plugin:
         return f"{name}: unknown area {area!r} (Access's rows, or the plugin's id)"
+    if not isinstance(spec.get("deletes", False), bool):
+        return f"{name}: deletes must be true or false"
+    if spec.get("deletes") and spec["class"] == "read":
+        return f"{name}: a read tool can't delete"
     stdin = spec.get("stdin")
     if stdin is not None and not isinstance(stdin, str):
         return f"{name}: stdin must be \"json\" or a string"
@@ -170,6 +179,7 @@ class Registry:
         self.logged = set()   # problems already in the log: it's read on every call
         self.confirm = optional("confirm")
         self.undo = optional("undo")
+        self.rules = None     # the Access that visible() last read: call() decides by the same one it listed by
 
     def load(self):
         """All the tools by name, the core's first (a plugin can't take a core tool's name), and the problems."""
@@ -194,7 +204,8 @@ class Registry:
             if text not in self.logged:
                 self.logged.add(text)
                 self.log(text)
-        return {n: t for n, t in tools.items() if rules.allows(t.cls, t.area)}
+        self.rules = rules
+        return {n: t for n, t in tools.items() if rules.decide(t.cls, t.area, t.right) != "no"}
 
     def list(self):
         return [t.listing() for t in self.visible().values()]
@@ -204,10 +215,10 @@ class Registry:
         if tool is None:
             raise UnknownTool(name)
         run.check(tool, arguments)
-        if tool.cls == "act":
+        if self.rules.decide(tool.cls, tool.area, tool.right) == "ask":
             if self.confirm is None:
-                raise ToolError(f"{name} wasn't run: actions with consequences need Nightdrive's confirmation card, "
-                                "which this version doesn't have yet.")
+                raise ToolError(f"{name} wasn't run: the user's Access asks before it, and this version doesn't "
+                                "have Nightdrive's confirmation card.")
             if not self.confirm.ask(tool, arguments):
                 raise ToolError(f"The user didn't allow {name} on screen, so it wasn't run. Don't try it another way.")
         undoable = tool.cls == "change" and self.undo is not None
@@ -233,15 +244,11 @@ def main():
     tools, _ = reg.load()
     rules = access.load(reg.access_file)
     for name, tool in tools.items():
-        if name in shown:
-            state = "listed"
-        elif tool.cls == "act" and rules.area(tool.area) == "change":
-            state = "hidden (Access: actions are off)"
-        else:
-            state = f"hidden (Access: {tool.area} is {rules.area(tool.area)})"
+        decision = rules.decide(tool.cls, tool.area, tool.right)
+        state = {"allow": "listed", "ask": "listed, asks on screen"}.get(decision, "hidden (Access: No)")
         source = Path(tool.source)
         source = source.relative_to(REPO) if REPO in source.parents else source
-        print(f"{name:28} {tool.cls:7} {tool.area:15} {state:36} {source}")
+        print(f"{name:28} {tool.cls:7} {tool.area:15} {tool.right:7} {state:24} {source}")
     if not tools:
         print("No tools.")
 

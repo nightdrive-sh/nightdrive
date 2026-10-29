@@ -113,7 +113,8 @@
       "stdin": "json",
       "class": "act",
       "timeout": 300,
-      "area": "software"
+      "area": "software",
+      "deletes": true
     },
     {
       "name": "software_plugin_install",

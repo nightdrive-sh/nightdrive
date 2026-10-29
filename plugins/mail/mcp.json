@@ -301,7 +301,8 @@
       ],
       "stdin": "json",
       "class": "act",
-      "area": "mail"
+      "area": "mail",
+      "deletes": true
     }
   ]
 }

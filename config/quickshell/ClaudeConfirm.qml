@@ -5,8 +5,10 @@ import Quickshell.Io
 import Quickshell.Wayland
 
 // Claude's confirmation card: an action with consequences (sending a mail, a device, installing) that Claude asked
-// Nightdrive's MCP server to do waits here for the user (config/mcp/confirm.py, Dashboard #1766). It shows the tool and
-// every argument as plain text; Enter or Allow runs it, Esc or Deny refuses, and so does the countdown running out.
+// Nightdrive's MCP server to do waits here for the user (config/mcp/confirm.py, Dashboard #1766), and so does any call
+// whose right the user set to Ask in Access (#1831): a read, a change, a delete, each with its own heading and a line
+// on what follows from allowing it. It shows the tool and every argument as plain text; Enter or Allow runs it, Esc or
+// Deny refuses, and so does the countdown running out.
 // confirm.py treats anything but an allow as a refusal: a card that never opened, closed or reloaded without an answer.
 //   qs ipc call claudeConfirm open <file>   shows the request (confirm.py's JSON): "shown <md5 of what was read>", or
 //                                           "busy" while another card is up (confirm.py tries again)
@@ -22,7 +24,7 @@ PanelWindow {
     readonly property int armDelay: 700         // ms after the card appears (a click) or gets the keyboard (Enter) before Allow counts
 
     property bool open: false
-    property var req: ({})                      // { id, title, source, tool, fields: [...], timeout }
+    property var req: ({})                      // { id, title, source, tool, heading?, note?, glyph, fields: [...], timeout }
     property bool grabbed: false                // the card has the keyboard
     property bool armed: false                  // a click on Allow counts now
     property bool keyArmed: false               // Enter counts now
@@ -139,7 +141,7 @@ PanelWindow {
                     width: 36
                     anchors.verticalCenter: parent.verticalCenter
                     horizontalAlignment: Text.AlignHCenter
-                    text: Icons.g("shield-alert")
+                    text: Icons.g(win.req.glyph || "shield-alert")
                     color: Theme.warning
                     font { family: Icons.familyThin; pixelSize: 30 }
                 }
@@ -149,7 +151,8 @@ PanelWindow {
                     spacing: 2
                     Text {
                         width: parent.width
-                        text: "Claude asks to: " + (win.req.title || "")
+                        // An act's title says what it does ("Send an email"); an Ask names the kind, then the tool
+                        text: win.req.heading || "Claude asks to: " + (win.req.title || "")
                         textFormat: Text.PlainText
                         wrapMode: Text.Wrap
                         color: Theme.title
@@ -157,7 +160,7 @@ PanelWindow {
                     }
                     Text {
                         width: parent.width
-                        text: (win.req.source || "") + " · " + (win.req.tool || "")
+                        text: (win.req.source || "") + " · " + ((win.req.heading ? win.req.title : win.req.tool) || "")
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
                         color: Theme.dim
@@ -207,6 +210,17 @@ PanelWindow {
                         GradientStop { position: 1; color: Theme.launcherBg }
                     }
                 }
+            }
+
+            // What follows from allowing it: a read goes to Anthropic, a change can be undone, a delete maybe not
+            Text {
+                visible: !!win.req.note
+                width: parent.width
+                text: win.req.note || ""
+                textFormat: Text.PlainText
+                wrapMode: Text.Wrap
+                color: Theme.dim
+                font { family: Theme.font; pixelSize: 12 }
             }
 
             Item {

@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""What the user lets Claude use: Settings › Claude › Access, read for Nightdrive's MCP server (plan: Dashboard #1761).
+"""What the user lets Claude use: Settings › Claude › Access, read by Nightdrive's MCP server (plan: Dashboard #1761,
+the model #1831).
 
-~/.config/nightdrive/claude-access.json (Settings writes it, MCP 7 #1768):
-    {"level": "normal", "act": false, "areas": {"mail": "read", "home-assistant": "off"}}
-level    strict, normal or open: the preset the rows start from
-areas    a row per area, each off, read or change ("reads and changes"); an area left out has its level's value
-act      tools with consequences (sending, devices, installing), in the areas set to change; always through the
-         confirmation card. Left out: the level's (only open has it)
-A tool is listed, and can be called, only when its area allows its class; the server reads this file on every
-tools/list and tools/call, so a change applies at once.
+~/.config/nightdrive/claude-access.json (the Access window and Welcome write it, through this file only):
+    {"version": 2, "level": "normal", "areas": {"mail": {"read": "allow"}, "software": {"modify": "no"}}}
+level    strict, normal or open (levels.py): what every area's rights are to begin with
+areas    the user's own: per area, read / modify / delete, each allow, ask or no. Only what differs from the level is
+         written, so a right put back to the level's value follows the level again
+A tool belongs to one right of its area (registry.Tool.right). No: it isn't listed and can't be called. Ask: it runs
+only after the user allows that call on Nightdrive's card. Allow: it runs (a change with Undo). A tool with
+consequences (class act) is at most Ask. The server reads this file on every tools/list and tools/call, so a change
+applies at once.
 
-The file is written only here (`nightdrive mcp access …` runs this), so Settings and Welcome keep it in one shape:
-    access.py                          what applies now, as JSON (Settings › Claude › Access reads it)
-    access.py level strict|normal|open a preset: the rows and act go back to the level's
-    access.py area NAME off|read|change one row; the level's own value isn't written, so the row follows the level again
-    access.py act on|off               actions with consequences, whatever the level
+Version 1 (until #1831: a row per area off, read or change, and act on or off) is read as version 2 and written as
+such on the next change: off → all No; read → Modify and Delete No, and reading follows the level (Normal asks for
+the private areas); change → the level's; act is gone, the card's Ask is built in.
+
+    access.py                                  what applies, as JSON (the Access window and the launcher read it)
+    access.py level strict|normal|open         a level: your own values go back to it
+    access.py set AREA read|modify|delete allow|ask|no
 """
 
 import json
@@ -24,79 +28,90 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import areas  # noqa: E402  (after the path above)
+from areas import AREAS, RIGHTS  # noqa: E402,F401  (registry.py checks a tool's area against AREAS)
+from levels import LEVELS, VALUES, preset  # noqa: E402
+
 FILE = Path.home() / ".config/nightdrive/claude-access.json"
-
-# The rows of Settings › Claude › Access, in their order. A plugin's tools may use its own id as an area instead;
-# such an area has its level's value until it gets a row.
-AREAS = {
-    "nightdrive": "Nightdrive's docs and status",
-    "mail": "Mail",
-    "contacts": "Contacts",
-    "calendar": "Calendar",
-    "tasks": "Tasks",
-    "notes": "Notes",
-    "deck": "Deck",
-    "ferry": "Ferry",
-    "home-assistant": "Home Assistant",
-    "notifications": "Notifications",
-    "appearance": "Appearance",
-    "sound-display": "Sound and display",
-    "apps-files": "Apps and files",
-    "software": "Software",
-}
-# The areas that are an app's (the plugin of the same id): Settings shows their rows only while it is installed
-APPS = ("mail", "contacts", "calendar", "tasks", "notes", "deck", "ferry", "home-assistant")
-VALUES = ("off", "read", "change")
-# What each class needs of its area; act needs `act` on top
-NEEDS = {"read": "read", "change": "change", "act": "change"}
-
-# The presets: Strict gives only the docs and status, Normal reading and changes that can be undone, Open also the
-# actions with consequences (each one still asks on the card)
-LEVELS = {
-    "strict": {"default": "off", "areas": {"nightdrive": "read"}, "act": False},
-    "normal": {"default": "change", "areas": {}, "act": False},
-    "open": {"default": "change", "areas": {}, "act": True},
-}
-# Without a file the user hasn't chosen yet (Welcome asks, #1768): Normal, since installing the server for Claude Code
-# (`nightdrive mcp install`) is already the user's choice. A file that can't be read gives Strict: a typo mustn't
-# open everything.
+VERSION = 2
+# Without a file: Normal, since installing the server for Claude Code (`nightdrive mcp install`, Welcome's or Access's
+# switch) is already the user's choice. A file that can't be read gives Strict: a typo mustn't open everything.
 UNCHOSEN = "normal"
 BROKEN = "strict"
+AREA_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
 
 
 class Access:
-    def __init__(self, level=UNCHOSEN, areas=None, act=None, problem=None):
+    def __init__(self, level=UNCHOSEN, own=None, problem=None):
         self.level = level
-        self.areas = areas or {}
-        self.act = LEVELS[level]["act"] if act is None else act
-        self.problem = problem  # why the file wasn't used as such, for the log
+        self.own = own or {}          # {area: {right: value}}: the user's, apart from the level
+        self.problem = problem        # why the file wasn't used as such, for the log
 
-    def area(self, name):
-        preset = LEVELS[self.level]
-        return self.areas.get(name) or preset["areas"].get(name) or preset["default"]
+    def preset(self, area, right):
+        return preset(self.level, area, right)
 
-    def allows(self, cls, area):
-        """Whether a tool of this class in this area is Claude's to see and call."""
-        need = NEEDS.get(cls)
-        if need is None or VALUES.index(self.area(area)) < VALUES.index(need):
-            return False
-        return cls != "act" or self.act
+    def value(self, area, right):
+        """The right's value as set: the user's own, else the level's."""
+        return self.own.get(area, {}).get(right) or self.preset(area, right)
 
-    def summary(self, extra=()):
-        """What applies now: every row's value (and those of extra areas, e.g. plugins' own), as JSON for Settings.
-        chosen: the user has picked something (else the level is UNCHOSEN's); changed: the rows set apart from the
-        level, and whether act is"""
-        names = list(AREAS) + [a for a in sorted(set(extra) | set(self.areas)) if a not in AREAS]
-        changed = sorted(a for a in self.areas if self.areas[a] != self.preset(a))
-        return {"file": str(FILE), "chosen": FILE.exists(), "level": self.level, "act": self.act,
-                "areas": {a: self.area(a) for a in names}, "names": AREAS, "apps": APPS,
-                "changed": changed, "actChanged": self.act != LEVELS[self.level]["act"],
-                **({"problem": self.problem} if self.problem else {})}
+    def decide(self, cls, area, right):
+        """allow, ask or no for a call of a tool of this class and right in this area. A tool with consequences
+        never runs without the card."""
+        value = self.value(area, right)
+        return "ask" if value == "allow" and cls == "act" else value
 
-    def preset(self, name):
-        """The row's value at this level, before the user's own"""
-        preset = LEVELS[self.level]
-        return preset["areas"].get(name) or preset["default"]
+    def count_own(self):
+        return sum(len(v) for v in self.own.values())
+
+    def summary(self, tools=()):
+        """What applies now, for the Access window and the launcher: every area that has tools, with its rights, and
+        each right's tools; a right without tools isn't there. tools: registry's Tool objects (the installed ones)."""
+        by_area = {}
+        for t in tools:
+            by_area.setdefault(t.area, {}).setdefault(t.right, []).append(t)
+        names = [a for a in AREAS if a in by_area] + sorted(a for a in by_area if a not in AREAS)
+        rows = []
+        for a in names:
+            rights = {}
+            for r in RIGHTS:
+                found = by_area[a].get(r)
+                if not found:
+                    continue
+                consequential = all(t.cls == "act" for t in found)
+                # Where every tool asks anyway, Allow shows as the Ask it is
+                shown = (lambda v: "ask" if consequential and v == "allow" else v)
+                rights[r] = {
+                    "value": shown(self.value(a, r)), "preset": shown(self.preset(a, r)),
+                    "own": shown(self.value(a, r)) != shown(self.preset(a, r)),
+                    # Allow isn't offered where every tool asks anyway: it would say something that isn't so
+                    "choices": ["ask", "no"] if consequential else list(VALUES),
+                    "words": areas.words(a, r),
+                    "tools": [{"name": t.name, "title": t.spec.get("title") or t.name,
+                               "asks": t.cls == "act", "undo": t.cls == "change"} for t in found],
+                }
+            rows.append({"id": a, "name": areas.name(a), "glyph": areas.glyph(a), "rights": rights})
+        return {"file": str(FILE), "chosen": FILE.exists(), "level": self.level, "levels": list(LEVELS),
+                "own": self.count_own(), "areas": rows, **({"problem": self.problem} if self.problem else {})}
+
+
+def from_v1(data, path):
+    """A version 1 file's rows as version 2's own values (see the docstring); what can't be read closes its area."""
+    own, bad = {}, []
+    rows = data.get("areas", {})
+    for name, value in (rows.items() if isinstance(rows, dict) else []):
+        if value == "change":
+            continue
+        if value not in ("off", "read"):
+            bad.append(name)
+        closed = ("modify", "delete") if value == "read" else RIGHTS
+        own[name] = {r: "no" for r in closed}
+    # The picture of a window was Apps and files' until it got a row of its own
+    if "apps-files" in own and "read" in own["apps-files"]:
+        own["screen"] = {"read": "no"}
+    problem = f"{path}: unknown value for {', '.join(bad)}: off" if bad else None
+    return own, problem
 
 
 def load(path=FILE):
@@ -111,19 +126,30 @@ def load(path=FILE):
     level = data.get("level", UNCHOSEN)
     if level not in LEVELS:
         return Access(BROKEN, problem=f"{path}: unknown level {level!r}: Strict until it's fixed")
-    areas, bad = {}, []
+    version = data.get("version", 1)
+    if version == 1:
+        own, problem = from_v1(data, path)
+        return Access(level, own, problem)
+    if version != VERSION:
+        return Access(BROKEN, problem=f"{path}: version {version!r} is newer than this Nightdrive: Strict until "
+                                      "it's updated")
+    own, bad = {}, []
     rows = data.get("areas", {})
-    for name, value in (rows.items() if isinstance(rows, dict) else []):
-        if value in VALUES:
-            areas[name] = value
-        else:
-            areas[name] = "off"  # a value we can't read closes its row rather than leaving the level's
+    for name, rights in (rows.items() if isinstance(rows, dict) else []):
+        if not isinstance(rights, dict):
+            own[name] = {r: "no" for r in RIGHTS}   # what we can't read closes its area rather than opening it
             bad.append(name)
-    act = data.get("act")
-    if not isinstance(act, bool):
-        act = None
-    problem = f"{path}: unknown value for {', '.join(bad)}: off" if bad else None
-    return Access(level, areas, act, problem)
+            continue
+        for right, value in rights.items():
+            if right not in RIGHTS:
+                bad.append(f"{name}.{right}")
+            elif value in VALUES:
+                own.setdefault(name, {})[right] = value
+            else:
+                own.setdefault(name, {})[right] = "no"
+                bad.append(f"{name}.{right}")
+    problem = f"{path}: unknown value for {', '.join(bad)}: No" if bad else None
+    return Access(level, own, problem)
 
 
 def save(data, path=FILE):
@@ -141,15 +167,16 @@ def save(data, path=FILE):
 
 
 def write(now, path=FILE):
-    """The file from an Access: only what differs from its level is written, so a row the user puts back to the
-    level's value follows the level again. Built from what applies now, a broken or missing file starts from its
-    level (Strict, Normal), not from nothing."""
-    data = {"level": now.level}
-    areas = {a: v for a, v in now.areas.items() if v != now.preset(a)}
-    if areas:
-        data["areas"] = areas
-    if now.act != LEVELS[now.level]["act"]:
-        data["act"] = now.act
+    """The file from an Access, as version 2 with only what differs from the level. A broken or missing file starts
+    from its level (Strict, Normal), not from nothing."""
+    data = {"version": VERSION, "level": now.level}
+    own = {}
+    for area, rights in sorted(now.own.items()):
+        kept = {r: v for r, v in rights.items() if v != now.preset(area, r)}
+        if kept:
+            own[area] = {r: kept[r] for r in RIGHTS if r in kept}
+    if own:
+        data["areas"] = own
     save(data, path)
 
 
@@ -159,43 +186,37 @@ def set_level(level, path=FILE):
     write(Access(level), path)
 
 
-def set_area(name, value, path=FILE):
+def set_value(area, right, value, path=FILE):
+    if not AREA_ID.fullmatch(area):
+        raise ValueError(f"not an area: {area!r}")
+    if right not in RIGHTS:
+        raise ValueError(f"unknown right {right!r}: {', '.join(RIGHTS)}")
     if value not in VALUES:
         raise ValueError(f"unknown value {value!r}: {', '.join(VALUES)}")
-    if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", name):
-        raise ValueError(f"not an area: {name!r}")
     now = load(path)
-    now.areas[name] = value
+    now.own.setdefault(area, {})[right] = value
     write(now, path)
 
 
-def set_act(on, path=FILE):
-    now = load(path)
-    now.act = on
-    write(now, path)
-
-
-def plugin_areas():
-    """The areas of the installed plugins' own tools that have no row (registry.py knows them); none if it can't say"""
+def installed_tools():
+    """The tools of the core and the installed plugins (registry.py knows them); none if it can't say."""
     try:
         from registry import Registry
-        return {t.area for t in Registry().load()[0].values()}
-    except Exception:  # Settings still shows the rows without them
-        return set()
+        return list(Registry().load()[0].values())
+    except Exception:  # the window still shows the levels without them
+        return []
 
 
 def main(argv):
-    usage = "usage: access.py [level strict|normal|open | area NAME off|read|change | act on|off]"
+    usage = "usage: access.py [level strict|normal|open | set AREA read|modify|delete allow|ask|no]"
     try:
         if not argv:
-            json.dump(load().summary(plugin_areas()), sys.stdout, ensure_ascii=False, indent=2)
+            json.dump(load().summary(installed_tools()), sys.stdout, ensure_ascii=False, indent=2)
             print()
         elif argv[0] == "level" and len(argv) == 2:
             set_level(argv[1])
-        elif argv[0] == "area" and len(argv) == 3:
-            set_area(argv[1], argv[2])
-        elif argv[0] == "act" and len(argv) == 2 and argv[1] in ("on", "off"):
-            set_act(argv[1] == "on")
+        elif argv[0] == "set" and len(argv) == 4:
+            set_value(*argv[1:])
         else:
             print(usage, file=sys.stderr)
             return 2

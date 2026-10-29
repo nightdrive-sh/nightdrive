@@ -26,9 +26,10 @@ PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]
 INSTRUCTIONS = """\
 Nightdrive is a desktop for Fedora built on Hyprland and Quickshell: a top bar with menus, a launcher, and its own \
 apps (Mail, Contacts, Deck, Ferry) and plugins. These tools act on the desktop of the person you are talking to, on \
-this machine. Which tools you see follows their Settings › Claude › Access: what is off isn't listed at all. Tools \
-that change something tell the user, who can undo it; those with consequences (sending, devices, installing) ask the \
-user on screen first, and a refusal there is the user's answer, not an error to work around.
+this machine. Which tools you see follows their Settings › Claude › Access: what they said No to isn't listed at \
+all. Tools that change something tell the user, who can undo it. Some calls ask the user on screen first: those with \
+consequences (sending, devices, installing) always, and any read, change or delete they chose to be asked about, so \
+ask for what you need in as few calls as you can. A refusal there is the user's answer, not an error to work around.
 
 Nightdrive's documentation is in your tools, as this machine has it: docs_search before you guess how something \
 works, where a setting is or which command does it, then docs_read for the section; shortcuts for the keys; \

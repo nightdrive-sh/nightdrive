@@ -4,38 +4,27 @@ import Quickshell.Io
 
 // The launcher's Settings › Claude › Access: what Claude Code may use of this desktop through Nightdrive's MCP server
 // (config/mcp, plan: Dashboard #1761). At the top the server itself, on or off (`nightdrive mcp install|remove`); then
-// the level, Strict, Normal or Open, which sets every row; then a row per area, each Off, Reads or Reads and changes,
-// and the actions with consequences (sending, devices, installing), which always ask on screen as well. An app's area
-// shows only while the app is installed. An area that is off isn't there for Claude at all.
+// the level, Strict, Normal or Open, which sets every area; then a row that opens the Access window
+// (config/claude-access, #1831), where each area's Read, Modify and Delete are Allow, Ask or No: a grid of choices is
+// too much for the launcher's rows.
 // config/mcp/access.py owns ~/.config/nightdrive/claude-access.json: this only runs `nightdrive mcp access …`, and
-// reads back what applies (`nightdrive mcp access`). Welcome to Nightdrive asks for the level once (config/welcome).
+// reads back what applies (`nightdrive mcp access`). Welcome to Nightdrive asks once (config/welcome).
 Item {
     id: w
     property var launcher: null
 
     readonly property string nd: Quickshell.env("HOME") + "/.local/bin/nightdrive"
-    readonly property var levels: ["claudeaccess", "claudeaccessarea"]
-    readonly property var titles: ({ claudeaccess: "Settings › Claude › Access",
-                                     claudeaccessarea: "Access › " + (names[area] || area) })
-    readonly property var parents: ({ claudeaccess: "settings", claudeaccessarea: "claudeaccess" })
+    readonly property var levels: ["claudeaccess"]
+    readonly property var titles: ({ claudeaccess: "Settings › Claude › Access" })
+    readonly property var parents: ({ claudeaccess: "settings" })
 
     readonly property var presets: [
         ["strict", "Strict", "shield", "Only Nightdrive's docs and status: Claude tells you how things work"],
-        ["normal", "Normal", "shield-half", "Reads, and makes changes you can undo; nothing with consequences"],
-        ["open", "Open", "shield-check", "Also sends, installs and works devices, each time asking you on screen"]]
-    readonly property var values: [
-        ["off", "Off", "eye-off", "Claude doesn't see it at all"],
-        ["read", "Reads", "eye", "Searches and reads, changes nothing"],
-        ["change", "Reads and changes", "pencil", "Each change comes with a notification that undoes it"]]
-    readonly property var glyphs: ({ nightdrive: "book-open", mail: "mail", contacts: "contact", calendar: "calendar",
-                                     tasks: "list-checks", notes: "notebook-pen", deck: "disc-3", ferry: "smartphone",
-                                     "home-assistant": "house", notifications: "bell-ring", appearance: "palette",
-                                     "sound-display": "volume-2", "apps-files": "folder", software: "package" })
+        ["normal", "Normal", "shield-half", "Reading mail, people, calendar, notes, notifications and the screen asks; deleting asks"],
+        ["open", "Open", "shield-check", "Everything allowed; sending, devices and installing still ask on screen"]]
 
-    // access.py's summary: { chosen, level, act, areas: {id: value}, names, apps, changed, actChanged, problem? }
+    // access.py's summary: { chosen, level, own, areas: [...], problem? }
     property var now: null
-    readonly property var names: now ? now.names : ({})
-    property string area: ""                 // the row Access › Area is about
     // `nightdrive mcp status --json --quick`: { claude, server, allowed, … }; null until read
     property var server: null
     property bool serverBusy: false          // install or remove still running
@@ -102,31 +91,18 @@ Item {
     }
 
     function presetName(id) { const p = presets.find(p => p[0] === id); return p ? p[1] : id }
-    function valueName(id) { const v = values.find(v => v[0] === id); return v ? v[1] : id }
     readonly property bool serverOn: !!(server && server.server)
-
-    // The rows of the areas: an app's only while it is installed, plugins' own areas (not in names) by their id
-    function areaRows() {
-        if (!now) return []
-        return Object.keys(now.areas)
-            .filter(a => now.apps.indexOf(a) < 0 || Plugins.has(a))
-            .map(a => ({ kind: "caarea", value: a, name: names[a] || a.charAt(0).toUpperCase() + a.slice(1).replace(/-/g, " "),
-                         glyph: glyphs[a] || "puzzle", summary: valueName(now.areas[a]),
-                         sub: now.changed.indexOf(a) >= 0 ? "Your own, not the level's" : undefined }))
-    }
 
     function footer(level, query) {
         const cur = launcher.results[launcher.selIndex] || {}
-        if (cur.kind === "caserver" || cur.kind === "caact") return "Enter: on/off"
-        if (cur.kind === "capreset") return now && (now.changed.length || now.actChanged) ? "Enter: use it (your own rows go back to it)" : "Enter: use it"
-        if (cur.kind === "caarea") return "Enter: choose"
-        if (cur.kind === "cavalue") return "Enter: choose"
+        if (cur.kind === "caserver") return "Enter: on/off"
+        if (cur.kind === "capreset") return now && now.own ? "Enter: use it (your own choices go back to it)" : "Enter: use it"
+        if (cur.kind === "cawindow") return "Enter: open"
         return ""
     }
     function opened() {}
     function entered(level) {
         if (level === "claudeaccess") { reread(); statusProc.running = true }
-        if (level === "claudeaccessarea" && now) Qt.callLater(() => launcher.selectWhere(r => r.value === now.areas[area]))
     }
 
     function items(level, q) {
@@ -140,21 +116,15 @@ Item {
                      sub: serverBusy ? (serverOn ? "Turning off…" : "Turning on…")
                         : serverOn ? "Claude Code can use your desktop as allowed below" : "Off: Claude Code doesn't see your desktop" }]
                   .concat(serverError ? [{ kind: "note", name: serverError }] : [])
-            const changed = now.changed.length + (now.actChanged ? 1 : 0)
+            const changed = now.own
             const presetRows = presets.map(p => ({ kind: "capreset", value: p[0], name: p[1], sub: p[3],
                 glyph: p[0] === now.level ? "check" : p[2],
                 summary: p[0] !== now.level ? (p[0] === "normal" ? "default" : undefined)
                        : changed ? "current, " + changed + " of your own" : "current" }))
-            const act = { kind: "caact", name: "Actions with consequences", glyph: "zap", switchOn: now.act,
-                          sub: "Sending, devices, installing: in the areas that read and change, each one asks you on screen" }
-            return top.concat([{ kind: "header", name: "Level" }], presetRows, [{ kind: "header", name: "Areas" }], areaRows(), [act],
+            const open = { kind: "cawindow", name: "Areas: what Claude may read, modify and delete…", glyph: "app-window",
+                           sub: "Each area Allow, Ask or No, in plain words, in a window of its own" }
+            return top.concat([{ kind: "header", name: "Level" }], presetRows, [{ kind: "header", name: "Areas" }], [open],
                               now.problem ? [{ kind: "note", name: now.problem }] : [])
-        }
-        if (level === "claudeaccessarea") {
-            if (!now) return l.hint("Loading…")
-            const cur = now.areas[area]
-            return values.map(v => ({ kind: "cavalue", value: v[0], name: v[1], sub: v[3], glyph: v[0] === cur ? "check" : v[2],
-                                      summary: v[0] === cur ? "current" : undefined }))
         }
         return []
     }
@@ -176,22 +146,9 @@ Item {
             set(["level", it.value])
             return true
         }
-        if (it.kind === "caact") {
-            l.keepSelection()
-            now = Object.assign({}, now, { act: !now.act })
-            set(["act", now.act ? "on" : "off"])
-            return true
-        }
-        if (it.kind === "caarea") {
-            area = it.value
-            l.go("claudeaccessarea")
-            return true
-        }
-        if (it.kind === "cavalue") {
-            const areas = Object.assign({}, now.areas); areas[area] = it.value
-            now = Object.assign({}, now, { areas: areas })
-            set(["area", area, it.value])
-            l.back()   // to the area's row
+        if (it.kind === "cawindow") {
+            Quickshell.execDetached([nd, "mcp", "access", "open"])
+            l.open = false
             return true
         }
         return false

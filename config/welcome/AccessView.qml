@@ -7,13 +7,13 @@ import qs.kit
 // Welcome's step "Claude's access" (tasks: only with Claude Code installed): how much Claude may use of the desktop
 // through Nightdrive's MCP server (config/mcp). A level writes ~/.config/nightdrive/claude-access.json (`nightdrive mcp
 // access level …`, access.py owns the file) and turns the server on in Claude Code (`nightdrive mcp install --yes`:
-// choosing here is the yes). Not now leaves it off and the row skipped. Settings › Claude › Access changes it later,
-// area by area. Esc goes back to the list.
+// choosing here is the yes). Off, picked to begin with (Dashboard #1837: turning Claude on is the user's own step), leaves
+// it off and the row skipped. Settings › Claude › Access changes it later, area by area. Esc goes back to the list.
 Item {
     id: root
     required property var app
     required property QtObject c
-    property int current: 1
+    property int current: 3
     property string error: ""
     readonly property string nd: app.dir + "/../../bin/nightdrive"   // this checkout's, as the window is
     signal done()
@@ -22,15 +22,17 @@ Item {
         { level: "strict", icon: "shield", name: "Strict",
           about: "Only Nightdrive's docs and status: Claude tells you how things work, and where to find them." },
         { level: "normal", icon: "shield-half", name: "Normal", tag: "(recommended)",
-          about: "Claude reads your apps and settings, and makes changes you can undo: each comes with a notification that "
-               + "undoes it. Nothing that sends, installs or works your devices." },
+          about: "Claude reads and changes your apps and settings, each change with Undo. Reading your mail, contacts, "
+               + "calendar, notes, notifications or screen asks you each time, and so does deleting." },
         { level: "open", icon: "shield-check", name: "Open",
-          about: "Claude may also send mail, install software and work your devices, each time asking you on screen first." },
-        { level: "", icon: "circle-slash", name: "Not now",
-          about: "Claude Code doesn't get Nightdrive's tools. You can turn them on later in Settings › Claude › Access." }
+          about: "Claude also reads all of it, and deletes to the trash, without asking. Sending, devices and "
+               + "installing still ask." },
+        { level: "", icon: "circle-slash", name: "Off",
+          about: "Claude Code doesn't get Nightdrive's tools. You can turn them on later in Settings › Claude › Access, "
+               + "where each area's reading, changing and deleting is yours to choose." }
     ]
 
-    // When shown, the level now in use is picked (Normal before any choice)
+    // When shown, the level chosen before is picked; Off until there is one
     onVisibleChanged: if (visible) { error = ""; reader.running = true }
     Process {
         id: reader
@@ -39,8 +41,8 @@ Item {
             onStreamFinished: {
                 let now = {}
                 try { now = JSON.parse(text) } catch (e) {}
-                const i = root.choices.findIndex(ch => ch.level === (now.level || "normal"))
-                root.current = i < 0 ? 1 : i
+                const i = now.chosen ? root.choices.findIndex(ch => ch.level === now.level) : -1
+                root.current = i < 0 ? root.choices.length - 1 : i
             }
         }
     }
@@ -161,7 +163,7 @@ Item {
         wrapMode: Text.Wrap; lineHeight: 1.25
         color: root.error ? root.c.danger : root.c.dim; font.family: root.c.font; font.pixelSize: 12
         text: root.error || "Whatever you choose, Claude never sees your passwords, and nothing that sends or installs runs "
-            + "without your Enter on Nightdrive's own card. Settings › Claude › Access changes it later, area by area."
+            + "without your Enter on Nightdrive's own card."
     }
 
     Item {

@@ -127,7 +127,7 @@ ShellRoot {
             function back(): void { win.choose("") }
             function steps(id: string): void { win.openId = id }
             function access(): void { win.accessOpen = true }
-            function chooseAccess(n: int): void { accessView.choose(n) }    // 0 Strict, 1 Normal, 2 Open, 3 Not now
+            function chooseAccess(n: int): void { accessView.choose(n) }    // 0 Strict, 1 Normal, 2 Open, 3 Off
             function go(n: int): void { stepView.go(n) }
             function fill(key: string, text: string): void { stepView.setValue(key, text) }
         }

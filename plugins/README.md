@@ -348,12 +348,13 @@ card, undo, timeouts).
 | `inputSchema` | The arguments as JSON Schema, an `object`. The server checks the top level (required, types, enums) before running anything |
 | `command` | Argv, run without a shell. `{name}` is that argument (a whole element or part of one; a list gives one element each). A nested list is optional: left out unless every argument in it is given. A boolean in one is the switch itself: `["--all", "{all}"]` gives `--all` when true |
 | `stdin` | Optional: `"json"` writes all the arguments as JSON on the command's stdin, `"{body}"` one argument's text (long text that doesn't fit argv) |
-| `class` | `read` runs at once. `change` runs at once and tells the user, who can undo it. `act` (sending, devices, installing) runs only after the user allows it on Nightdrive's card |
+| `class` | `read` runs at once. `change` runs at once and tells the user, who can undo it. `act` (sending, devices, installing) runs only after the user allows it on Nightdrive's card. Access may make any of them ask on the card too (below) |
+| `deletes` | Optional: `true` for a tool that removes something (to the trash, a mail, an event): it then comes under the area's Delete in Access instead of Modify |
 | `undo` | For `change`, required: the argv that undoes it. Its `{name}`s come from `before`'s JSON object, then the command's JSON output (its object's fields), then the arguments |
 | `before` | Optional, for `change`: argv that prints the state the tool changes as a JSON object (`{"path": "…"}`, the wallpaper set now), run first. If it fails, the tool isn't run: a change must be one the user can undo |
 | `notice` | Optional, for `change`: the notification's line, e.g. `"Changed the wallpaper to {path}"` (the output's fields, then the arguments). Default: `title` |
 | `image` | Optional: the field of the command's JSON output that holds a picture, `{"mimeType": "image/png", "data": "<base64>"}`. Claude gets it as an image, and the rest of the output as text (`windows_view`) |
-| `area` | The row in Settings › Claude › Access that turns it off or on: `mail`, `contacts`, `calendar`, `tasks`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `appearance`, `sound-display`, `apps-files`, `software`, or the plugin's own id |
+| `area` | The row in Settings › Claude › Access it belongs to: `mail`, `contacts`, `calendar`, `tasks`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `appearance`, `sound-display`, `screen`, `apps-files`, `software`, or the plugin's own id |
 | `timeout` | Optional: seconds before it's stopped (30, at most 300) |
 
 A `change` tool's call shows a notification with Undo (it stays in the history for an hour) and goes in
@@ -363,8 +364,10 @@ filling `undo` from that run's output (a new draft's new id).
 
 The command runs in the plugin's folder, with its `bin/` and Nightdrive's first in `PATH`. stdout is the result Claude
 reads (a JSON object also as structured content, at most 100 000 characters); an exit status other than 0 is an error
-Claude reads, with stderr as the message, so write that for a reader. A tool whose area is off in Access isn't listed at
-all. `python3 config/mcp/registry.py` lists what the server would give, and the files it left out and why.
+Claude reads, with stderr as the message, so write that for a reader. In Access each area's Read (the `read` tools),
+Modify (`change` and `act`) and Delete (`deletes`) is Allow, Ask or No: No leaves the tool out of the list, Ask shows the
+card before each call, and an `act` tool asks whatever the choice. `python3 config/mcp/registry.py` lists what the
+server would give, and the files it left out and why.
 
 An `act` tool's call first waits on Nightdrive's confirmation card, which shows the tool's `title` and every argument
 as plain text, each labelled with its schema `title` (else its name): give the arguments a user can check (`to`,

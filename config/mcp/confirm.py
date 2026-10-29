@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """The confirmation card of Nightdrive's MCP server: an act tool (sending, devices, installing) runs only after the
-user allows it on screen (MCP 5, Dashboard #1766; registry.py calls ask() before running one).
+user allows it on screen (MCP 5, Dashboard #1766; registry.py calls ask() before running one), and so does any tool
+whose right the user set to Ask in Access (#1831): a read, a change, a delete. The card's heading says which, and a
+line says what follows from allowing it: a read goes to Anthropic, a change can be undone, a delete maybe not.
 
 The card is Quickshell's (config/quickshell/ClaudeConfirm.qml, IPC target claudeConfirm). It shows exactly what will
 be done: the tool, and every argument Claude gave it, as plain text. Enter or Allow allows, Esc or Deny refuses, and
@@ -32,7 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import access  # noqa: E402  (after the path above)
+import areas  # noqa: E402  (after the path above)
 from run import ToolError  # noqa: E402
 
 TIMEOUT = 60         # seconds the card waits for an answer; then it is a refusal
@@ -83,16 +85,41 @@ def field(name, prop, value):
             "mono": mono, "lines": lines, "chars": len(text)}
 
 
+# By what the call is: (heading, note, glyph). An act's own title says it ("Send an email"), as it did before Ask
+KINDS = {
+    "read": ("Claude wants to read", "What it finds is sent to Anthropic for Claude's answer.", "eye"),
+    "modify": ("Claude wants to change", "You can undo it from the notification that follows.", "pencil"),
+    "delete": ("Claude wants to delete", "It goes to the trash: you can undo it from the notification that follows.",
+               "trash-2"),
+    "act-delete": ("Claude wants to delete", "Nightdrive can't undo this.", "trash-2"),
+    "act": (None, None, "shield-alert"),
+}
+
+
+def kind(tool):
+    """The card's kind for a tool: its right, or act (sending, devices, installing) for what can't be undone."""
+    cls = getattr(tool, "cls", None) or tool.spec.get("class", "act")
+    right = getattr(tool, "right", None) or ("delete" if tool.spec.get("deletes") else
+                                             "read" if cls == "read" else "modify")
+    if cls == "act":
+        return "act-delete" if right == "delete" else "act"
+    return right
+
+
 def card(tool, arguments, timeout=TIMEOUT):
     """What the card shows: the tool, where it is from, and every argument, in the schema's order and then any
     others. Nothing is left out: what the user doesn't see, they didn't allow."""
     props = tool.spec["inputSchema"].get("properties", {})
     names = [n for n in props if n in arguments] + [n for n in arguments if n not in props]
     title = tool.spec.get("title") or tool.name
+    heading, note, glyph = KINDS[kind(tool)]
     return {
         "title": visible(str(title)),
-        "source": visible(access.AREAS.get(tool.area, tool.area)),
+        "source": visible(areas.name(tool.area)),
         "tool": tool.name,
+        "heading": heading,
+        "note": note,
+        "glyph": glyph,
         "fields": [field(n, props.get(n), arguments[n]) for n in names],
         "timeout": timeout,
     }
@@ -190,6 +217,13 @@ DEMOS = {
                 "inputSchema": {"type": "object", "properties": {
                     "entity": {"type": "string", "title": "Device"}, "state": {"type": "string"}}}},
                {"entity": "switch.sauna", "state": "on"}),
+    "read": ({"title": "Search mail", "class": "read", "area": "mail",
+              "inputSchema": {"type": "object", "properties": {
+                  "query": {"type": "string", "title": "Search"}, "account": {"type": "string"}}}},
+             {"query": "invoice from:telia", "account": "all"}),
+    "trash": ({"title": "Move a note to the trash", "class": "change", "area": "notes", "deletes": True,
+               "inputSchema": {"type": "object", "properties": {"path": {"type": "string", "title": "Note"}}}},
+              {"path": "Shopping.md"}),
     "package": ({"title": "Install software", "class": "act", "area": "software",
                  "inputSchema": {"type": "object", "properties": {
                      "package": {"type": "string"}, "source": {"type": "string"}, "options": {"type": "object"}}}},

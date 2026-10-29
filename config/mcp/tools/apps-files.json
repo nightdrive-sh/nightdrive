@@ -24,7 +24,7 @@
       "command": ["nightdrive", "windows", "shot", "{window}", "--json", "--inline"],
       "image": "image",
       "class": "read",
-      "area": "apps-files"
+      "area": "screen"
     },
     {
       "name": "windows_focus",
@@ -129,7 +129,8 @@
       "undo": ["nightdrive", "files", "restore", "--", "{names}"],
       "notice": "Moved {what} to the trash",
       "class": "change",
-      "area": "apps-files"
+      "area": "apps-files",
+      "deletes": true
     }
   ]
 }

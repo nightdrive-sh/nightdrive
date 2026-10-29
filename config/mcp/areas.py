@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""The rows of Settings › Claude › Access, in their order, and what each lets Claude do in plain words (plan: Dashboard
+#1761, the model #1831). A tool's `area` in mcp.json is one of these, or its plugin's own id (shown by that id).
+
+Each area has up to three rights, each Allow, Ask or No (levels.py has the presets):
+    read     what Claude can see of it, which goes to Anthropic with the answer
+    modify   what Claude can change or do in it (a `change` tool, with Undo, or an `act` tool: sending, devices,
+             installing, which never runs without the card, so at most Ask)
+    delete   what Claude can remove (a tool with "deletes": true)
+The words below finish "Claude …" in the Access window; a right an area has no tools for isn't shown at all.
+"""
+
+RIGHTS = ("read", "modify", "delete")
+
+AREAS = {
+    "nightdrive": {"name": "Nightdrive's docs and status", "glyph": "book-open",
+                   "read": "reads the docs and keys of this version, the version, plugins and displays",
+                   "modify": "undoes its own changes"},
+    "mail": {"name": "Mail", "glyph": "mail", "app": True,
+             "read": "searches and reads your mail: unread, whole threads, your accounts",
+             "modify": "writes new drafts and archives; sends a draft",
+             "delete": "moves mail to Trash"},
+    "contacts": {"name": "Contacts", "glyph": "contact", "app": True,
+                 "read": "finds people and reads their cards: emails, numbers, addresses, birthdays, notes"},
+    "calendar": {"name": "Calendar", "glyph": "calendar", "app": True,
+                 "read": "reads your calendars and their events, invitations included",
+                 "modify": "adds events (without guests, so no invitation goes out)",
+                 "delete": "deletes events"},
+    "tasks": {"name": "Tasks", "glyph": "list-checks", "app": True,
+              "read": "reads your lists and tasks",
+              "modify": "adds tasks, marks them done, moves them later",
+              "delete": "moves tasks to the trash"},
+    "notes": {"name": "Notes", "glyph": "notebook-pen", "app": True,
+              "read": "lists, searches and reads your notes in ~/Notes",
+              "modify": "writes new notes and adds to the end of one",
+              "delete": "moves notes to the trash"},
+    "deck": {"name": "Deck", "glyph": "disc-3", "app": True,
+             "read": "sees what plays, searches music and albums (the search words go to Spotify)",
+             "modify": "plays, queues, pauses and skips, likes songs"},
+    "ferry": {"name": "Ferry", "glyph": "smartphone", "app": True,
+              "read": "sees whether Ferry is on, your devices and the box",
+              "modify": "sends files or a text to your devices"},
+    "home-assistant": {"name": "Home Assistant", "glyph": "house", "app": True,
+                       "read": "reads your devices and sensors",
+                       "modify": "switches devices, runs scenes and automations"},
+    "notifications": {"name": "Notifications", "glyph": "bell-ring",
+                      "read": "reads the latest notifications of every app",
+                      "modify": "sends you a notification, turns Do Not Disturb on or off"},
+    "appearance": {"name": "Appearance", "glyph": "palette",
+                   "read": "sees your wallpaper and theme",
+                   "modify": "changes the wallpaper, theme, colour, night light and bar style"},
+    "sound-display": {"name": "Sound and display", "glyph": "volume-2",
+                      "read": "reads the volume, outputs, screens, network, Bluetooth and battery",
+                      "modify": "sets the volume, output and brightness; a screen's scale or resolution, the network off"},
+    "screen": {"name": "What's on screen", "glyph": "scan-eye",
+               "read": "takes a picture of a window on screen and looks at it"},
+    "apps-files": {"name": "Apps and files", "glyph": "folder",
+                   "read": "lists your open windows and the newest files in your folders",
+                   "modify": "opens apps, files and web addresses, brings a window forward",
+                   "delete": "moves files to the trash"},
+    "software": {"name": "Software", "glyph": "package",
+                 "read": "searches software, its details and what an install would change",
+                 "modify": "installs packages, Flatpaks and Nightdrive's plugins",
+                 "delete": "removes packages and Flatpaks"},
+}
+
+
+def name(area):
+    """The row's name; a plugin's own area by its id in words (disk-usage → Disk usage)."""
+    known = AREAS.get(area)
+    return known["name"] if known else area.replace("-", " ").capitalize()
+
+
+def glyph(area):
+    return AREAS.get(area, {}).get("glyph", "puzzle")
+
+
+def words(area, right):
+    return AREAS.get(area, {}).get(right, "")

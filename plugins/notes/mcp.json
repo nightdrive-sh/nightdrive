@@ -104,7 +104,8 @@
       "undo": ["notes", "restore", "--", "{names}"],
       "notice": "Moved the note {title} to the trash",
       "class": "change",
-      "area": "notes"
+      "area": "notes",
+      "deletes": true
     }
   ]
 }

@@ -46,7 +46,7 @@ usage() {
   row "mcp"                      "Nightdrive's MCP server for Claude (stdio: Claude Code starts it)"
   row "mcp install|remove"       "Register it in Claude Code and allow its tools, or take that away (asks first; --dry-run shows)"
   row "mcp status"               "Whether Claude Code has it, and its tools are allowed (--json)"
-  row "mcp access [level|area|act]" "What Claude may use: level strict|normal|open, area NAME off|read|change, act on|off"
+  row "mcp access [open|level|set]" "What Claude may use: open (the window), level strict|normal|open, set AREA read|modify|delete allow|ask|no"
   row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
   section "Apps"
   row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage), and which are installed"
@@ -843,7 +843,8 @@ case ${1:-} in
   mcp) case ${2:-} in
         "") exec python3 "$repo/config/mcp/server.py" ;;               # Dashboard #1761; Claude Code runs it
         install|remove|status) exec python3 "$repo/config/mcp/register.py" "${@:2}" ;;
-        access) exec python3 "$repo/config/mcp/access.py" "${@:3}" ;;  # Settings › Claude › Access
+        access) [[ ${3:-} == open ]] && exec "$repo/config/claude-access/claude-access" "${@:4}"  # the window
+                exec python3 "$repo/config/mcp/access.py" "${@:3}" ;;  # Settings › Claude › Access
         *) usage >&2; exit 1 ;;
       esac ;;
   welcome) exec "$repo/config/welcome/welcome" "${@:2}" ;;             # Welcome to Nightdrive (launcher › System › Set up Nightdrive)
