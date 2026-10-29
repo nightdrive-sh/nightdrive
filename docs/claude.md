@@ -200,6 +200,9 @@ two quiet seconds, five at most, and otherwise gives up, so what you type doesn'
 - Passwords and the keyring, and the windows Send to Claude leaves out (password managers, private browser windows, the
   apps you list there): Claude sees no title of theirs and no picture.
 - Hidden files and folders (`~/.ssh`, `~/.config`…): not listed, opened, trashed or sent with Ferry, on any level.
+- Nothing in `~/Mail`, `~/Notes`, `~/Projects`, another mail folder or a git repository goes to the trash, even on
+  Open: a mail file trashed there would be deleted from the server by the next sync. Nor does Claude open a web page,
+  an SVG, XML, an event or a contact file (they load from the internet or import as they open); you can, in Files.
 - Anything that can't be taken back without asking: no permanent delete (mail goes to Trash, files and notes to the
   trash), no recurring events deleted, no attachments Claude adds to a mail (your own draft's go, and the card names them).
 - Shutting down, users, the clipboard history.

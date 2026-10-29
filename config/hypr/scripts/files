@@ -16,8 +16,10 @@ file tools keep:
   (#1849; areas.py's apps-files `folders`, given to the tool's command as its own or its options_from): a path, where
   it lies and where it points, is in one of them or below it, so a link can't lead into one or out of one. Without
   that list (a tool that doesn't get it, one that can't be read) Claude may use none. Nor does it open or send a hard
-  link (a file with another name too, which nothing says where: one_name). Your own use has no such limit, nor has
-  restore: it only ever puts back, where it was, what a trash moved after this check (its undo).
+  link (a file with another name too, which nothing says where: one_name), nor open what does something as it opens
+  (a web page, an SVG, XML, an event or a contact file: ACTIVE), nor trash anything in your mail, notes or projects,
+  a mail folder or a git repository (GUARDED). Your own use has no such limit, nor has restore: it only ever puts
+  back, where it was, what a trash moved after this check (its undo).
 
   files recent [--in downloads|pictures|documents …] [--name TEXT] [--limit N] [--json]
                                    the newest files first (default 10, at most 50), in those folders and DEPTH levels
@@ -55,6 +57,16 @@ OPENABLE = ("text/", "image/", "audio/", "video/", "inode/directory", "applicati
             "application/json", "application/xml", "application/zip", "application/x-tar", "application/gzip",
             "application/x-compressed-tar", "application/x-7z-compressed", "application/vnd.rar")
 NOT_OPENED = ("text/x-shellscript", "text/x-python", "text/x-perl", "text/x-ruby", "application/x-desktop")
+# Not opened for Claude (#1883): what does something as it opens. A web page or an SVG opens in the browser, whose
+# requests (images, scripts, a form sent by itself) go out with no card; XML can fetch too; an event or a contact
+# file opens an import
+ACTIVE = ("text/html", "application/xhtml+xml", "image/svg+xml", "text/xml", "application/xml", "text/calendar",
+          "text/vcard", "text/x-vcard", "text/directory")
+# Where Claude's trash never reaches, whatever folders it may use (#1883): the mail store, whose next sync deletes on
+# the server what went from here (mbsync's Expunge Both); the notes; code. Also any mail folder (cur, new and tmp)
+# elsewhere, and any git repository, Nightdrive's own among them (its undo runs from it)
+GUARDED = {"Mail": "your mail", "Projects": "your projects"}
+NOTES = Path(os.environ.get("NOTES_DIR") or HOME / "Notes")   # plugins/notes/lib/store.py's ROOT
 # The folders Claude can use: Access's apps-files `folders` (config/mcp/areas.py). Its entries are ~, ~/A/B or one of
 # these, home's own folders by their English names, which xdg-user-dir finds wherever they are (~/Lataukset)
 ACCESS_AREA, ACCESS_OPTION = "apps-files", "folders"
@@ -146,6 +158,22 @@ def one_name(path, arg):
             "or send it. Copy it (cp) and give the copy.")
 
 
+def guarded(path):
+    """What of Claude's trash's no-go places (GUARDED) a path is in, in words; None when it is in none."""
+    places = {(HOME / name).resolve(): what for name, what in GUARDED.items()}
+    places[NOTES.resolve()] = "your notes"
+    for p in (path, *path.parents):
+        if p == HOME:
+            return None   # home itself in git (a dotfiles repo) doesn't guard all of it
+        if p in places:
+            return places[p]
+        if os.path.lexists(p / ".git"):
+            return "a git repository"
+        if all((p / d).is_dir() for d in ("cur", "new", "tmp")):
+            return "a mail folder"
+    return None
+
+
 def checked(arg, moving=False, sending=False):
     """The path a PATH argument means, by the rules above; dies with the reason otherwise. Its folder is resolved
     (no link leads it out), the last part is kept as it is: trashing a link moves the link, not what it points to."""
@@ -155,12 +183,16 @@ def checked(arg, moving=False, sending=False):
     # Claude's folders first, so a refusal doesn't tell whether something exists outside them
     if folders is not None and not within(p.parent.resolve() / p.name, folders, below=moving):
         refuse_outside(arg, folders)
+    # Out of home or hidden by where it would be, before anything about whether it is there: ~/.ssh/id_rsa and
+    # ~/.ssh/nothing get the same answer (Open's folders are the whole home, #1883)
+    if p.name in ("", ".", "..") or not inside_home(p.parent.resolve() / p.name):
+        die(f"{arg}: only files in your home folder, and none hidden (settings, keys, the trash).")
     try:
         folder = p.parent.resolve(strict=True)
     except OSError:
         die(f"{arg}: no such folder.")
     path = folder / p.name
-    if p.name in ("", ".", "..") or not os.path.lexists(path):
+    if not os.path.lexists(path):
         die(f"{arg} doesn't exist.")
     if not inside_home(path):
         die(f"{arg}: only files in your home folder, and none hidden (settings, keys, the trash).")
@@ -180,6 +212,8 @@ def checked(arg, moving=False, sending=False):
             refuse_outside(arg, folders)
         if not moving:
             one_name(path.resolve(), arg)
+        elif guarded(path):
+            die(f"{arg} is in {guarded(path)}: Claude doesn't move anything there to the trash. The user can, in Files.")
     return path
 
 
@@ -249,6 +283,9 @@ def cmd_open(a):
     if (runnable and not path.is_dir()) or ctype.startswith(NOT_OPENED) or not ctype.startswith(OPENABLE):
         die(f"{a.path} is {'a program or script' if runnable else ctype or 'of an unknown type'}: only documents, "
             "pictures, sound, video, text and folders are opened.")
+    if claude_folders() is not None and ctype in ACTIVE:
+        die(f"{a.path} is {ctype}, which does something as it opens (a web page loads from the internet): Claude "
+            "doesn't open it. The user can, in Files.")
     os.execv(str(SCRIPTS / "windows"), ["windows", "open", "--file", str(path), *(["--json"] if a.json else []),
                                         *(["--unless-typing"] if a.unless_typing else [])])
 

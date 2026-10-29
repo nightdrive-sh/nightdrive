@@ -41,23 +41,26 @@ case ${1:-} in
   current) if (( json )); then jq -n --arg p "$(current)" '{path: $p}'; else current; fi ;;
   set)
     f=$(readlink -m "${2:?usage: wallpaper set <file>}")   # -m: a missing folder still gets the message below
-    [[ -f $f ]] || { echo "not found: $f" >&2; exit 1; }
-    [[ ${f,,} =~ \.(jpe?g|png|webp)$ ]] || { echo "not an image swaybg shows (jpg, png, webp): $f" >&2; exit 1; }
     # From elsewhere: kept as an own image (the same name taken by another image gets a number)
-    if [[ $f != "$dir"/* && $f != "$(readlink -f "$own")"/* ]]; then
-      # Claude's (appearance_wallpaper) keeps its file rules and folders, as the copy would bring the image into
-      # Pictures (#1849); the wallpaper folders are this command's own, as appearance_wallpapers lists them
-      # (an absolute path only: files reads a relative one from home, this script from where it runs)
-      if [[ -n ${NIGHTDRIVE_MCP:-} ]]; then
-        [[ $2 == /* ]] || { echo "an absolute path, please: $2" >&2; exit 1; }
-        "$(dirname "$0")/files" check -- "$2" >/dev/null || exit 1
-      fi
+    elsewhere=0; [[ $f != "$dir"/* && $f != "$(readlink -f "$own")"/* ]] && elsewhere=1
+    # Claude's (appearance_wallpaper) keeps its file rules and folders, as the copy would bring the image into
+    # Pictures (#1849); the wallpaper folders are this command's own, as appearance_wallpapers lists them
+    # (an absolute path only: files reads a relative one from home, this script from where it runs). Before anything
+    # else, and the messages name the path as given, not where it leads: whether ~/.ssh/id_rsa is there, or where a
+    # link points, isn't Claude's to learn from a refusal (#1883)
+    if (( elsewhere )) && [[ -n ${NIGHTDRIVE_MCP:-} ]]; then
+      [[ $2 == /* ]] || { echo "an absolute path, please: $2" >&2; exit 1; }
+      "$(dirname "$0")/files" check -- "$2" >/dev/null || exit 1
+    fi
+    [[ -f $f ]] || { echo "not found: $2" >&2; exit 1; }
+    [[ ${f,,} =~ \.(jpe?g|png|webp)$ ]] || { echo "not an image swaybg shows (jpg, png, webp): $2" >&2; exit 1; }
+    if (( elsewhere )); then
       # By what it holds too, not its name alone: a key or a document renamed .png isn't copied into Pictures (#1866),
       # checked after Claude's folders (no hint of what lies outside them). By the formats' own first bytes (JPEG
       # ff d8 ff, PNG 89 50 4e 47, WebP RIFF….WEBP), so no `file` is needed
       magic=$(head -c 12 -- "$f" 2>/dev/null | od -An -tx1 | tr -d ' \n')
       [[ $magic == ffd8ff* || $magic == 89504e470d0a1a0a* || ( $magic == 52494646* && ${magic:16:8} == 57454250 ) ]] ||
-        { echo "not an image swaybg shows (its content isn't jpg, png or webp): $f" >&2; exit 1; }
+        { echo "not an image swaybg shows (its content isn't jpg, png or webp): $2" >&2; exit 1; }
       mkdir -p "$own"
       dst="$own/$(basename "$f")"; n=1
       while [[ -e $dst ]] && ! cmp -s "$f" "$dst"; do dst="$own/${f##*/}"; dst="${dst%.*}-$((++n)).${f##*.}"; done

@@ -116,10 +116,13 @@ class Files(unittest.TestCase):
                             "Claude may use none")
 
     def test_trash_inside_but_not_the_folder_itself(self):
-        status, _, err = self.run_files("trash", "--check", self.path("Projects/secret.txt"), folders=["~/Projects"])
+        # Not ~/Projects: Claude's trash never reaches it, listed or not (#1883, files_guard_test.py)
+        (self.home / "Archive").mkdir()
+        (self.home / "Archive/old.txt").write_text("x")
+        status, _, err = self.run_files("trash", "--check", self.path("Archive/old.txt"), folders=["~/Archive"])
         self.assertEqual(status, 0, err)
-        self.assert_refused(self.run_files("trash", "--check", self.path("Projects"), folders=["~/Projects"]))
-        self.assert_refused(self.run_files("trash", "--check", self.path("Projects/secret.txt"), folders=self.NORMAL))
+        self.assert_refused(self.run_files("trash", "--check", self.path("Archive"), folders=["~/Archive"]))
+        self.assert_refused(self.run_files("trash", "--check", self.path("Archive/old.txt"), folders=self.NORMAL))
 
     def test_recent_only_allowed(self):
         def names(folders):
