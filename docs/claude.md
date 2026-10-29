@@ -70,16 +70,20 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   Contacts has a box for each part of a card beside the name: *Company*, *Job title*, *Email addresses* and *Phone
   numbers*, on on Normal, as they are what Claude needs to write or call someone; *Street addresses*, *Birthday*, *Web
   addresses* and *Note*, off on Normal, as they are other people's. A part that is off isn't given, nor searched or
-  looked up by: Claude can't find who a number or a street belongs to. A note, when on, comes with card numbers, codes
-  and passwords masked. Claude's search needs a word of two characters or more and gives at most 25 people, so the
-  address book isn't read a letter at a time.
+  looked up by: Claude can't find who a number or a street belongs to. A note, when on, and the company, title and
+  nickname (a shared address book's are anyone's text) come with card numbers, codes and passwords masked. Claude's
+  search needs a word of two characters or more and gives at most 25 people, so the address book isn't read a letter
+  at a time.
 
   Mail, Calendar, Notes, Ferry and Notifications have *Codes, card numbers and passwords*, off on every level: what
   Claude reads there comes with them hidden, before it leaves your computer. One-time codes and meeting passcodes
   (`[code hidden]`), login and password reset links (`[login link hidden]`), card numbers with their expiry and CVV
   (`•••• 4242`), IBANs (`FI •••• 0785`), Finnish identity codes, passwords and API keys; a Ferry text that is a code or
-  a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. It goes by
-  patterns, so a code written in an unusual way may get through, and now and then a number that isn't one is hidden.
+  a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. Invisible
+  characters are taken out first and digits of other forms (`４`, `⁴`) read as 0–9, so a code split by them or spaced
+  out (`4 8 2 9 1 3`) is hidden too. A reply Claude drafts comes back with its quote hidden the same way: the card that
+  sends it shows `[code hidden]` where the mail has the code, and the draft goes out whole. It goes by patterns, so a
+  code written in an unusual way may get through, and now and then a number that isn't one is hidden.
   Turn it on for an area whose codes Claude should read (`nightdrive mcp access option mail secrets on`).
 
   What's on screen has a list instead, empty on every level: *Apps it sees without asking*. Its rows are the apps open

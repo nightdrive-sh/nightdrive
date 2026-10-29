@@ -16,14 +16,17 @@ numbers, passwords. They are replaced before the answer leaves the computer:
 The rest stays as it is: order and phone numbers, dates, prices and plain links aren't secrets, and the user often asks
 about them. So each rule wants proof: a card number passes Luhn and looks like one, an IBAN its mod-97 check, an identity
 code its check character, a code needs a word that says it is one ("code", "koodi", "PIN") next to it.
+Invisible characters go first, and digits of other forms become 0-9 (visible()): "48<zero-width space>2913" is a code.
 
 The registry applies it (registry.call) to the fields a tool's mcp.json names in `mask`, unless the user turned the area's
 choice `secrets` on in Access (areas.py). `python3 mask.py` masks stdin, for trying a text; mask_test.py has the samples.
 """
 
+import bisect
 import json
 import re
 import sys
+import unicodedata
 from urllib.parse import unquote
 
 CODE = "[code hidden]"
@@ -127,7 +130,7 @@ LABELS = [
            r"(?:vahvistus|kirjautumis)koodi"),
 ]
 LABELLED = [(kind, re.compile(r"(?<![\w-])(" + words + r")((?:(?:\*\*|__)?[ \t]*[:=：][ \t]*(?:\*\*|__)?[ \t]*\n?[ \t]*)|[ \t]+(?:is|on|was)[ \t]+)"
-                                    r"(\"[^\"\n]{1,200}\"|'[^'\n]{1,200}'|\d+(?:[ -]\d+)+#?(?!\S)|[a-z]{4}(?: [a-z]{4}){3}(?!\S)|[^\s\ue000\ue001]+)", re.I))
+                                    r"(\"[^\"\n]{1,200}\"|'[^'\n]{1,200}'|\d+(?:[ -]\d+)+#?(?=[.,;:)]*(?!\S))|[a-z]{4}(?: [a-z]{4}){3}(?!\S)|[^\s\ue000\ue001]+)", re.I))
             for kind, words in LABELS]
 
 
@@ -261,13 +264,16 @@ NOT_CODE = re.compile(r"postal|post|zip|area|country|qr|source|error|status|prom
                       r"asiakas|booking|varaus", re.I)
 NOT_CODE_AFTER = re.compile(r"reviews?|of|editor|block|snippet|style|quality|changes?|commits?|repo(?:sitory)?|signing|"
                             r"base|owners?", re.I)
-DIGITS = re.compile(r"(?<![\w.,:/+#€$£-])(?<!\d[ -])(?:G-)?(\d{4,8}|\d{3}[ -]\d{3}|\d{4}[ -]\d{4})"
+# A code as one number, or as digits spaced out one or two at a time ("4 8 2 9 1 3", "48-29-13"): read aloud the same
+DIGITS = re.compile(r"(?<![\w.,:/+#€$£-])(?<!\d[ -])(?:G-)?(\d{4,8}|\d{3}[ -]\d{3}|\d{4}[ -]\d{4}|"
+                    r"\d(?:[ -]\d){3,7}|\d\d(?:[ -]\d\d){1,3})"
                     r"(?![\w%€$£]|[.,:/-]\d|[ -]\d)")
 LETTERS_AND_DIGITS = re.compile(r"(?<![\w-])(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9]{2,8}(?:-[A-Z0-9]{2,8}){0,2}"
                                 r"(?![\w-])")
 NOT_A_CODE_TOKEN = {"2FA", "MFA", "OTP", "PIN", "PUK", "SMS", "G-", "4G", "5G", "3G", "MP3", "MP4", "A4", "USB-C"}
 SENTENCE = re.compile(r"(?<=[.!?])(?=\s)|(?<=\n)")   # where re.split cuts a text into sentences and lines
-LONE_CODE = re.compile(r"\s*(?:G-)?(?:\d{4,8}|\d{3}[ -]\d{3}|(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]{4,12})\s*")
+LONE_CODE = re.compile(r"\s*(?:G-)?(?:\d{4,8}|\d{3}[ -]\d{3}|\d(?:[ -]\d){3,7}|\d\d(?:[ -]\d\d){1,3}|"
+                       r"(?=[A-Z0-9-]*\d)(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]{4,12})\s*")
 DIAL_PASSCODE = re.compile(r"(,,\d{6,12}#(?:,,+)?\*?)(\d{4,10})(#)")   # a dial-in string's passcode: ,,845…#,,,,*123456#
 
 
@@ -286,18 +292,28 @@ def code_words(sentence):
 
 def codes_in(sentence, words, found):
     """The codes near a code word in one sentence."""
+    # The words in order, looked up by bisect: a long text of codes and code words isn't every number by every word
+    ends, starts = [w.end() for w in words], [w.start() for w in words]
+
+    def word_before(at, reach):   # a word that ends at most reach characters before at
+        i = bisect.bisect_right(ends, at)
+        return i > 0 and at - ends[i - 1] <= reach
+
+    def word_after(at, reach):    # a word that starts at most reach characters after at
+        i = bisect.bisect_left(starts, at)
+        return i < len(starts) and starts[i] - at <= reach
+
     spans = []
     for m in DIGITS.finditer(sentence):
-        for w in words:
-            after, before = m.start() - w.end(), w.start() - m.end()
-            year = re.fullmatch(r"(?:19|20)\d\d", m.group(1))
-            if (0 <= after <= (YEAR_REACH if year else CODE_REACH)) or (0 <= before <= CODE_BEFORE and not year):
-                spans.append(m.span())
-                break
+        year = re.fullmatch(r"(?:19|20)\d\d", m.group(1))
+        if word_before(m.start(), YEAR_REACH if year else CODE_REACH) or (not year and word_after(m.end(), CODE_BEFORE)):
+            spans.append(m.span())
+    numbers = list(spans)   # in order, apart: the last that starts before a token is the only one it can overlap
     for m in LETTERS_AND_DIGITS.finditer(sentence):
-        if m.group(0) in NOT_A_CODE_TOKEN or any(m.start() < e and s < m.end() for s, e in spans):
+        i = bisect.bisect_left(numbers, (m.end(),))
+        if m.group(0) in NOT_A_CODE_TOKEN or (i > 0 and numbers[i - 1][1] > m.start()):
             continue
-        if any(0 <= m.start() - w.end() <= 40 for w in words):
+        if word_before(m.start(), 40):
             spans.append(m.span())
     for s, e in sorted(spans, reverse=True):
         sentence = sentence[:s] + found.mark(CODE) + sentence[e:]
@@ -344,12 +360,37 @@ def lone_passwords(text, found):
     return re.sub(r"(?m)^([ \t]*)(\S+)([ \t]*)$", one, text)
 
 
+# --- Invisible characters -------------------------------------------------------------------------------------------
+# A model reads 482913 in "48<zero-width space>29<zero-width space>13" and in keycap emoji digits, but no rule above
+# would see a number there, and an injection can ask a sender to write a code so (Dashboard #1861). So before the
+# rules: format characters (zero-width spaces, soft hyphens, direction marks, the invisible tag letters of "ASCII
+# smuggling") go, marks on a digit go, and digits of other forms (fullwidth, superscript, circled, mathematical)
+# become 0-9. Only Claude's copy changes. A zero-width joiner or non-joiner between two letters of another script
+# stays: emoji families and Persian or Indic words need it.
+JOINERS = "\u200c\u200d"
+DIGIT_MARK = re.compile(r"(?<=[0-9])[\u0300-\u036f\u20d0-\u20ff\ufe00-\ufe0f]+")   # 4 + FE0F + 20E3, a keycap
+
+
+def visible(text):
+    out = []
+    for i, c in enumerate(text):
+        if unicodedata.category(c) == "Cf":
+            if c in JOINERS and 0 < i < len(text) - 1 and not text[i - 1].isascii() and not text[i + 1].isascii():
+                out.append(c)
+            continue
+        if not c.isascii() and unicodedata.digit(c, None) is not None:
+            c = str(unicodedata.digit(c))
+        out.append(c)
+    return DIGIT_MARK.sub("", "".join(out))
+
+
 # --- All together ---------------------------------------------------------------------------------------------------
 def mask(text):
     """text with its secrets hidden; anything else as it was."""
     if not isinstance(text, str) or not text:
         return text
     found = Found()
+    text = visible(text)
     text = re.sub("[\ue000\ue001]", lambda m: found.mark(m.group(0)), text)   # the text's own, kept as they are
     text = PRIVATE_KEY.sub(lambda m: found.mark(KEY), text)
     text = links(text, found)

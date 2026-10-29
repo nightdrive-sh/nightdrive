@@ -15,12 +15,13 @@
       },
       "command": ["contacts", "find", "--json", ["--limit", "{limit}"], "{query}"],
       "class": "read",
+      "mask": ["people.org", "people.title"],
       "area": "contacts"
     },
     {
       "name": "contacts_card",
       "title": "Contact card",
-      "description": "One person's card from the user's contacts: name, nickname and the accounts and card ids it comes from, and of company, title, email addresses, phone numbers, street addresses, web addresses, birthday (YYYY-MM-DD, or --MM-DD without the year) and note those the user's Access gives (a part it leaves out is missing, not empty; card numbers, codes and passwords in the note are masked). who is an id from contacts_find, an email address or a phone number (if Access gives those). An error says when no one matches.",
+      "description": "One person's card from the user's contacts: name, nickname and the accounts and card ids it comes from, and of company, title, email addresses, phone numbers, street addresses, web addresses, birthday (YYYY-MM-DD, or --MM-DD without the year) and note those the user's Access gives (a part it leaves out is missing, not empty; card numbers, codes and passwords in the note, company, title and nickname are masked). who is an id from contacts_find, an email address or a phone number (if Access gives those). An error says when no one matches.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -30,7 +31,7 @@
         "additionalProperties": false
       },
       "command": ["contacts", "card", "--json", "{who}"],
-      "mask": ["note"],
+      "mask": ["note", "org", "title", "nickname"],
       "class": "read",
       "area": "contacts"
     }

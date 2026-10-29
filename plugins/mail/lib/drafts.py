@@ -16,6 +16,7 @@ id, exactly (ids.py): never a query. A new draft gets the account's signature, a
 Failures go to stderr with exit status 1.
 """
 
+import importlib.util
 import json
 import os
 import smtplib
@@ -23,6 +24,7 @@ import ssl
 import subprocess
 import sys
 from email.utils import formataddr, getaddresses
+from pathlib import Path
 
 import blocked
 import compose
@@ -106,6 +108,26 @@ def discard(msgid):
     return {"discarded": msgid}
 
 
+# Claude gets a draft with its secrets hidden (config/mcp/mask.py: a code or a login link in the mail a reply quotes,
+# #1861), and gives that copy back to send: the card then shows "[code hidden]" where the draft has the code, and the
+# draft goes out whole. Loaded by its path: this folder's modules mustn't be shadowed by the server's, nor theirs by these
+MASK = Path(__file__).resolve().parents[3] / "config/mcp/mask.py"
+
+
+def masked(text):
+    spec = importlib.util.spec_from_file_location("nightdrive_mask", MASK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.mask(text)
+
+
+def same(have, shown):
+    """shown is the draft's text, or Claude's copy of it with the secrets hidden."""
+    if lines(have) == lines(shown):
+        return True
+    return MASK.exists() and lines(masked(have)) == lines(shown)
+
+
 def lines(text):
     """A text as compared: line ends and trailing spaces don't count, as the card doesn't show them."""
     return "\n".join(line.rstrip() for line in str(text or "").replace("\r\n", "\n").split("\n")).strip()
@@ -119,10 +141,9 @@ def differences(have, shown):
     for key in ("from", "to", "cc"):
         if pairs(have[key]) != pairs(shown.get(key, [] if key != "from" else "")):
             out.append(key)
-    if lines(have["subject"]) != lines(shown.get("subject")):
-        out.append("subject")
-    if lines(have["body"]) != lines(shown.get("body")):
-        out.append("body")
+    for key in ("subject", "body"):
+        if not same(have[key], shown.get(key)):
+            out.append(key)
     if sorted(have["attachments"]) != sorted(shown.get("attachments") or []):
         out.append("attachments")
     return out

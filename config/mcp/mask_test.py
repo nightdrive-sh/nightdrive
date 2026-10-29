@@ -120,5 +120,22 @@ class Registry(unittest.TestCase):
         self.assertEqual(self.call("mail", {"secrets": True})["text"], "Your verification code is 482913.")
 
 
+class Declared(unittest.TestCase):
+    """Fields that carry text someone else wrote are in their tool's `mask`: a draft's quote of a mail (#1861), the
+    subject a sent mail answers with, a shared address book's free text."""
+    WANT = {"mail": {"mail_draft": {"subject", "body"}, "mail_send": {"subject"},
+                     "mail_thread": {"subject", "messages.subject", "messages.text"}},
+            "contacts": {"contacts_find": {"people.org", "people.title"},
+                         "contacts_card": {"note", "org", "title", "nickname"}}}
+
+    def test_masks(self):
+        for plugin, tools in self.WANT.items():
+            spec = json.loads((HERE.parents[1] / "plugins" / plugin / "mcp.json").read_text())
+            masks = {t["name"]: set(t.get("mask", [])) for t in spec["tools"]}
+            for name, fields in tools.items():
+                with self.subTest(tool=name):
+                    self.assertLessEqual(fields, masks[name])
+
+
 if __name__ == "__main__":
     unittest.main()
