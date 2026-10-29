@@ -23,26 +23,6 @@ import Quickshell.Widgets
 PanelWindow {
     id: win
 
-    // A key in the footer: Lucide glyph (Enter, Ctrl, ...) or its name (Esc). A footer part's keys share one frame (footer, below).
-    component Keycap: Item {
-        property string key: ""
-        readonly property string glyph: win.keyGlyphs[key] || ""
-        width: label.implicitWidth; height: 19
-        Text {
-            id: label
-            anchors.centerIn: parent
-            // a letter (⌘C) and a function key (F3) stay capitals, and Hyper, a modifier with no symbol, is in capitals like
-            // the bar's tags
-            text: parent.glyph !== "" ? Icons.g(parent.glyph) : letter ? parent.key
-                : parent.key === "Hyper" ? "HYPER" : parent.key.toLowerCase()
-            color: Theme.dim
-            // a capital as big and heavy as the glyphs next to it (⌘ ⇧ V); a key name (esc) stays small
-            readonly property bool letter: parent.glyph === "" && (parent.key.length === 1 || /^F\d+$/.test(parent.key))
-            font { family: parent.glyph !== "" ? Icons.family : Theme.font; pixelSize: parent.glyph !== "" ? 12 : letter ? 14 : 11
-                   weight: letter ? Font.Medium : Font.Normal }
-        }
-    }
-
     // --- Tunables ---
     readonly property int iconSize: 28        // icon size (px)
     readonly property int rowHeight: 52       // row height (px)
@@ -168,10 +148,6 @@ PanelWindow {
     // The footer as key caps: "Ctrl+Enter: show in Apps  ·  Esc: back" → [{ keys: ["Ctrl", "Enter"], text: "show in Apps" }, ...].
     // "Enter creates …" (no colon) works too, and a letter alone with a colon ("C: set up"); a part that doesn't start with a
     // key is plain text.
-    readonly property var keyGlyphs: ({ Enter: "corner-down-left", Ctrl: "chevron-up", Shift: "arrow-big-up", Alt: "option", Cmd: "command",
-                                        Up: "arrow-up", Down: "arrow-down", Left: "arrow-left", Right: "arrow-right",
-                                        Backspace: "delete", Space: "space" })
-    readonly property var keySymbolNames: ({ "⌘": "Cmd", "⇧": "Shift", "⌥": "Alt", "⌃": "Ctrl", "⌫": "Backspace" })   // SHORTCUTS.md symbols → keyGlyphs
     readonly property var footerParts: footer === "" ? [] : footer.split(/\s+·\s+/).map(part => {
         const m = part.match(/^((?:Ctrl|Shift|Alt|Cmd|Enter|Esc|Tab|Space|Backspace|Up|Down|Left|Right|[A-Z](?=:))(?:\+(?:Ctrl|Shift|Alt|Cmd|Enter|Esc|Tab|Space|Backspace|Up|Down|Left|Right|[A-Z]))*)(?::\s*|\s+)(.*)$/)
         return m ? { keys: m[1].split("+"), text: m[2] } : { keys: [], text: part }
@@ -921,7 +897,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     }
 
     // A keybinding's keys → what Keybindings shows: [{ caps: ["⌘", "⇧", "S"] }, { text: "/" }, …]. Each combination goes
-    // in a key frame like a row's shortcut; between alternatives (" / ") and around a range (" … ") the separator stays
+    // in key caps like a row's shortcut; between alternatives (" / ") and around a range (" … ") the separator stays
     // text, and so do the words after a combination's keys ("⌘ + drag", "Delete in Settings › Background").
     function keyParts(keys) {
         const key = (t, last) => /^[⌘⇧⌥⌃⌫A-Z0-9,.=\-]$/.test(t) || /^(Hyper|Ctrl|Alt|Shift|Cmd|Enter|Esc|Tab|Space|Delete|Home|End|F\d+)$/.test(t)
@@ -1353,7 +1329,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         font { family: Theme.font; pixelSize: row.plain ? win.fontSize : nameText.subLine ? win.fontSize - 5 : win.fontSize - 6; weight: nameText.subLine ? win.fontWeight : Font.Normal
                                letterSpacing: nameText.subLine ? 0 : 1 }
                     }
-                    Rectangle {      // the row's shortcut (shortcutFor) in a key frame like the footer's, before the › of a submenu;
+                    Row {            // the row's shortcut (shortcutFor) as key caps like the footer's, before the › of a submenu;
                         id: shortcut     // not where the right side is taken. capKeys: a row's own keys (Settings › Apps › App shortcuts)
                         readonly property string keys: row.modelData.capKeys !== undefined ? row.modelData.capKeys
                             : !win.prefs.shortcuts || trailing.tag || row.modelData.keys !== undefined || row.armedNow
@@ -1361,20 +1337,13 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         // On a narrow card only where the whole name still fits beside it
                         visible: keys !== "" && (!win.narrow || nameText.x + nameText.implicitWidth + width + trailing.width + 60 < row.width)
                         anchors { right: trailing.left; rightMargin: trailing.text !== "" ? 18 : 0; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        width: shortcutCaps.implicitWidth + 14; height: 24; radius: 6
-                        color: "transparent"
-                        border { width: 1; color: Theme.dim }
-                        Row {        // the footer's keycaps: Lucide glyphs for ⌘ ⇧ ⌥ ⌃ (JetBrains Mono's ⇧ is a faint outline)
-                            id: shortcutCaps
-                            anchors.centerIn: parent
-                            spacing: 4
-                            Repeater {
-                                model: shortcut.keys.split(/\s+/).filter(k => k !== "").map(k => win.keySymbolNames[k] || k)
-                                Keycap { required property string modelData; key: modelData }
-                            }
+                        spacing: 4
+                        Repeater {
+                            model: shortcut.keys.split(/\s+/).filter(k => k !== "")
+                            KeyCap { required property string modelData; key: modelData; dim: !row.current }
                         }
                     }
-                    Row {            // Keybindings: a key's combinations in key frames like a row's shortcut (keyParts)
+                    Row {            // Keybindings: a key's combinations as key caps like a row's shortcut (keyParts)
                         id: keyFrames
                         visible: row.modelData.keys !== undefined
                         anchors { right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
@@ -1382,28 +1351,19 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         Repeater {
                             // On a narrow card only the first combination ("Hyper B / ⌘ B" → "Hyper B"): the name needs the room
                             model: !keyFrames.visible ? [] : win.narrow ? win.keyParts(row.modelData.keys).slice(0, 1) : win.keyParts(row.modelData.keys)
-                            Rectangle {
+                            Row {
                                 id: part
                                 required property var modelData
-                                readonly property bool frame: modelData.caps !== undefined
-                                width: frame ? partCaps.implicitWidth + 14 : partText.implicitWidth; height: 24; radius: 6
-                                color: "transparent"
-                                border { width: part.frame ? 1 : 0; color: Theme.dim }
-                                Row {
-                                    id: partCaps
-                                    visible: part.frame
-                                    anchors.centerIn: parent
-                                    spacing: 4
-                                    Repeater {
-                                        model: part.frame ? part.modelData.caps.map(k => win.keySymbolNames[k] || k) : []
-                                        Keycap { required property string modelData; key: modelData }
-                                    }
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 4
+                                Repeater {
+                                    model: part.modelData.caps || []
+                                    KeyCap { required property string modelData; key: modelData; dim: !row.current }
                                 }
                                 Text {
-                                    id: partText
-                                    visible: !part.frame
+                                    visible: part.modelData.caps === undefined
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: part.frame ? "" : part.modelData.text
+                                    text: visible ? part.modelData.text : ""
                                     color: Theme.dim
                                     font { family: Theme.font; pixelSize: win.fontSize - 5 }
                                 }
@@ -1617,7 +1577,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 }
             }
 
-            Flow {     // footer: the keys of this level, as key caps + what they do; on a narrow card in more lines
+            Flow {     // footer: each action's key caps (KeyCap), then what it does; on a narrow card in more lines
                 id: footerFlow
                 visible: win.footer !== ""
                 anchors.right: parent.right
@@ -1625,36 +1585,28 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 readonly property real natural: children.reduce((w, c) => w + (c instanceof Row ? c.implicitWidth + spacing : 0), 0) - spacing
                 width: Math.min(parent.width, natural + rightPadding)
                 rightPadding: 6
-                spacing: 6      // a part's leftPadding makes it 18 between parts
+                spacing: 6
+                // The main action (the first) at the right edge, like a dialog's default button: always in the same place
+                layoutDirection: Qt.RightToLeft
                 Repeater {
                     model: win.footerParts
                     Row {
                         id: part
                         required property var modelData
                         required property int index
-                        leftPadding: index > 0 ? 12 : 0
+                        // The first action with keys is the main one (Enter: open); the rest are quieter
+                        readonly property bool main: index === 0 && modelData.keys.length > 0
+                        rightPadding: index > 0 ? 12 : 0     // 18 between actions with the Flow's spacing (right to left)
                         spacing: 4
-                        Rectangle {      // one frame around the part's keys (⌃ ↵)
-                            visible: part.modelData.keys.length > 0
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: caps.implicitWidth + 12; height: 22; radius: 6
-                            color: "transparent"
-                            border { width: 1; color: Theme.dim }
-                            Row {
-                                id: caps
-                                anchors.centerIn: parent
-                                spacing: 4
-                                Repeater {
-                                    model: part.modelData.keys
-                                    Keycap { required property string modelData; key: modelData }
-                                }
-                            }
+                        Repeater {
+                            model: part.modelData.keys
+                            KeyCap { required property string modelData; key: modelData; dim: !part.main }
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            leftPadding: part.modelData.keys.length ? 3 : 0
+                            leftPadding: part.modelData.keys.length ? 4 : 0
                             text: part.modelData.text.charAt(0).toUpperCase() + part.modelData.text.slice(1)
-                            color: Theme.dim
+                            color: part.main ? Theme.text : Theme.dim
                             font { family: Theme.font; pixelSize: 12 }
                         }
                     }

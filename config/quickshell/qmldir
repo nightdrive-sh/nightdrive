@@ -1,6 +1,7 @@
 singleton Icons 1.0 Icons.qml
 singleton Theme 1.0 Theme.qml
 Sh 1.0 Sh.qml
+KeyCap 1.0 KeyCap.qml
 MenuRow 1.0 MenuRow.qml
 PrivacyApps 1.0 PrivacyApps.qml
 MicLevel 1.0 MicLevel.qml
