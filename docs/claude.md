@@ -145,8 +145,11 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
     kitty…, the lists `install.sh` uses), nor what would take one along.
   - *Plugins from other repositories*: off, Claude installs only Nightdrive's own plugins.
 
-  Its card says where the software comes from (Fedora, Flathub and whom it verified). Looking at what an install would
-  change asks Flathub about the app, as a search does.
+  Its card says where the software comes from (Fedora, Flathub and whom it verified), and for a plugin the
+  repositories its installer adds. dnf then installs only from the repositories on the card and imports no signing
+  key (one not imported yet is yours to accept, from the Launcher), and with the choice off it won't remove what
+  Nightdrive needs whatever the transaction has come to. Looking at what an install would change asks Flathub about
+  the app, as a search does.
 
 Sending, devices, installing and turning Do Not Disturb on (it hides alerts) **always ask**, whatever the level or
 your choice: where all of an area's Modify or Delete is such, the choice is only *Ask* or *No*. Turning it off is a

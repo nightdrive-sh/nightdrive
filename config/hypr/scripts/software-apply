@@ -27,8 +27,12 @@ NIGHTDRIVE = os.path.realpath(os.path.join(HERE, "../../../bin/nightdrive"))
 FLATHUB = "https://dl.flathub.org/repo/flathub.flatpakrepo"
 WAIT = 280                                 # seconds: inside the tool's 300 s timeout (run.py), the dialog's wait included
 PREVIEW_TIMEOUT = 120                      # dnf's dry run refreshes its metadata first
-# dnf5's transaction table: a section title, then " name arch version repository size" rows
-SECTION = re.compile(r"^(Installing|Upgrading|Downgrading|Reinstalling|Removing)\b.*:$")
+# dnf5's transaction table: a header, then section titles, each with " name arch version repository size" rows
+TABLE = re.compile(r"^Package\s+Arch\s+Version\s+Repository\b")
+SECTION = re.compile(r"^(Installing|Upgrading|Downgrading|Reinstalling|Removing)( dependencies| weak dependencies"
+                     r"| group/module packages| dependent packages| unused dependencies)?:$")
+# Sections whose rows are groups, modules or a reason changed: no package comes or goes by them
+OTHER = re.compile(r"^(Changing reason|.*groups|.*modules?|.*module streams)( [a-z ]+)?:$")
 # What an ID may be (#1862): dnf takes a URL, an .rpm's path or a glob in a name's place too (a read, preview, would
 # fetch the URL), and a Flatpak command takes one that starts with - as an option. pkg-info keeps to the same
 DNF_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
@@ -48,21 +52,37 @@ def run(*cmd, timeout=60):
 
 
 def dnf_preview(action, name):
-    """The transaction dnf would make, as "name · repository" rows (an upgrade it pulls in is marked)"""
+    """The transaction dnf would make, as "name · repository" rows (an upgrade it pulls in is marked). A line of its
+    table that can't be read stops it (#1879): a row left out would be one the card doesn't show, and one Access's
+    checks don't see (a protected package's removal), so nothing is guessed"""
     p = run("dnf", action, "--assumeno", "--", name, timeout=PREVIEW_TIMEOUT)
-    rows, verb, space = [], None, ""
+    rows, verb, space, table = [], None, "", False
     for line in (p.stdout + p.stderr).splitlines():
-        m = SECTION.match(line)
-        if m:
-            verb = m.group(1)
-        elif verb and line.startswith(" "):
-            f = line.split()
-            if len(f) >= 4 and f[0] != "replacing":
-                rows.append(f"{f[0]} · {f[3]}" + ("" if verb in ("Installing", "Removing") else f" · {verb.lower()}"))
-        else:                                 # a blank line, the summary: the table is over
-            verb = None
         if line.startswith("After this operation"):
             space = line.removeprefix("After this operation, ").rstrip(".")
+        if TABLE.match(line):
+            table = True
+            continue
+        if not table:
+            continue
+        if not line.strip():                  # a blank line before the summary: the table is over
+            table, verb = False, None
+            continue
+        if not line.startswith(" "):
+            m = SECTION.match(line)
+            if m:
+                verb = m.group(1)
+            elif OTHER.match(line):
+                verb = "other"
+            else:
+                fail(f"dnf's preview has a part this can't read ({line.strip()!r}), so nothing was changed")
+            continue
+        f = line.split()
+        if verb == "other" or f[0] == "replacing":
+            continue                          # replacing: the old version an upgrade or reinstall takes the place of
+        if verb is None or len(f) < 4:
+            fail(f"dnf's preview has a row this can't read ({line.strip()!r}), so nothing was changed")
+        rows.append(f"{f[0]} · {f[3]}" + ("" if verb in ("Installing", "Removing") else f" · {verb.lower()}"))
     if not rows:
         said = " ".join(l.strip() for l in (p.stderr + p.stdout).splitlines()
                         if l.strip() and not l.startswith(("Updating and loading", "Repositories loaded", "Operation aborted")))
@@ -179,7 +199,8 @@ def apply(action, source, ident, check, as_json, show=False):
     elif not asked(f"{action.capitalize()}:\n  " + "\n  ".join(plan["packages"]) + (f"\n{plan['space']}" if plan["space"] else "")):
         fail("Nothing was done.")
     if source == "dnf":
-        rc, out = background(["pkexec", "/usr/bin/dnf", action, "-y", "--", ident])
+        rc, out = background(["pkexec", "/usr/bin/dnf", action, "-y",
+                              *claude.dnf_options(action, plan["packages"]), "--", ident])
     else:
         if action == "install":
             run("flatpak", "remote-add", "--user", "--if-not-exists", "flathub", FLATHUB)
@@ -195,6 +216,9 @@ def apply(action, source, ident, check, as_json, show=False):
         why = ("the system can't ask for the password here (no polkit, or no agent to show its dialog)"
                if re.search(r"authentication agent|authority", out) else "the system's dialog was closed or the password not given")
         fail(f"Nothing was {done}: {why}.")
+    elif rc and source == "dnf" and claude.options() is not None and re.search(r"OpenPGP|PGP key|GPG", out):
+        fail(f"Nothing was {done}: a package's signing key isn't imported yet, and Claude doesn't import one (no card "
+             f"shows it). Tell the user they can install it themselves (Launcher › Install › Software).\n{tail(out)}")
     elif rc:
         fail(f"{action.capitalize()} failed ({rc}):\n{tail(out)}")
     else:
@@ -215,7 +239,10 @@ def plugin_install(ident, check, as_json, show=False):
     if no:
         fail(no)
     if show:
-        print(json.dumps({"Plugin": p["name"], "Comes from": p["from"]}, ensure_ascii=False))
+        facts = {"Plugin": p["name"], "Comes from": p["from"]}
+        if p.get("repos"):                    # what dnf installs from later too, and Access's Software doesn't cover
+            facts["Adds repository"] = ", ".join(p["repos"])
+        print(json.dumps(facts, ensure_ascii=False))
         return
     if check and json.load(sys.stdin).get("from") != p["from"]:
         fail(f"Nothing was done: {p['name']} comes from {p['from']}, not from what was shown. Ask again with that.")

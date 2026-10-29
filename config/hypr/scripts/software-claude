@@ -11,6 +11,7 @@ own calls don't set it, so what the user does themselves is as it was.
                        too: a Fedora package can't bring one from RPM Fusion along
   nightdrive_packages  off: no removal whose transaction takes a package Nightdrive installs (install.sh's lists)
   any_plugin           off: only Nightdrive's own plugins, not one from another repository
+The transaction dnf then runs is its own, worked out again as root: dnf_options keeps it to what the card showed (#1879).
 """
 import glob, json, os, re, subprocess, sys
 import xml.etree.ElementTree as ET
@@ -25,6 +26,8 @@ NEEDED = ("packages.txt", "packages-hyprland.txt", "packages-pc.txt", "packages-
 FEDORA = {"fedora", "updates", "fedora-cisco-openh264", "copr:copr.fedorainfracloud.org:group_nightdrive:nightdrive"}
 # Fedora Asahi Remix's own, on a Mac: its kernel and mesa come from them, and many installs bring a mesa upgrade along
 ASAHI = re.compile(r"(copr:copr\.fedorainfracloud\.org:group_asahi:[\w.+-]+|fedora-asahi-remix-hotfixes)")
+# What the desktop needs that install.sh doesn't list: Fedora installs them, or they come as a dependency (#1879)
+SYSTEM = ("linux-firmware", "xorg-x11-server-Xwayland")
 APPSTREAM = "~/.local/share/flatpak/appstream/flathub/*/active/appstream.xml"
 VERIFY = "flathub::verification::"
 ACCESS = "the user's Access (Settings › Claude › Access › Software)"
@@ -50,8 +53,8 @@ def allowed(option):
 
 def needed():
     """The packages (and Flatpak app ids) install.sh installs, an @group's members among them (#1862): the group's
-    name is never a row of a removal, its members are"""
-    names, groups = set(), set()
+    name is never a row of a removal, its members are. SYSTEM's too"""
+    names, groups = set(SYSTEM), set()
     for name in NEEDED:
         try:
             with open(os.path.join(REPO, name)) as fh:
@@ -164,6 +167,22 @@ def remove_refusal(packages):
     return (f"Nothing was removed: it would take {', '.join(hit)} along, which Nightdrive needs, and {ACCESS} doesn't "
             "let Claude remove those (the desktop could stop working). The user can do it themselves (Launcher › "
             "Remove › Software) if they're sure; don't try it another way.")
+
+
+def dnf_options(action, packages):
+    """What keeps the transaction dnf runs (as root, worked out again) to the one the card showed: Claude's call only.
+    An install draws only on the repositories of its rows, so one whose metadata changed meanwhile can't add a row from
+    another (RPM Fusion's, say). No repository's signing key is imported: the card doesn't show one, and -y would say
+    yes to it, so a package only a key not yet imported can verify fails instead. And what Nightdrive needs dnf itself
+    won't remove (protected_packages adds to dnf's own list), whatever the transaction comes to by then."""
+    if options() is None:
+        return []
+    out = ["--setopt=*.gpgkey="]
+    if action == "install":
+        out += [f"--repo={r}" for r in sorted({r for _, r in rows(packages) if r})]
+    if not allowed("nightdrive_packages"):
+        out.append("--setopt=protected_packages=" + ",".join(sorted(needed())))
+    return out
 
 
 def plugin_refusal(name, origin):

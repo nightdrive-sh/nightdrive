@@ -21,7 +21,7 @@ BAR_ICONS = os.path.join(REPO, "config/topbar/icons")             # the bar's ow
 CORE_MODULES = os.path.join(REPO, "config/topbar/modules.jsonc")
 
 CONF_KEYS = ("name", "icon", "description", "default", "install", "installed", "packages", "units", "group", "version",
-             "author", "order", "setup", "configured", "welcome", "bundled")
+             "author", "order", "setup", "configured", "welcome", "bundled", "repos")
 CONF_NEEDED = ("name", "icon", "description", "installed", "version", "author")   # without installed it never counts
                                                              # as installed; version and author go in bug reports
 GROUPS = ("app", "recommended", "webapp", "plugin")
@@ -127,7 +127,26 @@ def check_conf(d, pid, icons):
     for k in ("install", "installed"):
         if conf.get(k) and (err := shell_syntax(conf[k], d)):
             find(path, at[k], f"{k}: {err}")
+    # An installer that adds a package repository says so: Claude's card for installing the plugin shows it (#1879)
+    if not conf.get("repos", "").strip() and adds_repo(d, conf.get("install", "")):
+        find(path, at.get("install", 1), "its installer adds a package repository: name it in repos=")
     return conf
+
+
+REPO_ADDED = re.compile(r"yum\.repos\.d|copr enable|config-manager|addrepo")
+
+
+def adds_repo(d, install):
+    """Whether the install command, or the script in the folder it names, adds a dnf repository"""
+    script = os.path.join(d, install.split()[0]) if install.split() else ""
+    text = install
+    if os.path.isfile(script):
+        try:
+            with open(script) as fh:
+                text = fh.read()
+        except (OSError, UnicodeDecodeError):
+            pass
+    return bool(REPO_ADDED.search(text))
 
 
 def shell_syntax(cmd, cwd):

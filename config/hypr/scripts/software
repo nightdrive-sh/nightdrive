@@ -95,15 +95,19 @@ def plugins():
         f = line.split("\t")
         if len(f) < 11:
             continue
-        version = ""
+        conf = {}
         if f[8]:
             try:
                 with open(os.path.join(f[8], "plugin.conf")) as fh:
-                    version = next((l.split("=", 1)[1].strip() for l in fh if l.startswith("version=")), "")
-            except OSError:
+                    conf = dict(l.rstrip("\n").split("=", 1) for l in fh if "=" in l and not l.startswith("#"))
+            except (OSError, ValueError):
                 pass
-        out.append({"id": f[0], "name": f[1], "description": f[3], "group": f[7], "installed": f[6] == "1",
-                    "on": f[6] == "1" and f[9] == "0", "version": version, "from": origin(f[10], f[8])})
+        row = {"id": f[0], "name": f[1], "description": f[3], "group": f[7], "installed": f[6] == "1",
+               "on": f[6] == "1" and f[9] == "0", "version": conf.get("version", "").strip(),
+               "from": origin(f[10], f[8])}
+        if conf.get("repos", "").strip():     # the package repositories its installer adds (#1879)
+            row["repos"] = conf["repos"].split()
+        out.append(row)
     return out
 
 

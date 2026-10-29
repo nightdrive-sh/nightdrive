@@ -72,6 +72,7 @@ author=@jarilehtinen
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
 | `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
+| `repos` | The package repositories the installer adds, separated by spaces: a repo's address, or `copr:owner/project`. Claude's card for installing the plugin shows them (`nightdrive plugin check` asks for it when the installer adds one) |
 | `units` | User units the installer set up outside the folder, space-separated (Ferry's `ferry.service`, which Ferry's own install writes): `nightdrive plugins off` stops them with the folder's `systemd/` ones |
 | `group` | Where it is listed: `plugin` (default, Install › Plugins: a feature of the desktop), `recommended` (Install › Recommended: an app Nightdrive sets up), `webapp`, or `app`: one of Nightdrive's own apps (below) |
 | `bundled` | For an `app`: `yes` (default) comes with every install; `no` doesn't (below) |
