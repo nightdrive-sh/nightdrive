@@ -221,7 +221,7 @@ ShellRoot {
 
     ClaudeWrite {}
 
-    ClaudeConfirm {}
+    ClaudeConfirm { id: confirm }
 
     Drawer {}
 
@@ -231,7 +231,8 @@ ShellRoot {
 
     Launcher {
         id: launcher
-        stepAside: polkit.asking
+        // a password prompt or Claude's card goes over it (a short card of Ask Claude's comes into the launcher instead)
+        stepAside: polkit.asking || (confirm.open && !confirm.inlined)
         extSource: root.localLauncher ? "local/LauncherExtension.qml" : ""
         onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.current = name }   // below its bar icon (-1 = none: right edge)
     }

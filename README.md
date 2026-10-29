@@ -48,9 +48,9 @@ Nightdrive puts all of that together into one opinionated desktop.
 - **Power**: lock, sleep, log out, restart and shut down
 - **Music**: while it plays, a player row above the list
 
-Type a request and press ⌘⌥Enter: Claude does it in the background with [Nightdrive's tools](docs/claude.md) and
-answers in a notification (⌘⌃Enter sends it to Claude Code in a terminal instead). Search "Rename current space" to name
-the workspace you're on in the bar.
+Type a request and press ⌘Enter, or Enter on the **Ask Claude** row: Claude does it with [Nightdrive's
+tools](docs/claude.md) right in the Launcher, showing each step and its answer, and you can write back (⌘⌃Enter sends
+it to Claude Code in a terminal instead). Search "Rename current space" to name the workspace you're on in the bar.
 
 It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and the answer is the first row; Enter
 copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal comma in results* answers `3,5`.
@@ -206,7 +206,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own) | a mailbox both ways with your phone and other computers, over Tailscale |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
 | Passwords (optional) | [1Password](plugins/1password/README.md) and its `op` CLI | Passwords level in the Launcher, SSH agent |
-| AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘⌥Enter asks from the Launcher, ⌘⌃Enter in a terminal, Claude writes (⌘⇧C), sessions and usage limits in the bar |
+| AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘Enter asks from the Launcher, ⌘⌃Enter in a terminal, Claude writes (⌘⇧C), sessions and usage limits in the bar |
 | Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet, offline) | hold F5 or Fn (Mac), Insert (PC) to talk |
 | Network | NetworkManager, BlueZ, [Tailscale](plugins/tailscale/README.md) | Wi-Fi, Bluetooth and Tailscale menus |
 | Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 %), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
@@ -457,8 +457,8 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | Keys | Action |
 |---|---|
 | ⌘ Space | Launcher |
-| ⌘ Enter | Terminal |
-| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, answered in the background with Nightdrive's tools only, the answer a notification (Claude Code without text) |
+| ⌘ Enter | Terminal (in the Launcher with text typed: Ask Claude, as ⌘⌥Enter) |
+| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, done with Nightdrive's tools only, its steps and answer in the Launcher (Claude Code without text) |
 | ⌘ ⌃ Enter | Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt) |
 | ⌘ C / ⌘ V / ⌘ X | Copy, paste, cut, in every app |
 | ⌘ S | Save |

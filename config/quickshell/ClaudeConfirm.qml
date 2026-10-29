@@ -35,6 +35,20 @@ PanelWindow {
     // Read when Allow or Enter is pressed, after armDelay, so the new card's height has been laid out by then
     readonly property bool seenAll: scrolledToEnd || flick.atEnd
     property var verdicts: ({})                 // id → allow | deny | timeout, until confirm.py collects it
+    // Shown in Ask Claude's conversation instead (AskClaudeConfirm.qml), when it is in view and the request is short:
+    // everything on it is on screen there at once, and its keys are Enter and Esc in Ask Claude's field. A long one
+    // (a mail's text) gets this card, to be read to the end; so does a short one if the conversation goes out of view
+    property bool inlined: false
+    readonly property int inlineFields: 6
+    Component.onCompleted: AskClaudeSession.card = win
+    Connections {
+        target: AskClaudeSession
+        function onViewingChanged() {
+            if (AskClaudeSession.viewing || !win.inlined || !win.open) return
+            win.inlined = false; win.keyArmed = false; win.armed = false
+            armTimer.restart()
+        }
+    }
 
     function show(path) {
         if (open) return "busy"
@@ -50,14 +64,16 @@ PanelWindow {
         grabbed = false; armed = false; keyArmed = false
         flick.contentY = 0
         scrolledToEnd = false
+        inlined = AskClaudeSession.viewing && r.fields.length <= inlineFields && r.fields.every(f => !f.long)
         open = true
         armTimer.restart()
+        if (inlined) keyTimer.restart()   // the launcher has the keyboard: Enter counts after the same moment
         return "shown " + Qt.md5(text)
     }
     function decide(v) {
         if (!open) return
         verdicts[req.id] = v
-        open = false; grabbed = false; armed = false; keyArmed = false
+        open = false; grabbed = false; armed = false; keyArmed = false; inlined = false
         armTimer.stop(); keyTimer.stop()
     }
     function grab() {
@@ -85,7 +101,7 @@ PanelWindow {
 
     // Input elsewhere keeps it from being idle: the card takes the keyboard once the typing has stopped
     IdleMonitor {
-        enabled: win.open && !win.grabbed
+        enabled: win.open && !win.grabbed && !win.inlined
         timeout: win.idleBeforeGrab
         respectInhibitors: false   // a video playing mustn't hold the keyboard back, nor give it away
         onIsIdleChanged: if (isIdle) win.grab()
@@ -98,7 +114,7 @@ PanelWindow {
         onTriggered: if (--win.left <= 0) win.decide("timeout")
     }
 
-    visible: open
+    visible: open && !inlined
     color: "transparent"
     implicitWidth: card.width
     implicitHeight: card.height

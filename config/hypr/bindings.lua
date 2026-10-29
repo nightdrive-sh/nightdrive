@@ -85,7 +85,16 @@ hl.bind = function (keys, action, opts)
 end
 
 -- Programs
-hl.bind(mod .. " + RETURN",      hl.dsp.exec_cmd(terminal))
+-- ⌘Enter: a terminal; over the launcher (it has the keyboard) Ask Claude with what was typed there, as ⌘⌥Enter, or on
+-- Ask Claude's row and level, where Enter asks, Claude Code in a terminal (askClaude key decides), and a terminal still
+-- when there's nothing to ask (an empty search, a menu has the keyboard): askClaude answers "" then
+hl.bind(mod .. " + RETURN", function ()
+    if NIGHTDRIVE_LAYER_HAS_KEYBOARD() then
+        hl.dispatch(hl.dsp.exec_cmd('[ "$(qs ipc call launcher askClaude key 2>/dev/null)" = ok ] || exec ' .. terminal))
+    else
+        hl.dispatch(hl.dsp.exec_cmd(terminal))
+    end
+end)
 hl.bind(mod .. " + ALT + RETURN", hl.dsp.exec_cmd(scripts .. "/ask-claude"))   -- Ask Claude: the launcher's text in the background, the answer a notification
 hl.bind(mod .. " + CTRL + RETURN", hl.dsp.exec_cmd(scripts .. "/terminal-or-claude"))   -- Claude Code in a terminal; the launcher's text becomes the prompt
 hl.bind(mod .. " + SPACE",       hl.dsp.exec_cmd("qs ipc call launcher toggle"))   -- Quickshell launcher

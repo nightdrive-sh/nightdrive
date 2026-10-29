@@ -74,6 +74,11 @@ ClaudeWriteLevels 1.0 ClaudeWriteLevels.qml
 SendCapture 1.0 SendCapture.qml
 SendClaudeLevels 1.0 SendClaudeLevels.qml
 AskClaudeHint 1.0 AskClaudeHint.qml
+AskClaudeLevels 1.0 AskClaudeLevels.qml
+AskClaudeField 1.0 AskClaudeField.qml
+AskClaudeThread 1.0 AskClaudeThread.qml
+AskClaudeConfirm 1.0 AskClaudeConfirm.qml
+singleton AskClaudeSession 1.0 AskClaudeSession.qml
 PolkitWatch 1.0 PolkitWatch.qml
 ClaudeConfirm 1.0 ClaudeConfirm.qml
 ClaudeConfirmField 1.0 ClaudeConfirmField.qml

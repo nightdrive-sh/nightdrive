@@ -112,11 +112,11 @@ PanelWindow {
     // SystemLevels (Wi-Fi, Bluetooth, Sound, Tailscale, Status), HomeLevels (Home Assistant), DefaultAppsLevels, AppKeyLevels
     // (App shortcuts), BehaviourLevels (Mouse, Launcher, Firefox, Computer name, Remote login, Notifications, Crash reports, Update channel), InstallLevels,
     // ToolsLevels (Clipboard, Emoji, Snippets), AppearanceLevels (Top bar, Screensaver), DisplayLevels (Display, Battery),
-    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, ClaudeAccessLevels, SendClaudeLevels, AboutLevels, the plugins' and the private
+    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, ClaudeAccessLevels, SendClaudeLevels, AskClaudeLevels, AboutLevels, the plugins' and the private
     // extension. A new file goes in this list, not in each question's code
     // The installed plugins' level files (their <Name>Levels.qml, TopBar.plugin.levels: Deck's Music) come after the core's
     property var pluginExts: []
-    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, caccess, sendclaude, about].concat(pluginExts, ext ? [ext] : [])
+    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, caccess, sendclaude, ask, about].concat(pluginExts, ext ? [ext] : [])
     // A plugin's row above the search field (topRow; Deck's player): the first file that has one. ↑ from the list's first
     // row selects it, its keys then go to topKey(event), and Ctrl+Space anywhere to topPress()
     readonly property var topExt: exts.find(e => e.topRow) || null
@@ -133,8 +133,10 @@ PanelWindow {
     // The selected row is an app: ⌃Enter shows it in Apps (the list with an empty query) or hides it from there.
     // "Hide", not "remove": removing sounded like uninstalling.
     readonly property var selApp: { const c = results[list.currentIndex]; return (level === "apps" || level === "root") && c && c.kind === "app" ? c : null }
-    // The level's or the row's keys, then ⌘⌥Enter when the search looks like a request for Claude (AskClaudeHint.qml)
-    readonly property string footer: askHint.shows(level, query, results) ? [levelFooter, askHint.text].filter(f => f !== "").join("  ·  ") : levelFooter
+    // The level's or the row's keys, then ⌘Enter when the search looks like a request for Claude (AskClaudeHint.qml); on
+    // the Ask Claude row its own
+    readonly property string footer: (results[list.currentIndex] || {}).kind === "askclaude" ? ask.rowFooter(query)
+        : askHint.shows(level, query, results) ? [levelFooter, askHint.text].filter(f => f !== "").join("  ·  ") : levelFooter
     readonly property string levelFooter: detail !== null ? details.footer
         : selApp ? "Enter: open  ·  Ctrl+Enter: " + (selApp.shown ? "hide from Apps" : "show in Apps")
                                               + "  ·  Alt+Enter: " + (autostartIds.indexOf(appId(selApp)) >= 0 ? "don’t start at login" : "start at login")
@@ -172,9 +174,9 @@ PanelWindow {
     function shot(mode) { return ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/screenshot\" \"$1\"", "_", mode] }
 
     // Passwords only with 1Password; the plugins' level files add their own (rootItems: Deck's Music)
-    readonly property var rootItems: [
+    readonly property var rootItems: ask.rootRows().concat([
         { kind: "nav", name: "Apps", glyph: "layout-grid", target: "apps" },
-    ].concat(Plugins.has("1password") ? [{ kind: "nav", name: "Passwords", glyph: "key-round", target: "passwords" }] : [], [
+    ], Plugins.has("1password") ? [{ kind: "nav", name: "Passwords", glyph: "key-round", target: "passwords" }] : [], [
         { kind: "nav", name: "Clipboard", glyph: "clipboard-list", target: "clipboard" },
     ], ...pluginExts.map(e => e.rootItems || []), home.rootItems, ext ? ext.rootItems : [], [
         { kind: "nav", name: "Tools", glyph: "wrench", target: "tools" },
@@ -550,6 +552,8 @@ PanelWindow {
         // The calculator's answer ("3*8" → "= 24") first, unless a name starts with what was typed: "7-zip" stays an app
         const sum = level === "root" ? calc.row(query) : null
         if (sum) res.splice(scored.filter(o => o.s <= 0.5).length, 0, sum)
+        // A search that looks like a request: Ask Claude right after the hits, before the plugins' rows (Search Spotify)
+        if (level === "root") { const t = res.findIndex(r => r.tail); res.splice(t < 0 ? res.length : t, 0, ...ask.tailRows(query, res)) }
         return level === "keys" ? grouped(res) : res
     }
     readonly property var results: items()
@@ -720,11 +724,13 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     function extCtrl(item) { const t = extOf(level); return !!(t && t.ctrlActivate && t.ctrlActivate(item)) }
     function extDelete() { const t = extOf(level); return !!(t && t.deleteSelected && t.deleteSelected()) }
     function extMove(dir) { const t = extOf(level); return !!(t && t.moveSelected && t.moveSelected(dir)) }   // Ctrl+Up/Down
-    // ⌘⌫ / ⌥⌫ in the query: a selection goes first, otherwise to the line start (word = only the word before the cursor)
+    // ⌘⌫ / ⌥⌫ in the query (or Ask Claude's field): a selection goes first, otherwise to the line start (word = only the
+    // word before the cursor)
     function deleteBack(word) {
+        const input = level === "askclaude" ? askField.edit : win.field
         if (input.selectedText !== "") { input.remove(input.selectionStart, input.selectionEnd); return }
         const end = input.cursorPosition
-        let start = 0
+        let start = input.text.lastIndexOf("\n", end - 1) + 1
         if (word) {
             start = end
             while (start > 0 && /\s/.test(input.text[start - 1])) start--
@@ -803,6 +809,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     ClaudeAccessLevels { id: caccess; launcher: win }
     SendClaudeLevels { id: sendclaude; launcher: win }
     AskClaudeHint { id: askHint; launcher: win }
+    AskClaudeLevels { id: ask; launcher: win; hint: askHint; field: askField }
     InstallLevels { id: inst; launcher: win }
     ToolsLevels { id: tools; launcher: win }
     AppearanceLevels { id: look; launcher: win }
@@ -963,18 +970,17 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         // ⌘⇧V (clipboard) over a text field (a level in a Levels file's `inputs`) opens Clipboard as a picker for it
         function openLevel(level: string): void { if (level === "clipboard" && tools.picker.begin()) return; win.open = true; win.go(level); win.keyLevel = level }
         function setQuery(text: string): void { input.text = text }
-        // askClaude background|terminal: with the launcher open and a non-empty query, sends the text to Claude Code:
-        // ⌘⌥Enter in the background, the answer a notification (hypr/scripts/ask-claude), ⌘⌃Enter in a terminal
-        // (hypr/scripts/terminal-or-claude). Returns "ok" or "".
+        // askClaude background|terminal: with the launcher open, sends the text typed to Claude Code (AskClaudeLevels.qml):
+        // ⌘Enter / ⌘⌥Enter on Ask Claude's level, where the conversation shows (hypr/scripts/ask-claude), ⌘⌃Enter in a
+        // terminal (hypr/scripts/terminal-or-claude), going on with the conversation from its level. Returns "ok", or ""
+        // when there's nothing to ask and the key does what it does elsewhere.
+        // key: ⌘Enter, which is the terminal on the Ask Claude row and level (Enter asks there), elsewhere background
         function askClaude(how: string): string {
-            const q = win.query.trim()
-            if (!win.open || q === "" || (win.level !== "root" && win.level !== "apps")) return ""
-            win.open = false
-            // the session's name (claude -n) is the question's start, to find it again in the Claude menu and /resume
-            const name = q.length > 40 ? q.slice(0, 40).replace(/\s+\S*$/, "") + "…" : q
-            const script = how === "background" ? "/ask-claude" : "/terminal-or-claude"
-            Quickshell.execDetached([win.scripts + script, "--name", name, "--", q])
-            return "ok"
+            if (how === "key") how = win.level === "askclaude" || (win.results[list.currentIndex] || {}).kind === "askclaude" ? "terminal" : "background"
+            if (!win.open || ["root", "apps", "askclaude"].indexOf(win.level) < 0) return ""
+            const text = win.level === "askclaude" ? askField.text : win.query
+            if (how === "terminal") return text.trim() === "" && win.level !== "askclaude" ? "" : (ask.terminal(text, win.level === "askclaude"), "ok")
+            return ask.submit(text) ? "ok" : ""
         }
         // rows: the open level's title, footer, selected index and rows as JSON, primitive fields only (automated testing)
         function rows(): string {
@@ -1063,8 +1069,12 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 sourceComponent: win.topExt ? win.topExt.topRow : null
             }
 
-            // Search field (+ path when in a sublevel)
+            // Search field (+ path when in a sublevel); Ask Claude's level has its own, of more lines
+            AskClaudeField { id: askField; launcher: win; levels: ask; width: parent.width; visible: win.level === "askclaude" }
+            AskClaudeThread { visible: askField.visible && (AskClaudeSession.entries.length > 0 || AskClaudeSession.busy); width: parent.width
+                              maxHeight: win.listRoom - (askField.height - 44); fontSize: win.fontSize; fontWeight: win.fontWeight }
             Row {
+                visible: !askField.visible
                 width: parent.width
                 height: 44
                 Text {

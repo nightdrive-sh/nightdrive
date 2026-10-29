@@ -4,13 +4,17 @@ With Nightdrive's tools on, Claude Code can use your desktop: find a mail and dr
 play an album, set the wallpaper, tell you which key does what. You ask in plain words in any Claude Code session (⌘⌃Enter
 in the Launcher, `nightdrive ask`, a terminal), and you decide in Settings how far it may go.
 
-**Ask Claude** is the quick way: type a request in the Launcher ("Open three Finnish news sites") and press ⌘⌥Enter.
-Claude Code does it in the background with Nightdrive's tools and nothing else (no shell, files, web pages, hooks or
-plugins of its own), so the card and Access below decide as always. A notification says it is working, with **Cancel**,
-and after 5 minutes it is stopped. The answer comes as a notification; a click on it, or **Open in terminal**, goes on
-with the same conversation in Claude Code, where it has its usual tools again. What the tools read in the background (a
-mail, a note) comes along, so look at what it asks then as in any session. Without the tools on, or without Claude Code,
-⌘⌥Enter opens the terminal as ⌘⌃Enter does.
+**Ask Claude** is the quick way: type a request in the Launcher ("Open three Finnish news sites") and press ⌘Enter, or
+Enter on the **Ask Claude** row (the first, and after the hits when what you typed looks like a request; with nothing
+typed it opens a field of several lines, Shift+Enter for a new line). The Launcher becomes a conversation: each step
+Claude takes, then its answer as it is written, and the field to write back. ⌃C stops it, ⌘N starts a new chat (so does
+a request from the search, or one after 15 minutes), and ⌘Enter there goes on with it in Claude Code in a terminal, where
+it has its usual tools again. Esc closes the Launcher without stopping Claude: the row says when it has answered.
+Claude Code works with Nightdrive's tools and nothing else (no shell, files, web pages, hooks or plugins of its own), so
+the card and Access below decide as always: a short card comes into the conversation (Enter allows, Esc denies), a long
+one on its own, and after 5 minutes a request is stopped. What the tools read (a mail, a note) comes along, so look at
+what it asks then as in any session. Without the tools on, or without Claude Code, Ask Claude says so; ⌘⌃Enter opens a
+terminal.
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.
@@ -201,7 +205,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Notes | **list, search, read (`~/Notes`)** | a new note, add to the end of one | **to the trash** |
 | Deck | what plays, search, albums | play, queue, pause and skip, like, Pick for me | |
 | Ferry | whether it's on, devices, the box | send files or a text to a device † | |
-| Home Assistant | devices and sensors (presence and location: a choice) | switch a device, lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
+| Home Assistant | devices and sensors (presence and location: a choice) | switch a device, dim a light (with Undo), lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
 | Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail) | send one, Do Not Disturb off; on † | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
