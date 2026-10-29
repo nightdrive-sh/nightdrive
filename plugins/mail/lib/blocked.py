@@ -23,6 +23,7 @@ import subprocess
 import sys
 from datetime import datetime
 
+from ids import string  # noqa: F401 (browse.py's too)
 from notify import name
 
 # One entry, as access.py checks it (config/mcp/areas.py has the same pattern): nothing that could leave its string
@@ -43,11 +44,6 @@ def entries():
         raise ValueError(f"Access's list of blocked mail has {bad[0]!r}, which isn't an address, a domain or "
                          "tag:NAME: nothing is shown")
     return listed
-
-
-def string(text):
-    """A string of the s-expression syntax."""
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def query(listed):

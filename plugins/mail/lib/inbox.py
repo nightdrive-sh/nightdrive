@@ -6,7 +6,8 @@ tools (mcp.json).
     inbox.py unarchive ID…           back to the inbox (archive's undo)
     inbox.py delete [--check] ID…    the inbox's copies to Trash, as Mail's d does
 
-An ID is a message's id, or a thread ("thread:0000000000000005"): then its messages in the inbox. Only what is in the
+An ID is a message's id, or a thread ("thread:0000000000000005"): then its messages in the inbox. Each must have
+exactly that form and find one message or thread (ids.py), or nothing moves: an id is never a query. Only what is in the
 inbox moves, so your own replies stay in Sent, and the moves are move.py's (Gmail's All Mail is kept). Prints
 {"moved": N, "ids": [the messages moved], "subjects": "…"}; nothing to move is an error.
 
@@ -21,9 +22,11 @@ import subprocess
 import sys
 
 import browse
+import ids
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-INBOX = "tag:inbox"
+INBOX = "(tag inbox)"
+ARCHIVED = '(folder (rx "Archive$"))'
 SUBJECTS_MAX = 100   # characters of "subjects", the line of a notification
 
 
@@ -31,50 +34,45 @@ def notmuch(*args):
     return subprocess.run(["notmuch", *args], capture_output=True, text=True, check=True).stdout
 
 
-def term(ident):
-    return ident if ident.startswith("thread:") else f'id:"{ident}"'
-
-
-def either(terms):
-    return "(" + " or ".join(terms) + ")"
-
-
-def subject(ident):
-    found = json.loads(notmuch("search", "--format=json", "--exclude=false", "--limit=1", term(ident)) or "[]")
+def subject(query):
+    """The subject of what an s-expression (ids.py) finds: a thread's, or a message's."""
+    found = json.loads(notmuch("search", "--format=json", "--exclude=false", "--limit=1", "--query=sexp", query) or "[]")
     if not found:
-        raise LookupError(f"No message or thread {ident}")
+        raise LookupError("No such message or thread")
     return found[0].get("subject", "")
 
 
-def subjects_of(ident):
+def subjects_of(query):
     """The subjects a thread (or a message) goes by: the thread's, and each of its messages' ("Re: …")."""
-    shown = json.loads(notmuch("show", "--format=json", "--body=false", "--exclude=false", term(ident)) or "[]")
-    return {subject(ident).strip()} | {m["headers"].get("Subject", "").strip() for m in browse.walk(shown, [])}
+    shown = json.loads(notmuch("show", "--format=json", "--body=false", "--exclude=false", "--query=sexp", query) or "[]")
+    return {subject(query).strip()} | {m["headers"].get("Subject", "").strip() for m in browse.walk(shown, [])}
 
 
-def check(idents, shown):
+def check(idents, terms, shown):
     """Each ID's subject is one the user was shown for it."""
     if len(shown) != len(idents):
         raise LookupError(f"Nothing deleted: {len(idents)} ids but {len(shown)} subjects; give one subject for each.")
-    for ident, said in zip(idents, shown):
-        if str(said).strip() not in subjects_of(ident):
-            raise LookupError(f"Nothing deleted: {ident}'s subject is {subject(ident)!r}, not {said!r}.")
+    for ident, query, said in zip(idents, terms, shown):
+        if str(said).strip() not in subjects_of(query):
+            raise LookupError(f"Nothing deleted: {ident}'s subject is {subject(query)!r}, not {said!r}.")
 
 
 def move(to, query, source, tag):
-    """The query's messages to the folder `to` from `source`; their ids and subjects."""
-    ids = notmuch("search", "--output=messages", "--exclude=false", query).split()
-    if not ids:
+    """The s-expression query's messages to the folder `to` from `source`; their ids and subjects."""
+    found = [i.removeprefix("id:") for i in notmuch("search", "--output=messages", "--exclude=false", "--query=sexp",
+                                                    query).split()]
+    if not found:
         return [], []
-    exact = either(f'id:"{i.removeprefix("id:")}"' for i in ids)
-    subjects = [subject(i.removeprefix("id:")) for i in ids]
-    out = subprocess.run([sys.executable, os.path.join(HERE, "move.py"), to, exact, source],
+    # Each message by its own id, quoted: a Message-ID with a quote in it stays one id
+    exact = ids.messages(found)
+    subjects = [subject(ids.message(i)) for i in found]
+    out = subprocess.run([sys.executable, os.path.join(HERE, "move.py"), "--sexp", to, exact, source],
                          capture_output=True, text=True, check=True).stdout
     result = json.loads(out)
     if result.get("error"):
         raise RuntimeError(result["error"])
-    notmuch("tag", tag, "--", exact)
-    return [i.removeprefix("id:") for i in ids], subjects
+    notmuch("tag", "--query=sexp", tag, "--", exact)
+    return found, subjects
 
 
 def summary(subjects):
@@ -87,18 +85,19 @@ def main():
     idents = [a for a in args if a != "--check"]
     if cmd not in ("archive", "unarchive", "delete") or not idents or ("--check" in args and cmd != "delete"):
         sys.exit("usage: inbox.py archive ID… | unarchive ID… | delete [--check] ID…")
+    terms = [ids.one(i) for i in idents]   # before anything else: an id that isn't one stops it all
     if "--check" in args:
-        check(idents, json.loads(sys.stdin.read() or "{}").get("subjects") or [])
-    asked = either(map(term, idents))
+        check(idents, terms, json.loads(sys.stdin.read() or "{}").get("subjects") or [])
+    asked = f"(or {' '.join(terms)})"
     if cmd == "unarchive":
-        moved = move("INBOX", f"{asked} and not {INBOX} and folder:/Archive$/", "Archive", "+inbox")
+        moved = move("INBOX", f"(and {asked} (not {INBOX}) {ARCHIVED})", "Archive", "+inbox")
     else:
-        moved = move("Archive" if cmd == "archive" else "Trash", f"{asked} and {INBOX}", "INBOX", "-inbox")
-    ids, subjects = moved
-    if not ids:
+        moved = move("Archive" if cmd == "archive" else "Trash", f"(and {asked} {INBOX})", "INBOX", "-inbox")
+    done, subjects = moved
+    if not done:
         where = "in Archive" if cmd == "unarchive" else "in the inbox"
         raise LookupError(f"Nothing moved: none of {', '.join(idents)} is {where}")
-    print(json.dumps({"moved": len(ids), "ids": ids, "subjects": summary(subjects)}, ensure_ascii=False))
+    print(json.dumps({"moved": len(done), "ids": done, "subjects": summary(subjects)}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

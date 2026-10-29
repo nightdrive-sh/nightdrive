@@ -15,6 +15,8 @@ import shutil
 import subprocess
 import sys
 
+import ids
+
 NEW = "folder:/INBOX$/ and tag:inbox and tag:unread and not tag:notified"
 # Mail sent from one of your accounts to another: its Message-ID is the Sent copy's, so notmuch adds the received file
 # to that message and gives it no new.tags. Tags belong to the message, not the file, so the inbox tag goes on by the
@@ -70,7 +72,8 @@ def announce():
 
 
 def wait(msgid):
-    m = json.loads(notmuch("show", "--format=json", "--body=false", f'id:"{msgid}"'))
+    # A stranger's Message-ID may hold a quote: quoted, it stays one message's id (ids.py)
+    m = json.loads(notmuch("show", "--format=json", "--body=false", "--query=sexp", ids.message(msgid)))
     while isinstance(m, list):
         m = m[0]
     h = m["headers"]

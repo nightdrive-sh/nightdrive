@@ -183,7 +183,7 @@ SyncState *
 | `nightmail settings` | Opens Mail's settings |
 | `nightmail sync` | Fetches new mail now and shows it |
 | `nightmail show ID`, `reply ID`, `claude ID` | A message by its notmuch id, as the notifications use them |
-| `nightmail archive ID…`, `unarchive ID…`, `delete ID…` | From the inbox to Archive (and back) or Trash, as `a` and `d` do; an ID is a message's id or a thread (`thread:…`) |
+| `nightmail archive ID…`, `unarchive ID…`, `delete ID…` | From the inbox to Archive (and back) or Trash, as `a` and `d` do; an ID is one message's id or a thread (`thread:…`), exactly, never a query |
 | `nightmail unread`, `search QUERY [LIMIT]`, `thread ID`, `accounts` | Mail as JSON, without the window: unread threads, a notmuch search, a thread's messages as text |
 | `nightmail draft`, `draft-show ID`, `discard ID`, `send ID` | Drafts without the window: `draft` saves one from JSON on stdin (`{to, cc, subject, body, account}`, or a reply: `{reply_to, reply_all, body}`), with the signature and quote; `send` sends one |
 | `nightmail enable`, `disable` | Mail among the apps, its notifications and the sync, on or off (your mail and settings stay). Run `enable` again after changing `isyncrc`. |
