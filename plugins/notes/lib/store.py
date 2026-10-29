@@ -118,8 +118,10 @@ def brief(path, text=None):
 def new_path(title):
     """Where a new note titled so goes: its title as the file name ("Shopping list.md"), with a number after it when
     that is taken ("Shopping list 2.md")."""
-    name = re.sub(r"[/\\\x00-\x1f]", " ", title).strip().lstrip(".").strip()
-    name = re.sub(r"\s+", " ", name)[:NAME_MAX].strip() or "Note"
+    name = re.sub(r"[/\\\x00-\x1f]", " ", title)
+    # No leading dot once the spaces are squeezed: "../.bashrc" would be a hidden ".bashrc.md" that Notes doesn't list
+    # and its undo can't trash (#1863)
+    name = re.sub(r"^[\s.]+", "", re.sub(r"\s+", " ", name))[:NAME_MAX].strip() or "Note"
     path, n = ROOT / f"{name}{SUFFIX}", 2
     while path.exists():
         path, n = ROOT / f"{name} {n}{SUFFIX}", n + 1

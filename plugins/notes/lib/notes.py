@@ -15,6 +15,7 @@ Without --json they print text for a terminal. An error goes to stderr in plain 
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -91,8 +92,11 @@ def unappend(who, before, after):
 def trash(who):
     p = store.find(who)
     note = store.brief(p)
+    # Without the MCP server's variables: files would hold a note to the folders Access gives Claude's file tools,
+    # which ~/Notes isn't among, and fail every time (#1863). store.find has kept the path to a note in ~/Notes
+    env = {k: v for k, v in os.environ.items() if not k.startswith("NIGHTDRIVE_MCP")}
     done = subprocess.run([str(NIGHTDRIVE), "files", "trash", "--json", "--", str(p)],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, env=env)
     if done.returncode != 0:
         raise NoteError(done.stderr.strip() or "The note couldn't be moved to the trash.")
     return dict(json.loads(done.stdout), id=note["id"], title=note["title"])

@@ -163,7 +163,8 @@ def notify(entry_id, summary, body="", button=None):
     if button:
         cmd += ["-A", f"{button[0]}={button[1]}", "-w"]
     try:
-        out = subprocess.run(cmd + [summary, body], stdin=subprocess.DEVNULL, capture_output=True, text=True).stdout
+        out = subprocess.run(cmd + ["--", summary, body], stdin=subprocess.DEVNULL, capture_output=True,
+                             text=True).stdout
     except OSError:
         return None  # no notify-send: the log still has it, for Claude
     return out.strip() or None

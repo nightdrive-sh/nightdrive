@@ -73,7 +73,9 @@ def notify(tag, summary, body, actions):
     for key, name in actions:
         cmd += ["-A", f"{key}={name}"]
     try:
-        out = subprocess.run(cmd + [summary, body], stdin=subprocess.DEVNULL, capture_output=True, text=True).stdout
+        # -- first: a title that starts with - (--app-name=Mail) is the text, not an option (#1863)
+        out = subprocess.run(cmd + ["--", summary, body], stdin=subprocess.DEVNULL, capture_output=True,
+                             text=True).stdout
     except OSError:
         return None
     return out.strip() or None
