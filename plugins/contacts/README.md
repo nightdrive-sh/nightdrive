@@ -79,6 +79,10 @@ password-cmd = secret-tool lookup service carddav.googleapis.com user you@exampl
 
 Google's CardDAV with an app password works, but Google's own documentation asks for OAuth. If Google ever stops taking it, vdirsyncer's `google_contacts` with an OAuth client of your own is the way left.
 
+## Claude
+
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Contacts), Claude can search your contacts and read a whole card, notes and birthdays included, but not change them.
+
 ## In a terminal
 
 | Command | What it does |

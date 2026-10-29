@@ -66,6 +66,10 @@ still, the list and the message take turns.
 - **[Deck](plugins/deck/README.md)**: Spotify (Premium) with your albums on a shelf, in the bar, the Launcher and the media keys
 - **[Garage](plugins/garage/README.md)**: virtual machines from a ready-made Fedora or an ISO, with snapshots to go back to
 - **[Ferry](plugins/ferry/README.md)**: a mailbox over Tailscale between your computers and your phone
+- **[Notes](plugins/notes/README.md)**, **[Tasks](plugins/tasks/README.md)** and **[Calendar](plugins/calendar/README.md)**:
+  new, and simple for now. Their windows show your Markdown notes, your tasks (a notification when one comes due) and
+  your iCloud and Google calendars, and you add and change things with their commands or by asking Claude
+  ([Claude and your desktop](docs/claude.md))
 
 ![Mail four ways: folders, list and message; list and message; and in a narrow window the list, then the message](docs/releases/0.6.0-mail-sizes.jpg)
 
@@ -342,8 +346,8 @@ reports) and other Wi-Fi chips' firmware, listed in `packages-remove-asahi.txt`.
 At your first login, **Welcome to Nightdrive** opens and asks whether you have Claude Code (a Pro or Max plan).
 
 - **With Claude**, sign in there first, and choose how much Claude may use of your desktop (*Claude's access*, see
-  [Good to know](#good-to-know)). Then Claude sets up Tailscale, Mail, Contacts, Deck and Ferry with you, each in a
-  session of its own that does only that one thing.
+  [Claude and your desktop](docs/claude.md)). Then Claude sets up Tailscale, Mail, Contacts, Deck and Ferry with you,
+  each in a session of its own that does only that one thing.
 - **Without**, it shows each one's steps right there, one at a time in plain words.
 - **I'll do it myself** lists the apps, each opening its README in Apostrophe.
 
@@ -431,7 +435,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive files recent` | The newest files in Downloads, Pictures and Documents (`--in downloads`, `--name TEXT`, `--json`); `open PATH` opens one in its default app, `trash PATH…` moves to the trash and `restore NAME…` puts back. Only in your home folder and nothing hidden; programs and scripts aren't opened |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
 | `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also Launcher › Settings › Top bar › Date format |
-| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
+| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage, Notes, Tasks, Calendar) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
 | `nightdrive plugins` | Optional parts and whether each is installed and on; `nightdrive plugins install home-assistant` runs one's installer |
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |
 | `nightdrive software search gimp` | Fedora's packages and Flathub's apps, as System › Install › Software finds them; `info dnf ID` (or `flatpak`, `plugin`), `installed` and `plugins` tell more (`--json`). `install dnf ID` or `install flatpak ID` installs one, `remove` removes it, `preview install …` shows first what would change; dnf asks for the password in the system's own dialog |
@@ -546,7 +550,8 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   `nightdrive mcp install`), any Claude Code session can use your desktop as far as Access allows. *Strict* gives only
   Nightdrive's docs and status, *Normal* reading and changes you can undo, *Open* also sending, installing and devices,
   each only after your Enter on Nightdrive's own card. Each area (Mail, Appearance…) can be set apart: off, reads, or
-  reads and changes. An area that is off isn't there for Claude at all; passwords never are.
+  reads and changes. An area that is off isn't there for Claude at all; passwords never are. What each area gives, and
+  how to turn it off: [docs/claude.md](docs/claude.md).
 - **No credentials are stored in this repo.** Tokens stay with each app (Deck, Claude Code) or in 1Password.
 
 ## Want to participate?

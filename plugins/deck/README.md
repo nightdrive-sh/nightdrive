@@ -46,6 +46,10 @@ Curated needs that Spotify app too, and something to go on: your Last.fm listeni
 
 Deck's first start offers Set up with Claude: Claude Code goes through what is missing with you a step at a time, and without Last.fm, talks with you about the music you like and writes it down. `deck-window setup`, Curated's button and Welcome to Nightdrive (Launcher › System › Set up Nightdrive) do the same. Sign-ins happen only in your browser.
 
+## Claude
+
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Deck), Claude can tell what plays, search Spotify, play or queue an album or a song, pause and skip, like a track and Pick for me. Each change shows a notification with Undo, which goes back to what played before.
+
 ## In a terminal
 
 | Command | What it does |
