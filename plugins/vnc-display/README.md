@@ -24,7 +24,9 @@ Add the device in Settings › Other displays › Add a display: an iPad, iPhone
 
 In RealVNC Viewer, Touch panel mode under the connection's settings makes your finger a touchpad, which is easier for small targets. If the name doesn't connect (MagicDNS off in Tailscale), use the IP address Settings › Other displays shows.
 
-Another device works the same way with Tailscale and any VNC app: RealVNC Viewer on Android or a Mac, Remmina or TigerVNC on Linux. On a Mac, use RealVNC Viewer: macOS's own Screen Sharing (`vnc://`) doesn't speak this display's encryption.
+Another device works the same way with Tailscale and any VNC app: RealVNC Viewer on Android, Remmina or TigerVNC on Linux.
+
+On a Mac, use TigerVNC Viewer (free, no account: tigervnc.org, or `brew install --cask tigervnc-viewer`). macOS's own Screen Sharing can't connect, and RealVNC Viewer on a Mac wants an account. TigerVNC draws one pixel per point, not Retina's two, so `macbook-16` is 1728 × 1080 at scale 1: in full screen (F8 › Full screen) it fills the screen below the notch at the Mac's default size, softer than the Mac's own apps. It asks for the password every time.
 
 ## Limits
 

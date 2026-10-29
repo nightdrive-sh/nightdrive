@@ -65,7 +65,9 @@ size_of() {
     ipad-mini) echo "2266x1488 2 beside" ;;
     iphone) echo "1179x2556 3 away" ;;         # iPhone 15, 16
     iphone-max) echo "1320x2868 3 away" ;;     # iPhone 16 Pro Max
-    macbook-16) echo "3456x2234 2 beside" ;;   # MacBook Pro 16-inch (2021 on): its Retina panel at its default look
+    # MacBook Pro 16-inch (2021 on): a full-screen window below the notch at macOS's default look (1728x1117 points),
+    # one pixel per point: TigerVNC on a Mac isn't Retina-aware, so the panel's own 3456x2234@2 showed a quarter of it
+    macbook-16) echo "1728x1080 1 beside" ;;
     *x*@*)
       local w=${1%%x*} rest=${1#*x} h s
       h=${rest%@*} s=${rest#*@}
