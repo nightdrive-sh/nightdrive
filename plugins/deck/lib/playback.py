@@ -10,8 +10,11 @@ Deck's own commands do the work (`deck ctl …`, `deck status --json`); this add
   nothing else: not one the user queued since, nor one already played (#1860).
 - control ACTION / undo-control ACTION SNAPSHOT PLAYING: play, pause, next, previous, and back.
 - like true|false: the like as asked (Deck's own `like` toggles it).
-- play-album, play-song, queue-album, queue-song, pick: Deck's, started first if no Deck runs, waiting a moment for
-  the new track so the answer (and the notification) can name it.
+- play-album, play-song, queue-album, queue-song, pick, radio GENRE: Deck's, started first if no Deck runs, waiting a
+  moment for the new track so the answer (and the notification) can name it.
+- now-playing: `deck status --json`; genres: the genre radios there are, without their seeds.
+
+A Deck older than these commands answers with its usage: that becomes "update Deck", not the usage itself.
 
 Errors go to stderr in words for a reader, with exit status 1: Claude reads them.
 """
@@ -27,6 +30,9 @@ SNAPSHOTS = Path.home() / ".local/state/nightdrive/deck-undo"
 SNAPSHOT_AGE = 6 * 3600   # seconds; the undo log offers Undo for an hour, so older copies are only clutter
 WAIT = 4.0                # seconds to wait for Deck to start what it was told, before answering without it
 HERE = Path(__file__).resolve().parent
+TOO_OLD = ("This Deck is too old for Claude's tools (they need Deck 0.1.2 or newer): update it with Update in the "
+           "Launcher or nightdrive update, then ask again.")
+GENRE = re.compile(r"[a-z0-9][a-z0-9-]*")   # Deck's genre ids, e.g. synthwave, 80s-rock
 # What Claude's uris must be before they go to Deck (#1862): one that starts with - would be an option of its CLI
 URI = re.compile(r"spotify:(album|track):[A-Za-z0-9]+")
 URIS = {"play-album": ("album",), "queue-album": ("album",), "play-song": ("track", "album"),
@@ -43,6 +49,9 @@ def deck(*args, check=True):
         res = subprocess.run(["deck", *args], capture_output=True, text=True, timeout=20)
     except FileNotFoundError:
         raise Failed("Deck isn't installed (no deck command).")
+    # Deck exits 2 with its usage for a command it doesn't know: one older than status --json and ctl save
+    if res.returncode == 2 and (res.stderr or res.stdout).lstrip().startswith("usage: deck"):
+        raise Failed(TOO_OLD)
     if check and res.returncode != 0:
         raise Failed((res.stderr.strip() or res.stdout.strip() or f"deck {args[0]} failed").removeprefix("deck: "))
     return res.stdout
@@ -53,7 +62,7 @@ def status():
     try:
         return json.loads(out)
     except ValueError:
-        raise Failed("This Deck can't tell what plays (deck status --json): update Deck.")
+        raise Failed(TOO_OLD)
 
 
 def start_player():
@@ -104,7 +113,7 @@ def snapshot():
     end = time.monotonic() + WAIT
     while not path.is_file():
         if time.monotonic() > end:
-            raise Failed("Deck didn't save what plays (deck ctl save: update Deck), so the change couldn't be undone.")
+            raise Failed("Deck didn't save what plays (deck ctl save), so the change couldn't be undone.")
         time.sleep(0.1)
     state["snapshot"] = str(path)
     return state
@@ -210,7 +219,33 @@ def play(kind, *uris):
     return {"queue_length": len(queue), "queued": [t.get("uri") for t in queue[queued:]]}
 
 
+def genres():
+    """The genre radios: id and name, the seeds' artists to tell what it sounds like, own for the user's own."""
+    out = []
+    for g in json.loads(deck("genre", "list")):
+        # a seed is an artist ("The Byrds") or a track ("The Yardbirds · For Your Love"): the artist is enough
+        artists = list(dict.fromkeys(s.get("name", "").split(" · ")[0] for s in g.get("seeds") or []))
+        out.append({"id": g["id"], "name": g["name"], "artists": [a for a in artists if a],
+                    **({"own": True} if g.get("own") else {})})
+    return out
+
+
+def radio(genre):
+    # The id is checked against Deck's own list before it goes to its CLI, where one starting with - is an option
+    if not GENRE.fullmatch(genre) or genre not in {g["id"] for g in genres()}:
+        raise Failed(f"Deck has no genre {genre!r}: deck_genres lists them.")
+    start_player()
+    track = status().get("track_uri")
+    ctl("radio", genre)
+    st = wait_for(lambda st: (st.get("radio") or {}).get("genre") == genre and st.get("track_uri") != track
+                  and st.get("playing"))
+    return {**playing(st), "radio": (st.get("radio") or {}).get("name") or genre}
+
+
 COMMANDS = {
+    "now-playing": (0, status),
+    "genres": (0, genres),
+    "radio": (1, radio),
     "snapshot": (0, snapshot),
     "restore": (2, restore),
     "unqueue": (-1, unqueue),   # LENGTH, then the URIs (an undo logged before them has none: it refuses)

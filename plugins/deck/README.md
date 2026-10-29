@@ -48,7 +48,7 @@ Deck's first start offers Set up with Claude: Claude Code goes through what is m
 
 ## Claude
 
-With Nightdrive's tools for Claude on (Settings › Claude › Access › Deck), Claude can tell what plays, search Spotify, play or queue an album or a song, pause and skip, like a track and Pick for me. Each change shows a notification with Undo, which goes back to what played before.
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Deck), Claude can tell what plays, search Spotify, play or queue an album or a song, play a genre radio, pause and skip, like a track and Pick for me. Each change shows a notification with Undo, which goes back to what played before. The tools need Deck 0.1.2 or newer: an older one asks you to update.
 
 ## In a terminal
 

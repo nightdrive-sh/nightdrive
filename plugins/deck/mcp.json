@@ -5,7 +5,7 @@
       "title": "What plays in Deck",
       "description": "What plays in Deck, the user's Spotify player: running (false and nothing else when Deck isn't running), playing (false when paused), the track's title, artist and album, track_uri and album_uri, position_ms and duration_ms, liked (null when likes aren't available), queued (the track came from the queue), the queue (each track's uri, title, artist, duration_ms, album_uri), the genre radio playing (genre, name) and Deck's latest error. Makes no request to Spotify. Use it before changing what plays, and to answer what's playing.",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
-      "command": ["deck", "status", "--json"],
+      "command": ["python3", "lib/playback.py", "now-playing"],
       "class": "read",
       "area": "deck"
     },
@@ -133,6 +133,35 @@
       "command": ["python3", "lib/playback.py", "queue-song", "{track_uri}", "{album_uri}"],
       "before": ["python3", "lib/playback.py", "snapshot"],
       "undo": ["python3", "lib/playback.py", "unqueue", "{queue_length}", "{queued}"],
+      "class": "change",
+      "area": "deck",
+      "timeout": 60
+    },
+    {
+      "name": "deck_genres",
+      "title": "Deck's genre radios",
+      "description": "The genre radios Deck can play (deck_radio): each one's id, name and the artists it starts from, own true for one the user added. Makes no request to Spotify.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["python3", "lib/playback.py", "genres"],
+      "class": "read",
+      "area": "deck"
+    },
+    {
+      "name": "deck_radio",
+      "title": "Play a genre radio in Deck",
+      "description": "Plays a genre's radio in Deck (Deck's player starts if it isn't running), in place of what plays: endless tracks in that genre, e.g. for \"play some synthwave\". The genre's id from deck_genres. Returns what then plays. The user can undo it, back to what played before, where it was.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "genre": {"type": "string", "title": "Genre", "description": "The genre's id from deck_genres, e.g. synthwave", "pattern": "^[a-z0-9][a-z0-9-]*$"}
+        },
+        "required": ["genre"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/playback.py", "radio", "{genre}"],
+      "before": ["python3", "lib/playback.py", "snapshot"],
+      "undo": ["python3", "lib/playback.py", "restore", "{snapshot}", "{playing}"],
+      "notice": "Deck plays {radio} radio",
       "class": "change",
       "area": "deck",
       "timeout": 60
