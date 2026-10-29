@@ -2,7 +2,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// The launcher's footer hint that ⌘⌥Enter sends what was typed to Claude Code (askClaude in Launcher.qml's IpcHandler).
+// The launcher's footer hint that ⌘⌥Enter sends what was typed to Claude Code (askClaude in Launcher.qml's IpcHandler):
+// in the background with only Nightdrive's tools, the answer a notification (hypr/scripts/ask-claude, which opens a
+// terminal instead when the MCP server is off), and ⌘⌃Enter in a terminal (hypr/scripts/terminal-or-claude).
 // Few know the key, so it shows when the search looks like a request rather than a name: nothing found, three words or
 // more ("Soita jazzia Deckistä"), or two words that none of the hits has in its name. A one-word search with hits (an
 // app, a fuzzy "fierfox") stays as it was. Only when Claude Code is installed, at the path terminal-or-claude runs.
@@ -10,7 +12,7 @@ Item {
     id: h
     property var launcher: null
 
-    readonly property string text: "Cmd+Alt+Enter: Ask Claude"
+    readonly property string text: "Cmd+Alt+Enter: Ask Claude  ·  Cmd+Ctrl+Enter: in terminal"
     readonly property string claudeBin: Quickshell.env("HOME") + "/.local/bin/claude"
     property bool installed: false
 

@@ -30,7 +30,8 @@ Nightdrive puts all of that together into one opinionated desktop.
   dictation, and sleep is tuned for Asahi.
 - **Everything is a keystroke away.** One launcher handles apps, passwords, clipboard history, emoji, screenshots, settings,
   installing packages and power. You rarely need a terminal for everyday things.
-- **Apps of its own.** Mail, Contacts, Deck, Garage and Ferry come with it, made for the keyboard and in the desktop's colours.
+- **Apps of its own.** Mail, Contacts, Calendar, Tasks, Notes, Deck, Garage and Ferry come with it, made for the keyboard
+  and in the desktop's colours.
 - **Simple and readable.** Plain config files, a few small scripts, and comments that explain *why*.
 
 ## Highlights
@@ -58,9 +59,9 @@ copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal 
 
 ### Apps of its own
 
-Mail, Contacts, Deck and Ferry come with every install; Garage waits in Launcher › System › Install › Recommended. They're
-made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the sidebar steps aside; narrower
-still, the list and the message take turns.
+Mail, Contacts, Deck, Ferry, Notes, Tasks and Calendar come with every install; Garage waits in Launcher › System ›
+Install › Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the
+sidebar steps aside; narrower still, the list and the message take turns.
 
 - **[Mail](plugins/mail/README.md)**: any IMAP account, quiet reading, notifications you can answer from
 - **[Contacts](plugins/contacts/README.md)**: iCloud, Google or CardDAV, in sync both ways; Mail and the Launcher find them
@@ -132,8 +133,9 @@ fit go into a **…** menu, the ones farthest from the clock first.
 details before installing (Tab there takes Flathub's when both have it). Browse has the 100 most popular apps and
 categories. System › Remove takes software and web apps away; Ctrl+Enter there removes one without asking.
 
-Nightdrive's own apps (Mail, Contacts, Deck, Ferry) and Tailscale come with every install; Garage, Nightdrive's app for
-virtual machines, waits in System › Install › Recommended. The rest are optional parts, under System › Install:
+Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) and Tailscale come with every install;
+Garage, Nightdrive's app for virtual machines, waits in System › Install › Recommended. The rest are optional parts,
+under System › Install:
 
 - **Recommended**: apps Nightdrive sets up for you (1Password, Home Assistant…)
 - **Webapp**: ready-made web apps with a key, or any site of your own
@@ -269,9 +271,10 @@ A minimal Fedora gets what a desktop edition would have: it boots to the login s
 AirPlay in as on Fedora KDE, and SSH stays off until you turn on Remote login (Launcher › Settings), unless you install
 over ssh.
 
-Claude Code, Tailscale, Mail, Contacts, Deck and Ferry come with every install and stay quiet until you set them up. The
-optional parts that are on by default (Apostrophe, YouTube) come too; the rest can be added later from the Launcher
-(System › Install) or with `nightdrive plugins install ID` (`nightdrive apps install garage` for an app).
+Claude Code, Tailscale and Nightdrive's apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) come with every
+install and stay quiet until you set them up. The optional parts that are on by default (Apostrophe, YouTube) come too;
+the rest can be added later from the Launcher (System › Install) or with `nightdrive plugins install ID`
+(`nightdrive apps install garage` for an app).
 
 **Trying it on the system you already use?** Nightdrive doesn't remove your apps: on a Mac only the services listed
 under [Installer options](#installer-options) go (`--choose` unticks them). Your configs in `~/.config` are moved aside to
@@ -304,8 +307,8 @@ Give them to `./install.sh`, or after `--` in the curl line (`bash -s -- --choos
 | `--vm` | The virtual machine settings, if the VM isn't detected as one ([docs/vm.md](docs/vm.md)) |
 | `--no-nvidia` | On a PC, leaves an NVIDIA card's driver alone instead of installing RPM Fusion's ([docs/pc.md](docs/pc.md)) |
 | `--with 1password,slack` | These optional parts on top of the defaults (`--dry-run` lists the ids) |
-| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail, Contacts, Deck or Ferry too |
-| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale, Mail, Contacts, Deck and Ferry come with each |
+| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale or one of Nightdrive's apps (`mail`, `tasks`…) too |
+| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale and Nightdrive's apps come with each |
 | `--dry-run` | Shows the optional parts, the packages and system settings it would add and what it would remove, then stops |
 
 To pick the optional parts yourself, run `./install.sh --choose`: it lists them first (a number toggles one, Enter
@@ -347,8 +350,8 @@ reports) and other Wi-Fi chips' firmware, listed in `packages-remove-asahi.txt`.
 At your first login, **Welcome to Nightdrive** opens and asks whether you have Claude Code (a Pro or Max plan).
 
 - **With Claude**, sign in there first, and choose how much Claude may use of your desktop (*Claude's access*, see
-  [Claude and your desktop](docs/claude.md)). Then Claude sets up Tailscale, Mail, Contacts, Deck and Ferry with you,
-  each in a session of its own that does only that one thing.
+  [Claude and your desktop](docs/claude.md)). Then Claude sets up Tailscale, Mail, Contacts, Calendar, Tasks, Deck and
+  Ferry with you, each in a session of its own that does only that one thing.
 - **Without**, it shows each one's steps right there, one at a time in plain words.
 - **I'll do it myself** lists the apps, each opening its README in Apostrophe.
 
@@ -393,8 +396,9 @@ You can also update any time from the Launcher (**Update**) or a terminal:
 nightdrive update
 ```
 
-An install without one of Nightdrive's apps (Mail, Contacts, Deck, Ferry) gets it with the next update, once. Remove
-one, and it stays removed: Launcher › System › Install › Recommended or `nightdrive apps install mail` brings it back.
+An install without one of Nightdrive's apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) gets it with the next
+update, once. Remove one, and it stays removed: Launcher › System › Install › Recommended or
+`nightdrive apps install mail` brings it back.
 Settings › Apps › Nightdrive apps turns one off or on.
 
 It never overwrites your own edits: a repo with uncommitted changes is skipped with a note. On an install older than the
