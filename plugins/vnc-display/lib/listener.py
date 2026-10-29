@@ -7,7 +7,9 @@ capturing"), as wayvnc begins capturing the pointer before its first capture of 
 ~0.15 s later is fine, and the device knocks before the display, and so wayvnc, even exists. So a connection waits
 here until wayvnc has had READY seconds.
 """
+import functools
 import os
+import re
 import socket
 import subprocess
 import threading
@@ -16,10 +18,23 @@ import time
 READY = 0.5      # seconds wayvnc gets after its socket appears before a client is let through (measured: 0.15 is enough)
 START_WAIT = 5   # seconds to wait for wayvnc's socket
 CHUNK = 1 << 18
+DES_SINCE = (0, 10)   # the first wayvnc with the old VNC password (allow_broken_crypto); 0.9 stops at an unknown key
 
 
 def log(msg):
     print(msg, flush=True)
+
+
+@functools.cache
+def has_des():
+    """macOS's Screen Sharing speaks RFB 3.3 to a server that isn't Apple's, and there only the old VNC password (DES):
+    wayvnc 0.9 (neatvnc 0.9) knows neither, and the Mac says the software is incompatible (#1812)."""
+    try:
+        v = subprocess.run(["wayvnc", "--version"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    m = re.search(r"wayvnc: v?(\d+)\.(\d+)", v)   # "wayvnc: 0.9.1", or "wayvnc: v0.10.2-bb83745 (HEAD)" from git
+    return bool(m) and (int(m[1]), int(m[2])) >= DES_SINCE
 
 
 def local(address):
@@ -48,8 +63,9 @@ def relay(src, dst):
 
 
 class Listener:
-    """relax: Apple's own login (Diffie-Hellman, used by e.g. the Screens app) then leaves the picture unencrypted, which
-    is fine inside Tailscale's encryption but not on the home network."""
+    """relax: Apple's own login (Diffie-Hellman, used by e.g. the Screens app) and, with wayvnc 0.10 on, the old VNC
+    password (DES, macOS's Screen Sharing: only the password's first 8 characters count) then leave the picture
+    unencrypted, which is fine inside Tailscale's encryption but not on the home network."""
 
     def __init__(self, name, kind, conf, relax, run_dir, key, fps):
         self.name, self.kind, self.conf, self.relax = name, kind, conf, relax
@@ -101,6 +117,8 @@ class Listener:
             with os.fdopen(fd, "w") as f:
                 f.write(f"enable_auth=true\nusername={self.conf['username']}\npassword={self.conf['password']}\n"
                         f"rsa_private_key_file={self.key}\nrelax_encryption={'true' if self.relax else 'false'}\n")
+                if self.relax and has_des():
+                    f.write("allow_broken_crypto=true\n")
                 f.writelines(f"{k}={v}\n" for k, v in kb.items() if v)
             try:
                 os.remove(self.path("vnc"))
