@@ -2,7 +2,7 @@
 # The desktop's Quickshell (the top bars, their menus, the launcher, the notifications) under a small supervisor that
 # starts it again after a crash: without one, a crash left the session with no bar at all (#1826).
 #   desktop-shell run       the supervisor: hyprland.lua starts it at login instead of plain qs
-#   desktop-shell restart   a fresh qs, the supervised way: for agents and `nightdrive update` (not `qs kill; setsid -f qs`)
+#   desktop-shell restart   a fresh qs, the supervised way: `nightdrive restart`, `nightdrive update` (not `qs kill; setsid -f qs`)
 #
 # Why not a systemd unit: the user manager doesn't have Hyprland's environment (QV4_FORCE_INTERPRETER while Qt is older
 # than 6.12, QT_QPA_PLATFORM, the display), and the sandbox has no user manager. Started from Hyprland, this has both.
@@ -76,7 +76,7 @@ supervise() {
     crashes=("${recent[@]}" "$now")
     if (( ${#crashes[@]} >= CRASH_LIMIT )); then
       # Hyprland's own notice: notify-send needs the notification service, which is qs
-      hyprctl notify 0 "$GIVE_UP_NOTICE_MS" 0 "The top bar crashed ${#crashes[@]} times in $((CRASH_WINDOW / 60)) minutes and stays off. Start it: ~/.config/hypr/scripts/desktop-shell restart" >/dev/null 2>&1
+      hyprctl notify 0 "$GIVE_UP_NOTICE_MS" 0 "The top bar crashed ${#crashes[@]} times in $((CRASH_WINDOW / 60)) minutes and stays off. Start it: nightdrive restart" >/dev/null 2>&1
       exit 1
     fi
     crashed=1
