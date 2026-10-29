@@ -3,7 +3,7 @@
     {
       "name": "notifications_recent",
       "title": "Recent notifications",
-      "description": "The latest notifications the user has had on this desktop, newest first: app, summary, body and time (ISO 8601), and whether Do Not Disturb is on (dnd). Use it when the user asks what they missed, or what a notification said.",
+      "description": "The latest notifications the user has had on this desktop, newest first: app, summary, body and time (ISO 8601), and whether Do Not Disturb is on (dnd). left_out counts the notifications the user's Access keeps from Claude (some apps', Mail's of mail it blocks): don't look for them another way. Use it when the user asks what they missed, or what a notification said.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13,6 +13,7 @@
       },
       "command": ["nightdrive", "notifications", "list", "--json", ["--limit", "{limit}"]],
       "mask": ["notifications.summary", "notifications.body"],
+      "options_from": ["mail"],
       "class": "read",
       "area": "notifications"
     },
@@ -37,21 +38,23 @@
       "area": "notifications"
     },
     {
-      "name": "notifications_dnd",
-      "title": "Do Not Disturb",
-      "description": "Turn Do Not Disturb on or off: while it's on, notifications don't pop up or chime, and they still go into the history (notifications_recent shows whether it's on). Turning it on also hides the popups on screen now.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "state": {"type": "string", "enum": ["on", "off"]}
-        },
-        "required": ["state"],
-        "additionalProperties": false
-      },
-      "command": ["nightdrive", "notifications", "dnd", "{state}", "--json"],
+      "name": "notifications_dnd_on",
+      "title": "Turn Do Not Disturb on",
+      "description": "Turn Do Not Disturb on: notifications stop popping up and chiming (they still go into the history), and the popups on screen now go. It hides alerts, so the user allows it on Nightdrive's card: turn it on only when the user asked to. notifications_recent shows whether it's on.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "notifications", "dnd", "on", "--json"],
+      "class": "act",
+      "area": "notifications"
+    },
+    {
+      "name": "notifications_dnd_off",
+      "title": "Turn Do Not Disturb off",
+      "description": "Turn Do Not Disturb off: notifications pop up and chime again. notifications_recent shows whether it's on.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "notifications", "dnd", "off", "--json"],
       "before": ["nightdrive", "notifications", "dnd", "--json"],
       "undo": ["nightdrive", "notifications", "dnd", "{state}"],
-      "notice": "Turned Do Not Disturb {state}",
+      "notice": "Turned Do Not Disturb off",
       "class": "change",
       "area": "notifications"
     }

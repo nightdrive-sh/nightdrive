@@ -14,7 +14,7 @@ Claude writes (⌘⇧C) and Mail's replies don't get the tools: what they read c
 | --- | --- | --- |
 | **Reads** | search mail, today's events, what plays, the newest downloads, the docs | at once |
 | **Changes** | the wallpaper, the volume, a new task, a note, a draft, a file to the trash | at once, with a notification that has **Undo** |
-| **Actions with consequences** | sending mail, a Home Assistant device, installing software, a screen's resolution | only after you allow it on Nightdrive's card |
+| **Actions with consequences** | sending mail, a Home Assistant device, installing software, a screen's resolution, Do Not Disturb on | only after you allow it on Nightdrive's card |
 
 Any read, change or delete can ask on the card too: that is your choice in Access, area by area (below). On the
 Normal level, reading what is private (mail, contacts, calendar, notes, notifications, a window on screen) and every
@@ -86,6 +86,18 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   windows never, ticked or not. In a terminal: `nightdrive mcp access option screen apps add kitty` (a window class or
   the app's name), `remove` to take it off.
 
+  Mail has a list too, empty at first: *Mail Claude never gets*. Type an address (`maija@example.com`), a domain
+  (`bank.fi`, which takes `mail.bank.fi` along) or a tag (`tag:health`) in the field under it and press Enter; Space
+  takes the picked one off. Mail from or to an address or domain on it, and mail with a tag on it, isn't in Claude's
+  unread, searches or threads: a thread shows only its other messages, and a draft can't answer one. Its
+  notifications are left out of the latest notifications as well, as they name the sender and the subject. Your own
+  `nightmail` in a terminal still shows everything. `nightdrive mcp access option mail blocked add bank.fi`.
+
+  Notifications has *Apps whose notifications Claude doesn't see*, empty at first: its rows are the apps in the
+  notification history. `nightdrive mcp access option notifications apps add Signal` (the name a notification shows).
+
+  A list that hides can't be read (edited by hand, say): its area's Read goes to *No* until it is fixed.
+
   Software has three. What they leave out you install or remove yourself: the Launcher's Install and Remove are as
   they were.
   - *Install from any source*: off, every package of an install, dependencies too, comes from Fedora's own
@@ -97,8 +109,9 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
 
   Its card says where the software comes from (Fedora, Flathub and whom it verified).
 
-Sending, devices and installing **always ask**, whatever the level or your choice: where all of an area's Modify or
-Delete is such, the choice is only *Ask* or *No*. What Claude reads goes to Anthropic with its answer.
+Sending, devices, installing and turning Do Not Disturb on (it hides alerts) **always ask**, whatever the level or
+your choice: where all of an area's Modify or Delete is such, the choice is only *Ask* or *No*. Turning it off is a
+change with Undo. What Claude reads goes to Anthropic with its answer.
 
 **These choices cover only Nightdrive's tools.** What Claude Code may do with its own, running commands and editing
 files, is set in Claude Code, and a command can do what a tool here can't without asking: `nightmail` sends mail, `nightdrive
@@ -118,7 +131,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Area | Read | Modify | Delete |
 | --- | --- | --- | --- |
 | Docs and status | the docs and keys of this version, the version, plugins, displays | undo Claude's own changes | |
-| Mail | **unread, search, threads, accounts** | a new draft, archive; send a draft † | **to Trash †** |
+| Mail | **unread, search, threads, accounts** (without the senders, domains and tags you block) | a new draft, archive; send a draft † | **to Trash †** |
 | Contacts | **search, a card** (company, title, emails, numbers; addresses, birthday, web addresses, note: choices) | | |
 | Calendar | **calendars, events** | add an event | **an event †** |
 | Tasks | lists and tasks | add, done, later | **to the trash** |
@@ -126,7 +139,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Deck | what plays, search, albums | play, queue, pause and skip, like, Pick for me | |
 | Ferry | whether it's on, devices, the box | send files or a text to a device † | |
 | Home Assistant | devices and sensors (presence and location: a choice) | switch a device, lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
-| Notifications | **the latest** | send one, Do Not Disturb | |
+| Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail) | send one, Do Not Disturb off; on † | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output, brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |

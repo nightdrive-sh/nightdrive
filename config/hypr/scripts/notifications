@@ -11,8 +11,12 @@
                                                the text) lets `remove` take it away again; --json prints {tag, app,
                                                summary}
   notifications remove [--app NAME] TAG        takes away what that app sent with that stack tag: its popup and its row
+
+For Claude's tools (NIGHTDRIVE_MCP=1) the list leaves out what Access hides (Dashboard #1789): the apps on Access ›
+Notifications' list, and Mail's notifications of the mail Access › Mail blocks, which would tell Claude its sender
+and subject (`nightmail blocked-notifications` knows them; when it can't say, Mail's go). left_out counts them.
 """
-import argparse, datetime, hashlib, json, subprocess, sys
+import argparse, datetime, hashlib, json, os, subprocess, sys
 
 APP = "Nightdrive"   # send's and remove's app name when none is given
 
@@ -33,10 +37,14 @@ def ipc(*args):
     return p.stdout.strip()
 
 
-def latest(limit):
-    rows = json.loads(ipc("rows") or "[]")[:limit]
+MAIL_APP = "mail"    # Nightdrive Mail's notifications (plugins/mail/lib/notify.py's APP), in lower case
+# This checkout's Mail, as the server runs this checkout's tools (a worktree's); else the one in PATH
+NIGHTMAIL = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../plugins/mail/bin/nightmail")
+
+
+def latest():
     out = []
-    for r in rows:
+    for r in json.loads(ipc("rows") or "[]"):
         # time is ms since the epoch; an older Notifs.qml's rows have none
         t = r.get("time")
         when = datetime.datetime.fromtimestamp(t / 1000).astimezone().isoformat(timespec="seconds") if t else ""
@@ -44,10 +52,48 @@ def latest(limit):
     return out
 
 
+def env_json(key):
+    try:
+        value = json.loads(os.environ.get(key) or "{}")
+    except ValueError:
+        value = None
+    return value if isinstance(value, dict) else None
+
+
+def for_claude(rows):
+    """The rows Access lets Claude see. What can't be read hides: a list the server passes wrong hides everything."""
+    own, others = env_json("NIGHTDRIVE_MCP_OPTIONS"), env_json("NIGHTDRIVE_MCP_OPTIONS_FROM")
+    if own is None or others is None:
+        return []
+    hidden = {str(a).lower() for a in own.get("apps") or []}
+    rows = [r for r in rows if r["app"].lower() not in hidden]
+    mail = others.get("mail") or {}
+    mails = [r for r in rows if r["app"].lower() == MAIL_APP]
+    if not mail.get("blocked") or not mails:
+        return rows
+    try:
+        cmd = [NIGHTMAIL if os.path.exists(NIGHTMAIL) else "nightmail", "blocked-notifications"]
+        p = subprocess.run(cmd, input=json.dumps(mails, ensure_ascii=False), capture_output=True, text=True, timeout=20,
+                           env={**os.environ, "NIGHTDRIVE_MCP": "1", "NIGHTDRIVE_MCP_OPTIONS": json.dumps(mail)})
+        verdicts = json.loads(p.stdout) if p.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        verdicts = None
+    if not isinstance(verdicts, list) or len(verdicts) != len(mails):
+        verdicts = [True] * len(mails)   # Mail can't say which are blocked: none of its notifications go
+    gone = {id(r) for r, v in zip(mails, verdicts) if v is not False}
+    return [r for r in rows if id(r) not in gone]
+
+
 def cmd_list(a):
-    rows = latest(a.limit)
+    rows = latest()
+    total = len(rows)
+    if os.environ.get("NIGHTDRIVE_MCP") == "1":
+        rows = for_claude(rows)
+    left_out = total - len(rows)
+    rows = rows[:a.limit]
     if a.json:
-        print(json.dumps({"dnd": ipc("getDnd") == "true", "notifications": rows}, ensure_ascii=False))
+        print(json.dumps({"dnd": ipc("getDnd") == "true", "notifications": rows,
+                          **({"left_out": left_out} if left_out else {})}, ensure_ascii=False))
         return
     for r in rows:
         when = r["time"][11:16] if r["time"] else "     "

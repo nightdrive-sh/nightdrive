@@ -197,6 +197,7 @@ Usage: nightmail [command]
   discard ID     throw a draft away
   send ID        send a draft, through the account's SMTP server
   notify         notify of new mail (notmuch's post-new hook runs it)
+  blocked-notifications  which of Mail's notifications (JSON on stdin) are of mail Access › Mail keeps from Claude
   keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
   push           sync as soon as new mail comes to an inbox (IMAP IDLE; its service runs it)
   enable         Mail among the desktop's apps, its notifications and the sync every 5 minutes (the installer)
@@ -248,6 +249,7 @@ case ${1:-open} in
   draft-show)
     python3 "$APP_DIR/lib/drafts.py" show "${@:2}" ;;
   notify)    python3 "$APP_DIR/lib/notify.py" ;;
+  blocked-notifications) python3 "$APP_DIR/lib/blocked.py" notifications ;;   # `nightdrive notifications` for Claude
   fetch)     fetch "${@:2}" ;;
   keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
   push)      exec python3 "$APP_DIR/lib/push.py" ;;

@@ -23,6 +23,7 @@ import subprocess
 import sys
 from email.utils import formataddr, getaddresses
 
+import blocked
 import compose
 
 
@@ -68,6 +69,9 @@ def draft(f):
         raise LookupError(f"No account {f['account']!r}: the accounts are {', '.join(accs)}")
     text = str(f.get("body", "")).rstrip()
     if f.get("reply_to"):
+        # The reply quotes it: mail Access › Mail keeps from Claude isn't answered by Claude either (blocked.py)
+        if blocked.among([f["reply_to"]], blocked.query(blocked.entries())):
+            raise LookupError(f"No message {f['reply_to']} (it may have been deleted, or not synced yet)")
         r = compose.reply(f["reply_to"], bool(f.get("reply_all")))
         fields = {k: r[k] for k in ("to", "cc", "subject", "in_reply_to", "references")}
         fields["account"] = f.get("account") or r["account"]

@@ -10,8 +10,10 @@ format is left out with a line in the log; `python3 registry.py` shows what is l
 Each tool belongs to one right of its area (Tool.right: read, modify or delete; #1831), and Access gives that right
 Allow, Ask or No. No hides the tool; Ask, and an act tool always, runs it only once the user allows the call on the card.
 An area's own choices (access.Access.options, #1830) go to the tool too (Tool.keep): what one that is off takes away
-isn't in its schema, and its command gets them all to keep to. What a read tool gives passes through mask.py on its way
-to Claude (#1789): the fields its mcp.json names in `mask`, unless its area's choice `secrets` is on.
+isn't in its schema, and its command gets them all to keep to, and another area's too when its mcp.json names that
+area in `options_from` (the latest notifications keep to Mail's blocked list: a notification would tell what it hides).
+What a read tool gives passes through mask.py on its way to Claude (#1789): the fields its mcp.json names in `mask`,
+unless its area's choice `secrets` is on.
 
 The steps of phase 3 slot in as modules beside this one, found by name:
     confirm.ask(tool, arguments) -> bool     the card that allows a call (MCP 5, #1766). Without it, what asks is
@@ -63,6 +65,7 @@ class Tool:
         self.dir = folder         # where its command runs: the plugin's folder, config/mcp for the core's
         self.source = source      # the file, for the log
         self.options = {}         # its area's own choices as Access has them now: {id: on}
+        self.options_from = {}    # the choices of the other areas it names in options_from: {area: {id: on}}
 
     def keep(self, options):
         """Its area's own choices: its command gets them (run.environment), and the values that one that is off takes
@@ -126,6 +129,9 @@ def problem(spec, plugin):
                 isinstance(v, list) and isinstance(schema.get("properties", {}).get(p), dict)
                 and isinstance(schema["properties"][p].get("enum"), list) for p, v in props.items()):
             return f"{name}: options.{option} must give, per argument with an enum, the values it takes away"
+    others = spec.get("options_from", [])
+    if not isinstance(others, list) or not all(isinstance(a, str) and access.areas.options(a) for a in others):
+        return f"{name}: options_from must list areas that have choices of their own"
     if "card" in spec and not is_template(spec["card"]):
         return f"{name}: card must be a list of strings (and lists of them)"
     unknown = run.placeholders(spec.get("card") or []) - set(schema.get("properties", {}))
@@ -244,6 +250,7 @@ class Registry:
         shown = {n: t for n, t in tools.items() if rules.decide(t.cls, t.area, t.right) != "no"}
         for t in shown.values():
             t.keep(rules.options(t.area))
+            t.options_from = {a: rules.options(a) for a in t.spec.get("options_from", [])}
         return shown
 
     def list(self):

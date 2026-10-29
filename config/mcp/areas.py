@@ -14,7 +14,11 @@ in a sentence each. A level sets them (levels.OPTIONS), the user may set one apa
 mcp.json `options` takes values out of its arguments, and its command gets them (run.environment) and refuses.
 A choice with `"list": True` is a list the user keeps instead (window classes: the apps whose windows Claude sees
 without asking, #1832), empty at every level, with what being on it means (`on`) and not (`off`). Its command gets it
-the same way, and its `card` command may let a call on it past the card (confirm.facts).
+the same way, and its `card` command may let a call on it past the card (confirm.facts). One with `"hides": True` takes
+away instead (Mail's blocked senders, the apps whose notifications Claude doesn't see: #1789), so one that can't be read
+closes the area's Read rather than opening it (access.load). `item` is the pattern of one entry and `item_words` what it
+is in words, `offer` where the Access window finds entries to tick: the open apps (`windows`), the apps in the
+notification history (`notifications`), or none: typed (`typed`).
 """
 
 RIGHTS = ("read", "modify", "delete")
@@ -27,6 +31,10 @@ SECRETS = {"id": "secrets", "name": "Codes, card numbers and passwords",
            "off": "Claude reads them hidden (•••• 4242, [code hidden], [login link hidden]): the rest of the text, "
                   "order and phone numbers, dates and links, as it is."}
 
+# Mail's blocked list: an address, a domain or tag:NAME, with nothing that could leave a notmuch query's string
+# (plugins/mail/lib/blocked.py checks the same)
+MAIL_ENTRY = r'(?:tag:[^\s"()\\]{1,100}|(?:[^\s"()\\@<>]{0,64}@)?[^\s"()\\@<>.]{1,63}(?:\.[^\s"()\\@<>.]{1,63})+)'
+
 AREAS = {
     "nightdrive": {"name": "Nightdrive's docs and status", "glyph": "book-open",
                    "read": "reads the docs and keys of this version, the version, plugins and displays",
@@ -35,7 +43,17 @@ AREAS = {
              "read": "searches and reads your mail: unread, whole threads, your accounts",
              "modify": "writes new drafts and archives; sends a draft",
              "delete": "moves mail to Trash",
-             "options": [SECRETS]},
+             "options": [
+                 SECRETS,
+                 # Logs 3300, 3301: the bank, health, the people close to you can be left out whole; empty at first
+                 {"id": "blocked", "name": "Mail Claude never gets", "list": True, "hides": True, "offer": "typed",
+                  "item": MAIL_ENTRY, "item_words": "an address, a domain or tag:NAME",
+                  "words": "Mail from or to these addresses and domains (bank.fi: also mail.bank.fi), and mail with "
+                           "these tags (tag:health), isn't in Claude's searches, unread or threads, nor its "
+                           "notifications.",
+                  "on": "Claude never gets this mail.",
+                  "off": "Claude may read it."},
+             ]},
     "contacts": {"name": "Contacts", "glyph": "contact", "app": True,
                  "read": "finds people by name and reads the parts of their cards you tick in its choices",
                  # The parts of a card beside the name (#1789): what is off isn't searched or given, so a street or a
@@ -110,7 +128,15 @@ AREAS = {
     "notifications": {"name": "Notifications", "glyph": "bell-ring",
                       "read": "reads the latest notifications of every app",
                       "modify": "sends you a notification, turns Do Not Disturb on or off",
-                      "options": [SECRETS]},
+                      "options": [
+                          SECRETS,
+                          {"id": "apps", "name": "Apps whose notifications Claude doesn't see", "list": True,
+                           "hides": True, "offer": "notifications", "item_words": "an app's name",
+                           "words": "Their notifications aren't among the latest Claude reads. Mail's of the mail "
+                                    "Access › Mail blocks aren't either.",
+                           "on": "Claude doesn't see its notifications.",
+                           "off": "Claude sees its notifications."},
+                      ]},
     "appearance": {"name": "Appearance", "glyph": "palette",
                    "read": "sees your wallpaper and theme",
                    "modify": "changes the wallpaper, theme, colour, night light and bar style"},
@@ -120,7 +146,8 @@ AREAS = {
     "screen": {"name": "What's on screen", "glyph": "scan-eye",
                "read": "takes a picture of a window on screen and looks at it",
                "options": [
-                   {"id": "apps", "name": "Apps it sees without asking", "list": True,
+                   {"id": "apps", "name": "Apps it sees without asking", "list": True, "offer": "windows",
+                    "item_words": "a window class",
                     "words": "When reading asks, Claude takes a picture of these apps' windows without the card. "
                              "Password managers and private windows never, listed or not.",
                     "on": "Claude sees its windows without asking.",

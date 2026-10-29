@@ -10,7 +10,8 @@ const LEVELS = [
     { id: "strict", name: "Strict", about: "Only Nightdrive's docs and status: Claude explains how things work." },
     { id: "normal", name: "Normal", about: "Reading what is private (mail, people, calendar, notes, notifications, "
         + "the screen) asks you each time; the rest is allowed. Changes come with Undo; deleting asks." },
-    { id: "open", name: "Open", about: "Everything allowed. Sending, devices and installing still ask each time." }
+    { id: "open", name: "Open", about: "Everything allowed. Sending, devices, installing and Do Not Disturb on still "
+        + "ask each time." }
 ]
 
 // The menu's line under each choice

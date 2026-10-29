@@ -7,8 +7,10 @@ import "Words.js" as Words
 // ask and which come with Undo, so nothing Claude can do here is hidden behind a summary. The area's own finer
 // choices (Contacts' fields, Mail's block list, the apps whose windows Claude may see, Home Assistant's: Dashboard
 // #1789, #1830, #1832) go in this panel, under the rights: on or off each (OptionRow), ↑ ↓ and Space. A list choice
-// (the apps whose windows Claude sees without asking) is a row per app: those on it ticked, the open apps that aren't
-// under them, so Space or a click puts one on or takes it off.
+// is a row per entry: those on it ticked, and under them what areas.py's `offer` finds to add (the open apps for the
+// apps whose windows Claude sees without asking, those in the notification history for the ones whose notifications
+// it doesn't), so Space or a click puts one on or takes it off; a typed list (Mail's blocked senders) ends in a field
+// to add one (AddItemRow).
 AppPanel {
     id: root
     property var area: null             // the row's area as it was when the panel opened
@@ -21,14 +23,18 @@ AppPanel {
         let out = []
         for (const o of options) {
             if (!o.list) { out.push({ option: o, row: o }); continue }
-            const on = o.value.map(cls => ({ option: o, item: cls,
-                                             row: { name: openApps.name(cls), value: true, on: o.on } }))
+            const label = v => o.offer === "windows" ? openApps.name(v) : v
+            const on = o.value.map(v => ({ option: o, item: v, row: { name: label(v), value: true, on: o.on } }))
             const listed = o.value.map(v => v.toLowerCase())
-            const off = openApps.classes.filter(cls => listed.indexOf(cls.toLowerCase()) < 0)
-                .map(cls => ({ option: o, item: cls, row: { name: openApps.name(cls), value: false, off: o.off } }))
+            const offered = o.offer === "windows" ? openApps.classes : o.offer === "notifications" ? notifApps.names : []
+            const off = offered.filter(v => listed.indexOf(v.toLowerCase()) < 0)
+                .map(v => ({ option: o, item: v, row: { name: label(v), value: false, off: o.off } }))
                 .sort((a, b) => a.row.name.localeCompare(b.row.name))
             const rows = on.concat(off)
-            if (!rows.length) rows.push({ option: o, note: "None listed: open an app and it shows here to add." })
+            if (o.offer === "typed") rows.push({ option: o, add: true })
+            if (!rows.length) rows.push({ option: o, note: o.offer === "notifications"
+                ? "None listed: an app shows here to add once it has sent a notification."
+                : "None listed: open an app and it shows here to add." })
             rows[0].heading = o
             out = out.concat(rows)
         }
@@ -38,6 +44,8 @@ AppPanel {
     readonly property int margin: 24    // the window's edge to the card when it scrolls
     // The picked choice stays in view as ↑ ↓ move it
     onPickChanged: Qt.callLater(() => {
+        // A typed list's field takes the keys while picked (AddItemRow); anything else gives them back to the panel
+        if (visible && !(picks[pick] && picks[pick].add)) root.forceActiveFocus()
         const item = choiceRows.itemAt(pick)
         if (!item) return
         const y = item.mapToItem(body, 0, 0).y
@@ -48,13 +56,18 @@ AppPanel {
     cardWidth: 580
     visible: area !== null
     onOutsideTapped: area = null
-    onAreaChanged: { pick = Math.max(0, picks.findIndex(p => !p.note)); scroll.contentY = 0 }
+    onAreaChanged: {
+        pick = Math.max(0, picks.findIndex(p => !p.note && !p.add)); scroll.contentY = 0
+        // The area's own: `options` may not have followed it yet here
+        if (area && (area.options || []).some(o => o.offer === "notifications")) notifApps.refresh()
+    }
 
     OpenApps { id: openApps }
+    NotifApps { id: notifApps; nd: root.access ? root.access.nd : "" }
 
     function toggle(i) {
         const p = picks[i]
-        if (!p || p.note || !access) return
+        if (!p || p.note || p.add || !access) return
         pick = i
         if (p.item !== undefined) access.setListItem(live.id, p.option.id, p.item, !p.row.value)
         else access.setOption(live.id, p.option.id, !p.option.value)
@@ -192,11 +205,27 @@ AppPanel {
                             color: root.c.faint
                             font { family: root.c.font; pixelSize: 12 }
                         }
-                        OptionRow {
-                            visible: !pickRow.modelData.note
+                        AddItemRow {
+                            visible: !!pickRow.modelData.add
                             width: parent.width
                             c: root.c
-                            option: pickRow.modelData.row || ({})
+                            option: pickRow.modelData.option
+                            picked: visible && pickRow.index === root.pick
+                            onAdded: text => {
+                                const id = pickRow.modelData.option.id
+                                root.access.setListItem(root.live.id, id, text, true)
+                                // The new entry's row goes above the field: the field stays picked, for the next one
+                                Qt.callLater(() => root.pick = root.picks.findIndex(p => p.add && p.option.id === id))
+                            }
+                            onMoved: d => root.step(d)
+                            onClicked: root.pick = pickRow.index
+                            onEscaped: root.area = null
+                        }
+                        OptionRow {
+                            visible: !pickRow.modelData.note && !pickRow.modelData.add
+                            width: parent.width
+                            c: root.c
+                            option: pickRow.modelData.row || ({ name: "", value: false, on: "", off: "" })
                             picked: pickRow.index === root.pick
                             onToggled: root.toggle(pickRow.index)
                         }

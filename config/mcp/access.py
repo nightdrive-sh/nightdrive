@@ -10,7 +10,9 @@ areas    the user's own: per area, read / modify / delete, each allow, ask or no
          written, so a right put back to the level's value follows the level again
 options  the user's own of an area's own choices (areas.options: Home Assistant's locks, #1830), true or false, the
          same way. What can't be read is off: these only ever allow more. A list choice (the apps whose windows Claude
-         sees without asking, #1832) is a list of window classes: {"screen": {"apps": ["kitty"]}}; levels leave it empty
+         sees without asking, #1832) is a list of window classes: {"screen": {"apps": ["kitty"]}}; levels leave it
+         empty. A list that hides (Mail's blocked senders, #1789) keeps what of it can be read, and closes the area's
+         Read until it is fixed
 A tool belongs to one right of its area (registry.Tool.right). No: it isn't listed and can't be called. Ask: it runs
 only after the user allows that call on Nightdrive's card. Allow: it runs (a change with Undo). A tool with
 consequences (class act) is at most Ask. The server reads this file on every tools/list and tools/call, so a change
@@ -47,7 +49,12 @@ VERSION = 2
 UNCHOSEN = "normal"
 BROKEN = "strict"
 AREA_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
-LIST_ITEM = re.compile(r"[^\x00-\x1f\x7f]{1,200}")   # a window class: one line of text
+LIST_ITEM = re.compile(r"[^\x00-\x1f\x7f]{1,200}")   # a list's entry without a pattern of its own: one line of text
+
+
+def list_item(option):
+    """The pattern of one entry of a list choice (areas.py's `item`), else one line of text."""
+    return re.compile(option["item"]) if option.get("item") else LIST_ITEM
 
 
 def option_default(level, area, option):
@@ -181,12 +188,23 @@ def load(path=FILE):
     own_options = {}
     rows = data.get("options", {})
     for name, chosen in (rows.items() if isinstance(rows, dict) else []):
-        lists = {o["id"] for o in areas.options(name) if o.get("list")}
+        lists = {o["id"]: o for o in areas.options(name) if o.get("list")}
         for option, value in (chosen.items() if isinstance(chosen, dict) else []):
             if option in lists:
-                # A list only ever lets more through, so one that can't be read is empty
-                ok = isinstance(value, list) and all(isinstance(v, str) and LIST_ITEM.fullmatch(v) for v in value)
-                own_options.setdefault(name, {})[option] = value if ok else []
+                known = lists[option]
+                pattern = list_item(known)
+                items = value if isinstance(value, list) else []
+                kept = [v for v in items if isinstance(v, str) and pattern.fullmatch(v)]
+                ok = isinstance(value, list) and len(kept) == len(value)
+                if known.get("hides"):
+                    # A list that hides keeps what can be read, and as an entry lost would show what it hid, the
+                    # area's Read is closed until the list is fixed
+                    own_options.setdefault(name, {})[option] = kept
+                    if not ok:
+                        own.setdefault(name, {})["read"] = "no"
+                else:
+                    # A list that lets more through is empty when it can't be read
+                    own_options.setdefault(name, {})[option] = value if ok else []
                 if not ok:
                     bad.append(f"{name}.{option}")
             elif isinstance(value, bool):
@@ -196,6 +214,8 @@ def load(path=FILE):
                 bad.append(f"{name}.{option}")
         if not isinstance(chosen, dict):
             own_options[name] = {o["id"]: [] if o.get("list") else False for o in areas.options(name)}
+            if any(o.get("hides") for o in areas.options(name)):
+                own.setdefault(name, {})["read"] = "no"
             bad.append(name)
     problem = f"{path}: unknown value for {', '.join(bad)}: No" if bad else None
     return Access(level, own, problem, own_options)
@@ -263,8 +283,9 @@ def set_option(area, option, value, item=None, path=FILE):
     if known[option].get("list"):
         if value not in ("add", "remove") or item is None:
             raise ValueError(f"{area} {option} is a list: add VALUE, remove VALUE")
-        if not LIST_ITEM.fullmatch(item):
-            raise ValueError(f"not a window class: {item!r}")
+        item = item.strip()
+        if not list_item(known[option]).fullmatch(item):
+            raise ValueError(f"not {known[option].get('item_words', 'an entry')}: {item!r}")
         kept = [v for v in now.option(area, option) if v.lower() != item.lower()]
         now.own_options.setdefault(area, {})[option] = kept + ([item] if value == "add" else [])
     else:

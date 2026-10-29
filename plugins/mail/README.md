@@ -189,6 +189,6 @@ SyncState *
 | `nightmail enable`, `disable` | Mail among the apps, its notifications and the sync, on or off (your mail and settings stay). Run `enable` again after changing `isyncrc`. |
 | `nightmail restart`, `quit`, `log` | After a change to Mail, and its QML errors |
 
-Claude Code uses these too, with Nightdrive's tools for Claude (Settings › Claude › Access › Mail): it reads and searches your mail, writes drafts and archives, which you can undo, and sends or deletes only after you allow it on Nightdrive's card, which shows exactly what goes out: a message Claude reads can't send or delete anything.
+Claude Code uses these too, with Nightdrive's tools for Claude (Settings › Claude › Access › Mail): it reads and searches your mail, writes drafts and archives, which you can undo, and sends or deletes only after you allow it on Nightdrive's card, which shows exactly what goes out: a message Claude reads can't send or delete anything. Access › Mail › *Mail Claude never gets* keeps senders, domains and tags from it whole (`maija@example.com`, `bank.fi`, `tag:health`): that mail, and mail you sent them, isn't in its unread, searches or threads, nor its notifications in the latest notifications. Empty at first. These commands in a terminal give everything.
 
 Needs: notmuch, isync (mbsync), an IMAP account; Claude Code for Claude's replies

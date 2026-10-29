@@ -128,6 +128,9 @@ def environment(tool):
     # Its area's own choices in Access ({"unlock": false}), for the command to keep to: the schema already leaves out
     # what they take away, and a command that checks too can't be talked past (#1830)
     env["NIGHTDRIVE_MCP_OPTIONS"] = json.dumps(getattr(tool, "options", None) or {})
+    # …and those of the areas its mcp.json names in options_from ({"mail": {"blocked": […]}}): what another area hides
+    # mustn't come out through this one (#1789)
+    env["NIGHTDRIVE_MCP_OPTIONS_FROM"] = json.dumps(getattr(tool, "options_from", None) or {})
     return env
 
 
