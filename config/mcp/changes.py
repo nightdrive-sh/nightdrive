@@ -63,6 +63,16 @@ def write(entries):
     os.replace(tmp, FILE)
 
 
+def private():
+    """The log readable by the user alone, also one from before write() made it so: it stayed 644 until the next change
+    (#1865). `nightdrive mcp install` and `status` (the Access window reads it) call it."""
+    try:
+        if FILE.stat().st_mode & 0o077:
+            FILE.chmod(0o600)
+    except OSError:
+        pass
+
+
 @contextmanager
 def editing():
     """The entries under the log's lock, written back when the block ends: a short lock, never held while a command

@@ -114,8 +114,9 @@ def limits_problem(prop):
     return None
 
 
-def problem(spec, plugin):
-    """What is wrong with one tool's definition, in a few words; None when nothing is."""
+def problem(spec, plugin, external=False):
+    """What is wrong with one tool's definition, in a few words; None when nothing is. external: a plugin from outside
+    this repository, whose tools stay in its own area."""
     if not isinstance(spec, dict):
         return "a tool that isn't an object"
     name = spec.get("name")
@@ -140,6 +141,10 @@ def problem(spec, plugin):
     area = spec.get("area")
     if area not in access.AREAS and area != plugin:
         return f"{name}: unknown area {area!r} (Access's rows, or the plugin's id)"
+    # Not Nightdrive's own row (read even on Strict) nor Mail's: Access would show its tools there, under rules the
+    # user set for another's (#1865). Its own id only, and not one that is a row of Access already
+    if external and (area != plugin or area in access.AREAS):
+        return f"{name}: a plugin from outside Nightdrive keeps its tools in its own area ({plugin!r})"
     options = spec.get("options", {})
     if not isinstance(options, dict):
         return f"{name}: options must be an object"
@@ -204,7 +209,7 @@ def read_file(path, folder, plugin):
         return [], [f"{path}: must be an object with a list \"tools\""]
     tools, problems = [], []
     for spec in data["tools"]:
-        why = problem(spec, plugin)
+        why = problem(spec, plugin, external=plugin is not None and Path(folder).resolve().parent != REPO / "plugins")
         if why:
             problems.append(f"{path}: {why}: left out")
         else:

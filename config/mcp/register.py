@@ -16,11 +16,16 @@ import argparse
 import difflib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import changes  # noqa: E402  (after the path above)
 
 NAME = "nightdrive"                                   # the name in Claude Code: its tools are mcp__nightdrive__…
 RULE = f"mcp__{NAME}__*"
@@ -153,26 +158,55 @@ def allowed(allow):
 
 
 # Claude Code's own permissions that make Nightdrive's limits moot: with them Claude Code runs any command without
-# asking, `nightmail send` or `nightdrive mcp access level open` among them (Dashboard #1837). Only the user's own
-# settings.json is read: a project's settings apply in that project alone.
-WHOLE_BASH = ("Bash", "Bash(*)")
+# asking, `nightmail send` or `nightdrive mcp access level open` among them (Dashboard #1837). Read from the user's
+# settings.json and settings.local.json, which hold for every session (the second for those started in home too);
+# another project's own .claude/settings apply in that project alone, and aren't looked into.
+SETTINGS_LOCAL = HOME / ".claude" / "settings.local.json"
+# Commands that run any other, or Nightdrive's own: a rule that lets them run with any arguments lets everything
+ANY_COMMAND = re.compile(r"(?:ba|z|da|fi)?sh|python[\d.]*|perl|ruby|node|deno|bun|lua|php|env|xargs|exec|eval|sudo|"
+                         r"doas|pkexec|systemd-run|flatpak-spawn|nightdrive|nightmail|contacts|calendar|notes|tasks|"
+                         r"ferry|home-assistant|software-\w+")
 
 
-def wide_open(data):
-    """What in settings.json lets Claude Code past Nightdrive's limits, in plain words; [] when nothing does."""
-    perms = data.get("permissions")
+def any_command(rule):
+    """Whether one permissions.allow rule lets Claude Code run any command: Bash, Bash(*), Bash(*:*), or any arguments
+    to a shell, an interpreter or one of Nightdrive's own commands (Bash(nightdrive *), Bash(python3:*))."""
+    m = re.fullmatch(r"Bash(?:\((.*)\))?", rule.strip()) if isinstance(rule, str) else None
+    if not m:
+        return False
+    inner = (m.group(1) or "").strip()
+    if inner in ("", ":*") or inner.startswith("*"):
+        return True
+    # Any arguments to the command itself; not one subcommand of it (Bash(nightdrive release *)) nor one command as it
+    # is (Bash(nightdrive mcp status))
+    first = re.split(r"[\s:]", inner, maxsplit=1)[0]
+    return inner[len(first):].lstrip(" :").startswith("*") and bool(ANY_COMMAND.fullmatch(Path(first).name))
+
+
+def wide_open(data, where=None):
+    """What in a settings file lets Claude Code past Nightdrive's limits, in plain words; [] when nothing does."""
+    perms = data.get("permissions") if isinstance(data, dict) else None
     if not isinstance(perms, dict):
         return []
-    out, where = [], f"~/{SETTINGS.relative_to(HOME)}"
+    out, where = [], where or f"~/{SETTINGS.relative_to(HOME)}"
     if perms.get("defaultMode") == "bypassPermissions":
         out.append(f"Claude Code doesn't ask before anything (defaultMode bypassPermissions in {where}): it can run "
                    "any command, and so get round these limits.")
     allow = perms.get("allow")
-    rules = [r for r in allow if r in WHOLE_BASH] if isinstance(allow, list) else []
+    rules = [r for r in allow if any_command(r)] if isinstance(allow, list) else []
     if rules:
         out.append(f"Claude Code may run any command without asking ({rules[0]} allowed in {where}): it can get "
                    "round these limits.")
     return out
+
+
+def local_wide_open():
+    """wide_open of settings.local.json; nothing when it is missing or not JSON (it isn't ours to judge)."""
+    try:
+        data = json.loads(SETTINGS_LOCAL.read_text())
+    except (OSError, ValueError):
+        return []
+    return wide_open(data, f"~/{SETTINGS_LOCAL.relative_to(HOME)}")
 
 
 def add_rule(data):
@@ -230,6 +264,7 @@ def run_claude(cmd, *argv):
 # --- the commands -------------------------------------------------------------------------------------------------
 
 def install(args):
+    changes.private()
     cmd = claude()
     if not cmd:
         print("Claude Code isn't installed: there is nothing to register Nightdrive's server in.")
@@ -318,6 +353,7 @@ def remove(args):
 
 
 def status(args):
+    changes.private()
     cmd, have, state = claude(), registered(), load_state()
     try:
         data = read_settings()[1]
@@ -330,7 +366,7 @@ def status(args):
         "connection": connected(cmd) if cmd and have and not args.quick else None,
         "allowed": allowed(allow),
         "byInstall": {"server": bool(state.get("server")), "rule": bool(state.get("rule"))},
-        "warnings": wide_open(data),
+        "warnings": wide_open(data) + local_wide_open(),
     }
     if args.json:
         print(json.dumps(info, indent=2))

@@ -10,13 +10,16 @@ stdout carries the protocol and nothing else; diagnostics go to stderr, which Cl
 """
 
 import json
+import queue
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from registry import Registry, ToolError, UnknownTool  # noqa: E402  (after the path above)
+import confirm  # noqa: E402  (after the path above)
+from registry import Registry, ToolError, UnknownTool  # noqa: E402
 
 NAME = "nightdrive"
 # Newest first. A client asking for one of these gets it back; any other gets the newest, and the client decides
@@ -69,6 +72,10 @@ class Server:
     def __init__(self, tools):
         self.tools = tools
         self.client = None  # clientInfo from initialize, for the log
+        self.running = None  # the id of the request being handled, which a cancel can name
+        self.waiting = set()  # ids of requests read and not yet answered
+        self.cancelled = set()  # of those, the ones the client cancelled: not run, or not answered (MCP › Cancellation)
+        self.gone = False  # stdin ended: what is still queued runs, but no card waits for an answer no one reads
 
     # The methods, by name. A handler takes params (a dict) and returns the result, or raises RpcError.
 
@@ -128,7 +135,7 @@ class Server:
         method = message["method"]
         params = message.get("params", {})
         if notification:
-            # notifications/initialized, notifications/cancelled: nothing runs long enough yet to cancel
+            # notifications/initialized; notifications/cancelled is read as it comes (listen), not after the call
             return None
         if not isinstance(mid, (str, int)) or isinstance(mid, bool):
             return error_response(None, INVALID_REQUEST, "id must be a string or a number")
@@ -137,6 +144,13 @@ class Server:
         handler = self.METHODS.get(method)
         if handler is None:
             return error_response(mid, METHOD_NOT_FOUND, f"Method not found: {method}")
+        if mid in self.cancelled:
+            return None   # cancelled before it ran: nothing is done, and serve sends nothing
+        if not self.gone:
+            confirm.CANCELLED.clear()
+        self.running = mid   # after the clear: a cancel that comes now stays set
+        if mid in self.cancelled:
+            confirm.CANCELLED.set()   # one that came between the check above and now
         try:
             return {"jsonrpc": "2.0", "id": mid, "result": handler(self, params)}
         except RpcError as e:
@@ -144,17 +158,52 @@ class Server:
         except Exception as e:  # a bug in a handler mustn't end the session
             log(f"{method} failed: {e!r}")
             return error_response(mid, INTERNAL_ERROR, f"Internal error: {e}")
+        finally:
+            self.running = None
+
+    def listen(self, stdin, lines):
+        """The reader (a thread of its own): each line to the queue, and a cancel of the call being handled, or the
+        client going away, at once to the confirmation card, which waits in the main thread (#1865). None at the end."""
+        for line in stdin:
+            try:
+                message = json.loads(line)
+            except ValueError:
+                message = None
+            if isinstance(message, dict) and message.get("method") == "notifications/cancelled":
+                params = message.get("params")
+                rid = params.get("requestId") if isinstance(params, dict) else None
+                if isinstance(rid, (str, int)) and rid in self.waiting:
+                    self.cancelled.add(rid)
+                    if rid == self.running:
+                        confirm.CANCELLED.set()
+                    log(f"request {rid} cancelled by the client")
+            elif isinstance(message, dict) and "method" in message and isinstance(message.get("id"), (str, int)):
+                self.waiting.add(message["id"])
+            lines.put(line)
+        # A pipe (printf … | nightdrive mcp) ends before its answers are written, so the queue still runs; a card
+        # can't be answered for a client that is gone
+        self.gone = True
+        confirm.CANCELLED.set()
+        lines.put(None)
 
     def serve(self, stdin, stdout):
-        for line in stdin:
+        lines = queue.Queue()
+        threading.Thread(target=self.listen, args=(stdin, lines), daemon=True).start()
+        while (line := lines.get()) is not None:
             if not line.strip():
                 continue
             try:
                 message = json.loads(line)
             except json.JSONDecodeError as e:
-                response = error_response(None, PARSE_ERROR, f"Parse error: {e}")
+                message, response = None, error_response(None, PARSE_ERROR, f"Parse error: {e}")
             else:
                 response = self.handle(message)
+            mid = message.get("id") if isinstance(message, dict) else None
+            if isinstance(mid, (str, int)) and mid in self.waiting:
+                self.waiting.discard(mid)
+                if mid in self.cancelled:   # the client stopped waiting for it
+                    self.cancelled.discard(mid)
+                    continue
             if response is not None:
                 # ensure_ascii off: the tools speak Finnish too, and MCP's stdio is UTF-8
                 stdout.write(json.dumps(response, ensure_ascii=False, separators=(",", ":")) + "\n")

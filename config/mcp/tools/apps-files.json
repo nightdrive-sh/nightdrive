@@ -3,7 +3,7 @@
     {
       "name": "windows_list",
       "title": "Open windows",
-      "description": "The windows open on this desktop, the most recently used first: address, app, title, workspace (\"background\" for an app hidden in the background), whether it has the focus and whether it is on screen now. A window Send to Claude leaves out (a password manager, a private browser window, an app the user listed) is there as private, without its title. Use the address with windows_focus and windows_view.",
+      "description": "The windows open on this desktop, the most recently used first: address, app, title, workspace (\"background\" for an app hidden in the background), whether it has the focus and whether it is on screen now. A window Send to Claude leaves out (a password manager, a private browser window, an app the user listed) is there as private, without its title. Use the address to name the window to the other window tools.",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
       "command": ["nightdrive", "windows", "list", "--json"],
       "class": "read",
@@ -12,17 +12,18 @@
     {
       "name": "windows_view",
       "title": "See a window",
-      "description": "A picture of one window as it is on screen now, to read what it shows (a page, a document, an error). Only a window on screen: bring it forward first with windows_focus. The user is usually asked on screen first, with the app and the window's title (not for the apps they let you see without asking), so take one picture of what you need rather than several. Never of a window Send to Claude leaves out (password managers, private browser windows, the apps the user listed), nor with one of those over it; that is the user's choice, so don't try another way.",
+      "description": "A picture of one window as it is on screen now, to read what it shows (a page, a document, an error). Only a window on screen: one that isn't must be brought forward first. The user is usually asked on screen first, with the app and the window's title (not for the apps they let you see without asking), so take one picture of what you need rather than several. Never of a window Send to Claude leaves out (password managers, private browser windows, the apps the user listed), nor with one of those over it; that is the user's choice, so don't try another way.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "window": {"type": "string", "description": "Its address from windows_list, or an app's name (its most recently used window)"}
+          "window": {"type": "string", "description": "Its address (the list of open windows has them), or an app's name (its most recently used window)"}
         },
         "required": ["window"],
         "additionalProperties": false
       },
       "command": ["nightdrive", "windows", "shot", "{window}", "--json", "--inline"],
       "card": ["nightdrive", "windows", "shot", "{window}", "--check"],
+      "unasked_by": "apps",
       "image": "image",
       "class": "read",
       "area": "screen"

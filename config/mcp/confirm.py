@@ -33,6 +33,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -48,6 +49,11 @@ POLL = 0.4           # seconds between asking the card for its answer
 IPC_TIMEOUT = 5      # seconds for one `qs ipc call`
 TARGET = "claudeConfirm"
 LONG = 80            # characters: a longer value, or one with a newline, gets a box of its own
+
+# Set by server.py when Claude Code cancels the call in progress (Esc, its own timeout) or goes away: the card closes
+# at once, rather than stay to be allowed for a call whose answer no one reads, which Claude might then try again
+# (a mail sent twice, #1865). Cleared as each call starts.
+CANCELLED = threading.Event()
 
 # What could make the text on the card read differently from what runs: control characters, and the ones that
 # reorder (bidi) or hide (zero-width) text. They are shown as ⟨U+202E⟩ instead. ZWJ/ZWNJ stay: scripts and emoji
@@ -116,8 +122,9 @@ def facts(tool, arguments):
     nothing (`switch.sonoff_1000a`), which Claude can't word. It prints a JSON object, label → text. A command that
     fails stops the call before any card, with its message: a device that isn't there, a state Access doesn't allow.
     (rows, ask): `"ask": false` in the object says the call is on a list the user keeps in Access (windows_view's apps,
-    #1832), so it runs without the card. It counts only for a tool whose area has such a list and it isn't empty, and
-    never for an act tool: a card command can't wave a call through that the user listed nothing for."""
+    #1832), so it runs without the card. It counts only for a tool that names that list in its mcp.json
+    (`"unasked_by": "apps"`) when the list isn't empty, and never for an act tool: a card command can't wave a call
+    through that the user listed nothing for, nor through another list of its area (files_trash's folders, #1865)."""
     template = tool.spec.get("card")
     if not template:
         return [], True
@@ -132,8 +139,9 @@ def facts(tool, arguments):
     ask = rows.pop("ask", True) if isinstance(rows, dict) else True
     if not isinstance(rows, dict) or not all(isinstance(v, str) for v in rows.values()) or not isinstance(ask, bool):
         raise ToolError(f"{tool.name} wasn't run: its card command didn't print a JSON object of texts.")
-    listed = kind(tool) not in ("act", "act-delete") and any(
-        isinstance(v, list) and v for v in (getattr(tool, "options", None) or {}).values())
+    by = tool.spec.get("unasked_by")
+    chosen = (getattr(tool, "options", None) or {}).get(by) if isinstance(by, str) else None
+    listed = kind(tool) not in ("act", "act-delete") and isinstance(chosen, list) and bool(chosen)
     return [field(name, {"title": name}, text) for name, text in rows.items()], ask or not listed
 
 
@@ -189,6 +197,8 @@ def show(request):
                                 "Tell the user; it can't be run without their answer on screen.")
             if said != "busy":
                 break
+            if CANCELLED.is_set():
+                raise ToolError(f"{request['tool']} wasn't run: the call was cancelled.")
             if time.monotonic() > waited:
                 raise ToolError(f"{request['tool']} wasn't run: another confirmation stayed on screen for "
                                 f"{QUEUE_WAIT} s. Try again once the user has answered it.")
@@ -208,6 +218,8 @@ def wait(cid, tool, timeout):
     deadline = time.monotonic() + timeout + 3   # the card's own countdown ends first; this is in case it hangs
     try:
         while time.monotonic() < deadline:
+            if CANCELLED.is_set():   # before the answer: an Allow that came with the cancel allows nothing
+                raise ToolError(f"{tool} wasn't run: the call was cancelled, and its card closed.")
             said = qs("answer", cid)
             if said == "allow":
                 return True
@@ -221,7 +233,7 @@ def wait(cid, tool, timeout):
                                 "restarted?). Ask the user whether to try again.")
             time.sleep(POLL)
     except BaseException:
-        qs("close", cid)   # the client gave up (Ctrl+C, the call cancelled): the card mustn't stay to allow nothing
+        qs("close", cid)   # the client gave up (Ctrl+C, CANCELLED): the card mustn't stay to allow nothing
         raise
     qs("close", cid)
     raise ToolError(f"{tool} wasn't run: the user didn't answer the confirmation card in {timeout} s. Ask them in "
@@ -234,6 +246,8 @@ def ask(tool, arguments, timeout=TIMEOUT):
     request = card(tool, arguments, timeout)
     if request.get("unasked"):
         return True   # on the user's own list in Access: they said this one needs no card
+    if CANCELLED.is_set():   # cancelled while its card command ran, or the client is gone: no card to flash
+        raise ToolError(f"{tool.name} wasn't run: the call was cancelled.")
     request["id"] = secrets.token_hex(8)
     cid = show(request)
     return wait(cid, tool.name, timeout)
