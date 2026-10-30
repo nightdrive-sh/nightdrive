@@ -2,6 +2,9 @@
 # dictate <start|stop>: F5 (speech to text). If the mic is muted, don't start recording; show a "MIC MUTED" toast instead.
 # dictate daemon: started at login (hyprland.lua) with the best Parakeet model that is installed.
 # dictate <fn-down|fn-up>: Fn held. Starts only after 0.3 s so that Fn combos (Fn+arrows, Fn+Backspace …) don't trigger dictation.
+# dictate claude-start, claude-fn-down: ⌘⇧ + the key (Dashboard #1908): the text goes to the launcher's Ask Claude field
+#   instead of being typed, to check and send with Enter (a terminal's Claude Code when its tools aren't set up). Any
+#   release of the key stops it (stop, fn-up).
 vt="$HOME/.local/bin/voxtype-onnx"
 run=${XDG_RUNTIME_DIR:-/run/user/$UID}
 models="$HOME/.local/share/voxtype/models"
@@ -10,6 +13,8 @@ models="$HOME/.local/share/voxtype/models"
 FULL_MODEL=parakeet-tdt-0.6b-v3
 # Your own cleanup of the text before it's typed (not in the repo, docs/dictation.md): text in on stdin, out on stdout
 POST_PROCESS="$HOME/.config/voxtype/post-process"
+scripts=$(dirname "$(readlink -f "$0")")
+claude_txt="$run/dictate-claude.txt"   # where a dictation to Claude is written, and a sign that one is going on
 case $1 in
   daemon)
     # A daemon that is killed (pkill, an update) leaves its OSD running: each restart added one more Quickshell. The
@@ -28,21 +33,34 @@ case $1 in
       exec "$vt" -c "$run/voxtype-config.toml" daemon
     fi
     exec "$vt" daemon ;;
-  fn-down)
+  fn-down|claude-fn-down)
+    start=start; [[ $1 == claude-* ]] && start=claude-start
     touch "$run/dictate-fn"
-    ( sleep 0.3; [[ -e $run/dictate-fn ]] && { touch "$run/dictate-fn-active"; "$0" start; } ) & ;;
+    ( sleep 0.3; [[ -e $run/dictate-fn ]] && { touch "$run/dictate-fn-active"; "$0" "$start"; } ) & ;;
   fn-up)
     rm -f "$run/dictate-fn"
     [[ -e $run/dictate-fn-active ]] && { rm -f "$run/dictate-fn-active"; "$0" stop; } ;;
-  start)
+  start|claude-start)
+    rm -f "$claude_txt"
+    # Without Claude Code it's plain dictation: there's nothing else the text could go to
+    file=(); [[ $1 == claude-start && -x $HOME/.local/bin/claude ]] && { : >"$claude_txt"; file=(--file="$claude_txt"); }
     if wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | grep -q MUTED; then
       qs ipc call osd micblocked
       touch "$run/dictate-blocked"
     else
       rm -f "$run/dictate-blocked"
-      "$vt" record start >/dev/null 2>&1
+      "$vt" record start "${file[@]}" >/dev/null 2>&1
     fi ;;
   stop)
     # If the start was blocked, there is nothing to stop
-    if [[ -e $run/dictate-blocked ]]; then rm -f "$run/dictate-blocked"; else "$vt" record stop >/dev/null 2>&1; fi ;;
+    if [[ -e $run/dictate-blocked ]]; then rm -f "$run/dictate-blocked" "$claude_txt"
+    elif [[ -e $claude_txt ]]; then
+      # --wait returns once the text is in the file (or it gave up: no text, nothing asked)
+      "$vt" record stop --wait --timeout 60 >/dev/null 2>&1
+      text=$(<"$claude_txt"); rm -f "$claude_txt"
+      text=${text#"${text%%[![:space:]]*}"}; text=${text%"${text##*[![:space:]]}"}
+      [[ -n $text ]] || exit 0
+      if "$scripts/ask-claude" --ready; then qs ipc call launcher askClaudeDraft "$text"
+      else exec "$scripts/terminal-or-claude" -- "$text"; fi
+    else "$vt" record stop >/dev/null 2>&1; fi ;;
 esac

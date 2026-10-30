@@ -16,6 +16,10 @@ one on its own, and after 5 minutes a request is stopped. What the tools read (a
 what it asks then as in any session. Without the tools on, or without Claude Code, Ask Claude says so; ⌘⌃Enter opens a
 terminal.
 
+To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
+let go: the Launcher opens on Ask Claude with what you said in the field, to check before Enter sends it. Over a
+conversation in view it goes on with that one. Without the tools on, it goes to Claude Code in a terminal instead.
+
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.
 Claude writes (⌘⇧C) and Mail's replies don't get the tools: what they read can't make them do anything.

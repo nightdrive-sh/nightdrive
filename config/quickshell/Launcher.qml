@@ -982,6 +982,8 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
             if (how === "terminal") return text.trim() === "" && win.level !== "askclaude" ? "" : (ask.terminal(text, win.level === "askclaude"), "ok")
             return ask.submit(text) ? "ok" : ""
         }
+        // askClaudeDraft TEXT: Ask Claude's level with TEXT in its field, to check and send (hypr/scripts/dictate)
+        function askClaudeDraft(text: string): void { ask.draft(text) }
         // rows: the open level's title, footer, selected index and rows as JSON, primitive fields only (automated testing)
         function rows(): string {
             const plain = r => { const o = {}; for (const k in r) if (r[k] === null || typeof r[k] !== "object" && typeof r[k] !== "function") o[k] = r[k]; return o }

@@ -10,6 +10,8 @@
 #       for the launcher's Ask Claude view (quickshell/AskClaudeSession.qml): Claude's events as they come, one JSON
 #       object a line (claude's stream-json), no notifications; --resume ID goes on with that conversation. A failure
 #       ends with {"type":"nightdrive_error","message":…}; "notools" when Claude Code or the tools are missing.
+#   ask-claude --ready                exit 0 when the launcher's Ask Claude can run: Claude Code and the tools are there
+#                                     (hypr/scripts/dictate, which otherwise takes a dictated question to a terminal)
 readonly LIMIT=300        # seconds Claude gets for one request, cards included; then it is stopped
 readonly SHOWN=1500       # characters of the answer the notification gets; the rest is in the terminal
 readonly OPEN_WAIT=1800   # seconds the answer's buttons are waited on
@@ -17,11 +19,20 @@ readonly SERVER=nightdrive   # the server's name here, so its tools are mcp__nig
 scripts=$(dirname "$(readlink -f "$0")")
 claude_bin="$HOME/.local/bin/claude"   # where terminal-or-claude runs it too
 
+# Nightdrive's server as Claude Code has it (nightdrive mcp install: "nightdrive"; a checkout of one's own may have
+# registered `…/bin/nightdrive mcp` under another name): {command, args}, or nothing when the tools are off
+server() {
+  jq -c '(.mcpServers // {}) | (.nightdrive // (to_entries | map(.value)
+           | first(.[] | select((.command // "" | test("/nightdrive$")) and .args == ["mcp"])))) // empty
+         | { type: "stdio", command, args }' "$HOME/.claude.json" 2>/dev/null
+}
+
 name=; stream=0; resume=
 while (( $# )); do
   case $1 in
     --name) name=${2:-}; shift 2 ;;
     --stream) stream=1; shift ;;
+    --ready) [[ -x $claude_bin && -n $(server) ]]; exit ;;
     --resume) resume=${2:-}; shift 2
               [[ $resume =~ ^[0-9a-f-]{36}$ ]] || { echo "--resume needs a session id" >&2; exit 2; } ;;
     --) shift; break ;;
@@ -34,13 +45,6 @@ if (( ! $# )); then
 fi
 prompt=$*
 
-# Nightdrive's server as Claude Code has it (nightdrive mcp install: "nightdrive"; a checkout of one's own may have
-# registered `…/bin/nightdrive mcp` under another name): {command, args}, or nothing when the tools are off
-server() {
-  jq -c '(.mcpServers // {}) | (.nightdrive // (to_entries | map(.value)
-           | first(.[] | select((.command // "" | test("/nightdrive$")) and .args == ["mcp"])))) // empty
-         | { type: "stdio", command, args }' "$HOME/.claude.json" 2>/dev/null
-}
 srv=$( [[ -x $claude_bin ]] && server )
 if [[ -z $srv ]]; then
   (( stream )) && { jq -cn '{ type: "nightdrive_error", message: "notools" }'; exit 3; }

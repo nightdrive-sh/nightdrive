@@ -1,6 +1,7 @@
 # Dictation (Voxtype)
 
 Hold **F5** or **Fn** on a Mac, **Insert** on a PC (or another key: below), speak, and let go: the text is typed into the active window.
+With **⌘⇧** held too, it goes to the Launcher's [Ask Claude](claude.md) as a question instead, to check and send with Enter.
 
 It runs fully offline with [Voxtype](https://github.com/peteonrails/voxtype) and NVIDIA's Parakeet model, on the CPU (about 1.4 s for 6 s of speech on an M2 Max).
 
@@ -49,10 +50,12 @@ is awkward (a laptop's Fn layer), give dictation another key in `config/hypr/loc
 
 ```lua
 hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate start"), { locked = true })
-hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate stop"), { locked = true, release = true, transparent = true })
+hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate stop"), { locked = true, release = true, transparent = true, ignore_mods = true })
+hl.bind("SUPER + SHIFT + Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate claude-start"), { locked = true })
 ```
 
-(`transparent` keeps the release working when you click with the mouse while holding the key.)
+(`transparent` keeps the release working when you click with the mouse while holding the key, `ignore_mods` when ⌘⇧
+is still held; the third line dictates to Ask Claude.)
 
 `hyprctl reload` isn't needed: Hyprland reloads on save. Things that got in the way on a Keychron K8:
 

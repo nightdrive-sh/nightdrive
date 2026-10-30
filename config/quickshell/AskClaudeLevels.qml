@@ -82,6 +82,22 @@ Item {
     }
     function fresh() { session.reset(); field.begin("") }
 
+    // Dictation to Claude (⌘⇧ + the dictation key, hypr/scripts/dictate, Dashboard #1908): the level with the dictated
+    // text in the field, to check before Enter sends it, as a misheard word could ask for the wrong thing. Over the
+    // conversation shown it goes on with it (after what was already written); from elsewhere it starts a new one, as a
+    // request from the search does (unless one still runs). Esc closes the launcher, as on a level a key opened.
+    function draft(text) {
+        const goOn = launcher.open && launcher.level === "askclaude"
+        if (!goOn) {
+            if (!session.busy) session.reset()
+            launcher.open = true
+            launcher.go("askclaude")
+            launcher.keyLevel = "askclaude"
+        }
+        const before = goOn ? field.text.trim() : ""
+        field.begin(before !== "" ? before + " " + text : text)
+    }
+
     // ⌘⌃Enter: from the level, the conversation goes on in Claude Code in a terminal, with its usual tools (stopped here
     // first: one session can't run in two places); from the search or without one, the text is a new session's prompt
     function terminal(text, goOn) {

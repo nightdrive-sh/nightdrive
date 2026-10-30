@@ -104,15 +104,21 @@ hl.bind(mod .. " + XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_A
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate start"), { locked = true })               -- F5 (sends KEY_MICMUTE): hold -> speech to text (Voxtype, Parakeet)
 -- The releases are transparent: a mouse click while the key is held "shadows" the binds of every held key (Hyprland's
 -- shadowKeybinds), and the release would be skipped, so dictation kept recording until the key was pressed again.
-hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true })    -- release -> transcribe and type
+hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true, ignore_mods = true })    -- release -> transcribe and type
+-- ⌘⇧ + the dictation key: the text goes to the launcher's Ask Claude field instead, to check and send (Dashboard #1908).
+-- The releases above ignore modifiers, so the key's own release stops it whether ⌘⇧ is let go first or last.
+hl.bind(mod .. " + SHIFT + XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
+hl.bind(mod .. " + SHIFT + Insert", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
+hl.bind(mod .. " + SHIFT + XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate claude-fn-down"), { locked = true })
+hl.bind(mod .. " + SHIFT + F19",    hl.dsp.exec_cmd(scripts .. "/dictate claude-fn-down"), { locked = true })
 -- A PC keyboard has neither F5's mic key nor a Fn the system sees: Insert, held, is its dictation key (a Mac keyboard has
 -- no Insert). Plain Insert only, so Shift+Insert / Ctrl+Insert (paste, copy, and ⌘V / ⌘C above) still reach the app.
 hl.bind("Insert", hl.dsp.exec_cmd(scripts .. "/dictate start"), { locked = true })
-hl.bind("Insert", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true })
+hl.bind("Insert", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true, ignore_mods = true })
 hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-down"), { locked = true })                       -- Fn held (over 0.3 s) -> dictation, like F5
-hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true })
+hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true, ignore_mods = true })
 hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-down"), { locked = true })                       -- Fn when keyd (Mac Keyboard Shortcuts) runs: keyd sends F19 for it
-hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true })
+hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true, ignore_mods = true })
 -- Apps open with Hyper (Caps Lock, Mod3: hyprland.lua's kb_options) + a letter: the browser, Files, Email, and the optional
 -- parts' apps below and in the plugins' bindings.lua (Deck M, 1Password P). ⌘ stays for the desktop and the apps' own keys.
 -- These are defaults: your own keys (appKeys, above) replace them.
