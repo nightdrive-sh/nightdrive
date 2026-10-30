@@ -32,7 +32,7 @@ Singleton {
     readonly property color caution: "#e0af68"                    // yellow: the middle step of a three-step meter (SystemMenu)
     readonly property color ok:      "#9ece6a"
     readonly property color launcherBg: c.launcherBg || "#f7171822"   // the terminals' background and opacity (`nightdrive theme set background`)
-    readonly property string font:   "JetBrains Mono"
+    readonly property string font:   c.font || "JetBrains Mono"  // `nightdrive theme font FAMILY` (theme.json)
     readonly property int barHeight: 37                           // the top bar (Bar.qml)
     readonly property int notchWidth: 190                         // about the MacBook's notch (14", scale 2), centred on the top edge
 }

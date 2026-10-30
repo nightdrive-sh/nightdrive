@@ -3,25 +3,28 @@ import Quickshell
 
 // The launcher's Settings › Theme: Themes (Nightdrive's and the ones saved in Theme Editor; ⌘⌫ deletes one of yours),
 // Color (the desktop's accent; the launcher recolors at once), Background (the wallpapers, yours and the bundled ones;
-// ⌘⌫ moves one of yours to the trash) and Theme Editor (ThemeEditor.qml: the window background, borders and shadow). Background's rows are drawn as a grid
+// ⌘⌫ moves one of yours to the trash), Font (the fonts on trial, #1839: the menus, launcher and apps change at once)
+// and Theme Editor (ThemeEditor.qml: the window background, borders and shadow). Background's rows are drawn as a grid
 // by Launcher.qml (grid, once wallLoaded), which also marks wallCurrent there.
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered), and also
 // deleteSelected (⌘⌫, Delete).
 Item {
     id: t
     property var launcher: null
+    property var behave: null                 // BehaviourLevels: the update channel, which gates Font
 
     property var themeList: []                // Color: [{ value, name, swatch, current }] (hypr/scripts/theme list)
+    property var fontList: []                 // Font: [{ family, installed, current }] (hypr/scripts/theme fonts)
     property var savedList: []                // Themes: [{ id, name, swatch, own, state }] (hypr/scripts/theme themes)
     property var wallList: []                 // Background: [{ path, thumb, name, group, own }] (hypr/scripts/wallpaper list)
     property bool wallLoaded: false
     property string wallCurrent: ""           // the current wallpaper
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
-    readonly property var levels: ["theme", "themes", "themecolor", "background"]
+    readonly property var levels: ["theme", "themes", "themecolor", "themefont", "background"]
     readonly property var titles: ({ theme: "Settings › Theme", themes: "Settings › Theme › Themes", themecolor: "Settings › Theme › Color",
-                                     background: "Settings › Theme › Background" })
-    readonly property var parents: ({ theme: "settings", themes: "theme", themecolor: "theme", background: "theme" })
+                                     themefont: "Settings › Theme › Font", background: "Settings › Theme › Background" })
+    readonly property var parents: ({ theme: "settings", themes: "theme", themecolor: "theme", themefont: "theme", background: "theme" })
 
     function footer(level, query) { return level === "themes" ? "Cmd+Backspace: delete one of yours" : "" }
     function opened() {}
@@ -29,24 +32,45 @@ Item {
         if (level === "background") wallProc.running = true
         if (level === "theme" || level === "themecolor") themeProc.running = true
         if (level === "theme" || level === "themes") savedProc.running = true
+        if (level === "theme" || level === "themefont") fontProc.running = true
+        if (level === "theme" && behave) behave.entered("channel")   // Font's gate, also when Theme is opened directly
     }
     function shiftActivate(it) {}
+
+    // #1839: the font picker is on trial (the UI font isn't chosen yet and the sizes are made for JetBrains Mono), so
+    // Font shows only on the dev channel and a release doesn't hand it to stable users unasked. To lift it: true.
+    readonly property bool fontOnTrial: behave !== null && behave.channel === "dev"
 
     // Theme: Color with its current value, and Background (the root search finds them too)
     function themeItems() {
         const cur = themeList.find(c => c.current)
         const saved = savedList.find(c => c.state !== "")
+        const font = fontList.find(f => f.current)
         return [
             { kind: "nav", name: "Themes", glyph: "swatch-book", target: "themes",
               summary: saved ? saved.name + (saved.state === "changed" ? " · changed" : "") : undefined },
             { kind: "nav", name: "Color", glyph: "palette", target: "themecolor", summary: cur ? cur.name.toLowerCase() : undefined },
+        ].concat(fontOnTrial ? [
+            { kind: "nav", name: "Font", glyph: "type", target: "themefont", summary: font ? fontName(font.family) : undefined }
+        ] : [], [
             { kind: "nav", name: "Background", glyph: "wallpaper", target: "background" },
             { kind: "action", name: "Theme Editor…", glyph: "paint-bucket", cmd: ["qs", "ipc", "call", "themeeditor", "open"] }
-        ]
+        ])
     }
 
+    // "Inter Variable" is the family's name, Inter the font's
+    function fontName(family) { return family.replace(/ Variable$/, "") }
+
     function items(level, q) {
-        if (level === "theme") return { all: themeItems().map(i => ({ item: i, text: i.name, extra: launcher.settingsAliases[i.name] || "" })) }
+        if (level === "theme") return { all: themeItems().map(i => ({ item: i, text: i.name,
+                                                                      extra: i.name === "Font" ? "typeface" : launcher.settingsAliases[i.name] || "" })) }
+        if (level === "themefont") {
+            if (fontList.length === 0) return [{ kind: "hint", name: "Loading…" }]
+            return { all: fontList.map((f, i) => ({ item: { kind: "themefont", value: f.family, name: fontName(f.family), glyph: "type",
+                                                            installed: f.installed,
+                                                            summary: f.current ? "current" : !f.installed ? "not installed"
+                                                                   : i === 0 ? "default" : undefined }, text: fontName(f.family) })) }
+        }
         if (level === "themes") {
             if (savedList.length === 0) return [{ kind: "hint", name: "Loading…" }]
             return { all: savedList.map(c => ({ item: { kind: "savedtheme", value: c.id, name: c.name, swatch: c.swatch, own: c.own,
@@ -73,6 +97,13 @@ Item {
             l.keepSelection()
             themeList = themeList.map(c => Object.assign({}, c, { current: c.value === it.value }))
             Quickshell.execDetached([scripts + "/theme", "color", String(it.value)])
+            return true
+        }
+        if (it.kind === "themefont") {    // stays open: fonts can be tried one after another, the launcher changes at once
+            if (!it.installed) { l.shakeNow(); return true }
+            l.keepSelection()
+            fontList = fontList.map(f => Object.assign({}, f, { current: f.family === it.value }))
+            Quickshell.execDetached([scripts + "/theme", "font", String(it.value)])
             return true
         }
         if (it.kind === "savedtheme") {   // stays open: themes can be tried one after another
@@ -151,6 +182,17 @@ Item {
                 .map(f => ({ id: f[0], name: f[1], swatch: f[2], own: f[4] === "own", state: f[5] }))
             const l = t.launcher
             if (l.level === "themes" && l.query === "") l.selectWhere(r => r.value === (t.savedList.find(c => c.state !== "") || {}).id)
+        }
+    }
+    // Font: the fonts on trial and the current one; select the current one
+    Sh {
+        id: fontProc
+        command: [t.scripts + "/theme", "fonts"]
+        onResult: text => {
+            t.fontList = text.split("\n").map(l => l.split("\t")).filter(f => f.length >= 3 && f[0] !== "")
+                .map(f => ({ family: f[0], installed: f[1] === "installed", current: f[2] === "current" }))
+            const l = t.launcher
+            if (l.level === "themefont" && l.query === "") l.selectWhere(r => r.value === (t.fontList.find(f => f.current) || {}).family)
         }
     }
     // Color: themes and the current one; select the current one

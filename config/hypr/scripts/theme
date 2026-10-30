@@ -15,6 +15,9 @@ Themes). Choices: ~/.local/state/theme-color, ~/.local/state/nightdrive/theme-lo
   theme save NAME      the colour and look as a theme of yours (the same name again: updates it)
   theme delete ID      deletes a theme of yours
   theme reset          back to the Default theme
+  theme fonts          "family<TAB>installed?<TAB>current?": the fonts on trial (FONTS) for Settings › Theme › Font
+  theme font [FAMILY]  prints / sets the menus', launcher's and apps' font (an installed family, e.g. "DM Sans";
+                       `default`: JetBrains Mono). Kept apart from the themes while other fonts are tried (#1839)
   theme apply          writes ~/.cache/nightdrive/: theme.json (Quickshell), notify-icons, fuzzel.ini, hyprlock.conf,
                        hyprtoolkit.conf (the polkit password prompt),
                        gtk-colors.css (imported by config/gtk-*/gtk.css), the look's files for the terminals and
@@ -31,6 +34,10 @@ HOME = os.environ["HOME"]
 STATE = f"{HOME}/.local/state/theme-color"
 LOOK_STATE = f"{HOME}/.local/state/nightdrive/theme-look.json"   # only the settings changed from LOOK
 NAME_STATE = f"{HOME}/.local/state/nightdrive/theme-name"        # the theme last chosen or saved (its id)
+FONT_STATE = f"{HOME}/.local/state/nightdrive/font"              # the UI font's family; none = Theme.qml's default
+# The fonts on trial for the UI (#1839), JetBrains Mono (the default) first. Others work too with `theme font FAMILY`.
+FONTS = ["JetBrains Mono", "Inter Variable", "Geist", "Atkinson Hyperlegible Next", "DM Sans", "Rubik", "Mulish",
+         "Figtree", "Work Sans", "Plus Jakarta Sans", "Source Sans 3"]
 OWN_THEMES = f"{HOME}/.config/hypr/themes"                       # Nightdrive's: the repo's config/hypr/themes
 MY_THEMES = f"{HOME}/.config/nightdrive/themes"                  # yours, saved from Theme Editor
 OUT = f"{HOME}/.cache/nightdrive"
@@ -144,6 +151,18 @@ def themes():
     return out
 
 
+def font():
+    try:
+        return open(FONT_STATE).read().strip()
+    except OSError:
+        return ""
+
+
+def installed_fonts():
+    out = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True).stdout
+    return {f.strip() for line in out.splitlines() for f in line.split(",")}
+
+
 def theme_name():
     try:
         return open(NAME_STATE).read().strip()
@@ -221,8 +240,10 @@ def apply():
     os.makedirs(OUT, exist_ok=True)
     lk = look()
     bg, op = lk["background"], lk["background-opacity"]
+    # font only when one is chosen: Theme.qml falls back to its own default
     write(f"{OUT}/theme.json", json.dumps(dict(p, name=current(), launcherBg="#" + alpha(lk["background-opacity"])
-                                               + lk["background"][1:]), indent=1) + "\n")
+                                               + lk["background"][1:], **({"font": font()} if font() else {})),
+                                          indent=1) + "\n")
     hx = {k: v[1:] for k, v in p.items()}
     # Notification icons (quickshell/data/notify-icons, drawn in the original muted colour) in the theme's text colour
     src, icons = f"{HOME}/.config/quickshell/data/notify-icons", f"{OUT}/notify-icons"
@@ -432,6 +453,24 @@ elif args[:1] == ["delete"] and len(args) == 2:
         os.remove(NAME_STATE)       # the values stay: they just aren't a saved theme any more
 elif args[:1] == ["reset"]:
     use("default")
+elif args == ["fonts"]:
+    have, cur = installed_fonts(), font() or FONTS[0]
+    for f in FONTS:
+        print(f"{f}\t{'installed' if f in have else ''}\t{'current' if f == cur else ''}")
+elif args[:1] == ["font"] and len(args) <= 2:
+    if len(args) == 1:
+        print(font() or "JetBrains Mono")
+    else:
+        if args[1] in ("default", FONTS[0]):
+            if os.path.exists(FONT_STATE):
+                os.remove(FONT_STATE)
+        else:
+            # Only an installed family: Qt would quietly draw a fallback for an unknown one
+            if args[1] not in installed_fonts():
+                sys.exit(f"font not installed: {args[1]} (fc-list : family lists them)")
+            os.makedirs(os.path.dirname(FONT_STATE), exist_ok=True)
+            write(FONT_STATE, args[1] + "\n")
+        apply()      # Quickshell watches theme.json: the menus, launcher and apps change at once
 elif args[:1] == ["color"]:
     if len(args) == 1:
         print(current())

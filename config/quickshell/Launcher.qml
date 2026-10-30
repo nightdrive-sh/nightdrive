@@ -816,7 +816,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     DisplayLevels { id: disp; launcher: win }
     RemoveLevels { id: rm; launcher: win }
     PasswordLevels { id: pw; launcher: win }
-    ThemeLevels { id: themes; launcher: win }
+    ThemeLevels { id: themes; launcher: win; behave: behave }
     AboutLevels { id: about; launcher: win }
     Calculator { id: calc; launcher: win }
     Instantiator {
