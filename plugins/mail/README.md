@@ -56,7 +56,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 ## Notifications
 
 - New mail in the inbox gets a notification with Reply, Reply with Claude, Archive and Delete, also with Mail closed. More than three at once come as one.
-- Inbox mail arrives within seconds (IMAP IDLE); the other folders, and a server without IDLE, sync every 5 minutes.
+- Inbox mail arrives within seconds (IMAP IDLE); the other folders, and a server without IDLE, sync every 5 minutes. ⌘R fetches now; a turning icon beside Mail's name shows a fetch in progress.
 - Notmuch's post-new hook runs `nightmail notify`. A hook of your own is left alone: add `nightmail notify` to it.
 
 ## Settings

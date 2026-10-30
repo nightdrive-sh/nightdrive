@@ -1,13 +1,14 @@
 import QtQuick
 import qs.kit
 
-// The sidebar's title line, over AppSidebar's own title (give it the sidebar as its parent): the sending badge
-// (SendStatus.qml) at its right, and Settings' gear, which shows only while the pointer is over the line. ⌘, and
+// The sidebar's title line, over AppSidebar's own title (give it the sidebar as its parent): a spinner while mail is
+// fetched (FetchWatch.qml) and the sending badge (SendStatus.qml) at its right, and Settings' gear, which shows only while the pointer is over the line. ⌘, and
 // launcher › Settings › Apps › Mail open Settings too, so the gear needn't take room all the time.
 Item {
     id: root
     required property QtObject c
     required property QtObject outbox
+    required property bool fetching
     required property int headerHeight      // AppSidebar's: the title is centred in it
     signal settings()
     anchors.left: parent.left; anchors.right: parent.right
@@ -28,6 +29,12 @@ Item {
             glyph: "settings"; glyphColor: root.c.faint
             tip: "Settings"; keys: "⌘,"; tipAlign: "right"
             onClicked: root.settings()
+        }
+        Spinner {
+            anchors.verticalCenter: parent.verticalCenter
+            c: root.c
+            running: root.fetching
+            tip: "Fetching mail"; tipAlign: "right"
         }
         SendStatus {
             anchors.verticalCenter: parent.verticalCenter

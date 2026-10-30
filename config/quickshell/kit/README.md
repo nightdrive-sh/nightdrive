@@ -26,6 +26,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppPanel` | A card over the dimmed window (settings, a question, a first start); a click outside comes out as a signal |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |
 | `Tip` | A button's tip: what it does and its key |
+| `Spinner` | A turning glyph while something runs in the background (Mail's fetch), shown at least a moment; a tip says what runs |
 | `KeyCap` | Keys as caps: "⌘N  c" is [⌘][N] [c] (`or`: a "/" between the alternatives); `tint` colours them |
 | `Key` | One key cap, Raycast's way: a square a little lighter than its ground, a name (esc, HYPER) wider. The launcher uses it too (`import qs.kit as Kit`) |
 | `KeySheet` | The window's keys, on ? and Ctrl+? |

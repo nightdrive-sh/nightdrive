@@ -26,6 +26,8 @@ ShellRoot {
         AppLook { id: c }
 
         Notmuch { id: nm }
+        // The sidebar's spinner while mail is fetched (FetchWatch.qml); what came in shows at once, not at the timer
+        FetchWatch { id: fetchWatch; onEnded: win.needsAccount ? win.loadAccounts() : win.reload(true) }
         Outbox {
             id: outbox
             nm: nm
@@ -70,6 +72,8 @@ ShellRoot {
         IpcHandler {
             target: "mail"
             function refresh(): void { win.reload(true) }
+            // A fetch has started (`nightmail fetching`, from its fetch())
+            function fetching(): void { fetchWatch.check() }
             function compose(): void { win.compose("new") }
             // Settings › Apps › Mail (`nightmail settings`)
             function openSettings(): void { win.showSettings = true }
@@ -613,6 +617,7 @@ ShellRoot {
                 if (old.length) nm.tag(old.map(x => "-" + x), old.map(x => "tag:" + x).join(" or "))
             })
             loadAccounts()
+            fetchWatch.check()
             book.load()
             list.forceActiveFocus()
         }
@@ -637,7 +642,8 @@ ShellRoot {
         // ⌘N, ⌘B and ⌘⇧C arrive as Super (Meta) + the key. ⌘⏎ opens a terminal, so sending stays Ctrl+⏎.
         Shortcut { sequences: ["/", "Ctrl+F"]; onActivated: search.forceActiveFocus() }
         Shortcut { sequences: ["Meta+Shift+C", "Ctrl+Shift+C"]; onActivated: win.compose("claude") }
-        Shortcut { sequence: "Ctrl+R"; onActivated: win.reload(true) }
+        // ⌘R fetches new mail now (`nightmail sync`, which shows it once indexed), as Mac Mail's Get New Mail
+        Shortcut { sequence: "Ctrl+R"; onActivated: { win.reload(true); nm.nightmail(["sync"]) } }
         Shortcut { sequences: ["Ctrl+N", "Meta+N"]; onActivated: win.compose("new") }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
         Shortcut { sequences: ["Meta+,", "Ctrl+,"]; onActivated: win.showSettings = !win.showSettings }
@@ -705,6 +711,7 @@ ShellRoot {
                 SidebarHead {
                     parent: sidebar     // over the sidebar's title, outside its column
                     c: win.look; outbox: outbox
+                    fetching: fetchWatch.fetching
                     headerHeight: sidebar.headerHeight
                     onSettings: win.showSettings = true
                 }
@@ -1143,7 +1150,7 @@ ShellRoot {
         readonly property var keyHelp: [
             { title: "Read", keys: [["↑ ↓  j k", "Previous, next"], ["⏎", "Open in a window"], ["Esc  ←", "Back to the list (narrow window)"], ["PgUp PgDn", "In the list alone: a page in it"], ["↑ ↓", "In the thread alone: scroll it"], ["Space ⇧Space  PgDn PgUp", "Page down, up"], ["h", "HTML or text"], ["⇧H", "HTML in the browser"],
                                     ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
-            { title: "Act", keys: [["a", "Archive"], ["d  ⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Refresh"],
+            { title: "Act", keys: [["a", "Archive"], ["d  ⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Fetch new mail"],
                                    ["⇧↑ ⇧↓  ⇧-click", "Select several"], ["Ctrl-click", "Select or leave out"], ["⌘A", "Select all"]] },
             { title: "Write", keys: [["⌘N  c", "New message"], ["r", "Reply to all"], ["⇧R", "Reply to the sender only"], ["f", "Forward"],
                                      ["⏎", "Continue a draft (in Drafts)"], ["⌘⇧C", "Claude writes the reply"], ["⌘⇧C", "…from the selected text"],

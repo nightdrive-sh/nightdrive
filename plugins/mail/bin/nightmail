@@ -97,11 +97,14 @@ same way by \"More accounts\", and ask again after each."
 }
 
 # The timer's full round and push's inbox-only one wait here for each other: two mbsyncs on the same folders would
-# fail on its locks, and notmuch on its database's.
+# fail on its locks, and notmuch on its database's. Mail's spinner watches the same lock (app/FetchWatch.qml): once it
+# is taken, `nightmail fetching` tells an open Mail, in the background so the fetch doesn't wait for it. -o: only flock
+# holds the lock, not the commands, so that call can't keep it after the fetch.
 fetch() {
   mkdir -p "$(dirname "$FETCH_LOCK")"
   (($#)) || set -- -a
-  flock "$FETCH_LOCK" sh -c 'mbsync -q "$@" && notmuch new --quiet' sh "$@"
+  flock -o "$FETCH_LOCK" sh -c '"$0" fetching >/dev/null 2>&1 & mbsync -q "$@" && notmuch new --quiet' \
+    "$APP_DIR/bin/nightmail" "$@"
 }
 
 # Claude's reply shows in the desktop's Claude writes card (quickshell/ClaudeWrite.qml, `qs ipc call write ask`), which
@@ -253,6 +256,7 @@ case ${1:-open} in
   notify)    python3 "$APP_DIR/lib/notify.py" ;;
   blocked-notifications) python3 "$APP_DIR/lib/blocked.py" notifications ;;   # `nightdrive notifications` for Claude
   fetch)     fetch "${@:2}" ;;
+  fetching)  running && ipc fetching ;;     # fetch()'s, for Mail's spinner
   keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
   push)      exec python3 "$APP_DIR/lib/push.py" ;;
   ask-claude)    ask_claude "$2" "$3" ;;   # Mail's ⌘⇧C (the commands below are the card's)
