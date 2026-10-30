@@ -1,28 +1,35 @@
 import QtQuick
+import "Words.js" as Words
 
-// The launcher's Ask Claude field (level askclaude, AskClaudeLevels.qml): in the search field's place and its look, but
-// it wraps into more lines as the request grows, up to maxLines and then scrolls, and its font gets a little smaller the
-// longer the text is, so a long request still fits in view. Enter sends it (AskClaudeLevels.submit), Shift+Enter starts
-// a new line, ⌃C stops Claude, ⌘N starts a new conversation; ⌘Enter, ⌘⌥Enter and ⌘⌃Enter are Hyprland's keys and come
-// over IPC (askClaude in Launcher.qml), which reads `text`.
+// Ask Claude's field: one line in the look of the launcher's search field, but it wraps into more lines as the request
+// grows, up to maxLines and then scrolls, and its font gets a little smaller the longer the text is, so a long request
+// still fits in view. Enter sends it (sent), Shift+Enter starts a new line, ⌃C stops Claude, ⌘N starts a new
+// conversation (newChat), Esc or Backspace on an empty field leaves (leaving); the view decides what those do. ⌘Enter,
+// ⌘⌥Enter and ⌘⌃Enter are Hyprland's keys and come over IPC, which reads `text`.
+// It knows nothing of where it is shown (the launcher's level, Ask Claude's toast, Dashboard #1895).
 Item {
     id: f
-    property var launcher: null
-    property var levels: null     // AskClaudeLevels: submit(), fresh() and leave()
+    property int baseSize: 17                  // the view's own text size; the field's is a little bigger
+    property int fontWeight: Font.Light
+    property int minHeight: 44                 // one line's height, as the launcher's search field
     readonly property alias text: edit.text
     readonly property alias edit: edit    // for ⌘⌫ / ⌥⌫ (deleteBack in Launcher.qml)
+    signal sent(string text)
+    signal newChat()
+    signal leaving(string text)
+    signal refused()                            // Enter with nothing to send
 
     // --- Tunables ---
-    readonly property int bigSize: launcher.fontSize + 2   // the search field's size, for a short request
-    readonly property int smallSize: launcher.fontSize - 3 // the smallest, from smallFrom characters on
+    readonly property int bigSize: baseSize + 2   // the search field's size, for a short request
+    readonly property int smallSize: baseSize - 3 // the smallest, from smallFrom characters on
     readonly property int bigUntil: 60                     // characters that still get the search field's size
     readonly property int smallFrom: 400
     readonly property int lineWeight: 40                   // a line break counts as this many characters
     readonly property int maxLines: 8                      // lines in view before the field scrolls
-    // Above and below the text: one line of the search field's font centred in its 44 px, as TextInput centres it, so
-    // the text stays where it was when the search turns into this field
-    readonly property real pad: Math.floor((44 - bigLine.height) / 2)
-    FontMetrics { id: bigLine; font { family: Theme.font; pixelSize: f.bigSize; weight: launcher.fontWeight } }
+    // Above and below the text: one line of the search field's font centred in its minHeight, as TextInput centres it,
+    // so the text stays where it was when the search turns into this field
+    readonly property real pad: Math.floor((minHeight - bigLine.height) / 2)
+    FontMetrics { id: bigLine; font { family: Theme.font; pixelSize: f.bigSize; weight: f.fontWeight } }
 
     // By the length rather than the lines: lines depend on the size, and the size would then flicker at a line's end
     readonly property int amount: edit.text.length + (edit.text.split("\n").length - 1) * lineWeight
@@ -32,7 +39,7 @@ Item {
     FontMetrics { id: lineMetrics; font: edit.font }
     readonly property real lineH: lineMetrics.height
 
-    implicitHeight: Math.max(44, Math.min(edit.contentHeight, maxLines * lineH) + 2 * pad)
+    implicitHeight: Math.max(minHeight, Math.min(edit.contentHeight, maxLines * lineH) + 2 * pad)
 
     // Opens with the search's text, the cursor at its end, ready to go on writing
     function begin(text) {
@@ -40,10 +47,6 @@ Item {
         edit.cursorPosition = edit.length
         edit.forceActiveFocus()
     }
-
-    // Leaving the level (Esc, Backspace, back over IPC) hides the field with the keyboard still in it: hand it back to
-    // the search field, or nothing would take the keys
-    onVisibleChanged: if (!visible && launcher.open) launcher.field.forceActiveFocus()
 
     // No "Ask Claude ›" before it, unlike other levels' fields: the text gets the card's whole width, as in the search
     Text {      // as the search field shows nothing when empty, but here there's a field to explain
@@ -76,7 +79,7 @@ Item {
             color: Theme.text
             selectionColor: Theme.sel
             selectByMouse: true
-            font { family: Theme.font; pixelSize: Math.round(f.size); weight: launcher.fontWeight }
+            font { family: Theme.font; pixelSize: Math.round(f.size); weight: f.fontWeight }
             onCursorRectangleChanged: view.follow(cursorRectangle)
             Keys.onPressed: event => {
                 const shift = event.modifiers & Qt.ShiftModifier
@@ -92,18 +95,18 @@ Item {
                     card.decide("deny"); event.accepted = true
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     if (shift) insert(cursorPosition, "\n")
-                    else if (text.trim() === "") launcher.shakeNow()
-                    else f.levels.submit(text)
+                    else if (text.trim() === "") f.refused()
+                    else f.sent(text)
                     event.accepted = true
                 } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C && selectedText === "" && AskClaudeSession.busy) {
                     AskClaudeSession.stop(); event.accepted = true   // ⌃C as in a terminal; with a selection it copies
                 } else if (cmd && event.key === Qt.Key_N) {
-                    f.levels.fresh(); event.accepted = true
+                    f.newChat(); event.accepted = true
                 } else if (event.key === Qt.Key_Escape || (event.key === Qt.Key_Backspace && text === "")) {
-                    f.levels.leave(text); event.accepted = true
+                    f.leaving(text); event.accepted = true
                 } else if ((event.modifiers & Qt.AltModifier) && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
                     // ⌥← / ⌥→ by word, as in the search field
-                    const pos = launcher.wordPos(text, cursorPosition, event.key === Qt.Key_Left ? -1 : 1)
+                    const pos = Words.pos(text, cursorPosition, event.key === Qt.Key_Left ? -1 : 1)
                     if (shift) moveCursorSelection(pos, TextEdit.SelectCharacters)
                     else { deselect(); cursorPosition = pos }
                     event.accepted = true

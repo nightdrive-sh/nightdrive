@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
 import qs.kit as Kit
+import "Words.js" as Words
 
 // Launcher (⌘Space). A plugin's row above the search field (Deck's player: Ctrl+Space = play/pause). Root level: Apps, Passwords, Clipboard, Screenshot, Keybindings, Settings, Install, Remove, Update, Power. Enter opens an item, Esc/Backspace (with an empty query, not in a form's field) goes back,
 // at the root level Esc closes. Up/down arrows or Ctrl+N/P/J/K move the selection.
@@ -443,14 +444,7 @@ PanelWindow {
                                        cmd: ["bash", "-c", "pgrep -f '^qs -p .*/shaders/warp' >/dev/null || exec qs -p ~/.config/hypr/shaders/warp"] })
 
     // The next word boundary from `pos` in direction `dir` (-1 / 1): over any spaces and punctuation, then the word
-    function wordPos(s, pos, dir) {
-        const isWord = c => c.toLowerCase() !== c.toUpperCase() || /[0-9_]/.test(c)
-        const at = i => s.charAt(dir < 0 ? i - 1 : i)
-        const inside = i => dir < 0 ? i > 0 : i < s.length
-        while (inside(pos) && !isWord(at(pos))) pos += dir
-        while (inside(pos) && isWord(at(pos))) pos += dir
-        return pos
-    }
+    function wordPos(s, pos, dir) { return Words.pos(s, pos, dir) }
 
     function items() {
         const q = query.trim().toLowerCase()
@@ -1072,7 +1066,20 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
             }
 
             // Search field (+ path when in a sublevel); Ask Claude's level has its own, of more lines
-            AskClaudeField { id: askField; launcher: win; levels: ask; width: parent.width; visible: win.level === "askclaude" }
+            AskClaudeField {
+                id: askField
+                width: parent.width
+                visible: win.level === "askclaude"
+                baseSize: win.fontSize
+                fontWeight: win.fontWeight
+                onSent: text => ask.submit(text)
+                onNewChat: ask.fresh()
+                onLeaving: text => ask.leave(text)
+                onRefused: win.shakeNow()
+                // Leaving the level (Esc, Backspace, back over IPC) hides the field with the keyboard still in it: hand
+                // it back to the search field, or nothing would take the keys
+                onVisibleChanged: if (!visible && win.open) win.field.forceActiveFocus()
+            }
             AskClaudeThread { visible: askField.visible && (AskClaudeSession.entries.length > 0 || AskClaudeSession.busy); width: parent.width
                               maxHeight: win.listRoom - (askField.height - 44); fontSize: win.fontSize; fontWeight: win.fontWeight }
             Row {

@@ -9,6 +9,9 @@ Rectangle {
     property bool shown: false
     property real cardWidth: 280
     property real cardHeight: 48
+    // Written in (Ask Claude): ToastStack gives the keyboard to this card and closes it with a click beside it
+    property bool takesKeys: false
+    signal outsideClicked()
     default property alias content: body.data
 
     // Column lays the cards out from the top; each one centres itself in the stack's width
@@ -23,6 +26,9 @@ Rectangle {
     // Only while shown: a card that appears takes its new size at once rather than growing from its last one
     Behavior on width { enabled: toast.shown; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
     Behavior on height { enabled: toast.shown; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+    // A click on the card isn't one beside it: ToastStack's catcher is under the cards
+    MouseArea { anchors.fill: parent; enabled: toast.takesKeys }
 
     Item {
         id: body
