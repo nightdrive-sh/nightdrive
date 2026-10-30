@@ -18,8 +18,10 @@ terminal.
 
 To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
 let go: the dictation's toast below the bar grows into Ask Claude's, with what you said in the field to check before
-Enter sends it; PgUp and PgDn scroll a long answer. Esc, or a click beside it, closes it without stopping Claude. Over
-the toast's conversation it goes on with that one. Without the tools on, it goes to Claude Code in a terminal instead.
+Enter sends it; PgUp and PgDn scroll a long answer. Esc, or a click beside it, closes it without stopping Claude: a
+small card says it is working, then for a moment that it answered, and a click on it, or ⌘⌥Enter with nothing typed,
+opens the toast again (a new conversation after 15 minutes). Over the toast's conversation it goes on with that one.
+Without the tools on, it goes to Claude Code in a terminal instead.
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.

@@ -12,6 +12,9 @@ Rectangle {
     // Written in (Ask Claude): ToastStack gives the keyboard to this card and closes it with a click beside it
     property bool takesKeys: false
     signal outsideClicked()
+    // Clicked, without the keyboard (Ask Claude's closed card, which opens it): only the card takes the click
+    property bool clickable: false
+    signal tapped()
     default property alias content: body.data
 
     // Column lays the cards out from the top; each one centres itself in the stack's width
@@ -28,7 +31,12 @@ Rectangle {
     Behavior on height { enabled: toast.shown; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
     // A click on the card isn't one beside it: ToastStack's catcher is under the cards
-    MouseArea { anchors.fill: parent; enabled: toast.takesKeys }
+    MouseArea {
+        anchors.fill: parent
+        enabled: toast.takesKeys || toast.clickable
+        cursorShape: toast.takesKeys ? Qt.ArrowCursor : Qt.PointingHandCursor
+        onClicked: if (!toast.takesKeys) toast.tapped()
+    }
 
     Item {
         id: body

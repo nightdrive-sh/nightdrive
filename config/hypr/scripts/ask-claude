@@ -4,7 +4,8 @@
 # and Settings › Claude › Access decide, as in any session. A notification shows it working, with Cancel; the answer
 # comes as a notification too, whose click (or Open in terminal) continues the same session in a terminal.
 # ⌘⌃Enter (terminal-or-claude) sends the text to Claude Code in a terminal instead, as ⌘⌥Enter did before.
-#   ask-claude                        the key: the launcher's text (askClaude in Launcher.qml), else as ⌘⌃Enter
+#   ask-claude                        the key: the launcher's text (askClaude in Launcher.qml), else Ask Claude's
+#                                     toast (open or closed), else as ⌘⌃Enter when the tools aren't there
 #   ask-claude [--name NAME] [--] PROMPT   ask in the background; in a terminal when Claude Code or the server is missing
 #   ask-claude --stream [--resume ID] [--name NAME] [--] PROMPT
 #       for the launcher's Ask Claude view (quickshell/AskClaudeSession.qml): Claude's events as they come, one JSON
@@ -41,6 +42,8 @@ while (( $# )); do
 done
 if (( ! $# )); then
   [ "$(qs ipc call launcher askClaude background 2>/dev/null)" = "ok" ] && exit 0
+  # Nothing typed: Ask Claude's toast, with the conversation (quickshell/AskClaudeToast.qml, Dashboard #1895)
+  [[ -x $claude_bin && -n $(server) && "$(qs ipc call askClaude toggle 2>/dev/null)" = "ok" ]] && exit 0
   exec "$scripts/terminal-or-claude"
 fi
 prompt=$*

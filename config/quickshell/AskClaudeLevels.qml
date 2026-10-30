@@ -113,17 +113,12 @@ Item {
                                  "--resume", session.sessionId].concat(q !== "" ? [q] : []))
     }
 
-    // An answer while the launcher isn't showing it: the row says so, and a notification for now, its click back here
-    // (a toast in the top bar may take its place)
+    // An answer while no view shows it: the row says so (Ask Claude's small toast does too, for a while)
     Connections {
         target: a.session
         function onAnswered() {
             if ((a.launcher.open && a.launcher.level === "askclaude") || a.session.toastViewing) return
             a.session.unseen = true
-            const last = a.session.entries[a.session.entries.length - 1] || {}
-            const body = (last.text || "").slice(0, 200)
-            Quickshell.execDetached(["bash", "-c", '[ "$(notify-send -a Claude -i lucide:bot -A default=Open -w -- "$1" "$2")" = default ] && qs ipc call launcher openLevel askclaude',
-                                     "_", "Claude answered", body])
         }
     }
 }

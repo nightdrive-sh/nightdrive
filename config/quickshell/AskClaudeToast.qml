@@ -11,9 +11,13 @@ import Quickshell.Io
 //   Claude's field, conversation and keys (AskClaudePanel.qml) fade in, with the text to check before Enter sends it.
 //   Now it has the keyboard, as the launcher does.
 // - Esc, or a click beside it, closes it without stopping Claude; what was written stays in the field for next time.
+//   While Claude works, the card stays small (AskClaudeStatus.qml), and says for a while when it has answered; a click
+//   on it, or ⌘⌥Enter (hypr/scripts/ask-claude, with nothing typed in the launcher), opens it again.
 //   qs ipc call askClaude dictating     a dictation to Claude has started
 //   qs ipc call askClaude draft TEXT    its text: into the field (after what was there, when the toast is open)
 //   qs ipc call askClaude cancel        it gave no text
+//   qs ipc call askClaude toggle        opens it with the conversation (a new one after AskClaudeSession.freshAfter),
+//                                       or closes it: "ok"
 Toast {
     id: toast
     property bool stepAside: false        // a password prompt or Claude's full card is up: they get the keys
@@ -22,35 +26,57 @@ Toast {
     readonly property int askWidth: 660            // as the launcher's card
     readonly property real screenShare: 0.6        // the most of the screen's height it grows to before it scrolls
     readonly property int listenGrace: 3000        // ms the card waits for the text after Voxtype is done
+    readonly property int answeredFor: 10000       // ms the closed card says Claude answered
 
     property string mode: ""              // "" | listen (holds the card until the dictation's text) | ask
     readonly property bool asking: mode === "ask"
-    property bool grown: false            // the card has its Ask Claude size (after the indicator faded out)
+    property bool grown: false            // the card has its Ask Claude size (after the small content faded out)
+    property bool answeredShown: false    // an answer came while it was closed: the small card says so for a while
+    readonly property bool working: !asking && (AskClaudeSession.busy || answeredShown)
+    // The small card's content: the dictation's indicator while you speak, else Claude's state
+    readonly property bool dictationCard: vt.shown || mode === "listen"
 
-    shown: vt.shown || mode !== ""
+    shown: vt.shown || mode !== "" || working
     takesKeys: asking && !stepAside
-    cardWidth: grown ? askWidth : indicator.implicitWidth
-    cardHeight: grown ? panel.implicitHeight : indicator.implicitHeight
+    clickable: working && !dictationCard
+    cardWidth: grown ? askWidth : dictationCard ? indicator.implicitWidth : status.implicitWidth
+    cardHeight: grown ? panel.implicitHeight : 48
     onOutsideClicked: close()
+    onTapped: open(panel.field.text)
 
     Binding { target: AskClaudeSession; property: "toastViewing"; value: toast.takesKeys }
     onTakesKeysChanged: if (takesKeys) panel.field.edit.forceActiveFocus()   // back from a card that had the keys
+    Connections {
+        target: AskClaudeSession
+        function onAnswered() { if (!toast.asking) { toast.answeredShown = true; answeredTimer.restart() } }
+    }
+    Timer { id: answeredTimer; interval: toast.answeredFor; onTriggered: toast.answeredShown = false }
 
     Dictation { id: vt }
 
-    function open(text, animate) {
+    // Over a card already shown (the dictation's, the small one) it grows out of it; from nothing it appears whole
+    function open(text) {
+        const animate = shown
         mode = "ask"
+        answeredShown = false
         AskClaudeSession.unseen = false
         panel.field.begin(text)
         if (animate) grow.restart()
-        else { grow.stop(); indicator.opacity = 0; grown = true; panel.opacity = 1 }
+        else { grow.stop(); small.opacity = 0; grown = true; panel.opacity = 1 }
     }
+    // While Claude works the card shrinks back to the small one (Toast animates it, as it's still shown)
     function close() {
         grow.stop()
         mode = ""
         grown = false
-        indicator.opacity = 1
+        small.opacity = 1
         panel.opacity = 0
+    }
+    function toggle() {
+        if (asking) { close(); return }
+        const s = AskClaudeSession
+        if (!s.busy && s.sessionId !== "" && Date.now() - s.lastAt > s.freshAfter) { s.reset(); panel.field.begin("") }
+        open(panel.field.text)
     }
 
     // A dictation's text: over an open toast it goes on after what was written there; else a new conversation starts
@@ -62,13 +88,13 @@ Toast {
             return
         }
         if (!AskClaudeSession.busy) AskClaudeSession.reset()
-        open(text, vt.shown || mode === "listen")
+        open(text)
     }
 
-    // The indicator fades out, the card takes its new size (Toast animates it), then Ask Claude's part fades in
+    // The small content fades out, the card takes its new size (Toast animates it), then Ask Claude's part fades in
     SequentialAnimation {
         id: grow
-        NumberAnimation { target: indicator; property: "opacity"; to: 0; duration: 120 }
+        NumberAnimation { target: small; property: "opacity"; to: 0; duration: 120 }
         ScriptAction { script: toast.grown = true }
         PauseAnimation { duration: 180 }
         NumberAnimation { target: panel; property: "opacity"; to: 1; duration: 150 }
@@ -81,11 +107,21 @@ Toast {
         onTriggered: if (toast.mode === "listen") toast.mode = ""
     }
 
-    DictationIndicator {
-        id: indicator
-        visible: opacity > 0
-        dictation: vt
-        running: toast.shown && !toast.grown
+    Item {
+        id: small
+        visible: opacity > 0 && !toast.grown
+        width: toast.cardWidth
+        height: 48
+        DictationIndicator {
+            id: indicator
+            visible: toast.dictationCard
+            dictation: vt
+            running: toast.shown && !toast.grown && visible
+        }
+        AskClaudeStatus {
+            id: status
+            visible: !toast.dictationCard
+        }
     }
     AskClaudePanel {
         id: panel
@@ -103,5 +139,6 @@ Toast {
         function dictating(): void { if (!toast.asking) toast.mode = "listen" }
         function draft(text: string): void { toast.draft(text) }
         function cancel(): void { if (toast.mode === "listen") toast.mode = "" }
+        function toggle(): string { toast.toggle(); return "ok" }
     }
 }
