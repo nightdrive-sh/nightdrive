@@ -200,7 +200,10 @@ ShellRoot {
     // The "…" menu lists the modules that didn't fit on its screen's bar
     Binding { target: TopBar; property: "overflow"; value: bar.tuckedOf(root.menuScreen) }
 
-    Osd {}
+    // Toasts below the bar (ToastStack.qml), stacked in this order
+    ToastStack {
+        Osd {}
+    }
 
     NotificationPopups {}
 
