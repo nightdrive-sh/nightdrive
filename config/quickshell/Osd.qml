@@ -3,7 +3,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 
-// Toast at the top: volume, screen or keyboard brightness, do not disturb and mic mute.
+// Toast at the top: volume, screen or keyboard brightness, do not disturb and mic mute. No border: the dark card
+// stands out from the bar and windows by itself (the dictation toast, config/voxtype/OsdSurface.qml, matches it).
 // The keybinding runs:  qs ipc call osd volume | brightness | kbd | dnd | mic
 // (called only after wpctl / brightnessctl / the dnd toggle, so this just reads the current state).
 // A volume key also ticks (hypr/scripts/sounds event volume: off in Settings › Notifications › System sounds), at the
@@ -81,7 +82,6 @@ Scope {
             anchors.fill: parent
             radius: 10
             color: Theme.bg
-            border { color: Theme.border; width: 1 }
 
             Text {
                 id: ico

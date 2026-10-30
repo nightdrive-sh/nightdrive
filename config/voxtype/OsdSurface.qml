@@ -1,5 +1,5 @@
 // Voxtype OSD, Nightdrive's version: replaces the original OsdSurface.qml (copied to ~/.local/share/voxtype/quickshell/).
-// Same look as the other toasts (Osd.qml: 10 px radius, dark card, violet UPPERCASE text):
+// Same look as the other toasts (Osd.qml: 10 px radius, dark card without a border, violet UPPERCASE text):
 //   mic icon | equalizer (stationary bars growing up and down from the center line) | state (LISTENING / TRANSCRIBING)
 // Keeps the original interface: daemonState, osdSuppressed, audio (frameReceived), style (unused).
 
@@ -51,7 +51,6 @@ PanelWindow {
         onLoaded: { try { panel.themeC = JSON.parse(text()) } catch (e) {} }
     }
     readonly property color cBg: "#0b0b0d"
-    readonly property color cBorder: themeC.border || "#3a2f45"
     readonly property color cViolet: themeC.primary || "#c071eb"
     readonly property color cAccent: themeC.accent || "#e0bff2"
     readonly property color cDim: themeC.dim || "#9486a3"
@@ -119,7 +118,6 @@ PanelWindow {
         anchors.fill: parent
         radius: 10
         color: panel.cBg
-        border { color: panel.cBorder; width: 1 }
 
         Text {
             id: ico
