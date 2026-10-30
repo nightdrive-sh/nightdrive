@@ -235,17 +235,22 @@ end
 -- ⌥← / ⌥→ move by word, like in macOS, in apps where Alt+arrows does something else: GtkSourceView editors swap
 -- words with them, Chromium and its web apps go back/forward. These get Ctrl+arrows (word move; ⇧ selects).
 -- Other apps get the keys as they were.
-local WORD_ARROW_APPS = { ["org.gnome.gitlab.somas.Apostrophe"] = true, chromium = true, ["chromium-browser"] = true }
-local function word_arrow_app(class)
-    return class and (WORD_ARROW_APPS[class] or class:match("^chrome%-.*%-Default$")) and true or false
-end
-for _, key in ipairs({ "left", "right" }) do
-    for _, shift in ipairs({ "", " SHIFT" }) do
-        hl.bind("ALT" .. (shift ~= "" and " +" .. shift or "") .. " + " .. key, function ()
-            local w = hl.get_active_window()
-            local mods = (w and word_arrow_app(w.class)) and "CTRL" or "ALT"
-            hl.dispatch(hl.dsp.send_shortcut({ mods = mods .. shift, key = key }))
-        end, { repeating = true })
+-- With the Mac Keyboard Shortcuts plugin keyd does this instead (its app.conf), and the keys aren't bound here at all:
+-- send_shortcut holds the arrow down with no modifiers, so a press held past the repeat delay became a plain arrow in
+-- the app and dropped the start of a ⌥⇧ selection.
+if not plugins.keyd then
+    local WORD_ARROW_APPS = { ["org.gnome.gitlab.somas.Apostrophe"] = true, chromium = true, ["chromium-browser"] = true }
+    local function word_arrow_app(class)
+        return class and (WORD_ARROW_APPS[class] or class:match("^chrome%-.*%-Default$")) and true or false
+    end
+    for _, key in ipairs({ "left", "right" }) do
+        for _, shift in ipairs({ "", " SHIFT" }) do
+            hl.bind("ALT" .. (shift ~= "" and " +" .. shift or "") .. " + " .. key, function ()
+                local w = hl.get_active_window()
+                local mods = (w and word_arrow_app(w.class)) and "CTRL" or "ALT"
+                hl.dispatch(hl.dsp.send_shortcut({ mods = mods .. shift, key = key }))
+            end, { repeating = true })
+        end
     end
 end
 
