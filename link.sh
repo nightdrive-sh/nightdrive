@@ -206,9 +206,15 @@ for f in "$repo"/config/bash/*.sh; do link "$f" "$HOME/.bashrc.d/$(basename "$f"
 # Voxtype (speech to text, F5): config. The binaries ~/.local/bin/voxtype{,-onnx} and models ~/.local/share/voxtype/models are installed by hand (see docs/dictation.md).
 mkdir -p "$HOME/.config/voxtype"
 link "$repo/config/voxtype/config.toml" "$HOME/.config/voxtype/config.toml"
-mkdir -p "$HOME/.local/share/voxtype/quickshell"
-link "$repo/config/voxtype/OsdSurface.qml" "$HOME/.local/share/voxtype/quickshell/OsdSurface.qml"   # modified OSD (top centre, no dimming)
-for f in listening.wav done.wav; do link "$repo/config/voxtype/$f" "$HOME/.local/share/voxtype/quickshell/$f"; done   # its sound cues (found next to it)
+# Until 30.10.2026 Voxtype drew the dictation toast in a Quickshell of its own (our OsdSurface.qml linked into
+# ~/.local/share/voxtype/quickshell, its links removed above); now Nightdrive's shell does (quickshell/DictationToast.qml)
+# and config.toml turns Voxtype's off. A daemon started before that still runs it: restart the daemon once, as at login
+# (dictate daemon closes the old card).
+if pgrep -u "$USER" -f '[q]s -p .*/voxtype/quickshell' >/dev/null && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
+  pkill -u "$USER" -f '[v]oxtype.* daemon$' && sleep 0.5
+  setsid -f env PATH="$HOME/.local/bin:$PATH" "$HOME/.config/hypr/scripts/dictate" daemon >/dev/null 2>&1
+  echo "restarted   the dictation daemon (its toast is Nightdrive's own now)"
+fi
 
 # Firefox: userChrome.css (tabs below the address bar) into the default profile, and user.js (enables userChrome.css)
 # with the choices of launcher › Settings › Apps › Firefox: firefox-prefs writes it, as it isn't a link

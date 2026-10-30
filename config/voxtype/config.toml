@@ -325,6 +325,10 @@ on_transcription = false
 # filler_words = ["uh", "um", "er", "ah", "eh", "hmm", "hm", "mm", "mhm"]
 
 [osd]
+# Off: Nightdrive draws the dictation toast itself (quickshell/DictationToast.qml), from the state file and the audio
+# socket, which the daemon keeps either way.
+enabled = false
+
 # On-screen display frontend.
 # - gtk4: Default toolkit frontend
 # - native: SCTK + wgpu + egui frontend

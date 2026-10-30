@@ -17,8 +17,9 @@ scripts=$(dirname "$(readlink -f "$0")")
 claude_txt="$run/dictate-claude.txt"   # where a dictation to Claude is written, and a sign that one is going on
 case $1 in
   daemon)
-    # A daemon that is killed (pkill, an update) leaves its OSD running: each restart added one more Quickshell. The
-    # new daemon starts its own, so close those whose daemon is gone.
+    # A daemon that is killed (pkill, an update) leaves its OSD running: each restart added one more Quickshell. Its OSD
+    # is off now (Nightdrive draws the toast, quickshell/DictationToast.qml), but one from a daemon started before that
+    # may still run: close those whose daemon is gone.
     for p in $(pgrep -u "$USER" -f '[q]s -p .*/voxtype/quickshell'); do
       parent=$(ps -o ppid= -p "$p" | tr -d ' ')
       [[ $(ps -o comm= -p "${parent:-1}") == voxtype* ]] || kill "$p"
