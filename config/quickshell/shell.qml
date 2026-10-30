@@ -200,10 +200,14 @@ ShellRoot {
     // The "…" menu lists the modules that didn't fit on its screen's bar
     Binding { target: TopBar; property: "overflow"; value: bar.tuckedOf(root.menuScreen) }
 
-    // Toasts below the bar (ToastStack.qml), stacked in this order: dictation stays put while a volume toast comes and
-    // goes below it
+    // Toasts below the bar (ToastStack.qml), stacked in this order: dictation (and Ask Claude, which grows out of it)
+    // stays put while a volume toast comes and goes below it
     ToastStack {
-        DictationToast {}
+        AskClaudeToast {
+            // a password prompt or Claude's long card goes over it and takes the keys (a short card comes into it)
+            stepAside: polkit.asking || (confirm.open && !confirm.inlined)
+            onAskingChanged: if (asking) launcher.open = false   // both would want the keyboard
+        }
         Osd {}
     }
 

@@ -18,6 +18,8 @@ Item {
     signal newChat()
     signal leaving(string text)
     signal refused()                            // Enter with nothing to send
+    signal paged(int dir)                       // PgUp (-1) / PgDn (1): the conversation's, not the field's
+    property bool backspaceLeaves: true         // Backspace on an empty field leaves too (the launcher's level), as Esc
 
     // --- Tunables ---
     readonly property int bigSize: baseSize + 2   // the search field's size, for a short request
@@ -102,7 +104,9 @@ Item {
                     AskClaudeSession.stop(); event.accepted = true   // ⌃C as in a terminal; with a selection it copies
                 } else if (cmd && event.key === Qt.Key_N) {
                     f.newChat(); event.accepted = true
-                } else if (event.key === Qt.Key_Escape || (event.key === Qt.Key_Backspace && text === "")) {
+                } else if (event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown) {
+                    f.paged(event.key === Qt.Key_PageUp ? -1 : 1); event.accepted = true
+                } else if (event.key === Qt.Key_Escape || (f.backspaceLeaves && event.key === Qt.Key_Backspace && text === "")) {
                     f.leaving(text); event.accepted = true
                 } else if ((event.modifiers & Qt.AltModifier) && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
                     // ⌥← / ⌥→ by word, as in the search field

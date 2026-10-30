@@ -20,6 +20,11 @@ Item {
     implicitHeight: Math.min(col.implicitHeight, maxHeight)
     clip: true
 
+    // PgUp / PgDn (dir -1 / 1): most of a view's height, so a line stays in sight across the jump
+    function page(dir) {
+        view.contentY = Math.max(0, Math.min(view.contentHeight - view.height, view.contentY + dir * (view.height - 2 * stepHeight)))
+    }
+
     // A step's glyph and text, or the thinking row's
     component StepRow: Row {
         property string glyph: ""
@@ -104,9 +109,13 @@ Item {
         contentWidth: width
         contentHeight: col.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
-        // The newest stays in view as the conversation grows
-        onContentHeightChanged: contentY = Math.max(0, contentHeight - height)
-        onHeightChanged: contentY = Math.max(0, contentHeight - height)
+        // The newest stays in view as the conversation grows, unless you scrolled up to read: then it stays where you are
+        // until you scroll back to the end
+        property bool pinned: true
+        function toEnd() { contentY = Math.max(0, contentHeight - height) }
+        onContentYChanged: pinned = contentY >= contentHeight - height - 4
+        onContentHeightChanged: if (pinned) toEnd()
+        onHeightChanged: if (pinned) toEnd()
         TouchScroll { view: view; step: t.stepHeight }
 
         Column {

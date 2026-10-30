@@ -2,9 +2,9 @@
 # dictate <start|stop>: F5 (speech to text). If the mic is muted, don't start recording; show a "MIC MUTED" toast instead.
 # dictate daemon: started at login (hyprland.lua) with the best Parakeet model that is installed.
 # dictate <fn-down|fn-up>: Fn held. Starts only after 0.3 s so that Fn combos (Fn+arrows, Fn+Backspace …) don't trigger dictation.
-# dictate claude-start, claude-fn-down: ⌘⇧ + the key (Dashboard #1908): the text goes to the launcher's Ask Claude field
-#   instead of being typed, to check and send with Enter (a terminal's Claude Code when its tools aren't set up). Any
-#   release of the key stops it (stop, fn-up).
+# dictate claude-start, claude-fn-down: ⌘⇧ + the key (Dashboard #1908): the text goes to Ask Claude's toast, which
+#   grows out of the dictation's (quickshell/AskClaudeToast.qml, #1895), instead of being typed, to check and send with
+#   Enter (a terminal's Claude Code when its tools aren't set up). Any release of the key stops it (stop, fn-up).
 vt="$HOME/.local/bin/voxtype-onnx"
 run=${XDG_RUNTIME_DIR:-/run/user/$UID}
 models="$HOME/.local/share/voxtype/models"
@@ -51,6 +51,8 @@ case $1 in
     else
       rm -f "$run/dictate-blocked"
       "$vt" record start "${file[@]}" >/dev/null 2>&1
+      # Ask Claude's toast holds the card through the transcription, to grow out of it when the text comes
+      [[ -e $claude_txt ]] && qs ipc call askClaude dictating >/dev/null 2>&1
     fi ;;
   stop)
     # If the start was blocked, there is nothing to stop
@@ -60,8 +62,8 @@ case $1 in
       "$vt" record stop --wait --timeout 60 >/dev/null 2>&1
       text=$(<"$claude_txt"); rm -f "$claude_txt"
       text=${text#"${text%%[![:space:]]*}"}; text=${text%"${text##*[![:space:]]}"}
-      [[ -n $text ]] || exit 0
-      if "$scripts/ask-claude" --ready; then qs ipc call launcher askClaudeDraft "$text"
+      [[ -n $text ]] || { qs ipc call askClaude cancel >/dev/null 2>&1; exit 0; }
+      if "$scripts/ask-claude" --ready; then qs ipc call askClaude draft "$text"
       else exec "$scripts/terminal-or-claude" -- "$text"; fi
     else "$vt" record stop >/dev/null 2>&1; fi ;;
 esac

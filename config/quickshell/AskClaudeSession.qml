@@ -24,9 +24,12 @@ Singleton {
     property bool busy: false
     property bool unseen: false          // an answer came while no view showed it (the launcher's row says so)
     property double lastAt: 0
-    // A view shows the conversation now (the launcher's level): Claude's confirmation card comes into it, a short one
-    // (ClaudeConfirm.qml decides, and sets card); the view shows it while pendingCard and answers through card.decide()
-    property bool viewing: false
+    // A view shows the conversation now (the launcher's level, Ask Claude's toast): Claude's confirmation card comes into
+    // it, a short one (ClaudeConfirm.qml decides, and sets card); the view shows it while pendingCard and answers through
+    // card.decide()
+    property bool launcherViewing: false
+    property bool toastViewing: false
+    readonly property bool viewing: launcherViewing || toastViewing
     property var card: null
     readonly property bool pendingCard: !!card && card.open && card.inlined
     signal answered()                    // a request finished (its answer, an error, or stopped)

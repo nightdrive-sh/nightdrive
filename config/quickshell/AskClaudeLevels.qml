@@ -24,7 +24,7 @@ Item {
                                   summary: session.busy ? "working…" : session.unseen ? "answered" : undefined })
 
     // The conversation is in view while the launcher shows the level (and hasn't stepped aside for a card)
-    Binding { target: AskClaudeSession; property: "viewing"; value: a.launcher.open && a.launcher.level === "askclaude" && !a.launcher.stepAside }
+    Binding { target: AskClaudeSession; property: "launcherViewing"; value: a.launcher.open && a.launcher.level === "askclaude" && !a.launcher.stepAside }
     // Back from a card or a password prompt: the keys go to the field again
     Connections {
         target: a.launcher
@@ -118,7 +118,7 @@ Item {
     Connections {
         target: a.session
         function onAnswered() {
-            if (a.launcher.open && a.launcher.level === "askclaude") return
+            if ((a.launcher.open && a.launcher.level === "askclaude") || a.session.toastViewing) return
             a.session.unseen = true
             const last = a.session.entries[a.session.entries.length - 1] || {}
             const body = (last.text || "").slice(0, 200)

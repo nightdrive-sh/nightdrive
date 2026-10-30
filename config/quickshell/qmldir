@@ -19,7 +19,10 @@ Toast 1.0 Toast.qml
 ToastStack 1.0 ToastStack.qml
 Dictation 1.0 Dictation.qml
 DictationMeter 1.0 DictationMeter.qml
-DictationToast 1.0 DictationToast.qml
+DictationIndicator 1.0 DictationIndicator.qml
+AskClaudeToast 1.0 AskClaudeToast.qml
+AskClaudePanel 1.0 AskClaudePanel.qml
+KeyFooter 1.0 KeyFooter.qml
 Picker 1.0 Picker.qml
 PowerDialog 1.0 PowerDialog.qml
 CodeDialog 1.0 CodeDialog.qml

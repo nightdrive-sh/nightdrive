@@ -149,13 +149,6 @@ PanelWindow {
         : (results[list.currentIndex] || {}).kind === "calc" ? "Enter: copy the result"
         : extOf(level) ? extOf(level).footer(level, query)   // not extLevel: it can lag a level change by one update
         : ""
-    // The footer as key caps: "Ctrl+Enter: show in Apps  ·  Esc: back" → [{ keys: ["Ctrl", "Enter"], text: "show in Apps" }, ...].
-    // "Enter creates …" (no colon) works too, and a letter alone with a colon ("C: set up"); a part that doesn't start with a
-    // key is plain text.
-    readonly property var footerParts: footer === "" ? [] : footer.split(/\s+·\s+/).map(part => {
-        const m = part.match(/^((?:Ctrl|Shift|Alt|Cmd|Enter|Esc|Tab|Space|Backspace|Up|Down|Left|Right|[A-Z](?=:))(?:\+(?:Ctrl|Shift|Alt|Cmd|Enter|Esc|Tab|Space|Backspace|Up|Down|Left|Right|[A-Z]))*)(?::\s*|\s+)(.*)$/)
-        return m ? { keys: m[1].split("+"), text: m[2] } : { keys: [], text: part }
-    })
     property var lastMouse: null              // last mouse position (window coordinates); null = not seen yet since opening
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
     signal openMenu(string name)              // Settings: opens a Quickshell menu (wifi, bluetooth, ...)
@@ -1597,40 +1590,11 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 }
             }
 
-            Flow {     // footer: each action's key caps (Key), then what it does; on a narrow card in more lines
+            KeyFooter {     // footer: each action's key caps, then what it does; on a narrow card in more lines
                 id: footerFlow
-                visible: win.footer !== ""
                 anchors.right: parent.right
-                // As wide as its parts in one line (right-aligned), at most the card's width
-                readonly property real natural: children.reduce((w, c) => w + (c instanceof Row ? c.implicitWidth + spacing : 0), 0) - spacing
-                width: Math.min(parent.width, natural + rightPadding)
-                rightPadding: 6
-                spacing: 6
-                // The main action (the first) at the right edge, like a dialog's default button: always in the same place
-                layoutDirection: Qt.RightToLeft
-                Repeater {
-                    model: win.footerParts
-                    Row {
-                        id: part
-                        required property var modelData
-                        required property int index
-                        // The first action with keys is the main one (Enter: open); the rest are quieter
-                        readonly property bool main: index === 0 && modelData.keys.length > 0
-                        rightPadding: index > 0 ? 12 : 0     // 18 between actions with the Flow's spacing (right to left)
-                        spacing: 4
-                        Repeater {
-                            model: part.modelData.keys
-                            Kit.Key { required property string modelData; key: modelData; dim: !part.main }
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            leftPadding: part.modelData.keys.length ? 4 : 0
-                            text: part.modelData.text.charAt(0).toUpperCase() + part.modelData.text.slice(1)
-                            color: part.main ? Theme.text : Theme.dim
-                            font { family: Theme.font; pixelSize: 12 }
-                        }
-                    }
-                }
+                maxWidth: parent.width
+                text: win.footer
             }
         }
     }

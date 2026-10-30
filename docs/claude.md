@@ -17,8 +17,9 @@ what it asks then as in any session. Without the tools on, or without Claude Cod
 terminal.
 
 To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
-let go: the Launcher opens on Ask Claude with what you said in the field, to check before Enter sends it. Over a
-conversation in view it goes on with that one. Without the tools on, it goes to Claude Code in a terminal instead.
+let go: the dictation's toast below the bar grows into Ask Claude's, with what you said in the field to check before
+Enter sends it; PgUp and PgDn scroll a long answer. Esc, or a click beside it, closes it without stopping Claude. Over
+the toast's conversation it goes on with that one. Without the tools on, it goes to Claude Code in a terminal instead.
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.
