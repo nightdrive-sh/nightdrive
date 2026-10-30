@@ -4,22 +4,22 @@ import "Words.js" as Words
 // Ask Claude's field: one line in the look of the launcher's search field, but it wraps into more lines as the request
 // grows, up to maxLines and then scrolls, and its font gets a little smaller the longer the text is, so a long request
 // still fits in view. Enter sends it (sent), Shift+Enter starts a new line, ⌃C stops Claude, ⌘N starts a new
-// conversation (newChat), Esc or Backspace on an empty field leaves (leaving); the view decides what those do. ⌘Enter,
-// ⌘⌥Enter and ⌘⌃Enter are Hyprland's keys and come over IPC, which reads `text`.
-// It knows nothing of where it is shown (the launcher's level, Ask Claude's toast, Dashboard #1895).
+// conversation (newChat), Esc leaves (leaving), PgUp / PgDn are the conversation's (paged); the view decides what those
+// do. ⌘Enter, ⌘⌥Enter and ⌘⌃Enter are Hyprland's keys and come over IPC, which reads `text` (AskClaudeSession.draft).
+// It knows nothing of where it is shown (Ask Claude's toast, AskClaudePanel.qml, Dashboard #1895).
 Item {
     id: f
     property int baseSize: 17                  // the view's own text size; the field's is a little bigger
     property int fontWeight: Font.Light
     property int minHeight: 44                 // one line's height, as the launcher's search field
+    property string placeholder: "Ask Claude…"
     readonly property alias text: edit.text
-    readonly property alias edit: edit    // for ⌘⌫ / ⌥⌫ (deleteBack in Launcher.qml)
+    readonly property alias edit: edit    // for ⌘⌫ / ⌥⌫ (Words.deleteBack, from Launcher.qml's IPC)
     signal sent(string text)
     signal newChat()
     signal leaving(string text)
     signal refused()                            // Enter with nothing to send
     signal paged(int dir)                       // PgUp (-1) / PgDn (1): the conversation's, not the field's
-    property bool backspaceLeaves: true         // Backspace on an empty field leaves too (the launcher's level), as Esc
 
     // --- Tunables ---
     readonly property int bigSize: baseSize + 2   // the search field's size, for a short request
@@ -54,7 +54,7 @@ Item {
     Text {      // as the search field shows nothing when empty, but here there's a field to explain
         visible: edit.text === ""
         anchors { left: view.left; top: view.top }
-        text: "Ask Claude…"
+        text: f.placeholder
         color: Theme.dim
         opacity: 0.6
         font: edit.font
@@ -106,7 +106,7 @@ Item {
                     f.newChat(); event.accepted = true
                 } else if (event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown) {
                     f.paged(event.key === Qt.Key_PageUp ? -1 : 1); event.accepted = true
-                } else if (event.key === Qt.Key_Escape || (f.backspaceLeaves && event.key === Qt.Key_Backspace && text === "")) {
+                } else if (event.key === Qt.Key_Escape) {
                     f.leaving(text); event.accepted = true
                 } else if ((event.modifiers & Qt.AltModifier) && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
                     // ⌥← / ⌥→ by word, as in the search field

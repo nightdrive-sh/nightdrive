@@ -713,18 +713,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     function extMove(dir) { const t = extOf(level); return !!(t && t.moveSelected && t.moveSelected(dir)) }   // Ctrl+Up/Down
     // ⌘⌫ / ⌥⌫ in the query (or Ask Claude's field): a selection goes first, otherwise to the line start (word = only the
     // word before the cursor)
-    function deleteBack(word) {
-        const input = level === "askclaude" ? askField.edit : win.field
-        if (input.selectedText !== "") { input.remove(input.selectionStart, input.selectionEnd); return }
-        const end = input.cursorPosition
-        let start = input.text.lastIndexOf("\n", end - 1) + 1
-        if (word) {
-            start = end
-            while (start > 0 && /\s/.test(input.text[start - 1])) start--
-            while (start > 0 && !/\s/.test(input.text[start - 1])) start--
-        }
-        if (start < end) input.remove(start, end)
-    }
+    function deleteBack(word) { Words.deleteBack(win.field, word) }
 
     // The selection changes only when the mouse actually moves. Merely "mouse is over a row" isn't enough,
     // because a stationary cursor left under the launcher (or a scrolling list) would trigger it.
@@ -796,7 +785,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     ClaudeAccessLevels { id: caccess; launcher: win }
     SendClaudeLevels { id: sendclaude; launcher: win }
     AskClaudeHint { id: askHint; launcher: win }
-    AskClaudeLevels { id: ask; launcher: win; hint: askHint; field: askField }
+    AskClaudeLevels { id: ask; launcher: win; hint: askHint }
     InstallLevels { id: inst; launcher: win }
     ToolsLevels { id: tools; launcher: win }
     AppearanceLevels { id: look; launcher: win }
@@ -957,20 +946,22 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         // ⌘⇧V (clipboard) over a text field (a level in a Levels file's `inputs`) opens Clipboard as a picker for it
         function openLevel(level: string): void { if (level === "clipboard" && tools.picker.begin()) return; win.open = true; win.go(level); win.keyLevel = level }
         function setQuery(text: string): void { input.text = text }
-        // askClaude background|terminal: with the launcher open, sends the text typed to Claude Code (AskClaudeLevels.qml):
-        // ⌘Enter / ⌘⌥Enter on Ask Claude's level, where the conversation shows (hypr/scripts/ask-claude), ⌘⌃Enter in a
-        // terminal (hypr/scripts/terminal-or-claude), going on with the conversation from its level. Returns "ok", or ""
-        // when there's nothing to ask and the key does what it does elsewhere.
-        // key: ⌘Enter, which is the terminal on the Ask Claude row and level (Enter asks there), elsewhere background
+        // askClaude background|terminal|key: sends the text typed in the launcher to Ask Claude's toast (AskClaudeLevels.qml):
+        // ⌘⌥Enter (hypr/scripts/ask-claude), ⌘Enter (key: the terminal on the Ask Claude row, where Enter asks), ⌘⌃Enter
+        // in a terminal (hypr/scripts/terminal-or-claude). Over the toast (the launcher closed) ⌘Enter and ⌘⌃Enter go on
+        // with its conversation in a terminal. Returns "ok", or "" when there's nothing to ask and the key does what it
+        // does elsewhere (⌘⌥Enter then opens or closes the toast).
         function askClaude(how: string): string {
-            if (how === "key") how = win.level === "askclaude" || (win.results[list.currentIndex] || {}).kind === "askclaude" ? "terminal" : "background"
-            if (!win.open || ["root", "apps", "askclaude"].indexOf(win.level) < 0) return ""
-            const text = win.level === "askclaude" ? askField.text : win.query
-            if (how === "terminal") return text.trim() === "" && win.level !== "askclaude" ? "" : (ask.terminal(text, win.level === "askclaude"), "ok")
-            return ask.submit(text) ? "ok" : ""
+            if (!win.open) {
+                if (!AskClaudeSession.toastViewing || how === "background") return ""
+                ask.terminal(AskClaudeSession.draft, true)
+                return "ok"
+            }
+            if (how === "key") how = (win.results[list.currentIndex] || {}).kind === "askclaude" ? "terminal" : "background"
+            if (["root", "apps"].indexOf(win.level) < 0) return ""
+            if (how === "terminal") return win.query.trim() === "" ? "" : (ask.terminal(win.query, false), "ok")
+            return ask.submit(win.query) ? "ok" : ""
         }
-        // askClaudeDraft TEXT: Ask Claude's level with TEXT in its field, to check and send (hypr/scripts/dictate)
-        function askClaudeDraft(text: string): void { ask.draft(text) }
         // rows: the open level's title, footer, selected index and rows as JSON, primitive fields only (automated testing)
         function rows(): string {
             const plain = r => { const o = {}; for (const k in r) if (r[k] === null || typeof r[k] !== "object" && typeof r[k] !== "function") o[k] = r[k]; return o }
@@ -983,7 +974,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         function detailTab(): void { if (win.detail !== null) details.switchSource(); else shake.restart() }
         // ⌘⌫ (bindings.lua): in Background removes your own wallpaper, elsewhere deletes the query to the cursor's left (like macOS)
         function deleteSelected(): void {
-            if (!win.open) return
+            if (!win.open) { if (AskClaudeSession.toastViewing) AskClaudeSession.deleteBackRequested(false); return }
             if (win.extDelete()) {}
             else win.deleteBack(false)
         }
@@ -999,7 +990,10 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
             return "ok"
         }
         // ⌥⌫: deletes the word to the cursor's left (Hyprland's binding takes the key, so the launcher does it here)
-        function deleteWord(): void { if (win.open) win.deleteBack(true) }
+        function deleteWord(): void {
+            if (win.open) win.deleteBack(true)
+            else if (AskClaudeSession.toastViewing) AskClaudeSession.deleteBackRequested(true)
+        }
         function stepUp(): void { win.detail !== null ? details.scroll(-win.rowHeight) : win.step(-1) }
         function stepDown(): void { win.detail !== null ? details.scroll(win.rowHeight) : win.topFocused ? (win.topFocused = false) : win.step(1) }
         function back(): void { win.back() }
@@ -1058,25 +1052,8 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 sourceComponent: win.topExt ? win.topExt.topRow : null
             }
 
-            // Search field (+ path when in a sublevel); Ask Claude's level has its own, of more lines
-            AskClaudeField {
-                id: askField
-                width: parent.width
-                visible: win.level === "askclaude"
-                baseSize: win.fontSize
-                fontWeight: win.fontWeight
-                onSent: text => ask.submit(text)
-                onNewChat: ask.fresh()
-                onLeaving: text => ask.leave(text)
-                onRefused: win.shakeNow()
-                // Leaving the level (Esc, Backspace, back over IPC) hides the field with the keyboard still in it: hand
-                // it back to the search field, or nothing would take the keys
-                onVisibleChanged: if (!visible && win.open) win.field.forceActiveFocus()
-            }
-            AskClaudeThread { visible: askField.visible && (AskClaudeSession.entries.length > 0 || AskClaudeSession.busy); width: parent.width
-                              maxHeight: win.listRoom - (askField.height - 44); fontSize: win.fontSize; fontWeight: win.fontWeight }
+            // Search field (+ path when in a sublevel)
             Row {
-                visible: !askField.visible
                 width: parent.width
                 height: 44
                 Text {

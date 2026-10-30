@@ -204,6 +204,7 @@ ShellRoot {
     // stays put while a volume toast comes and goes below it
     ToastStack {
         AskClaudeToast {
+            id: askToast
             // a password prompt or Claude's long card goes over it and takes the keys (a short card comes into it)
             stepAside: polkit.asking || (confirm.open && !confirm.inlined)
             onAskingChanged: if (asking) launcher.open = false   // both would want the keyboard
@@ -240,17 +241,17 @@ ShellRoot {
 
     Launcher {
         id: launcher
-        // a password prompt or Claude's card goes over it (a short card of Ask Claude's comes into the launcher instead)
+        // a password prompt or Claude's card goes over it
         stepAside: polkit.asking || (confirm.open && !confirm.inlined)
         extSource: root.localLauncher ? "local/LauncherExtension.qml" : ""
         onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.current = name }   // below its bar icon (-1 = none: right edge)
     }
-    // An open bar menu (the core's or a plugin's) closes when the launcher opens: its overlay's keyboard focus and the
-    // qsmenu submap (arrows, Enter, Esc) would otherwise keep the keys from the launcher. A Connections: an
+    // An open bar menu (the core's or a plugin's) and Ask Claude's toast close when the launcher opens: their keyboard
+    // focus (and the menus' qsmenu submap: arrows, Enter, Esc) would otherwise keep the keys from the launcher. A Connections: an
     // onOpenChanged on the Launcher instance above didn't run (Launcher has its own).
     Connections {
         target: launcher
-        function onOpenChanged() { if (launcher.open) root.current = "" }
+        function onOpenChanged() { if (launcher.open) { root.current = ""; askToast.close() } }
     }
 
     PanelWindow {

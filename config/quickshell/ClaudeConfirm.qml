@@ -67,7 +67,7 @@ PanelWindow {
         inlined = AskClaudeSession.viewing && r.fields.length <= inlineFields && r.fields.every(f => !f.long)
         open = true
         armTimer.restart()
-        if (inlined) keyTimer.restart()   // the launcher has the keyboard: Enter counts after the same moment
+        if (inlined) keyTimer.restart()   // Ask Claude's toast has the keyboard: Enter counts after the same moment
         return "shown " + Qt.md5(text)
     }
     function decide(v) {

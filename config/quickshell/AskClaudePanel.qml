@@ -58,7 +58,7 @@ Item {
             x: 28
             width: parent.width - x
             baseSize: p.fontSize
-            backspaceLeaves: false             // Backspace on an empty field mustn't close the toast
+            placeholder: p.session.entries.length ? "Write back…" : "Ask Claude…"
             opacity: p.dictating ? 0 : 1
             // One still running: the text waits in the field
             onSent: text => { if (p.session.ask(text)) field.begin(""); else p.refuse() }

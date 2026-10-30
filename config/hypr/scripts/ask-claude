@@ -8,10 +8,10 @@
 #                                     toast (open or closed), else as ⌘⌃Enter when the tools aren't there
 #   ask-claude [--name NAME] [--] PROMPT   ask in the background; in a terminal when Claude Code or the server is missing
 #   ask-claude --stream [--resume ID] [--name NAME] [--] PROMPT
-#       for the launcher's Ask Claude view (quickshell/AskClaudeSession.qml): Claude's events as they come, one JSON
+#       for Ask Claude's toast (quickshell/AskClaudeSession.qml): Claude's events as they come, one JSON
 #       object a line (claude's stream-json), no notifications; --resume ID goes on with that conversation. A failure
 #       ends with {"type":"nightdrive_error","message":…}; "notools" when Claude Code or the tools are missing.
-#   ask-claude --ready                exit 0 when the launcher's Ask Claude can run: Claude Code and the tools are there
+#   ask-claude --ready                exit 0 when Ask Claude's toast can run: Claude Code and the tools are there
 #                                     (hypr/scripts/dictate, which otherwise takes a dictated question to a terminal)
 readonly LIMIT=300        # seconds Claude gets for one request, cards included; then it is stopped
 readonly SHOWN=1500       # characters of the answer the notification gets; the rest is in the terminal
@@ -71,8 +71,8 @@ see your last message as a desktop notification. Your only tools are Nightdrive'
 Do what the request asks with them, then answer in one to three short sentences of plain text (no Markdown, lists or \
 headings), in the language of the request. If it needs more than these tools can do, say so briefly: the user can go \
 on with this conversation in a terminal from the notification."
-(( stream )) && system="You run in the background from the user's launcher (Nightdrive's Ask Claude): they see each step \
-you take and your messages as they come, in a small panel, and can write back. Your only tools are Nightdrive's: no \
+(( stream )) && system="You run in the background from the user's desktop (Nightdrive's Ask Claude): they see each step \
+you take and your messages as they come, in a small panel below the top bar, and can write back. Your only tools are Nightdrive's: no \
 shell, no files, no web pages. Do what the request asks with them, then answer briefly in plain text (no Markdown, \
 tables or headings), in the language of the request. If it needs more than these tools can do, say so briefly: the \
 user can go on with this conversation in a terminal (Cmd+Enter)."

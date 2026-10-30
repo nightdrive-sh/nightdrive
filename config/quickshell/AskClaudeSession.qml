@@ -4,10 +4,9 @@ import Quickshell
 import Quickshell.Io
 import "AskClaudeTools.js" as Tools
 
-// Ask Claude's conversation (Dashboard #1895): one at a time, kept here and not in the launcher, so another view (a
-// toast in the top bar) can show the same one. Each request runs hypr/scripts/ask-claude --stream, which sets up
-// Claude Code with Nightdrive's tools only and passes its events on as they come; a request after the first goes on
-// with the same session (--resume). The view reads `entries` and `live` (AskClaudeThread.qml).
+// Ask Claude's conversation (Dashboard #1895): one at a time, kept here and shown by Ask Claude's toast below the bar
+// (AskClaudeToast.qml). Each request runs hypr/scripts/ask-claude --stream, which sets up Claude Code with Nightdrive's
+// tools only and passes its events on as they come; a request after the first goes on with the same session (--resume). The view reads `entries` and `live` (AskClaudeThread.qml).
 //   entries: [{ kind: "you", text }, { kind: "step", id, glyph, text, state: run | done | error | stop },
 //             { kind: "text", text }, { kind: "error", text }]
 Singleton {
@@ -22,14 +21,18 @@ Singleton {
     property string live: ""             // the answer's text as it is being written, added to entries when its block ends
     property string sessionId: ""
     property bool busy: false
-    property bool unseen: false          // an answer came while no view showed it (the launcher's row says so)
+    property bool unseen: false          // an answer came while the toast was closed (the launcher's row says so)
     property double lastAt: 0
-    // A view shows the conversation now (the launcher's level, Ask Claude's toast): Claude's confirmation card comes into
-    // it, a short one (ClaudeConfirm.qml decides, and sets card); the view shows it while pendingCard and answers through
-    // card.decide()
-    property bool launcherViewing: false
+    // Ask Claude's toast (AskClaudeToast.qml) shows the conversation; the launcher's row and keys (AskClaudeLevels.qml)
+    // ask it to through these, as neither knows the other
+    signal showRequested(string text, bool send)   // open it: send text as a new request, or leave it in the field
+    signal hideRequested()
+    signal deleteBackRequested(bool word)          // ⌘⌫ / ⌥⌫ over it, which Hyprland takes (Launcher.qml's IPC)
+    property string draft: ""            // what the toast's field has, for ⌘Enter's terminal (Launcher.qml's IPC)
+    // The toast shows the conversation now: Claude's confirmation card comes into it, a short one (ClaudeConfirm.qml
+    // decides, and sets card); the toast shows it while pendingCard and answers through card.decide()
     property bool toastViewing: false
-    readonly property bool viewing: launcherViewing || toastViewing
+    readonly property bool viewing: toastViewing
     property var card: null
     readonly property bool pendingCard: !!card && card.open && card.inlined
     signal answered()                    // a request finished (its answer, an error, or stopped)

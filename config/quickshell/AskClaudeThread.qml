@@ -2,7 +2,7 @@ import QtQuick
 
 // Ask Claude's conversation as it goes (AskClaudeSession): your requests in a darker box, each step Claude takes as a
 // row with its glyph (pulsing while it runs, dim once done, red with ✕ when it failed), a robot's head while it thinks, and its answer's text as it is written.
-// It knows nothing of the launcher, so another place can show it: give it a width, maxHeight and the font.
+// It knows nothing of where it is shown (Ask Claude's toast, AskClaudePanel.qml): give it a width, maxHeight and the font.
 Item {
     id: t
     property int maxHeight: 400

@@ -6,10 +6,12 @@ in the Launcher, `nightdrive ask`, a terminal), and you decide in Settings how f
 
 **Ask Claude** is the quick way: type a request in the Launcher ("Open three Finnish news sites") and press ⌘Enter, or
 Enter on the **Ask Claude** row (the first, and after the hits when what you typed looks like a request; with nothing
-typed it opens a field of several lines, Shift+Enter for a new line). The Launcher becomes a conversation: each step
-Claude takes, then its answer as it is written, and the field to write back. ⌃C stops it, ⌘N starts a new chat (so does
-a request from the search, or one after 15 minutes), and ⌘Enter there goes on with it in Claude Code in a terminal, where
-it has its usual tools again. Esc closes the Launcher without stopping Claude: the row says when it has answered.
+typed it opens the toast to write in, Shift+Enter for a new line). The Launcher closes, and a toast below the bar shows
+the conversation: each step Claude takes, then its answer as it is written, and the field to write back. ⌃C stops it,
+⌘N starts a new chat (so does a request from the search, or one after 15 minutes), PgUp and PgDn scroll a long answer,
+and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again. Esc, or a click beside the
+toast, closes it without stopping Claude: a small card says it is working, then for a moment that it answered (the
+row says so too), and a click on it, or ⌘⌥Enter with nothing typed, opens the toast again.
 Claude Code works with Nightdrive's tools and nothing else (no shell, files, web pages, hooks or plugins of its own), so
 the card and Access below decide as always: a short card comes into the conversation (Enter allows, Esc denies), a long
 one on its own, and after 5 minutes a request is stopped. What the tools read (a mail, a note) comes along, so look at
@@ -17,11 +19,9 @@ what it asks then as in any session. Without the tools on, or without Claude Cod
 terminal.
 
 To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
-let go: the dictation's toast below the bar grows into Ask Claude's, with what you said in the field to check before
-Enter sends it; PgUp and PgDn scroll a long answer. Esc, or a click beside it, closes it without stopping Claude: a
-small card says it is working, then for a moment that it answered, and a click on it, or ⌘⌥Enter with nothing typed,
-opens the toast again (a new conversation after 15 minutes). Over the toast's conversation it goes on with that one.
-Without the tools on, it goes to Claude Code in a terminal instead.
+let go: the dictation's toast grows into Ask Claude's, with what you said in the field to check before Enter sends it.
+Over the toast's conversation it goes on with that one. Without the tools on, it goes to Claude Code in a terminal
+instead.
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.

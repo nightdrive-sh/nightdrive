@@ -49,7 +49,7 @@ Nightdrive puts all of that together into one opinionated desktop.
 - **Music**: while it plays, a player row above the list
 
 Type a request and press ⌘Enter, or Enter on the **Ask Claude** row: Claude does it with [Nightdrive's
-tools](docs/claude.md) right in the Launcher, showing each step and its answer, and you can write back (⌘⌃Enter sends
+tools](docs/claude.md) in a toast below the bar, showing each step and its answer, and you can write back (⌘⌃Enter sends
 it to Claude Code in a terminal instead). Search "Rename current space" to name the workspace you're on in the bar.
 
 It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and the answer is the first row; Enter
@@ -459,7 +459,7 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 |---|---|
 | ⌘ Space | Launcher |
 | ⌘ Enter | Terminal (in the Launcher with text typed: Ask Claude, as ⌘⌥Enter) |
-| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, done with Nightdrive's tools only, its steps and answer in the Launcher (without text: opens or closes Ask Claude's toast) |
+| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, done with Nightdrive's tools only, its steps and answer in a toast below the bar (without text: opens or closes it) |
 | ⌘ ⌃ Enter | Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt) |
 | ⌘ C / ⌘ V / ⌘ X | Copy, paste, cut, in every app |
 | ⌘ S | Save |

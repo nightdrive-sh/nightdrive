@@ -2,7 +2,7 @@
 
 ## Apps
   Hyper              Caps Lock: Hyper + a letter opens an app (below); your own: Launcher › Settings › Apps › App shortcuts
-  ⌘ Enter            Terminal (in the Launcher with text typed: Ask Claude, as ⌘⌥Enter; on Ask Claude: Claude Code in a terminal)
+  ⌘ Enter            Terminal (in the Launcher with text typed: Ask Claude, as ⌘⌥Enter; on the Ask Claude row or its toast: Claude Code in a terminal)
   ⌘ ⌥ Enter          Ask Claude: the text typed in the Launcher, with Nightdrive's tools (without text: opens or closes Ask Claude's toast)
   ⌘ ⌃ Enter          Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt)
   ⌘ Space            Launcher (↑↓ select, Enter open, Esc close; on an app ⌃Enter adds/removes it in Apps, ⌥Enter starts it at login)

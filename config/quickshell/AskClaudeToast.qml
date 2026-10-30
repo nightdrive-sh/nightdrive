@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Window
 import Quickshell
 import Quickshell.Io
+import "Words.js" as Words
 
 // Dictation's toast, which grows into Ask Claude's (Dashboard #1895): one card in ToastStack.
 // - While Voxtype records it is the dictation indicator (DictationIndicator.qml), and it never takes a key: what you
@@ -46,9 +47,13 @@ Toast {
 
     Binding { target: AskClaudeSession; property: "toastViewing"; value: toast.takesKeys }
     onTakesKeysChanged: if (takesKeys) panel.field.edit.forceActiveFocus()   // back from a card that had the keys
+    Binding { target: AskClaudeSession; property: "draft"; value: panel.field.text }
     Connections {
         target: AskClaudeSession
         function onAnswered() { if (!toast.asking) { toast.answeredShown = true; answeredTimer.restart() } }
+        function onShowRequested(text, send) { toast.request(text, send) }
+        function onHideRequested() { toast.close() }
+        function onDeleteBackRequested(word) { if (toast.takesKeys) Words.deleteBack(panel.field.edit, word) }
     }
     Timer { id: answeredTimer; interval: toast.answeredFor; onTriggered: toast.answeredShown = false }
 
@@ -72,11 +77,21 @@ Toast {
         small.opacity = 1
         panel.opacity = 0
     }
-    function toggle() {
-        if (asking) { close(); return }
+    // Back to the conversation, or a new one when it's been quiet for a while (AskClaudeSession.freshAfter)
+    function reopen() {
         const s = AskClaudeSession
         if (!s.busy && s.sessionId !== "" && Date.now() - s.lastAt > s.freshAfter) { s.reset(); panel.field.begin("") }
         open(panel.field.text)
+    }
+    function toggle() { if (asking) close(); else reopen() }
+    // From the launcher (AskClaudeLevels.qml): a request typed there starts a new conversation, as a search does; while
+    // one still runs it waits in the field. Without one to send, the toast just opens.
+    function request(text, send) {
+        if (!send) { if (!asking) reopen(); return }
+        if (AskClaudeSession.busy) { open(text); panel.refuse(); return }
+        AskClaudeSession.reset()
+        open("")
+        AskClaudeSession.ask(text)
     }
 
     // A dictation's text: over an open toast it goes on after what was written there; else a new conversation starts
