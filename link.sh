@@ -22,7 +22,7 @@ link() {
 # login.
 external=$HOME/.local/share/nightdrive/plugins   # plugins from elsewhere (nightdrive plugins add)
 reenable=()
-for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,keyd,alsa,voxtype,gtk-3.0,gtk-4.0}/* \
+for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,systemd/user/wireplumber.service.d,keyd,alsa,voxtype,gtk-3.0,gtk-4.0}/* \
   "$HOME"/.config/systemd/user/*.wants/* "$HOME"/.config/fontconfig/conf.d/* "$HOME"/.config/wireplumber/wireplumber.conf.d/* \
   "$HOME"/.local/bin/* "$HOME"/.local/share/* "$HOME"/.local/share/{applications,nightdrive,easyeffects/output,voxtype/quickshell}/* \
   "$HOME"/.local/share/nautilus-python/extensions/* "$HOME"/.bashrc.d/* "$HOME"/.cache/nightdrive/plugins.d/icons/*; do
@@ -70,6 +70,8 @@ for f in "$repo"/config/easyeffects/output/*.json; do link "$f" "$HOME/.local/sh
 cp -n "$repo/config/easyeffects/db/easyeffectsrc" "$HOME/.config/easyeffects/db/easyeffectsrc"
 
 link "$repo/config/wireplumber/wireplumber.conf.d/51-bt-no-headset-autoswitch.conf" "$HOME/.config/wireplumber/wireplumber.conf.d/51-bt-no-headset-autoswitch.conf"   # don't make the BT headset mic the default
+# Network speakers (AirPlay, Sonos) aren't the default or an app's output after a login (hypr/scripts/forget-network-sound)
+link "$repo/config/systemd/user/wireplumber.service.d/50-nightdrive-forget-network-sound.conf" "$HOME/.config/systemd/user/wireplumber.service.d/50-nightdrive-forget-network-sound.conf"
 
 link "$repo/config/applications/nm-connection-editor.desktop" "$HOME/.local/share/applications/nm-connection-editor.desktop"   # Fedora ships none
 # macbook_mic alias for dictation (voxtype): the MacBook's mic on Apple Silicon, the default mic elsewhere
