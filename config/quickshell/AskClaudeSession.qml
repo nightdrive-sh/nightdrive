@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "AskClaudeTools.js" as Tools
 
-// Ask Claude's conversation (Dashboard #1895): one at a time, kept here and shown by Ask Claude's toast below the bar
+// Ask Claude's conversation (Dashboard #1895): one at a time, kept here and shown by Ask Claude's toast
 // (AskClaudeToast.qml). Each request runs hypr/scripts/ask-claude --stream, which sets up Claude Code with Nightdrive's
 // tools only and passes its events on as they come; a request after the first goes on with the same session (--resume). The view reads `entries` and `live` (AskClaudeThread.qml).
 //   entries: [{ kind: "you", text }, { kind: "step", id, glyph, text, state: run | done | error | stop },

@@ -34,5 +34,8 @@ Singleton {
     readonly property color launcherBg: c.launcherBg || "#f7171822"   // the terminals' background and opacity (`nightdrive theme set background`)
     readonly property string font:   c.font || "JetBrains Mono"  // `nightdrive theme font FAMILY` (theme.json)
     readonly property int barHeight: 37                           // the top bar (Bar.qml)
+    // The launcher's card and Ask Claude's, which takes over from it, have their top edge here, as a fraction of the
+    // screen's height: one place for both, so going from one to the other doesn't jump (#1895)
+    readonly property real cardTop: 0.15
     readonly property int notchWidth: 190                         // about the MacBook's notch (14", scale 2), centred on the top edge
 }

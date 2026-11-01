@@ -33,7 +33,7 @@ PanelWindow {
     readonly property int cardWidth: 660
     readonly property int fontSize: 17
     readonly property int fontWeight: Font.Light   // text weight (headers in bold)
-    readonly property real topPosition: 0.189  // card top edge as a fraction of screen height (0 = top)
+    readonly property real topPosition: Theme.cardTop  // card top edge as a fraction of screen height (0 = top)
     // A narrow or low screen (a VM's window): the card keeps this far from its edges, narrower, with fewer rows
     readonly property int edge: 12
     readonly property bool narrow: width < cardWidth + 2 * edge

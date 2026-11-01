@@ -6,7 +6,7 @@
   ⌘ ⌥ Enter          Ask Claude: the text typed in the Launcher, with Nightdrive's tools (without text: Claude Code in a terminal)
   ⌘ ⌃ Enter          Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt)
   ⌘ Space            Launcher (↑↓ select, Enter open, Esc close; on an app ⌃Enter adds/removes it in Apps, ⌥Enter starts it at login)
-  ⌘ ⌥ Space          Ask Claude: opens or closes its toast below the bar, with the conversation
+  ⌘ ⌥ Space          Ask Claude: opens or closes its toast in the Launcher's place, with the conversation
   Hyper B / ⌘ ⇧ Enter  Browser (the default apps: Launcher › Settings › Apps › Default apps)
   Hyper F            Files
   Hyper E            Email

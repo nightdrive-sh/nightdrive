@@ -3,9 +3,9 @@ import Quickshell
 
 // The launcher's Ask Claude row (Dashboard #1893, #1895). The row is the root level's first, and while searching it
 // comes after the hits when the search looks like a request (AskClaudeHint.shows), or as one found by its name. Enter on
-// it asks what was typed, or with nothing typed opens Ask Claude's toast below the bar (AskClaudeToast.qml), where the
-// conversation is: the launcher closes, and the toast shows Claude's steps and answer as they come. The row says when
-// Claude is working or has answered.
+// it asks what was typed, or with nothing typed opens Ask Claude's toast in the launcher's place (AskClaudeToast.qml),
+// where the conversation is: the launcher closes, and the toast shows Claude's steps and answer as they come. The row
+// says when Claude is working or has answered.
 // The keys Hyprland takes (⌘Enter, which is the terminal here, ⌘⌥Enter, ⌘⌃Enter) come over IPC (askClaude in
 // Launcher.qml) from hypr/scripts/ask-claude and terminal-or-claude, to submit() and terminal() here. Only with Claude
 // Code installed.

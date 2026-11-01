@@ -8,8 +8,9 @@ import "Words.js" as Words
 // - While Voxtype records it is the dictation indicator (DictationIndicator.qml), and it never takes a key: what you
 //   say is typed into the window you're in.
 // - ⌘⇧ + the dictation key (hypr/scripts/dictate) makes the dictation Claude's (dictating): the card stays through the
-//   transcription, and when the text comes (draft), the indicator fades out, the same card grows wide and down, and Ask
-//   Claude's field, conversation and keys (AskClaudePanel.qml) fade in, with the text to check before Enter sends it.
+//   transcription, and when the text comes (draft), the indicator fades out, the same card grows wide and down to the
+//   launcher's place, and Ask Claude's field, conversation and keys (AskClaudePanel.qml) fade in, with the text to check
+//   before Enter sends it.
 //   Now it has the keyboard, as the launcher does.
 // - Esc, or a click beside it, closes it without stopping Claude; what was written stays in the field for next time.
 //   While Claude works, the card stays small (AskClaudeStatus.qml), and says for a while when it has answered; a click
@@ -44,10 +45,14 @@ Toast {
     clickable: working && !dictationCard
     cardWidth: grown ? askWidth : dictationCard ? indicator.implicitWidth : status.implicitWidth
     cardHeight: grown ? panel.implicitHeight : 48
-    // In Ask Claude's size the launcher's border, as it takes the keys as the launcher does; the small cards have none
-    // (#1910)
+    // In Ask Claude's size it looks like the launcher and sits where the launcher's card does (Theme.cardTop), as it
+    // takes over from it (#1895): its background, corners and border. The small cards stay black and borderless (#1910),
+    // so the colour changes as the dictation's card grows.
     border { color: Theme.primary; width: grown ? 2 : 0 }
-    lowered: 30
+    color: grown ? Theme.launcherBg : Theme.bg
+    Behavior on color { enabled: !toast.instant; ColorAnimation { duration: 180 } }
+    radius: grown ? 12 : 10
+    lowered: Math.max(0, Math.round((Screen.height || 900) * Theme.cardTop) - Theme.barHeight - 8)
     onOutsideClicked: close()
     onTapped: open(panel.field.text)
 

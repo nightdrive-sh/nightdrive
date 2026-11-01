@@ -19,7 +19,7 @@ Item {
 
     // --- Tunables ---
     readonly property int fontSize: 17      // as the launcher's
-    readonly property int pad: 12           // the card's edge to its content
+    readonly property int pad: 18           // the card's edge to its content: the launcher's
     readonly property int gap: 8            // between the field, the conversation and the footer
 
     readonly property var session: AskClaudeSession
@@ -34,7 +34,7 @@ Item {
     readonly property string keys: session.pendingCard ? ""
         : session.busy ? "Ctrl+C: stop"
         : session.entries.length ? "Enter: send  ·  Cmd+N: new chat"
-        : "Enter: ask"
+        : "Enter: ask Claude"
 
     Item {
         id: fieldRow

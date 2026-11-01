@@ -6,7 +6,7 @@ in the Launcher, `nightdrive ask`, a terminal), and you decide in Settings how f
 
 **Ask Claude** is the quick way: type a request in the Launcher ("Open three Finnish news sites") and press ⌘Enter, or
 Enter on the **Ask Claude** row (the first, and after the hits when what you typed looks like a request; with nothing
-typed it opens the toast to write in, Shift+Enter for a new line). The Launcher closes, and a toast below the bar shows
+typed it opens the toast to write in, Shift+Enter for a new line). The Launcher closes, and a toast in its place shows
 the conversation: each step Claude takes, then its answer as it is written, and the field to write back. ⌃C stops it,
 ⌘N starts a new chat (so does a request from the search, or one after 15 minutes), PgUp and PgDn scroll a long answer,
 and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again. Esc, or a click beside the
