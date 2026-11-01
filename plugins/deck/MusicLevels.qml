@@ -60,7 +60,8 @@ Item {
     // Search Spotify for what was typed: opens Music › Search Spotify with it (Spotify is asked only then). A fixed name,
     // as Ask Claude's row has: the typed words are already in the field above it (Dashboard #1919)
     function searchRow(text) {
-        return { kind: "spotifysearch", name: "Search Spotify", glyph: "search", value: text, from: "Music" }
+        return { kind: "spotifysearch", name: "Search Spotify", glyph: "search", value: text, from: "Music",
+                 footer: "Enter: search Spotify" }
     }
 
     // 3:45

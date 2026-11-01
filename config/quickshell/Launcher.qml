@@ -135,13 +135,16 @@ PanelWindow {
     // "Hide", not "remove": removing sounded like uninstalling.
     readonly property var selApp: { const c = results[list.currentIndex]; return (level === "apps" || level === "root") && c && c.kind === "app" ? c : null }
     // The level's or the row's keys, then ⌘Enter when the search looks like a request for Claude (AskClaudeHint.qml); on
-    // the Ask Claude row its own
+    // the Ask Claude row its own. Not while that row is listed: it says so itself, and the hint stood in for the keys of
+    // a row without any (Deck's Search Spotify, #1895)
     readonly property string footer: (results[list.currentIndex] || {}).kind === "askclaude" ? ask.rowFooter(query)
-        : askHint.shows(level, query, results) ? [levelFooter, askHint.text].filter(f => f !== "").join("  ·  ") : levelFooter
+        : askHint.shows(level, query, results) && !results.some(r => r.kind === "askclaude")
+            ? [levelFooter, askHint.text].filter(f => f !== "").join("  ·  ") : levelFooter
     readonly property string levelFooter: detail !== null ? details.footer
         : selApp ? "Enter: open  ·  Ctrl+Enter: " + (selApp.shown ? "hide from Apps" : "show in Apps")
                                               + "  ·  Alt+Enter: " + (autostartIds.indexOf(appId(selApp)) >= 0 ? "don’t start at login" : "start at login")
         : level === "startup" ? "Enter: start at login on/off  ·  background apps start hidden"
+        : typeof (results[list.currentIndex] || {}).footer === "string" ? results[list.currentIndex].footer   // a row's own keys
         : (results[list.currentIndex] || {}).kind === "brightness" ? "Left+Right: brightness"
         : (results[list.currentIndex] || {}).kind === "mirrordev" ? sys.footer(level, query)
         : (results[list.currentIndex] || {}).kind === "haent" ? home.footer(level, query)

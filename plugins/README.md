@@ -203,6 +203,7 @@ have `rootItems` (rows at the Launcher's root: Deck's Music), `toolItems` (rows 
 (rows for the root search: Deck's albums) and `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
 `inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
 into the field.
+A row may carry `footer`, its own keys for the footer while it is selected ("Enter: search Spotify").
 A form's field is a row with `field: true` (`summary` its value, `placeholder` while empty, `unit` after a typed value):
 while it is selected, typing goes into a box on the row (`config/quickshell/FieldBox.qml`) instead of the search line;
 `activate()` reads `launcher.query` on Enter and calls `launcher.clearQuery()`, and `commitField(row, text)` takes it
