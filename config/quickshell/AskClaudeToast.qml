@@ -13,7 +13,7 @@ import "Words.js" as Words
 //   Now it has the keyboard, as the launcher does.
 // - Esc, or a click beside it, closes it without stopping Claude; what was written stays in the field for next time.
 //   While Claude works, the card stays small (AskClaudeStatus.qml), and says for a while when it has answered; a click
-//   on it, or ⌘⌥Enter (hypr/scripts/ask-claude, with nothing typed in the launcher), opens it again.
+//   on it, or ⌘⌥Space (hypr/scripts/ask-claude --toggle), opens it again.
 //   qs ipc call askClaude dictating     a dictation to Claude has started
 //   qs ipc call askClaude draft TEXT    its text: into the field (after what was there, when the toast is open)
 //   qs ipc call askClaude cancel        it gave no text
@@ -34,14 +34,20 @@ Toast {
     property bool grown: false            // the card has its Ask Claude size (after the small content faded out)
     property bool answeredShown: false    // an answer came while it was closed: the small card says so for a while
     readonly property bool working: !asking && (AskClaudeSession.busy || answeredShown)
-    // The small card's content: the dictation's indicator while you speak, else Claude's state
-    readonly property bool dictationCard: vt.shown || mode === "listen"
+    // The small card's content: the dictation's indicator while you speak (and while it fades out as the card grows out
+    // of it), else Claude's state
+    property bool fromDictation: false
+    readonly property bool dictationCard: vt.shown || mode === "listen" || (fromDictation && !grown)
 
     shown: vt.shown || mode !== "" || working
     takesKeys: asking && !stepAside
     clickable: working && !dictationCard
     cardWidth: grown ? askWidth : dictationCard ? indicator.implicitWidth : status.implicitWidth
     cardHeight: grown ? panel.implicitHeight : 48
+    // In Ask Claude's size the launcher's border, as it takes the keys as the launcher does; the small cards have none
+    // (#1910)
+    border { color: Theme.primary; width: grown ? 2 : 0 }
+    lowered: 30
     onOutsideClicked: close()
     onTapped: open(panel.field.text)
 
@@ -59,23 +65,30 @@ Toast {
 
     Dictation { id: vt }
 
-    // Over a card already shown (the dictation's, the small one) it grows out of it; from nothing it appears whole
+    // Out of the dictation's card it grows (the user's choice, #1895); from anywhere else (⌘⌥Space, the launcher, the
+    // small card) it appears at its size at once
     function open(text) {
-        const animate = shown
+        const animate = dictationCard
+        fromDictation = animate
+        instant = !animate
         mode = "ask"
         answeredShown = false
         AskClaudeSession.unseen = false
         panel.field.begin(text)
         if (animate) grow.restart()
         else { grow.stop(); small.opacity = 0; grown = true; panel.opacity = 1 }
+        Qt.callLater(() => toast.instant = false)   // the conversation's own growth still animates
     }
-    // While Claude works the card shrinks back to the small one (Toast animates it, as it's still shown)
+    // While Claude works the small card takes its place at once
     function close() {
         grow.stop()
+        instant = true
+        fromDictation = false
         mode = ""
         grown = false
         small.opacity = 1
         panel.opacity = 0
+        Qt.callLater(() => toast.instant = false)
     }
     // Back to the conversation, or a new one when it's been quiet for a while (AskClaudeSession.freshAfter)
     function reopen() {

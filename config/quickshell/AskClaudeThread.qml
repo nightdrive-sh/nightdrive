@@ -1,7 +1,9 @@
 import QtQuick
 
-// Ask Claude's conversation as it goes (AskClaudeSession): your requests in a darker box, each step Claude takes as a
-// row with its glyph (pulsing while it runs, dim once done, red with ✕ when it failed), a robot's head while it thinks, and its answer's text as it is written.
+// Ask Claude's conversation as it goes (AskClaudeSession): your requests in a darker box at the right, as in a chat (at
+// most youShare of the width, narrower for a short one), each step Claude takes as a row with its glyph (pulsing while
+// it runs, dim once done, red with ✕ when it failed), a robot's head while it thinks, and its answer's text as it is
+// written.
 // It knows nothing of where it is shown (Ask Claude's toast, AskClaudePanel.qml): give it a width, maxHeight and the font.
 Item {
     id: t
@@ -14,6 +16,7 @@ Item {
     readonly property int inset: 14      // text starts here, as in the search field and the request's box
     readonly property int textX: inset + 28   // Claude's part: the steps' and answers' text, after their glyph
     readonly property int gap: 10
+    readonly property real youShare: 0.7    // the most of the width your request's box takes
 
     readonly property var session: AskClaudeSession
     readonly property bool thinking: session.busy && session.live === "" && !session.entries.some(e => e.kind === "step" && e.state === "run")
@@ -138,13 +141,16 @@ Item {
                         id: you
                         visible: entry.kind === "you"
                         y: entry.above
-                        width: t.width
+                        x: t.width - width
+                        width: youText.width
                         height: youText.implicitHeight + 20
                         radius: 10
                         color: Theme.card
                         Said {
                             id: youText
                             y: 10
+                            // As wide as the text in one line, up to youShare: then it wraps
+                            width: Math.min(implicitWidth, Math.round(t.width * t.youShare))
                             text: entry.kind === "you" ? entry.modelData.text : ""
                             color: Theme.muted
                             font.pixelSize: t.fontSize - 2

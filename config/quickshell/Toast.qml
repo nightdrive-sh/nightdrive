@@ -12,6 +12,8 @@ Rectangle {
     // Written in (Ask Claude): ToastStack gives the keyboard to this card and closes it with a click beside it
     property bool takesKeys: false
     signal outsideClicked()
+    // While it has the keys, ToastStack puts the cards this much lower (Ask Claude's, away from the bar)
+    property int lowered: 0
     // Clicked, without the keyboard (Ask Claude's closed card, which opens it): only the card takes the click
     property bool clickable: false
     signal tapped()
@@ -26,9 +28,11 @@ Rectangle {
     color: Theme.bg
     clip: true
 
-    // Only while shown: a card that appears takes its new size at once rather than growing from its last one
-    Behavior on width { enabled: toast.shown; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-    Behavior on height { enabled: toast.shown; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    // Only while shown: a card that appears takes its new size at once rather than growing from its last one.
+    // instant: this change of size isn't animated either (Ask Claude opened from its small card)
+    property bool instant: false
+    Behavior on width { enabled: toast.shown && !toast.instant; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on height { enabled: toast.shown && !toast.instant; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
     // A click on the card isn't one beside it: ToastStack's catcher is under the cards
     MouseArea {

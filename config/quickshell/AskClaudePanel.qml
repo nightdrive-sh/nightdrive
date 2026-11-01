@@ -1,15 +1,15 @@
 import QtQuick
 import Quickshell
 
-// Ask Claude's toast once it is written in (AskClaudeToast.qml, Dashboard #1895): Claude's robot head and the field
-// (AskClaudeField), the conversation (AskClaudeThread, from AskClaudeSession) and its keys (KeyFooter). The field is on
-// top, where the dictation indicator was, so the dictated text appears where you looked; fieldOnTop: false puts it at
-// the bottom as in a chat (still to try out). While you dictate more, the indicator stands in the field's place.
+// Ask Claude's toast once it is written in (AskClaudeToast.qml, Dashboard #1895): the field (AskClaudeField), the conversation (AskClaudeThread, from AskClaudeSession) and its keys (KeyFooter). As in a chat,
+// the field is under the conversation, so the newest message is always just above it, where you wrote (the user's
+// choice, #1895); a new conversation is the field alone, so dictated text still appears where the indicator was.
+// fieldOnTop puts it above instead. While you dictate more, the indicator stands in the field's place.
 // A long conversation scrolls inside it: the toast stays within maxHeight.
 Item {
     id: p
     property int maxHeight: 600
-    property bool fieldOnTop: true
+    property bool fieldOnTop: false
     property bool dictating: false
     property var dictation: null          // Dictation, for the indicator
     readonly property alias field: field
@@ -29,11 +29,12 @@ Item {
     readonly property real footerH: footer.visible ? footer.height + gap : 0
     implicitHeight: 2 * pad + fieldH + threadH + footerH
 
-    // Shift+Enter (a new line) isn't listed: it's what text fields do. Claude's card has its keys on its buttons.
+    // Shift+Enter (a new line) and Esc (close) aren't listed: what text fields and toasts do. Claude's card has its keys on
+    // its buttons.
     readonly property string keys: session.pendingCard ? ""
-        : session.busy ? "Esc: close  ·  Ctrl+C: stop"
-        : session.entries.length ? "Enter: send  ·  Esc: close  ·  Cmd+N: new chat"
-        : "Enter: ask  ·  Esc: close"
+        : session.busy ? "Ctrl+C: stop"
+        : session.entries.length ? "Enter: send  ·  Cmd+N: new chat"
+        : "Enter: ask"
 
     Item {
         id: fieldRow
@@ -42,21 +43,9 @@ Item {
         width: p.width - 2 * p.pad
         height: field.height
 
-        // Says whose field this is, where the dictation's mic was; in line with the robot heads of Claude's answers
-        Text {
-            x: 10
-            width: 20
-            y: Math.round((44 - height) / 2)
-            horizontalAlignment: Text.AlignHCenter
-            text: Icons.g(p.session.thinkingGlyph)
-            color: Theme.accent
-            font { family: Icons.family; pixelSize: 18 }
-            opacity: p.dictating ? 0 : 1
-        }
         AskClaudeField {
             id: field
-            x: 28
-            width: parent.width - x
+            width: parent.width
             baseSize: p.fontSize
             placeholder: p.session.entries.length ? "Write back…" : "Ask Claude…"
             opacity: p.dictating ? 0 : 1
@@ -72,7 +61,6 @@ Item {
             dictation: p.dictation
             running: visible
             anchors.verticalCenter: field.verticalCenter
-            x: -6                              // its mic where the robot head is
         }
     }
 

@@ -24,6 +24,12 @@ PanelWindow {
         }
         return null
     }
+    // A card changes size at once just now (Toast.instant): the stack's place changes at once with it
+    readonly property bool instantNow: {
+        for (let i = 0; i < column.children.length; i++)
+            if (column.children[i].instant) return true
+        return false
+    }
     readonly property var clickCard: {
         for (let i = 0; i < column.children.length; i++) {
             const c = column.children[i]
@@ -56,7 +62,11 @@ PanelWindow {
 
     Column {
         id: column
-        anchors { top: parent.top; topMargin: Theme.barHeight + 8; horizontalCenter: parent.horizontalCenter }
+        anchors { top: parent.top; topMargin: topGap; horizontalCenter: parent.horizontalCenter }
+        // A card with the keys sits lower (its lowered); it slides there as it grows out of another card, but a card
+        // that appears at its size (instant) is there at once
+        property real topGap: Theme.barHeight + 8 + (stack.keyCard ? stack.keyCard.lowered : 0)
+        Behavior on topGap { enabled: !stack.instantNow; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
         spacing: 8
     }
 }
