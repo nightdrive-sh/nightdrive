@@ -210,8 +210,8 @@ link "$repo/config/voxtype/config.toml" "$HOME/.config/voxtype/config.toml"
 # ~/.local/share/voxtype/quickshell, its links removed above); now Nightdrive's shell does (quickshell/DictationToast.qml)
 # and config.toml turns Voxtype's off. A daemon started before that still runs it: restart the daemon once, as at login
 # (dictate daemon closes the old card).
-if pgrep -u "$USER" -f '[q]s -p .*/voxtype/quickshell' >/dev/null && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
-  pkill -u "$USER" -f '[v]oxtype.* daemon$' && sleep 0.5
+if pgrep -u "$(id -u)" -f '[q]s -p .*/voxtype/quickshell' >/dev/null && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
+  pkill -u "$(id -u)" -f '[v]oxtype.* daemon$' && sleep 0.5
   setsid -f env PATH="$HOME/.local/bin:$PATH" "$HOME/.config/hypr/scripts/dictate" daemon >/dev/null 2>&1
   echo "restarted   the dictation daemon (its toast is Nightdrive's own now)"
 fi
