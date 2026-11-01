@@ -339,7 +339,9 @@ def apply_look(lk):
           f'    decoration = {{ shadow = {{ enabled = {"true" if lk["shadow"] == "on" else "false"}, '
           f'range = {lk["shadow-size"]}, color = "{shadow}", '
           f'color_inactive = "{inactive_shadow}" }} }},\n'
-          "})\n")
+          "})\n"
+          # layer-keys.lua: while a layer holds the keyboard the active window wears these inactive colours
+          "if NightdriveLayerKeys then NightdriveLayerKeys(true) end\n")
 
 
 def reload_look():

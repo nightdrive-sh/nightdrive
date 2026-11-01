@@ -500,6 +500,7 @@ require("bindings")
 require("scroll")
 require("float-link")   -- ⌃⌘ + click on a link: the window it opens floats
 require("last-key")     -- when the last key was pressed: Claude doesn't move the focus while you type
+require("layer-keys")   -- the window under a layer that holds the keyboard looks inactive
 
 -----------------------
 ---- WINDOW RULES ----
