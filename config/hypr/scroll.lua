@@ -11,6 +11,9 @@ local apps = {
     { name = "firefox",  class = "^(org.mozilla.firefox|firefox)$",                   touchpad = 0.45, mouse = 1.0 },
     -- Chromium browser and app windows (webapps): moves further per scroll event than Firefox
     { name = "chromium", class = "^(chromium|chromium-browser|chrome-.*-Default)$", touchpad = 0.2, mouse = 0.5 },
+    -- Brave (Origin and the regular build) and its app windows: Chromium underneath, so Chromium's values to start
+    -- with; a row of its own so it can be tuned apart
+    { name = "brave",    class = "^(brave-origin|brave-browser|brave-.*-Default)$",   touchpad = 0.2, mouse = 0.5 },
 }
 
 for _, a in ipairs(apps) do
