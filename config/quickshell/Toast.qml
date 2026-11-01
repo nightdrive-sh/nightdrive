@@ -14,6 +14,9 @@ Rectangle {
     signal outsideClicked()
     // While it has the keys, ToastStack puts the cards this much lower (Ask Claude's, away from the bar)
     property int lowered: 0
+    // ToastStack has drawn this card with the keys for the first time (Ask Claude's toast taking over from the launcher,
+    // which closes only then)
+    signal drawn()
     // Clicked, without the keyboard (Ask Claude's closed card, which opens it): only the card takes the click
     property bool clickable: false
     signal tapped()

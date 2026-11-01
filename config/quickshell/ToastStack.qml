@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import Quickshell
 import Quickshell.Wayland
 
@@ -29,6 +30,16 @@ PanelWindow {
         for (let i = 0; i < column.children.length; i++)
             if (column.children[i].instant) return true
         return false
+    }
+    // A card that takes the keys says when its first frame is on screen (Toast.drawn)
+    property var drawPending: null
+    onKeyCardChanged: drawPending = keyCard
+    Connections {
+        target: column.Window.window
+        function onFrameSwapped() {
+            const c = stack.drawPending
+            if (c) { stack.drawPending = null; c.drawn() }
+        }
     }
     readonly property var clickCard: {
         for (let i = 0; i < column.children.length; i++) {

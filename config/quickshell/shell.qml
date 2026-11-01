@@ -207,10 +207,16 @@ ShellRoot {
             id: askToast
             // a password prompt or Claude's long card goes over it and takes the keys (a short card comes into it)
             stepAside: polkit.asking || (confirm.open && !confirm.inlined)
-            onAskingChanged: if (asking) launcher.open = false   // both would want the keyboard
+            // Both would want the keyboard, so the launcher closes, but only once the toast, in its place and looking like
+            // it, is on screen over it (drawn): closing it first left a frame or two with neither, a flash (#1895).
+            // handOff closes it anyway if that frame doesn't come (the toast stepped aside for a password prompt).
+            onAskingChanged: if (asking && launcher.open) handOff.restart()
+            onDrawn: if (handOff.running) { handOff.stop(); launcher.open = false }
         }
         Osd {}
     }
+
+    Timer { id: handOff; interval: 250; onTriggered: launcher.open = false }
 
     NotificationPopups {}
 

@@ -39,10 +39,7 @@ Item {
     // Enter on the row: what was typed is asked at once, as ⌘Enter does; with nothing typed the toast opens to write in
     function activate(it) {
         if (it.kind !== "askclaude") return false
-        if (!submit(launcher.query)) {
-            launcher.open = false
-            session.showRequested("", false)
-        }
+        if (!submit(launcher.query)) session.showRequested("", false)
         return true
     }
     // The footer while the row is selected: Enter is the key then, not ⌘Enter (AskClaudeHint's)
@@ -50,12 +47,11 @@ Item {
         return query.trim() !== "" ? "Enter: ask Claude  ·  Cmd+Enter: in terminal" : "Enter: open"
     }
 
-    // A request from the search (Enter on the row, ⌘Enter / ⌘⌥Enter over IPC): the launcher closes and the toast starts
-    // a new conversation with it (unless one still runs: then the text waits in its field). True when it was taken
-    // here, so the key's script doesn't open a terminal instead
+    // A request from the search (Enter on the row, ⌘Enter / ⌘⌥Enter over IPC): the toast takes over (shell.qml closes
+    // the launcher under it once it's drawn) and starts a new conversation with it (unless one still runs: then the text
+    // waits in its field). True when it was taken here, so the key's script doesn't open a terminal instead
     function submit(text) {
         if (text.trim() === "") return false
-        launcher.open = false
         session.showRequested(text, true)
         return true
     }
