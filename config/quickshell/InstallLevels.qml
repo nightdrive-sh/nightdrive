@@ -57,9 +57,10 @@ Item {
                 .concat(swCats.map(c => ({ kind: "swcat", name: c.name, glyph: c.glyph, key: c.key })))
             if (q === "") return [{ kind: "swsearch", name: "Search", glyph: "search", summary: "Fedora + Flathub" },
                                   { kind: "header", name: "Browse" }].concat(browse)
-            // What's typed can always go on to the package search (the categories rarely match an app's name)
+            // What's typed can always go on to the package search (the categories rarely match an app's name); the row's
+            // name stays fixed, as Ask Claude's and Search Spotify's do (Dashboard #1919)
             return { all: browse.map(r => ({ item: r, text: r.name })),
-                     tail: [{ kind: "swsearch", name: "Search for “" + l.query.trim() + "”", glyph: "search", summary: "Fedora + Flathub" }] }
+                     tail: [{ kind: "swsearch", name: "Search", glyph: "search", summary: "Fedora + Flathub" }] }
         }
         if (level === "swsearch") {
             if (q.replace(/[^a-z0-9._+\-]/g, "").length < 2) return [{ kind: "hint", name: "Type at least 2 characters to search apps and tools" }]
