@@ -950,7 +950,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         // ⌘⌥Enter (hypr/scripts/ask-claude), ⌘Enter (key: the terminal on the Ask Claude row, where Enter asks), ⌘⌃Enter
         // in a terminal (hypr/scripts/terminal-or-claude). Over the toast (the launcher closed) ⌘Enter and ⌘⌃Enter go on
         // with its conversation in a terminal. Returns "ok", or "" when there's nothing to ask and the key does what it
-        // does elsewhere (⌘⌥Enter then opens or closes the toast).
+        // does elsewhere.
         function askClaude(how: string): string {
             if (!win.open) {
                 if (!AskClaudeSession.toastViewing || how === "background") return ""

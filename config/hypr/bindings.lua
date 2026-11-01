@@ -98,6 +98,7 @@ end)
 hl.bind(mod .. " + ALT + RETURN", hl.dsp.exec_cmd(scripts .. "/ask-claude"))   -- Ask Claude: the launcher's text in the background, the answer a notification
 hl.bind(mod .. " + CTRL + RETURN", hl.dsp.exec_cmd(scripts .. "/terminal-or-claude"))   -- Claude Code in a terminal; the launcher's text becomes the prompt
 hl.bind(mod .. " + SPACE",       hl.dsp.exec_cmd("qs ipc call launcher toggle"))   -- Quickshell launcher
+hl.bind(mod .. " + ALT + SPACE", hl.dsp.exec_cmd(scripts .. "/ask-claude --toggle"))   -- Ask Claude's toast, open or closed (beside the launcher's ⌘Space)
 hl.bind("XF86Search",               hl.dsp.exec_cmd("qs ipc call launcher toggle"))   -- F4 (magnifier): launcher, like ⌘Space
 hl.bind("XF86LaunchA",              hl.dsp.exec_cmd("qs ipc call menu toggle notifications"))   -- F3 (Mission Control, KEY_SCALE): notification centre
 hl.bind(mod .. " + XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ; qs ipc call osd mic"), { locked = true })   -- ⌘F5: mic on/off + toast

@@ -458,8 +458,9 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | Keys | Action |
 |---|---|
 | ⌘ Space | Launcher |
+| ⌘ ⌥ Space | Ask Claude: opens or closes its toast below the bar |
 | ⌘ Enter | Terminal (in the Launcher with text typed: Ask Claude, as ⌘⌥Enter) |
-| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, done with Nightdrive's tools only, its steps and answer in a toast below the bar (without text: opens or closes it) |
+| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, done with Nightdrive's tools only, its steps and answer in a toast below the bar (Claude Code without text) |
 | ⌘ ⌃ Enter | Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt) |
 | ⌘ C / ⌘ V / ⌘ X | Copy, paste, cut, in every app |
 | ⌘ S | Save |

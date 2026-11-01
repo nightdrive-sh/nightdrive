@@ -11,7 +11,7 @@ the conversation: each step Claude takes, then its answer as it is written, and 
 ⌘N starts a new chat (so does a request from the search, or one after 15 minutes), PgUp and PgDn scroll a long answer,
 and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again. Esc, or a click beside the
 toast, closes it without stopping Claude: a small card says it is working, then for a moment that it answered (the
-row says so too), and a click on it, or ⌘⌥Enter with nothing typed, opens the toast again.
+row says so too), and a click on it, or ⌘⌥Space, opens the toast again (⌘⌥Space anywhere opens it to write in).
 Claude Code works with Nightdrive's tools and nothing else (no shell, files, web pages, hooks or plugins of its own), so
 the card and Access below decide as always: a short card comes into the conversation (Enter allows, Esc denies), a long
 one on its own, and after 5 minutes a request is stopped. What the tools read (a mail, a note) comes along, so look at
