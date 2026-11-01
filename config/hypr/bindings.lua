@@ -87,10 +87,12 @@ end
 -- Programs
 -- ⌘Enter: a terminal; over the launcher (it has the keyboard) Ask Claude with what was typed there, as ⌘⌥Enter, or on
 -- Ask Claude's row and level, where Enter asks, Claude Code in a terminal (askClaude key decides), and a terminal still
--- when there's nothing to ask (an empty search, a menu has the keyboard): askClaude answers "" then
+-- when there's nothing to ask (an empty search, a menu has the keyboard): askClaude answers "" then.
+-- test, not [ … ]: exec_cmd reads a leading [ … ] as window rules (exec [float] cmd), which swallowed the test and left
+-- a shell with only "|| exec …": ⌘Enter did nothing over the launcher (#1895)
 hl.bind(mod .. " + RETURN", function ()
     if NIGHTDRIVE_LAYER_HAS_KEYBOARD() then
-        hl.dispatch(hl.dsp.exec_cmd('[ "$(qs ipc call launcher askClaude key 2>/dev/null)" = ok ] || exec ' .. terminal))
+        hl.dispatch(hl.dsp.exec_cmd('test "$(qs ipc call launcher askClaude key 2>/dev/null)" = ok || exec ' .. terminal))
     else
         hl.dispatch(hl.dsp.exec_cmd(terminal))
     end
