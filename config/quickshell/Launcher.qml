@@ -22,6 +22,11 @@ import "Words.js" as Words
 // text and screenshot from a plugin folder's README.md, or docs/plugins/<id>.md for a plugins.txt line); there Enter runs
 // the installer, an installed one's again, and Tab (or its switch) turns an installed one off or on (`nightdrive plugins
 // off|on`).
+// This file is the window, its state and navigation, and the card that puts the parts together. The parts, each in a
+// file of its own: LauncherLevels (the Levels files), LauncherMenus and LauncherSettings (the fixed menus),
+// LauncherSearch (the rows and their ranking), LauncherApps (apps' state), LauncherShortcuts (SHORTCUTS.md),
+// LauncherSearchField (the keys), LauncherList and LauncherRow (the rows), LauncherWallGrid, LauncherIpc. Other files use
+// the launcher only through the properties and functions here (launcher.go, launcher.results, launcher.levels.disp …).
 PanelWindow {
     id: win
 
@@ -46,10 +51,6 @@ PanelWindow {
     property bool stepAside: false            // a polkit password prompt is open (PolkitWatch): hidden, not closed
     property string level: "root"             // root | apps | keys
     property string query: ""
-    property var syncHidden: []               // apps hidden by sync-apps: [{ path, name, icon, extra }]
-    property var missingApps: ({})            // ids of entries whose program isn't installed (missing-apps.sh): left out
-    property var keyList: []                  // [{ name, sub, keys, section }]
-    property var keyIndex: ({})               // lower-case name → keys (shortcutFor)
     property string armed: ""                 // action awaiting confirmation
     // A form's text field (a level file's row with `field: true`, drawn by FieldBox.qml): while it is selected, typing
     // goes into its box instead of the search line, and the selection stays on it. The file's activate() reads `query`
@@ -58,10 +59,10 @@ PanelWindow {
     readonly property var fieldRow: { const r = results[list.currentIndex]; return r && r.field === true ? r : null }
     property int fieldAt: -1                  // the field row typed into, while there is one
     property bool holdIndex: false            // clearing the field's text keeps the selection where it is
-    function clearQuery() { holdIndex = true; input.text = ""; holdIndex = false }
+    function clearQuery() { holdIndex = true; field.text = ""; holdIndex = false }
     function leaveField() {
-        if (fieldAt >= 0 && fieldAt !== list.currentIndex && input.text !== "") {
-            const row = results[fieldAt], t = extOf(level), text = input.text
+        if (fieldAt >= 0 && fieldAt !== list.currentIndex && field.text !== "") {
+            const row = results[fieldAt], t = extOf(level), text = field.text
             // Cleared before the commit: a value that changes the rows resets the list's selection, which calls this
             // again, and with the text still there it committed twice, its keepSelection() keeping the reset row
             clearQuery()
@@ -81,6 +82,7 @@ PanelWindow {
     }
     readonly property var detail: details.item   // Install / Remove: the row whose details are shown (DetailCard.qml), null = none
     readonly property int detailWidth: 860    // the card's width while showing them
+    property alias detailCard: details
     // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts } in ~/.local/state/nightdrive/launcher.json (missing = on;
     // deck, the music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for)
     property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true })
@@ -101,53 +103,71 @@ PanelWindow {
                                  "_", JSON.stringify(n), prefsFile])
     }
     property int updates: 0                   // Update: new Nightdrive commits waiting (nightdrive update check, every 6 h)
+    Sh {
+        id: updatesProc
+        script: 'cat "$HOME/.cache/nightdrive/updates" 2>/dev/null'
+        onResult: text => { win.updates = parseInt(text, 10) || 0 }
+    }
     // Background's wallpapers as a grid once they're read (ThemeLevels.qml), other levels as a list
-    readonly property bool grid: level === "background" && themes.wallLoaded
+    readonly property bool grid: level === "background" && lv.themes.wallLoaded
     readonly property int gridCols: 2
     property bool topFocused: false           // a plugin's row above the search field is selected (up arrow from the first list row)
-    // Personal additions from a private overlay: local/LauncherExtension.qml (not in the repo, see README).
-    // It may add root items and whole levels; see the functions it is asked for below (extItems, activate, ...).
-    property string extSource: ""             // shell.qml sets this when the file exists
-    readonly property var ext: extLoader.item
-    // Levels from other files, which answer the same questions (items, activate, footer, entered; the optional ones below):
-    // WifiLevels, BluetoothLevels, SoundLevels (Sound, Headphones), TailscaleLevels, StatusLevels, MirroringLevels, HomeLevels (Home Assistant), DefaultAppsLevels, AppKeyLevels
-    // (App shortcuts), BehaviourLevels (Mouse, Launcher, Firefox, Computer name, Remote login, Notifications, Crash reports, Update channel), InstallLevels,
-    // ToolsLevels (Clipboard, Emoji, Snippets), AppearanceLevels (Top bar, Screensaver), DisplayLevels (Display, Battery),
-    // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, ClaudeAccessLevels, SendClaudeLevels, AskClaudeLevels, AboutLevels, the plugins' and the private
-    // extension. A new file goes in this list, not in each question's code
-    // The installed plugins' level files (their <Name>Levels.qml, TopBar.plugin.levels: Deck's Music) come after the core's
-    property var pluginExts: []
-    readonly property var exts: [wifi, bt, sound, ts, stats, mirror, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, caccess, sendclaude, ask, about].concat(pluginExts, ext ? [ext] : [])
-    // A plugin's row above the search field (topRow; Deck's player): the first file that has one. ↑ from the list's first
-    // row selects it, its keys then go to topKey(event), and Ctrl+Space anywhere to topPress()
-    readonly property var topExt: exts.find(e => e.topRow) || null
-    function extOf(l) { return exts.find(e => e.levels.indexOf(l) >= 0) || null }
+
+    // --- The parts (see the top) ---
+    property string extSource: ""             // shell.qml sets this when local/LauncherExtension.qml exists (LauncherLevels)
+    LauncherLevels { id: lv; launcher: win }
+    LauncherMenus { id: menusPart; launcher: win }
+    LauncherSettings { id: settingsPart; launcher: win }
+    LauncherSearch { id: searchPart; launcher: win }
+    LauncherApps { id: appsPart; launcher: win }
+    LauncherShortcuts { id: shortcutsPart; launcher: win }
+    LauncherIpc { launcher: win }
+    RowCopy { id: copier; launcher: win }
+    property alias levels: lv                 // launcher.levels.disp, .sound, .ask …: a Levels file by its short name
+    property alias menus: menusPart
+    property alias settingsRows: settingsPart
+    property alias appState: appsPart
+    property alias shortcuts: shortcutsPart
+    property alias rowCopy: copier   // Wi-Fi's and Tailscale's rows say "copied" (RowCopy.qml)
+
+    readonly property var ext: lv.ext
+    readonly property var pluginExts: lv.pluginExts
+    readonly property var exts: lv.exts
+    readonly property var topExt: lv.topExt
+    function extOf(l) { return lv.extOf(l) }
     readonly property bool extLevel: extOf(level) !== null
+    readonly property var titles: Object.assign({}, menusPart.titles, settingsPart.titles, ...exts.map(e => e.titles))
+    readonly property var parents: Object.assign({}, menusPart.parents, settingsPart.parents, ...exts.map(e => e.parents))
+    readonly property var statics: Object.assign({}, menusPart.statics, settingsPart.statics)
+    readonly property var settingsAliases: settingsPart.settingsAliases
+    readonly property var results: searchPart.items()
+    function fold(s) { return searchPart.fold(s) }
+    function mirrorRows() { return lv.mirror.mirrorRows() }   // DisplayLevels: Screen Mirroring's rows under Display
+
     readonly property int selIndex: list.currentIndex
     function shakeNow() { shake.restart() }
-    function search(target, text) { go(target); input.text = text }   // a level with its query typed (Default apps › Find more)
-    function insertText(text) { input.insert(input.cursorPosition, text) }   // at the cursor (Snippets: Shift+Enter → ↵)
-    property alias field: input                                         // the search / text field (ClipPicker keeps its text and cursor)
-    readonly property var swCats: inst.swCats                          // Install › Software's categories (Default apps › Find more)
-    function openCategory(key, name) { inst.openCategory(key, name) }
-    readonly property var parents: Object.assign({ install: "system", screenshot: "tools", startup: "appsettings", appsettings: "settings" }, ...exts.map(e => e.parents))
+    function search(target, text) { go(target); field.text = text }   // a level with its query typed (Default apps › Find more)
+    function insertText(text) { field.insert(field.cursorPosition, text) }   // at the cursor (Snippets: Shift+Enter → ↵)
+    property alias field: searchField.input                             // the search / text field (ClipPicker keeps its text and cursor)
+    readonly property var swCats: lv.inst.swCats                        // Install › Software's categories (Default apps › Find more)
+    function openCategory(key, name) { lv.inst.openCategory(key, name) }
     // The selected row is an app: ⌃Enter shows it in Apps (the list with an empty query) or hides it from there.
     // "Hide", not "remove": removing sounded like uninstalling.
     readonly property var selApp: { const c = results[list.currentIndex]; return (level === "apps" || level === "root") && c && c.kind === "app" ? c : null }
     // The level's or the row's keys, then ⌘Enter when the search looks like a request for Claude (AskClaudeHint.qml); on
     // the Ask Claude row its own. Not while that row is listed: it says so itself, and the hint stood in for the keys of
     // a row without any (Deck's Search Spotify, #1895)
-    readonly property string footer: (results[list.currentIndex] || {}).kind === "askclaude" ? ask.rowFooter(query)
-        : askHint.shows(level, query, results) && !results.some(r => r.kind === "askclaude")
-            ? [levelFooter, askHint.text].filter(f => f !== "").join("  ·  ") : levelFooter
+    readonly property string footer: (results[list.currentIndex] || {}).kind === "askclaude" ? lv.ask.rowFooter(query)
+        : lv.askHint.shows(level, query, results) && !results.some(r => r.kind === "askclaude")
+            ? [levelFooter, lv.askHint.text].filter(f => f !== "").join("  ·  ") : levelFooter
     readonly property string levelFooter: detail !== null ? details.footer
         : selApp ? "Enter: open  ·  Ctrl+Enter: " + (selApp.shown ? "hide from Apps" : "show in Apps")
-                                              + "  ·  Alt+Enter: " + (autostartIds.indexOf(appId(selApp)) >= 0 ? "don’t start at login" : "start at login")
+                                              + "  ·  Alt+Enter: " + (appsPart.autostartIds.indexOf(appsPart.appId(selApp)) >= 0 ? "don’t start at login" : "start at login")
         : level === "startup" ? "Enter: start at login on/off  ·  background apps start hidden"
         : typeof (results[list.currentIndex] || {}).footer === "string" ? results[list.currentIndex].footer   // a row's own keys
         : (results[list.currentIndex] || {}).kind === "brightness" ? "Left+Right: brightness"
-        : (results[list.currentIndex] || {}).kind === "mirrordev" ? mirror.footer(level, query)
-        : (results[list.currentIndex] || {}).kind === "haent" ? home.footer(level, query)
+        : (results[list.currentIndex] || {}).kind === "mirrordev" ? lv.mirror.footer(level, query)
+        : (results[list.currentIndex] || {}).kind === "haent" ? lv.home.footer(level, query)
         : (results[list.currentIndex] || {}).kind === "nightlight" ? "Enter: night light on/off"
         : (results[list.currentIndex] || {}).kind === "calc" ? "Enter: copy the result"
         : extOf(level) ? extOf(level).footer(level, query)   // not extLevel: it can lag a level change by one update
@@ -156,212 +176,16 @@ PanelWindow {
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
     signal openMenu(string name)              // Settings: opens a Quickshell menu (wifi, bluetooth, ...)
 
-    readonly property var titles: Object.assign({ apps: "Apps", keys: "Keybindings", screenshot: "Tools › Screenshot", settings: "Settings", startup: "Apps › Startup", appsettings: "Settings › Apps", theme: "Settings › Theme", themecolor: "Settings › Theme › Color", background: "Settings › Theme › Background",
-                                     system: "System", install: "System › Install", power: "Power",
-                                     tools: "Tools" }, ...exts.map(e => e.titles))
-
-    // Reference at startup: the app list only loads on first reference
-    property var apps: DesktopEntries.applications.values
-
     // Terminal window that runs a command and waits for Enter (sudo asks for the password here)
     function term(script, arg) {
         return [scripts + "/terminal", "--class", "floating-tui", "--", "bash", "-c",
                 script + "; echo; read -rp 'Done. Press Enter to close…'", "_", arg || ""]
     }
-    function shot(mode) { return ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/screenshot\" \"$1\"", "_", mode] }
-
-    // Passwords only with 1Password; the plugins' level files add their own (rootItems: Deck's Music)
-    readonly property var rootItems: ask.rootRows().concat([
-        { kind: "nav", name: "Apps", glyph: "layout-grid", target: "apps" },
-    ], Plugins.has("1password") ? [{ kind: "nav", name: "Passwords", glyph: "key-round", target: "passwords" }] : [], [
-        { kind: "nav", name: "Clipboard", glyph: "clipboard-list", target: "clipboard" },
-    ], ...pluginExts.map(e => e.rootItems || []), home.rootItems, ext ? ext.rootItems : [], [
-        { kind: "nav", name: "Tools", glyph: "wrench", target: "tools" },
-        { kind: "nav", name: "Keybindings", glyph: "keyboard", target: "keys" },
-        { kind: "nav", name: "Settings", glyph: "settings", target: "settings" },
-        // System: Install, Remove, Update, Status and About Nightdrive (the update count shows here too)
-        { kind: "nav", name: "System", glyph: "monitor-cog", target: "system", summary: updates > 0 ? updates + " new" : undefined },
-        { kind: "nav", name: "Power", glyph: "power", target: "power" }
-    ])
-
-    // Static sublevels
-    readonly property var statics: ({
-        system: [
-            { kind: "nav", name: "Install", glyph: "package-plus", target: "install", extra: "software package app flatpak dnf" },
-            { kind: "nav", name: "Remove", glyph: "package-minus", target: "remove", extra: "uninstall delete package app" },
-            { kind: "action", name: "Update", glyph: "refresh-cw", confirm: true, cmd: term('"$HOME/.local/bin/nightdrive" update'),
-              summary: updates > 0 ? updates + " new" : undefined, extra: "upgrade dnf flatpak nightdrive" },
-            // Welcome to Nightdrive (config/welcome): the first login's window, again
-            { kind: "action", name: "Set up Nightdrive", glyph: "sparkles", cmd: [Quickshell.env("HOME") + "/.local/bin/nightdrive", "welcome"],
-              extra: "welcome first run start setup claude sign in login tailscale mail deck" },
-            { kind: "nav", name: "Status", glyph: "activity", target: "status", extra: "cpu memory processes temperature claude usage" },
-            { kind: "nav", name: "About Nightdrive", glyph: "info", target: "about", extra: "version release channel info website github" }
-        ],
-        tools: [
-            { kind: "nav", name: "Screenshot", glyph: "camera", target: "screenshot" },
-            { kind: "nav", name: "Emoji", glyph: "smile", target: "emoji" },
-            { kind: "nav", name: "Snippets", glyph: "text-cursor-input", target: "snippets", extra: "text expansion replacement abbreviation autotext" },
-            { kind: "action", name: "Color Picker", glyph: "pipette", cmd: ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/color-picker\""] },
-            // as ⌘⌃C, once the launcher is gone: the window under it is what's gathered, and its screenshot is without the launcher
-            { kind: "action", name: "Send to Claude", glyph: "bot", keyHint: true, extra: "selection files picture screenshot prompt claude code",
-              cmd: ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/send-capture\" sendclaude"] }
-        ].concat(Plugins.has("localsend") ? [   // to a phone running LocalSend (plugins/localsend); several: picked from a list
-            { kind: "action", name: "Send clipboard with LocalSend", glyph: "smartphone", cmd: [Quickshell.env("HOME") + "/.local/bin/localsend", "send-clipboard"],
-              extra: "phone iphone share airdrop text link" },
-            { kind: "action", name: "Send files with LocalSend", glyph: "smartphone", cmd: [Quickshell.env("HOME") + "/.local/bin/localsend", "send-pick"],
-              extra: "phone iphone share airdrop" }
-        ] : [], ...pluginExts.map(e => e.toolItems || [])),   // the plugins' level files add theirs (toolItems: Keep Awake)
-        screenshot: [
-            { kind: "action", name: "Region", glyph: "crop", cmd: shot("region") },
-            { kind: "action", name: "Window", glyph: "app-window", cmd: shot("window") },
-            { kind: "action", name: "Full screen", glyph: "monitor", cmd: shot("full") }
-        ],
-        install: [
-            { kind: "nav", name: "Software", glyph: "package-plus", target: "software", summary: "dnf + Flatpak" },
-            { kind: "nav", name: "Webapp", glyph: "app-window", target: "webapp", summary: "website as an app" },
-            { kind: "nav", name: "Recommended", glyph: "star", target: "recommended", summary: "apps set up for Nightdrive" },
-            { kind: "nav", name: "Plugins", glyph: "puzzle", target: "plugins", summary: "desktop features" }
-        ],
-        // In groups like macOS's System Settings: the often used first (connections, hardware), then the look, the apps' own
-        // settings (one row, as on iOS: appsettings), Claude, and what is set once (system)
-        settings: [
-            { kind: "header", name: "Connections" },
-            { kind: "nav", name: "Wi-Fi", glyph: "wifi", target: "wifi" },
-            { kind: "nav", name: "Bluetooth", glyph: "bluetooth", target: "bluetooth" }
-        ].concat(Plugins.has("tailscale") ? [{ kind: "nav", name: "Tailscale", glyph: "shield-check", target: "tailscale" }] : [], [
-            { kind: "header", name: "Hardware" },
-            { kind: "nav", name: "Sound", glyph: "volume-2", target: "sound" },   // Headphones are a row there, while connected
-            { kind: "nav", name: "Display", glyph: "monitor", target: "display" }
-        ], disp.hasOthers() ? [{ kind: "nav", name: "Other displays", glyph: "monitor-smartphone", target: "otherdisplays", summary: disp.othersSummary() }] : [], [
-            { kind: "nav", name: "Mouse", glyph: "mouse", target: "mousescroll", summary: behave.mouseScroll ? behave.mouseScroll + "× scroll" : undefined }
-        ], disp.hasBattery ? [{ kind: "nav", name: "Battery", glyph: "battery-medium", target: "battery" }] : [], [
-            { kind: "header", name: "Appearance" },
-            { kind: "nav", name: "Theme", glyph: "palette", target: "theme" },
-            { kind: "nav", name: "Top bar", glyph: "panel-top", target: "topbar" },   // its look and what it shows
-            { kind: "nav", name: "Screensaver", glyph: "monitor-pause", target: "screensaver" },
-            { kind: "nav", name: "Notifications", glyph: "bell-ring", target: "sounds" },
-            { kind: "header", name: "Apps" },
-            { kind: "nav", name: "App settings", glyph: "layout-grid", target: "appsettings" },
-            { kind: "header", name: "Claude" },
-            { kind: "nav", name: "Claude writes", glyph: "sparkles", target: "claudewrite", summary: cwrite.modelName(cwrite.model) },
-            { kind: "nav", name: "Access", glyph: "shield-half", target: "claudeaccess", summary: caccess.summary,
-              extra: "claude access mcp tools privacy" }   // what Claude Code may use of the desktop (ClaudeAccessLevels)
-        ], behave.crashReportItems, [
-            { kind: "header", name: "System" },
-            { kind: "nav", name: "Launcher", glyph: "text-search", target: "launcherprefs" },
-            { kind: "nav", name: "Computer name", glyph: "laptop", target: "compname", summary: behave.compName }   // what phones see
-        ], behave.remoteLoginItems, [
-            { kind: "nav", name: "Update channel", glyph: "git-branch", target: "channel",
-              summary: behave.channel === "dev" ? "development" : (behave.channel === "custom" ? behave.channelBranch || "custom" : behave.channel || undefined) }
-        ]),
-        // Settings › Apps: what is about apps in general first, then each app's own settings (only those installed)
-        appsettings: defs.settingsItems.concat(akeys.settingsItems, [
-            { kind: "nav", name: "Startup", glyph: "rocket", target: "startup" },
-            { kind: "nav", name: "Nightdrive apps", glyph: "app-window", target: "ndapps", summary: "on or off" }   // InstallLevels.qml
-        ], behave.browserItems.length || home.settingsItems.length || Plugins.has("mail") || Plugins.has("contacts") ? [{ kind: "header", name: "Installed apps" }] : [],
-           behave.browserItems.concat(home.settingsItems,
-               Plugins.has("contacts") ? [{ kind: "action", name: "Contacts", glyph: "contact", cmd: [Quickshell.env("HOME") + "/.local/bin/contacts", "settings"] }] : [],
-               Plugins.has("mail") ? [{ kind: "action", name: "Mail", glyph: "mail", cmd: [Quickshell.env("HOME") + "/.local/bin/nightmail", "settings"] }] : [])
-               .map(t => Object.assign({}, t, { appName: t.name }))),   // an app's own: "Mail settings" in the root search
-        power: [
-            { kind: "action", name: "Lock", glyph: "lock", cmd: ["loginctl", "lock-session"] },
-            { kind: "action", name: "Sleep", glyph: "moon", cmd: ["systemctl", "suspend"] },
-            { kind: "action", name: "Log out", glyph: "log-out", cmd: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-end", "logout"] },
-            { kind: "action", name: "Restart", glyph: "rotate-cw", confirm: true, cmd: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-end", "reboot"] },
-            { kind: "action", name: "Shut down", glyph: "power", confirm: true, cmd: [Quickshell.env("HOME") + "/.config/hypr/scripts/session-end", "poweroff"] }
-        ]
-    })
-
-    readonly property var settingsAliases: ({ "Wi-Fi": "wifi wlan network internet", "Sound": "audio volume output speakers headphones airpods noise cancelling equalizer", "Battery": "power charge charging health cycles",
-                                              "Display": "brightness keyboard backlight night light warm scale scaling resolution monitor screen retina hidpi zoom size bigger smaller",
-                                              "Other displays": "ipad iphone tablet phone android second screen extra extend sidecar vnc airplay apple tv mirror cast",
-                                              "Notifications": "notification sounds alert chime beep ping tone urgent critical popup timeout seconds duration",
-                                              "Crash reports": "crash crashes bug report claude app quit coredump",
-                                              "Tailscale": "vpn", "Mouse": "scroll scrolling wheel speed fast slow",
-                                              "Claude writes": "ai write rewrite polish text draft reply tone instructions prompt model",
-                                              "Default apps": "browser email mail files folders text editor terminal images photos video music player pdf calendar open with",
-                                              "App shortcuts": "keyboard shortcuts hyper caps lock keys keybindings hotkeys open app", "Theme": "appearance style look colors",
-                                              "Color": "theme accent violet purple blue teal green amber rose graphite gray",
-                                              "Background": "wallpaper desktop image picture",
-                                              "Theme Editor…": "window background terminal kitty opacity transparency border frame shadow inactive",
-                                              "Top bar": "waybar panel menu bar",
-                                              "Firefox": "browser tabs tab bar links new window",
-                                              "Launcher": "search fuzzy typos shortcuts hints spotlight",
-                                              "Computer name": "hostname rename device localsend airplay ferry phone",
-                                              "Remote login": "ssh sshd server remote access terminal sharing",
-                                              "Update channel": "stable development dev beta branch updates",
-                                              "Home Assistant": "home automations buttons lights types",
-                                              "App settings": "apps applications preferences",
-                                              "Mail": "email settings preferences",
-                                              "Opacity": "top bar waybar panel transparency transparent",
-                                              "Icon colors": "top bar waybar panel white black light dark text",
-                                              "Highlight": "top bar waybar panel active workspace",
-                                              "Items": "top bar panel modules icons show hide clock date battery",
-                                              "Brightness": "screen dim dimmer brighter backlight",
-                                              "Keyboard backlight": "keyboard light lit illumination brightness dim",
-                                              "Night light": "night shift warm yellow blue light evening",
-                                              "Scale": "scaling resolution monitor screen retina hidpi zoom size bigger smaller",
-                                              "Screen Mirroring": "airplay cast mirror apple tv share screen" })
-    // Settings › Theme: sub-items (Color with its current value)
-    // Settings › Display for the root search: the brightness slider row itself (←/→ work there too), the night light toggle
-    // and Scale (opens Display)
-    function displayItems() {
-        return (disp.bright >= 0 ? [{ kind: "brightness", key: "screen", name: "Brightness", glyph: "sun" }] : [])
-            .concat(disp.keys >= 0 ? [{ kind: "brightness", key: "keys", name: "Keyboard backlight", glyph: "keyboard" }] : [])
-            .concat([{ kind: "nightlight", name: "Night light", glyph: "moon" },
-                     { kind: "nav", name: "Scale", glyph: "monitor", target: "display" }],
-                    mirror.mirrorAvail ? [{ kind: "nav", name: "Screen Mirroring", glyph: "screen-share", target: "otherdisplays" }] : [])
-    }
-    readonly property var installAliases: ({ "Software": "package dnf rpm flatpak flathub app apps program store",
-                                             "Webapp": "web app website site pwa url slack teams whatsapp youtube",
-                                             "Recommended": "optional home assistant jottacloud deck vscode 1password tailscale thunderbird apostrophe",
-                                             "Plugins": "plugin extension addon optional airplay screen mirroring" })
-    readonly property var powerAliases: ({ "Lock": "screen", "Sleep": "suspend", "Log out": "logout sign out exit", "Restart": "reboot", "Shut down": "shutdown poweroff power off" })
-
-    // Lower case without diacritics: "keittio" finds Keittiö, "ylavalo" Ylävalo
-    function fold(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") }
-    // 0 = the whole name, 0.5 = starts with query, 1 = word start, 2 = contains, -1 = no match (q folded). The whole name
-    // first: "code" puts Code before Code - OSS, whatever their order in the list.
-    function score(text, q) {
-        const t = fold(text)
-        if (t === q) return 0
-        if (t.startsWith(q)) return 0.5
-        if (t.split(/[\s\-_.\/]+/).some(w => w.startsWith(q))) return 1
-        if (t.includes(q)) return 2
-        return -1
-    }
-    // The last tier: q's letters in order, but not just anywhere (that would match nearly everything). Each letter is at a
-    // word start, right after the previous match, or a letter or two after it in the same word: "vsc" → Visual Studio
-    // Code, "kattovlo" → Kattovalo. Both folded.
-    function fuzzy(t, q) {
-        const start = i => i === 0 || /[\s\-_.\/›:]/.test(t[i - 1])
-        const from = (qi, ti) => {        // q[qi..] matches from t[ti..]; prev match at ti - 1
-            if (qi === q.length) return true
-            for (let i = ti; i < t.length; i++) {
-                if (t[i] !== q[qi]) continue
-                const gap = i - ti
-                const ok = qi === 0 ? start(i) : gap === 0 || start(i) || (gap <= 2 && !/[\s\-_.\/›:]/.test(t.slice(ti, i)))
-                if (ok && from(qi + 1, i + 1)) return true
-            }
-            return false
-        }
-        return q.length >= 2 && from(0, 0)
+    // Install › Software's rows and a details card's Tab (the other source)
+    function installCmd(src, id) {
+        return src === "flatpak" ? term('flatpak install --user flathub "$1"', id) : term('sudo dnf install "$1"', id)
     }
 
-    // Groups keybindings by section (sections in file order) and adds header rows
-    function grouped(list) {
-        const by = {}
-        for (const it of list) (by[it.section] = by[it.section] || []).push(it)
-        const out = []
-        const seen = {}
-        for (const k of keyList) {
-            if (seen[k.section] || !by[k.section]) continue
-            seen[k.section] = true
-            out.push({ kind: "header", name: k.section })
-            for (const it of by[k.section]) out.push(it)
-        }
-        return out
-    }
     // Rows that can't be selected: section headers, and notes (kind "note": a line of help in small text, e.g. Settings ›
     // App shortcuts' "the others are in the config files"), unlike a hint, which stands in for the rows ("Loading…"), and
     // quotes (kind "quote": lines of what something holds, in a darker box: Send to Claude's preview)
@@ -383,170 +207,11 @@ PanelWindow {
             if (dir > 0 && results.slice(i + 1).every(fixedRow)) Qt.callLater(() => list.positionViewAtEnd())
         }
     }
-    readonly property int headerHeight: 40
-    // A row's description (sub) wraps, up to subMaxLines (or the row's own subMax: a snippet's lines): each line after
-    // the first makes the row this much taller. subPlain: in the name's font instead (a snippet's text, all of it alike)
-    readonly property int subMaxLines: 3
-    readonly property int subLineHeight: Math.ceil(subMetrics.height)
-    readonly property int plainLineHeight: Math.ceil(plainMetrics.height)
-    FontMetrics { id: subMetrics; font { family: Theme.font; pixelSize: win.fontSize - 5; weight: win.fontWeight } }
-    FontMetrics { id: plainMetrics; font { family: Theme.font; pixelSize: win.fontSize; weight: win.fontWeight } }
-    // A quote's lines (its name, already cut to a few lines) and the box's padding
-    readonly property int quoteLineHeight: Math.ceil(quoteMetrics.height)
-    readonly property int quotePad: 12
-    FontMetrics { id: quoteMetrics; font { family: Theme.font; pixelSize: win.fontSize - 3; weight: win.fontWeight } }
-    function quoteHeight(it) { return it.name.split("\n").length * quoteLineHeight + 2 * quotePad }
-    // The lines a row's description takes (an estimate from its width, for the list's height; the row measures its own)
-    function subLines(it) {
-        if (!it.sub || fixedRow(it)) return 1
-        const room = Math.max(1, list.width - iconSize - 70)
-        const m = it.subPlain ? plainMetrics : subMetrics
-        const lines = keySpaced(it.sub).split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(m.advanceWidth(l) / room)), 0)
-        return Math.min(it.subMax || subMaxLines, lines)
-    }
-    function listHeight() {
-        const cap = Math.min(maxRows * (rowHeight + rowGap), listRoom)
-        let h = 0
-        for (const it of results) {
-            h += (it.kind === "quote" ? quoteHeight(it) : fixedRow(it) ? headerHeight : rowHeight + (subLines(it) - 1) * (it.subPlain ? plainLineHeight : subLineHeight)) + rowGap
-            if (h >= cap) return cap
-        }
-        return h
-    }
 
     function hint(text) { return [{ kind: "hint", name: text }] }
 
-    // App rows: with an empty query only allow-listed apps; when searching, also those hidden by sync-apps
-    function appEntries(q) {
-        const all = apps.filter(e => !e.noDisplay && !missingApps[appId({ entry: e })]).map(e => ({
-            item: { kind: "app", name: e.name, icon: e.icon, entry: e, shown: true },
-            text: e.name,
-            extra: (e.genericName || "") + " " + (e.keywords || []).join(" ")
-        }))
-        if (q !== "") for (const h of syncHidden) if (!missingApps[appId({ path: h.path })]) all.push({ item: { kind: "app", name: h.name, icon: h.icon, path: h.path, shown: false }, text: h.name, extra: h.extra })
-        // An app just moved with ⌃Enter: the two sources (DesktopEntries, hidden-apps.sh) update at different moments, so
-        // until its new place shows up the row is kept from the snapshot, and its old place is left out
-        const out = all.filter(a => { const p = pinPending[appId(a.item)]; return !p || p.shown === a.item.shown })
-        for (const id in pinPending) {
-            const p = pinPending[id]
-            if (!out.some(a => appId(a.item) === id) && (p.shown || q !== "")) out.push({ item: p, text: p.name, extra: "" })
-        }
-        return out
-    }
-
-    // Typed in the root search, a certain old command (only its hash is here) and Enter start hypr/shaders/warp
-    readonly property string basicKey: "c6a812e51728d75227cd473fd4d23ff0"
-    readonly property var basicRow: ({ kind: "action", name: "SEARCHING FOR *", sub: "LOADING", glyph: "save",
-                                       cmd: ["bash", "-c", "pgrep -f '^qs -p .*/shaders/warp' >/dev/null || exec qs -p ~/.config/hypr/shaders/warp"] })
-
     // The next word boundary from `pos` in direction `dir` (-1 / 1): over any spaces and punctuation, then the word
     function wordPos(s, pos, dir) { return Words.pos(s, pos, dir) }
-
-    function items() {
-        const q = query.trim().toLowerCase()
-        let all, tail = [], short = false
-        if (level === "root" && Qt.md5(q.replace(/\s+/g, "").replace(/[“”„]/g, '"')) === basicKey) return [basicRow]
-        if (level === "root") {
-            all = rootItems.map(r => ({ item: r, text: r.name, extra: r.extra || "" }))
-            // When searching, the root level also finds rows from the sublevels, so there's no need to open a menu first.
-            // "from" tells which menu a row comes from; extra adds search words (aliases, alternative spellings).
-            if (q !== "") for (const src of [
-                // Tools entries ("color" → Color Picker)
-                statics.tools.map(t => ({ item: t, text: t.name })),
-                // Screenshot actions ("region", "screenshot", "capture")
-                statics.screenshot.map(t => ({ item: Object.assign({}, t, { from: "Screenshot" }), text: t.name, extra: "screenshot capture screen" })),
-                // Settings items ("wallpaper" → Background, "wifi" → Wi-Fi) plus Theme and Top bar sub-items ("opacity")
-                statics.settings.filter(t => t.kind !== "header").map(t => ({ item: Object.assign({}, t, { from: "Settings" }), text: t.name, extra: "settings " + (settingsAliases[t.name] || "") })),
-                // (an app's own settings named so, not to come before the app: "mail" finds Mail first, then Mail settings)
-                statics.appsettings.filter(t => t.kind !== "header").map(t => {
-                    const name = t.appName ? t.appName + " settings" : t.name
-                    return { item: Object.assign({}, t, { from: "Settings", name: name }), text: name, extra: "settings apps " + (settingsAliases[t.name] || "") }
-                }),
-                themes.themeItems().map(t => ({ item: Object.assign({}, t, { from: "Theme", summary: undefined }), text: t.name, extra: "theme " + (settingsAliases[t.name] || "") })),
-                look.topbarItems().map(t => ({ item: Object.assign({}, t, { from: "Top bar", summary: undefined }), text: t.name, extra: settingsAliases[t.name] || "" })),
-                // Display and Screensaver sub-items ("night" → Night light, "dim" → Brightness, "saver" → Start after)
-                displayItems().map(t => ({ item: Object.assign({}, t, { from: "Display" }), text: t.name, extra: "display " + (settingsAliases[t.name] || "") })),
-                // Screen Mirroring's receivers ("mirror", "airplay", "olohuone"): Enter starts mirroring right from the search
-                mirror.mirrorRows().filter(t => t.kind === "mirrordev").map(t => ({ item: Object.assign({}, t, { from: "Screen Mirroring", summary: undefined }),
-                                                                                  text: t.name, extra: "screen mirroring " + t.extra })),
-                // AirPlay speakers ("airplay", "olohuone"): Enter makes it the sound output
-                sound.sinks.filter(d => d.airplay).map(d => ({ item: { kind: "sounddev", id: d.id, name: d.name, glyph: "speaker", from: "Sound",
-                                                                     trailGlyph: d.current ? "check" : undefined },
-                                                             text: d.name, extra: "airplay sound audio output speaker" })),
-                look.screensaverItems().map(t => ({ item: Object.assign({}, t, { from: "Screensaver", summary: undefined }), text: t.name, extra: "screensaver idle lock" })),
-                // System's items ("upd" → Update, "cpu" → Status)
-                statics.system.map(t => ({ item: Object.assign({}, t, { from: "System", summary: undefined }), text: t.name, extra: t.extra || "" })),
-                // Install's sub-items ("flatpak", "webapp", "flathub" → Flatpak)
-                statics.install.map(t => ({ item: Object.assign({}, t, { from: "Install", summary: undefined }), text: t.name,
-                                            extra: "install " + (installAliases[t.name] || "") })),
-                // Only found by searching: names the focused workspace (ToolsLevels › wsname)
-                [{ item: { kind: "nav", name: "Rename current space", glyph: "pencil", target: "wsname" }, text: "Rename current space",
-                   extra: "workspace name label" }],
-                // Power actions ("shut" → Shut down)
-                statics.power.map(t => ({ item: t, text: t.name, extra: powerAliases[t.name] || "" })),
-                // Apps ("1pas" → 1Password), also one named like a root item (e.g. a webapp next to its menu): the APPS tag and
-                // the open-window dot tell them apart
-                appEntries(q).map(a => Object.assign({}, a, { item: Object.assign({}, a.item, { from: "Apps" }) })),
-                // Home Assistant's devices ("olohuone" → its lights): Enter turns one on/off right from the search
-                home.rootRows(),
-                // The plugins' own rows (rootRows: Deck's albums, "fm-84" → Atlas)
-                ...pluginExts.map(e => e.rootRows ? e.rootRows() : [])
-            ]) all = all.concat(src)
-            // Rows after the hits as they are, whatever was typed (rootTail: Deck's Search Spotify row, when Deck is in the search)
-            if (q !== "") tail = [].concat(...pluginExts.map(e => e.rootTail ? e.rootTail(q) : [])).map(r => Object.assign({ tail: true }, r))
-        } else if (level === "apps") {
-            all = appEntries(q)
-            if (q === "") all.sort((a, b) => a.text.localeCompare(b.text))
-        } else if (level === "keys") {
-            all = keyList.map(k => ({ item: { kind: "key", name: k.name, sub: k.sub || undefined, keys: k.keys, section: k.section }, text: k.name,
-                                      extra: k.keys + " " + k.section + " " + k.sub }))
-        } else if (extOf(level)) {
-            const r = extOf(level).items(level, q)
-            if (!r.all) return r          // ready-made rows (hints, etc.)
-            all = r.all                   // [{ item, text, extra }], filtered by the query below
-            tail = r.tail || []           // rows after a search's hits
-            short = r.short === true      // thousands of short names (Emoji): no fuzzy matching, the shortest first
-        } else if (level === "startup") {
-            all = appEntries(q).map(a => {
-                const on = autostartIds.indexOf(appId(a.item)) >= 0
-                return Object.assign({}, a, { item: Object.assign({}, a.item, { summary: on ? (bgApps[a.item.name] !== undefined ? "at login, hidden" : "at login") : undefined }) })
-            })
-            if (q === "") return all.sort((a, b) => a.text.localeCompare(b.text)).map(x => x.item)   // a fixed order: toggling doesn't move rows
-        } else {
-            all = (statics[level] || []).map(r => ({ item: r, text: r.kind === "header" ? "" : r.name }))   // a search drops the headers
-        }
-        if (q === "") return level === "keys" ? grouped(all.map(x => x.item)) : all.map(x => x.item)
-        const scored = []
-        // Several words: each may hit the name or the search words ("olohuone kattovalo" → the room is in extra, the name in text)
-        const fq = fold(q)
-        const words = fq.split(/\s+/).filter(w => w !== "")
-        const fuzzyOk = prefs.fuzzy && !short   // letters in order would hit too many of them
-        all.forEach((x, i) => {
-            let s = score(x.text, fq)
-            // An app's own settings ("Firefox settings") right after the app while its name is being typed: "fire" hits
-            // both as a start, and the settings come earlier in the list
-            if (s >= 0 && s < 1 && x.item.appName && score(x.item.appName, fq) >= 0) s += 0.25
-            const extra = x.extra ? fold(x.extra) : ""
-            if (s < 0 && extra.includes(fq)) s = 3
-            if (s < 0 && words.length > 1) {
-                const hay = fold(x.text) + " " + extra
-                if (words.every(w => hay.includes(w))) s = 4
-                // 5: the same with typos and shortcuts, each word fuzzy ("olohuone kattovlo")
-                else if (fuzzyOk && words.every(w => hay.includes(w) || fuzzy(hay, w))) s = 5
-            }
-            if (s < 0 && fuzzyOk && words.length === 1 && fuzzy(fold(x.text), fq)) s = 5
-            if (s >= 0) scored.push({ x: x, s: s, i: i })
-        })
-        scored.sort((a, b) => (a.s - b.s) || (level === "apps" ? a.x.text.localeCompare(b.x.text) : short ? (a.x.text.length - b.x.text.length) || (a.i - b.i) : a.i - b.i))
-        const res = scored.map(o => o.x.item).concat(tail)
-        // The calculator's answer ("3*8" → "= 24") first, unless a name starts with what was typed: "7-zip" stays an app
-        const sum = level === "root" ? calc.row(query) : null
-        if (sum) res.splice(scored.filter(o => o.s <= 0.5).length, 0, sum)
-        // A search that looks like a request: Ask Claude right after the hits, before the plugins' rows (Search Spotify)
-        if (level === "root") { const t = res.findIndex(r => r.tail); res.splice(t < 0 ? res.length : t, 0, ...ask.tailRows(query, res)) }
-        return level === "keys" ? grouped(res) : res
-    }
-    readonly property var results: items()
 
     // The row each level had selected when a sublevel was opened (by name: a search may have been on), so Esc returns to it
     property var lastSel: ({})
@@ -556,7 +221,7 @@ PanelWindow {
     // The level openLevel opened (a key, a menu, a script), "" when the launcher was opened as itself: back() closes there
     property string keyLevel: ""
     // Opens a level with this already typed (Deck's Search Spotify row)
-    function goSearch(target, text) { go(target); input.text = text }
+    function goSearch(target, text) { go(target); field.text = text }
     function go(target, goingBack) {
         const cur = results[list.currentIndex]
         if (cur && cur.name && target !== level && (parents[target] || "root") === level)   // going down one level
@@ -564,126 +229,25 @@ PanelWindow {
         // back() keeps the record: a sublevel's Esc returns here and this level's Esc still to the search
         if (!goingBack && target !== level)
             fromSearch[target] = query.trim() !== "" ? { level: level, query: query, sel: cur ? { kind: cur.kind, name: cur.name } : null } : undefined
-        level = target; input.text = ""; query = ""; armed = ""; topFocused = false; details.close()
-        hiddenProc.running = true
-        missingProc.running = true
-        if (target === "keys") keysProc.running = true     // re-read SHORTCUTS.md: changes show up immediately
+        level = target; field.text = ""; query = ""; armed = ""; topFocused = false; details.close()
+        appsPart.rescan()
+        if (target === "keys") shortcutsPart.reload()     // re-read SHORTCUTS.md: changes show up immediately
         list.currentIndex = firstSelectable()
-        if (target === "settings" || target === "appsettings") behave.entered("settings")   // the computer name and channel on its rows, Firefox's
-        if (target === "display" || target === "otherdisplays") mirror.entered("display")   // Screen Mirroring's rows (Other displays)
+        if (target === "settings" || target === "appsettings") lv.behave.entered("settings")   // the computer name and channel on its rows, Firefox's
+        if (target === "display" || target === "otherdisplays") lv.mirror.entered("display")   // Screen Mirroring's rows (Other displays)
         if (extOf(target)) extOf(target).entered(target)
-    }
-    // Background apps (⌘W hides them to special:bg, ⌘Q quits): app name -> window class regex, from hypr/background-apps(.local),
-    // the same list close-or-hide uses. An open app (also a hidden one) gets a green dot at the right end of its row.
-    property var bgApps: ({})
-    Sh {
-        id: bgAppsProc   // re-read on every open, so an app added to the list works without restarting the shell
-        script: 'cd "$HOME/.config/hypr" && cat background-apps background-apps.local 2>/dev/null'
-        running: true
-        onResult: text => {
-            const m = {}
-            for (const l of text.split("\n")) {
-                const i = l.indexOf(" = ")
-                if (i > 0 && !l.startsWith("#")) m[l.slice(0, i).trim()] = l.slice(i + 3).trim()
-            }
-            win.bgApps = m
-        }
-    }
-    property var runningClasses: []    // classes of all open windows (lowercase)
-    // Whether an app has a window open (on any workspace, also in the background): background apps by their class list (bgApps),
-    // others by the .desktop file's StartupWMClass or id
-    function appRunning(item) { return item.kind === "app" && (item.entry !== undefined || item.path !== undefined) && appClassRe(item) !== "" }
-    // The window class regex of a running app (for quit-app --class), "" when it has no window open. A row hidden by
-    // sync-apps has only the .desktop file's path: its id is the file name.
-    function appClassRe(item) {
-        const re = bgApps[item.name]
-        if (re !== undefined) return runningClasses.some(c => new RegExp(re, "i").test(c)) ? re : ""
-        const wm = (item.entry && item.entry.startupClass || "").toLowerCase()
-        const id = appId(item).replace(/\.desktop$/, "").toLowerCase()
-        const c = [wm, id].find(c => c !== "" && runningClasses.includes(c))
-        return c ? "^" + c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$" : ""
-    }
-    // Apps quit with ⌘Q: class regex -> when. Their green dot pulses until the app is gone (or 10 s: it asked about unsaved
-    // work or refused), the window list is re-read often meanwhile.
-    property var quitting: ({})
-    readonly property bool anyQuitting: Object.keys(quitting).length > 0
-    function quitPending(item) { const re = appClassRe(item); return re !== "" && quitting[re] !== undefined }
-    onRunningClassesChanged: {
-        if (!anyQuitting) return
-        const left = {}
-        for (const re in quitting)
-            if (Date.now() - quitting[re] < 10000 && runningClasses.some(c => new RegExp(re, "i").test(c))) left[re] = quitting[re]
-        quitting = left
-    }
-    Timer { interval: 300; repeat: true; running: win.anyQuitting; onTriggered: bgProc.running = true }
-    Sh {
-        id: bgProc
-        script: 'hyprctl -j clients | jq -r \'.[].class\''
-        onResult: text => { win.runningClasses = text.split("\n").filter(l => l !== "" && !l.startsWith("__")).map(l => l.toLowerCase()) }
-    }
-    Timer { interval: 1500; repeat: true; running: win.open; onTriggered: bgProc.running = true }
-    // ⌃Enter on an app: the choice goes to ~/.local/state/nightdrive/apps.json ({"shown": [ids], "hidden": [ids]}), then sync-apps
-    // updates the overrides (fuzzel/sync-apps) and the list follows
-    function appId(item) {
-        const id = item.entry ? item.entry.id : item.path.split("/").pop()
-        return id.endsWith(".desktop") ? id : id + ".desktop"
-    }
-    property var pinPending: ({})           // id -> the app's row in its new state, until both sources have caught up
-    function togglePin(item) {
-        keepSelection()
-        const n = Object.assign({}, pinPending)
-        n[appId(item)] = Object.assign({}, item, { shown: !item.shown })
-        pinPending = n
-        pinProc.environment = { "ID": appId(item), "TO": item.shown ? "hidden" : "shown" }
-        pinProc.running = true
-    }
-    // A pending app is done once its new place is in the sources (and its old place is gone); the timer is a fallback
-    function prunePins() {
-        let changed = false
-        const n = Object.assign({}, pinPending)
-        for (const id in n) {
-            const inApps = apps.some(e => !e.noDisplay && appId({ entry: e }) === id)
-            const inHidden = syncHidden.some(h => appId({ path: h.path }) === id)
-            if (n[id].shown ? inApps && !inHidden : inHidden && !inApps) { delete n[id]; changed = true }
-        }
-        if (changed) pinPending = n
-    }
-    onAppsChanged: prunePins()
-    onSyncHiddenChanged: prunePins()
-    Timer { id: pinSettle; interval: 5000; onTriggered: win.pinPending = ({}) }
-    Sh {
-        id: pinProc
-        // The id moves to one list and out of the other; other keys in the file are kept (room for more settings later)
-        script: 'f="$HOME/.local/state/nightdrive/apps.json"; mkdir -p "${f%/*}"; [ -s "$f" ] || echo "{}" > "$f"
-jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden = ((.hidden // []) - [$id]) | .[$to] += [$id]\' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-"$HOME/.config/fuzzel/sync-apps" >/dev/null'
-        onResult: { hiddenProc.running = true; pinSettle.restart() }   // (prunePins runs when the lists change)
-    }
-
-    // Login apps (Settings › Apps › Startup, ⌥Enter on an app): hypr/scripts/autostart keeps the list and starts them at login
-    property var autostartIds: []
-    Sh {
-        id: autostartProc
-        command: [win.scripts + "/autostart", "list"]
-        onResult: text => { win.autostartIds = text.split("\n").filter(l => l !== "") }
-    }
-    function toggleAutostart(item) {
-        keepSelection()
-        const id = appId(item)
-        autostartIds = autostartIds.indexOf(id) >= 0 ? autostartIds.filter(x => x !== id) : autostartIds.concat([id])   // shown at once
-        Quickshell.execDetached([scripts + "/autostart", "toggle", id])
     }
 
     function activate(item) {
         if (!item) return
         if (item.switchBusy) { shake.restart(); return }   // its last change is still waiting (e.g. for the password)
         if (item.kind === "nav") go(item.target)
-        else if (item.kind === "app" && level === "startup") toggleAutostart(item)
+        else if (item.kind === "app" && level === "startup") appsPart.toggleAutostart(item)
         else if (item.kind === "app") {
             win.open = false
             // Background app: bring the hidden window back (no second instance)
-            if (item.entry && bgApps[item.name] !== undefined)
-                Quickshell.execDetached([scripts + "/launch-or-focus", bgApps[item.name], "gtk-launch", item.entry.id + ".desktop"])
+            if (item.entry && appsPart.bgApps[item.name] !== undefined)
+                Quickshell.execDetached([scripts + "/launch-or-focus", appsPart.bgApps[item.name], "gtk-launch", item.entry.id + ".desktop"])
             // An app that runs in a terminal (htop, aerc) in the chosen one: execute() would start it without any
             else if (item.entry && item.entry.runInTerminal)
                 Quickshell.execDetached([scripts + "/terminal", "--"].concat(item.entry.command))
@@ -745,7 +309,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     function showTop() { Qt.callLater(() => list.positionViewAtBeginning()) }
     function back() {
         if (detail !== null) { details.close(); return }
-        if (tools.picker.back()) return      // Clipboard as a text field's picker: back to the field, its text kept
+        if (lv.tools.picker.back()) return      // Clipboard as a text field's picker: back to the field, its text kept
         if (level === "root") { win.open = false; return }
         // The level a key or a menu opened the launcher on (openLevel: ⌘⇧E Emoji, ⌘⌃C Send to Claude): there's nothing
         // in the launcher to go back to, so Esc closes it, as that key's own card would
@@ -754,7 +318,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         if (s) {
             delete fromSearch[level]
             go(s.level, true)
-            input.text = s.query
+            field.text = s.query
             reselect(s.sel)
             return
         }
@@ -769,247 +333,15 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
 
     // Closing leaves the details right away (after the Behavior above has seen open = false), so the next open starts narrow
     onOpenChanged: if (!open) Qt.callLater(() => { if (!win.open) details.close() })
-    else { lastMouse = null; lastSel = ({}); fromSearch = ({}); keyLevel = ""; exts.forEach(e => e.opened()); Plugins.check(); go("root"); bgProc.running = true; bgAppsProc.running = true; autostartProc.running = true; updatesProc.running = true; mirror.entered("display"); sound.soundRefresh(); input.forceActiveFocus() }
-    Component.onCompleted: keysProc.running = true
+    else { lastMouse = null; lastSel = ({}); fromSearch = ({}); keyLevel = ""; exts.forEach(e => e.opened()); Plugins.check(); go("root"); appsPart.opened(); updatesProc.running = true; lv.mirror.entered("display"); lv.sound.soundRefresh(); field.forceActiveFocus() }
 
     Timer { id: disarm; interval: 4000; onTriggered: win.armed = "" }
 
-
-    // Install › Software's rows and a details card's Tab (the other source)
-    function installCmd(src, id) {
-        return src === "flatpak" ? term('flatpak install --user flathub "$1"', id) : term('sudo dnf install "$1"', id)
-    }
-    WifiLevels { id: wifi; launcher: win }
-    BluetoothLevels { id: bt; launcher: win }
-    SoundLevels { id: sound; launcher: win }
-    TailscaleLevels { id: ts; launcher: win }
-    StatusLevels { id: stats; launcher: win }
-    MirroringLevels { id: mirror; launcher: win }
-    RowCopy { id: copier; launcher: win }
-    property alias rowCopy: copier   // Wi-Fi's and Tailscale's rows say "copied" (RowCopy.qml)
-    // A row's every-second value (its `live` / `liveName` key: Wi-Fi's rate, Status), from the Levels file that knows the key
-    function liveText(key) { for (const e of exts) { const t = e.liveText ? e.liveText(key) : undefined; if (t !== undefined) return t } return "" }
-    HomeLevels { id: home; launcher: win }
-    DefaultAppsLevels { id: defs; launcher: win }
-    AppKeyLevels { id: akeys; launcher: win }
-    BehaviourLevels { id: behave; launcher: win }
-    ClaudeWriteLevels { id: cwrite; launcher: win }
-    ClaudeAccessLevels { id: caccess; launcher: win }
-    SendClaudeLevels { id: sendclaude; launcher: win }
-    AskClaudeHint { id: askHint; launcher: win }
-    AskClaudeLevels { id: ask; launcher: win; hint: askHint }
-    InstallLevels { id: inst; launcher: win }
-    ToolsLevels { id: tools; launcher: win }
-    AppearanceLevels { id: look; launcher: win }
-    DisplayLevels { id: disp; launcher: win }
-    RemoveLevels { id: rm; launcher: win }
-    PasswordLevels { id: pw; launcher: win }
-    ThemeLevels { id: themes; launcher: win; behave: behave }
-    AboutLevels { id: about; launcher: win }
-    Calculator { id: calc; launcher: win }
-    Instantiator {
-        id: pluginLevels
-        model: TopBar.plugin.levels
-        delegate: Loader { source: "file://" + modelData; onLoaded: item.launcher = win }
-        // later: while a file loads, the Instantiator doesn't list its Loader yet (objectAt is null)
-        onObjectAdded: Qt.callLater(win.listPluginExts)
-        onObjectRemoved: Qt.callLater(win.listPluginExts)
-    }
-    function listPluginExts() {
-        const out = []
-        for (let i = 0; i < pluginLevels.count; i++) { const o = pluginLevels.objectAt(i); if (o && o.item) out.push(o.item) }
-        pluginExts = out
-    }
-    Loader {
-        id: extLoader
-        source: win.extSource
-        onLoaded: item.launcher = win
-    }
     function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
-    Sh {
-        id: updatesProc
-        script: 'cat "$HOME/.cache/nightdrive/updates" 2>/dev/null'
-        onResult: text => { win.updates = parseInt(text, 10) || 0 }
-    }
-    function mirrorRows() { return mirror.mirrorRows() }   // DisplayLevels: Screen Mirroring's rows under Display
-
-    // overrides marked by sync-apps → ids of hidden apps
-    Sh {
-        id: hiddenProc
-        command: [Quickshell.env("HOME") + "/.config/quickshell/hidden-apps.sh"]
-        onResult: text => {
-            win.syncHidden = text.split("\n").filter(l => l.includes("|")).map(l => {
-                const f = l.split("|")
-                return { path: f[0], name: f[1], icon: f[2], extra: f[3] || "" }
-            })
-        }
-    }
-
-    // entries whose program is gone (a removed package's local copy or link) → ids to leave out of Apps
-    Sh {
-        id: missingProc
-        command: [Quickshell.env("HOME") + "/.config/quickshell/missing-apps.sh"]
-        onResult: text => {
-            const m = {}
-            for (const id of text.split("\n")) if (id) m[id] = true
-            win.missingApps = m
-        }
-    }
-
-    // A row's shortcut from SHORTCUTS.md ("" = none): apps and the launcher's own items, by name. Names that differ
-    // between the launcher and SHORTCUTS.md: shortcutAliases.
-    readonly property var shortcutAliases: ({ "kitty": "terminal", "firefox": "browser", "visual studio code": "vs code",
-                                              "clipboard": "clipboard history", "emoji": "emoji picker", "keybindings": "this help" })
-    function shortcutFor(it) {
-        if (!it || !it.name || (it.kind !== "app" && it.kind !== "nav" && !it.keyHint)) return ""   // keyHint: an action with a key of its own
-        if (level === "startup") return ""      // there the rows are switches, not apps to open
-        // settings pages: "Notifications" is not the ⌘Esc panel, Apps › "Firefox" not Hyper B
-        if (it.kind === "nav" && (parents[it.target] === "settings" || parents[it.target] === "appsettings")) return ""
-        const n = it.name.toLowerCase()
-        return keyIndex[n] || keyIndex[shortcutAliases[n] || ""] || ""
-    }
-
-    // A keybinding's text → [name, second line]: the row has no room for long texts. A note in parentheses at the end goes
-    // on the second line ("Emoji picker (Enter pastes…)"), and so does what a long name has after its first ": " or "; "
-    // outside parentheses ("Play/pause; starts Deck if…").
-    function splitKeyText(text) {
-        let name = text, sub = ""
-        const p = name.match(/^(.*\S)\s*\(([^()]*)\)$/)
-        if (p) { name = p[1]; sub = p[2] }
-        if (name.length > 36) {
-            let depth = 0
-            for (let i = 0; i < name.length - 1; i++) {
-                const c = name[i]
-                if (c === "(") depth++
-                else if (c === ")") depth--
-                else if (depth === 0 && (c === ":" || c === ";") && name[i + 1] === " ") {
-                    sub = name.slice(i + 2) + (sub ? " (" + sub + ")" : "")
-                    name = name.slice(0, i)
-                    break
-                }
-            }
-        }
-        return [name, sub.charAt(0).toUpperCase() + sub.slice(1)]
-    }
-
-    // A keybinding's keys → what Keybindings shows: [{ caps: ["⌘", "⇧", "S"] }, { text: "/" }, …]. Each combination goes
-    // in key caps like a row's shortcut; between alternatives (" / ") and around a range (" … ") the separator stays
-    // text, and so do the words after a combination's keys ("⌘ + drag", "Delete in Settings › Background").
-    function keyParts(keys) {
-        const key = (t, last) => /^[⌘⇧⌥⌃⌫A-Z0-9,.=\-]$/.test(t) || /^(Hyper|Ctrl|Alt|Shift|Cmd|Enter|Esc|Tab|Space|Delete|Home|End|F\d+)$/.test(t)
-            || (last && /^(←\/→|[←→↑↓])$/.test(t))   // an arrow only at the end: "⌘ Space → Tools" is a path
-        const out = []
-        keys.replace(/← \/ →/g, "←/→").split(/ (\/|…) /).forEach((seg, i) => {
-            if (i % 2) { out.push({ text: seg }); return }
-            const t = seg.split(/\s+/).filter(x => x !== "")
-            let n = 0
-            while (n < t.length && key(t[n], n === t.length - 1)) n++
-            if (n > 0) out.push({ caps: t.slice(0, n) })
-            if (n < t.length) out.push({ text: t.slice(n).join(" ") })
-        })
-        return out
-    }
-
-    // SHORTCUTS.md → [{ name, sub, keys, section }], without the lines of optional parts that aren't installed (read again
-    // when that list changes)
-    Connections { target: Plugins; function onIdsChanged() { keysProc.running = true } }
-    Sh {
-        id: keysProc
-        script: '"$HOME/.config/hypr/scripts/shortcuts"'
-        onResult: text => {
-            const out = []
-            let section = ""
-            for (const line of text.split("\n")) {
-                const h = line.match(/^##\s+(.*)$/)
-                if (h) { section = h[1]; continue }
-                // Keys and description are split at the last run of two or more spaces
-                const m = line.match(/^ {2}(\S.*) {2,}(\S.*)$/)
-                if (!m || !section) continue
-                const t = win.splitKeyText(m[2].trim())
-                out.push({ keys: m[1].trim(), name: t[0], sub: t[1], section: section })
-            }
-            win.keyList = out
-            // name → keys, for showing an app's or a launcher item's shortcut on its row: the row's name with and without
-            // its parentheses, the names in them ("Music (Deck, Spotify)" → deck) and in its note ("Email (Thunderbird,
-            // inbox)" → thunderbird). The first of alternatives ("⌘ ⇧ Enter / ⌘ ⇧ B").
-            const idx = {}
-            for (const k of out) {
-                const keys = k.keys.split(" / ")[0]
-                const inParens = (k.name.match(/\(([^()]*)\)/g) || []).map(p => p.slice(1, -1)).join(",")
-                const names = [k.name, k.name.replace(/\s*\([^()]*\)/g, "")]
-                for (const n of names.concat((inParens + "," + k.sub).split(/,\s*/))) {
-                    const key = n.trim().toLowerCase()
-                    if (key && idx[key] === undefined) idx[key] = keys
-                }
-            }
-            win.keyIndex = idx
-        }
-    }
 
     // A hair space between key symbols in running text: JetBrains Mono's ⌘⌥⌫ are wider than their cell and overlap side
     // by side (the shortcut rows use letterSpacing instead)
-    function keySpaced(t) { return t.replace(/([⌘⌥⇧⌃⌫⌦])(?=[⌘⌥⇧⌃⌫⌦])/g, "$1\u200A") }
-
-    IpcHandler {
-        target: "launcher"
-        function toggle(): void { win.open = !win.open }
-        function close(): void { win.open = false }
-        // openLevel apps | keys | root: opens a sublevel directly
-        // ⌘⇧V (clipboard) over a text field (a level in a Levels file's `inputs`) opens Clipboard as a picker for it
-        function openLevel(level: string): void { if (level === "clipboard" && tools.picker.begin()) return; win.open = true; win.go(level); win.keyLevel = level }
-        function setQuery(text: string): void { input.text = text }
-        // askClaude background|terminal|key: sends the text typed in the launcher to Ask Claude's toast (AskClaudeLevels.qml):
-        // ⌘⌥Enter (hypr/scripts/ask-claude), ⌘Enter (key: the terminal on the Ask Claude row, where Enter asks), ⌘⌃Enter
-        // in a terminal (hypr/scripts/terminal-or-claude). Over the toast (the launcher closed) ⌘Enter and ⌘⌃Enter go on
-        // with its conversation in a terminal. Returns "ok", or "" when there's nothing to ask and the key does what it
-        // does elsewhere.
-        function askClaude(how: string): string {
-            if (!win.open) {
-                if (!AskClaudeSession.toastViewing || how === "background") return ""
-                ask.terminal(AskClaudeSession.draft, true)
-                return "ok"
-            }
-            if (how === "key") how = (win.results[list.currentIndex] || {}).kind === "askclaude" ? "terminal" : "background"
-            if (["root", "apps"].indexOf(win.level) < 0) return ""
-            if (how === "terminal") return win.query.trim() === "" ? "" : (ask.terminal(win.query, false), "ok")
-            return ask.submit(win.query) ? "ok" : ""
-        }
-        // rows: the open level's title, footer, selected index and rows as JSON, primitive fields only (automated testing)
-        function rows(): string {
-            const plain = r => { const o = {}; for (const k in r) if (r[k] === null || typeof r[k] !== "object" && typeof r[k] !== "function") o[k] = r[k]; return o }
-            return JSON.stringify({ level: win.level, title: win.titles[win.level] || "", footer: win.footer, sel: list.currentIndex,
-                                    rows: win.results.map(plain) })
-        }
-        // pick <index>: selects a row like Enter (automated testing)
-        function pick(index: int): void { const r = win.results[index]; if (r) win.activate(r); else shake.restart() }
-        // detailTab: Tab in a package's or plugin's details, e.g. a plugin's on/off switch (automated testing)
-        function detailTab(): void { if (win.detail !== null) details.switchSource(); else shake.restart() }
-        // ⌘⌫ (bindings.lua): in Background removes your own wallpaper, elsewhere deletes the query to the cursor's left (like macOS)
-        function deleteSelected(): void {
-            if (!win.open) { if (AskClaudeSession.toastViewing) AskClaudeSession.deleteBackRequested(false); return }
-            if (win.extDelete()) {}
-            else win.deleteBack(false)
-        }
-        // ⌘Q (hypr/scripts/quit-app asks first): with the launcher open quits the selected app if it's running, otherwise
-        // shakes. Returns "ok" when the launcher is open, so the window under it is never quit; "" when it's closed.
-        function quitSelected(): string {
-            if (!win.open) return ""
-            const re = win.selApp ? win.appClassRe(win.selApp) : ""
-            if (re === "") { shake.restart(); return "ok" }
-            Quickshell.execDetached([win.scripts + "/quit-app", "--class", re])
-            win.quitting = Object.assign({}, win.quitting, { [re]: Date.now() })
-            bgProc.running = true
-            return "ok"
-        }
-        // ⌥⌫: deletes the word to the cursor's left (Hyprland's binding takes the key, so the launcher does it here)
-        function deleteWord(): void {
-            if (win.open) win.deleteBack(true)
-            else if (AskClaudeSession.toastViewing) AskClaudeSession.deleteBackRequested(true)
-        }
-        function stepUp(): void { win.detail !== null ? details.scroll(-win.rowHeight) : win.step(-1) }
-        function stepDown(): void { win.detail !== null ? details.scroll(win.rowHeight) : win.topFocused ? (win.topFocused = false) : win.step(1) }
-        function back(): void { win.back() }
-    }
+    function keySpaced(t) { return t.replace(/([⌘⌥⇧⌃⌫⌦])(?=[⌘⌥⇧⌃⌫⌦])/g, "$1 ") }
 
     visible: open && !stepAside
     anchors { top: true; bottom: true; left: true; right: true }
@@ -1065,519 +397,14 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
             }
 
             // Search field (+ path when in a sublevel)
-            Row {
-                width: parent.width
-                height: 44
-                Text {
-                    id: crumb
-                    visible: win.level !== "root"
-                    anchors.verticalCenter: parent.verticalCenter
-                    leftPadding: 14
-                    rightPadding: 6
-                    text: (win.titles[win.level] || win.level) + "  ›"
-                    color: Theme.dim
-                    font { family: Theme.font; pixelSize: win.fontSize + 1; weight: win.fontWeight }
-                }
-                TextInput {
-                    id: input
-                    echoMode: win.level === "wifipw" ? TextInput.Password : TextInput.Normal   // Wi-Fi › Password
-                    opacity: win.fieldRow ? 0 : 1      // a form's field shows the text in its own box (FieldBox.qml)
-                    width: parent.width - (crumb.visible ? crumb.width : 0)
-                    height: parent.height
-                    verticalAlignment: TextInput.AlignVCenter
-                    leftPadding: crumb.visible ? 4 : 14
-                    color: Theme.text
-                    selectionColor: Theme.sel
-                    font { family: Theme.font; pixelSize: win.fontSize + 2; weight: win.fontWeight }
-                    focus: true
-                    clip: true
-                    onTextChanged: { if (win.detail !== null) details.close()   // a new search (IPC setQuery)
-                                     win.query = text; win.armed = ""; win.topFocused = false
-                                     if (win.fieldRow) win.fieldAt = list.currentIndex   // typed into: leaving it hands the text over
-                                     else if (!win.holdIndex) list.currentIndex = win.firstSelectable() }
-                    Keys.onPressed: event => {
-                        const ctrl = event.modifiers & Qt.ControlModifier
-                        if (win.topFocused && win.topExt && win.topExt.topKey(event)) { event.accepted = true; return }
-                        // ⌘C (Hyprland sends Ctrl+Insert; Ctrl+C too) on a row with a `copy` value, e.g. an IP address;
-                        // selected text in the search field is copied as usual
-                        const copyRow = win.results[list.currentIndex]
-                        if (ctrl && (event.key === Qt.Key_Insert || event.key === Qt.Key_C) && copyRow && copyRow.copy !== undefined && selectedText === "") {
-                            copier.copyText(copyRow.copy, copyRow.sensitive === true); event.accepted = true; return
-                        }
-                        if (win.detail !== null) {         // details: Enter installs / removes, C sets up with Claude, arrows scroll, typing does nothing
-                            if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) win.back()
-                            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) details.confirm(ctrl)
-                            else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) details.switchSource()
-                            else if (event.key === Qt.Key_C && !ctrl) details.setup()
-                            else if (event.key === Qt.Key_Down || (ctrl && (event.key === Qt.Key_N || event.key === Qt.Key_J))) details.scroll(win.rowHeight)
-                            else if (event.key === Qt.Key_Up || (ctrl && (event.key === Qt.Key_P || event.key === Qt.Key_K))) details.scroll(-win.rowHeight)
-                            else if (event.key === Qt.Key_PageDown || event.key === Qt.Key_Space) details.scroll(details.height - win.rowHeight)
-                            else if (event.key === Qt.Key_PageUp) details.scroll(-(details.height - win.rowHeight))
-                            event.accepted = true
-                            return
-                        }
-                        // Esc with a search typed clears it first (on any level); with an empty one it goes back / closes
-                        if (event.key === Qt.Key_Escape) { if (text !== "") text = ""; else win.back(); event.accepted = true }
-                        else if (ctrl && event.key === Qt.Key_Space) { if (win.topExt) win.topExt.topPress(); event.accepted = true }
-                        // Delete: removes your own wallpaper in Background, the selected snippet in Snippets (empty search). ⌘⌫
-                        // arrives as ⇧Home + Delete with the keyd plugin (plugins/keyd/app.conf), so it does the same
-                        else if (event.key === Qt.Key_Delete && win.extDelete()) event.accepted = true
-                        // Tab / ⇧Tab: a form's next / previous field
-                        else if ((event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) && win.stepField(event.key === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier) ? 1 : -1)) event.accepted = true
-                        // Backspace with an empty search goes back; Ctrl+⌫ (⌥⌫ with keyd: delete a word) doesn't. In a form's
-                        // field it only deletes: one Backspace too many after clearing a value mustn't leave the form
-                        else if (event.key === Qt.Key_Backspace && !ctrl && text === "" && win.fieldRow) event.accepted = true
-                        else if (event.key === Qt.Key_Backspace && !ctrl && text === "" && win.level !== "root") { win.back(); event.accepted = true }
-                        // ⌥← / ⌥→ move by word, like in macOS (Hyprland sends them as Alt+arrows); ⇧ selects
-                        else if ((event.modifiers & Qt.AltModifier) && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
-                            const pos = win.wordPos(text, cursorPosition, event.key === Qt.Key_Left ? -1 : 1)
-                            if (event.modifiers & Qt.ShiftModifier) moveCursorSelection(pos, TextInput.SelectCharacters)
-                            else { deselect(); cursorPosition = pos }
-                            event.accepted = true
-                        }
-                        else if (win.grid && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
-                            win.step(event.key === Qt.Key_Left ? -1 : 1); event.accepted = true
-                        } else if (win.grid && (event.key === Qt.Key_Down || event.key === Qt.Key_Up)) {
-                            const i = list.currentIndex + (event.key === Qt.Key_Down ? win.gridCols : -win.gridCols)
-                            if (i >= 0 && i < win.results.length) list.currentIndex = i
-                            else if (i < 0) win.topFocused = win.topExt !== null
-                            event.accepted = true
-                        } else if (win.extLevel && ctrl && (event.key === Qt.Key_Up || event.key === Qt.Key_Down) && win.extMove(event.key === Qt.Key_Up ? -1 : 1)) {
-                            event.accepted = true
-                        } else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Right) && (win.results[list.currentIndex] || {}).kind === "brightness") {
-                            disp.stepBright(event.key === Qt.Key_Left ? -1 : 1, win.results[list.currentIndex].key); event.accepted = true
-                        } else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Right) && (win.results[list.currentIndex] || {}).kind === "slider") {
-                            sound.stepSlider(win.results[list.currentIndex].key, event.key === Qt.Key_Left ? -1 : 1); event.accepted = true
-                        } else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Right) && (win.results[list.currentIndex] || {}).slider !== undefined) {
-                            home.stepSlide(win.results[list.currentIndex], event.key === Qt.Key_Left ? -1 : 1); event.accepted = true
-                        } else if (event.key === Qt.Key_Down || (ctrl && (event.key === Qt.Key_N || event.key === Qt.Key_J))) {
-                            win.step(1); event.accepted = true
-                        } else if (event.key === Qt.Key_Up || (ctrl && (event.key === Qt.Key_P || event.key === Qt.Key_K))) {
-                            win.step(-1); event.accepted = true
-                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            const cur = win.results[list.currentIndex]
-                            if (win.selApp && ctrl) win.togglePin(cur)
-                            else if (win.selApp && (event.modifiers & Qt.AltModifier)) win.toggleAutostart(cur)
-                            else if (win.extLevel && cur && (event.modifiers & Qt.ShiftModifier)) win.extShift(cur)
-                            else if (win.extLevel && cur && ctrl && win.extCtrl(cur)) {}
-                            else if (win.results.length === 0) shake.restart()
-                            else win.activate(cur)
-                            event.accepted = true
-                        }
-                    }
-                }
-            }
+            LauncherSearchField { id: searchField; launcher: win }
 
-            ListView {
-                id: list
-                width: parent.width
-                // On the grid level the list is hidden, but its currentIndex is still the selection (keys, Enter)
-                visible: !win.grid && win.detail === null
-                height: visible ? win.listHeight() : 0
-                model: win.results
-                onCurrentIndexChanged: win.leaveField()
-                clip: true
-                currentIndex: 0
-                highlightMoveDuration: 0
-                boundsBehavior: Flickable.StopAtBounds
-                spacing: win.rowGap
-                TouchScroll { view: list; step: win.rowHeight + win.rowGap }
-                delegate: Rectangle {
-                    id: row
-                    required property var modelData
-                    required property int index
-                    readonly property bool isHeader: modelData.kind === "header"
-                    readonly property bool isNote: modelData.kind === "note"
-                    readonly property bool isQuote: modelData.kind === "quote"
-                    readonly property bool current: !isHeader && !isNote && !isQuote && !win.topFocused && index === list.currentIndex
-                    readonly property bool noIcon: modelData.kind === "key" || modelData.kind === "hint" || isHeader || isNote || isQuote
-                    readonly property bool armedNow: (modelData.kind === "action" && modelData.confirm === true && win.armed === modelData.name)
-                                                    || (modelData.armKey !== undefined && win.armed === modelData.armKey)
-                    readonly property bool chevron: modelData.kind === "nav" || modelData.kind === "menu" || modelData.chevron === true
-                    width: list.width
-                    readonly property int extraLines: subText.visible ? Math.max(0, subText.lineCount - 1) : 0
-                    // A taller row keeps its icon and right side at the name and the first line, not in the middle
-                    readonly property bool plain: modelData.subPlain === true
-                    readonly property int lineH: plain ? win.plainLineHeight : win.subLineHeight
-                    readonly property real topShift: -extraLines * lineH / 2
-                    height: isQuote ? win.quoteHeight(modelData) : isHeader || isNote ? win.headerHeight : win.rowHeight + extraLines * lineH
-                    radius: 10
-                    color: current ? Theme.sel : isQuote ? Theme.card : "transparent"
-                    Text {      // a quote's lines, in the darker box
-                        visible: row.isQuote
-                        anchors { fill: parent; margins: win.quotePad; leftMargin: 16; rightMargin: 16 }
-                        text: row.isQuote ? row.modelData.name : ""
-                        textFormat: Text.PlainText
-                        elide: Text.ElideRight
-                        lineHeightMode: Text.FixedHeight
-                        lineHeight: win.quoteLineHeight
-                        color: Theme.text
-                        font { family: Theme.font; pixelSize: win.fontSize - 3; weight: win.fontWeight }
-                    }
-
-                    // Icon: app = image, root item = Lucide glyph, keybinding = no icon
-                    Item {
-                        id: slot
-                        visible: !row.noIcon
-                        anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        width: win.iconSize; height: win.iconSize
-                        LevelRing {      // row.slider (Home's lights): the brightness as a ring around the bulb
-                            id: brightRing
-                            anchors.centerIn: parent
-                            visible: row.modelData.slider !== undefined
-                            size: win.iconSize + 12
-                            // while dragged the rows aren't rebuilt (Home.holdBright), so the ring follows the mouse itself
-                            value: rowArea.sliding ? rowArea.dragV : row.modelData.slider || 0
-                            strength: row.current ? 1 : 0.7
-                        }
-                        AppIcon {
-                            anchors.fill: parent
-                            visible: (row.modelData.kind === "app" || row.modelData.iconFile !== undefined) && row.modelData.glyph === undefined && source !== ""
-                            sourceSize: Qt.size(win.iconSize * 2, win.iconSize * 2)
-                            name: row.modelData.iconFile !== undefined ? row.modelData.iconFile    // Install › Software
-                                : row.modelData.kind === "app" ? (row.modelData.icon || "") : ""
-                        }
-                        Text {
-                            anchors.centerIn: parent
-                            visible: row.modelData.emoji !== undefined
-                            text: row.modelData.emoji !== undefined ? row.modelData.emoji : ""
-                            font.pixelSize: win.iconSize - 6
-                        }
-                        Rectangle {      // Theme › Color: swatch (selected = border)
-                            anchors.centerIn: parent
-                            visible: row.modelData.swatch !== undefined
-                            width: 20; height: 20; radius: 10
-                            color: row.modelData.swatch || "transparent"
-                            border.width: row.modelData.summary === "current" ? 2 : 0
-                            border.color: Theme.accent
-                        }
-                        Text {
-                            anchors.centerIn: parent
-                            visible: row.modelData.glyph !== undefined
-                            text: row.modelData.glyph !== undefined ? Icons.g(row.modelData.glyph) : ""
-                            color: row.modelData.glyphColor !== undefined ? row.modelData.glyphColor   // Home: a light that's on is yellow
-                                 : row.modelData.dimmed ? Theme.dim : row.current ? Theme.accent : Theme.text
-                            font { family: Icons.familyLight; pixelSize: win.iconSize - 2 }
-                        }
-                    }
-                    Text {
-                        id: nameText
-                        // A second line: an album's artist, or the description of an Install search result (row.modelData.sub)
-                        readonly property bool twoLines: !!row.modelData.artist || !!row.modelData.sub
-                        readonly property bool subLine: !!row.modelData.sub
-                        anchors {
-                            left: row.noIcon ? parent.left : slot.right; leftMargin: 16
-                            right: keyFrames.visible ? keyFrames.left : shortcut.visible ? shortcut.left : trailing.left; rightMargin: (row.modelData.kind === "key" ? 24 : 12) + (dot.visible ? 19 : 0) + (badge.visible ? badge.implicitWidth + 10 : 0) + (note.visible ? note.implicitWidth + 10 : 0)   // keybindings get more room before the keys (description is elided with …)
-                            verticalCenter: parent.verticalCenter
-                            verticalCenterOffset: twoLines ? (subLine ? (row.plain ? -row.lineH / 2 : -9) - row.extraLines * row.lineH / 2 : -7) : 0
-                        }
-                        visible: !row.isQuote
-                        elide: Text.ElideRight
-                        // liveName: a name that changes often (Status' processes), bound here instead of rebuilding the rows
-                        text: row.modelData.liveName !== undefined ? win.liveText(row.modelData.liveName)
-                            : row.isHeader ? row.modelData.name.toUpperCase()
-                            : row.modelData.name
-                        color: row.armedNow ? Theme.primary : (row.isHeader ? Theme.primary : row.modelData.kind === "hint" || row.isNote || row.modelData.dimmed ? Theme.dim : (row.current ? Theme.accent : Theme.text))
-                        font { family: Theme.font; pixelSize: row.isHeader ? win.fontSize - 5 : row.isNote ? win.fontSize - 4 : nameText.subLine && !row.plain ? win.fontSize - 2 : win.fontSize; weight: row.isHeader ? Font.Bold : win.fontWeight; letterSpacing: row.isHeader ? 1.5 : 0 }
-                        topPadding: row.isHeader ? 10 : 0
-                    }
-                    Text {      // a row that asks first, asked: what a second Enter does (armHint), after the name in smaller text
-                        id: armTag
-                        visible: row.armedNow
-                        anchors { left: nameText.left; leftMargin: nameText.contentWidth + 12; baseline: nameText.baseline }
-                        width: Math.max(0, nameText.width - nameText.contentWidth - 12)
-                        elide: Text.ElideRight
-                        text: "— " + win.keySpaced(row.modelData.armHint || "Enter again to confirm")
-                        color: Theme.primary
-                        font { family: Theme.font; pixelSize: win.fontSize - 4 }
-                    }
-                    Text {      // EXPERIMENTAL after a plugin's name (Install › Plugins)
-                        id: expTag
-                        visible: !!row.modelData.experimental && !row.armedNow
-                        anchors { left: nameText.left; leftMargin: nameText.contentWidth + 10; baseline: nameText.baseline }
-                        text: "EXPERIMENTAL"
-                        color: Theme.caution
-                        font { family: Theme.font; pixelSize: win.fontSize - 7; letterSpacing: 1 }
-                    }
-                    Text {      // EXTERNAL: a plugin from elsewhere (nightdrive plugins add), not one of Nightdrive's own
-                        id: extTag
-                        visible: !!row.modelData.external && !row.armedNow
-                        anchors { left: nameText.left; leftMargin: nameText.contentWidth + 10 + (expTag.visible ? expTag.implicitWidth + 10 : 0); baseline: nameText.baseline }
-                        text: "EXTERNAL"
-                        color: Theme.primary
-                        font { family: Theme.font; pixelSize: win.fontSize - 7; letterSpacing: 1 }
-                    }
-                    Text {      // the other group's row in a Plugins or Recommended search (RECOMMENDED / PLUGINS): here, so the
-                                // right side keeps its installed / off like the group's own rows
-                        visible: row.modelData.groupTag !== undefined && !row.armedNow
-                        anchors { left: nameText.left; baseline: nameText.baseline
-                                  leftMargin: nameText.contentWidth + 10 + (expTag.visible ? expTag.implicitWidth + 10 : 0) + (extTag.visible ? extTag.implicitWidth + 10 : 0) }
-                        text: visible ? row.modelData.groupTag.toUpperCase() : ""
-                        color: Theme.primary
-                        font { family: Theme.font; pixelSize: win.fontSize - 7; letterSpacing: 1 }
-                    }
-                    Text {      // the description wraps (subMaxLines at most): the row grows with it
-                        id: subText
-                        visible: nameText.twoLines
-                        anchors { left: nameText.left; right: nameText.right; top: nameText.bottom; topMargin: nameText.subLine ? 0 : -1 }
-                        wrapMode: nameText.subLine ? Text.Wrap : Text.NoWrap
-                        maximumLineCount: row.modelData.subMax || win.subMaxLines
-                        lineHeightMode: Text.FixedHeight
-                        lineHeight: row.lineH
-                        elide: Text.ElideRight
-                        textFormat: Text.PlainText
-                        text: win.keySpaced(row.modelData.sub || (row.modelData.artist || "").toUpperCase())
-                        color: row.plain ? nameText.color : row.modelData.sub ? Theme.dim : Theme.primary
-                        font { family: Theme.font; pixelSize: row.plain ? win.fontSize : nameText.subLine ? win.fontSize - 5 : win.fontSize - 6; weight: nameText.subLine ? win.fontWeight : Font.Normal
-                               letterSpacing: nameText.subLine ? 0 : 1 }
-                    }
-                    Row {            // the row's shortcut (shortcutFor) as key caps like the footer's, before the › of a submenu;
-                        id: shortcut     // not where the right side is taken. capKeys: a row's own keys (Settings › Apps › App shortcuts)
-                        readonly property string keys: row.modelData.capKeys !== undefined ? row.modelData.capKeys
-                            : !win.prefs.shortcuts || trailing.tag || row.modelData.keys !== undefined || row.armedNow
-                            || (row.modelData.summary !== undefined && row.modelData.summary !== "") ? "" : win.shortcutFor(row.modelData)
-                        // On a narrow card only where the whole name still fits beside it
-                        visible: keys !== "" && (!win.narrow || nameText.x + nameText.implicitWidth + width + trailing.width + 60 < row.width)
-                        anchors { right: trailing.left; rightMargin: trailing.text !== "" ? 18 : 0; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        spacing: 4
-                        Repeater {
-                            model: shortcut.keys.split(/\s+/).filter(k => k !== "")
-                            Kit.Key { required property string modelData; key: modelData; dim: !row.current }
-                        }
-                    }
-                    Row {            // Keybindings: a key's combinations as key caps like a row's shortcut (keyParts)
-                        id: keyFrames
-                        visible: row.modelData.keys !== undefined
-                        anchors { right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        spacing: 6
-                        Repeater {
-                            // On a narrow card only the first combination ("Hyper B / ⌘ B" → "Hyper B"): the name needs the room
-                            model: !keyFrames.visible ? [] : win.narrow ? win.keyParts(row.modelData.keys).slice(0, 1) : win.keyParts(row.modelData.keys)
-                            Row {
-                                id: part
-                                required property var modelData
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 4
-                                Repeater {
-                                    model: part.modelData.caps || []
-                                    Kit.Key { required property string modelData; key: modelData; dim: !row.current }
-                                }
-                                Text {
-                                    visible: part.modelData.caps === undefined
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: visible ? part.modelData.text : ""
-                                    color: Theme.dim
-                                    font { family: Theme.font; pixelSize: win.fontSize - 5 }
-                                }
-                            }
-                        }
-                    }
-                    Toggle {         // row.switchOn: an on/off switch like the top bar menus' (MenuHeader), instead of "on"/"off"
-                        id: rowSwitch    // row.switchBusy: still changing (rowArea above takes the clicks; activate() refuses it)
-                        visible: row.modelData.switchOn !== undefined
-                        anchors { right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        checked: row.modelData.switchOn === true
-                        busy: row.modelData.switchBusy === true
-                    }
-                    FieldBox {
-                        visible: row.modelData.field === true
-                        anchors { right: parent.right; rightMargin: 12; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        height: win.rowHeight - 20
-                        row: row.modelData
-                        current: row.current
-                        typed: row.current ? win.query : ""
-                        fontSize: win.fontSize - 3
-                    }
-                    Text {
-                        id: trailing
-                        visible: row.modelData.field !== true
-                        anchors { right: parent.right; rightMargin: 16 + (rowSwitch.visible ? 34 + 14 : 0); verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        width: Math.min(implicitWidth, row.width * 0.42)
-                        elide: Text.ElideRight
-                        horizontalAlignment: Text.AlignRight
-                        // from = submenu a root-level search hit comes from (small violet tag)
-                        readonly property bool tag: row.modelData.from !== undefined
-                        // A row whose `copy` value was just copied (⌘C or Enter: RowCopy) says so for a moment
-                        readonly property bool copiedNow: row.modelData.copy !== undefined && copier.copied !== "" && copier.copied === row.modelData.copy
-                        readonly property bool glyphOnly: row.modelData.trailGlyph !== undefined
-                            || (!tag && row.modelData.keys === undefined && !(row.modelData.summary !== undefined && row.modelData.summary !== "" && !row.armedNow) && row.chevron)
-                        text: copiedNow ? "copied" : row.modelData.trailGlyph !== undefined ? Icons.g(row.modelData.trailGlyph)      // Top bar › Items: ✓ / – (hidden)
-                            : row.modelData.live !== undefined ? win.liveText(row.modelData.live)   // updates without rebuilding the rows
-                            : tag ? row.modelData.from.toUpperCase() : row.modelData.keys !== undefined ? ""   // keyFrames
-                            : (row.modelData.summary !== undefined && row.modelData.summary !== "" && !row.armedNow ? row.modelData.summary
-                            : (row.chevron ? Icons.g("chevron-right") : ""))
-                        color: copiedNow ? Theme.primary : row.modelData.trailGlyph !== undefined ? (row.modelData.dimmed ? Theme.dim : row.current ? Theme.accent : Theme.text)
-                             : tag ? Theme.primary : (row.modelData.keys !== undefined && row.current ? Theme.accent : Theme.dim)
-                        font { family: glyphOnly && !copiedNow ? Icons.familyLight : Theme.font; pixelSize: glyphOnly && !copiedNow ? win.iconSize - 6 : tag ? win.fontSize - 6 : row.modelData.kind === "album" ? win.fontSize - 5 : win.fontSize - 3
-                               letterSpacing: tag ? 1 : 0 }   // tags: normal weight and spacing, the same as an album's artist
-                    }
-                    Rectangle {      // green dot right after the name: the app has a window open (including one hidden to the background by ⌘W)
-                        id: dot
-                        visible: win.appRunning(row.modelData)
-                        x: nameText.x + Math.min(nameText.contentWidth, nameText.width) + 10
-                        anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: row.topShift
-                        width: 9; height: 9; radius: 5
-                        color: Theme.ok
-                        // ⌘Q pressed: pulses until the app is gone
-                        readonly property bool quitting: visible && win.anyQuitting && win.quitPending(row.modelData)
-                        SequentialAnimation on opacity {
-                            running: dot.quitting; loops: Animation.Infinite
-                            onRunningChanged: if (!running) dot.opacity = 1
-                            NumberAnimation { to: 0.15; duration: 350; easing.type: Easing.InOutSine }
-                            NumberAnimation { to: 1; duration: 350; easing.type: Easing.InOutSine }
-                        }
-                    }
-                    Text {           // row.modelData.note: small dim text after the name (Settings › Apps › Home Assistant: how many there are)
-                        id: note
-                        visible: row.modelData.note !== undefined
-                        x: nameText.x + Math.min(nameText.contentWidth, nameText.width) + 10
-                        anchors.baseline: nameText.baseline
-                        text: visible ? row.modelData.note : ""
-                        color: Theme.dim
-                        opacity: 0.55   // further back than the summaries on the right: a side note
-                        font { family: Theme.font; pixelSize: win.fontSize - 5 }
-                    }
-                    Text {           // a small mark after the name (and the dot): row.modelData.badge, a Lucide name (Home: "pin")
-                        id: badge
-                        visible: row.modelData.badge !== undefined
-                        x: nameText.x + Math.min(nameText.contentWidth, nameText.width) + 10 + (dot.visible ? 19 : 0)
-                        anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: row.topShift
-                        text: visible ? Icons.g(row.modelData.badge) : ""
-                        color: Theme.primary   // the theme colour, like section headers: it has to stand out
-                        font { family: Icons.family; pixelSize: win.fontSize - 2 }
-                    }
-                    Slider {         // Settings › Display › Brightness, Sound: above the row's MouseArea, so it gets the drag
-                        // Sound › Headphones › Battery: a meter (no knob, not draggable), green while charging, red when low
-                        visible: row.modelData.kind === "brightness" || row.modelData.kind === "slider" || row.modelData.kind === "battery"
-                        z: 1
-                        // after the name ("Screen" in Display, "Brightness" in a search), lined up while the name is short
-                        anchors { left: slot.right; leftMargin: Math.max(120, 16 + nameText.implicitWidth + 28); right: trailing.left; rightMargin: 20; verticalCenter: parent.verticalCenter; verticalCenterOffset: row.topShift }
-                        value: row.modelData.kind === "slider" || row.modelData.kind === "battery" ? row.modelData.value : Math.max(0, row.modelData.key === "keys" ? disp.keys : disp.bright)
-                        readOnly: row.modelData.kind === "battery"
-                        fillColor: row.modelData.charging ? Theme.ok : row.modelData.low ? Theme.danger : Theme.accent
-                        dimmed: !!row.modelData.dimmed
-                        trackColor: Qt.rgba(1, 1, 1, 0.1)   // the same on and off the selected row (Theme.border nearly matches Theme.sel)
-                        onMoved: v => { list.currentIndex = row.index; row.modelData.kind === "slider" ? sound.setSlider(row.modelData.key, v) : disp.setBright(v, row.modelData.key) }
-                    }
-                    MouseArea {
-                        id: rowArea
-                        cursorShape: Qt.PointingHandCursor
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        enabled: !row.isHeader && !row.isNote
-                        // row.slider (Home's lights): a sideways drag sets the brightness, a click still turns it on/off
-                        property real pressX: -1
-                        property bool sliding: false
-                        property real dragV: 0
-                        onPressed: mouse => { pressX = mouse.x; sliding = false }
-                        onPositionChanged: mouse => {
-                            if (pressed && row.modelData.slider !== undefined && (sliding || Math.abs(mouse.x - pressX) > 8)) {
-                                if (!sliding) { sliding = true; list.currentIndex = row.index; Home.holdBright(true) }
-                                // the drag spans from the name to the right edge (the ring shows it)
-                                dragV = Math.max(0, Math.min(1, (mouse.x - nameText.x) / (row.width - 16 - nameText.x)))
-                                home.slide(row.modelData, dragV)
-                                return
-                            }
-                            win.hover(rowArea, mouse, row.index)
-                        }
-                        onReleased: if (sliding) Home.holdBright(false)
-                        onCanceled: if (sliding) { sliding = false; Home.holdBright(false) }
-                        onClicked: { if (sliding) { sliding = false; return } win.activate(row.modelData) }
-                    }
-                }
-            }
+            LauncherList { id: list; launcher: win; width: parent.width }
 
             // Install / Remove: a package's or plugin's details (DetailCard.qml), in place of the list
-            DetailCard { id: details; launcher: win; width: parent.width; onPluginToggled: inst.reloadPlugins() }
+            DetailCard { id: details; launcher: win; width: parent.width; onPluginToggled: lv.inst.reloadPlugins() }
 
-            // Settings › Background: previews in two columns, name below; current wallpaper marked with ✓
-            GridView {
-                id: wallGrid
-                visible: win.grid
-                width: parent.width
-                readonly property int thumbH: Math.round((cellWidth - 12) * 390 / 600)
-                cellWidth: width / win.gridCols
-                cellHeight: thumbH + 40
-                height: visible ? Math.min(Math.ceil(win.results.length / win.gridCols) * cellHeight, 2.2 * cellHeight) : 0
-                model: visible ? win.results : []
-                currentIndex: win.topFocused ? -1 : list.currentIndex
-                highlightMoveDuration: 0
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                TouchScroll { view: wallGrid; step: wallGrid.cellHeight }
-                delegate: Item {
-                    id: cell
-                    required property var modelData
-                    required property int index
-                    readonly property bool current: !win.topFocused && index === list.currentIndex
-                    readonly property bool active: modelData.path === themes.wallCurrent
-                    width: wallGrid.cellWidth
-                    height: wallGrid.cellHeight
-                    Rectangle {
-                        id: frame
-                        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter }
-                        width: parent.width - 12
-                        height: wallGrid.thumbH
-                        radius: 8
-                        color: Theme.bg
-                        Text {
-                            visible: cell.modelData.kind === "walladd"
-                            anchors.centerIn: parent
-                            text: Icons.g("plus")
-                            color: cell.current ? Theme.accent : Theme.dim
-                            font { family: Icons.family; pixelSize: 44 }
-                        }
-                        ClippingRectangle {      // preview with rounded corners (frame's inner radius)
-                            anchors { fill: parent; margins: 3 }
-                            radius: 6
-                            color: "transparent"
-                            Image {
-                                anchors.fill: parent
-                                source: cell.modelData.thumb ? "file://" + cell.modelData.thumb : ""
-                                asynchronous: true
-                                fillMode: Image.PreserveAspectCrop
-                                sourceSize.width: 600
-                            }
-                        }
-                        Rectangle {      // selection frame
-                            anchors.fill: parent
-                            radius: 8
-                            color: "transparent"
-                            border.width: cell.current ? 3 : 1
-                            border.color: cell.current ? Theme.accent : Theme.border
-                        }
-                        Rectangle {      // current wallpaper
-                            visible: cell.active
-                            anchors { top: parent.top; right: parent.right; margins: 10 }
-                            width: 26; height: 26; radius: 13
-                            color: Theme.primary
-                            Text {
-                                anchors.centerIn: parent
-                                text: Icons.g("check")
-                                color: Theme.bg
-                                font { family: Icons.family; pixelSize: 16 }
-                            }
-                        }
-                    }
-                    Text {
-                        anchors { top: frame.bottom; topMargin: 6; left: frame.left; right: frame.right; leftMargin: 4; rightMargin: 4 }
-                        elide: Text.ElideRight
-                        textFormat: Text.PlainText
-                        readonly property bool armedNow: win.armed === "del:" + cell.modelData.path
-                        text: armedNow ? "⌘⌫ again to delete" : cell.modelData.name + (cell.modelData.group ? "  ·  " + cell.modelData.group : "")
-                        color: armedNow ? Theme.primary : cell.current ? Theme.accent : (cell.active ? Theme.text : Theme.dim)
-                        font { family: Theme.font; pixelSize: win.fontSize - 3; weight: win.fontWeight }
-                    }
-                    MouseArea {
-                        id: cellArea
-                        cursorShape: Qt.PointingHandCursor
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onPositionChanged: mouse => win.hover(cellArea, mouse, cell.index)
-                        onClicked: win.activate(cell.modelData)
-                    }
-                }
-            }
+            LauncherWallGrid { launcher: win; width: parent.width }
 
             KeyFooter {     // footer: each action's key caps, then what it does; on a narrow card in more lines
                 id: footerFlow

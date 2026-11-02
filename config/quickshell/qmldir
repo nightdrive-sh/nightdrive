@@ -15,6 +15,17 @@ SettingColor 1.0 SettingColor.qml
 SettingButton 1.0 SettingButton.qml
 SettingDropdown 1.0 SettingDropdown.qml
 Launcher 1.0 Launcher.qml
+LauncherLevels 1.0 LauncherLevels.qml
+LauncherMenus 1.0 LauncherMenus.qml
+LauncherSettings 1.0 LauncherSettings.qml
+LauncherSearch 1.0 LauncherSearch.qml
+LauncherApps 1.0 LauncherApps.qml
+LauncherShortcuts 1.0 LauncherShortcuts.qml
+LauncherIpc 1.0 LauncherIpc.qml
+LauncherSearchField 1.0 LauncherSearchField.qml
+LauncherList 1.0 LauncherList.qml
+LauncherRow 1.0 LauncherRow.qml
+LauncherWallGrid 1.0 LauncherWallGrid.qml
 Osd 1.0 Osd.qml
 Toast 1.0 Toast.qml
 ToastStack 1.0 ToastStack.qml
