@@ -199,7 +199,11 @@ def show(request):
         waited = time.monotonic() + QUEUE_WAIT
         while True:
             said = qs("open", str(path))
-            if said is None:
+            # qs answers a Quickshell without the card "Target not found." with exit 0 (#1877): anything but the
+            # card's own replies means no card, not a card that showed the request wrong
+            if said is None or not (said == "busy" or said.startswith("shown ")):
+                if said is not None:
+                    qs("close", request["id"])   # in case something did open: nothing stays on screen
                 raise ToolError(f"{request['tool']} wasn't run: Nightdrive's confirmation card couldn't be shown "
                                 "(Quickshell isn't running on this desktop, or is a version without the card). "
                                 "Tell the user; it can't be run without their answer on screen.")

@@ -3,7 +3,7 @@
 Only for a tool that names its list in `unasked_by`, when that list isn't empty, and never for an act tool: a card
 command that says so for another list of its area (files_trash under Normal's folders) still gets the card.
 And what the card spells out as ⟨U+…⟩: every invisible or format character it would send (#1922), and a tool's
-card_note under the card's note (#1913)."""
+card_note under the card's note (#1913). And how qs's answer to the card is read (#1877)."""
 
 import sys
 import tempfile
@@ -103,6 +103,27 @@ class Hidden(unittest.TestCase):
     def test_field_and_list(self):
         self.assertIn("⟨U+E0041⟩", confirm.field("body", {}, "x\U000e0041")["text"])
         self.assertIn("⟨U+FE0F⟩", confirm.field("to", {}, ["a@x️.fi"])["text"])
+
+
+class Show(unittest.TestCase):
+    """What qs answers decides what Claude tells the user (#1877): no card is "couldn't be shown", not "showed wrong"."""
+
+    def show(self, said):
+        real, confirm.qs = confirm.qs, lambda *args: said if args[0] == "open" else ""
+        try:
+            with self.assertRaises(confirm.ToolError) as caught:
+                confirm.show({"tool": "test_tool", "id": "c1"})
+            return str(caught.exception)
+        finally:
+            confirm.qs = real
+
+    def test_no_card(self):
+        for said in (None, "Target not found.", "", "Function not found."):
+            with self.subTest(said=said):
+                self.assertIn("couldn't be shown", self.show(said))
+
+    def test_wrong_digest(self):
+        self.assertIn("didn't show the request", self.show("shown 0123"))
 
 
 if __name__ == "__main__":
