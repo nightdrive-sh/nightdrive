@@ -75,7 +75,7 @@ fi
 # The notification, once the new window is there (the one not among the earlier ones), detached as well: it waits for
 # its click, which goes to the window and its workspace. A terminal that opens its windows from a process of its own
 # (Ghostty's single instance) escapes the exec rule: the window is moved there then, silently. The same icon as
-# claude-notify's.
+# claude-notify's, and its stack (x-nightdrive-group sessions, quickshell/Notifs.qml).
 icon=lucide:bot
 for f in "$HOME"/.config/nightdrive/agent-icon.{svg,png}; do [[ -f $f ]] && { icon=$f; break; }; done
 prompt=$*; prompt=${prompt%%$'\n'*}; (( ${#prompt} > 120 )) && prompt="${prompt:0:120}…"
@@ -94,6 +94,6 @@ setsid -f bash -c '
     [[ $ws =~ ^-?[0-9]+$ ]] && target=$ws || target="\"$ws\""
     [[ -n $at && $at != "$ws" ]] && hyprctl dispatch "hl.dsp.window.move({ workspace = $target, follow = false, window = \"address:$addr\" })" >/dev/null
   fi
-  action=$(notify-send -a Claude -i "$icon" -A default=Open -A show="Show session" -w -- "Claude session opened: $1" "$2")
+  action=$(notify-send -a Claude -i "$icon" -h string:x-nightdrive-group:sessions -A default=Open -A show="Show session" -w -- "Claude session opened: $1" "$2")
   [[ $action == default || $action == show ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
 ' _ "${name:-${dir##*/}}" "${prompt:+$prompt · }$project" >/dev/null 2>&1 < /dev/null

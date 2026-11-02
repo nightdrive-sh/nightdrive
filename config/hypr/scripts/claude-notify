@@ -49,6 +49,7 @@ topic=$(sed -E 's/^[^[:alnum:][:space:]]+[[:space:]]+//' <<<"$title")
 icon=lucide:bot   # the same as agent-warn's: your own at ~/.config/nightdrive/agent-icon.svg|png
 for f in "$HOME"/.config/nightdrive/agent-icon.{svg,png}; do [[ -f $f ]] && { icon=$f; break; }; done
 
+# In one stack with the sessions opened (terminal-or-claude): x-nightdrive-group sessions (quickshell/Notifs.qml).
 # One notification per session: its last one closes (the id is kept by window) and a new one pops up; replacing it
 # (notify-send -r) would only update the card, with no popup
 idf="$state/${addr:-none}"
@@ -78,7 +79,7 @@ if [[ $event == PermissionRequest ]]; then
   fi
   out=$(mktemp "$state/perm.XXXXXX")
   touch "$state/$addr.perm"
-  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -A default=Open "${allow[@]}" -A deny=Deny \
+  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" -A deny=Deny \
     -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
   ns=$!
   # The terminal's answer ends this hook early (Claude Code stops it): the notification goes with it
@@ -109,7 +110,7 @@ msg=$(jq -r '.message // "Claude is waiting for your input"' <<<"$in")
 # In the background, so the hook returns at once while the notification waits for its click. notify-send -p prints the
 # id at once, -w the action later.
 setsid bash -c '
-  notify-send -a Claude -i "$1" -p -A default=Open -A show="Show session" -w "$2" "$3" | {
+  notify-send -a Claude -i "$1" -p -h string:x-nightdrive-group:sessions -A default=Open -A show="Show session" -w "$2" "$3" | {
     read -r id && echo "$id" > "$4"
     read -r action && [[ ( $action == default || $action == show ) && -n $5 ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$5\" })"
   }' _ "$icon" "$topic" "${msg%.}${project:+ · $project}" "$idf" "$addr" >/dev/null 2>&1 < /dev/null &

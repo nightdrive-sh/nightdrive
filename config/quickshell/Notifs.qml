@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import Quickshell.Wayland
+import "NotifGroups.js" as Groups
 
 // Notification server (org.freedesktop.Notifications; replaced mako on 14.10.2026). NotificationPopups.qml draws the popups,
 // NotificationsMenu.qml the history. The app's icon comes from its .desktop file, so every notification shows one.
@@ -11,6 +12,8 @@ import Quickshell.Wayland
 // Priority (#1982): a pinned one (urgency critical, or hint x-nightdrive-pin: `-h boolean:x-nightdrive-pin:true`, Claude's
 // permission requests) stays until answered or dismissed and gets through do not disturb, without a sound; a low one
 // goes only to the history, without a popup. Do not disturb hides the other popups, the history keeps them.
+// The rest stack by app, newest on top (NotifGroups.js, NotificationStack.qml); a sender can keep its own stack apart
+// with hint x-nightdrive-group (`-h string:x-nightdrive-group:sessions`: Claude's sessions, apart from its changes).
 // Under the login screen at an autologin start (greeter/lock.qml) they're quiet and wait: their popups show after the
 // password, and they never chime.
 // A new notification plays a sound (hypr/scripts/sounds; Settings › Notifications): regular or urgent by its urgency,
@@ -45,7 +48,8 @@ Singleton {
         onLoadFailed: s.timeout = s.defaultTimeout
     }
     readonly property int maxHistory: 50
-    readonly property int maxPopups: 6
+    readonly property int maxPopups: 6        // on screen: pinned ones and stacks
+    readonly property int maxStack: 5         // cards in a stack; the older ones are in the history
     readonly property int soundGap: 2000      // ms: an app's notifications closer together than this chime once
 
     property var popups: []                   // [{ uid, n (Notification), entry (history row) }], newest first
@@ -160,8 +164,7 @@ Singleton {
         if ((dnd && !p.entry.pinned) || menuOpen || p.entry.low) { if (p.n.transient) p.n.expire(); return }
         const all = [p].concat(popups.filter(q => q.uid !== p.uid))
         // Too many: the oldest go (into the history only), never a pinned one
-        const room = all.filter(q => !q.entry.pinned).slice(0, Math.max(0, maxPopups - all.filter(q => q.entry.pinned).length))
-        popups = all.filter(q => q.entry.pinned || room.indexOf(q) >= 0)
+        popups = Groups.trim(all, maxPopups, maxStack)
         for (const q of all) if (popups.indexOf(q) < 0 && q.n.transient) q.n.expire()
     }
     // The popup goes; the notification stays open for the history unless it's transient
@@ -319,6 +322,7 @@ Singleton {
                 expires: hints["x-nightdrive-expires"] > 0 ? Date.now() + hints["x-nightdrive-expires"] * 1000 : 0
             }
             s.relabel(row, n)
+            row.group = Groups.key(row.app, String(hints["x-nightdrive-group"] || ""))
             const stack = hints["x-dunst-stack-tag"] || hints["x-canonical-private-synchronous"] || ""
             if (stack) row.tag = row.app + "\n" + stack
             // The earlier one this replaces: the same stack tag, or else the same text (in the history, or a transient popup)

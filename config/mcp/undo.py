@@ -394,7 +394,9 @@ def notify(entry_id, summary, body="", button=None):
     """One row for the entry (a new one replaces the last, by its stack tag); the button's action when it's
     pressed, else None once the row has gone (dismissed, replaced, expired, retired)."""
     cmd = ["notify-send", "-a", "Claude", "-i", icon(),
-           "-h", f"string:x-dunst-stack-tag:claude-change-{entry_id}", "-h", f"int:x-nightdrive-expires:{NOTICE_FOR}"]
+           "-h", f"string:x-dunst-stack-tag:claude-change-{entry_id}", "-h", f"int:x-nightdrive-expires:{NOTICE_FOR}",
+           # A stack of their own, apart from the sessions' notifications (quickshell/Notifs.qml)
+           "-h", "string:x-nightdrive-group:changes"]
     if button:
         cmd += ["-A", f"{button[0]}={button[1]}", "-w"]
     try:

@@ -21,6 +21,7 @@ Rectangle {
 
     property var row: ({})
     property var n: null
+    property alias footer: footerSlot.data
     // Actions the sender offers only while its whole text shows (hint x-nightdrive-whole: their ids, comma-separated):
     // Claude's Allow answers for the whole command (hypr/scripts/claude-notify), so it goes when the text is cut here.
     // Such a text is shown as it is, without the <…> taken out below, which could hide part of a command.
@@ -396,5 +397,9 @@ Rectangle {
                 }
             }
         }
+
+        // A line of the stack's own under the card (NotificationStack.qml: "+3 more")
+        Item { width: 1; height: footerSlot.childrenRect.height > 0 ? 10 : 0 }
+        Item { id: footerSlot; width: parent.width; height: childrenRect.height }
     }
 }

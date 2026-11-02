@@ -118,9 +118,10 @@ Click an icon and a small menu opens under it:
   for them, noise cancelling, and music or headset mode
 - **Microphone** and **Camera**, only while an app uses them: which apps
 - **Notifications** (≡ at the right end, or ⌘Esc): the ones you've had, and Do Not Disturb. A click opens the app, a
-  right click removes one, Clear removes all. A critical one, or one that waits for your answer (Claude's permission
-  requests), stays on screen until you answer or dismiss it, and gets through Do Not Disturb without a sound; a low one
-  goes straight to this list, without a popup.
+  right click removes one, Clear removes all. Popups from one app stack up, newest on top: **+N more** opens the stack,
+  each with its own buttons. A critical one, or one that waits for your answer (Claude's permission requests), stays on
+  screen until you answer or dismiss it, and gets through Do Not Disturb without a sound; a low one goes straight to
+  this list, without a popup.
 - **Music**: what Deck is playing, with the cover, the progress and the controls
 - **Claude**: your Claude Code sessions and usage limits. A dot on the icon tells a session finished while you were
   elsewhere, and a click goes to its window. A right click changes what the icon shows (5-hour or weekly usage, or the
