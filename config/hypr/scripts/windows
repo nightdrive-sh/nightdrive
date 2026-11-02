@@ -13,9 +13,9 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
                                    It waits up to QUIET_WAIT s for the quiet (the Enter that sent the prompt), then
                                    refuses
   windows shot WINDOW [--out FILE] [--json] [--inline] [--check]
-                                   a picture of a window on screen (PNG, at most MAX_EDGE px on its long side), never
-                                   of one Send to Claude leaves out, nor with one of those or a layer surface (a menu,
-                                   a notification: not OWN_LAYERS) over it. Default FILE:
+                                   a picture of a window on screen (PNG, at most MAX_EDGE px on its long side): its
+                                   own buffer (grim -T), so nothing over it is in it. Never of one Send to Claude
+                                   leaves out; thrown away if the window changed while grim ran. Default FILE:
                                    $XDG_RUNTIME_DIR/nightdrive/windows/shot.png. --inline puts it in the JSON
                                    ({image: {mimeType, data}}, base64) instead of a file. --check takes none: it says
                                    for Claude's card which window it would be ({App, Title, Window}: the run refuses
@@ -54,9 +54,6 @@ QUIET = 2              # s without a key before Claude's tools move the focus (-
 QUIET_WAIT = 5         # s to wait for that quiet before refusing
 SCHEMES = ("http://", "https://", "mailto:")
 MAILTO_FIELDS = {"to", "cc", "subject", "body"}   # a mailto:'s query may set these, not attach= or bcc= (#1866)
-# Layer surfaces that are always mapped, mostly empty, and hold nothing of the user's: any other over a window (a menu,
-# a notification, the Wi-Fi password field, the launcher) stops a picture of it, as grim would take it along (#1866)
-OWN_LAYERS = {"wallpaper", "nightdrive-bar", "nightdrive-drawer", "nightdrive-garage-resizing", "claude-confirm"}
 BACKGROUND = "special:bg"
 
 
@@ -256,17 +253,26 @@ def listed(c, apps):
     return any(isinstance(v, str) and v.lower() in mine for v in listing)
 
 
-def layer_over(x, y, w, h):
-    """The namespace of a layer surface above windows (Top, Overlay) over the rectangle, not one of OWN_LAYERS."""
-    for monitor in (hypr("layers") or {}).values():
-        for level, layers in (monitor.get("levels") or {}).items():
-            if str(level) not in ("2", "3"):
-                continue
-            for l in layers:
-                lx, ly, lw, lh = (l.get(k, 0) for k in ("x", "y", "w", "h"))
-                if l.get("namespace") not in OWN_LAYERS and lx < x + w and x < lx + lw and ly < y + h and y < ly + lh:
-                    return l.get("namespace") or "a layer"
-    return None
+def pictureable(c):
+    """Dies unless a picture of the window may be taken: not one Send to Claude leaves out, and on screen."""
+    if blocked(c):
+        die("That window is left out, as Send to Claude leaves it out (a password manager, a private window, or an "
+            "app in Launcher › Settings › Claude writes › Not in these apps): no picture was taken.")
+    if c["workspace"]["name"] not in on_screen_workspaces() or c.get("hidden"):
+        die("That window isn't on screen (its workspace isn't shown): bring it forward first (windows focus).")
+
+
+def state(c):
+    """What a picture of the window depends on, to compare before and after grim (#1913)."""
+    return {"its title": c.get("title", ""), "its app": c.get("class", ""), "its workspace": c["workspace"]["name"],
+            "whether it's hidden": bool(c.get("hidden")),
+            "whether it's on screen": c["workspace"]["name"] in on_screen_workspaces(),
+            "whether it's left out": blocked(c), "the focus": focused_address()}
+
+
+def changes(before, after):
+    """The first of state's facts that differs, in words ("its title"), or ""."""
+    return next((k for k in before if before[k] != after.get(k)), "")
 
 
 def card_said():
@@ -318,44 +324,51 @@ def cmd_shot(a):
     if not a.check and "Title" in said and said["Title"] != (c["title"] or "(no title)"):
         die(f"The window's title changed after the card showed it ({said['Title']!r}, now another): no picture was "
             "taken. Ask again if the user wants it.")
-    visible = on_screen_workspaces()
-    if blocked(c):
-        die("That window is left out, as Send to Claude leaves it out (a password manager, a private window, or an "
-            "app in Launcher › Settings › Claude writes › Not in these apps): no picture was taken.")
-    if c["workspace"]["name"] not in visible or c.get("hidden"):
-        die("That window isn't on screen (its workspace isn't shown): bring it forward first (windows focus).")
-    x, y = c["at"]; w, h = c["size"]
-    for o in wins:  # a left-out window over it (a password manager's popup) mustn't end up in the picture
-        if o is c or o["workspace"]["name"] not in visible:
-            continue
-        ox, oy = o["at"]; ow, oh = o["size"]
-        if ox < x + w and x < ox + ow and oy < y + h and y < oy + oh and blocked(o):
-            die("A window that is left out (a password manager, a private window…) is over it: no picture was taken.")
-    over = layer_over(x, y, w, h)
-    if over:
-        die(f"Something of the desktop's is over it ({over}: a menu, a notification, the launcher): no picture was "
-            "taken. Try again once it has gone.")
+    pictureable(c)
+    if not c.get("stableId"):
+        die("This Hyprland doesn't name the window for a picture of its own (no stableId): no picture was taken.")
     if a.check:
         apps = entries()
         card = {"App": app_name(c["class"], apps), "Title": c["title"] or "(no title)", "Window": c["address"]}
         unasked = listed(c, apps) and not new_title(c)
         print(json.dumps({**card, **({"ask": False} if unasked else {})}, ensure_ascii=False))
         return
-    scale = next((m["scale"] for m in hypr("monitors") if m["id"] == c.get("monitor")), 1)
-    scale = min(scale, MAX_EDGE / max(w, h, 1))
+    w, h = c["size"]
+    mscale = next((m["scale"] for m in hypr("monitors") if m["id"] == c.get("monitor")), 1)
+    # grim -T scales the window's buffer (its size × the monitor's scale), not its size on screen
+    scale = min(1, MAX_EDGE / max(w * mscale, h * mscale, 1))
     out = Path(a.out) if a.out else SHOT
     out.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    p = subprocess.run(["grim", "-g", f"{x},{y} {w}x{h}", "-s", f"{scale:.3f}", "-t", "png", str(out)],
-                       capture_output=True, text=True, timeout=10)
+    before = state(c)
+    # The window's own buffer (ext-image-copy-capture of its toplevel), not the screen's area: a window, a menu or a
+    # notification over it isn't in the picture, as grim -g would take them along (#1913). Never the cursor (no -c)
+    try:
+        p = subprocess.run(["grim", "-T", str(c["stableId"]), "-s", f"{scale:.3f}", "-t", "png", str(out)],
+                           capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        out.unlink(missing_ok=True)
+        die(f"grim couldn't take the picture ({e}): no picture was taken.")
     if p.returncode != 0:
-        die("grim couldn't take the picture: " + (p.stderr.strip() or "no message"))
+        out.unlink(missing_ok=True)
+        why = p.stderr.strip() or "no message"
+        if "invalid option" in why:
+            why += " (grim 1.5 or later is needed: it pictures the window alone)"
+        die("grim couldn't take the picture: " + why)
+    # …and what was checked before still holds after it: a tab switched, the window gone or moved off screen, the focus
+    # moved while grim ran: the picture may be of something the card didn't show, so it goes (#1913)
+    after = next((o for o in clients() if o["address"] == c["address"]), None)
+    changed = "the window closed" if after is None else changes(before, state(after))
+    if changed:
+        out.unlink(missing_ok=True)
+        die(f"Something changed while the picture was taken ({changed}): it was thrown away. Ask again if the user "
+            "wants it.")
     if os.environ.get("NIGHTDRIVE_MCP"):
         try:
             remember(c)
         except OSError:
             pass   # the picture is taken: a title not kept only means a card next time
     info = {"address": c["address"], "app": app_name(c["class"], entries()), "class": c["class"], "title": c["title"],
-            "width": round(w * scale), "height": round(h * scale)}
+            "width": round(w * mscale * scale), "height": round(h * mscale * scale)}
     if a.inline:
         info["image"] = {"mimeType": "image/png", "data": base64.b64encode(out.read_bytes()).decode()}
         out.unlink(missing_ok=True)

@@ -181,6 +181,11 @@ def card(tool, arguments, timeout=TIMEOUT):
     names = [n for n in props if n in arguments] + [n for n in arguments if n not in props]
     title = tool.spec.get("title") or tool.name
     heading, note, glyph = KINDS[kind(tool)]
+    # A tool's own caveat goes under its kind's: what the card can't check for the user (windows_view: a password
+    # manager's browser extension is part of the browser's window, #1913)
+    extra = tool.spec.get("card_note")
+    if isinstance(extra, str) and extra:
+        note = f"{note} {extra}" if note else extra
     rows, ask = facts(tool, arguments)
     return {
         "title": visible(str(title)),

@@ -131,14 +131,15 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   Turn it on for an area whose codes Claude should read (`nightdrive mcp access option mail secrets on`).
 
   What's on screen has a list instead, empty on every level: *Apps it sees without asking*. Its rows are the apps open
-  now, and Space or a click ticks one. Claude's picture of a window asks each time on Normal, and the card names the
-  app and the window's title; a ticked app's windows Claude sees without the card. Password managers and private
-  windows never, ticked or not, nor a window with a menu, a notification or the launcher over it. A password manager's
-  browser extension pops up inside the browser's window, though: a picture of the browser shows it. The list of
-  windows names a private window's app (not its title), so Claude can tell a password manager is open. Claude gets the
-  window the card showed with the title it showed, or none (a tab switched meanwhile), and a ticked app's window
-  showing a title Claude hasn't pictured before asks again: the bank tab after Wikipedia. In a terminal: `nightdrive
-  mcp access option screen apps add kitty` (a window class or the app's name), `remove` to take it off.
+  now, and Space or a click ticks one. Claude's picture of a window asks each time on Normal, and the card names the app
+  and the window's title; a ticked app's windows Claude sees without the card. Password managers and private windows
+  never, ticked or not. The picture is of the window alone: another window, a menu or a notification over it isn't in
+  it. But all that window shows is: a password manager's browser extension pops up inside the browser's window, and so
+  does a password you made visible on a page, so close those first. The list of windows names a private window's app
+  (not its title), so Claude can tell a password manager is open. Claude gets the window the card showed with the title
+  it showed, or none (a tab switched meanwhile, or while the picture was taken), and a ticked app's window showing a
+  title Claude hasn't pictured before asks again: the bank tab after Wikipedia. In a terminal: `nightdrive mcp access
+  option screen apps add kitty` (a window class or the app's name), `remove` to take it off.
 
   Mail has a list too, empty at first: *Mail Claude never gets*. Type an address (`maija@example.com`), a domain
   (`bank.fi`, which takes `mail.bank.fi` along) or a tag (`tag:health`) in the field under it and press Enter; Space

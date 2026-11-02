@@ -2,7 +2,8 @@
 """When a card command's `"ask": false` lets a call past the card (#1832, #1865): `python3 config/mcp/confirm_test.py`.
 Only for a tool that names its list in `unasked_by`, when that list isn't empty, and never for an act tool: a card
 command that says so for another list of its area (files_trash under Normal's folders) still gets the card.
-And what the card spells out as ⟨U+…⟩: every invisible or format character it would send (#1922)."""
+And what the card spells out as ⟨U+…⟩: every invisible or format character it would send (#1922), and a tool's
+card_note under the card's note (#1913)."""
 
 import sys
 import tempfile
@@ -47,6 +48,16 @@ class Unasked(unittest.TestCase):
 
     def test_never_for_act(self):
         self.assertTrue(self.ask(Tool(cls="act", options={"apps": ["kitty"]}, unasked_by="apps")))
+
+
+class Note(unittest.TestCase):
+    """A tool's card_note goes under its kind's note: windows_view's caveat about a browser's password popup (#1913)."""
+
+    def test_card_note(self):
+        base = confirm.KINDS["read"][1]
+        note = confirm.card(Tool(card_note="Mind the popup."), {})["note"]
+        self.assertEqual(note, base + " Mind the popup.")
+        self.assertEqual(confirm.card(Tool(), {})["note"], base)
 
 
 class Hidden(unittest.TestCase):

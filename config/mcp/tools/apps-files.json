@@ -12,7 +12,7 @@
     {
       "name": "windows_view",
       "title": "See a window",
-      "description": "A picture of one window as it is on screen now, to read what it shows (a page, a document, an error). Only a window on screen: one that isn't must be brought forward first. The user is usually asked on screen first, with the app and the window's title (not for the apps they let you see without asking), so take one picture of what you need rather than several. Never of a window Send to Claude leaves out (password managers, private browser windows, the apps the user listed), nor with one of those over it; that is the user's choice, so don't try another way.",
+      "description": "A picture of one window as it is on screen now, to read what it shows (a page, a document, an error). Only a window on screen: one that isn't must be brought forward first. The user is usually asked on screen first, with the app and the window's title (not for the apps they let you see without asking), so take one picture of what you need rather than several. Only the window itself, nothing over it. Never of a window Send to Claude leaves out (password managers, private browser windows, the apps the user listed); that is the user's choice, so don't try another way.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -23,6 +23,7 @@
       },
       "command": ["nightdrive", "windows", "shot", "{window}", "--json", "--inline"],
       "card": ["nightdrive", "windows", "shot", "{window}", "--check"],
+      "card_note": "The picture shows all the window shows: a password manager's popup in the browser too, and a password made visible in a page.",
       "unasked_by": "apps",
       "image": "image",
       "class": "read",
