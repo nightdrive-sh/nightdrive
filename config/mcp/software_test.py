@@ -160,6 +160,30 @@ class PluginRepos(unittest.TestCase):
         self.assertTrue(check.adds_repo("/nonexistent", "sudo dnf copr enable -y someone/thing && sudo dnf install x"))
         self.assertFalse(check.adds_repo("/nonexistent", "sudo dnf install -y ncdu"))
 
+    def test_a_repo_added_through_a_setup_script_counts(self):
+        """An installer that calls the repo's setup-hyprland-repo.sh adds Nightdrive's COPR, so it needs repos= (#1948)"""
+        sys.dont_write_bytecode = True
+        check = load(HERE.parent / "hypr/scripts/plugin-check", "plugin_check")
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / "example"
+            d.mkdir()
+            (d / "install.sh").write_text('#!/bin/bash\nrepo=$(cd "$(dirname "$0")/../.." && pwd)\n'
+                                          '"$repo/setup-hyprland-repo.sh" >/dev/null && sudo dnf install -y wayvnc\n')
+            self.assertEqual(check.adds_repo(str(d), "install.sh"), "setup-hyprland-repo.sh")
+            conf = "name=Example\nicon=tablet\ndescription=An example\ninstall=install.sh\ninstalled=true\n" \
+                   "version=1.0.0\nauthor=@someone\n"
+            (d / "plugin.conf").write_text(conf)
+            check.findings.clear()
+            check.check_conf(str(d), "example", set())
+            self.assertTrue(any("repos=copr:@nightdrive/nightdrive" in f for f in check.findings), check.findings)
+            (d / "plugin.conf").write_text(conf + "repos=copr:@nightdrive/nightdrive\n")
+            check.findings.clear()
+            check.check_conf(str(d), "example", set())
+            self.assertFalse(any("repos" in f for f in check.findings), check.findings)
+            # A setup script that adds no repository doesn't count
+            (d / "install.sh").write_text('"$here/../../setup-user.sh"\n')
+            self.assertFalse(check.adds_repo(str(d), "install.sh"))
+
     def test_software_plugins_lists_them(self):
         found = json.loads(subprocess.run([str(HERE.parent / "hypr/scripts/software"), "plugins", "--json"],
                                           capture_output=True, text=True).stdout)["plugins"]

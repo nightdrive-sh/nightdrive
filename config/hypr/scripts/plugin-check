@@ -128,25 +128,38 @@ def check_conf(d, pid, icons):
         if conf.get(k) and (err := shell_syntax(conf[k], d)):
             find(path, at[k], f"{k}: {err}")
     # An installer that adds a package repository says so: Claude's card for installing the plugin shows it (#1879)
-    if not conf.get("repos", "").strip() and adds_repo(d, conf.get("install", "")):
-        find(path, at.get("install", 1), "its installer adds a package repository: name it in repos=")
+    if not conf.get("repos", "").strip() and (via := adds_repo(d, conf.get("install", ""))):
+        how = "" if via is True else f" (through {via}" + (f", repos={REPO_OF[via]}" if via in REPO_OF else "") + ")"
+        find(path, at.get("install", 1), f"its installer adds a package repository{how}: name it in repos=")
     return conf
 
 
 REPO_ADDED = re.compile(r"yum\.repos\.d|copr enable|config-manager|addrepo")
+# The repo's own setup scripts a plugin's installer may call ("$repo/setup-hyprland-repo.sh"): one that adds a repository
+# adds it for the installer too, so the call counts (#1948). REPO_OF: what repos= should then say, where it is known.
+SETUP_SCRIPT = re.compile(r"(?:^|[/\s\"'])(setup-[\w-]+\.sh)\b")
+REPO_OF = {"setup-hyprland-repo.sh": "copr:@nightdrive/nightdrive"}
+
+
+def read(path):
+    try:
+        with open(path) as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
 
 
 def adds_repo(d, install):
-    """Whether the install command, or the script in the folder it names, adds a dnf repository"""
+    """Whether the install command, the script in the folder it names, or a setup-*.sh of the repo's that either calls
+    adds a dnf repository: False, True, or the name of the setup script that adds it (for the finding)"""
     script = os.path.join(d, install.split()[0]) if install.split() else ""
-    text = install
-    if os.path.isfile(script):
-        try:
-            with open(script) as fh:
-                text = fh.read()
-        except (OSError, UnicodeDecodeError):
-            pass
-    return bool(REPO_ADDED.search(text))
+    text = install + "\n" + (read(script) if os.path.isfile(script) else "")
+    if REPO_ADDED.search(text):
+        return True
+    for name in dict.fromkeys(SETUP_SCRIPT.findall(text)):
+        if REPO_ADDED.search(read(os.path.join(REPO, name))):
+            return name
+    return False
 
 
 def shell_syntax(cmd, cwd):
