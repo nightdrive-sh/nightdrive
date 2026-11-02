@@ -4,13 +4,14 @@ import Quickshell
 // Ask Claude's toast once it is written in (AskClaudeToast.qml, Dashboard #1895): the field (AskClaudeField), the conversation (AskClaudeThread, from AskClaudeSession) and its keys (KeyFooter). As in a chat,
 // the field is under the conversation, so the newest message is always just above it, where you wrote (the user's
 // choice, #1895); a new conversation is the field alone, so dictated text still appears where the indicator was.
-// fieldOnTop puts it above instead. While you dictate more, the indicator stands in the field's place.
+// fieldOnTop puts it above instead. While you dictate, the indicator stands in the field's place.
 // A long conversation scrolls inside it: the toast stays within maxHeight.
 Item {
     id: p
     property int maxHeight: 600
     property bool fieldOnTop: false
     property bool dictating: false
+    property bool listenOnly: false       // opened to listen (#1996): no keys yet, so no footer either
     property var dictation: null          // Dictation, for the indicator
     readonly property alias field: field
     signal close()
@@ -41,7 +42,7 @@ Item {
     property bool copied: false
     Timer { id: copiedTimer; interval: 1500; onTriggered: p.copied = false }
     readonly property string copyKey: copied ? "Cmd+C: copied" : thread.selectedText !== "" ? "Cmd+C: copy" : ""
-    readonly property string keys: [session.pendingCard ? ""
+    readonly property string keys: listenOnly ? "" : [session.pendingCard ? ""
         : session.busy ? "Ctrl+C: stop  ·  " + terminalKey
         : session.entries.length ? "Enter: send  ·  " + terminalKey + "  ·  Cmd+N: new chat"
         : "Enter: ask Claude  ·  " + terminalKey, copyKey].filter(k => k !== "").join("  ·  ")

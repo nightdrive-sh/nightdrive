@@ -1,8 +1,8 @@
 # Dictation (Voxtype)
 
 Hold **F5** or **Fn** on a Mac, **Insert** on a PC (or another key: below), speak, and let go: the text is typed into the active window.
-With **⌘⇧** held too, it goes to [Ask Claude](claude.md) as a question instead: the dictation's toast grows into Ask
-Claude's, with the text to check and send with Enter.
+With **⌘⇧** held too, it goes to [Ask Claude](claude.md) as a question instead: Ask Claude's toast opens at once and
+listens, and the text comes into its field to check and send with Enter.
 
 It runs fully offline with [Voxtype](https://github.com/peteonrails/voxtype) and NVIDIA's Parakeet model, on the CPU (about 1.4 s for 6 s of speech on an M2 Max).
 

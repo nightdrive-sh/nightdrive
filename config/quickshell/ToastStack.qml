@@ -41,6 +41,14 @@ PanelWindow {
             if (c) { stack.drawPending = null; c.drawn() }
         }
     }
+    // The card that puts the stack lower (Toast.sitsLow)
+    readonly property var lowCard: {
+        for (let i = 0; i < column.children.length; i++) {
+            const c = column.children[i]
+            if (c.shown && c.sitsLow) return c
+        }
+        return null
+    }
     readonly property var clickCard: {
         for (let i = 0; i < column.children.length; i++) {
             const c = column.children[i]
@@ -74,9 +82,9 @@ PanelWindow {
     Column {
         id: column
         anchors { top: parent.top; topMargin: topGap; horizontalCenter: parent.horizontalCenter }
-        // A card with the keys sits lower (its lowered); it slides there as it grows out of another card, but a card
-        // that appears at its size (instant) is there at once
-        property real topGap: Theme.barHeight + 8 + (stack.keyCard ? stack.keyCard.lowered : 0)
+        // A card with the keys (or sitsLow) sits lower (its lowered); it slides there when it changes, but a card that
+        // appears at its size (instant) is there at once
+        property real topGap: Theme.barHeight + 8 + (stack.lowCard ? stack.lowCard.lowered : 0)
         Behavior on topGap { enabled: !stack.instantNow; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
         spacing: 8
     }

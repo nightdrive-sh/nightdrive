@@ -12,8 +12,10 @@ Rectangle {
     // Written in (Ask Claude): ToastStack gives the keyboard to this card and closes it with a click beside it
     property bool takesKeys: false
     signal outsideClicked()
-    // While it has the keys, ToastStack puts the cards this much lower (Ask Claude's, away from the bar)
+    // While sitsLow (by default: while it has the keys), ToastStack puts the cards this much lower (Ask Claude's, in the
+    // launcher's place, also while it only listens to a dictation, #1996)
     property int lowered: 0
+    property bool sitsLow: takesKeys
     // ToastStack has drawn this card with the keys for the first time (Ask Claude's toast taking over from the launcher,
     // which closes only then)
     signal drawn()
