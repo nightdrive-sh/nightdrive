@@ -421,7 +421,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | Command | What it does |
 |---|---|
 | `nightdrive update` | Updates Nightdrive and the system (above) |
-| `nightdrive update check` | Only looks for new changes (what the six-hourly check runs) |
+| `nightdrive update check` | Only looks for new changes, and for system files (in /etc) that differ from the repo's (what the six-hourly check runs) |
 | `nightdrive channel` | The update channel, stable or dev; `nightdrive channel dev` switches to it |
 | `nightdrive version` | The release you have, and the channel |
 | `nightdrive minimal --dry-run` | On an install on Fedora KDE: what turning it into Fedora Minimal would remove, and what stays as yours; without `--dry-run` it does it ([Install](#install)) |

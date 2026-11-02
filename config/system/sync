@@ -1,0 +1,64 @@
+#!/bin/bash
+# The system files Nightdrive keeps outside the home folder (install.sh puts them in place), copied again when the repo's
+# version differs or is missing: nightdrive update runs this (System files), so an install from before a file was added
+# or changed gets it too (e.g. the power key, 14.10.2026). It runs sudo itself; update's as_root wraps it, so the password
+# is asked once for the whole update.
+#   sync           copy the ones that differ, and reload what reads them
+#   sync --check   only list the ones that differ (no sudo), exit 1 if any
+# --check is for nightdrive update check: on the machine Nightdrive is developed on, commits land in the checkout
+# itself, which is never behind origin, so the update check found nothing and /etc fell behind the repo unseen (keyd's
+# default.conf after #1731, #1917). It counts these too.
+set -uo pipefail
+repo=$(cd "$(dirname "$(readlink -f "$0")")/../.." && pwd)
+
+# One line each: the repo's file, where it goes, its mode
+files() {
+  cat <<'LIST'
+config/system/nightdrive-sleep /usr/lib/systemd/system-sleep/nightdrive-sleep 755
+config/system/logind-ignore-sleep-key.conf /etc/systemd/logind.conf.d/50-ignore-sleep-key.conf 644
+config/system/logind-power-key.conf /etc/systemd/logind.conf.d/50-power-key.conf 644
+config/system/nightdrive.actions /etc/dnf/libdnf5-plugins/actions.d/nightdrive.actions 644
+config/system/dnf-excludes.conf /etc/dnf/libdnf5.conf.d/90-nightdrive.conf 644
+LIST
+  # Asahi Macs: macOS's partitions out of the file manager's sidebar (26.10.2026)
+  [[ $("$repo/config/hypr/scripts/platform" machine) == asahi ]] &&
+    echo "config/system/apple-partitions.rules /etc/udev/rules.d/61-nightdrive-apple-partitions.rules 644"
+  # Mac Keyboard Shortcuts (plugins/keyd): its /etc config follows the repo's, if the plugin is installed
+  [[ -f /etc/keyd/default.conf ]] && echo "plugins/keyd/default.conf /etc/keyd/default.conf 644"
+  return 0
+}
+
+# The ones that differ from the repo's (or are missing)
+stale() {
+  local src dst mode
+  while read -r src dst mode; do
+    cmp -s "$repo/$src" "$dst" || echo "$src $dst $mode"
+  done < <(files)
+}
+
+if [[ ${1:-} == --check ]]; then
+  out=$(stale)
+  [[ -z $out ]] && exit 0
+  cut -d' ' -f2 <<<"$out"; exit 1
+fi
+
+# Each file's reader is told once, after its copy: logind re-reads its drop-ins on HUP, udev applies new rules to the
+# disks already there with a trigger, keyd starts again. Not `keyd reload`: keyd 2.6.0 segfaulted on the next key event
+# after one (the release of the Enter that ran this, held through the reload; 18.10. and 2.11.2026, #1917) and stayed down.
+failed=0 logind=0 udev=0 keyd=0
+mapfile -t todo < <(stale)   # read first: sudo below keeps the terminal's stdin for its password prompt
+(( ${#todo[@]} )) || echo "    up to date"
+for line in "${todo[@]}"; do
+  read -r src dst mode <<<"$line"
+  echo "    $dst"
+  sudo install -Dm"$mode" "$repo/$src" "$dst" || { failed=1; continue; }
+  case $dst in
+    /etc/systemd/logind.conf.d/*) logind=1 ;;
+    /etc/udev/rules.d/*) udev=1 ;;
+    /etc/keyd/*) keyd=1 ;;
+  esac
+done
+(( logind )) && { sudo systemctl kill -s HUP systemd-logind || failed=1; }
+(( udev )) && { sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=block --action=change || failed=1; }
+(( keyd )) && { sudo systemctl restart keyd || failed=1; }
+exit $failed

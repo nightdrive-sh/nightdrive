@@ -214,6 +214,9 @@ check() {
     timeout 30 git -C "$r" fetch -q 2>/dev/null || continue
     if [[ $r == "$repo" ]]; then total=$(( total + $(behind_nightdrive) )); else total=$(( total + $(behind "$r") )); fi
   done < <(repos | sort -u)
+  # System files that differ from the repo's (config/system/sync): on the machine Nightdrive is developed on, the checkout
+  # is never behind origin, so these are what tells it to update (keyd's /etc config after #1731 went unseen, #1917)
+  total=$(( total + $("$repo/config/system/sync" --check | wc -l) ))
   mkdir -p "$cache"
   echo "$total" > "$cache/updates"
   last=$(cat "$cache/updates-notified" 2>/dev/null || echo 0)
@@ -325,40 +328,13 @@ update() {
     if [[ -z $dt_want || $dt_have != "$dt_want"* ]]; then as_root "doubletake" "$repo/plugins/mirroring/install.sh"; else echo "    up to date"; fi
   fi
 
-  # The system files install.sh puts in place: copied again when the repo's version differs (or is missing), so an
-  # install from before a file was added gets it too (e.g. the power key, 14.10.2026)
+  # The system files install.sh puts in place (config/system/sync: its list, and what reloads each): copied again when
+  # the repo's version differs or is missing
   echo "==> System files"
-  changed=0 copied=0
-  while read -r src dst mode; do
-    cmp -s "$repo/config/system/$src" "$dst" && continue
-    echo "    $dst"; copied=1
-    as_root "System files" sudo install -Dm"$mode" "$repo/config/system/$src" "$dst" \
-      && [[ $dst == /etc/systemd/logind.conf.d/* ]] && changed=1
-  done <<'LIST'
-nightdrive-sleep /usr/lib/systemd/system-sleep/nightdrive-sleep 755
-logind-ignore-sleep-key.conf /etc/systemd/logind.conf.d/50-ignore-sleep-key.conf 644
-logind-power-key.conf /etc/systemd/logind.conf.d/50-power-key.conf 644
-nightdrive.actions /etc/dnf/libdnf5-plugins/actions.d/nightdrive.actions 644
-dnf-excludes.conf /etc/dnf/libdnf5.conf.d/90-nightdrive.conf 644
-LIST
-  # Asahi Macs: macOS's partitions out of the file manager's sidebar (26.10.2026); udev picks them up at once
-  rules=/etc/udev/rules.d/61-nightdrive-apple-partitions.rules
-  if [[ $("$scripts/platform" machine) == asahi ]] && ! cmp -s "$repo/config/system/apple-partitions.rules" $rules; then
-    echo "    $rules"; copied=1
-    as_root "System files" sudo install -Dm644 "$repo/config/system/apple-partitions.rules" $rules \
-      && as_root "System files" sudo udevadm control --reload \
-      && as_root "System files" sudo udevadm trigger --subsystem-match=block --action=change
-  fi
-  # Mac Keyboard Shortcuts (plugins/keyd): its /etc config follows the repo's, if the plugin is installed
-  if [[ -f /etc/keyd/default.conf ]] && ! cmp -s "$repo/plugins/keyd/default.conf" /etc/keyd/default.conf; then
-    echo "    /etc/keyd/default.conf"; copied=1
-    as_root "System files" sudo install -Dm644 "$repo/plugins/keyd/default.conf" /etc/keyd/default.conf \
-      && as_root "System files" sudo keyd reload
-  fi
+  # Checked first without sudo: when nothing differs, an update without a terminal has no step to list as skipped
+  if "$repo/config/system/sync" --check >/dev/null; then echo "    up to date"; else as_root "System files" "$repo/config/system/sync"; fi
   # The file the dnf hook touches; Quickshell watches it only if it exists when it starts (restarted below)
   [[ -e /var/lib/nightdrive/dnf-changed ]] || as_root "System files" sudo install -Dm644 /dev/null /var/lib/nightdrive/dnf-changed
-  (( changed )) && as_root "System files" sudo systemctl kill -s HUP systemd-logind
-  (( copied )) || echo "    up to date"
 
   # Remote login: SSH only over Tailscale and on the networks trusted, once (config/hypr/scripts/remote-login, 23.10.2026).
   # In the session firewalld lets a wheel user do it (on Fedora KDE without a password); over ssh only root may read its
@@ -449,7 +425,8 @@ LIST
   # The old top bar (before Quickshell drew it, 13.10.2026), also when updating over SSH. Quickshell reloads its own files.
   pkill -x waybar || true
 
-  mkdir -p "$cache"; echo 0 > "$cache/updates"; echo 0 > "$cache/updates-notified"
+  # Nothing waits now, except system files a skipped sudo step left behind: they stay counted (update check)
+  mkdir -p "$cache"; "$repo/config/system/sync" --check | wc -l > "$cache/updates"; echo 0 > "$cache/updates-notified"
   # The notes of the releases this update brought in (CHANGELOG.md): last, where they're seen when the update ends
   if ! git -C "$repo" diff --quiet "$was" HEAD -- CHANGELOG.md 2>/dev/null; then
     # A picture in the notes (![…](docs/releases/…)) is for the website and GitHub: not shown in a terminal
