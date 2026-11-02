@@ -74,6 +74,8 @@ link "$repo/config/wireplumber/wireplumber.conf.d/51-bt-no-headset-autoswitch.co
 link "$repo/config/systemd/user/wireplumber.service.d/50-nightdrive-forget-network-sound.conf" "$HOME/.config/systemd/user/wireplumber.service.d/50-nightdrive-forget-network-sound.conf"
 
 link "$repo/config/applications/nm-connection-editor.desktop" "$HOME/.local/share/applications/nm-connection-editor.desktop"   # Fedora ships none
+# slack:, zoommtg: … links of apps with no Linux version: a notification instead of the portal's "No Apps available"
+link "$repo/config/applications/nightdrive-app-link.desktop" "$HOME/.local/share/applications/nightdrive-app-link.desktop"
 # macbook_mic alias for dictation (voxtype): the MacBook's mic on Apple Silicon, the default mic elsewhere
 if [[ $("$repo/config/hypr/scripts/platform" name) == asahi ]]; then asound=asoundrc; else asound=asoundrc.generic; fi
 link "$repo/config/alsa/$asound" "$HOME/.config/alsa/asoundrc"

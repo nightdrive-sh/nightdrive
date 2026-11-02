@@ -1,0 +1,8 @@
+[Desktop Entry]
+# The quiet handler of app links whose app has no Linux version: hypr/scripts/app-link explains. A scheme an app
+# installed here handles (Discord, Spotify on x86) stays off the list, so this never stands between it and its app.
+Type=Application
+Name=App link
+Exec=sh -c "exec \\"\\$HOME/.config/hypr/scripts/app-link\\" \\"\\$1\\"" app-link %u
+NoDisplay=true
+MimeType=x-scheme-handler/slack;x-scheme-handler/zoommtg;x-scheme-handler/zoomus;x-scheme-handler/zoomphonecall;x-scheme-handler/msteams;

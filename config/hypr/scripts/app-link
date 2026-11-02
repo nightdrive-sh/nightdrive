@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# app-link URL: the handler of app links (slack:, zoommtg:, msteams: …) for apps that have no Linux (or ARM) version,
+# registered by config/applications/nightdrive-app-link.desktop. Without it a page that hands such a link to the
+# desktop (Slack's "Launching…" sign-in page) gets xdg-desktop-portal's "Open With… No Apps available" dialog, whose
+# "Find More in Software" leads nowhere here: the portal finds no app for the scheme and asks. With one handler it asks
+# nothing. So this one opens a real app if one has been installed since (a second handler of the scheme), and otherwise
+# says in a notification what to do instead: the page's link to the web version.
+set -u
+
+url=${1:-}
+scheme=${url%%:*}
+[[ -n $url && $scheme != "$url" ]] || exit 0
+SELF=nightdrive-app-link.desktop
+
+# A real app for the scheme (Zoom installed later, on x86): the portal may pick this file over it, so pass it on
+other=$(gio mime "x-scheme-handler/$scheme" 2>/dev/null \
+  | awk '/^Registered applications:/ {on = 1; next} /^[^\t]/ {on = 0} on {gsub(/\t/, ""); print}' \
+  | grep -vxF "$SELF" | head -n 1)
+if [[ -n $other ]]; then
+  exec gtk-launch "${other%.desktop}" "$url"
+fi
+
+case $scheme in
+  slack) app=Slack ;;
+  zoommtg | zoomus | zoomphonecall) app=Zoom ;;
+  msteams) app="Microsoft Teams" ;;
+  *) app=${scheme^} ;;
+esac
+notify-send -a Links -i lucide:external-link "No $app app here" \
+  "The page tried to open $app's desktop app. Use its link to the web version instead (for Slack: “use Slack in your browser”)."
