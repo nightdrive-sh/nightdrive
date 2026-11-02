@@ -32,11 +32,14 @@ Item {
     implicitHeight: 2 * pad + fieldH + threadH + footerH
 
     // Shift+Enter (a new line) and Esc (close) aren't listed: what text fields and toasts do. Claude's card has its keys on
-    // its buttons.
+    // its buttons. ⌘Enter is Hyprland's key, not the field's (so it never sends or adds a line): over the toast it comes
+    // over IPC (askClaude key in Launcher.qml) and goes on with the conversation in a terminal (AskClaudeLevels.terminal),
+    // as ⌘Enter on the launcher's Ask Claude row does (#1980); without one yet, what was written is a new session's prompt.
+    readonly property string terminalKey: "Cmd+Enter: open in terminal"
     readonly property string keys: session.pendingCard ? ""
-        : session.busy ? "Ctrl+C: stop"
-        : session.entries.length ? "Enter: send  ·  Cmd+N: new chat"
-        : "Enter: ask Claude"
+        : session.busy ? "Ctrl+C: stop  ·  " + terminalKey
+        : session.entries.length ? "Enter: send  ·  " + terminalKey + "  ·  Cmd+N: new chat"
+        : "Enter: ask Claude  ·  " + terminalKey
 
     Item {
         id: fieldRow

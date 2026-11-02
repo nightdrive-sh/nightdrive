@@ -56,7 +56,7 @@ Item {
         return true
     }
 
-    // ⌘⌃Enter: over the toast, its conversation goes on in Claude Code in a terminal, with its usual tools (stopped here
+    // ⌘Enter or ⌘⌃Enter: over the toast, its conversation goes on in Claude Code in a terminal, with its usual tools (stopped here
     // first: one session can't run in two places); from the search or without one, the text is a new session's prompt
     function terminal(text, goOn) {
         const q = text.trim()
