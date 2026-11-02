@@ -13,7 +13,7 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | `t` | Today |
 | `m`, `w` | Month, week |
 | `Enter` | Open the day's first event (a click opens any) |
-| `n` | New event on the day picked (also New, or a double click in the week's hours) |
+| `n` | New event on the day picked (also New, or a double click on a day or in the week's hours) |
 | `e` | Edit the event open (also Edit on it) |
 | `Del` or `⌫` | Delete the event open, after you say yes (also Delete on it) |
 | `1`–`9` or Ctrl+↑ Ctrl+↓ | A calendar of the sidebar, or All calendars |
@@ -21,9 +21,9 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | ⌘B | Hide or show the sidebar |
 
 - A new or edited event: `Tab` moves between its fields, `Enter` or Ctrl+Enter saves it, `Esc` leaves it. A time is typed as 9:30 or 930, a day as 2026-11-05 or 5.11.2026; the end moves with the start. It goes in a calendar that isn't read only (below), the one you used last.
-- In a narrow window the buttons show as icons, and below about 500 px the month or week shows as a list of its days.
+- In a narrow window the buttons show as icons, and below about 500 px the month or week shows as a list of its days (without the Week | Month switch: `m` and `w` still change it).
 - Editing keeps what Calendar doesn't show (alarms, invitees); another calendar moves the event there. A recurring event, or one in a read-only calendar, isn't changed or deleted here: the card says so. A deleted event goes from the server too, and the window has no undo for it.
-- A double click on a day in the month opens its week. A recurring event shows at each of its times.
+- A recurring event shows at each of its times.
 - The events are kept as `.ics` files in `~/.local/share/calendar`, a folder per account and calendar, and vdirsyncer syncs them. khal reads them, recurring events and all.
 
 ## Your calendars

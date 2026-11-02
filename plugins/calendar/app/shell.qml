@@ -23,6 +23,10 @@ ShellRoot {
 
         AppLook { id: c }
         readonly property QtObject look: c
+        // The picked day and the one under the pointer are whole cells here, not rows: the kit's sel and hover would
+        // fill a large part of the month, so the views take them fainter (Jari 2.11.)
+        readonly property color dayPicked: Qt.rgba(c.sel.r, c.sel.g, c.sel.b, 0.55)
+        readonly property color dayHover: Qt.rgba(c.sel.r, c.sel.g, c.sel.b, 0.25)
 
         // `calendar sync`, add and delete ask for a reload once they are done
         IpcHandler {
@@ -107,7 +111,6 @@ ShellRoot {
         Component.onCompleted: { calReader.running = true; load(true); keys.forceActiveFocus() }
 
         function pickDay(d) { day = d }
-        function showWeek(d) { day = d; view = "week" }
         // The month or week before (-1) or after (1)
         function page(n) {
             const d = Dates.parse(day)
@@ -192,9 +195,13 @@ ShellRoot {
                 spacing: 0
                 Header {
                     Layout.fillWidth: true
-                    Layout.leftMargin: 28; Layout.rightMargin: 18; Layout.topMargin: 16
+                    // In line with the sidebar's title; over the list of days (a narrow window), with the list's edges
+                    Layout.leftMargin: keys.listed ? 12 : 28; Layout.rightMargin: keys.listed ? 12 : 18; Layout.topMargin: 16
                     // As high as the buttons (AppButton's 28): the name stays level with the sidebar's title
                     Layout.preferredHeight: Math.max(win.headerHeight, 28)
+                    // Over the divider and the view that come after it, which would otherwise draw over its buttons' tips
+                    z: 1
+                    switchable: !keys.listed
                     app: win
                     c: win.look
                 }

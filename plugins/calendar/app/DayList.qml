@@ -7,7 +7,7 @@ import "Dates.js" as Dates
 // reads at any width. A click on a day picks it, on an event opens it; the picked day (← → and the rest) stays in view.
 ListView {
     id: root
-    required property var app           // the window: day, view, today, byDay, pickDay(), openEvent()
+    required property var app           // the window: day, view, today, byDay, dayPicked, dayHover, pickDay(), openEvent(), newEvent()
     required property QtObject c
     readonly property date at: Dates.parse(app.day)
     readonly property var days: {
@@ -50,9 +50,9 @@ ListView {
         // The day: its name and number, the picked one on the selection's colour, today's number in the accent
         Rectangle {
             width: parent.width; height: 30; radius: 6
-            color: dayItem.picked ? root.c.sel : dayHover.hovered ? root.c.hover : "transparent"
+            color: dayItem.picked ? root.app.dayPicked : dayHover.hovered ? root.app.dayHover : "transparent"
             HoverHandler { id: dayHover }
-            TapHandler { onTapped: root.app.pickDay(dayItem.modelData) }
+            TapHandler { onTapped: root.app.pickDay(dayItem.modelData); onDoubleTapped: root.app.newEvent(dayItem.modelData) }
             Row {
                 x: 8; anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
@@ -83,7 +83,7 @@ ListView {
                 readonly property bool allDay: Dates.spansDays(modelData)
                 x: 8; width: dayItem.width - 8; height: root.line
                 radius: 4
-                color: rowHover.hovered ? root.c.hover : "transparent"
+                color: rowHover.hovered ? root.app.dayHover : "transparent"
                 HoverHandler { id: rowHover; cursorShape: Qt.PointingHandCursor }
                 TapHandler { onTapped: root.app.openEvent(row.modelData) }
                 // The calendar's colour: a bar for what takes the day, a dot for a time

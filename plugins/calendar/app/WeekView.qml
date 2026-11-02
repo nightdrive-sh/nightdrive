@@ -6,7 +6,7 @@ import "Dates.js" as Dates
 // end. Events that overlap share their day's width, side by side.
 Item {
     id: root
-    required property var app           // the window: day, today, now, byDay, pickDay(), openEvent(), newEvent()
+    required property var app           // the window: day, today, now, byDay, dayPicked, pickDay(), openEvent(), newEvent()
     required property QtObject c
     readonly property date monday: Dates.monday(Dates.parse(app.day))
     readonly property var days: [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(monday, i)))
@@ -70,7 +70,7 @@ Item {
                 }
                 Rectangle {
                     width: 26; height: 22; radius: 11
-                    color: modelData === root.today ? root.c.primary : modelData === root.app.day ? root.c.sel : "transparent"
+                    color: modelData === root.today ? root.c.primary : modelData === root.app.day ? root.app.dayPicked : "transparent"
                     Text {
                         anchors.centerIn: parent
                         text: Dates.parse(modelData).getDate()
@@ -162,8 +162,10 @@ Item {
                 x: root.timeCol + index * root.colW
                 width: root.colW; height: 24 * root.hourH
                 Rectangle { width: 1; height: parent.height; color: root.c.line }
+                // Each day draws its left line: Sunday closes the week on its right too, as Monday opens it
+                Rectangle { visible: column.index === 6; anchors.right: parent.right; width: 1; height: parent.height; color: root.c.line }
                 Rectangle {
-                    anchors.fill: parent; anchors.leftMargin: 1
+                    anchors.fill: parent; anchors.leftMargin: 1; anchors.rightMargin: column.index === 6 ? 1 : 0
                     color: column.modelData === root.app.day ? Qt.rgba(root.c.sel.r, root.c.sel.g, root.c.sel.b, 0.35) : "transparent"
                 }
                 // A double click in the hours: a new event there, at the half hour it fell in. Not on an event: the

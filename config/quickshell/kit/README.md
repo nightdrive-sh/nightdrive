@@ -23,6 +23,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppRow` | A list row's ground, for a `ListView` delegate: `selected`, `marked` (the keyboard's place, list not focused), `active` (the keys are here: a frame) |
 | `AppButton` | A framed button with a glyph and a label (Play, New list); `strong`, `on`, a tip with its key (`tipAlign`) |
 | `AppIconButton` | A glyph-only button (Back, Settings) with a tip (`tipSide`, `tipAlign`) |
+| `AppSegments` | One of a few that go together as one framed switch (Week \| Month): `options` `[{ label, glyph, tip, keys }]`, `current`, `picked(i)`; the fill slides to the picked part, `compact` shows the glyphs |
 | `AppSearchField` | The search glyph and a field; Return, ↓ and Esc come out as signals |
 | `AppPanel` | A card over the dimmed window (settings, a question, a first start); a click outside comes out as a signal. Never taller than the window: its content scrolls, and its last row of `AppPanelButton`s stays in sight under it |
 | `AppPanelButton` | A panel's answer (Create, Cancel): its keys in the theme colour, then the word; `strong` for the one Return gives |

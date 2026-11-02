@@ -8,7 +8,7 @@ import "Dates.js" as Dates
 // width the time goes and the title stays, and "+4 more" becomes "+4"; narrower still, DayList takes the month's place.
 Item {
     id: root
-    required property var app           // the window: day, today, now, byDay, pickDay(), openEvent(), showWeek()
+    required property var app           // the window: day, today, now, byDay, dayPicked, dayHover, pickDay(), openEvent(), newEvent()
     required property QtObject c
     readonly property date first: Dates.parse(app.day)
     readonly property var days: Dates.monthDays(first.getFullYear(), first.getMonth())
@@ -66,12 +66,23 @@ Item {
             x: root.weekCol + (index % 7) * root.cellW
             y: root.headRow + Math.floor(index / 7) * root.cellH
             width: root.cellW; height: root.cellH
-            color: day === root.app.day ? root.c.sel : hover.hovered ? root.c.hover : "transparent"
+            color: day === root.app.day ? root.app.dayPicked : hover.hovered ? root.app.dayHover : "transparent"
             Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: root.c.line }
-            Rectangle { anchors.left: parent.left; height: parent.height; width: 1; color: root.c.line; visible: cell.index % 7 > 0 }
+            // Every day its left line, Monday's apart from the week numbers, and Sunday its right: the grid is closed at
+            // both sides, as the week's hours are (Jari 2.11.)
+            Rectangle { anchors.left: parent.left; height: parent.height; width: 1; color: root.c.line }
+            Rectangle { anchors.right: parent.right; height: parent.height; width: 1; color: root.c.line; visible: cell.index % 7 === 6 }
 
             HoverHandler { id: hover }
-            TapHandler { onTapped: root.app.pickDay(cell.day); onDoubleTapped: root.app.showWeek(cell.day) }
+            // A double click on the day: a new event on it (Jari 2.11.; it opened the week). Not on an event: the
+            // chip's own TapHandler opens it, and in Qt 6 this one gets the same taps (both grab passively)
+            TapHandler {
+                onTapped: root.app.pickDay(cell.day)
+                onDoubleTapped: point => {
+                    const hit = chips.childAt(point.position.x - chips.x, point.position.y - chips.y)
+                    if (!(hit && hit.isEvent)) root.app.newEvent(cell.day)
+                }
+            }
 
             // The day's number; today's in a circle of the accent
             Rectangle {
@@ -88,6 +99,7 @@ Item {
             }
 
             Column {
+                id: chips
                 x: 4; y: 28
                 width: parent.width - 8
                 spacing: root.gap
@@ -97,9 +109,10 @@ Item {
                         id: chip
                         required property var modelData
                         readonly property bool bar: Dates.spansDays(modelData)
+                        readonly property bool isEvent: true     // for the cell's double click, above
                         width: parent.width; height: root.line - root.gap      // with the gap, a row is still root.line
                         radius: 4
-                        color: bar ? Qt.rgba(ev.r, ev.g, ev.b, 0.35) : chipHover.hovered ? root.c.hover : "transparent"
+                        color: bar ? Qt.rgba(ev.r, ev.g, ev.b, 0.35) : chipHover.hovered ? root.app.dayHover : "transparent"
                         readonly property color ev: modelData.color
                         HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
                         TapHandler { onTapped: root.app.openEvent(chip.modelData) }
