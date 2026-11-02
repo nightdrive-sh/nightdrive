@@ -12,6 +12,7 @@ Rectangle {
     readonly property var glyphs: ({ Enter: "corner-down-left" })
     property string label
     property bool strong: false
+    readonly property bool panelAnswer: true     // how AppPanel finds the answers to keep in sight under its scrolling column
     readonly property alias hovered: hover.hovered
     signal clicked()
     implicitWidth: row.implicitWidth + 28; implicitHeight: 36; radius: 9
