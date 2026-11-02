@@ -15,7 +15,8 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | Part | What it is |
 |---|---|
 | `AppLook` | The colours: the desktop's theme, with the terminal's background behind the window and a few shades from it |
-| `AppSidebar` | The sidebar: the app's name (`AppTitle`) level with the view's header, a column of rows, a line on its right |
+| `AppSidebar` | The sidebar: the app's name (`AppTitle`) level with the view's header, a column of rows, a line on its right; `titleItems` at the title's right (`titleHovered`: Mail's gear shows only then) |
+| `AppAccountBar` | The accounts at the sidebar's foot under a line: each one's label and count, a click picks one (`picked`); one account is its label alone |
 | `AppTitle` | The app's name with the wordmark's block cursor: "Mail█" |
 | `AppNavRow` | A row of the sidebar: glyph, name, count; `selected`, `dropTarget`, `active` (the keyboard is in the sidebar) |
 | `AppPointer` | In the window's RowLayout: the pointer moving hides the keys' frame (`c.keyboard`: the app's key handlers call `c.moved(e)`, which only Tab and the arrows turn on) |

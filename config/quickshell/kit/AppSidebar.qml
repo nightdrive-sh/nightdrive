@@ -3,7 +3,8 @@ import QtQuick.Layouts
 
 // The sidebar on the window's left: the app's name (AppTitle) centred in the header's height, what it holds (AppNavRow
 // rows, typically) in a column from contentTop down, and a line on its right. Put it first in the window's RowLayout and
-// give it a Layout.preferredWidth.
+// give it a Layout.preferredWidth. The title's line takes a few small things at its right (titleItems: a spinner, a
+// badge, a button that shows only while the pointer is on the line, titleHovered); AppAccountBar goes at the foot.
 Rectangle {
     id: root
     required property QtObject c
@@ -13,9 +14,24 @@ Rectangle {
     property int bottomMargin: 18
     property alias spacing: column.spacing
     default property alias content: column.data
+    property alias titleItems: titleRow.data
+    readonly property alias titleHovered: titleHover.hovered
     Layout.fillHeight: true
     color: "transparent"
     AppTitle { x: 28; y: (root.headerHeight - height) / 2; c: root.c; text: root.title }
+    // Over the title, the line's full width so the hover covers it all; above the column (z), so a card one of the
+    // items opens under it (Mail's "Not sent") lies over the rows
+    Item {
+        width: parent.width; height: root.headerHeight
+        z: 2
+        HoverHandler { id: titleHover }
+        Row {
+            id: titleRow
+            anchors.right: parent.right; anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+        }
+    }
     ColumnLayout {
         id: column
         anchors.fill: parent

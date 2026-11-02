@@ -22,7 +22,7 @@ AppSidebar {
     title: "Mail"
     headerHeight: 2 * 18 + win.headerHeight
     contentTop: 18 + win.headerHeight + win.headerGap
-    bottomMargin: 0     // the account bar's line reaches the foot (AccountBar.qml)
+    bottomMargin: 0     // the account bar's line reaches the foot (AppAccountBar)
     Repeater {
         id: folderRows
         model: win.folders
@@ -54,20 +54,39 @@ AppSidebar {
         }
     }
     Item { Layout.fillHeight: true }
-    AccountBar {
+    AppAccountBar {
         c: win.look
-        accounts: win.accounts
+        accounts: win.accounts     // compose.py accounts: their addresses
         current: win.acct
-        unread: win.inboxUnread
+        counts: win.inboxUnread    // the inboxes' unread threads
         onPicked: i => { win.pickAccount(i); win.list.forceActiveFocus() }
     }
-    SidebarHead {
-        parent: sidebar     // over the sidebar's title, outside its column
-        c: win.look; outbox: sidebar.outbox
-        fetching: sidebar.fetching
-        headerHeight: sidebar.headerHeight
-        onSettings: sidebar.settings()
-    }
+
+    // At the title's right: Settings' gear, only while the pointer is on the line (⌘, and launcher › Settings › Apps ›
+    // Mail open Settings too, so it needn't take room all the time), a spinner while mail is fetched (FetchWatch.qml)
+    // and the sending badge (SendStatus.qml)
+    titleItems: [
+        AppIconButton {
+            anchors.verticalCenter: parent.verticalCenter
+            visible: sidebar.titleHovered
+            implicitWidth: 22       // a narrow sidebar (168 px) has just room for "Mail█", the gear and "Not sent"
+            c: win.look
+            glyph: "settings"; glyphColor: c.faint
+            tip: "Settings"; keys: "⌘,"; tipAlign: "right"
+            onClicked: sidebar.settings()
+        },
+        Spinner {
+            anchors.verticalCenter: parent.verticalCenter
+            c: win.look
+            running: sidebar.fetching
+            tip: "Fetching mail"; tipAlign: "right"
+        },
+        SendStatus {
+            anchors.verticalCenter: parent.verticalCenter
+            c: win.look; outbox: sidebar.outbox
+            frame: sidebar      // its card starts at the sidebar's left
+        }
+    ]
 
     // The folder under a thread dragged from the list (pos in the window), if takes(i) says it takes it, else -1
     function dropAt(pos, takes) {
