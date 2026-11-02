@@ -6,6 +6,7 @@
 #   - Fedora Minimal's own packages (base-pc.txt or base-asahi.txt here)
 #   - Nightdrive's package lists (packages*.txt) and what install.sh's steps add (the boot splash, an NVIDIA driver)
 #   - the installed plugins' packages (plugin.conf's packages=, `nightdrive plugins packages`)
+#   - in a virtual machine, its hypervisor's guest agents (qemu-guest-agent, spice-vdagent…)
 #   - the packages dnf protects, and the ones given with --keep
 #   - yours: user-installed, but not by the system's image (its kiwi transactions in dnf history), not by KDE's groups,
 #     and never in Nightdrive's lists (their git history: one dropped from them goes, and is listed apart)
@@ -132,6 +133,16 @@ lists=()
 for l in "${LISTS[@]}"; do [[ $l == packages-pc.txt && $kind != pc || $l == packages-asahi.txt && $kind != asahi ]] || lists+=("$repo/$l"); done
 add_file "${lists[@]}"
 add "${EXTRAS[@]}"
+# In a VM, its hypervisor's agents: without them the host can't shut it down cleanly (Garage's stop falls back to the
+# power button, which Nightdrive ignores), set its clock or share the clipboard (#1632). Another hypervisor's go
+if [[ $machine == vm ]]; then
+  case $(systemd-detect-virt --vm 2>/dev/null) in
+    qemu|kvm) add qemu-guest-agent spice-vdagent spice-webdavd ;;
+    vmware) add 'open-vm-tools*' ;;
+    microsoft) add 'hyperv-daemons*' 'hypervvssd' 'hypervkvpd' 'hypervfcopyd' ;;
+    oracle) add 'virtualbox-guest-additions*' ;;
+  esac
+fi
 read -ra plugin_pkgs <<<"$("$repo/bin/nightdrive" plugins packages | tr '\n' ' ')"
 add "${plugin_pkgs[@]}"
 # The edition's release packages (fedora-release-kde-desktop, fedora-release-identity-kde-desktop: the name in
