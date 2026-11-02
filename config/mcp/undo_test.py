@@ -1,26 +1,22 @@
 #!/usr/bin/env python3
 """Undo that keeps to what the user allows (#1860): `python3 config/mcp/undo_test.py`. An undo that does what an act
-tool does asks on the card, from Claude and from the notification; an undo that refuses can be tried again; open's
-undo closes only the window it opened and not while the user types; Deck's unqueue takes off only what Claude queued;
-Tasks' restore doesn't write over an edit made since. A log written by something else runs nothing its tool wouldn't,
-undo_change without an id takes only its own server's change, and a deletion's Undo isn't pushed out of the log while
-it is on screen (#1881). Nothing here runs a real command or shows a card: the log is a file of its own, and the card,
-the commands and the desktop are stand-ins."""
+tool does asks on the card, from Claude and from the notification; an undo that refuses can be tried again. A log
+written by something else runs nothing its tool wouldn't, undo_change without an id takes only its own server's change,
+and a deletion's Undo isn't pushed out of the log while it is on screen (#1881). undo_change keeps to the area's Access
+as it is now, and a redo asks again when its asks_if says so (#1924). Nothing here runs a real command or shows a
+card: the log is a file of its own, and the card, the commands and the desktop are stand-ins. The tools' own undos
+(a window, Deck's queue, Tasks) are undo_tools_test.py's."""
 
 import json
 import os
-import subprocess
 import sys
 import tempfile
 import unittest
-from importlib.machinery import SourceFileLoader
-from importlib.util import module_from_spec, spec_from_loader
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 sys.dont_write_bytecode = True
 
@@ -30,13 +26,6 @@ import registry  # noqa: E402
 import run  # noqa: E402
 import undo  # noqa: E402
 from run import ToolError  # noqa: E402
-
-
-def load(name, path):
-    loader = SourceFileLoader(name, str(path))
-    module = module_from_spec(spec_from_loader(name, loader))
-    loader.exec_module(module)
-    return module
 
 
 class Matching(unittest.TestCase):
@@ -73,12 +62,15 @@ class Log(unittest.TestCase):
         patches = [mock.patch.object(changes, "FILE", Path(self.tmp.name) / "claude-changes.jsonl"),
                    mock.patch.object(confirm, "ask", side_effect=self.card),
                    mock.patch.object(run, "execute", side_effect=self.execute),
-                   mock.patch.object(undo, "notify", side_effect=self.notify)]
+                   mock.patch.object(undo, "notify", side_effect=self.notify),
+                   # Access as Normal has it, not the user's own file: each test sets what it needs in own
+                   mock.patch.object(undo.access, "load", side_effect=lambda *a: self.rules)]
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
         self.cards, self.ran, self.rows, self.wheres = [], [], [], []
         self.answer, self.status, self.pressed = True, [0], []
+        self.rules = undo.access.Access("normal")
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -263,6 +255,116 @@ class Forged(Log):
         self.assertEqual(changes.get(e["id"])["undo"], ["nightdrive", "wallpaper", "set", "/old.png"])
 
 
+class Gated(Log):
+    """Claude's undo keeps to Access as the tool's own call would now, and a redo asks again when its call would have
+    (#1924). The notification's buttons are the user's: Access doesn't stop them."""
+
+    SPEAKER = ["nightdrive", "sound", "output", "AirPlay"]
+
+    def setUp(self):
+        super().setUp()
+        self.remote, self.asked = "no", []
+
+    def execute(self, where, argv, stdin, timeout):
+        if argv[:3] == ["nightdrive", "sound", "remote"]:   # sound_output's asks_if
+            self.asked.append(argv)
+            return self.remote + "\n", "", 0
+        return super().execute(where, argv, stdin, timeout)
+
+    def wall(self):
+        # The log's area isn't the one that counts: the tool's own is (a log can be written by anything, #1881)
+        return self.entry("appearance_wallpaper", Forged.WALL, area="notifications")
+
+    def speaker(self):
+        e = self.entry("sound_output", ["nightdrive", "sound", "output", "Speakers"], "Switched the sound to AirPlay",
+                       do=self.SPEAKER, arguments={"output": "AirPlay"}, area="sound-display")
+        changes.mark(e["id"], "undone")
+        return e
+
+    def test_modify_no_refuses_claude(self):
+        e = self.wall()
+        self.rules.own = {"appearance": {"modify": "no"}}
+        with self.assertRaises(ToolError) as said:
+            undo.undo_change({"id": e["id"]})
+        self.assertIn("Modify: No", str(said.exception))
+        self.assertNotIn("A change", str(said.exception))   # what it was is the area's
+        self.assertEqual((self.ran, self.cards), ([], []))
+        self.assertEqual(changes.get(e["id"])["state"], "done")
+        self.pressed = ["undo", None]      # the user's own Undo still works
+        undo.notice(e["id"], "undo")
+        self.assertEqual(self.ran, [Forged.WALL])
+        self.assertEqual(changes.get(e["id"])["state"], "undone")
+
+    def test_modify_ask_shows_the_card(self):
+        e = self.wall()
+        self.rules.own = {"appearance": {"modify": "ask"}}
+        self.answer = False
+        with self.assertRaises(ToolError) as said:
+            undo.undo_change({"id": e["id"]})
+        self.assertIn("didn't allow", str(said.exception))
+        self.assertEqual(self.ran, [])
+        self.assertEqual(self.cards, [("Undo: A change", {"does": "nightdrive wallpaper set /x.png"})])
+        self.answer = True
+        undo.undo_change({"id": e["id"]})
+        self.assertEqual(self.ran, [Forged.WALL])
+
+    def test_ask_and_an_act_are_one_card(self):
+        e = self.dnd()
+        self.rules.own = {"notifications": {"modify": "ask"}}
+        undo.undo_change({"id": e["id"]})
+        self.assertEqual(self.cards, [("Undo: Turned Do Not Disturb off", {"does": "Turn Do Not Disturb on"})])
+
+    def test_a_deletions_undo_is_a_change(self):
+        """Putting back what was trashed deletes nothing: Delete No doesn't stop it, Modify No does"""
+        e = self.entry("files_trash", ["nightdrive", "files", "restore", "--", "x"])
+        self.rules.own = {"apps-files": {"delete": "no"}}
+        undo.undo_change({"id": e["id"]})
+        self.assertEqual((len(self.ran), self.cards), (1, []))
+        e = self.entry("files_trash", ["nightdrive", "files", "restore", "--", "y"])
+        self.rules.own = {"apps-files": {"modify": "no"}}
+        with self.assertRaises(ToolError):
+            undo.undo_change({"id": e["id"]})
+        self.assertEqual(len(self.ran), 1)
+
+    def test_access_unreadable_refuses(self):
+        e = self.wall()
+        with mock.patch.object(undo.access, "load", side_effect=ValueError("broken")):
+            with self.assertRaises(ToolError):
+                undo.undo_change({"id": e["id"]})
+        self.assertEqual(self.ran, [])
+
+    def test_a_redo_asks_when_its_call_would(self):
+        e = self.speaker()
+        undo.perform(e["id"], "redo")       # asks_if says no: no card, as the call had none
+        self.assertEqual((self.asked, self.cards), ([["nightdrive", "sound", "remote", "AirPlay"]], []))
+        self.assertEqual(self.ran, [self.SPEAKER])
+        changes.mark(e["id"], "undone")
+        self.ran, self.remote, self.answer = [], "yes", False
+        with self.assertRaises(ToolError) as said:
+            undo.perform(e["id"], "redo")
+        self.assertIn("didn't allow redoing", str(said.exception))
+        self.assertEqual(self.cards, [("Switch the sound output", {"output": "AirPlay"})])
+        self.assertEqual(self.ran, [])
+        self.pressed = ["redo", None]       # the notification's Redo asks too, and offers Try again
+        undo.notice(e["id"], "redo")
+        self.assertEqual((len(self.cards), self.ran), (2, []))
+        self.assertEqual(self.rows[-1][1], ("redo", "Try again"))
+        self.answer = True
+        undo.perform(e["id"], "redo")
+        self.assertEqual(self.ran, [self.SPEAKER])
+        self.assertEqual(changes.get(e["id"])["state"], "done")
+
+    def test_claudes_redo_keeps_to_access(self):
+        e = self.speaker()
+        self.rules.own = {"sound-display": {"modify": "no"}}
+        with self.assertRaises(ToolError):
+            undo.perform(e["id"], "redo", claude=True)
+        self.assertEqual((self.ran, self.asked), ([], []))
+        self.rules.own = {"sound-display": {"modify": "ask"}}
+        undo.perform(e["id"], "redo", claude=True)   # Ask: the card, without asking asks_if first
+        self.assertEqual((len(self.cards), self.asked, self.ran), (1, [], [self.SPEAKER]))
+
+
 class Newest(Log):
     """undo_change without an id: only this server's own newest change (#1881)"""
 
@@ -288,16 +390,6 @@ class Newest(Log):
         self.assertEqual(undo.server_id(os.getpid()), undo.server_id(os.getpid()))
         self.assertTrue(undo.server_id(os.getpid()).startswith(f"{os.getpid()}:"))
         self.assertIsNone(undo.server_id(2 ** 31))
-
-
-class Calendar(unittest.TestCase):
-    def test_an_added_events_undo_asks(self):
-        """calendar_add's undo deletes the event, as calendar_delete does (its --check only checks the card)"""
-        tools = {t.name: t for t in registry.read_file(REPO / "plugins/calendar/mcp.json", REPO / "plugins/calendar",
-                                                        "calendar")[0]}
-        argv = run.expand(tools["calendar_add"].spec["undo"], {"calendar": "home", "uid": "abc"})
-        with mock.patch.object(registry.Registry, "load", return_value=(tools, [])):
-            self.assertEqual(undo.acts_like({"tool": "calendar_add"}, argv).name, "calendar_delete")
 
 
 class Kept(unittest.TestCase):
@@ -329,137 +421,6 @@ class Kept(unittest.TestCase):
             for _ in range(20):
                 changes.add({"tool": "files_trash", "notice": "Trashed", "deletes": True})
             self.assertEqual(len(changes.read()), 8)
-
-
-class Windows(unittest.TestCase):
-    def setUp(self):
-        self.w = load("windows_under_test", HERE.parent / "hypr/scripts/windows")
-        self.w.WAIT, self.w.POLL, self.w.QUIET_WAIT = 0.3, 0.01, 0.05
-        self.app = ("org.gnome.TextEditor", {"name": "Text Editor", "wmclass": "", "hidden": False})
-
-    def window(self, address, cls):
-        return {"address": address, "class": cls, "initialClass": cls, "title": "", "workspace": {"name": "1"}}
-
-    def test_another_apps_window_isnt_new(self):
-        mine = self.window("0x2", "org.gnome.TextEditor")
-        later = [[self.window("0x9", "kitty")]] * 3 + [[self.window("0x9", "kitty"), mine]]
-        with mock.patch.object(self.w, "clients", side_effect=later + [later[-1]] * 50):
-            self.assertEqual(self.w.wait_new(set(), self.app), mine)
-        with mock.patch.object(self.w, "clients", return_value=[self.window("0x9", "kitty")]):
-            self.assertIsNone(self.w.wait_new(set(), self.app))
-
-    def test_unknown_app_waits_for_nothing(self):
-        with mock.patch.object(self.w, "clients", return_value=[self.window("0x9", "kitty")]) as clients:
-            self.assertIsNone(self.w.wait_new(set(), None))
-            clients.assert_not_called()
-
-    def test_close_waits_while_typing(self):
-        a = SimpleNamespace(address="0x2", focus="0x1", unless_typing=True)
-        with mock.patch.object(self.w, "key_age", return_value=0), \
-                mock.patch.object(self.w, "clients", return_value=[self.window("0x2", "x"), self.window("0x1", "y")]), \
-                mock.patch.object(self.w, "dispatch") as dispatch, mock.patch("sys.stderr"):
-            with self.assertRaises(SystemExit):
-                self.w.cmd_close(a)
-            dispatch.assert_not_called()
-        with mock.patch.object(self.w, "key_age", return_value=9), \
-                mock.patch.object(self.w, "clients", return_value=[self.window("0x2", "x"), self.window("0x1", "y")]), \
-                mock.patch.object(self.w, "dispatch") as dispatch:
-            self.w.cmd_close(a)
-            self.assertEqual(dispatch.call_count, 2)
-
-    def test_undo_templates_wait_while_typing(self):
-        tools = {t.name: t for t in registry.read_file(HERE / "tools/apps-files.json", HERE, None)[0]}
-        for name in ("windows_focus", "apps_open", "files_open"):
-            self.assertIn("--unless-typing", tools[name].spec["undo"], name)
-
-
-class Deck(unittest.TestCase):
-    def setUp(self):
-        self.p = load("playback_under_test", REPO / "plugins/deck/lib/playback.py")
-        self.removed = []
-
-    def unqueue(self, queue, length, queued):
-        self.queue = list(queue)
-
-        def ctl(*args):
-            self.assertEqual(args[0], "unqueue")
-            self.removed.append(self.queue.pop(int(args[1])))
-        with mock.patch.object(self.p, "status", side_effect=lambda: {"queue": [{"uri": u} for u in self.queue]}), \
-                mock.patch.object(self.p, "ctl", side_effect=ctl):
-            return self.p.unqueue(str(length), *queued)
-
-    def test_users_later_tracks_stay(self):
-        self.unqueue(["u1", "c1", "c2", "u2"], 1, ["c1", "c2"])
-        self.assertEqual(self.queue, ["u1", "u2"])
-
-    def test_queue_played_on(self):
-        self.unqueue(["c1", "c2", "u2"], 2, ["c1", "c2"])        # u0 and u1 have played
-        self.assertEqual(self.queue, ["u2"])
-        self.unqueue(["c2", "u2"], 1, ["c1", "c2"])              # c1 has played too
-        self.assertEqual(self.queue, ["u2"])
-
-    def test_the_same_album_queued_again_by_the_user(self):
-        self.unqueue(["c1", "c2", "c1", "c2"], 0, ["c1", "c2"])
-        self.assertEqual(self.removed, ["c1", "c2"])
-        self.assertEqual(self.queue, ["c1", "c2"])
-
-    def test_gone_takes_nothing(self):
-        with self.assertRaises(self.p.Failed):
-            self.unqueue(["u1", "u2"], 0, ["c1"])
-        with self.assertRaises(self.p.Failed):
-            self.unqueue(["u1"], 1, [])                           # an undo logged before the uris
-        self.assertEqual(self.removed, [])
-
-
-class Tasks(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        d = Path(self.tmp.name)
-        self.env = {**os.environ, "NIGHTDRIVE_TASKS_DIR": str(d / "data"), "XDG_STATE_HOME": str(d / "state")}
-
-    def tearDown(self):
-        self.tmp.cleanup()
-
-    def tasks(self, *argv):
-        p = subprocess.run([sys.executable, str(REPO / "plugins/tasks/lib/cli.py"), *argv], capture_output=True,
-                           text=True, env=self.env)
-        return p.returncode, json.loads(p.stdout) if p.returncode == 0 and argv[0] != "restore" else p.stderr
-
-    def file(self, task):
-        return next(Path(self.env["NIGHTDRIVE_TASKS_DIR"]).rglob(f"*{task['id'][:8]}*.ics"))
-
-    def test_an_edit_since_stays(self):
-        _, task = self.tasks("add", "--json", "--", "Buy milk")
-        _, done = self.tasks("done", "--json", "--", task["id"])
-        f = self.file(task)
-        f.write_text(f.read_text().replace("Buy milk", "Buy oat milk"))       # the user, an hour later
-        status, said = self.tasks("restore", "--json", done["undo"])
-        self.assertEqual(status, 1)
-        self.assertIn("changed since", said)
-        self.assertIn("Buy oat milk", f.read_text())
-
-    def test_an_add_edited_since_isnt_removed(self):
-        _, task = self.tasks("add", "--json", "--", "Call Anna")
-        f = self.file(task)
-        f.write_text(f.read_text().replace("Call Anna", "Call Anna at 5"))
-        self.assertEqual(self.tasks("restore", "--json", task["undo"])[0], 1)
-        self.assertTrue(f.exists())
-
-    def test_a_trashed_task_made_again_stays(self):
-        _, task = self.tasks("add", "--json", "--", "Plan")
-        f = self.file(task)
-        text = f.read_text()
-        _, trashed = self.tasks("trash", "--json", "--", task["id"])
-        f.write_text(text + "\n")                                             # back, as a sync brought it
-        self.assertEqual(self.tasks("restore", "--json", trashed["undo"])[0], 1)
-
-    def test_unchanged_undoes(self):
-        _, task = self.tasks("add", "--json", "--", "Water plants")
-        _, done = self.tasks("done", "--json", "--", task["id"])
-        self.assertEqual(self.tasks("restore", "--json", done["undo"])[0], 0)
-        self.assertNotIn("COMPLETED", self.file(task).read_text())
-        self.assertEqual(self.tasks("restore", "--json", task["undo"])[0], 0)
-        self.assertEqual(list(Path(self.env["NIGHTDRIVE_TASKS_DIR"]).rglob("*.ics")), [])
 
 
 class Notice(unittest.TestCase):

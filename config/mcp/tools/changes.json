@@ -19,7 +19,7 @@
     {
       "name": "undo_change",
       "title": "Undo a change",
-      "description": "Undo a change you (Claude) made with Nightdrive's tools, when the user asks (\"undo that\", \"put the old wallpaper back\"): by its id from recent_changes, or without one the newest change still in place if you made it in this conversation (else give its id). It puts back what was there before the change; the user sees it in a notification, with Redo.",
+      "description": "Undo a change you (Claude) made with Nightdrive's tools, when the user asks (\"undo that\", \"put the old wallpaper back\"): by its id from recent_changes, or without one the newest change still in place if you made it in this conversation (else give its id). It puts back what was there before the change; the user sees it in a notification, with Redo. The user's Access for that change's area applies as now: Modify No refuses it, Ask shows the card.",
       "inputSchema": {
         "type": "object",
         "properties": {

@@ -15,6 +15,9 @@ The row then reads "Undid: …" with Redo, which runs the tool's command again a
 output, as the first run's was (a new draft has a new id); Claude's undo_change shows the same row.
 An undo that does what an act tool does (dnd_off's undo turns Do Not Disturb on, which only the card may allow), or
 whose tool says `"undo_asks": true`, runs only once the user allows it on the card, from the notification too (#1860).
+Claude's undo_change keeps to Access as the tool's own call would now (#1924): the area's Modify No refuses it, Ask
+shows the card, whatever it was when the change was made. A redo is the tool's call again, so one its `asks_if` says
+reaches further (a speaker on the network, a shared calendar) asks on the tool's own card, from the notification too.
 An undo that refuses for now (the user is typing) leaves Try again on the row.
 The log is a file of the user's, which what they run can write (Claude Code's own Write too), so an undo or redo runs
 only what the tool the entry names, as installed now, would: its undo template word for word, its command with the
@@ -127,19 +130,20 @@ def server_id(pid):
         return None
 
 
-def perform(entry_id, action):
+def perform(entry_id, action, claude=False):
     """Undo (or redo) an entry: its logged argv run as run.py runs a tool, and its state changed. Returns the entry;
-    ToolError when it can't. An undo that asks waits for the card first, outside the lock: other undos and the log
-    don't wait on the user, and the entry is checked again once they have answered."""
-    argv, _, _ = runnable(entry_id, action)
-    if action == "undo":
-        ask(entry_id, argv)
+    ToolError when it can't. claude: Claude asked for it (undo_change), so Access applies as to the tool's own call;
+    the notification's buttons are the user's. One that asks waits for the card first, outside the lock: other undos
+    and the log don't wait on the user, and the entry is checked again once they have answered."""
+    argv, stdin, tool = runnable(entry_id, action)
+    said = ask(entry_id, action, argv, tool, claude)
     with changes.serial():
-        argv, stdin, tool = runnable(entry_id, action, shown=argv)
+        argv, stdin, tool = runnable(entry_id, action, shown=(argv, stdin))
         entry = changes.get(entry_id)
         then = "undone" if action == "undo" else "done"
-        # The tool's own folder, timeout and Access choices: none of them from the log
-        where = SimpleNamespace(dir=tool.dir, name=tool.name, **choices(tool))
+        # The tool's own folder, timeout and Access choices: none of them from the log. What its card said, for a
+        # command that checks it acts on that (#1866)
+        where = SimpleNamespace(dir=tool.dir, name=tool.name, said=said, **choices(tool))
         out, err, status = run.execute(where, argv, stdin, run.timeout_of(tool))
         if status != 0:
             why = (err.strip() or out.strip() or "no message")[-run.MESSAGE_MAX:]
@@ -152,7 +156,7 @@ def perform(entry_id, action):
 
 def runnable(entry_id, action, shown=None):
     """(argv, stdin, tool) an undo or redo of the entry runs; ToolError when the entry isn't in a state for it, its
-    argv isn't one its tool would run (registered), or isn't the one the card showed (shown)."""
+    argv isn't one its tool would run (registered), or isn't the one the card showed (shown: argv, stdin)."""
     entry = changes.get(entry_id)
     if entry is None:
         raise ToolError(f"There's no change {entry_id} in the log (it keeps the last {changes.KEEP}).")
@@ -165,7 +169,7 @@ def runnable(entry_id, action, shown=None):
         raise ToolError(f"Change {entry_id} ({entry['notice']}) can't be undone: its redo didn't report what "
                         "undoing it needs.")
     tool = registered(entry, action, argv, stdin)
-    if shown is not None and argv != shown:
+    if shown is not None and (argv, stdin) != shown:
         raise ToolError(f"Change {entry_id} ({entry['notice']}) changed while the card was on screen: nothing was "
                         "done.")
     return argv, stdin, tool
@@ -249,21 +253,64 @@ def acts_like(entry, argv):
     return next((t for t in tools.values() if t.cls == "act" and same_command(t.spec["command"], argv)), None)
 
 
-def ask(entry_id, argv):
-    """The card for an undo that acts (acts_like): returns once the user allowed it, else ToolError."""
+def ask(entry_id, action, argv, tool, claude=False):
+    """The card an undo or redo needs, if any (claude: undo_change's): returns once the user allowed it, with what a
+    tool's own card command said (confirm.facts), else ToolError. Nothing is run before this has returned."""
     entry = changes.get(entry_id)
+    decision = allowed(entry_id, action, tool) if claude else "allow"
+    if action == "redo":
+        return ask_redo(entry, tool, decision)
     act = acts_like(entry, argv)
-    if act is None:
-        return
+    if act is None and decision == "allow":
+        return None
     import confirm   # only now: the card needs Quickshell, a plain undo doesn't
-    does = " ".join(argv) if act is True else act.spec.get("title") or act.name
-    area = getattr(registered(entry, "undo", argv, None), "area", None) or "nightdrive"
-    card = SimpleNamespace(name=OWN, cls="act", right="modify", area=area, options={},
-                           spec={"title": f"Undo: {entry['notice']}", "class": "act", "area": area,
+    does = (act.spec.get("title") or act.name) if act not in (None, True) else " ".join(argv)
+    area = tool.area or "nightdrive"
+    # An undo that acts says so as an act's card does; one Access asks about is a change, which Redo puts back
+    cls = "act" if act is not None else "change"
+    card = SimpleNamespace(name=OWN, cls=cls, right="modify", area=area, options={},
+                           spec={"title": f"Undo: {entry['notice']}", "class": cls, "area": area,
                                  "inputSchema": {"type": "object", "properties": {"does": {"title": "That is"}}}})
     if not confirm.ask(card, {"does": does}):
         raise ToolError(f"The user didn't allow undoing change {entry_id} ({entry['notice']}) on screen, so it "
                         "wasn't undone. Don't try it another way.")
+    return None
+
+
+def allowed(entry_id, action, tool):
+    """allow or ask: what Access says now to Claude undoing or redoing a change of this tool, as to the tool's own call.
+    An undo changes its area (Modify, even a deletion's: putting back deletes nothing); a redo is the call again, by
+    the tool's own right. No, or an Access that can't be read, refuses: undo_change mustn't reach where the tool
+    can't."""
+    right = "modify" if action == "undo" else tool.right
+    try:
+        decision = access.load().decide(tool.cls, tool.area, right)
+    except Exception:
+        decision = "no"
+    if decision not in ("allow", "ask"):
+        # Its id and area alone: what it was is the area's, which recent_changes may not show now (#1884)
+        raise ToolError(f"Change {entry_id} wasn't {action}ne: the user's Access doesn't let you change "
+                        f"{access.areas.name(tool.area)} now ({right.capitalize()}: No). Tell the user; don't try "
+                        "it another way.")
+    return decision
+
+
+def ask_redo(entry, tool, decision):
+    """A redo is the tool's call again: the tool's own card, with the logged arguments, when Access asks (decision)
+    or its asks_if says this call reaches further than its right (#1887), as the call itself asked."""
+    import registry   # here, not at the top: registry imports this module as its seam
+    arguments = entry.get("arguments") or {}
+    tool.said = None
+    tool.options, tool.options_from = {}, {}
+    for name, value in choices(tool).items():
+        setattr(tool, name, value)   # the card command and asks_if keep to the area's choices, as the call's did
+    if decision == "allow" and not (tool.spec.get("asks_if") and registry.asks(tool, arguments)):
+        return None
+    import confirm
+    if not confirm.ask(tool, arguments):
+        raise ToolError(f"The user didn't allow redoing change {entry['id']} ({entry['notice']}) on screen, so it "
+                        "wasn't redone. Don't try it another way.")
+    return tool.said
 
 
 def choices(tool):
@@ -409,7 +456,7 @@ def undo_change(args):
             raise ToolError(f"The newest change in place, {newest['id']}, wasn't made in this conversation: find the "
                             "one the user means with recent_changes and give its id.")
         entry_id = newest["id"]
-    entry = perform(entry_id, "undo")
+    entry = perform(entry_id, "undo", claude=True)
     return {"id": entry_id, "undone": entry["notice"], "tool": entry["tool"]}
 
 
