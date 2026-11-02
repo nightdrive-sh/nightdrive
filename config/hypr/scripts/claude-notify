@@ -5,7 +5,8 @@
 # Claude icon gets its dot (Claude.qml). Nothing while you're in that window. Claude Code's own terminal notification
 # (kitty's, all alike) is turned off by link.sh.
 #   Notification: "Waiting for your input" and the like.
-#   PermissionRequest: what it wants to run or change, with Deny, and Allow when it shows all it allows. The hook waits
+#   PermissionRequest: what it wants to run or change, with Deny, and Allow when it shows all it allows. Pinned
+#   (x-nightdrive-pin, quickshell/Notifs.qml): it stays on screen until answered and gets through do not disturb. The hook waits
 #   for the answer (Claude Code asks in the terminal at the same time): Allow or Deny answers for you; going to the
 #   window, Show session, closing the notification or the terminal's own answer leave it to the terminal.
 # Reads the hook's JSON on stdin: {hook_event_name, cwd, message | tool_name, tool_input, ...}.
@@ -77,7 +78,7 @@ if [[ $event == PermissionRequest ]]; then
   fi
   out=$(mktemp "$state/perm.XXXXXX")
   touch "$state/$addr.perm"
-  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -A default=Open "${allow[@]}" -A deny=Deny \
+  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -A default=Open "${allow[@]}" -A deny=Deny \
     -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
   ns=$!
   # The terminal's answer ends this hook early (Claude Code stops it): the notification goes with it

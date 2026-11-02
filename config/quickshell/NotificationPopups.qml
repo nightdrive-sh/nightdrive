@@ -58,9 +58,9 @@ PanelWindow {
                 }
 
                 // Goes after Notifs.timeout, sliding out the way it came; the mouse over the card restarts the wait,
-                // critical ones stay
+                // pinned ones stay
                 Timer {
-                    running: !card.row.critical && !card.hovered && !leave.running
+                    running: !card.row.pinned && !card.hovered && !leave.running
                     interval: Notifs.timeout
                     onTriggered: { enter.stop(); leave.start() }
                 }
