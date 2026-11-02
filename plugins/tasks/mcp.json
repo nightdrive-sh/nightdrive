@@ -3,7 +3,7 @@
     {
       "name": "tasks_list",
       "title": "List tasks",
-      "description": "The user's tasks in Nightdrive Tasks (kept on this computer, a list per folder): each task's id, title, note, list, due (YYYY-MM-DD, or YYYY-MM-DDTHH:MM local time), due_label, overdue, priority (high, low or empty) and done. view: open (default: every task not done, soonest due first, those without a due last), today (due today or earlier, overdue included), scheduled (every open task with a due), done (the 50 done most recently), all. Also gives now (the local time, to work out dates from) and the lists with their open counts. Use the ids with tasks_edit, tasks_done, tasks_snooze and tasks_trash.",
+      "description": "The user's tasks in Nightdrive Tasks (kept on this computer, a list per folder): each task's id, title, note, list, due (YYYY-MM-DD, or YYYY-MM-DDTHH:MM local time), due_label, overdue, priority (high, low or empty) and done. view: open (default: every task not done, soonest due first, those without a due last), today (due today or earlier, overdue included), scheduled (every open task with a due), done (the 50 done most recently), all. Also gives now (the local time, to work out dates from) and the lists with their open counts. Use the ids with tasks_edit, tasks_done, tasks_undone, tasks_snooze and tasks_trash.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -56,6 +56,25 @@
       "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Marked {title} done",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_undone",
+      "title": "Mark a task not done",
+      "description": "Puts a task in Nightdrive Tasks that is done back among the open ones, as it was before it was ticked off (its due stays). id is a task's id from tasks_list (view done).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "undone", "--json", "--", "{id}"],
+      "mask": ["title", "note"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Marked {title} not done",
       "class": "change",
       "area": "tasks"
     },

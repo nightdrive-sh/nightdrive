@@ -1,8 +1,8 @@
 # Tasks
 
 Your tasks, kept on your computer: Today, Scheduled and your lists in a window of their own, and a notification when one
-comes due, with Done and Later. You add and edit them in the window; Claude adds and changes them too (Settings › Claude ›
-Access › Tasks). Ticking off and lists in the window come next.
+comes due, with Done and Later. You add, edit and tick them off in the window; Claude adds and changes them too (Settings ›
+Claude › Access › Tasks). Lists in the window come next.
 
 ## Using it
 
@@ -11,6 +11,9 @@ Access › Tasks). Ticking off and lists in the window come next.
 | `?` | Tasks' keys |
 | `n` | New task (also New, or `tasks new [LIST]`): ⏎ or Ctrl+⏎ adds it, Tab the next field, ← → another list |
 | ⏎ or `e` | Edit the picked task (a double click too): Ctrl+⏎ saves |
+| Space | Done (a click on its circle too); in Done, open again |
+| Delete | To the trash |
+| ⌘Z | Undo the last change (also Undo in the message at the top) |
 | ↑ ↓ or `j` `k` | Move in the list; the picked task shows its whole note |
 | `1`–`9` or Ctrl+↑ Ctrl+↓ | A row of the sidebar |
 | `Tab` | Keys between the sidebar and the tasks |
@@ -25,7 +28,7 @@ Access › Tasks). Ticking off and lists in the window come next.
 ## In a terminal
 
 `tasks help` lists the commands: `tasks add "Buy milk" --due today --list Shopping`, `tasks list --view today`, `tasks
-edit ID --due fri --list Home` (`--no-due` takes the date away), `tasks done ID`, `tasks snooze ID --until "tomorrow 9:00"`, `tasks trash ID`. A due is `[DAY] [TIME]`: the day `today`, `tomorrow`,
+edit ID --due fri --list Home` (`--no-due` takes the date away), `tasks done ID` (`tasks undone ID` opens it again), `tasks snooze ID --until "tomorrow 9:00"`, `tasks trash ID`. A due is `[DAY] [TIME]`: the day `today`, `tomorrow`,
 `mon` … `sun` (the next one), `5.11.`, `2026-11-05` or `+3d`, the time `9:30`, `930` or `14` (alone: the next such time);
 or `+30m`, `+2h`. `tasks when "fri 930"` shows how one reads. `--json` gives what Claude reads.
 

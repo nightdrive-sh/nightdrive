@@ -33,7 +33,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppChips` | One of a few as chips in a row (the list a task goes in): `options` `[{ id, name, color? }]`, `picked`; ← → move it |
 | `AppCheck` | A box to tick and its word (Important): `on`, Space or a click turns it (`toggled`), ⏎ `accepted` |
 | `AppNote` | What went wrong, at the foot of the page, in the danger colour, until ✕; two lines at most |
-| `AppToast` | What just happened, in a rounded card at the top of the window: `show(text, { sticky, danger, duration })`, gone after 4 s (a failure 8 s), sticky until the next; a click dismisses it |
+| `AppToast` | What just happened, in a rounded card at the top of the window: `show(text, { sticky, danger, duration, action, run })`, gone after 4 s (a failure 8 s, one with an action such as Undo 7 s), sticky until the next; a click dismisses it, `act()` runs the action for a key (⌘Z) |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |
 | `Tip` | A button's tip: what it does and its key |
 | `Spinner` | A turning glyph while something runs in the background (Mail's fetch), shown at least a moment; a tip says what runs |

@@ -6,9 +6,9 @@ import qs
 import qs.kit
 
 // Nightdrive Tasks: Today, Scheduled and the lists in the sidebar, their tasks on the right. New (n) adds one and ⏎ or e
-// changes one, in a panel (TaskEditor); changes come from Claude (mcp.json), the `tasks` command and the notifications'
-// Done and Later too, which all ask it to read them again (`tasks …` calls refresh). lib/cli.py reads and writes the
-// VTODO files.
+// changes one, in a panel (TaskEditor); Space ticks one off and Delete trashes it, with Undo in the toast (Actions).
+// Changes come from Claude (mcp.json), the `tasks` command and the notifications' Done and Later too, which all ask it
+// to read them again (`tasks …` calls refresh). lib/cli.py reads and writes the VTODO files.
 ShellRoot {
     id: shell
     FloatingWindow {
@@ -143,6 +143,10 @@ ShellRoot {
         }
         // What just happened, at the top of the window (the kit's toast)
         function say(t, danger) { toast.show(t, { danger: !!danger }) }
+        function offer(t, undo) { toast.show(t, { action: "Undo", run: undo }) }
+        Actions { id: ops; app: win }
+        // A task's circle, Space: done, or back to open in Done
+        function toggleDone(index) { ops.toggle(shown[index === undefined ? current : index]) }
         function move(d) {
             if (!shown.length) return
             current = Math.max(0, Math.min(shown.length - 1, current + d))
@@ -155,6 +159,8 @@ ShellRoot {
         function toList() { pane = "list"; list.forceActiveFocus() }
 
         Shortcut { sequence: "Ctrl+R"; onActivated: win.load() }
+        // The toast's Undo while it shows, else the window's newest change; not while a panel's field has the keys
+        Shortcut { sequence: "Ctrl+Z"; enabled: !editor.visible; onActivated: if (!toast.act()) ops.undo() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
 
@@ -222,6 +228,8 @@ ShellRoot {
                     else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
                     else if (k === Qt.Key_N && !ctrl) win.newTask("")
                     else if ((k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_E) && !ctrl) win.editTask()
+                    else if (k === Qt.Key_Space && !ctrl) win.toggleDone()
+                    else if (k === Qt.Key_Delete && !ctrl) ops.trash(win.shown[win.current])
                     else return
                     e.accepted = true
                 }
@@ -310,9 +318,9 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it (a double click too)"]] },
+                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it (a double click too)"], ["Space", "Done (a click on its circle too); in Done, open again"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change (also the toast's Undo)"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
-                { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Claude", "Adds, moves, marks done"], ["tasks", "The same in a terminal: tasks help"], ["Notification", "Done, Later"]] },
+                { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"], ["Claude", "Adds, moves, marks done"], ["tasks", "The same in a terminal: tasks help"], ["Notification", "Done, Later"]] },
                 { title: "New task, edit", keys: [["⏎  Ctrl ⏎", "Add or save it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["Esc", "Leave it"]] }
             ]
         }

@@ -29,6 +29,15 @@ AppRow {
         color: row.task.done ? row.c.faint : row.task.priority === "high" ? row.c.accent : row.c.dim
     }
 
+    // The circle ticks it off (or, in Done, opens it again): a target larger than the glyph, and its own press, so the
+    // row's tap (pick) and double tap (edit) don't come with it
+    MouseArea {
+        anchors.centerIn: mark
+        width: 36; height: 36
+        cursorShape: Qt.PointingHandCursor
+        onClicked: { row.app.current = row.index; row.app.toggleDone(row.index) }
+    }
+
     Column {
         id: body
         anchors.left: mark.right; anchors.leftMargin: 12
