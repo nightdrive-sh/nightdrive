@@ -19,6 +19,7 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | ⌘B | Hide or show the sidebar |
 
 - A new event: `Tab` moves between its fields, `Enter` or Ctrl+Enter adds it, `Esc` leaves it. A time is typed as 9:30 or 930, a day as 2026-11-05 or 5.11.2026; the end moves with the start. It goes in a calendar that isn't read only (below), the one you used last.
+- In a narrow window the buttons show as icons, and below about 500 px the month or week shows as a list of its days.
 - A double click on a day in the month opens its week. A recurring event shows at each of its times.
 - The events are kept as `.ics` files in `~/.local/share/calendar`, a folder per account and calendar, and vdirsyncer syncs them. khal reads them, recurring events and all.
 

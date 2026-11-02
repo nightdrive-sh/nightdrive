@@ -9,7 +9,7 @@ AppPanel {
     property var event: null
     signal closed()
     visible: false
-    cardWidth: 520
+    cardWidth: Math.min(520, width - 24)     // a narrow window (#2025): the card fits in it
     spacing: 14
 
     function show(e) { event = e; visible = true; forceActiveFocus() }

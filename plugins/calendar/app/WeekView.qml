@@ -21,6 +21,10 @@ Item {
     readonly property int laneH: laneRows * bar + 8
     readonly property var dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     readonly property int scrollTo: 7       // the hour at the top when the week opens
+    // A narrow window (#2025): a day's name is its letter once "Mon" and the date's circle no longer fit side by side,
+    // and an event too narrow for a word is its colour alone (its title elided to "…" said nothing)
+    readonly property bool shortNames: colW < 72
+    readonly property int wordMin: 28
 
     // A day's timed events with their place: [{ e, top, height, col, cols }]. Greedy columns: each event takes the
     // first column free at its start; a cluster of overlapping ones shares the width by its count of columns.
@@ -54,11 +58,12 @@ Item {
             width: root.colW; height: root.headRow
             TapHandler { onTapped: root.app.pickDay(parent.modelData) }
             Row {
-                anchors.left: parent.left; anchors.leftMargin: 8; anchors.verticalCenter: parent.verticalCenter
+                anchors.left: parent.left; anchors.leftMargin: root.colW < 56 ? 3 : 8; anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.dayNames[index]
+                    visible: root.colW >= 44
+                    text: root.shortNames ? root.dayNames[index][0] : root.dayNames[index]
                     color: index >= 5 ? root.c.faint : root.c.dim
                     font.family: root.c.font; font.pixelSize: 11; font.weight: Font.Medium
                 }
@@ -188,6 +193,7 @@ Item {
                         HoverHandler { id: blockHover; cursorShape: Qt.PointingHandCursor }
                         TapHandler { onTapped: root.app.openEvent(block.modelData.e) }
                         Column {
+                            visible: block.width >= root.wordMin
                             x: 8; y: 3; width: parent.width - 12
                             Text {
                                 textFormat: Text.PlainText

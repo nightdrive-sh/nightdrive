@@ -19,8 +19,9 @@ AppPanel {
     signal added(var event)             // calendar add's JSON: uid, calendar_name, title, start, when, synced…
     signal closed()
     visible: false
-    cardWidth: 600
-    spacing: 14
+    // As wide as the window lets it (#2025: every panel works in a narrow window): 600, or the window less a margin
+    cardWidth: Math.min(600, width - 24)
+    spacing: height < 700 ? 10 : 14     // a low window: less air, so the card fits
 
     // dayText "YYYY-MM-DD"; hour and minute when the event starts at a clicked time
     function open(dayText, hour, minute) {
@@ -134,18 +135,20 @@ AppPanel {
         onAccepted: root.save()
         onEscaped: root.close()
     }
-    // The first day and time, the last day and time: an all-day event hides the times
-    Row {
-        spacing: 24
+    // The first day and time, the last day and time: an all-day event hides the times. A Flow, so in a narrow panel
+    // Ends goes under Starts rather than out of the card
+    Flow {
+        width: parent.width
+        spacing: 14
         Row {
             spacing: 8
-            AppField { id: startDay; c: root.c; width: 140; label: "Starts"; onAccepted: root.save(); onEscaped: root.close() }
-            AppField { id: startTime; c: root.c; width: 76; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
+            AppField { id: startDay; c: root.c; width: 136; label: "Starts"; onAccepted: root.save(); onEscaped: root.close() }
+            AppField { id: startTime; c: root.c; width: 72; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
         }
         Row {
             spacing: 8
-            AppField { id: endDay; c: root.c; width: 140; label: "Ends"; onAccepted: root.save(); onEscaped: root.close() }
-            AppField { id: endTime; c: root.c; width: 76; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
+            AppField { id: endDay; c: root.c; width: 136; label: "Ends"; onAccepted: root.save(); onEscaped: root.close() }
+            AppField { id: endTime; c: root.c; width: 72; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
         }
     }
     // A day or time field: picked whole when the keys come to it, so typing replaces it (9:00 → 1430, not 9:001430);
@@ -206,6 +209,7 @@ AppPanel {
         id: notes
         c: root.c
         width: parent.width
+        boxHeight: root.height < 700 ? 50 : 74     // a low window: the card must fit; the notes scroll with the cursor
         onSave: root.save()
         onEscaped: root.close()
     }

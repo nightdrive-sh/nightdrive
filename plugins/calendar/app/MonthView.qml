@@ -4,7 +4,8 @@ import "Dates.js" as Dates
 
 // The month: six weeks from the Monday on or before the 1st, with week numbers, and as many of each day's events as
 // fit in its cell (all-day ones first, as a coloured bar; then the times). A click on a day picks it, a double click
-// opens its week; a click on an event opens it (EventPanel).
+// opens its week; a click on an event opens it (EventPanel). A narrower window (#2025) keeps them readable: below a
+// width the time goes and the title stays, and "+4 more" becomes "+4"; narrower still, DayList takes the month's place.
 Item {
     id: root
     required property var app           // the window: day, today, now, byDay, pickDay(), openEvent(), showWeek()
@@ -18,6 +19,9 @@ Item {
     readonly property real cellH: (height - headRow) / 6
     readonly property int line: 18          // an event's row in a cell
     readonly property var dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    FontMetrics { id: small; font.family: root.c.font; font.pixelSize: 11 }
+    // A chip's words: the time too only while "16:30 Ainon" fits, else the title alone ("16…" said nothing)
+    readonly property bool withTime: cellW - 8 - 18 >= small.advanceWidth("00:00 Abcd")
 
     // The weekdays' names over the columns
     Repeater {
@@ -109,17 +113,20 @@ Item {
                             width: parent.width - x - 4
                             anchors.verticalCenter: parent.verticalCenter
                             elide: Text.ElideRight
-                            text: (chip.bar ? "" : Dates.time(chip.modelData) + " ") + chip.modelData.title
+                            text: (chip.bar || !root.withTime ? "" : Dates.time(chip.modelData) + " ") + chip.modelData.title
                             color: root.c.text; font.family: root.c.font; font.pixelSize: 11
                         }
                     }
                 }
+                // "+4 more", or "+4" where that doesn't fit: it ran into the next day's cell (#2025)
                 Text {
+                    readonly property string count: "+" + (cell.items.length - cell.shown)
                     visible: cell.items.length > cell.shown
-                    x: 6
+                    x: 6; width: parent.width - 6
                     height: root.line
+                    clip: true
                     verticalAlignment: Text.AlignVCenter
-                    text: "+" + (cell.items.length - cell.shown) + " more"
+                    text: small.advanceWidth(count + " more") <= width ? count + " more" : count
                     color: root.c.faint; font.family: root.c.font; font.pixelSize: 10
                 }
             }

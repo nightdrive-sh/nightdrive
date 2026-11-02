@@ -128,13 +128,6 @@ ShellRoot {
         // ⏎ on a day: its first event
         function openFirst() { const list = byDay[day] || []; if (list.length) openEvent(list[0]) }
 
-        readonly property string heading: {
-            const d = Dates.parse(day)
-            if (view === "month") return Qt.formatDate(d, "MMMM yyyy")
-            const m = Dates.monday(d), s = Dates.addDays(m, 6)
-            return "Week " + Dates.week(m) + "  ·  " + Qt.formatDate(m, m.getMonth() === s.getMonth() ? "d" : "d MMM") + " – " + Qt.formatDate(s, "d MMM yyyy")
-        }
-
         // A sync from the window (⌘R): the command's, which asks for a reload when it's done
         Process { id: syncer; command: [win.command, "sync"]; onExited: code => win.say(code === 0 ? "Synced" : "The sync didn't finish: calendar sync in a terminal says why", false, code !== 0) }
         function sync() { if (!syncer.running) { say("Syncing…", true); syncer.running = true } }
@@ -196,36 +189,13 @@ ShellRoot {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 0
-                // The month's or week's name on the left, the buttons that move about in the middle, and New on the right:
-                // the one that makes something stands apart from them (Jari 2.11.). The middle gives way to a long name
-                Item {
-                    id: header
+                Header {
                     Layout.fillWidth: true
                     Layout.leftMargin: 28; Layout.rightMargin: 18; Layout.topMargin: 16
-                    // As high as the buttons (AppButton's 28), as the row before it was: the name stays level with the
-                    // sidebar's title
+                    // As high as the buttons (AppButton's 28): the name stays level with the sidebar's title
                     Layout.preferredHeight: Math.max(win.headerHeight, 28)
-                    Text {
-                        id: headingText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: win.heading
-                        color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium
-                    }
-                    Row {
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: Math.max((header.width - width) / 2, headingText.implicitWidth + 24)
-                        spacing: 8
-                        AppIconButton { c: win.look; glyph: "chevron-left"; tip: win.view === "month" ? "Previous month" : "Previous week"; keys: "PgUp"; tipAlign: "left"; onClicked: win.page(-1) }
-                        AppButton { c: win.look; label: "Today"; tip: "Go to today"; keys: "t"; tipAlign: "left"; onClicked: win.pickDay(Dates.iso(new Date())) }
-                        AppIconButton { c: win.look; glyph: "chevron-right"; tip: win.view === "month" ? "Next month" : "Next week"; keys: "PgDn"; tipAlign: "left"; onClicked: win.page(1) }
-                        Item { width: 10; height: 1 }
-                        AppButton { c: win.look; label: "Month"; on: win.view === "month"; tip: "The month"; keys: "m"; tipAlign: "left"; onClicked: win.view = "month" }
-                        AppButton { c: win.look; label: "Week"; on: win.view === "week"; tip: "The week"; keys: "w"; tipAlign: "left"; onClicked: win.view = "week" }
-                    }
-                    AppButton {
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        c: win.look; glyph: "plus"; label: "New"; tip: "New event"; keys: "n"; onClicked: win.newEvent(win.day)
-                    }
+                    app: win
+                    c: win.look
                 }
                 Rectangle { Layout.fillWidth: true; Layout.topMargin: 17; Layout.preferredHeight: 1; color: c.divider }
 
@@ -257,17 +227,26 @@ ShellRoot {
                         else return
                         e.accepted = true
                     }
+                    // Narrower than this the grids' cells can't hold a word (#2025): the days as a list instead
+                    readonly property bool listed: width < 500
+                    DayList {
+                        anchors.fill: parent
+                        anchors.margins: 12; anchors.topMargin: 8
+                        visible: keys.listed
+                        app: win
+                        c: win.look
+                    }
                     MonthView {
                         anchors.fill: parent
                         anchors.margins: 12; anchors.topMargin: 4
-                        visible: win.view === "month"
+                        visible: win.view === "month" && !keys.listed
                         app: win
                         c: win.look
                     }
                     WeekView {
                         anchors.fill: parent
                         anchors.margins: 12; anchors.topMargin: 4
-                        visible: win.view === "week"
+                        visible: win.view === "week" && !keys.listed
                         app: win
                         c: win.look
                     }
