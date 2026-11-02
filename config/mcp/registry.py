@@ -368,6 +368,7 @@ class Registry:
         if tool is None:
             raise UnknownTool(name)
         run.check(tool, arguments)
+        run.prepare(tool, arguments)   # a value its command refuses (#1930) is refused before a card asks about it
         tool.said = None   # what a card said is this call's alone (confirm.facts sets it)
         decision, first = self.rules.decide(tool.cls, tool.area, tool.right), None
         if decision == "allow" and tool.spec.get("asks_if"):
@@ -388,8 +389,14 @@ class Registry:
         self.pace.ran(tool)
         undoable = tool.cls == "change" and self.undo is not None
         state = self.undo.before(tool, arguments) if undoable else None  # ToolError: nothing is changed
-        answer = run.run(tool, arguments)
-        if tool.spec.get("mask") and not tool.options.get("secrets"):
+        masked = tool.spec.get("mask") and not tool.options.get("secrets")
+        try:
+            answer = run.run(tool, arguments)
+        except ToolError as e:
+            # A failure's message is the command's stderr (or stdout), up to run.MESSAGE_MAX characters: a mail or a
+            # note it quotes in it is the same text its output would be, so it is masked the same way (#1930)
+            raise ToolError(mask.mask(str(e))) if masked else e
+        if masked:
             answer = mask.answer(answer, tool.spec["mask"])
         if undoable:
             try:

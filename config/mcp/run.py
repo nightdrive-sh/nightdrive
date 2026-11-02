@@ -179,16 +179,32 @@ def given(value):
     return value is not None and value is not False
 
 
-def expand(template, values, group=False):
+def expand(template, values):
     """A command template with the values in place: a whole-element placeholder of a list gives one element per item,
     a nested list (a group) is left out unless all its values are given, and a boolean in a group is the switch
-    itself (its other elements are what it turns on)."""
+    itself (its other elements are what it turns on).
+
+    A value that would begin a word with - is refused unless a -- came before it in the template (#1930), as
+    undo.same_command refuses it in a logged undo: the command would read "--all" or "-rf" as an option it was never
+    given, not as the note, query or entity it is. The template can't say which words are options with a value of
+    their own (`--json {note}` is a switch and then the note), so only a group's [option, {name}] pair is taken as
+    one: the group is there because the value goes with the option, and a value there that looks like an option is
+    the option's (a task's note "- milk"). A list's items are each checked even there: after the first they are
+    positional again."""
+    return _expand(template, values, False, False)[0]
+
+
+def _expand(template, values, group, ended):
+    """expand()'s words for a template or a group, and whether a -- has been passed by its end."""
     out = []
-    for item in template:
+    for i, item in enumerate(template):
         if isinstance(item, list):
             if all(given(values.get(n)) for n in placeholders(item)):
-                out += expand(item, values, group=True)
+                words, ended = _expand(item, values, True, ended)
+                out += words
             continue
+        if item == "--":
+            ended = True
         whole = PLACEHOLDER.fullmatch(item)
         if whole:
             name = whole.group(1)
@@ -197,13 +213,28 @@ def expand(template, values, group=False):
             value = values[name]
             if isinstance(value, bool) and group:
                 continue
-            out += [text(v) for v in value] if isinstance(value, list) else [text(value)]
+            words = [text(v) for v in value] if isinstance(value, list) else [text(value)]
+            option_value = group and not isinstance(value, list) and i > 0 and is_option(template[i - 1])
+            if not ended and not option_value and any(w.startswith("-") for w in words):
+                raise ToolError(dashed(name))
+            out += words
             continue
         for name in placeholders(item):
             if name not in values:
                 raise ToolError(f"needs {name}.")
-        out.append(PLACEHOLDER.sub(lambda m: text(values[m.group(1)]), item))
-    return out
+        word = PLACEHOLDER.sub(lambda m: text(values[m.group(1)]), item)
+        if not ended and word.startswith("-") and not item.startswith("-"):   # "{name}.txt": the value begins it
+            raise ToolError(dashed(PLACEHOLDER.match(item).group(1)))
+        out.append(word)
+    return out, ended
+
+
+def is_option(word):
+    return isinstance(word, str) and word.startswith("-") and word != "--" and not PLACEHOLDER.search(word)
+
+
+def dashed(name):
+    return f"takes no {name} that begins with \"-\": the command would read it as an option."
 
 
 def environment(tool):

@@ -143,14 +143,15 @@ class Answers(unittest.TestCase):
 class Registry(unittest.TestCase):
     """The registry masks a tool's `mask` fields on their way to Claude, unless its area's `secrets` is on."""
 
-    def call(self, area, options=None):
+    OUT = json.dumps({"id": "thread:01", "text": "Your verification code is 482913."})
+
+    def call(self, area, options=None, command=None):
         import tempfile
         import registry
         with tempfile.TemporaryDirectory() as tmp:
-            out = json.dumps({"id": "thread:01", "text": "Your verification code is 482913."})
             tool = {"name": "test_read", "description": "A test.", "class": "read", "area": area,
                     "inputSchema": {"type": "object", "properties": {}}, "mask": ["text"],
-                    "command": ["python3", "-c", f"print({out!r})"]}
+                    "command": command or ["python3", "-c", f"print({self.OUT!r})"]}
             (Path(tmp) / "tools.json").write_text(json.dumps({"tools": [tool]}))
             rules = {"version": 2, "level": "open", "areas": {}, "options": {area: options or {}}}
             (Path(tmp) / "access.json").write_text(json.dumps(rules))
@@ -166,6 +167,27 @@ class Registry(unittest.TestCase):
 
     def test_shown(self):
         self.assertEqual(self.call("mail", {"secrets": True})["text"], "Your verification code is 482913.")
+
+    # A failing command's message is its stderr, or its stdout without one: what it quotes there is masked too (#1930)
+    FAIL_ERR = ["python3", "-c", "import sys; sys.exit('cannot parse: Your verification code is 482913.')"]
+    FAIL_OUT = ["python3", "-c", "print('Your verification code is 482913.'); raise SystemExit(2)"]
+
+    def failure(self, command, options=None):
+        from run import ToolError
+        with self.assertRaises(ToolError) as caught:
+            self.call("mail", options, command)
+        return str(caught.exception)
+
+    def test_error_masked(self):
+        for command in (self.FAIL_ERR, self.FAIL_OUT):
+            with self.subTest(command=command[-1]):
+                message = self.failure(command)
+                self.assertIn("Your verification code is [code hidden].", message)
+                self.assertNotIn("482913", message)
+                self.assertTrue(message.startswith("test_read failed (python3 exited with "), message)
+
+    def test_error_shown_with_secrets(self):
+        self.assertIn("482913", self.failure(self.FAIL_ERR, {"secrets": True}))
 
 
 class Declared(unittest.TestCase):
