@@ -5,6 +5,7 @@ own use (the window, the `notes` command) is as before. A dangling symlink with 
 The window's editor saves through `notes write`: whole, never over a save made elsewhere, never a text cut short (#2012)."""
 
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -113,6 +114,50 @@ class Write(unittest.TestCase):
         self.note.chmod(0o600)
         self.write("x\n")
         self.assertEqual(self.note.stat().st_mode & 0o777, 0o600)
+
+
+class Discard(unittest.TestCase):
+    """A new note the window's editor left empty is deleted, but only while it is as the editor last saw it (#2013)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.notes = Path(self.tmp.name) / "Notes"
+        self.notes.mkdir()
+        self.env = dict(os.environ, NOTES_DIR=str(self.notes))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_notes(self, *args):
+        return subprocess.run([sys.executable, str(HERE / "notes.py"), *args], input=b"", env=self.env,
+                              capture_output=True, timeout=30)
+
+    def created(self):
+        out = self.run_notes("create", "--json", "Idea")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return json.loads(out.stdout)
+
+    def test_create_gives_its_text(self):
+        note = self.created()
+        self.assertEqual(note["text"], (self.notes / "Idea.md").read_text())
+
+    def test_deletes_it_as_left(self):
+        note = self.created()
+        out = self.run_notes("discard", "--json", "--expect", hashlib.md5(note["text"].encode()).hexdigest(), "Idea.md")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(list(self.notes.iterdir()), [])
+
+    def test_keeps_a_save_elsewhere(self):
+        note = self.created()
+        (self.notes / "Idea.md").write_text("# Idea\n\nfrom Apostrophe\n")
+        out = self.run_notes("discard", "--expect", hashlib.md5(note["text"].encode()).hexdigest(), "Idea.md")
+        self.assertEqual(out.returncode, 3)
+        self.assertTrue((self.notes / "Idea.md").exists())
+
+    def test_needs_expect(self):
+        self.created()
+        self.assertEqual(self.run_notes("discard", "Idea.md").returncode, 1)
+        self.assertTrue((self.notes / "Idea.md").exists())
 
 
 if __name__ == "__main__":

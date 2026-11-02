@@ -12,13 +12,17 @@ Item {
     required property QtObject store
     property bool onePane: false
     signal back()
+    signal newNote()                           // New: the window asks for its title (shell.qml)
     signal message(string text, bool danger)   // for the window's toast
     readonly property var note: store.note
     readonly property int margin: width < 520 ? 24 : 40
     readonly property bool editing: editor.open
     readonly property bool busy: editor.busy     // a save still running: quitting waits for it
 
-    function edit() { if (note && !editing) editor.begin(note.id, store.text) }
+    // Not before the note's file has been read: the editor would start from an empty text
+    function edit() { if (note && !editing && store.textId === note.id) editor.begin(note.id, store.text, false) }
+    // A note New has just made (notes create's answer): written in at once, below its heading
+    function editNew(note) { editor.begin(note.id, note.text, true) }
     // Back to reading, saved first. Not with a conflict unsettled: leaving would drop the text that wasn't saved.
     function leave() {
         if (!editing) return true
@@ -70,6 +74,8 @@ Item {
                 spacing: 12
                 Text {
                     id: stateText
+                    width: Math.min(implicitWidth, parent.width)
+                    elide: Text.ElideRight
                     textFormat: Text.PlainText
                     text: !root.note ? "" : root.editing ? editor.status
                         : Qt.formatDateTime(new Date(root.note.modified), "d MMM yyyy  HH:mm")
@@ -78,6 +84,7 @@ Item {
                 }
                 Text {
                     textFormat: Text.PlainText
+                    visible: width > 40      // a path cut to a few letters says nothing
                     width: Math.max(0, parent.width - stateText.width - parent.spacing)
                     elide: Text.ElideMiddle
                     text: root.note ? root.store.folder + "/" + root.note.id : ""
@@ -85,20 +92,26 @@ Item {
                 }
             }
         }
-        // Reading: Edit and Apostrophe. Writing: Done, or with a conflict its two ways out.
+        // Reading: New, Apostrophe and Edit (New also with no note at all). Writing: Done, or with a conflict its two
+        // ways out.
         Row {
             id: editButton
-            visible: !!root.note
             anchors.right: parent.right; anchors.rightMargin: 20; anchors.verticalCenter: parent.verticalCenter
             spacing: 8
             readonly property bool narrow: root.width < 520
-            AppIconButton {
+            AppButton {
                 visible: !root.editing
+                c: root.c; glyph: "plus"; label: editButton.narrow ? "" : "New"
+                tip: "New note"; keys: "n"
+                onClicked: root.newNote()
+            }
+            AppIconButton {
+                visible: !root.editing && !!root.note
                 c: root.c; glyph: "external-link"; tip: "Open in Apostrophe"; keys: "⇧⏎"
                 onClicked: root.store.edit()
             }
             AppButton {
-                visible: !root.editing
+                visible: !root.editing && !!root.note
                 c: root.c; glyph: "pencil"; label: editButton.narrow ? "" : "Edit"; strong: true
                 tip: "Write in it here"; keys: "⏎  e"
                 onClicked: root.edit()
@@ -189,7 +202,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
         text: root.store.error || (root.store.notes.length ? "Pick a note to read it."
-            : "No notes in " + root.store.folder + " yet.\nWrite one in Apostrophe, or ask Claude to.")
+            : "No notes in " + root.store.folder + " yet.\nNew (n) writes one, and Claude can too.")
         font.family: root.c.font; font.pixelSize: 13; color: root.c.faint
     }
 }

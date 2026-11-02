@@ -18,6 +18,7 @@ Item {
     signal conflict(string id, string text)
     signal failed(string id, string message)
     signal setAside(string id, var note)      // keepAside's new note
+    signal discarded(string id, bool gone)    // discard's: false when the note was kept (saved elsewhere meanwhile)
 
     property var pending: null               // the save asked for while one was running: the latest only
     function save(id, text, base) {
@@ -34,11 +35,19 @@ Item {
         start(job)
     }
 
+    // A new note left empty (NoteEditor): deleted, only while the file still has base, the text last read or written
+    function discard(id, base) {
+        const job = { id: id, discard: true, expect: Qt.md5(base) }
+        if (writing) { pending = job; return }
+        start(job)
+    }
+
     function start(job) {
         writing = true
         proc.job = job
         // --md5: notes.py writes only this text, whole; a stdin cut short is refused, not written
-        proc.command = job.aside ? [command, "create", "--json", job.aside]
+        proc.command = job.discard ? [command, "discard", "--json", "--expect", job.expect, job.id]
+            : job.aside ? [command, "create", "--json", job.aside]
             : [command, "write", "--json", "--md5", Qt.md5(job.text)]
                 .concat(job.expect === null ? [] : ["--expect", job.expect], [job.id])
         proc.stdinEnabled = true
@@ -48,14 +57,15 @@ Item {
     Process {
         id: proc
         property var job: null
-        onStarted: { write(job.text); stdinEnabled = false }   // the end of stdin ends the read
+        onStarted: { write(job.text || ""); stdinEnabled = false }   // the end of stdin ends the read
         stdout: StdioCollector { id: out }
         stderr: StdioCollector { id: err }
         onExited: code => {
             const job = proc.job
             let note = null
             if (code === 0) try { note = JSON.parse(out.text) } catch (e) {}
-            if (note && job.aside) root.setAside(job.id, note)
+            if (job.discard) root.discarded(job.id, code === 0)
+            else if (note && job.aside) root.setAside(job.id, note)
             else if (note) root.saved(job.id, job.text, note)
             else if (code === 3) root.conflict(job.id, job.text)
             // notes.py's own words, the last line: the rest is a traceback, if anything
@@ -65,7 +75,7 @@ Item {
             root.writing = false
             if (next) {
                 // The waiting save started from what this one wrote, if this one wrote: its check is against that
-                if (note && !job.aside && next.id === job.id && next.expect) next.expect = note.md5
+                if (note && !job.aside && !job.discard && next.id === job.id && next.expect) next.expect = note.md5
                 root.start(next)
             }
         }

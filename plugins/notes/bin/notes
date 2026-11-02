@@ -55,6 +55,7 @@ usage() {
 Usage: notes [command]
 
   (none), open     open Notes, or bring it forward if it is open
+  new [TITLE]      open Notes on a new note to write in: TITLE's, else it asks for one
   show NOTE        open Notes on NOTE: an id (as list gives it: Shopping.md, Work/Plan.md) or a title
   edit NOTE        open NOTE in Apostrophe
   list             the notes, newest first (--json; --limit N, 50 by default, 0 for all)
@@ -76,10 +77,11 @@ USAGE
 }
 
 case ${1:-open} in
+  new)       open_ready; ipc newNote "${*:2}" ;;
   show)      id=$(python3 "$NOTES_PY" read --json "${*:2}" | jq -r .id) || exit 1; open_ready; ipc pick "$id" ;;
   edit)      edit "${@:2}" ;;
   list|search|read) python3 "$NOTES_PY" "$@" ;;
-  create|append|unappend|write|trash) python3 "$NOTES_PY" "$@"; changed ;;
+  create|append|unappend|write|discard|trash) python3 "$NOTES_PY" "$@"; changed ;;
   restore)   "$APP_DIR/../../bin/nightdrive" files restore "${@:2}"; changed ;;   # trash's undo: back from the trash
   install)   install_app ;;
   uninstall) uninstall_app ;;

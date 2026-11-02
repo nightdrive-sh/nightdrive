@@ -13,6 +13,8 @@ terminal and Claude's tools (mcp.json), and the three changes Claude can make, e
                                                  --expect only while the file is still the text of that MD5, else
                                                  exit status 3: it was saved elsewhere meanwhile; with --md5 only if
                                                  stdin is the text of that MD5, all of it
+    notes.py discard [--json] --expect MD5 NOTE  a new note the window's editor left empty, deleted for good: only
+                                                 while it is still the text of that MD5, else exit status 3
     notes.py trash [--json] NOTE                 to the desktop's trash (`nightdrive files trash`), where Files puts
                                                  it back; nothing is deleted for good
 
@@ -81,7 +83,8 @@ def create(title, text):
             break
         except FileExistsError:
             continue
-    return dict(store.brief(p), path=str(p))
+    # The text too: the window's editor starts from it, and its first save is checked against it (write --expect)
+    return dict(store.brief(p), path=str(p), text=p.read_text(encoding="utf-8"))
 
 
 def append(who, text):
@@ -138,6 +141,19 @@ def unappend(who, before, after):
     with open(p, "r+b") as f:
         f.truncate(before)
     return store.brief(p)
+
+
+def discard(nid, expect):
+    """A new note the window made (New) and left empty, deleted rather than trashed: it was never anything, and
+    leaving it in the folder or the trash is only clutter. By id and only while the file still holds the text the
+    editor last saw, so a save elsewhere meanwhile is kept; never a symlink's target, as create never makes one."""
+    p = store.path_of(nid)
+    if p.is_symlink():
+        raise NoteError(f"{nid} is a link, not a note the window made: it's left as it is.")
+    if digest(p.read_bytes().decode("utf-8", "replace")) != expect:
+        raise Conflict(f"{nid} was saved elsewhere meanwhile, so it's kept.")
+    p.unlink()
+    return {"id": nid, "discarded": True}
 
 
 def trash(who):
@@ -208,6 +224,20 @@ def stdin_text(exact=False):
     return text
 
 
+def hashed(rest):
+    """write's and discard's NOTE and their --expect and --md5 MD5s."""
+    plain = [a for a in rest if a != "--json"]
+    hashes = {}
+    for flag in ("--expect", "--md5"):
+        if flag in plain:
+            i = plain.index(flag)
+            if i + 1 >= len(plain):
+                raise NoteError(f"{flag} takes an MD5 (notes help).")
+            hashes[flag[2:]] = plain[i + 1]
+            del plain[i:i + 2]
+    return " ".join(plain), hashes
+
+
 def main(argv):
     if not argv:
         sys.exit(__doc__)
@@ -235,16 +265,13 @@ def main(argv):
             raise NoteError("Usage: notes unappend NOTE BEFORE AFTER (sizes in bytes, as append --json gives them)")
         output(unappend(who, before, after), as_json, lambda n: f"Took the added text off {n['id']}")
     elif command == "write":
-        plain = [a for a in rest if a != "--json"]
-        hashes = {}
-        for flag in ("--expect", "--md5"):
-            if flag in plain:
-                i = plain.index(flag)
-                if i + 1 >= len(plain):
-                    raise NoteError(f"{flag} takes an MD5 (notes help).")
-                hashes[flag[2:]] = plain[i + 1]
-                del plain[i:i + 2]
-        output(write(" ".join(plain), stdin_text(exact=True), **hashes), as_json, lambda n: f"Wrote {n['id']}")
+        nid, hashes = hashed(rest)
+        output(write(nid, stdin_text(exact=True), **hashes), as_json, lambda n: f"Wrote {n['id']}")
+    elif command == "discard":
+        nid, hashes = hashed(rest)
+        if "expect" not in hashes:
+            raise NoteError("Usage: notes discard --expect MD5 NOTE: only a note still as the window left it goes.")
+        output(discard(nid, hashes["expect"]), as_json, lambda n: f"Deleted {n['id']}")
     elif command == "trash":
         output(trash(arg), as_json, lambda n: f"Moved {n['id']} to the trash")
     else:

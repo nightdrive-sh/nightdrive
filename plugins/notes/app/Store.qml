@@ -15,6 +15,7 @@ Item {
     readonly property int index: notes.findIndex(n => n.id === picked)
     readonly property var note: index >= 0 ? notes[index] : null
     property string text: ""                   // the open note's Markdown, as its file has it now
+    property string textId: ""                 // whose text that is: "" until the picked note's file has been read
     readonly property string root: Quickshell.env("NOTES_DIR") || Quickshell.env("HOME") + "/Notes"   // as lib/store.py's
     // The plugin's own command, by its path: the compositor's PATH may not have ~/.local/bin
     readonly property string command: Quickshell.shellDir + "/../bin/notes"
@@ -23,6 +24,47 @@ Item {
     function refresh() { if (!lister.running) lister.running = true; else again = true }
     property bool again: false
     property string raw: ""                    // the last list's JSON as it came
+    // A note just made (New: notes create's answer, its text included) shows at once, before the list is read again;
+    // drop() takes it out again when it was left empty, back to the note shown before it
+    property string before: ""
+    function add(note) {
+        before = picked
+        notes = [note].concat(notes.filter(n => n.id !== note.id))
+        picked = note.id
+        raw = ""
+        refresh()
+    }
+    function drop(id) {
+        notes = notes.filter(n => n.id !== id)
+        if (picked === id) picked = notes.some(n => n.id === before) ? before : notes.length ? notes[0].id : ""
+        raw = ""
+    }
+
+    // New: `notes create --json TITLE`, its stdin empty; then gets the new note, failed notes.py's words
+    function create(title, then, failed) {
+        if (creator.running) return
+        creator.then = then
+        creator.failed = failed
+        creator.command = [command, "create", "--json", title]
+        creator.running = true
+    }
+    Process {
+        id: creator
+        property var then: null
+        property var failed: null
+        stdinEnabled: true
+        onStarted: stdinEnabled = false             // an empty stdin: the note is its title alone
+        stdout: StdioCollector { id: created }
+        stderr: StdioCollector { id: createErr }
+        onExited: code => {
+            let note = null
+            if (code === 0) try { note = JSON.parse(created.text) } catch (e) {}
+            if (note) { store.add(note); creator.then(note) }
+            else creator.failed(createErr.text.trim().split("\n").pop() || "The note couldn't be made.")
+            stdinEnabled = true
+        }
+    }
+
     function step(d) { const n = notes.length; if (n) picked = notes[Math.max(0, Math.min(n - 1, index + d))].id }
 
     Process {
@@ -30,6 +72,8 @@ Item {
         command: [store.command, "list", "--json", "--limit", "0"]
         stdout: StdioCollector {
             onStreamFinished: {
+                // A read begun before a change here (a note made or dropped) is out of date: the next one is coming
+                if (store.again) return
                 // The same list again (the window's timer) changes nothing, so the rows and their scroll stay
                 if (text === store.raw) return
                 store.raw = text
@@ -55,8 +99,8 @@ Item {
         path: store.note ? store.root + "/" + store.note.id : ""
         watchChanges: true
         printErrors: false
-        onPathChanged: store.text = ""
-        onLoaded: store.text = text()
+        onPathChanged: { store.textId = ""; store.text = "" }
+        onLoaded: { store.text = text(); store.textId = store.picked }
         onFileChanged: { reload(); store.refresh() }   // its title, date and place in the list may change too
     }
 

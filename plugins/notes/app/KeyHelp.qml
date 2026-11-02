@@ -8,6 +8,7 @@ QtObject {
             ["↑ ↓  j k", "Move"],
             ["Home  End", "The newest, the oldest"],
             ["⏎  e", "Write in it"],
+            ["n  ⌘N", "New note: its title, then write"],
             ["⇧⏎", "Open in Apostrophe"],
             ["Space  ⇧Space", "Scroll the note"],
             ["⌘B", "Show or hide the notes"],

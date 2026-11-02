@@ -8,8 +8,15 @@ AppSidebar {
     id: root
     required property QtObject store
     property bool active: false          // the keys move between the notes: the open one has the kit's frame
+    property bool showNew: false         // one pane: the note's header, where New is, doesn't show beside the list
     signal picked(string id)
+    signal newNote()
     title: "Notes"
+    titleItems: AppIconButton {
+        visible: root.showNew
+        c: root.c; glyph: "plus"; tip: "New note"; keys: "n"; tipAlign: "right"
+        onClicked: root.newNote()
+    }
 
     // "14:05" today, "Tue" this week, "28 Oct" this year, else "28 Oct 2025"
     function when(iso) {

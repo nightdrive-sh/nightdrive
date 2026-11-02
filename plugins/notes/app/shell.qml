@@ -40,6 +40,19 @@ ShellRoot {
         function pick(id) { if (!view.leave()) return; store.picked = id; listOpen = false; view.home() }
         function step(d) { if (!view.leave()) return; store.step(d); view.home() }
 
+        // New (n, ⌘N, `notes new [TITLE]`): its title asked for unless given, the note made by notes create and written
+        // in at once. The note being written is left first, saved; one left empty on its own goes then (NoteEditor).
+        function newNote(title) {
+            if (!view.leave()) return
+            if (namePanel.visible) namePanel.answer(false)     // `notes new TITLE` while the title was being asked
+            if (title.trim()) makeNote(title)
+            else namePanel.ask("Title of the new note", "", t => { if (t) win.makeNote(t) })
+        }
+        function makeNote(title) {
+            store.create(title, note => { win.listOpen = false; view.home(); view.editNew(note) },
+                message => toast.show(message, { danger: true }))
+        }
+
         // What was written is saved before Notes goes: the last keys' save, and any still running
         property bool quitting: false
         function quit() { view.flush(true); quitting = true; if (!view.busy) Qt.quit() }
@@ -51,18 +64,24 @@ ShellRoot {
             target: "notes"
             function refresh(): void { store.refresh() }
             function pick(id: string): void { win.pick(id); store.refresh() }
+            function newNote(title: string): void { win.newNote(title) }
         }
 
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: win.quit() }
+        Shortcut { sequences: ["Ctrl+N", "Meta+N"]; enabled: !namePanel.visible; onActivated: win.newNote("") }
 
         RowLayout {
+            id: content
             anchors.fill: parent
             spacing: 0
             AppPointer { c: win.look }      // the pointer hides the keys' frame
 
             NoteList {
+                id: list
                 visible: win.sidebarShown
+                showNew: win.onePane
+                onNewNote: win.newNote("")
                 Layout.preferredWidth: win.onePane ? -1 : 280
                 Layout.fillWidth: win.onePane
                 c: win.look
@@ -83,6 +102,7 @@ ShellRoot {
                 onePane: win.onePane
                 focus: true
                 onBack: if (view.leave()) win.listOpen = true
+                onNewNote: win.newNote("")
                 onMessage: (text, danger) => toast.show(text, { danger: danger })
 
                 Keys.onPressed: e => {
@@ -95,6 +115,7 @@ ShellRoot {
                     else if (k === Qt.Key_Up || k === Qt.Key_K) win.step(-1)
                     else if (k === Qt.Key_Home && store.notes.length) win.pick(store.notes[0].id)
                     else if (k === Qt.Key_End && store.notes.length) win.pick(store.notes[store.notes.length - 1].id)
+                    else if (e.text === "n") win.newNote("")
                     else if (k === Qt.Key_Space) view.scroll((shift ? -1 : 1) * (view.height - 120))
                     else if (k === Qt.Key_PageDown) view.scroll(view.height - 120)
                     else if (k === Qt.Key_PageUp) view.scroll(-(view.height - 120))
@@ -106,6 +127,14 @@ ShellRoot {
                     e.accepted = true
                 }
             }
+        }
+
+        AppPrompt {
+            id: namePanel
+            behind: content
+            c: win.look
+            cardWidth: Math.min(440, win.width - 32)      // a narrow window: the card inside it
+            onClosed: if (!view.editing) view.forceActiveFocus()
         }
 
         KeySheet { id: sheet; c: win.look; groups: keyHelp.groups }
