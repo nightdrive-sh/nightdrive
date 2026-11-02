@@ -391,7 +391,8 @@ nightdrive minimal   # asks once; --keep kate,okular keeps KDE apps you still us
 
 It switches to Nightdrive's login screen, takes a read-only btrfs snapshot of the root and lets dnf remove what nothing
 you keep needs. The kernel, the boot loader and what the system needs to start or repair itself always stay (in a virtual
-machine also its guest agents): if dnf would remove one of them, it stops first. KDE's settings move to `~/.local/share/nightdrive/kde-config-<time>`, and Wi-Fi
+machine also its guest agents): if dnf would remove one of them, it stops first. Common command-line tools (rsync, wget,
+man pages…) stay too, as do a VPN plugin one of your connections uses and cron when it has jobs. KDE's settings move to `~/.local/share/nightdrive/kde-config-<time>`, and Wi-Fi
 networks whose password was in KDE's wallet ask for it again.
 
 The way back is printed at the end and kept in `~/.local/state/nightdrive/minimal-undo.txt`: `sudo dnf history rollback`

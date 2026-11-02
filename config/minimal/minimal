@@ -7,6 +7,7 @@
 #   - Nightdrive's package lists (packages*.txt) and what install.sh's steps add (the boot splash, an NVIDIA driver)
 #   - the installed plugins' packages (plugin.conf's packages=, `nightdrive plugins packages`)
 #   - in a virtual machine, its hypervisor's guest agents (qemu-guest-agent, spice-vdagent…)
+#   - common command-line tools (TOOLS), and what is in use: a VPN plugin a connection needs, cron where it has jobs
 #   - the packages dnf protects, and the ones given with --keep
 #   - yours: user-installed, but not by the system's image (its kiwi transactions in dnf history), not by KDE's groups,
 #     and never in Nightdrive's lists (their git history: one dropped from them goes, and is listed apart)
@@ -29,6 +30,9 @@ STATE=/usr/lib/sysimage/libdnf5
 # Fusion, dnf's copr command (setup-hyprland-repo.sh). And Podman, where it's installed: `nightdrive sandbox` runs in it
 EXTRAS=(plymouth plymouth-plugin-two-step plymouth-theme-spinner ImageMagick jetbrains-mono-fonts akmod-nvidia akmods
         mokutil openssl rpmfusion-free-release rpmfusion-nonfree-release dnf5-plugins podman)
+# Command-line tools a desktop's user expects, though Fedora Minimal doesn't have them: they stay where installed
+# (Jari's call, #1633)
+TOOLS=(rsync wget2-wget bc tree man-pages bind-utils whois traceroute)
 # The boot chain: what of it is installed always stays, and dnf is told to protect it. By pattern, as a kernel's files
 # aren't always in kernel-core (Fedora 44 on aarch64 has none: kernel-uki-dtbloader provides kernel-core-uname-r).
 # On a Mac also Asahi's: the repos its kernel, Mesa and boot chain update from (and the vendor change that lets their
@@ -159,6 +163,32 @@ done
 add "${protected[@]}"
 mapfile -t boot < <(installed "${BOOT[@]}")
 add "${boot[@]}"; protected+=("${boot[@]}")
+add "${TOOLS[@]}"
+
+# --- In use, though the image installed it: removing it would stop something silently (#1633) ---
+inuse=()
+# NetworkManager's VPN plugins a connection uses (vpn.service-type org.freedesktop.NetworkManager.openvpn →
+# NetworkManager-openvpn; a plugin's package brings the VPN program along)
+while read -r n; do
+  t=$(nmcli -g vpn.service-type connection show "$n" 2>/dev/null) || continue
+  p=NetworkManager-${t##*.}; [[ $p == NetworkManager-openswan ]] && p=NetworkManager-libreswan
+  [[ -n ${inst[$p]:-} ]] && inuse+=("$p")
+done < <(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$NF == "vpn" { sub(/:[^:]*$/, ""); print }' || true)
+# cron: a crontab of this user's (others' aren't readable without root), or a job in /etc/cron* that no package owns
+cron_jobs() {
+  crontab -l >/dev/null 2>&1 && return 0
+  [[ -r /var/spool/cron ]] && [[ -n $(ls -A /var/spool/cron 2>/dev/null) ]] && return 0
+  local f
+  for f in /etc/cron.d/* /etc/cron.{hourly,daily,weekly,monthly}/*; do
+    [[ -f $f ]] && ! rpm -qf "$f" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+if [[ -n ${inst[cronie]:-} ]] && cron_jobs; then
+  mapfile -t -O "${#inuse[@]}" inuse < <(installed cronie cronie-anacron crontabs)
+fi
+mapfile -t inuse < <(printf '%s\n' "${inuse[@]}" | sed '/^$/d' | sort -u)
+add "${inuse[@]}"
 
 # --- Yours: user-installed, not by the image, a group or Nightdrive ---
 declare -A notyours ever
@@ -242,6 +272,7 @@ summary() {
   else echo "Yours: none found (installed by you, not by KDE or Nightdrive)"; fi
   echo "Goes: ${#goes[@]} packages, KDE and what only it needed (and a few that only these recommended, found afterwards):"
   fold_list "${goes[@]}"
+  (( ${#inuse[@]} )) && { echo "In use, they stay (a VPN connection's plugin, cron with jobs):"; fold_list "${inuse[@]}"; }
   if (( ${#dropped[@]} )); then
     echo "Among them, once Nightdrive's but no longer in its lists (--keep NAME keeps one):"; fold_list "${dropped[@]}"
   fi
