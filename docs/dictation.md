@@ -14,9 +14,9 @@ Voxtype is installed by hand:
    (the card itself is Nightdrive's, below the top bar; Voxtype's own is turned off).
    - PC: the `linux-x86_64` files, `onnx-avx2` for `voxtype-onnx` (`onnx-avx512` if `grep avx512f /proc/cpuinfo` finds it).
    - Apple Silicon Mac: the `linux-aarch64` files.
-2. Download the model (into `~/.local/share/voxtype/models`). For better accuracy, also download the full one
-   (`--model parakeet-tdt-0.6b-v3`, 2.4 GB): it gets English names and sentence breaks clearly better, about 0.3 s slower
-   for 20 s of speech. The daemon uses it whenever it's there.
+2. Download the model (into `~/.local/share/voxtype/models`). Parakeet picks the language itself and can't be told
+   which: the int8 model keeps short Finnish words in Finnish, the full one (`parakeet-tdt-0.6b-v3`) often writes them
+   in Cyrillic ("testi" → "Тесты."), so the daemon no longer uses it, even when it's installed.
 
 ```sh
 voxtype-onnx setup --download --model parakeet-tdt-0.6b-v3-int8
@@ -63,3 +63,4 @@ is still held; the third line dictates to Ask Claude.)
 - `sudo keyd monitor` shows what a key sends.
 
 Timings for 6 s of speech on the CPU: Parakeet 1.4 s, Whisper small 4.3 s, medium 13.7 s, large-v3-turbo 24 s.
+Whisper with `language = ["fi", "en"]` gets Finnish right but takes 48 s for a 3 s word on an M2 Max's CPU.

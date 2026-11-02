@@ -1,16 +1,12 @@
 #!/bin/bash
 # dictate <start|stop>: F5 (speech to text). If the mic is muted, don't start recording; show a "MIC MUTED" toast instead.
-# dictate daemon: started at login (hyprland.lua) with the best Parakeet model that is installed.
+# dictate daemon: started at login (hyprland.lua) with config.toml's Parakeet model (int8).
 # dictate <fn-down|fn-up>: Fn held. Starts only after 0.3 s so that Fn combos (Fn+arrows, Fn+Backspace …) don't trigger dictation.
 # dictate claude-start, claude-fn-down: ⌘⇧ + the key (Dashboard #1908): the text goes to Ask Claude's toast, which
 #   grows out of the dictation's (quickshell/AskClaudeToast.qml, #1895), instead of being typed, to check and send with
 #   Enter (a terminal's Claude Code when its tools aren't set up). Any release of the key stops it (stop, fn-up).
 vt="$HOME/.local/bin/voxtype-onnx"
 run=${XDG_RUNTIME_DIR:-/run/user/$UID}
-models="$HOME/.local/share/voxtype/models"
-# The full model gets English names and sentence breaks clearly better than int8 (0.3 s slower), but it's an extra
-# 2.4 GB download (docs/dictation.md), so config.toml keeps int8 and this picks the full one when it's there.
-FULL_MODEL=parakeet-tdt-0.6b-v3
 # Your own cleanup of the text before it's typed (not in the repo, docs/dictation.md): text in on stdin, out on stdout
 POST_PROCESS="$HOME/.config/voxtype/post-process"
 scripts=$(dirname "$(readlink -f "$0")")
@@ -24,12 +20,12 @@ case $1 in
       parent=$(ps -o ppid= -p "$p" | tr -d ' ')
       [[ $(ps -o comm= -p "${parent:-1}") == voxtype* ]] || kill "$p"
     done
-    # Both go into a copy of the config: the daemon ignores --model, and Voxtype's config has no include
-    conf="$HOME/.config/voxtype/config.toml"
-    if [[ -d $models/$FULL_MODEL || -x $POST_PROCESS ]]; then
-      {
-        if [[ -d $models/$FULL_MODEL ]]; then sed "s/^model = \"$FULL_MODEL-int8\"/model = \"$FULL_MODEL\"/" "$conf"; else cat "$conf"; fi
-        if [[ -x $POST_PROCESS ]]; then printf '\n[output.post_process]\ncommand = "%s"\ntimeout_ms = 2000\n' "$POST_PROCESS"; fi
+    # The full Parakeet model is no longer picked when it's installed (#1946): it gets English names a little better,
+    # but writes short Finnish words in Cyrillic ("testi" → "Тесты.", 5 of 8 short words in a test), int8 none.
+    # The post-process goes into a copy of the config: Voxtype's config has no include
+    if [[ -x $POST_PROCESS ]]; then
+      { cat "$HOME/.config/voxtype/config.toml"
+        printf '\n[output.post_process]\ncommand = "%s"\ntimeout_ms = 2000\n' "$POST_PROCESS"
       } > "$run/voxtype-config.toml"
       exec "$vt" -c "$run/voxtype-config.toml" daemon
     fi
