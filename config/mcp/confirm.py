@@ -27,7 +27,6 @@ How it talks to the card:
 import hashlib
 import json
 import os
-import re
 import secrets
 import shutil
 import subprocess
@@ -35,12 +34,12 @@ import sys
 import tempfile
 import threading
 import time
-import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import areas  # noqa: E402  (after the path above)
+import invisible  # noqa: E402
 import run  # noqa: E402
 from run import ToolError  # noqa: E402
 
@@ -56,40 +55,16 @@ LONG = 80            # characters: a longer value, or one with a newline, gets a
 # (a mail sent twice, #1865). Cleared as each call starts.
 CANCELLED = threading.Event()
 
-# What could make the text on the card read differently from what runs is shown as ⟨U+202E⟩ instead: control
-# characters, the line and paragraph separators Qt breaks a line at, which would split one value into two (#1887),
-# every format character (category Cf: bidi marks, zero-width spaces, the soft hyphen, invisible operators, the tag
-# letters of "ASCII smuggling"), the same set mask.visible() takes out of Claude's copy (#1861), and whatever else
-# Unicode lets a font draw as nothing (Default_Ignorable_Code_Point: variation selectors, the combining grapheme
-# joiner, Hangul fillers, unassigned tags), which isn't all Cf. Otherwise Allow would send text the user never saw
-# (#1922). mask.visible() itself doesn't fit: it drops them and rewrites digits, and the card must show them.
-IGNORABLE = re.compile(r"[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f\u202a-\u202e"
-                       r"\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0\ufff0-\ufff8\U0001bca0-\U0001bca3"
-                       r"\U0001d173-\U0001d17a\U000e0000-\U000e0fff]")
-JOINERS = "\u200c\u200d"      # ZWNJ/ZWJ between two letters of another script stay, as in mask: emoji, Persian, Indic
-PRESENTATION = "\ufe0e\ufe0f"  # text or emoji style: one after a symbol (a heart) or in a keycap (1 FE0F 20E3) stays
-
-
-def hidden(text, i):
-    """Whether text[i] is spelled out on the card."""
-    c = text[i]
-    if c in "\t\n":
-        return False
-    before, after = text[i - 1] if i else "a", text[i + 1:i + 2] or "a"
-    if c in JOINERS:
-        return before.isascii() or after.isascii()
-    if c in PRESENTATION:
-        # Only one, and only after a character it can style, so a run of them carries nothing: a keycap's digit, or a
-        # letter, number or symbol outside ASCII (an emoji). Not after a mark, a space or another selector.
-        keycap = before in "0123456789#*" and after == "\u20e3"
-        return not (keycap or (not before.isascii() and unicodedata.category(before)[0] in "LNPS"))
-    return unicodedata.category(c) in ("Cc", "Cf", "Zl", "Zp") or bool(IGNORABLE.match(c))
+# What could make the text on the card read differently from what runs is shown as ⟨U+202E⟩ instead: every character
+# invisible.py counts as unseen (controls, line separators, format characters, Unicode's default-ignorables), the same
+# set mask.py takes out of Claude's copy. Otherwise Allow would send text the user never saw (#1887, #1922).
+# mask.visible() itself doesn't fit: it drops them and rewrites digits, and the card must show them.
 
 
 def visible(text):
     """A string as the card may show it: line ends as \\n, and what hides or reorders text spelled out."""
     text = text.replace("\r\n", "\n")
-    return "".join(f"⟨U+{ord(c):04X}⟩" if hidden(text, i) else c for i, c in enumerate(text))
+    return "".join(f"⟨U+{ord(c):04X}⟩" if invisible.hidden(text, i) else c for i, c in enumerate(text))
 
 
 def label(name, prop):

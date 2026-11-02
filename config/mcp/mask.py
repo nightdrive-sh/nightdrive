@@ -23,10 +23,12 @@ choice `secrets` on in Access (areas.py). `python3 mask.py` masks stdin, for try
 """
 
 import bisect
+import importlib.util
 import json
 import re
 import sys
 import unicodedata
+from pathlib import Path
 from urllib.parse import unquote
 
 CODE = "[code hidden]"
@@ -378,27 +380,64 @@ def lone_passwords(text, found):
 # --- Invisible characters -------------------------------------------------------------------------------------------
 # A model reads 482913 in "48<zero-width space>29<zero-width space>13" and in keycap emoji digits, but no rule above
 # would see a number there, and an injection can ask a sender to write a code so (Dashboard #1861). So before the
-# rules: format characters (zero-width spaces, soft hyphens, direction marks, the invisible tag letters of "ASCII
-# smuggling") go, marks on a digit go, digits of other forms (fullwidth, superscript, circled, mathematical)
-# become 0-9, and spaces of other widths a space. Only Claude's copy changes. A zero-width joiner or non-joiner between two letters of another script
-# stays: emoji families and Persian or Indic words need it.
-JOINERS = "\u200c\u200d"
-DIGIT_MARK = re.compile(r"(?<=[0-9])[\u0300-\u036f\u20d0-\u20ff\ufe00-\ufe0f]+")   # 4 + FE0F + 20E3, a keycap
+# rules: digits of other forms (fullwidth, superscript, circled, mathematical) become 0-9 and spaces of other widths a
+# space, then every character the confirmation card spells out goes (invisible.py: format characters, controls,
+# Hangul fillers and the rest of Unicode's default-ignorables, #1932), and marks on a digit go. Only Claude's copy
+# changes. A line break of another kind (U+2028, a lone CR) becomes a line feed, so two lines don't run together; a
+# CR before a line feed stays. Emoji, keycaps and the joiners of Persian or Indic words read as before.
+
+
+def _sibling(name):
+    """A module beside this one, loaded by its path: Mail loads mask.py so (plugins/mail/lib/unseen.py), and its
+    sys.path doesn't have this folder."""
+    spec = importlib.util.spec_from_file_location("nightdrive_" + name, Path(__file__).resolve().with_name(name + ".py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+invisible = _sibling("invisible")
+LINE_BREAKS = "\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029"
+# Joiners and style selectors, the ones that stay or go by their neighbours
+NEIGHBOURLY = re.compile("[" + invisible.NEIGHBOURLY + "]+")
+# 4 + FE0F + 20E3 (a keycap), and a joiner after a digit with whatever marks follow
+DIGIT_MARK = re.compile("(?<=[0-9])[\u0300-\u036f\u20d0-\u20ff\ufe00-\ufe0f" + invisible.JOINERS + "]+")
+
+
+def plain(text, i):
+    c = text[i]
+    if invisible.always(c):
+        if c == "\r" and text[i + 1:i + 2] == "\n":
+            return c   # a CRLF line end stays as it was
+        return "\n" if c in LINE_BREAKS else ""
+    if not c.isascii() and unicodedata.digit(c, None) is not None:
+        return str(unicodedata.digit(c))
+    if c != " " and unicodedata.category(c) == "Zs":
+        return " "   # a thin or no-break space between digits is a space: "482 913" (U+2009) is a code (#1884)
+    return c
+
+
+def neighbourly(text, m):
+    """A run of joiners and style selectors, less those out of place. A joiner is judged by the characters around the
+    whole run, not by its neighbour in it: 4 ZWJ ZWJ 8 is no more a word's than 4 ZWJ 8, nor 4 ZWJ <filler> ZWJ 8
+    once plain() has taken the filler out."""
+    before, after = text[m.start() - 1:m.start()] or "a", text[m.end():m.end() + 1] or "a"
+    run = m.group(0)
+    kept = []
+    for i, c in enumerate(run, 1):
+        if c in invisible.JOINERS:
+            gone = invisible.hidden(before + c + after, 1)
+        else:
+            gone = invisible.hidden(before + run + after, i)   # a selector by its own neighbours
+        if not gone:
+            kept.append(c)
+    return "".join(kept)
 
 
 def visible(text):
-    out = []
-    for i, c in enumerate(text):
-        if unicodedata.category(c) == "Cf":
-            if c in JOINERS and 0 < i < len(text) - 1 and not text[i - 1].isascii() and not text[i + 1].isascii():
-                out.append(c)
-            continue
-        if not c.isascii() and unicodedata.digit(c, None) is not None:
-            c = str(unicodedata.digit(c))
-        elif c != " " and unicodedata.category(c) == "Zs":
-            c = " "   # a thin or no-break space between digits is a space: "482 913" (U+2009) is a code (#1884)
-        out.append(c)
-    return DIGIT_MARK.sub("", "".join(out))
+    text = "".join(plain(text, i) for i in range(len(text)))
+    text = NEIGHBOURLY.sub(lambda m: neighbourly(text, m), text)
+    return DIGIT_MARK.sub("", text)
 
 
 # --- All together ---------------------------------------------------------------------------------------------------

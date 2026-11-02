@@ -48,6 +48,54 @@ class Samples(unittest.TestCase):
         self.assertEqual(mask.mask(text), "\U000f0000 •••• 4242")
 
 
+class Invisible(unittest.TestCase):
+    """visible() takes out what the confirmation card spells out, from the same definition (invisible.py, #1932)."""
+
+    def unseen(self):
+        """Every character invisible.py counts as unseen wherever it stands, with the card's own set beside it."""
+        import confirm
+        for n in range(0x110000):
+            c = chr(n)
+            if 0xD800 <= n < 0xE000 or not mask.invisible.always(c):
+                continue
+            yield c, confirm.visible("4" + c + "8")
+
+    def test_card_and_mask_agree(self):
+        """A code with any of them inside is a code, and the card shows each one: neither has a set of its own."""
+        unseen = list(self.unseen())
+        self.assertGreater(len(unseen), 4000)   # the tags alone are 4096
+        for c, card in unseen:
+            with self.subTest(c=f"U+{ord(c):04X}"):
+                self.assertEqual(card, f"4⟨U+{ord(c):04X}⟩8")
+                self.assertEqual(mask.mask(f"Your code is 48{c}2913"),
+                                 "Your code is 48\n[code hidden]" if c in mask.LINE_BREAKS else
+                                 "Your code is [code hidden]")
+
+    def test_line_breaks(self):
+        """A line break of another kind is a line feed, so lines don't run together; a CRLF stays."""
+        self.assertEqual(mask.visible("one two three\r\nfour\rfive\x0csix\x85seven"),
+                         "one\ntwo\nthree\r\nfour\nfive\nsix\nseven")
+
+    def test_emoji_read_as_before(self):
+        """Emoji, keycaps and the joiners words need come through as they did before #1932."""
+        same = ["❤️ Kiitos!", "\U0001f468‍❤️‍\U0001f468", "☺︎", "\U0001f1eb\U0001f1ee",
+                "\U0001f3f3️‍\U0001f308", "\U0001f44d\U0001f3fd", "\U0001f9d1‍\U0001f4bb", "#️⃣ *️⃣",
+                "‼️ ™️ ©️", "می‌خواهم", "क्‍ष", "한국어 ㄱ", "Hei\n\tmaailma\r\nrivi"]
+        for text in same:
+            with self.subTest(text=ascii(text)):
+                self.assertEqual(mask.visible(text), text)
+        self.assertEqual(mask.visible("Room 1️⃣2️⃣, 3️⃣"), "Room 12, 3")   # a keycap is its digit
+        # A subdivision flag's tags are tag letters, gone as before: the black flag stays
+        self.assertEqual(mask.visible("\U0001f3f4\U000e0067\U000e0062\U000e0073\U000e0063\U000e0074\U000e007f"),
+                         "\U0001f3f4")
+
+    def test_joiner_runs(self):
+        """A joiner stays only between characters outside ASCII, judged around the whole run of them: what was
+        taken out can't leave one between two digits."""
+        self.assertEqual(mask.visible("48‍‍‍29ㅤ‍ㅤ13"), "482913")
+        self.assertEqual(mask.visible("ä‍‍ö"), "ä‍‍ö")
+
+
 class Answers(unittest.TestCase):
     def thread(self):
         return {"id": "thread:0000000000000005", "subject": "Your code 482913",
