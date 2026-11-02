@@ -160,14 +160,9 @@ Item {
     Timer { id: disarmTimer; interval: 4000; onTriggered: if (s.launcher) s.launcher.armed = "" }
 
     // ⌘C (Hyprland sends Ctrl+Insert) or Enter on a row with a `copy` value: the row says "copied" for a moment.
-    // sensitive (a password, the row's `sensitive`): not in the clipboard history (cliphist), and cleared after 45 s
-    function copyText(v, sensitive) {
-        sel()
-        if (sensitive) Quickshell.execDetached(["bash", "-c", 'printf %s "$1" | wl-copy --sensitive; sleep 45; [ "$(wl-paste -n 2>/dev/null)" = "$1" ] && wl-copy --clear', "_", v])
-        else Quickshell.execDetached(["wl-copy", v])
-        copied = v
-        copiedTimer.restart()
-    }
+    // sensitive (a password, the row's `sensitive`): not in the clipboard history (cliphist), and cleared after 45 s.
+    // ClipCopy gives it to wl-copy on stdin: a command line is readable by every user in /proc (#1947)
+    function copyText(v, sensitive) { sel(); clip.copy(v, sensitive); copied = v; copiedTimer.restart() }
     // Values that change every second are bound in the row (the launcher asks with the row's `live` key), not baked into
     // the rows: rebuilding the rows every second made the list jump while moving in it
     function liveText(key) {
@@ -368,7 +363,8 @@ Item {
     }
     Sh {
         id: connectProc
-        script: 'if [ -n "$PW" ]; then nmcli --wait 20 device wifi connect "$SSID" password "$PW"; else nmcli --wait 20 device wifi connect "$SSID"; fi'
+        script: 'if [ -n "$PW" ]; then printf "%s\\n" "$PW" | nmcli --ask --wait 20 device wifi connect "$SSID" >/dev/null; else nmcli --wait 20 device wifi connect "$SSID"; fi'
+        // ^ The password on nmcli's stdin (--ask), not in its arguments (as WifiMenu, #1740); the prompt on stdout dropped
         onResult: text => {
             s.sel()
             s.connecting = ""
@@ -690,6 +686,7 @@ done; true'
     property string tsMessage: ""
     property string copied: ""
     Timer { id: copiedTimer; interval: 1500; onTriggered: { s.sel(); s.copied = "" } }
+    ClipCopy { id: clip }
     function tsRows() {
         const r = [{ kind: "systoggle", key: "tailscale", name: "Tailscale", glyph: tsRunning ? "shield-check" : "shield-off", switchOn: tsRunning }]
         if (tsNeedsLogin && !tsRunning)
