@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """What counts as a note for Claude (#1864): `python3 plugins/notes/lib/store_test.py`. A hard link in ~/Notes is the
 file it shares with another name, which may be ~/.ssh/id_ed25519: Claude's tools don't list, search or read it. Your
-own use (the window, the `notes` command) is as before."""
+own use (the window, the `notes` command) is as before. A dangling symlink with a new note's name isn't followed (#1930)."""
 
 import os
 import subprocess
@@ -46,6 +46,25 @@ class HardLink(unittest.TestCase):
 
     def test_your_own_use(self):
         self.assertIn("key.md", self.notes_cmd("list", "--json", claude=False).stdout)
+
+
+class DanglingLink(unittest.TestCase):
+    """A new note's name taken by a symlink to a file not there yet: create writes beside it, not through it."""
+
+    def test_create_doesnt_follow_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            notes = home / "Notes"
+            notes.mkdir()
+            target = home / ".bashrc"
+            (notes / "Plan.md").symlink_to(target)
+            env = dict(os.environ, NOTES_DIR=str(notes))
+            out = subprocess.run([sys.executable, str(HERE / "notes.py"), "create", "Plan"], input="echo hi\n",
+                                 env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertFalse(target.exists())
+            self.assertTrue((notes / "Plan.md").is_symlink())
+            self.assertEqual((notes / "Plan 2.md").read_text(), "# Plan\n\necho hi\n")
 
 
 if __name__ == "__main__":

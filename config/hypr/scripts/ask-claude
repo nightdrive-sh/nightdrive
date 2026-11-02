@@ -139,9 +139,11 @@ fi
 rm -rf "$run"; trap - EXIT
 
 # The answer, waited on in the background so this returns: a click or Open in terminal goes on in a terminal, where
-# Claude Code has its usual tools and asks as usual. A session cut short by the limit can be continued too.
+# Claude Code has its usual tools. In manual mode, whatever the user's settings start in: the transcript holds what the
+# tools read (a mail, a note), untrusted text, so every tool asks first until the user changes the mode (#1930). A
+# session cut short by the limit can be continued too.
 term="$HOME/.config/hypr/scripts/terminal"   # the terminal chosen in Default apps
 setsid -f bash -c '
   action=$(timeout "$1" notify-send -a Claude -i "$2" -A default="Open in terminal" -A open="Open in terminal" -w -- "$3" "$4")
-  [[ $action == default || $action == open ]] && exec "$5" --dir "$6" -- "$7" --resume "$8"
+  [[ $action == default || $action == open ]] && exec "$5" --dir "$6" -- "$7" --resume "$8" --permission-mode manual
 ' _ "$OPEN_WAIT" "$icon" "$title" "$body" "$term" "$dir" "$claude_bin" "$id" >/dev/null 2>&1 </dev/null

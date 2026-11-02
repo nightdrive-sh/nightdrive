@@ -7,7 +7,7 @@
 #   nightdrive sandbox shot [NAME] screenshot -> prints the path of NAME.png
 #   nightdrive sandbox ipc ARGS…   qs ipc call ARGS… (or `ipc show`)
 #   nightdrive sandbox exec CMD…   a command in the session (hyprctl, qs, …); `shell` for an interactive one
-#   nightdrive sandbox vnc [stop]  wayvnc on the tailnet address only, prints it; the display drops to the VNC size
+#   nightdrive sandbox vnc [stop]  wayvnc on the tailnet address only, prints it and the password; the display drops to the VNC size
 #   nightdrive sandbox down        removes the container
 #   nightdrive sandbox build       rebuilds the image (up does it when the Containerfile or the package lists change)
 # check, shot, ipc and exec start the sandbox first if it isn't up. The repo is mounted read-only: an edit in it reloads
@@ -127,9 +127,10 @@ vnc() {
   [[ -n $addr ]] || die "VNC is published only on the tailnet address, and there was none when the sandbox started
 (tailscale ip -4). Bring Tailscale up, then nightdrive sandbox up again."
   set_mode "$VNC_MODE" "$VNC_SCALE"
-  in_box vnc start || die "wayvnc didn't start (log in the container: /tmp/wayvnc.log)"
+  local auth; auth=$(in_box vnc start) || die "wayvnc didn't start (log in the container: /tmp/wayvnc.log)"
   local zone; zone=$(firewall-cmd --get-zone-of-interface=tailscale0 2>/dev/null)
-  echo "VNC: $addr ($VNC_MODE, no password: only the tailnet reaches it). Stop: nightdrive sandbox vnc stop"
+  echo "VNC: $addr ($VNC_MODE), user nd, ${auth:-password: see ~/.config/wayvnc/config in the container}. Stop: nightdrive sandbox vnc stop"
+  echo "The password needs a viewer with RSA-AES (TigerVNC 1.13 or later)."
   echo "If a viewer can't connect, the host's firewall must let $VNC_PORT/tcp in from the tailnet, e.g. (firewalld):"
   echo "  sudo firewall-cmd --permanent --zone=${zone:-<the zone of tailscale0>} --add-port=$VNC_PORT/tcp && sudo firewall-cmd --reload"
   echo "The size is fixed: a viewer's \"SetDesktopSize failed\" is harmless (TigerVNC: turn off \"Resize remote session\")."

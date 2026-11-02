@@ -132,7 +132,9 @@ def new_path(title):
     # and its undo can't trash (#1863)
     name = re.sub(r"^[\s.]+", "", re.sub(r"\s+", " ", name))[:NAME_MAX].strip() or "Note"
     path, n = ROOT / f"{name}{SUFFIX}", 2
-    while path.exists():
+    # lexists, not exists: a dangling symlink there is taken too, so writing the new note can't follow it out of the
+    # folder (create() opens with "x" as well, which refuses any name that is there by then)
+    while os.path.lexists(path):
         path, n = ROOT / f"{name} {n}{SUFFIX}", n + 1
     return path
 

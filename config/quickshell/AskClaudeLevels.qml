@@ -68,8 +68,11 @@ Item {
         }
         if (session.busy) session.stop()
         const home = Quickshell.env("HOME")
+        // Manual mode: the conversation holds what the tools read (a mail, a note), so every tool asks first there,
+        // whatever mode the user's settings start in (#1930). "--" before the draft: one starting with "-" isn't an option
         Quickshell.execDetached([scripts + "/terminal", "--dir", home + "/Projects", "--", home + "/.local/bin/claude",
-                                 "--resume", session.sessionId].concat(q !== "" ? [q] : []))
+                                 "--resume", session.sessionId, "--permission-mode", "manual"]
+                                .concat(q !== "" ? ["--", q] : []))
     }
 
     // An answer while the toast is closed: the row says so (the toast's small card does too, for a while)

@@ -83,6 +83,23 @@ Item {
         }
     }
 
+    // The address a hovered link goes to, as a browser shows it: a link's text can name another address than its own
+    // (a note Claude wrote, or one from the web), and this is the one a click opens (#1930)
+    Rectangle {
+        visible: page.hoveredLink !== ""
+        anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 8
+        width: Math.min(linkText.implicitWidth + 20, parent.width - 16); height: linkText.implicitHeight + 10
+        radius: 6; color: root.c.solid; border.width: 1; border.color: root.c.divider
+        Text {
+            id: linkText
+            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+            verticalAlignment: Text.AlignVCenter; elide: Text.ElideMiddle
+            textFormat: Text.PlainText
+            text: page.hoveredLink
+            font.family: root.c.font; font.pixelSize: 11; color: root.c.dim
+        }
+    }
+
     Text {
         visible: root.store.loaded && !root.note
         anchors.centerIn: parent

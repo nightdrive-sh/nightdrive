@@ -59,9 +59,16 @@ def create(title, text):
     if not title:
         raise NoteError("A new note needs a title.")
     store.ROOT.mkdir(parents=True, exist_ok=True)
-    p = store.new_path(title)
     body = text.strip("\n")
-    p.write_text(f"# {title}\n" + (f"\n{body}\n" if body else ""), encoding="utf-8")
+    # "x": never onto a file or link that is already there, one made after new_path looked included (then the next name)
+    while True:
+        p = store.new_path(title)
+        try:
+            with open(p, "x", encoding="utf-8") as f:
+                f.write(f"# {title}\n" + (f"\n{body}\n" if body else ""))
+            break
+        except FileExistsError:
+            continue
     return dict(store.brief(p), path=str(p))
 
 

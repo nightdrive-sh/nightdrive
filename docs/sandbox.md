@@ -38,8 +38,9 @@ The display sizes are constants at the top of `config/sandbox/sandbox`. Screensh
 MacBook Pro 14"). `vnc` drops it to 1512x982 at scale 1, the same UI size with a quarter of the pixels, which a viewer over
 the tailnet keeps up with; `vnc stop` sets it back.
 
-VNC is published only on the host's tailnet address (`tailscale ip -4`, read when the sandbox starts) on port 5901, with no
-password: the tailnet is the boundary. The host's firewall must let 5901/tcp in from the tailnet; `vnc` prints the
+VNC is published only on the host's tailnet address (`tailscale ip -4`, read when the sandbox starts) on port 5901, with
+user `nd` and a password that `vnc` prints (new with each `up`). It is encrypted with RSA-AES, which the viewer must support:
+TigerVNC 1.13 or later does. The host's firewall must let 5901/tcp in from the tailnet; `vnc` prints the
 firewalld command. The size is fixed: a viewer's "SetDesktopSize failed" is harmless (TigerVNC: turn off "Resize remote
 session").
 

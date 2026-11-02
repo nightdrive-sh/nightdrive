@@ -5,7 +5,8 @@
 #   inside check          Hyprland --verify-config, hyprctl configerrors, Quickshell's errors since its last (re)load,
 #                         nightdrive plugin check
 #   inside shot FILE      grim of Hyprland's output
-#   inside vnc start|stop wayvnc on the container's port 5900 (the host publishes it on the tailnet address only)
+#   inside vnc start|stop wayvnc on the container's port 5900 (the host publishes it on the tailnet address only), with
+#                         user nd and a password (RSA-AES), which start prints
 #   inside exec CMD…      a command with the session's environment (hyprctl, qs, …)
 set -u
 export XDG_RUNTIME_DIR=/tmp/xdg
@@ -76,6 +77,16 @@ check() {
   exit $fail
 }
 
+VNC_DIR=$HOME/.config/wayvnc
+vnc_auth() {
+  [[ -s $VNC_DIR/config ]] && return
+  mkdir -p "$VNC_DIR"; chmod 700 "$VNC_DIR"
+  [[ -s $VNC_DIR/rsa_key.pem ]] || ssh-keygen -q -m pem -t rsa -b 3072 -N "" -f "$VNC_DIR/rsa_key.pem" >/dev/null
+  local pw; pw=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)
+  ( umask 077; printf '%s\n' enable_auth=true username=nd "password=$pw" "rsa_private_key_file=$VNC_DIR/rsa_key.pem" \
+      >"$VNC_DIR/config" )
+}
+
 case ${1:-} in
   start) start "$2" "$3" ;;
   check) check ;;
@@ -83,7 +94,11 @@ case ${1:-} in
   vnc) case ${2:-start} in
          # -r: the cursor drawn into the image (Remmina showed none without it, and it doesn't depend on the cursor capture
          # that Hyprland fails on shape changes)
-         start) pgrep -x wayvnc >/dev/null || setsid -f wayvnc -r -o "$OUTPUT" 0.0.0.0 5900 >/tmp/wayvnc.log 2>&1 ;;
+         # A password, with RSA-AES (wayvnc takes one only with encryption): made once per container, printed on each
+         # start for the host to show. The tailnet alone let anyone on it in, a shared node or device included (#1930)
+         start) vnc_auth
+                pgrep -x wayvnc >/dev/null || setsid -f wayvnc -C "$VNC_DIR/config" -r -o "$OUTPUT" 0.0.0.0 5900 >/tmp/wayvnc.log 2>&1
+                echo "password: $(sed -n 's/^password=//p' "$VNC_DIR/config")" ;;
          stop) pkill -x wayvnc; true ;;
        esac ;;
   exec) shift; exec "$@" ;;

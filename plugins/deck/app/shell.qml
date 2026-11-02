@@ -1037,7 +1037,7 @@ ShellRoot {
                                         id: titleText
                                         width: Math.min(implicitWidth, parent.width - (dot.visible ? dot.implicitWidth + 8 : 0) - (star.visible ? star.implicitWidth + 8 : 0) - (byText.visible ? Math.min(byText.implicitWidth, parent.width / 3) : 0))
                                         elide: Text.ElideRight
-                                        text: r.modelData.title
+                                        text: r.modelData.title; textFormat: Text.PlainText
                                         font.family: c.font; font.pixelSize: 13
                                         color: r.now ? c.accent : c.title
                                     }
@@ -1048,7 +1048,7 @@ ShellRoot {
                                         anchors.baseline: titleText.baseline
                                         width: Math.min(implicitWidth, parent.width - titleText.width - parent.spacing)
                                         elide: Text.ElideRight
-                                        text: "– " + (r.modelData.by || "")
+                                        text: "– " + (r.modelData.by || ""); textFormat: Text.PlainText
                                         font.family: c.font; font.pixelSize: 12; color: c.dim
                                     }
                                     // On your shelf: the shelf's icon, as the player's button by the playing album
@@ -1072,7 +1072,7 @@ ShellRoot {
                                     visible: !!r.modelData.sub
                                     bottomPadding: r.modelData.note ? 5 : 0     // a little air before the reason
                                     width: parent.width; elide: Text.ElideRight
-                                    text: r.modelData.sub || ""
+                                    text: r.modelData.sub || ""; textFormat: Text.PlainText
                                     font.family: c.font; font.pixelSize: 12; color: c.dim
                                 }
                                 Text {
@@ -1082,7 +1082,7 @@ ShellRoot {
                                     wrapMode: Text.WordWrap
                                     maximumLineCount: r.current ? 6 : 2
                                     elide: Text.ElideRight
-                                    text: r.modelData.note || ""
+                                    text: r.modelData.note || ""; textFormat: Text.PlainText
                                     font.family: c.font; font.pixelSize: 11; color: c.faint; lineHeight: 1.2
                                 }
                             }
@@ -1093,7 +1093,7 @@ ShellRoot {
                                 anchors.right: parent.right; anchors.rightMargin: 16
                                 anchors.verticalCenter: parent.verticalCenter
                                 readonly property bool note: r.modelData.kind === "nowplaying"
-                                text: note ? Icons.g("music") : r.modelData.right || ""
+                                text: note ? Icons.g("music") : r.modelData.right || ""; textFormat: Text.PlainText
                                 font.family: note ? Icons.family : c.font; font.pixelSize: note ? 13 : 11
                                 // A Curated album you have listened to, in the theme's colour
                                 color: note || r.modelData.right === "Listened" ? c.primary : c.faint
@@ -1167,7 +1167,7 @@ ShellRoot {
                         spacing: 3
                         Text {
                             width: parent.width; elide: Text.ElideRight
-                            text: win.info ? win.info.title : win.alive ? "Nothing playing" : "Deck isn't running"
+                            text: win.info ? win.info.title : win.alive ? "Nothing playing" : "Deck isn't running"; textFormat: Text.PlainText
                             color: win.info ? c.accent : c.dim; font.family: c.font; font.pixelSize: 13; font.weight: Font.DemiBold
                         }
                         Row {
@@ -1177,7 +1177,7 @@ ShellRoot {
                             Text {
                                 width: Math.min(implicitWidth, parent.width - (shelfButton.visible ? shelfButton.width + 8 : 0))
                                 elide: Text.ElideRight
-                                text: win.info ? win.info.artist + " · " + win.info.album : ""
+                                text: win.info ? win.info.artist + " · " + win.info.album : ""; textFormat: Text.PlainText
                                 color: c.dim; font.family: c.font; font.pixelSize: 12
                             }
                             // The playing album on the shelf, or off it: by the album's name, so it doesn't read as the
