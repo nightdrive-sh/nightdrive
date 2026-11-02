@@ -2,8 +2,8 @@ import QtQuick
 import qs.kit
 import "Dates.js" as Dates
 
-// An event, opened from a view: its title, when, where, its calendar and notes. Read only, as the window is for now
-// (events are added and deleted with `calendar add` and `delete`, or by Claude). Esc, Enter or a click outside close it.
+// An event, opened from a view: its title, when, where, its calendar and notes. Read only for now: editing (#2002) and
+// deleting (#2003) come here next; until then `calendar delete`, or Claude. Esc, Enter or a click outside close it.
 AppPanel {
     id: root
     property var event: null

@@ -6,7 +6,7 @@ import "Dates.js" as Dates
 // end. Events that overlap share their day's width, side by side.
 Item {
     id: root
-    required property var app           // the window: day, today, now, byDay, pickDay(), openEvent()
+    required property var app           // the window: day, today, now, byDay, pickDay(), openEvent(), newEvent()
     required property QtObject c
     readonly property date monday: Dates.monday(Dates.parse(app.day))
     readonly property var days: [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(monday, i)))
@@ -160,12 +160,23 @@ Item {
                     anchors.fill: parent; anchors.leftMargin: 1
                     color: column.modelData === root.app.day ? Qt.rgba(root.c.sel.r, root.c.sel.g, root.c.sel.b, 0.35) : "transparent"
                 }
-                TapHandler { onTapped: root.app.pickDay(column.modelData) }
+                // A double click in the hours: a new event there, at the half hour it fell in. Not on an event: the
+                // block's own TapHandler opens it, and in Qt 6 this one gets the same taps (both grab passively)
+                TapHandler {
+                    onTapped: root.app.pickDay(column.modelData)
+                    onDoubleTapped: point => {
+                        const hit = column.childAt(point.position.x, point.position.y)
+                        if (hit && hit.isEvent) return
+                        const at = Math.floor(point.position.y / (root.hourH / 2))
+                        root.app.newEvent(column.modelData, Math.min(23, Math.floor(at / 2)), at % 2 ? 30 : 0)
+                    }
+                }
                 Repeater {
                     model: root.layout(column.modelData)
                     delegate: Rectangle {
                         id: block
                         required property var modelData
+                        readonly property bool isEvent: true     // for the column's double click, above
                         readonly property color ev: modelData.e.color
                         readonly property real w: (column.width - 6) / modelData.cols
                         x: 3 + modelData.col * w; y: modelData.top + 1

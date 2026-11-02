@@ -7,8 +7,8 @@ import qs.kit
 import "Dates.js" as Dates
 
 // Nightdrive Calendar: the calendars in the sidebar, the month or the week on the right, over the events the sync keeps
-// in ~/.local/share/calendar (`calendar events` reads them by khal). Read only for now: events are added and deleted
-// with the command, or by Claude (mcp.json), and the window shows them after the sync.
+// in ~/.local/share/calendar (`calendar events` reads them by khal). A new event is added in EventEditor (`calendar
+// add`); editing and deleting are still the command's and Claude's (mcp.json).
 ShellRoot {
     id: shell
     FloatingWindow {
@@ -32,6 +32,8 @@ ShellRoot {
             function showDay(day: string): void { if (/^\d{4}-\d{2}-\d{2}$/.test(day)) win.pickDay(day) }
             // "month" or "week" (`calendar month`, `calendar week`)
             function setView(view: string): void { if (view === "month" || view === "week") win.view = view }
+            // The new event panel on a day, YYYY-MM-DD, or the picked one (`calendar new [DAY]`)
+            function newEvent(day: string): void { win.newEvent(/^\d{4}-\d{2}-\d{2}$/.test(day) ? day : win.day) }
         }
 
         readonly property int headerHeight: 22  // the sidebar's title line and the view's header, as Contacts'
@@ -99,7 +101,7 @@ ShellRoot {
                     if (d.from + " " + d.to === win.range) win.events = d.events
                 }
             }
-            stderr: StdioCollector { onStreamFinished: if (text.trim()) win.say(text.trim().split("\n").pop()) }
+            stderr: StdioCollector { onStreamFinished: if (text.trim()) win.say(text.trim().split("\n").pop(), false, true) }
         }
         Component.onCompleted: { calReader.running = true; load(true); keys.forceActiveFocus() }
 
@@ -113,6 +115,16 @@ ShellRoot {
         function moveDay(n) { day = Dates.iso(Dates.addDays(Dates.parse(day), n)) }
         function pickSource(i) { if (i >= 0 && i < sources.length) source = i }
         function openEvent(e) { eventPanel.show(e) }
+        // The new event panel on day, at hour:minute when a time was clicked. Only a calendar that isn't read-only takes
+        // one: with none, say why rather than open a panel that can't save
+        function newEvent(d, hour, minute) {
+            if (!calendars.some(x => !x.read_only)) {
+                say("No calendar here takes new events: the ICS ones are read only, and so is an account with read-only = yes.", false, true)
+                return
+            }
+            if (d !== day) day = d
+            editor.open(d, hour, minute)
+        }
         // ⏎ on a day: its first event
         function openFirst() { const list = byDay[day] || []; if (list.length) openEvent(list[0]) }
 
@@ -124,12 +136,11 @@ ShellRoot {
         }
 
         // A sync from the window (⌘R): the command's, which asks for a reload when it's done
-        Process { id: syncer; command: [win.command, "sync"]; onExited: code => win.say(code === 0 ? "Synced" : "The sync didn't finish: calendar sync in a terminal says why") }
+        Process { id: syncer; command: [win.command, "sync"]; onExited: code => win.say(code === 0 ? "Synced" : "The sync didn't finish: calendar sync in a terminal says why", false, code !== 0) }
         function sync() { if (!syncer.running) { say("Syncing…", true); syncer.running = true } }
 
-        property string note: ""
-        function say(t, sticky) { note = t; if (sticky) noteTimer.stop(); else noteTimer.restart() }
-        Timer { id: noteTimer; interval: 4000; onTriggered: win.note = "" }
+        // What just happened, at the top of the window (the kit's toast): seen where a line at the sidebar's foot wasn't
+        function say(t, sticky, danger) { toast.show(t, { sticky: !!sticky, danger: !!danger }) }
 
         // The week's line for now, and today's circle, move along with the clock
         property date now: new Date()
@@ -179,36 +190,42 @@ ShellRoot {
                     }
                 }
                 Item { Layout.fillHeight: true }
-                Text {
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true; Layout.leftMargin: 26; Layout.rightMargin: 12
-                    visible: win.note !== ""
-                    wrapMode: Text.Wrap
-                    text: win.note; color: c.dim; font.family: c.font; font.pixelSize: 11
-                }
             }
 
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 0
-                // The month's or week's name, and the buttons
-                RowLayout {
+                // The month's or week's name on the left, the buttons that move about in the middle, and New on the right:
+                // the one that makes something stands apart from them (Jari 2.11.). The middle gives way to a long name
+                Item {
+                    id: header
                     Layout.fillWidth: true
                     Layout.leftMargin: 28; Layout.rightMargin: 18; Layout.topMargin: 16
-                    Layout.preferredHeight: win.headerHeight
-                    spacing: 8
+                    // As high as the buttons (AppButton's 28), as the row before it was: the name stays level with the
+                    // sidebar's title
+                    Layout.preferredHeight: Math.max(win.headerHeight, 28)
                     Text {
-                        Layout.fillWidth: true
+                        id: headingText
+                        anchors.verticalCenter: parent.verticalCenter
                         text: win.heading
                         color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium
                     }
-                    AppIconButton { c: win.look; glyph: "chevron-left"; tip: win.view === "month" ? "Previous month" : "Previous week"; keys: "PgUp"; tipAlign: "right"; onClicked: win.page(-1) }
-                    AppButton { c: win.look; label: "Today"; tip: "Go to today"; keys: "t"; onClicked: win.pickDay(Dates.iso(new Date())) }
-                    AppIconButton { c: win.look; glyph: "chevron-right"; tip: win.view === "month" ? "Next month" : "Next week"; keys: "PgDn"; tipAlign: "right"; onClicked: win.page(1) }
-                    Item { width: 10 }
-                    AppButton { c: win.look; label: "Month"; on: win.view === "month"; tip: "The month"; keys: "m"; onClicked: win.view = "month" }
-                    AppButton { c: win.look; label: "Week"; on: win.view === "week"; tip: "The week"; keys: "w"; onClicked: win.view = "week" }
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: Math.max((header.width - width) / 2, headingText.implicitWidth + 24)
+                        spacing: 8
+                        AppIconButton { c: win.look; glyph: "chevron-left"; tip: win.view === "month" ? "Previous month" : "Previous week"; keys: "PgUp"; tipAlign: "left"; onClicked: win.page(-1) }
+                        AppButton { c: win.look; label: "Today"; tip: "Go to today"; keys: "t"; tipAlign: "left"; onClicked: win.pickDay(Dates.iso(new Date())) }
+                        AppIconButton { c: win.look; glyph: "chevron-right"; tip: win.view === "month" ? "Next month" : "Next week"; keys: "PgDn"; tipAlign: "left"; onClicked: win.page(1) }
+                        Item { width: 10; height: 1 }
+                        AppButton { c: win.look; label: "Month"; on: win.view === "month"; tip: "The month"; keys: "m"; tipAlign: "left"; onClicked: win.view = "month" }
+                        AppButton { c: win.look; label: "Week"; on: win.view === "week"; tip: "The week"; keys: "w"; tipAlign: "left"; onClicked: win.view = "week" }
+                    }
+                    AppButton {
+                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                        c: win.look; glyph: "plus"; label: "New"; tip: "New event"; keys: "n"; onClicked: win.newEvent(win.day)
+                    }
                 }
                 Rectangle { Layout.fillWidth: true; Layout.topMargin: 17; Layout.preferredHeight: 1; color: c.divider }
 
@@ -233,6 +250,7 @@ ShellRoot {
                         else if (k === Qt.Key_T) win.pickDay(Dates.iso(new Date()))
                         else if (k === Qt.Key_M) win.view = "month"
                         else if (k === Qt.Key_W && !ctrl) win.view = "week"
+                        else if (k === Qt.Key_N && !ctrl) win.newEvent(win.day)
                         else if (k === Qt.Key_Return || k === Qt.Key_Enter) win.openFirst()
                         else if (k === Qt.Key_Question) win.cheats = !win.cheats
                         else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
@@ -271,6 +289,19 @@ ShellRoot {
             c: win.look
             onClosed: keys.forceActiveFocus()
         }
+        EventEditor {
+            id: editor
+            behind: content
+            c: win.look
+            app: win
+            onClosed: keys.forceActiveFocus()
+            // The window shows it at once: `calendar add` asks a running Calendar to reload, but this one may have been
+            // started apart from the command (qs -p), so reload here too
+            onAdded: ev => {
+                win.reload()
+                win.say("Added to " + ev.calendar_name + ": " + ev.title + (ev.synced ? "" : ". The next sync takes it to the server."))
+            }
+        }
 
         property alias cheats: sheet.shown
         KeySheet {
@@ -278,9 +309,13 @@ ShellRoot {
             c: win.look
             groups: [
                 { title: "Calendar", keys: [["← →  h l", "Previous, next day"], ["↑ ↓  k j", "A week back, on"], ["PgUp PgDn  [ ]", "Previous, next month or week"],
-                                           ["t", "Today"], ["m  w", "Month, week"], ["⏎", "Open the day's first event"], ["Double click", "A day's week"]] },
-                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] }
+                                           ["t", "Today"], ["m  w", "Month, week"], ["⏎", "Open the day's first event"], ["n", "New event"],
+                                           ["Double click", "A day's week; in the week's hours, a new event there"]] },
+                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
+                { title: "New event", keys: [["⏎  Ctrl ⏎", "Add it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["Esc", "Leave it"]] }
             ]
         }
+        // Last, so it shows over the panels too
+        AppToast { id: toast; c: win.look }
     }
 }

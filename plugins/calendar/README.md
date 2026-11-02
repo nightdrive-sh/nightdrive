@@ -1,6 +1,6 @@
 # Calendar
 
-Your iCloud calendars, and Google calendars by their private address, on your computer: the month or the week in a window of its own, kept in sync every 15 minutes. A first version: the window only shows the events. They are added and deleted with the `calendar` command, or by Claude when you ask it to.
+Your iCloud calendars, and Google calendars by their private address, on your computer: the month or the week in a window of its own, kept in sync every 15 minutes. A first version: you add events in the window; they are changed and deleted with the `calendar` command, or by Claude when you ask it to.
 
 ## Using it
 
@@ -13,10 +13,12 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | `t` | Today |
 | `m`, `w` | Month, week |
 | `Enter` | Open the day's first event (a click opens any) |
+| `n` | New event on the day picked (also New, or a double click in the week's hours) |
 | `1`–`9` or Ctrl+↑ Ctrl+↓ | A calendar of the sidebar, or All calendars |
 | ⌘R | Sync now |
 | ⌘B | Hide or show the sidebar |
 
+- A new event: `Tab` moves between its fields, `Enter` or Ctrl+Enter adds it, `Esc` leaves it. A time is typed as 9:30 or 930, a day as 2026-11-05 or 5.11.2026; the end moves with the start. It goes in a calendar that isn't read only (below), the one you used last.
 - A double click on a day in the month opens its week. A recurring event shows at each of its times.
 - The events are kept as `.ics` files in `~/.local/share/calendar`, a folder per account and calendar, and vdirsyncer syncs them. khal reads them, recurring events and all.
 
@@ -45,6 +47,7 @@ The first event Claude adds to a calendar asks on the card, and once you allow i
 | --- | --- |
 | `calendar` | Opens Calendar, or brings it forward |
 | `calendar show [DAY]`, `month`, `week` | Opens it on a day (YYYY-MM-DD), the month or the week |
+| `calendar new [DAY]` | Opens it with a new event on DAY (or the day it shows) |
 | `calendar calendars` | The calendars and how many events each has (`--json`) |
 | `calendar events FROM TO` | The events from FROM up to TO, not included (YYYY-MM-DD; `--json`, `--calendar ID`, `--search TEXT`, `--limit N`) |
 | `calendar add --title T --start S [--end E]` | A new event (`--calendar ID`, `--location L`, `--notes N`); S and E are YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day |
