@@ -19,6 +19,8 @@ The program starts anew, so a window comes back as it starts, not as it was:
 - A browser window, while the browser still has others open: the browser's own key for a closed window, tabs and all.
 - Any other app: its command line, so a file it had open opens too, or its desktop entry when the command line can't
   be run again (a process shared by several windows, a sandbox, a D-Bus service).
+A window that can't be opened again (the desktop's popups) still takes its turn: ⌘⇧U says so, and the next press opens
+the one before it.
 The list is kept in $XDG_RUNTIME_DIR, so it's gone after logging out. The session is kept on disk: it outlives a
 power loss.
 """
@@ -38,6 +40,9 @@ TERMINALS = {"kitty", "foot", "Alacritty", "com.mitchellh.ghostty", "org.wezfurl
 # Terminals in a window of their own class (kitty's floating-tui, floating-help…) are the desktop's popups, opened from a
 # menu with a command of their own (an update): never run again
 TERMINAL_EXES = {"kitty", "foot", "alacritty", "wezterm-gui", "ghostty"}
+# ...except these, which are ordinary terminals with a class of their own for a window rule: a Claude session opened in
+# the background (scripts/terminal-or-claude). They open again with the same class (Ghostty adds sh.nightdrive.).
+TERMINAL_ROLES = {"claude-background"}
 SHELLS = {"bash", "zsh", "fish", "sh", "dash", "nu", "xonsh", "elvish"}
 # Window class -> the browser's key that reopens its last closed window (Firefox's Ctrl+Shift+T is for tabs only)
 BROWSERS = [(r"^(chromium(-browser)?|google-chrome.*|brave-browser.*|vivaldi.*|microsoft-edge.*)$", "T"),
@@ -198,12 +203,15 @@ def describe(w, clients):
              "floating": bool(w.get("floating")), "x": x, "y": y, "w": sw, "h": sh,
              "fullscreen": bool(w.get("fullscreen")), "closed": int(time.time())}
     others = [c for c in clients if c.get("pid") == pid and c.get("address") != w["address"]]
-    if cls in TERMINALS:
+    role = re.sub(r"^sh\.nightdrive\.", "", cls)
+    if cls in TERMINALS or role in TERMINAL_ROLES:
         if w.get("xwayland") or not own_process(pid):
             return None
         t = terminal(pid)
         if not t:
             return None
+        if role in TERMINAL_ROLES:
+            t["class"] = role
         entry["terminal"] = t
     else:
         args = argv(pid)
@@ -219,7 +227,10 @@ def save(address=None):
     w = next((c for c in clients if c.get("address") == address), None) if address else hypr("activewindow")
     entry = describe(w, clients)
     if not entry:
-        return
+        if not (w and w.get("class")):
+            return
+        # Kept all the same, so that ⌘⇧U says this one can't come back instead of opening an older window in its place
+        entry = {"class": w["class"], "title": w.get("title", ""), "skip": True, "closed": int(time.time())}
     with locked() as stack:
         stack.append(entry)
         del stack[:-MAX_KEPT]
@@ -278,6 +289,9 @@ def reopen():
     if not e:
         notify("No closed windows", "A window closed with ⌘W opens again with ⌘⇧U, the last one first")
         return
+    if e.get("skip"):
+        notify("Can't open the window again", (e.get("title") or e["class"]) + "\nPress again for the one closed before it")
+        return
     open_again(e)
 
 
@@ -303,8 +317,8 @@ def open_again(e):
     else:
         if "terminal" in e:
             t = e["terminal"]
-            cmd = [SCRIPTS + "/terminal", "--dir", t["cwd"]] + (["--hold"] if t["run"] and t["shell"] else []) + \
-                  ["--"] + (t["run"] or [])
+            cmd = [SCRIPTS + "/terminal", "--dir", t["cwd"]] + (["--class", t["class"]] if t.get("class") else []) + \
+                  (["--hold"] if t["run"] and t["shell"] else []) + ["--"] + (t["run"] or [])
             folder = t["cwd"]
         elif e.get("cmd"):
             cmd, folder = e["cmd"], e.get("cwd")
