@@ -29,6 +29,7 @@
 #                                            time, "" for none); the disk only grows, iso "" ejects
 #   garage-ctl rename-vm NAME NEWNAME        while it is stopped: its folder, and its ssh name (lib/ssh.sh)
 #   garage-ctl ssh-sync                      ~/.ssh/config.d/garage written again from the VMs
+#   garage-ctl ssh-key                       JSON: the ssh key a VM from an image gets ({ from, type, name }, {} for none)
 #   garage-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
 #   garage-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
 #   garage-ctl restore|unsnap NAME TAG       go back to one, delete one
@@ -289,6 +290,7 @@ case ${1:-} in
   delete)   need "$2"; stopped "$2"; rm -rf "$(dir "$2")"; ssh_forget "$2"; ssh_sync ;;
   rename-vm) rename_vm "$2" "${3:-}" ;;
   ssh-sync) ssh_sync ;;
+  ssh-key)  ssh_key ;;
   snapshot) snap "$@"; qemu-img snapshot -c "$3" "$(dir "$2")/disk.qcow2"; [[ -z ${4:-} ]] || label "$2" "$3" "$4" ;;
   restore)  snap "$@"; qemu-img snapshot -a "$3" "$(dir "$2")/disk.qcow2" ;;
   unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2"; label "$2" "$3" "" ;;

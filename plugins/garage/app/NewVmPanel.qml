@@ -13,6 +13,7 @@ AppPanel {
     required property QtObject images
     property string source: "iso"           // an image's id, or "iso"
     property string problem: ""
+    property var sshKey: ({})                // garage-ctl ssh-key: the key a VM from an image gets, {} for none
     readonly property var image: source === "iso" ? null : images.image(source)
     readonly property bool fromImage: image !== null
     signal done()
@@ -25,6 +26,7 @@ AppPanel {
         mem.text = "4"; cpus.text = "4"; problem = ""
         pick(images.list.length ? images.list[0].id : "iso")
         ctl.run(["isos"], out => { const l = out.trim().split("\n"); iso.text = l[0] || "" })
+        ctl.run(["ssh-key"], out => { try { sshKey = JSON.parse(out) } catch (e) { sshKey = {} } })
         name.input.forceActiveFocus()
     }
     // An image's disk needs only room to grow from its own; an installer wants more
@@ -97,6 +99,18 @@ AppPanel {
             input.echoMode: TextInput.Password
             onAccepted: root.create(); onEscaped: root.done()
         }
+    }
+    // Which of the host's ssh keys its first boot puts in the VM (a key file, else the ssh agent's: 1Password's), so
+    // the user knows before whether `ssh NAME` will ask for the password
+    Text {
+        visible: root.fromImage
+        width: parent.width
+        wrapMode: Text.Wrap
+        text: !root.sshKey.type ? "No ssh key found (~/.ssh/id_*.pub or an ssh agent): ssh asks for the password"
+            : "ssh: your " + root.sshKey.type + " key" + (root.sshKey.name ? " “" + root.sshKey.name + "”" : "")
+              + (root.sshKey.from === "agent" ? " from the ssh agent" : " (" + root.sshKey.from + ")")
+              + ", so ssh " + (name.text || "NAME") + " needs no password"
+        color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
     }
     Row {
         visible: !root.fromImage

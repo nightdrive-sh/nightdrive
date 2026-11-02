@@ -3,7 +3,8 @@
 # systemd (256+) makes two units of them (systemd-debug-generator), which run two scripts that come the same way
 # (ImportCredential):
 #   nightdrive-vm-user    before the login prompt: the user (wheel, so sudo), the VM's name as its hostname, the host's
-#                         keymap and timezone, and the host's ssh key, so `ssh NAME` just works (lib/ssh.sh)
+#                         keymap and timezone, and the host's ssh key (a key file's, else the ssh agent's: lib/ssh.sh,
+#                         host_key), so `ssh NAME` just works
 #   nightdrive-vm-agent   once the network is up: sshd and qemu-guest-agent (Shut down, the clock), with dnf
 # and Fedora's initial-setup is skipped, as the user is made already (it would ask for one in the VM's window).
 # They are written to the VM's folder (firstboot/, a file each, the password only as a hash) and passed at each start
@@ -25,14 +26,12 @@ firstboot_creds() {
   local name=$1 user=$2 pass=$3 d; d=$(dir "$1")
   good_user "$user" || die "User: lower-case letters, digits, - and _, starting with a letter"
   [[ -n $pass ]] || die "A password for $user"
-  local hash keymap tz key="" k
+  local hash keymap tz key
   hash=$(printf '%s' "$pass" | openssl passwd -6 -stdin) || die "openssl couldn't hash the password"
   keymap=$(localectl status 2>/dev/null | awk -F': ' '/VC Keymap/ { print $2 }')
   [[ $keymap == "(unset)" ]] && keymap=""
   tz=$(timedatectl show -p Timezone --value 2>/dev/null || true)
-  for k in "$HOME"/.ssh/id_ed25519.pub "$HOME"/.ssh/id_ecdsa.pub "$HOME"/.ssh/id_rsa.pub; do
-    [[ -f $k ]] && { key=$(cat "$k"); break; }
-  done
+  key=$(host_key | cut -f2)     # lib/ssh.sh: a key file's, else the ssh agent's (1Password)
 
   # The scripts, their values quoted for bash (printf %q)
   local q_user q_home; q_user=$(printf %q "$user"); q_home=$(printf %q "/home/$user")
