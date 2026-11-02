@@ -36,7 +36,7 @@ Item {
         // rows: the open level's title, footer, selected index and rows as JSON, primitive fields only (automated testing)
         function rows(): string {
             const plain = r => { const o = {}; for (const k in r) if (r[k] === null || typeof r[k] !== "object" && typeof r[k] !== "function") o[k] = r[k]; return o }
-            return JSON.stringify({ level: launcher.level, title: launcher.titles[launcher.level] || "", footer: launcher.footer, sel: launcher.selIndex,
+            return JSON.stringify({ level: launcher.level, title: launcher.titles[launcher.level] || "", footer: launcher.footer, sel: launcher.selIndex, collapsed: launcher.collapsed,
                                     rows: launcher.results.map(plain) })
         }
         // pick <index>: selects a row like Enter (automated testing)

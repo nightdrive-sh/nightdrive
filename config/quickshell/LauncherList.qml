@@ -41,7 +41,7 @@ ListView {
     }
 
     // On the grid level the list is hidden, but its currentIndex is still the selection (keys, Enter)
-    visible: !list.launcher.grid && list.launcher.detail === null
+    visible: !list.launcher.grid && list.launcher.detail === null && !list.launcher.collapsed   // the light launcher: hidden until ↓
     height: visible ? list.listHeight() : 0
     model: list.launcher.results
     onCurrentIndexChanged: list.launcher.leaveField()

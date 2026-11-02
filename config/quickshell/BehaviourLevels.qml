@@ -231,6 +231,8 @@ Item {
                       sub: "Typos and initials also match: firefx, vsc", switchOn: launcher.prefs.fuzzy },
                     { kind: "lpref", key: "shortcuts", name: "Shortcut hints", glyph: "keyboard",
                       sub: "An app’s or menu’s keys on its row (Hyper P)", switchOn: launcher.prefs.shortcuts }]
+                .concat([{ kind: "lpref", key: "light", name: "Light launcher", glyph: "panel-top-dashed",
+                      sub: "Only the search field" + (Plugins.has("deck") ? " and Music" : "") + " until you type or press ↓", switchOn: launcher.prefs.light }])
                 .concat([{ kind: "lpref", key: "comma", name: "Decimal comma in results", glyph: "calculator",
                       sub: "The calculator answers 3,5 instead of 3.5 (type either)", switchOn: launcher.prefs.comma }])
                 .concat(Plugins.has("deck") ? [{ kind: "lpref", key: "deck", name: "Include Deck artists, albums and songs", glyph: "disc-3",

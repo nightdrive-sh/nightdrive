@@ -83,16 +83,17 @@ PanelWindow {
     readonly property var detail: details.item   // Install / Remove: the row whose details are shown (DetailCard.qml), null = none
     readonly property int detailWidth: 860    // the card's width while showing them
     property alias detailCard: details
-    // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts } in ~/.local/state/nightdrive/launcher.json (missing = on;
-    // deck, the music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for)
-    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true })
+    // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts, light } in ~/.local/state/nightdrive/launcher.json (missing = on;
+    // deck, the music player's albums and artists in the search, comma, the calculator's decimal comma, and light, only
+    // when asked for)
+    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true, light: false })
     readonly property string prefsFile: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
     FileView {
         path: win.prefsFile; watchChanges: true; onFileChanged: reload(); printErrors: false
         onLoaded: {
             let v = {}
             try { v = JSON.parse(text()) || {} } catch (e) {}
-            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true, contacts: v.contacts !== false }
+            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true, contacts: v.contacts !== false, light: v.light === true }
             if (JSON.stringify(n) !== JSON.stringify(win.prefs)) win.prefs = n
         }
     }
@@ -112,6 +113,11 @@ PanelWindow {
     readonly property bool grid: level === "background" && lv.themes.wallLoaded
     readonly property int gridCols: 2
     property bool topFocused: false           // a plugin's row above the search field is selected (up arrow from the first list row)
+    // Light launcher (Settings › Launcher › Light, #1998): at the root with nothing typed, only the search field and a
+    // plugin's row (Deck's player) show, for less to look at. ↓ reveals the rows, ↑ from the top row hides them
+    // again, Esc closes as before (whoever opened the rows is done with the launcher); typing searches as before. Not on a level a key opened, which has its rows to show
+    property bool revealed: false
+    readonly property bool collapsed: prefs.light && level === "root" && query === "" && !revealed && keyLevel === "" && detail === null
 
     // --- The parts (see the top) ---
     property string extSource: ""             // shell.qml sets this when local/LauncherExtension.qml exists (LauncherLevels)
@@ -157,7 +163,8 @@ PanelWindow {
     // The level's or the row's keys, then ⌘Enter when the search looks like a request for Claude (AskClaudeHint.qml); on
     // the Ask Claude row its own. Not while that row is listed: it says so itself, and the hint stood in for the keys of
     // a row without any (Deck's Search Spotify, #1895)
-    readonly property string footer: (results[list.currentIndex] || {}).kind === "askclaude" ? lv.ask.rowFooter(query)
+    readonly property string footer: collapsed ? ""
+        : (results[list.currentIndex] || {}).kind === "askclaude" ? lv.ask.rowFooter(query)
         : lv.askHint.shows(level, query, results) && !results.some(r => r.kind === "askclaude")
             ? [levelFooter, lv.askHint.text].filter(f => f !== "").join("  ·  ") : levelFooter
     readonly property string levelFooter: detail !== null ? details.footer
@@ -196,9 +203,11 @@ PanelWindow {
     }
     // Moves the selection, skipping header and note rows
     function step(dir) {
+        if (collapsed) { if (dir > 0) { revealed = true; selectFirst() } else topFocused = topExt !== null; return }
         let i = list.currentIndex + dir
         while (i >= 0 && i < results.length && fixedRow(results[i])) i += dir
-        if (i < 0 && dir < 0) { topFocused = topExt !== null; return }   // up from the top of the list: a plugin's row
+        // Up from the top of the list: the light launcher hides its rows again, else a plugin's row
+        if (i < 0 && dir < 0) { if (prefs.light && revealed && level === "root" && query === "") revealed = false; else topFocused = topExt !== null; return }
         if (i >= 0 && i < results.length) {
             list.currentIndex = i
             // Up onto a section's first row: its header comes into view too (the list only scrolls to the row itself)
@@ -230,6 +239,7 @@ PanelWindow {
         if (!goingBack && target !== level)
             fromSearch[target] = query.trim() !== "" ? { level: level, query: query, sel: cur ? { kind: cur.kind, name: cur.name } : null } : undefined
         level = target; field.text = ""; query = ""; armed = ""; topFocused = false; details.close()
+        revealed = goingBack === true   // back from a sublevel to the rows it was opened from
         appsPart.rescan()
         if (target === "keys") shortcutsPart.reload()     // re-read SHORTCUTS.md: changes show up immediately
         list.currentIndex = firstSelectable()

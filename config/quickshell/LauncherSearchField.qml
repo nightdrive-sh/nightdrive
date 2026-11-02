@@ -102,6 +102,7 @@ Row {
                 else if (root.launcher.selApp && (event.modifiers & Qt.AltModifier)) root.launcher.appState.toggleAutostart(cur)
                 else if (root.launcher.extLevel && cur && (event.modifiers & Qt.ShiftModifier)) root.launcher.extShift(cur)
                 else if (root.launcher.extLevel && cur && ctrl && root.launcher.extCtrl(cur)) {}
+                else if (root.launcher.collapsed) root.launcher.step(1)   // the light launcher: Enter on nothing typed shows the rows
                 else if (root.launcher.results.length === 0) root.launcher.shakeNow()
                 else root.launcher.activate(cur)
                 event.accepted = true

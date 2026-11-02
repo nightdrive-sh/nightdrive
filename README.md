@@ -52,7 +52,8 @@ Type a request and press ⌘Enter, or Enter on the **Ask Claude** row: Claude do
 tools](docs/claude.md) in a toast in the Launcher's place, showing each step and its answer, and you can write back (⌘⌃Enter sends
 it to Claude Code in a terminal instead). The tools are experimental: what Claude reads with them (a mail, a file) goes to
 Anthropic as part of the conversation ([What reaches Anthropic](docs/claude.md#what-reaches-anthropic)). Search "Rename current space" to name the workspace
-you're on in the bar.
+you're on in the bar. Settings › Launcher › *Light launcher* shows only the search field (and the player) until you
+type or press ↓; ↑ from the top row hides the rows again.
 
 It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and the answer is the first row; Enter
 copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal comma in results* answers `3,5`.
