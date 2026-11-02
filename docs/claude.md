@@ -217,10 +217,14 @@ session sees the new list. Welcome to Nightdrive asks for the level once, at the
 In a terminal: `nightdrive mcp access` shows what applies, `nightdrive mcp access level strict|normal|open`, `set mail
 read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 
-Some changes ask once: the first event Claude adds to a calendar shows the card, and once you allow it, Claude adds to
-that calendar without asking (a calendar marked shared asks every time). A refusal remembers nothing. `nightdrive mcp
-access allowed` lists what you allowed this way (in `~/.config/nightdrive/claude-allowed.json`), and `nightdrive mcp
-access forget calendar_add` forgets it, or `forget calendar_add "Family (icloud/family)"` one calendar.
+Some calls ask once: the first event Claude adds to a calendar shows the card, and once you allow it, Claude adds to
+that calendar without asking (a calendar marked shared asks every time). Web addresses are the same per site, the exact
+host (`github.com`; `gist.github.com` is another site), but an address that holds another address (a redirect such as
+`google.com/url?q=https://…`), has a long query, or whose host isn't plain (`user@`, `%`, letters outside ASCII) asks
+every time, as a `mailto:` does: what Claude puts in an address goes to whichever site opens it. A refusal remembers
+nothing, and *Ask* in Access asks every time. `nightdrive mcp access allowed` lists what you allowed this way (in
+`~/.config/nightdrive/claude-allowed.json`), and `nightdrive mcp access forget calendar_add` forgets it, or `forget
+calendar_add "Family (icloud/family)"` one calendar, `forget open_address github.com` one site.
 
 ## What each area gives
 
@@ -241,7 +245,7 @@ access forget calendar_add` forgets it, or `forget calendar_add "Family (icloud/
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
-| Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; open a web address † | **files to the trash** |
+| Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †) | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
 
 Claude doesn't bring a window forward while you type, nor open an app, a file or an address: after a key it waits for

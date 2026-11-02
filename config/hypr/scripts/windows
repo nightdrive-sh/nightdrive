@@ -29,6 +29,12 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
                                    forward) or an address (http, https, mailto: nothing else; a mailto: sets only
                                    to, cc, subject and body) in its default app.
                                    Without --app or --url, an address is told by its scheme
+  windows site URL                 open_address's asks_if (#1981): `first HOST` when the card may ask once for this
+                                   site (http/https, a plain host: the exact one, with a port that isn't the scheme's
+                                   own), else `yes`, which asks every time: a mailto:, an unclear host (user@, %,
+                                   non-ASCII, a space or a backslash anywhere), or an address that holds another one
+                                   (://, //, www. or host/ in its path, query or #fragment, %-encoded too: a redirect
+                                   on an allowed site would carry the address on) or has a long query (SITE_QUERY_MAX)
   windows open --file PATH [--json]   a file or folder in its default app (files open checks the path first)
                                    --json: {kind, opened, launched, new, address, previous}: new is the window it
                                    opened ("" when none came in WAIT s), previous the one that had the focus. New
@@ -39,7 +45,7 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
 """
 import argparse, base64, configparser, json, os, re, subprocess, sys, time
 from pathlib import Path
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, unquote
 
 SCRIPTS = Path(__file__).resolve().parent
 WRITE = SCRIPTS / "claude-write"            # `claude-write blocked CLASS TITLE`: the windows nothing is sent from
@@ -55,6 +61,13 @@ QUIET_WAIT = 5         # s to wait for that quiet before refusing
 SCHEMES = ("http://", "https://", "mailto:")
 MAILTO_FIELDS = {"to", "cc", "subject", "body"}   # a mailto:'s query may set these, not attach= or bcc= (#1866)
 BACKGROUND = "special:bg"
+SITE_QUERY_MAX = 200   # characters of query and #fragment an allowed site opens with, without the card (#1981)
+# A plain host as the browser reads it, and an optional port: anything else (user@, %, [::1], non-ASCII) asks each time
+AUTHORITY = re.compile(r"(?i)((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?::(\d{1,5}))?")
+DEFAULT_PORT = {"http": 80, "https": 443}
+# Another address inside this one: a scheme (http:/, https:\\), a protocol-relative //, www., or a value that starts
+# with a host and a slash (?next=evil.example/…). Matched against the decoded rest, lowercased
+NESTED = re.compile(r"[a-z][a-z0-9+.-]*:[/\\]|//|www\.|(?:^|[?&=#])(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?/")
 
 
 def die(msg, code=1):
@@ -457,6 +470,38 @@ def cmd_open(a):
     print(json.dumps(out, ensure_ascii=False) if a.json else f"Opened {out['opened']}")
 
 
+def site(url):
+    """`first HOST` when open_address may ask once for this address's site (#1981), else `yes`. What it lets through
+    unasked goes only to a site the user allowed: the exact host (a subdomain is another site), on a plain address
+    that holds no other address a redirect there could carry the user (and what Claude put in it) on to."""
+    if any(c <= " " or c == "\x7f" or c == "\\" for c in url):   # browsers drop or turn these: what host is it?
+        return "yes"
+    scheme, sep, rest = url.partition("://")
+    scheme = scheme.lower()
+    if not sep or scheme not in DEFAULT_PORT:
+        return "yes"   # mailto: asks every time: its body is Claude's
+    authority = re.split(r"[/?#]", rest, maxsplit=1)[0]
+    m = AUTHORITY.fullmatch(authority)
+    if not m or (m.group(2) and not 0 < int(m.group(2)) < 65536):
+        return "yes"
+    after = rest[len(authority):]
+    decoded = after
+    for _ in range(3):   # %2F%2F, and %252F%252F encoded twice
+        decoded = unquote(decoded)
+    if NESTED.search(decoded.lower()):
+        return "yes"
+    before, _, fragment = after.partition("#")
+    if len(before.partition("?")[2]) + len(fragment) > SITE_QUERY_MAX:
+        return "yes"
+    host = m.group(1).lower()
+    port = int(m.group(2)) if m.group(2) else DEFAULT_PORT[scheme]
+    return f"first {host}" if port == DEFAULT_PORT[scheme] else f"first {host}:{port}"
+
+
+def cmd_site(a):
+    print(site(a.url))
+
+
 def cmd_close(a):
     if a.unless_typing and (a.address or a.focus):
         not_typing()
@@ -483,6 +528,7 @@ def main():
         kind.add_argument(k, action="store_true")
     p.add_argument("--json", action="store_true"); p.add_argument("--unless-typing", action="store_true")
     p.set_defaults(fn=cmd_open)
+    p = sub.add_parser("site"); p.add_argument("url"); p.set_defaults(fn=cmd_site)
     p = sub.add_parser("close"); p.add_argument("address", nargs="?", default="")
     p.add_argument("--focus", default=""); p.add_argument("--unless-typing", action="store_true")
     p.set_defaults(fn=cmd_close)

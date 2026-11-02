@@ -117,7 +117,7 @@ class AsksIf(unittest.TestCase):
     def test_format(self):
         spec = dict(self.tool.spec)
         self.assertIsNone(registry.problem(spec, None))
-        for bad in ({"asks_if": "./asks"}, {"asks_if": ["./asks", "{nothing}"]}, {"class": "act", "asks_if": ["x"]}):
+        for bad in ({"asks_if": "./asks"}, {"asks_if": ["./asks", "{nothing}"]}, {"class": "read", "asks_if": ["x"]}):   # an act tool's may say first KEY (#1981)
             with self.subTest(bad=bad):
                 self.assertIsNotNone(registry.problem({**spec, **bad}, None))
 

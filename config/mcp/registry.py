@@ -14,7 +14,8 @@ to them again at once (pace.py, #1882).
 So does a call whose `asks_if` command says yes though Access allows the tool (asks): one that reaches further than
 its right says, sound to a speaker on the network or an event into a calendar others see (#1887). One that prints
 `first KEY` asks only until the user allows a call for KEY once (an event into a calendar Claude hasn't added to yet,
-#1929): allowed.py remembers it, and a refusal or a timeout remembers nothing.
+#1929): allowed.py remembers it, and a refusal or a timeout remembers nothing. An act tool may have one too, which only
+`first KEY` lets past the card, and only while Access allows its right (open_address: once per site, #1981).
 An area's own choices (access.Access.options, #1830) go to the tool too (Tool.keep): what one that is off takes away
 isn't in its schema, and its command gets them all to keep to, and another area's too when its mcp.json names that
 area in `options_from` (the latest notifications keep to Mail's blocked list: a notification would tell what it hides).
@@ -177,8 +178,10 @@ def problem(spec, plugin, external=False):
     unknown = run.placeholders(spec.get("card") or []) - set(schema.get("properties", {}))
     if unknown:
         return f"{name}: {', '.join(sorted(unknown))} in its card isn't in inputSchema"
-    if "asks_if" in spec and (spec["class"] != "change" or not is_template(spec["asks_if"])):
-        return f"{name}: asks_if is a change tool's, a list of strings (and lists of them); an act tool always asks"
+    if "asks_if" in spec and (spec["class"] == "read" or not is_template(spec["asks_if"])):
+        return f"{name}: asks_if is a change or act tool's, a list of strings (and lists of them)"
+    if not isinstance(spec.get("first_note", ""), str) or "first_note" in spec and "asks_if" not in spec:
+        return f"{name}: first_note is a string, for a tool with asks_if"
     unknown = run.placeholders(spec.get("asks_if") or []) - set(schema.get("properties", {}))
     if unknown:
         return f"{name}: {', '.join(sorted(unknown))} in its asks_if isn't in inputSchema"
@@ -285,16 +288,16 @@ def optional(module):
 
 def asks(tool, arguments):
     """Whether a call asks on the card though Access allows its tool, by its asks_if command: (ask, key). yes asks,
-    no doesn't; `first KEY` asks until the user has allowed this tool for KEY once, and key is what to remember when
-    they allow this call (None otherwise). One that fails, or says anything else, stops the call before anything runs,
-    with its message."""
+    no doesn't (an act tool's asks all the same: it has consequences); `first KEY` asks until the user has allowed this
+    tool for KEY once, and key is what to remember when they allow this call (None otherwise). One that fails, or says
+    anything else, stops the call before anything runs, with its message."""
     out, err, status = run.execute(tool, run.expand(tool.spec["asks_if"], arguments), None, run.timeout_of(tool))
     if status != 0:
         why = (err.strip() or out.strip() or f"exit status {status}")[-run.MESSAGE_MAX:]
         raise ToolError(f"{tool.name} wasn't run: {why}")
     said = out.strip()
     if said in ("yes", "no"):
-        return said == "yes", None
+        return said == "yes" or tool.cls == "act", None
     word, _, key = said.partition(" ")
     if word != "first" or not allowed.KEY.fullmatch(key):
         raise ToolError(f"{tool.name} wasn't run: its asks_if command didn't say yes, no or first KEY.")
@@ -305,13 +308,14 @@ def asks(tool, arguments):
 
 @contextmanager
 def first_time(tool, key):
-    """The card says that allowing this call allows the next ones for key too (the user must know what Allow does);
-    the tool's own note is back after."""
+    """The card says that allowing this call allows the next ones for key too (the user must know what Allow does):
+    the tool's first_note, with {key} in it, else a general line; the tool's own note is back after."""
     if key is None:
         yield
         return
     note = tool.spec.get("card_note")
-    said = f"Once you allow it, Claude does this for {key} without asking from now on."
+    said = tool.spec.get("first_note") or "Once you allow it, Claude does this for {key} without asking from now on."
+    said = said.replace("{key}", key)
     tool.spec["card_note"] = f"{note} {said}" if note else said
     try:
         yield
@@ -371,9 +375,11 @@ class Registry:
         run.prepare(tool, arguments)   # a value its command refuses (#1930) is refused before a card asks about it
         tool.said = None   # what a card said is this call's alone (confirm.facts sets it)
         decision, first = self.rules.decide(tool.cls, tool.area, tool.right), None
-        if decision == "allow" and tool.spec.get("asks_if"):
+        # Only while Access allows the right: an act tool's decision is ask then too, and its asks_if may let a call
+        # the user allowed once for its key past the card (#1981); Ask in Access asks every time
+        if tool.spec.get("asks_if") and self.rules.value(tool.area, tool.right) == "allow":
             ask, first = asks(tool, arguments)
-            decision = "ask" if ask else decision
+            decision = "ask" if ask else "allow"
         paced = self.pace.due(tool, decision)
         if decision == "ask" or paced:
             if self.confirm is None:

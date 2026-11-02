@@ -68,7 +68,7 @@
     {
       "name": "open_address",
       "title": "Open an address",
-      "description": "Opens a web address (http, https) in the default browser, or a mailto: link in the mail app's composer (nothing is sent; it may set to, cc, subject and body, nothing else). Opening an address sends it to that site, so the user allows it on screen first. Not while the user is typing, as windows_focus.",
+      "description": "Opens a web address (http, https) in the default browser, or a mailto: link in the mail app's composer (nothing is sent; it may set to, cc, subject and body, nothing else). Opening an address sends it to that site, so the user allows it on screen first: once per site (the exact host), after which that site's addresses open without asking; an address that holds another address (a redirect) or a long query, and a mailto:, ask every time. Not while the user is typing, as windows_focus.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -78,6 +78,8 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "windows", "open", "--url", "{url}", "--json", "--unless-typing"],
+      "asks_if": ["nightdrive", "windows", "site", "{url}"],
+      "first_note": "Once you allow it, Claude opens addresses on {key} without asking from now on. One that leads on to another address, or carries a long query, still asks.",
       "class": "act",
       "area": "apps-files"
     },
