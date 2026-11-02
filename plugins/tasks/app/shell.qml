@@ -234,7 +234,8 @@ ShellRoot {
                         // Higher than the header's text (AppButton's 28): it reaches a little over and under it
                         AppButton {
                             Layout.leftMargin: 12
-                            c: win.look; glyph: "plus"; label: "New"; tip: "New task"; keys: "n"; tipAlign: "right"
+                            // The glyph alone in a narrow window, where the view's name needs the room
+                            c: win.look; glyph: "plus"; label: win.width < 560 ? "" : "New"; tip: "New task"; keys: "n"; tipAlign: "right"
                             onClicked: win.newTask("")
                         }
                     }

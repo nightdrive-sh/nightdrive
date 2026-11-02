@@ -21,7 +21,8 @@ AppPanel {
     signal added(var task)              // cli.py's row of it: id, title, list, due_label…
     signal closed()
     visible: false
-    cardWidth: 560
+    // Narrower with the window: a card wider than it would be cut at both sides
+    cardWidth: Math.min(560, app.width - 24)
     spacing: 14
 
     // listId: the list the window shows, if it shows one; day: what the day field starts with ("today" in Today)
@@ -114,8 +115,10 @@ AppPanel {
         onAccepted: root.save()
         onEscaped: root.close()
     }
-    // The day and the time, and how they read: the words are the ones the task will show
-    Row {
+    // The day and the time, and how they read: the words are the ones the task will show. A Flow, so in a narrow
+    // window the reading goes under the fields rather than being cut to nothing
+    Flow {
+        width: parent.width
         spacing: 8
         AppField {
             id: dayField
@@ -131,13 +134,19 @@ AppPanel {
             onTextChanged: root.readDue()
             onAccepted: root.save(); onEscaped: root.close()
         }
-        Text {
-            textFormat: Text.PlainText
-            anchors.bottom: parent.bottom; bottomPadding: 8; leftPadding: 8
-            width: Math.max(0, title.width - dayField.width - timeField.width - 16)
-            elide: Text.ElideRight
-            text: root.reading
-            color: root.unreadable ? root.c.danger : root.c.dim; font.family: root.c.font; font.pixelSize: 12
+        Item {
+            width: Math.min(reading.implicitWidth, title.width)
+            // Level with the fields' boxes beside them; on a line of its own (y > 0), only its own height
+            height: y > 0 ? reading.implicitHeight : dayField.height
+            Text {
+                id: reading
+                textFormat: Text.PlainText
+                anchors.bottom: parent.bottom; bottomPadding: 8; leftPadding: 8
+                width: parent.width
+                elide: Text.ElideRight
+                text: root.reading
+                color: root.unreadable ? root.c.danger : root.c.dim; font.family: root.c.font; font.pixelSize: 12
+            }
         }
     }
     // Picked whole when the keys come to it, so typing replaces it ("today" → "fri", not "todayfri")
