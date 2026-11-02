@@ -121,9 +121,25 @@ def settle(sid):
     data = json.loads(snap.read_text(encoding="utf-8"))
     for f in data["files"]:
         if Path(f["path"]).name != "displayname":
-            p = DATA / f["path"]
+            p = inside(f["path"])
             f["after"] = p.read_text(encoding="utf-8") if p.is_file() else None
     write(snap, json.dumps(data, ensure_ascii=False))
+
+
+def inside(rel, root=None):
+    """A snapshot's path as the file it names, checked: list/file, links resolved, still in the tasks' folder (or the
+    trash). The snapshot is a JSON file in the state folder, and anything that can write there (the user's own
+    programs, an editor rule) could otherwise make an Undo write, unlink or rmtree any path the user can (#1925)."""
+    root = (root or DATA).resolve()
+    parts = Path(rel).parts if isinstance(rel, str) else ()
+    if len(parts) != 2 or Path(rel).is_absolute() or any(x in (".", "..") for x in parts):
+        raise NotFound(f"This undo names {rel!r}, not a file of the tasks: nothing was changed.")
+    p = (root / rel).resolve()
+    # Two levels below the root after resolving too: a list folder that is a link to the root itself would make the
+    # rmtree of a list the rmtree of every list
+    if not p.is_relative_to(root) or len(p.relative_to(root).parts) != 2:
+        raise NotFound(f"This undo names {rel!r}, which leads out of the tasks' folder: nothing was changed.")
+    return p
 
 
 def restore(sid):
@@ -133,14 +149,14 @@ def restore(sid):
     if not re.fullmatch(r"[0-9a-f]+", sid or "") or not (UNDO / f"{sid}.json").is_file():
         raise NotFound(f"Nothing to undo with {sid!r}: it is done already, or too old.")
     files = json.loads((UNDO / f"{sid}.json").read_text(encoding="utf-8"))["files"]
-    for f in files:
-        p = DATA / f["path"]
+    # Every path checked before any is read or touched: one bad path leaves the whole snapshot undone
+    paths = [(f, inside(f["path"]), inside(f["path"], TRASH)) for f in files]
+    for f, p, _ in paths:
         if "after" in f and (p.read_text(encoding="utf-8") if p.is_file() else None) != f["after"]:
             raise NotFound("The task has changed since, so the undo would lose that: nothing was changed. "
                            "Change it back by hand if need be.")
     out = []
-    for f in files:
-        p = DATA / f["path"]
+    for f, p, trashed in paths:
         if f["before"] is None and p.name == "displayname":
             # The list the change made, unless a task has gone in it since
             if p.parent.is_dir() and not any(p.parent.glob("*.ics")):
@@ -149,7 +165,7 @@ def restore(sid):
             p.unlink(missing_ok=True)
         else:
             write(p, f["before"])
-            (TRASH / f["path"]).unlink(missing_ok=True)
+            trashed.unlink(missing_ok=True)
         out.append(p)
     (UNDO / f"{sid}.json").unlink()
     return out

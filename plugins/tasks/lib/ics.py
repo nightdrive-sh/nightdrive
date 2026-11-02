@@ -61,12 +61,22 @@ def fold(line):
     return "\r\n ".join(out)
 
 
+# Every character Python's splitlines() would end a line at: CRLF and CR, VT, FF, the file, group and record
+# separators, NEL and Unicode's line and paragraph separators. escape() writes each as \n (a backslash and an n), so a
+# title or note can't end its own line and start a property (END:VTODO, STATUS, a VALARM) in a reader that splits
+# there, as unfold() did (#1925).
+BREAKS = re.compile("\r\n|[\n\r\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")
+
+
 def unfold(text):
-    return re.sub(r"\r?\n[ \t]", "", text).splitlines()
+    # Lines end at CRLF (or a bare LF) only, as RFC 5545 has them: a value written by another app with one of the
+    # other BREAKS in it stays one value, where splitlines() would have read the rest as a line of its own
+    return re.split(r"\r?\n", re.sub(r"\r?\n[ \t]", "", text))
 
 
 def escape(text):
-    return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+    text = text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+    return BREAKS.sub(r"\\n", text)
 
 
 def unescape(value):
