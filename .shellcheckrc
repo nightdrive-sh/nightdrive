@@ -1,0 +1,5 @@
+# Shellcheck settings for the repo (CI: .github/ci/check.py).
+# Sourced files (config/bash, kit/app.sh, plugins/garage/lib) have no shebang: they are all bash.
+shell=bash
+# Sourced paths are built at run time, so shellcheck cannot follow them.
+disable=SC1090,SC1091

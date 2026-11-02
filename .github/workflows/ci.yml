@@ -1,0 +1,36 @@
+name: CI
+
+# The checks in .github/ci/check.py: bash -n and ast.parse on every script, shellcheck against its baseline, and a
+# secret scan of the whole history with gitleaks. Run them locally the same way: .github/ci/check.py --secrets.
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Fedora, as users run: its Python parses the scripts, and ShellCheck and gitleaks come as its signed packages,
+    # not as downloads or third-party actions. By tag, not digest: Fedora's registry drops an old digest within
+    # weeks, and this job holds no secret and can write nothing.
+    container: registry.fedoraproject.org/fedora:44
+    steps:
+      - name: Install the tools
+        run: dnf -y -q install git-core python3 ShellCheck gitleaks
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # gitleaks reads every commit
+          persist-credentials: false
+      - name: Check
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          .github/ci/check.py --secrets

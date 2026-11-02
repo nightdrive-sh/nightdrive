@@ -5,6 +5,10 @@ save valid, then check:
 - Hyprland: `hyprctl configerrors` should be empty.
 - Quickshell: `qs log | tail` should show no QML errors.
 - Scripts: `bash -n` for shell, `ast.parse` for Python.
+- CI (`.github/workflows/ci.yml`) runs these on every push and pull request, with shellcheck and a secret scan:
+  `.github/ci/check.py [--secrets]` runs the same locally (`dnf install ShellCheck gitleaks`). A shellcheck warning
+  not in its baseline fails it: fix it, or add a `# shellcheck disable=SCxxxx` with the reason. A made-up key in a test
+  goes in a `_test.py` or `.gitleaks.toml`; a harmless finding's fingerprint in `.gitleaksignore`.
 
 Test over IPC (`qs ipc show`, e.g. `qs ipc call launcher openLevel settings`) and take screenshots with `grim`. `launcher rows`
 returns the open level's title, footer and rows as JSON: compare it before and after a change to the launcher.

@@ -1,0 +1,14 @@
+# Findings gitleaks reported in the history when CI began, each checked: none is a secret.
+# A line is a finding's fingerprint (commit:file:rule:line); a comment above says what it is.
+# an MD5 of a launcher easter egg's command, not a key
+f21126c55b5915ddcd0c01cf9c5b339532968cfc:config/quickshell/LauncherSearch.qml:generic-api-key:43
+# a public signing key's fingerprint
+0946fb767ddda1e71ccf940cd035de2495bf9646:setup-hyprland-repo.sh:generic-api-key:23
+# the characters a generated password may use
+534698d660fd5f2749e79cf1f0fb41d67e44974b:plugins/vnc-display/bin/vnc-display:generic-api-key:28
+# a public signing key's fingerprint
+6c1b3a4bf8e386572a7c88a937ca2662e5366c5e:setup-claude.sh:generic-api-key:12
+# the web app links extension's public key (fixes its id)
+108a983d11efd33ddbb26cc748fe77d35d76d096:config/hypr/webapp-links/manifest.json:generic-api-key:6
+# an MD5 of a launcher easter egg's command, not a key
+49fef005b6507a9f93817ea833fda4b225ddf355:config/quickshell/Launcher.qml:generic-api-key:384
