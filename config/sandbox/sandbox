@@ -2,8 +2,8 @@
 # nightdrive sandbox: Nightdrive in a headless rootless Podman container, to check a change and take screenshots of it on
 # a machine without Hyprland, or without taking over the desktop's keyboard. How it works and why: docs/sandbox.md.
 #   nightdrive sandbox up          builds the image when needed, starts KWin, Hyprland, Quickshell and swaybg in it
-#   nightdrive sandbox check       Hyprland --verify-config, hyprctl configerrors, Quickshell's errors, plugin check:
-#                                  exit 1 if any
+#   nightdrive sandbox check       Hyprland --verify-config, hyprctl configerrors, Quickshell's errors, plugin check,
+#                                  the size guard: exit 1 if any
 #   nightdrive sandbox shot [NAME] screenshot -> prints the path of NAME.png
 #   nightdrive sandbox ipc ARGS…   qs ipc call ARGS… (or `ipc show`)
 #   nightdrive sandbox exec CMD…   a command in the session (hyprctl, qs, …); `shell` for an interactive one
@@ -140,7 +140,10 @@ case ${1:-} in
   down) down ;;
   build) build ;;
   # The container's paths as the repo's (config/hypr/hyprland.lua:361 rather than /home/nd/.config/hypr/hyprland.lua:361)
-  check) need_up; in_box check | sed -E 's#/home/nd/nightdrive/##g; s#/home/nd/\.config/(hypr|quickshell|topbar)/#config/\1/#g' ;;
+  # The size guard runs here on the host, where git is: the working tree against HEAD (AGENTS.md › Conventions)
+  check) "$repo/config/hypr/scripts/size-guard" "$repo"; guard=$?
+         need_up; in_box check | sed -E 's#/home/nd/nightdrive/##g; s#/home/nd/\.config/(hypr|quickshell|topbar)/#config/\1/#g'
+         (( guard == 0 && PIPESTATUS[0] == 0 )) ;;
   shot) shot "${2:-}" ;;
   ipc) need_up
        case ${2:-} in show|call|prop|"") in_box exec qs ipc "${@:2}" ;; *) in_box exec qs ipc call "${@:2}" ;; esac ;;

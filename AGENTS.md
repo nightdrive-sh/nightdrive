@@ -61,6 +61,9 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
 - Code is written only by Claude, so files stay small for the context: one file does one thing, ~200–400 lines. Past ~600,
   split off what stands on its own (a component, a library, a level); past ~800 it must be split (generated files such as
   `Icons.qml` excepted). A new app or feature is planned in small files from the start.
+  `config/hypr/scripts/size-guard [REPO]` holds the line (here, Deck, Ferry, doubletake; `sandbox check` runs it): a file
+  over 800 may not grow and none may cross it. Opt-in as a commit hook: `size-guard --install [REPO]`. When growth is
+  justified, say why with a `Size-guard: <reason>` line in the commit message; exceptions are its `EXEMPT` list.
 - Colours come from `Theme.*` in QML, and the bar's from `TopBar.c()` (bar-style; source: `THEMES` in `hypr/scripts/theme`).
 - Machine-specific values are named constants at the top of each file.
 - Nothing personal goes in the repo. Private additions use the git-ignored *local* slots (README › Make it yours).

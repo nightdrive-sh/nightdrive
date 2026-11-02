@@ -1,0 +1,199 @@
+#!/usr/bin/python3
+"""Size guard: stops code files from growing past the size rule (AGENTS.md › Conventions).
+
+Over 600 lines is a warning, over 800 an error. It stops growth, not old files: a file already over a limit may not
+grow, and a new or smaller file may not cross one. A file that doesn't change, or shrinks, is never a finding, so the
+files not yet split don't block every commit.
+
+  size-guard [REPO]               the working tree (tracked and new files) against HEAD
+  size-guard --staged [REPO]      the index against HEAD
+  size-guard --commit REV [REPO]  commit REV against its parent
+  size-guard --all [REPO]         every file over 600 lines, changed or not (a report; never fails)
+  size-guard --install [REPO]     opt-in: link this script as REPO's commit-msg hook
+REPO defaults to the repository the current directory is in: the same script serves Deck, Ferry and doubletake.
+
+As a commit-msg hook it checks the staged files. A justified exception passes with a trailer in the commit message,
+so the reason stays in the history:  Size-guard: <why this file has to grow now>
+(`git commit --no-verify` skips every hook, without a reason: avoid it.)
+Exit 1 on an error that has no such reason.
+"""
+import fnmatch
+import os
+import re
+import subprocess
+import sys
+
+WARN, ERROR = 600, 800
+
+# The one list of exceptions: generated files, data, documentation and anything that isn't code. Each pattern is
+# matched against the file's path in the repo and against its name alone. Binary files are skipped anyway.
+EXEMPT = [
+    "Icons.qml", "EmojiNames.js", "*data/emoji.tsv", "*data/software.json",   # generated maps and data
+    "*fontconfig/*",                                                          # generated font rules
+    "*.md", "*.txt", "COPYING*", "LICENSE*",                                  # documentation and licences, not code
+    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.webp", "*.ico", "*.icns",
+    "*.ttf", "*.otf", "*.woff", "*.woff2", "*.mp4", "*.webm", "*.mp3", "*.wav", "*.ogg",
+    "*.lock", "go.sum", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
+]
+TRAILER = re.compile(r"^Size-guard:[ \t]*(\S.*)$", re.M)
+
+
+def git(repo, *args, check=True):
+    r = subprocess.run(["git", "-C", repo, *args], capture_output=True)
+    if check and r.returncode:
+        sys.exit(f"size-guard: git {' '.join(args)}: {r.stderr.decode(errors='replace').strip()}")
+    return r
+
+
+def exempt(path):
+    name = os.path.basename(path)
+    return any(fnmatch.fnmatch(path, p) or fnmatch.fnmatch(name, p) for p in EXEMPT)
+
+
+def lines(data):
+    """Line count, or None for a binary file."""
+    if data is None or b"\0" in data[:8192]:
+        return None
+    return len(data.splitlines())
+
+
+def blob(repo, rev, path):
+    """A file's contents at rev ("" = the index), None if it isn't there."""
+    r = git(repo, "show", f"{rev}:{path}", check=False)
+    return r.stdout if r.returncode == 0 else None
+
+
+def disk(repo, path):
+    try:
+        with open(os.path.join(repo, path), "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def has_head(repo):
+    return git(repo, "rev-parse", "--verify", "-q", "HEAD", check=False).returncode == 0
+
+
+def changes(repo, mode, rev):
+    """[(old path or None, new path)] of the added, copied, modified and renamed files."""
+    filt = ["--name-status", "-M", "--diff-filter=ACMR", "-z"]
+    if mode == "commit":
+        parent = git(repo, "rev-parse", "-q", "--verify", f"{rev}^", check=False).stdout.decode().strip()
+        out = git(repo, "diff-tree", "-r", "--root", *filt, *([parent, rev] if parent else [rev])).stdout
+    elif not has_head(repo):   # the first commit: everything is new
+        files = git(repo, "ls-files", "-z", *([] if mode == "staged" else ["-co", "--exclude-standard"])).stdout
+        return [(None, p) for p in files.decode().split("\0") if p]
+    elif mode == "staged":
+        out = git(repo, "diff", "--cached", *filt, "HEAD").stdout
+    else:
+        out = git(repo, "diff", *filt, "HEAD").stdout
+    parts, result = out.decode().split("\0"), []
+    i = 0
+    while i < len(parts) and parts[i]:
+        status = parts[i]
+        if status[0] in "RC":
+            result.append((parts[i + 1] if status[0] == "R" else None, parts[i + 2])); i += 3
+        else:
+            result.append((parts[i + 1] if status[0] == "M" else None, parts[i + 1])); i += 2
+    if mode == "tree":   # new files not yet added
+        new = git(repo, "ls-files", "-z", "--others", "--exclude-standard").stdout.decode().split("\0")
+        result += [(None, p) for p in new if p]
+    return result
+
+
+def check(repo, mode, rev):
+    """[(level, text)] for the files that grew past a limit or crossed one."""
+    new_rev, old_rev = {"staged": ("", "HEAD"), "commit": (rev, f"{rev}^"), "tree": (None, "HEAD")}[mode]
+    findings = []
+    for old_path, path in changes(repo, mode, rev):
+        if exempt(path):
+            continue
+        n = lines(disk(repo, path) if new_rev is None else blob(repo, new_rev, path))
+        if n is None or n <= WARN:
+            continue
+        o = lines(blob(repo, old_rev, old_path)) if old_path else None
+        if o is not None and n <= o:
+            continue   # unchanged or smaller: splitting it is its own task, not this commit's
+        level = "error" if n > ERROR else "warning"
+        limit = ERROR if n > ERROR else WARN
+        what = f"{o} → {n} lines" if o is not None else f"{n} lines, new"
+        verb = "grew past" if o is not None and o > limit else "crosses"
+        findings.append((level, f"{path}: {what} ({verb} {limit}): split off what stands on its own"))
+    return findings
+
+
+def report_all(repo):
+    files = git(repo, "ls-files", "-z").stdout.decode().split("\0")
+    rows = []
+    for p in filter(None, files):
+        if exempt(p):
+            continue
+        n = lines(disk(repo, p))
+        if n and n > WARN:
+            rows.append((n, p))
+    for n, p in sorted(rows, reverse=True):
+        print(f"{'error  ' if n > ERROR else 'warning'} {n:6} {p}")
+    if not rows:
+        print(f"ok: no code file over {WARN} lines")
+
+
+def install(repo):
+    hooks = git(repo, "rev-parse", "--git-path", "hooks").stdout.decode().strip()
+    hooks = os.path.join(repo, hooks) if not os.path.isabs(hooks) else hooks
+    if git(repo, "config", "core.hooksPath", check=False).stdout.strip():
+        sys.exit("size-guard: core.hooksPath is set in this repo: link the hook there by hand")
+    target, me = os.path.join(hooks, "commit-msg"), os.path.realpath(__file__)
+    if os.path.lexists(target):
+        if os.path.realpath(target) == me:
+            print(f"ok: {target} is already the size guard"); return
+        sys.exit(f"size-guard: {target} exists and is another hook: left as it is")
+    os.makedirs(hooks, exist_ok=True)
+    os.symlink(me, target)
+    print(f"installed: {target} -> {me}  (remove the link to turn it off)")
+
+
+def main():
+    args, mode, rev, msg_file = sys.argv[1:], "tree", None, None
+    hook = os.path.basename(sys.argv[0]) == "commit-msg"
+    if hook:   # git runs it from the top of the work tree with the message file
+        mode, msg_file, args = "staged", args[0] if args else None, []
+    repo_arg = None
+    while args:
+        a = args.pop(0)
+        if a == "--staged": mode = "staged"
+        elif a == "--commit": mode, rev = "commit", args.pop(0) if args else "HEAD"
+        elif a in ("--all", "--install"): mode = a[2:]
+        elif a in ("-h", "--help"): print(__doc__.strip()); return 0
+        elif a.startswith("-"): sys.exit(f"size-guard: unknown option {a} (--help)")
+        else: repo_arg = a
+    repo = git(repo_arg or ".", "rev-parse", "--show-toplevel").stdout.decode().strip()
+
+    if mode == "all": report_all(repo); return 0
+    if mode == "install": install(repo); return 0
+    # A merge brings commits that were checked on their own branch: checking them again here would only repeat that.
+    if hook and git(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD", check=False).returncode == 0:
+        return 0
+
+    findings = check(repo, mode, rev)
+    for level, text in findings:
+        print(f"size-guard {level}: {text}", file=sys.stderr)
+    if not any(level == "error" for level, _ in findings):
+        return 0
+    message = ""
+    if msg_file:
+        with open(msg_file, encoding="utf-8", errors="replace") as f:
+            message = "\n".join(l for l in f.read().splitlines() if not l.startswith("#"))
+    elif mode == "commit":
+        message = git(repo, "log", "-1", "--format=%B", rev).stdout.decode(errors="replace")
+    reason = TRAILER.search(message)
+    if reason:
+        print(f"size-guard: passed with the reason: {reason.group(1)}", file=sys.stderr)
+        return 0
+    print(f"size-guard: files over {ERROR} lines may not grow. If it is justified now, say why with a line in the "
+          "commit message:  Size-guard: <reason>", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
