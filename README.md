@@ -50,7 +50,9 @@ Nightdrive puts all of that together into one opinionated desktop.
 
 Type a request and press ⌘Enter, or Enter on the **Ask Claude** row: Claude does it with [Nightdrive's
 tools](docs/claude.md) in a toast in the Launcher's place, showing each step and its answer, and you can write back (⌘⌃Enter sends
-it to Claude Code in a terminal instead). Search "Rename current space" to name the workspace you're on in the bar.
+it to Claude Code in a terminal instead). The tools are experimental: what Claude reads with them (a mail, a file) goes to
+Anthropic as part of the conversation ([What reaches Anthropic](docs/claude.md#what-reaches-anthropic)). Search "Rename current space" to name the workspace
+you're on in the bar.
 
 It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and the answer is the first row; Enter
 copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal comma in results* answers `3,5`.

@@ -28,8 +28,7 @@ Item {
           about: "Claude also reads all of it, and deletes to the trash, without asking. Sending, devices and "
                + "installing still ask." },
         { level: "", icon: "circle-slash", name: "Off",
-          about: "Claude Code doesn't get Nightdrive's tools. You can turn them on later in Settings › Claude › Access, "
-               + "where each area's reading, changing and deleting is yours to choose." }
+          about: "Claude Code doesn't get Nightdrive's tools: Settings › Claude › Access turns them on later." }
     ]
 
     // When shown, the level chosen before is picked; Off until there is one
@@ -85,21 +84,37 @@ Item {
 
     Column {
         id: head
-        x: 40; y: 40
+        x: 40; y: 32
         width: parent.width - 80
-        spacing: 16
-        AppTitle { c: root.c; text: "Claude's access"; pixelSize: 24 }
+        spacing: 10
+        Row {
+            spacing: 12
+            AppTitle { id: title; c: root.c; text: "Claude's access"; pixelSize: 24 }
+            Text {
+                anchors.verticalCenter: title.verticalCenter; anchors.verticalCenterOffset: 2
+                text: "Experimental"
+                color: root.c.primary; font.family: root.c.font; font.pixelSize: 13
+            }
+        }
         Text {
             width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.25
             color: root.c.text; font.family: root.c.font; font.pixelSize: 13
             text: "In any Claude Code session, Claude can use your desktop for you: find a mail, change the wallpaper, "
                 + "tell you how Nightdrive works. How much may it do?"
         }
+        // What leaves the computer, said before the level is chosen (Dashboard #1834): plainly, without alarm
+        Text {
+            width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.25
+            color: root.c.dim; font.family: root.c.font; font.pixelSize: 12
+            text: "When Claude reads your mail, contacts, calendars, notes, files or windows with a tool, they go to "
+                + "Claude's service (Anthropic) in the conversation. Limit it here or in Settings › Claude › Access; use it "
+                + "at your own risk."
+        }
     }
 
     Column {
         id: rows
-        x: 26; y: head.y + head.height + 20
+        x: 26; y: head.y + head.height + 12
         width: parent.width - 52
         spacing: 2
         Repeater {
@@ -158,12 +173,12 @@ Item {
 
     // What the levels don't change: the card for what has consequences, and the way to change it later
     Text {
-        x: 40; y: rows.y + rows.height + 20
+        x: 40; y: rows.y + rows.height + 12
         width: parent.width - 80
         wrapMode: Text.Wrap; lineHeight: 1.25
         color: root.error ? root.c.danger : root.c.dim; font.family: root.c.font; font.pixelSize: 12
-        text: root.error || "Whatever you choose, Claude never sees your passwords, and nothing that sends or installs runs "
-            + "without your Enter on Nightdrive's own card."
+        text: root.error || "Claude never sees your passwords, and nothing sends or installs without your Enter on "
+            + "Nightdrive's card."
     }
 
     Item {

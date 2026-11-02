@@ -27,6 +27,14 @@ The tools come from `nightdrive mcp`, an MCP server on your own computer. Each t
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.
 Claude writes (⌘⇧C) and Mail's replies don't get the tools: what they read can't make them do anything.
 
+## What reaches Anthropic
+
+Nightdrive's tools are **experimental**: use them at your own risk. When Claude reads your mail, contacts, calendars,
+notes, files or a picture of a window, that goes to Claude's service (Anthropic) as part of the conversation, as
+anything else Claude reads does. Only what a tool returns goes, and only when Claude uses one: nothing is sent in the
+background. Limit it with the level and the areas in Settings › Claude › Access, below (on Normal, reading what is
+private asks each time), and turn it all off with its switch ([Turning it off](#turning-it-off)).
+
 ## Three kinds of tools
 
 | Kind | Examples | What happens |

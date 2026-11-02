@@ -126,6 +126,12 @@ Item {
                   .concat(serverError ? [{ kind: "note", name: serverError }] : [])
                   // Claude Code's own permissions that let it past these limits (#1837)
                   .concat((server.warnings || []).map(t => ({ kind: "note", name: t })))
+            // What leaves the computer, first and short (Dashboard #1834); docs/claude.md › What reaches Anthropic
+            // (a quote's lines don't wrap: each is kept short enough for the launcher's width)
+            const about = { kind: "quote", name: "Experimental: use it at your own risk. When Claude reads\n"
+                + "your mail, contacts, calendars, notes, files or a window's\n"
+                + "picture with a tool, it goes to Claude's service (Anthropic)\n"
+                + "in the conversation. Limit it below; the switch turns it off." }
             const changed = now.own
             const presetRows = presets.map(p => ({ kind: "capreset", value: p[0], name: p[1], sub: p[3],
                 glyph: p[0] === now.level ? "check" : p[2],
@@ -134,7 +140,7 @@ Item {
             const open = { kind: "cawindow", name: "Areas: what Claude may read, modify and delete…", glyph: "app-window",
                            sub: "Each area Allow, Ask or No, in plain words, in a window of its own" }
             const only = { kind: "note", name: "These cover only Nightdrive's tools: what Claude Code may do with its own (commands, files) is set in Claude Code" }
-            return top.concat([{ kind: "header", name: "Level" }], presetRows, [{ kind: "header", name: "Areas" }], [open],
+            return [about].concat(top, [{ kind: "header", name: "Level" }], presetRows, [{ kind: "header", name: "Areas" }], [open],
                               now.problem ? [{ kind: "note", name: now.problem }] : [], [only])
         }
         return []
