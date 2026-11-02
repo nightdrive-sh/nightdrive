@@ -129,7 +129,7 @@ def check_conf(d, pid, icons):
             find(path, at[k], f"{k}: {err}")
     # An installer that adds a package repository says so: Claude's card for installing the plugin shows it (#1879)
     if not conf.get("repos", "").strip() and (via := adds_repo(d, conf.get("install", ""))):
-        how = "" if via is True else f" (through {via}" + (f", repos={REPO_OF[via]}" if via in REPO_OF else "") + ")"
+        how = "" if via is True else f" (through {via}" + (f", repos={v}" if (v := repos_for(via)) else "") + ")"
         find(path, at.get("install", 1), f"its installer adds a package repository{how}: name it in repos=")
     return conf
 
@@ -137,8 +137,14 @@ def check_conf(d, pid, icons):
 REPO_ADDED = re.compile(r"yum\.repos\.d|copr enable|config-manager|addrepo")
 # The repo's own setup scripts a plugin's installer may call ("$repo/setup-hyprland-repo.sh"): one that adds a repository
 # adds it for the installer too, so the call counts (#1948). REPO_OF: what repos= should then say, where it is known.
-SETUP_SCRIPT = re.compile(r"(?:^|[/\s\"'])(setup-[\w-]+\.sh)\b")
-REPO_OF = {"setup-hyprland-repo.sh": "copr:@nightdrive/nightdrive"}
+# The words after the name are its arguments, up to a redirect, a comment or the line's end: setup-rpmfusion.sh's say
+# which of RPM Fusion's repos it adds, so its REPO_OF value has a {} filled in once for each (#1951). That script knows
+# them by name: it adds them by installing their release RPM, which REPO_ADDED can't see in its text.
+SETUP_SCRIPT = re.compile(r"(?:^|[/\s\"'])(setup-[\w-]+\.sh)\b[\"']?((?:[ \t]+[\w-]+)*)")
+RPMFUSION = "https://mirrors.rpmfusion.org/{}/fedora"
+REPO_OF = {"setup-hyprland-repo.sh": "copr:@nightdrive/nightdrive", "setup-rpmfusion.sh": RPMFUSION}
+# An installer may also install RPM Fusion's release RPM itself (dnf install …/rpmfusion-free-release-$(rpm -E %fedora)…)
+RELEASE_RPM = re.compile(r"\binstall\b[^\n;&|]*rpmfusion-(free|nonfree)-release")
 
 
 def read(path):
@@ -151,15 +157,29 @@ def read(path):
 
 def adds_repo(d, install):
     """Whether the install command, the script in the folder it names, or a setup-*.sh of the repo's that either calls
-    adds a dnf repository: False, True, or the name of the setup script that adds it (for the finding)"""
+    adds a dnf repository: False, True, or what adds it for the finding: a setup script with its arguments
+    ("setup-rpmfusion.sh free") or the release RPM installed ("rpmfusion-free-release")"""
     script = os.path.join(d, install.split()[0]) if install.split() else ""
     text = install + "\n" + (read(script) if os.path.isfile(script) else "")
+    if m := RELEASE_RPM.search(text):
+        return f"rpmfusion-{m[1]}-release"
     if REPO_ADDED.search(text):
         return True
-    for name in dict.fromkeys(SETUP_SCRIPT.findall(text)):
-        if REPO_ADDED.search(read(os.path.join(REPO, name))):
-            return name
+    for name, args in dict.fromkeys(SETUP_SCRIPT.findall(text)):
+        if name in REPO_OF or REPO_ADDED.search(read(os.path.join(REPO, name))):
+            return " ".join([name, *args.split()])
     return False
+
+
+def repos_for(via):
+    """The repos= value for what adds_repo found, or None where it isn't known"""
+    name, *args = via.split()
+    if m := re.fullmatch(r"rpmfusion-(\w+)-release", name):
+        return RPMFUSION.format(m[1])
+    value = REPO_OF.get(name)
+    if value and "{}" in value:
+        return " ".join(value.format(a) for a in args) or None
+    return value
 
 
 def shell_syntax(cmd, cwd):

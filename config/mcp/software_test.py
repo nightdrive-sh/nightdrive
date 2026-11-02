@@ -184,6 +184,34 @@ class PluginRepos(unittest.TestCase):
             (d / "install.sh").write_text('"$here/../../setup-user.sh"\n')
             self.assertFalse(check.adds_repo(str(d), "install.sh"))
 
+    def test_rpm_fusion_counts_with_the_value_to_name(self):
+        """setup-rpmfusion.sh adds RPM Fusion by installing its release RPM, which REPO_ADDED can't see: the call counts
+        by name, its arguments give repos= (#1951), and so does installing a release RPM directly"""
+        sys.dont_write_bytecode = True
+        check = load(HERE.parent / "hypr/scripts/plugin-check", "plugin_check")
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / "example"
+            d.mkdir()
+            (d / "install.sh").write_text('"$here/../../setup-rpmfusion.sh" free nonfree   # keys checked\n')
+            via = check.adds_repo(str(d), "install.sh")
+            self.assertEqual(via, "setup-rpmfusion.sh free nonfree")
+            self.assertEqual(check.repos_for(via), "https://mirrors.rpmfusion.org/free/fedora "
+                                                   "https://mirrors.rpmfusion.org/nonfree/fedora")
+            conf = "name=Example\nicon=tablet\ndescription=An example\ninstall=install.sh\ninstalled=true\n" \
+                   "version=1.0.0\nauthor=@someone\n"
+            (d / "plugin.conf").write_text(conf)
+            check.findings.clear()
+            check.check_conf(str(d), "example", set())
+            self.assertTrue(any("repos=https://mirrors.rpmfusion.org/free/fedora" in f for f in check.findings),
+                            check.findings)
+            direct = "sudo dnf install -y https://mirrors.rpmfusion.org/free/fedora/" \
+                     "rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm && sudo dnf install -y x"
+            via = check.adds_repo("/nonexistent", direct)
+            self.assertEqual((via, check.repos_for(via)),
+                             ("rpmfusion-free-release", "https://mirrors.rpmfusion.org/free/fedora"))
+            # Only checking that it is there adds nothing
+            self.assertFalse(check.adds_repo("/nonexistent", "rpm -q rpmfusion-free-release && sudo dnf install -y x"))
+
     def test_software_plugins_lists_them(self):
         found = json.loads(subprocess.run([str(HERE.parent / "hypr/scripts/software"), "plugins", "--json"],
                                           capture_output=True, text=True).stdout)["plugins"]
