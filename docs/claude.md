@@ -87,6 +87,8 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   - *Normal*, the default: reading your mail, contacts, calendar, notes, notifications or a window on screen asks you
     each time; the rest is allowed. Changes run at once with Undo; deleting asks.
   - *Open*: everything allowed.
+
+  Once you change any choice below, the level shows as *Custom* (from the level you changed).
 - **Areas…** opens the Access window (`nightdrive mcp access open`). Each area has up to three choices, **Read**,
   **Modify** and **Delete**, each *Allow*, *Ask* or *No*:
   - *Allow*: Claude does it when it needs to (a change comes with Undo).
@@ -94,10 +96,10 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
     can't show what will be found, only what Claude looks for.
   - *No*: Claude doesn't see those tools at all.
 
-  The picked row says in plain words what its choices let Claude do, and › lists every tool in the area. A dot marks a
-  choice of your own; picking a level again puts them back to the level's (it asks first). An app's area shows while
-  the app is installed.
-- **An area's own choices**, in its details (›), are on or off, and the level sets them too: off on Strict and Normal, on
+  The picked row says in plain words what its choices let Claude do, and **More ›** lists every tool in the area. A dot
+  marks a choice of your own; picking a level again puts them back to the level's (it asks first). An app's area shows
+  while the app is installed.
+- **An area's own choices**, in its details (**More ›**), are on or off, and the level sets them too: off on Strict and Normal, on
   on Open (but *Remove what Nightdrive needs* and *Codes, card numbers and passwords*, off on every level, and Contacts'
   parts of a card, below). Space turns the picked one on or off;
   `nightdrive mcp access option home-assistant unlock on` in a terminal.
@@ -216,8 +218,9 @@ there is none. Once it has, a missing file means *Strict*, as a broken one does,
 
 A change applies at once: a session already open may still list a tool you set to *No*, but its use is refused; a new
 session sees the new list. Welcome to Nightdrive asks for the level once, at the first login, with *Off* picked.
-In a terminal: `nightdrive mcp access` shows what applies, `nightdrive mcp access level strict|normal|open`, `set mail
-read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
+In a terminal: `nightdrive mcp access` shows what applies (`custom` once you changed the level), `nightdrive mcp
+access level strict|normal|open`, `set mail read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or
+`no`).
 
 Some calls ask once: the first event Claude adds to a calendar shows the card, and once you allow it, Claude adds to
 that calendar without asking (a calendar marked shared asks every time). Web addresses are the same per site, the exact

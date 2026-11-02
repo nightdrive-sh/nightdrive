@@ -3,7 +3,7 @@ import qs
 import qs.kit
 import "Words.js" as Words
 
-// An area in full (› on its row): each right's choice and every tool under it in plain words, with which ones always
+// An area in full (More › on its row): each right's choice and every tool under it in plain words, with which ones always
 // ask and which come with Undo, so nothing Claude can do here is hidden behind a summary. The area's own finer
 // choices (Contacts' fields, Mail's block list, the apps whose windows Claude may see, Home Assistant's: Dashboard
 // #1789, #1830, #1832) go in this panel, under the rights: on or off each (OptionRow), ↑ ↓ and Space. A list choice

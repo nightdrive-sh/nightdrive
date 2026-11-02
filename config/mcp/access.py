@@ -139,8 +139,10 @@ class Access:
                        for o in areas.options(a)]
             rows.append({"id": a, "name": areas.name(a), "glyph": areas.glyph(a), "rights": rights,
                          "options": options})
+        own = self.count_own()
+        # custom: a level the user has changed shows as Custom, not as that level (#1902); level stays the one it's from
         return {"file": str(FILE), "chosen": FILE.exists(), "level": self.level, "levels": list(LEVELS),
-                "own": self.count_own(), "areas": rows, **({"problem": self.problem} if self.problem else {})}
+                "own": own, "custom": own > 0, "areas": rows, **({"problem": self.problem} if self.problem else {})}
 
 
 def from_v1(data, path):

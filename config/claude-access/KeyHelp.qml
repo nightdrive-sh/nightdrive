@@ -7,7 +7,7 @@ QtObject {
         { title: "Access", keys: [
             ["↑ ↓  j k", "Move between the areas"],
             ["← →  h l", "Read, Modify, Delete, the area's details"],
-            ["⏎  Space", "Choose (or the details, on ›)"],
+            ["⏎  Space", "Choose (or the details, on More ›)"],
             ["1  2  3", "Allow, Ask, No"],
             ["i", "The area's details"]] },
         { title: "An area's details", keys: [

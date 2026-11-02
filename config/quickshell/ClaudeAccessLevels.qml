@@ -105,7 +105,7 @@ Item {
         const cur = launcher.results[launcher.selIndex] || {}
         if (cur.kind === "caserver") return "Enter: on/off"
         if (cur.kind === "capreset") return now && now.own ? "Enter: use it (your own choices go back to it)" : "Enter: use it"
-        if (cur.kind === "cawindow") return "Enter: open"
+        if (cur.kind === "cawindow" || cur.kind === "cacustom") return "Enter: open"
         return ""
     }
     function opened() {}
@@ -133,10 +133,14 @@ Item {
                 + "picture with a tool, it goes to Claude's service (Anthropic)\n"
                 + "in the conversation. Limit it below; the switch turns it off." }
             const changed = now.own
+            // A level the user has changed is Custom, not that level (#1902): no level row is checked then, and Custom's
+            // row opens the window where the choices are
             const presetRows = presets.map(p => ({ kind: "capreset", value: p[0], name: p[1], sub: p[3],
-                glyph: p[0] === now.level ? "check" : p[2],
-                summary: p[0] !== now.level ? (p[0] === "normal" ? "default" : undefined)
-                       : changed ? "current, " + changed + " of your own" : "current" }))
+                glyph: p[0] === now.level && !changed ? "check" : p[2],
+                summary: p[0] === now.level && !changed ? "current" : p[0] === "normal" ? "default" : undefined }))
+              .concat(changed ? [{ kind: "cacustom", name: "Custom", glyph: "check", summary: "current",
+                                   sub: presetName(now.level) + " with " + changed
+                                        + (changed === 1 ? " choice" : " choices") + " of your own" }] : [])
             const open = { kind: "cawindow", name: "Areas: what Claude may read, modify and delete…", glyph: "app-window",
                            sub: "Each area Allow, Ask or No, in plain words, in a window of its own" }
             const only = { kind: "note", name: "These cover only Nightdrive's tools: what Claude Code may do with its own (commands, files) is set in Claude Code" }
@@ -163,7 +167,7 @@ Item {
             set(["level", it.value])
             return true
         }
-        if (it.kind === "cawindow") {
+        if (it.kind === "cawindow" || it.kind === "cacustom") {
             Quickshell.execDetached([nd, "mcp", "access", "open"])
             l.open = false
             return true

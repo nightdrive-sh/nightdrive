@@ -188,7 +188,7 @@ ShellRoot {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "A dot marks a choice of your own, apart from the level.  ?  keys"
+                    text: "A dot marks a choice of your own, apart from the level. More ›: an area's tools and its own choices.  ?  keys"
                     color: c.faint
                     font { family: c.font; pixelSize: 11 }
                 }

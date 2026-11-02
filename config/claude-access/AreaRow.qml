@@ -3,7 +3,7 @@ import qs
 import qs.kit
 import "Words.js" as Words
 
-// An area's row: its glyph and name, Read / Modify / Delete (ChoiceCell), and › for its panel (AreaPanel). The picked
+// An area's row: its glyph and name, Read / Modify / Delete (ChoiceCell), and More › for its panel (AreaPanel). The picked
 // row says under it, in plain words, what each of its choices lets Claude do now and what goes to Anthropic.
 AppRow {
     id: row
@@ -59,20 +59,34 @@ AppRow {
                     onClicked: row.cellClicked(index, cell)
                 }
             }
+            // The area's details: every tool, and its own choices. A word beside the arrow, as a bare › didn't say
+            // there was more behind it (#1902)
             Item {
-                width: 30; height: parent.height
+                width: moreBox.width + 16; height: parent.height
                 Rectangle {
-                    anchors.centerIn: parent
-                    width: 26; height: 26; radius: 7
+                    id: moreBox
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: moreRow.implicitWidth + 20; height: 26; radius: 7
                     color: more.hovered ? row.c.hover : "transparent"
-                    border.color: row.selected && row.col === 3 ? row.c.primary : "transparent"
-                    border.width: 2
+                    border.color: row.selected && row.col === 3 ? row.c.primary : row.c.line
+                    border.width: row.selected && row.col === 3 ? 2 : 1
                     HoverHandler { id: more; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: row.cellClicked(3, null) }
-                    Text {
+                    Row {
+                        id: moreRow
                         anchors.centerIn: parent
-                        text: Icons.g("chevron-right"); color: row.c.dim
-                        font { family: Icons.family; pixelSize: 14 }
+                        spacing: 6
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "More"; color: row.c.text
+                            font { family: row.c.font; pixelSize: 12 }
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Icons.g("chevron-right"); color: row.c.dim
+                            font { family: Icons.family; pixelSize: 13 }
+                        }
                     }
                 }
             }
