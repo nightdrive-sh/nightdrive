@@ -184,6 +184,7 @@ create() {
   local name=$1 iso=$2 mem=$3 disk=$4 cpus=${5:-4} d; d=$(dir "$1")
   [[ -e $d ]] && die "$name exists already"
   [[ -f $iso ]] || die "No such ISO: $iso"
+  iso_check "$iso"
   sizes "$mem" "$disk" "$cpus"
   need_qemu
   mkdir -p "$d"
@@ -239,7 +240,7 @@ settings() {
       qemu-img resize -q "$d/disk.qcow2" "${v}G" ;;
     iso)
       [[ -z $v || -f $v ]] || die "No such ISO: $v"
-      if [[ -z $v ]]; then conf "$name" ISO '""'; else v=$(iso_path "$v"); conf "$name" ISO "$v"; fi ;;
+      if [[ -z $v ]]; then conf "$name" ISO '""'; else iso_check "$v"; v=$(iso_path "$v"); conf "$name" ISO "$v"; fi ;;
     *) die "set: mem, cpus, disk, iso, port or user" ;;
   esac
 }

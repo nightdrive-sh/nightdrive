@@ -7,6 +7,7 @@
 #   PIN             the host CPUs a VM runs on (taskset), empty for any
 #   TTY             the guest's serial console (lib/firstboot.sh: its user is made before the login prompt there)
 #   OTHER_ISO       a regex for ISO names that are another architecture's (garage-ctl isos leaves them out)
+#   HOST, ISO_HINT  what the host is called and what to look for instead, for iso_check's error
 #   PACKAGES        what Fedora needs for it, for the error when something is missing
 
 ARCH=${GARAGE_ARCH:-$(uname -m)}
@@ -22,6 +23,7 @@ case $ARCH in
     PIN=4-11
     TTY=ttyAMA0
     OTHER_ISO='x86_64|amd64|i[3-6]86'
+    HOST="this Mac runs ARM (aarch64) VMs"; ISO_HINT="an aarch64 or ARM64 download"
     PACKAGES="qemu-system-aarch64-core edk2-aarch64 qemu-img qemu-ui-sdl qemu-ui-opengl qemu-device-display-virtio-gpu-pci-gl"
     ;;
   x86_64)
@@ -37,6 +39,7 @@ case $ARCH in
     PIN=""
     TTY=ttyS0
     OTHER_ISO='aarch64|arm64'
+    HOST="this PC runs x86_64 VMs"; ISO_HINT="an x86_64 or amd64 download"
     PACKAGES="qemu-system-x86-core edk2-ovmf qemu-img qemu-ui-sdl qemu-ui-opengl qemu-device-display-virtio-vga-gl"
     ;;
   *) die "Garage runs VMs on aarch64 and x86_64, not on $ARCH" ;;
@@ -46,4 +49,15 @@ esac
 need_qemu() {
   command -v "$QEMU" >/dev/null && [[ -f $FW_CODE && -f $FW_VARS ]] \
     || die "Garage needs qemu for $ARCH: sudo dnf install $PACKAGES"
+}
+
+# Before an ISO goes in a VM's drive: one for another architecture only gets "No bootable option or device was found"
+# from the firmware, so it is refused with why (lib/isoarch.py reads its EFI loaders; nothing said when it can't tell).
+# Running another architecture's ISO would mean qemu emulating its CPU (TCG), much too slow on a Mac to be of use
+ISOARCH=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/isoarch.py
+iso_check() {
+  local a; a=$(python3 -I "$ISOARCH" "$1" 2>/dev/null) || a=""
+  [[ -z $a || $a == "$ARCH" ]] && return 0
+  local what; [[ $a == x86_64 ]] && what="PCs (x86_64)" || what="ARM (aarch64)"
+  die "This ISO is for $what; $HOST. Look for $ISO_HINT."
 }

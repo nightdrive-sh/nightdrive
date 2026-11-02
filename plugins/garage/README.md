@@ -21,7 +21,7 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 | ⌘, | Memory, CPUs, disk, ISO and ssh user of a stopped VM |
 | F2 | Rename a stopped VM |
 
-- A ready-made image (Fedora 44 Minimal on a Mac, Cloud Base on a PC) needs no installer: its first boot makes your user, with sudo and your ssh key. Or pick an ISO from Downloads (or ~/vm).
+- A ready-made image (Fedora 44 Minimal on a Mac, Cloud Base on a PC) needs no installer: its first boot makes your user, with sudo and your ssh key. Or pick an ISO from Downloads (or ~/vm): one for another architecture (a PC's x86_64 on a Mac) is refused, as it wouldn't boot.
 - The top bar's garage icon lights up while a VM runs, and blinks while one boots or shuts down; a click lists your VMs to start or show.
 - A VM is *Booting up* until its guest agent or sshd answers (at most two minutes), and *Shutting down* until qemu has gone. A shutdown that hasn't happened in a minute offers Force off.
 - A paused VM frees its CPUs but keeps its memory. Resume sets its clock (with qemu-guest-agent in it); snapshots and settings still need it shut down.
