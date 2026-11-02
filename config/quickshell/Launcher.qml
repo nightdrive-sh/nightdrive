@@ -110,14 +110,14 @@ PanelWindow {
     property string extSource: ""             // shell.qml sets this when the file exists
     readonly property var ext: extLoader.item
     // Levels from other files, which answer the same questions (items, activate, footer, entered; the optional ones below):
-    // SystemLevels (Wi-Fi, Bluetooth, Sound, Tailscale, Status), HomeLevels (Home Assistant), DefaultAppsLevels, AppKeyLevels
+    // WifiLevels, BluetoothLevels, SoundLevels (Sound, Headphones), TailscaleLevels, StatusLevels, MirroringLevels, HomeLevels (Home Assistant), DefaultAppsLevels, AppKeyLevels
     // (App shortcuts), BehaviourLevels (Mouse, Launcher, Firefox, Computer name, Remote login, Notifications, Crash reports, Update channel), InstallLevels,
     // ToolsLevels (Clipboard, Emoji, Snippets), AppearanceLevels (Top bar, Screensaver), DisplayLevels (Display, Battery),
     // RemoveLevels, PasswordLevels (with 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, ClaudeAccessLevels, SendClaudeLevels, AskClaudeLevels, AboutLevels, the plugins' and the private
     // extension. A new file goes in this list, not in each question's code
     // The installed plugins' level files (their <Name>Levels.qml, TopBar.plugin.levels: Deck's Music) come after the core's
     property var pluginExts: []
-    readonly property var exts: [sys, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, caccess, sendclaude, ask, about].concat(pluginExts, ext ? [ext] : [])
+    readonly property var exts: [wifi, bt, sound, ts, stats, mirror, home, defs, akeys, behave, inst, tools, look, disp, rm, pw, themes, cwrite, caccess, sendclaude, ask, about].concat(pluginExts, ext ? [ext] : [])
     // A plugin's row above the search field (topRow; Deck's player): the first file that has one. ↑ from the list's first
     // row selects it, its keys then go to topKey(event), and Ctrl+Space anywhere to topPress()
     readonly property var topExt: exts.find(e => e.topRow) || null
@@ -146,7 +146,7 @@ PanelWindow {
         : level === "startup" ? "Enter: start at login on/off  ·  background apps start hidden"
         : typeof (results[list.currentIndex] || {}).footer === "string" ? results[list.currentIndex].footer   // a row's own keys
         : (results[list.currentIndex] || {}).kind === "brightness" ? "Left+Right: brightness"
-        : (results[list.currentIndex] || {}).kind === "mirrordev" ? sys.footer(level, query)
+        : (results[list.currentIndex] || {}).kind === "mirrordev" ? mirror.footer(level, query)
         : (results[list.currentIndex] || {}).kind === "haent" ? home.footer(level, query)
         : (results[list.currentIndex] || {}).kind === "nightlight" ? "Enter: night light on/off"
         : (results[list.currentIndex] || {}).kind === "calc" ? "Enter: copy the result"
@@ -310,7 +310,7 @@ PanelWindow {
             .concat(disp.keys >= 0 ? [{ kind: "brightness", key: "keys", name: "Keyboard backlight", glyph: "keyboard" }] : [])
             .concat([{ kind: "nightlight", name: "Night light", glyph: "moon" },
                      { kind: "nav", name: "Scale", glyph: "monitor", target: "display" }],
-                    sys.mirrorAvail ? [{ kind: "nav", name: "Screen Mirroring", glyph: "screen-share", target: "otherdisplays" }] : [])
+                    mirror.mirrorAvail ? [{ kind: "nav", name: "Screen Mirroring", glyph: "screen-share", target: "otherdisplays" }] : [])
     }
     readonly property var installAliases: ({ "Software": "package dnf rpm flatpak flathub app apps program store",
                                              "Webapp": "web app website site pwa url slack teams whatsapp youtube",
@@ -467,10 +467,10 @@ PanelWindow {
                 // Display and Screensaver sub-items ("night" → Night light, "dim" → Brightness, "saver" → Start after)
                 displayItems().map(t => ({ item: Object.assign({}, t, { from: "Display" }), text: t.name, extra: "display " + (settingsAliases[t.name] || "") })),
                 // Screen Mirroring's receivers ("mirror", "airplay", "olohuone"): Enter starts mirroring right from the search
-                sys.mirrorRows().filter(t => t.kind === "mirrordev").map(t => ({ item: Object.assign({}, t, { from: "Screen Mirroring", summary: undefined }),
+                mirror.mirrorRows().filter(t => t.kind === "mirrordev").map(t => ({ item: Object.assign({}, t, { from: "Screen Mirroring", summary: undefined }),
                                                                                   text: t.name, extra: "screen mirroring " + t.extra })),
                 // AirPlay speakers ("airplay", "olohuone"): Enter makes it the sound output
-                sys.sinks.filter(d => d.airplay).map(d => ({ item: { kind: "sounddev", id: d.id, name: d.name, glyph: "speaker", from: "Sound",
+                sound.sinks.filter(d => d.airplay).map(d => ({ item: { kind: "sounddev", id: d.id, name: d.name, glyph: "speaker", from: "Sound",
                                                                      trailGlyph: d.current ? "check" : undefined },
                                                              text: d.name, extra: "airplay sound audio output speaker" })),
                 look.screensaverItems().map(t => ({ item: Object.assign({}, t, { from: "Screensaver", summary: undefined }), text: t.name, extra: "screensaver idle lock" })),
@@ -570,7 +570,7 @@ PanelWindow {
         if (target === "keys") keysProc.running = true     // re-read SHORTCUTS.md: changes show up immediately
         list.currentIndex = firstSelectable()
         if (target === "settings" || target === "appsettings") behave.entered("settings")   // the computer name and channel on its rows, Firefox's
-        if (target === "display" || target === "otherdisplays") sys.entered("display")   // Screen Mirroring's rows (Other displays)
+        if (target === "display" || target === "otherdisplays") mirror.entered("display")   // Screen Mirroring's rows (Other displays)
         if (extOf(target)) extOf(target).entered(target)
     }
     // Background apps (⌘W hides them to special:bg, ⌘Q quits): app name -> window class regex, from hypr/background-apps(.local),
@@ -689,9 +689,9 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                 Quickshell.execDetached([scripts + "/terminal", "--"].concat(item.entry.command))
             else if (item.entry) item.entry.execute(); else Quickshell.execDetached(["gio", "launch", item.path])
         }
-        else if (item.kind === "stat" && item.copy !== undefined) sys.copyText(item.copy, item.sensitive === true)   // Public IP, Local IP, Router: as ⌘C
+        else if (item.kind === "stat" && item.copy !== undefined) copier.copyText(item.copy, item.sensitive === true)   // Public IP, Local IP, Router: as ⌘C
         else if (item.kind === "stat") shake.restart()   // information only
-        else if (item.kind === "calc") { sys.copyText(item.copy); win.open = false }   // ready to paste
+        else if (item.kind === "calc") { copier.copyText(item.copy); win.open = false }   // ready to paste
         else if (exts.some(e => e.activate(item))) {}
         else if (item.kind === "menu") { win.open = false; win.openMenu(item.target) }
         else if (item.src && detail === null) details.show(item)
@@ -769,7 +769,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
 
     // Closing leaves the details right away (after the Behavior above has seen open = false), so the next open starts narrow
     onOpenChanged: if (!open) Qt.callLater(() => { if (!win.open) details.close() })
-    else { lastMouse = null; lastSel = ({}); fromSearch = ({}); keyLevel = ""; exts.forEach(e => e.opened()); Plugins.check(); go("root"); bgProc.running = true; bgAppsProc.running = true; autostartProc.running = true; updatesProc.running = true; sys.entered("display"); sys.soundRefresh(); input.forceActiveFocus() }
+    else { lastMouse = null; lastSel = ({}); fromSearch = ({}); keyLevel = ""; exts.forEach(e => e.opened()); Plugins.check(); go("root"); bgProc.running = true; bgAppsProc.running = true; autostartProc.running = true; updatesProc.running = true; mirror.entered("display"); sound.soundRefresh(); input.forceActiveFocus() }
     Component.onCompleted: keysProc.running = true
 
     Timer { id: disarm; interval: 4000; onTriggered: win.armed = "" }
@@ -779,7 +779,16 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
     function installCmd(src, id) {
         return src === "flatpak" ? term('flatpak install --user flathub "$1"', id) : term('sudo dnf install "$1"', id)
     }
-    SystemLevels { id: sys; launcher: win }
+    WifiLevels { id: wifi; launcher: win }
+    BluetoothLevels { id: bt; launcher: win }
+    SoundLevels { id: sound; launcher: win }
+    TailscaleLevels { id: ts; launcher: win }
+    StatusLevels { id: stats; launcher: win }
+    MirroringLevels { id: mirror; launcher: win }
+    RowCopy { id: copier; launcher: win }
+    property alias rowCopy: copier   // Wi-Fi's and Tailscale's rows say "copied" (RowCopy.qml)
+    // A row's every-second value (its `live` / `liveName` key: Wi-Fi's rate, Status), from the Levels file that knows the key
+    function liveText(key) { for (const e of exts) { const t = e.liveText ? e.liveText(key) : undefined; if (t !== undefined) return t } return "" }
     HomeLevels { id: home; launcher: win }
     DefaultAppsLevels { id: defs; launcher: win }
     AppKeyLevels { id: akeys; launcher: win }
@@ -822,7 +831,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
         script: 'cat "$HOME/.cache/nightdrive/updates" 2>/dev/null'
         onResult: text => { win.updates = parseInt(text, 10) || 0 }
     }
-    function mirrorRows() { return sys.mirrorRows() }   // DisplayLevels: Screen Mirroring's rows under Display
+    function mirrorRows() { return mirror.mirrorRows() }   // DisplayLevels: Screen Mirroring's rows under Display
 
     // overrides marked by sync-apps → ids of hidden apps
     Sh {
@@ -1093,7 +1102,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         // selected text in the search field is copied as usual
                         const copyRow = win.results[list.currentIndex]
                         if (ctrl && (event.key === Qt.Key_Insert || event.key === Qt.Key_C) && copyRow && copyRow.copy !== undefined && selectedText === "") {
-                            sys.copyText(copyRow.copy, copyRow.sensitive === true); event.accepted = true; return
+                            copier.copyText(copyRow.copy, copyRow.sensitive === true); event.accepted = true; return
                         }
                         if (win.detail !== null) {         // details: Enter installs / removes, C sets up with Claude, arrows scroll, typing does nothing
                             if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) win.back()
@@ -1138,7 +1147,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         } else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Right) && (win.results[list.currentIndex] || {}).kind === "brightness") {
                             disp.stepBright(event.key === Qt.Key_Left ? -1 : 1, win.results[list.currentIndex].key); event.accepted = true
                         } else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Right) && (win.results[list.currentIndex] || {}).kind === "slider") {
-                            sys.stepSlider(win.results[list.currentIndex].key, event.key === Qt.Key_Left ? -1 : 1); event.accepted = true
+                            sound.stepSlider(win.results[list.currentIndex].key, event.key === Qt.Key_Left ? -1 : 1); event.accepted = true
                         } else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Right) && (win.results[list.currentIndex] || {}).slider !== undefined) {
                             home.stepSlide(win.results[list.currentIndex], event.key === Qt.Key_Left ? -1 : 1); event.accepted = true
                         } else if (event.key === Qt.Key_Down || (ctrl && (event.key === Qt.Key_N || event.key === Qt.Key_J))) {
@@ -1265,7 +1274,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         visible: !row.isQuote
                         elide: Text.ElideRight
                         // liveName: a name that changes often (Status' processes), bound here instead of rebuilding the rows
-                        text: row.modelData.liveName !== undefined ? sys.liveText(row.modelData.liveName)
+                        text: row.modelData.liveName !== undefined ? win.liveText(row.modelData.liveName)
                             : row.isHeader ? row.modelData.name.toUpperCase()
                             : row.modelData.name
                         color: row.armedNow ? Theme.primary : (row.isHeader ? Theme.primary : row.modelData.kind === "hint" || row.isNote || row.modelData.dimmed ? Theme.dim : (row.current ? Theme.accent : Theme.text))
@@ -1388,12 +1397,12 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         horizontalAlignment: Text.AlignRight
                         // from = submenu a root-level search hit comes from (small violet tag)
                         readonly property bool tag: row.modelData.from !== undefined
-                        // A row whose `copy` value was just copied (⌘C or Enter: sys.copyText) says so for a moment
-                        readonly property bool copiedNow: row.modelData.copy !== undefined && sys.copied !== "" && sys.copied === row.modelData.copy
+                        // A row whose `copy` value was just copied (⌘C or Enter: RowCopy) says so for a moment
+                        readonly property bool copiedNow: row.modelData.copy !== undefined && copier.copied !== "" && copier.copied === row.modelData.copy
                         readonly property bool glyphOnly: row.modelData.trailGlyph !== undefined
                             || (!tag && row.modelData.keys === undefined && !(row.modelData.summary !== undefined && row.modelData.summary !== "" && !row.armedNow) && row.chevron)
                         text: copiedNow ? "copied" : row.modelData.trailGlyph !== undefined ? Icons.g(row.modelData.trailGlyph)      // Top bar › Items: ✓ / – (hidden)
-                            : row.modelData.live !== undefined ? sys.liveText(row.modelData.live)   // updates without rebuilding the rows
+                            : row.modelData.live !== undefined ? win.liveText(row.modelData.live)   // updates without rebuilding the rows
                             : tag ? row.modelData.from.toUpperCase() : row.modelData.keys !== undefined ? ""   // keyFrames
                             : (row.modelData.summary !== undefined && row.modelData.summary !== "" && !row.armedNow ? row.modelData.summary
                             : (row.chevron ? Icons.g("chevron-right") : ""))
@@ -1448,7 +1457,7 @@ jq --arg id "$ID" --arg to "$TO" \'.shown = ((.shown // []) - [$id]) | .hidden =
                         fillColor: row.modelData.charging ? Theme.ok : row.modelData.low ? Theme.danger : Theme.accent
                         dimmed: !!row.modelData.dimmed
                         trackColor: Qt.rgba(1, 1, 1, 0.1)   // the same on and off the selected row (Theme.border nearly matches Theme.sel)
-                        onMoved: v => { list.currentIndex = row.index; row.modelData.kind === "slider" ? sys.setSlider(row.modelData.key, v) : disp.setBright(v, row.modelData.key) }
+                        onMoved: v => { list.currentIndex = row.index; row.modelData.kind === "slider" ? sound.setSlider(row.modelData.key, v) : disp.setBright(v, row.modelData.key) }
                     }
                     MouseArea {
                         id: rowArea

@@ -23,7 +23,7 @@ PanelWindow {
         qr = ""; info = null; copied = ""
     }
     // A click on a value, or ⌘C for the password (Hyprland sends Ctrl+Insert). The password past the clipboard history
-    // and cleared after 45 s, as the launcher's password row (SystemLevels.copyText)
+    // and cleared after 45 s, as the launcher's password row (RowCopy.copyText)
     function copy(v, sensitive) {
         if (sensitive) clipper.createObject(c, { input: v })
         else Quickshell.execDetached(["wl-copy", v])

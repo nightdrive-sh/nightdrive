@@ -5,7 +5,7 @@ import Quickshell
 // Enter opens the kind's apps (Default apps › Browser), whose Enter makes one the default. The last row there goes to
 // Install › Software for apps that aren't installed yet: a search ("document viewer") or a category (Browsers).
 // Data and changes: hypr/scripts/default-apps (nightdrive defaults), which also starts the apps behind Hyper B / F / I.
-// Launcher.qml asks it like SystemLevels (levels, titles, parents, items, activate, footer, entered).
+// Launcher.qml asks it like its other Levels files (levels, titles, parents, items, activate, footer, entered).
 Item {
     id: d
     property var launcher: null

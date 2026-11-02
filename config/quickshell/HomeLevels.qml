@@ -7,7 +7,7 @@ import Quickshell
 // Enter turns a device on/off or runs a scene / script, and the launcher stays open; Shift+Enter pins it to the top bar's
 // Home menu. A light that's on has a yellow icon; a dimmable one shows its brightness as a ring around it: ←/→ steps 10 %, a sideways drag sets it.
 // Shown only when Home Assistant is set up and on (plugins/home-assistant; nightdrive plugins off hides it). Data: Home.qml.
-// Launcher.qml asks it like SystemLevels (levels, titles, parents, items, activate, footer, entered).
+// Launcher.qml asks it like its other Levels files (levels, titles, parents, items, activate, footer, entered).
 Item {
     id: x
     property var launcher: null

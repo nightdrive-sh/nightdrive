@@ -132,7 +132,7 @@ Column {
 
     // One list, the same kinds together: the machine's own devices (MacBook Pro …, then Built-in …), Bluetooth headphones
     // (connected, then the ones a click connects or switches to headset mode), other wired ones (USB, HDMI), then AirPlay
-    // speakers; alphabetically within each. SystemLevels' Sound page sorts the same way (group()).
+    // speakers; alphabetically within each. SoundLevels' Sound page sorts the same way (group()).
     function group(d) {
         return d.type === "btconnect" ? 3 : d.type === "btmic" ? 2 : /^MacBook Pro/i.test(d.name) ? 0 : /^Built-in/i.test(d.name) ? 1
              : d.bt ? 2 : /^raop_sink\./.test(d.node || "") ? 5 : 4

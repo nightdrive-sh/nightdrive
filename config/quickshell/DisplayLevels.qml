@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 
-// The launcher's Settings › Display (brightness, night light, Screen Mirroring's rows from SystemLevels.qml, where the
+// The launcher's Settings › Display (brightness, night light, Screen Mirroring's rows from MirroringLevels.qml, where the
 // laptop's screen is next to an external one, the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, then the details, as in the top bar's battery menu).
 // The brightness rows (screen, keyboard: the row's key) are sliders that Launcher.qml draws (bright, keys, setBright) and
 // ←/→ steps (stepBright), also in the root search; Launcher.qml's displayItems() puts them there.
@@ -29,7 +29,7 @@ Item {
     readonly property var parents: ({ display: "settings", otherdisplays: "settings", battery: "settings" })
 
     // Settings › Other displays: the screens beyond this computer's, by device, however they connect: AirPlay's
-    // (Screen Mirroring, SystemLevels.qml's mirrorRows, empty without doubletake) and a plugin's (displayRows: VNC
+    // (Screen Mirroring, MirroringLevels.qml's mirrorRows, empty without doubletake) and a plugin's (displayRows: VNC
     // Display's iPads), as macOS's "Mirror or extend to". Display is this computer's own screens only.
     function others() {
         const l = launcher

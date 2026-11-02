@@ -50,7 +50,13 @@ WiredProfiles 1.0 WiredProfiles.qml
 Toggle 1.0 Toggle.qml
 TouchScroll 1.0 TouchScroll.qml
 AppIcon 1.0 AppIcon.qml
-SystemLevels 1.0 SystemLevels.qml
+RowCopy 1.0 RowCopy.qml
+WifiLevels 1.0 WifiLevels.qml
+BluetoothLevels 1.0 BluetoothLevels.qml
+SoundLevels 1.0 SoundLevels.qml
+TailscaleLevels 1.0 TailscaleLevels.qml
+StatusLevels 1.0 StatusLevels.qml
+MirroringLevels 1.0 MirroringLevels.qml
 HomeLevels 1.0 HomeLevels.qml
 DefaultAppsLevels 1.0 DefaultAppsLevels.qml
 AppKeyLevels 1.0 AppKeyLevels.qml
