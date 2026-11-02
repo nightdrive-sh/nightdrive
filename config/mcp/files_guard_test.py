@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """What Claude's file tools leave alone whatever its folders (#1883): `python3 config/mcp/files_guard_test.py`. With
 Open's folders (the whole home), files_trash doesn't reach the mail store, the notes, the projects, any mail folder or
-git repository; files_open doesn't open what does something as it opens (a web page, an SVG); and neither `files` nor
-`wallpaper set` tells whether a hidden file exists, or where a link leads. Runs copies of the scripts in a home of its
-own, next to a `windows` stand-in that leaves a mark, so nothing opens on the desktop."""
+git repository; files_open doesn't open what does something as it opens (a web page, an SVG, a playlist); and neither
+`files` nor `wallpaper set` tells whether a hidden file exists, or where a link leads. Runs copies of the scripts in a
+home of its own, next to a `windows` stand-in that leaves a mark, so nothing opens on the desktop."""
 
+import gzip
 import json
 import os
 import shutil
@@ -42,6 +43,11 @@ class Guard(unittest.TestCase):
         (self.home / "Downloads/page.html").write_text("<html><img src='https://example.com/x.png'></html>")
         (self.home / "Downloads/pic.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>")
         (self.home / "Downloads/notes.txt").write_text("plain text")
+        # What passes OPENABLE's image/ and audio/ by its prefix but does something as it opens: an .svgz, playlists
+        # whose player fetches their addresses
+        (self.home / "Downloads/pic.svgz").write_bytes(gzip.compress(b"<svg xmlns='http://www.w3.org/2000/svg'/>"))
+        (self.home / "Downloads/list.m3u").write_text("#EXTM3U\nhttps://example.com/a.mp3\n")
+        (self.home / "Downloads/list.pls").write_text("[playlist]\nFile1=https://example.com/a.mp3\n")
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -112,7 +118,7 @@ class Guard(unittest.TestCase):
     # --- open ---
 
     def test_open_refuses_what_acts_as_it_opens(self):
-        for name in ("page.html", "pic.svg"):
+        for name in ("page.html", "pic.svg", "pic.svgz", "list.m3u", "list.pls"):
             status, _, err = self.run_script("open", self.p(f"Downloads/{name}"))
             self.assertNotEqual(status, 0, name)
             self.assertIn("Claude doesn't open it", err)

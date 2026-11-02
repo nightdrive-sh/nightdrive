@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Claude's dnf transaction kept to what its card showed (#1879): `python3 config/mcp/software_test.py`. The preview's
-table is read whole or not at all, the run draws only on the card's repositories, imports no signing key and leaves
-what Nightdrive needs, and a plugin's card names the repositories its installer adds. dnf and pkexec are stand-ins in
-PATH that print a table and leave a mark."""
+table is read whole or not at all, the run draws only on the card's repositories and the preview's very versions,
+imports no signing key and leaves what Nightdrive needs, a Flatpak's card shows its sandbox, and a plugin's card names
+the repositories its installer adds and never its remote's token. dnf, pkexec and flatpak are stand-ins in PATH that
+print what the real ones would and leave a mark."""
 
 import json
 import os
@@ -103,13 +104,61 @@ class Transaction(unittest.TestCase):
         for name in ("linux-firmware", "xorg-x11-server-Xwayland", "hyprland", "quickshell"):
             self.assertIn(name, protected)
 
+    def test_the_run_is_pinned_to_the_previews_versions(self):
+        """Each repository gives only the NEVRAs the preview found (includepkgs, the .repo file's own cleared first),
+        so root's dnf can't work out another transaction from metadata that changed after the check"""
+        p = self.apply("install", "dnf", "gimp", "--check", stdin={"packages": SHOWN})
+        self.assertEqual(p.returncode, 0, p.stderr)
+        words = next(l for l in self.ran().splitlines() if l.startswith("pkexec")).split()
+        pins = [w for w in words if ".includepkgs=" in w]
+        self.assertEqual(pins, ["--setopt=fedora.includepkgs=",
+                                "--setopt=fedora.includepkgs=babl-0:0.1.110-1.fc44.aarch64",
+                                "--setopt=updates.includepkgs=",
+                                "--setopt=updates.includepkgs=gimp-2:3.0.4-1.fc44.aarch64,"
+                                "mesa-libGL-0:26.0.1-1.fc44.aarch64"])
+        self.assertNotIn("26.0.0", " ".join(words))       # the version an upgrade replaces isn't one to install
+        self.assertNotIn("pin", json.loads(self.apply("preview", "install", "dnf", "gimp", "--json").stdout))
+
+    def test_the_log_is_in_the_runtime_folder(self):
+        """Not /tmp, where a run that outlasts WAIT would leave it"""
+        runtime = self.dir / "runtime"
+        runtime.mkdir(mode=0o700)
+        self.stand_in("pkexec", f'readlink /proc/$$/fd/1 >> {self.marks}; exit 0')
+        p = self.apply("install", "dnf", "gimp", "--check", stdin={"packages": SHOWN},
+                       env={**self.env, "XDG_RUNTIME_DIR": str(runtime)})
+        self.assertEqual(p.returncode, 0, p.stderr)
+        log = self.ran().splitlines()[-1]
+        self.assertTrue(log.startswith(f"{runtime}/nightdrive-software-"), log)
+        self.assertFalse(Path(log).exists())                # a finished run's log goes
+
+    def test_a_flatpaks_card_shows_its_sandbox(self):
+        self.stand_in("flatpak", r"""case "$1" in
+  info) exit 1 ;;
+  remote-info) if [[ " $* " == *" --show-metadata "* ]]; then
+      printf '[Application]\nname=org.example.App\n\n[Context]\nshared=network;ipc;\nsockets=wayland;\n'
+      printf 'filesystems=home;xdg-download:ro;\npersistent=.app;\n\n[Session Bus Policy]\n'
+      printf 'org.freedesktop.Flatpak=talk\norg.freedesktop.Notifications=talk\n'
+    else printf 'Runtime: org.example.Platform/aarch64/1\nDownload Size: 5 MB\n'; fi ;;
+esac""")
+        env = {**self.env, "NIGHTDRIVE_MCP_OPTIONS": json.dumps({"any_source": True})}
+        p = self.apply("install", "flatpak", "org.example.App", "--card", env=env)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(json.loads(p.stdout)["Permissions"],
+                         "files: home, xdg-download:ro; sockets: wayland; shared: network, ipc; session bus: "
+                         "org.freedesktop.Flatpak (talk), org.freedesktop.Notifications (talk)")
+        # Metadata Flathub doesn't give stops it: a card without them would hide what the user is asked to allow
+        self.stand_in("flatpak", '[[ $1 == remote-info && " $* " != *" --show-metadata "* ]] && exit 0; exit 1')
+        p = self.apply("install", "flatpak", "org.example.App", "--card", env=env)
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("permissions", p.stderr)
+
     def test_a_removal_is_protected_but_not_kept_to_repositories(self):
         self.table.write_text(TABLE.replace("Installing:", "Removing:").replace("Installing dependencies:",
                                                                                   "Removing unused dependencies:"))
         p = self.apply("remove", "dnf", "gimp", "--check", "--json", stdin={"packages": SHOWN})
         self.assertEqual(p.returncode, 0, p.stderr)
         words = next(l for l in self.ran().splitlines() if l.startswith("pkexec")).split()
-        self.assertFalse([w for w in words if w.startswith("--repo")])
+        self.assertFalse([w for w in words if w.startswith("--repo") or "includepkgs" in w])
         self.assertTrue([w for w in words if w.startswith("--setopt=protected_packages=")])
 
     def test_access_that_allows_removing_drops_only_the_protection(self):
@@ -238,6 +287,24 @@ class PluginRepos(unittest.TestCase):
                                                          env=env).stdout)
             self.assertEqual(card("code")["Adds repository"], "https://example.com/rpm")
             self.assertNotIn("Adds repository", card("plain"))
+
+
+class PluginOrigin(unittest.TestCase):
+    def test_a_remotes_userinfo_never_reaches_claude(self):
+        """An external plugin cloned from https://TOKEN@host/… keeps the token in its origin: software's from (the card,
+        plugin_refusal) and plugin-info's Source (software_info) leave it out"""
+        sys.dont_write_bytecode = True
+        software = load(HERE.parent / "hypr/scripts/software", "software")
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run(["git", "init", "-q", d], check=True)
+            subprocess.run(["git", "-C", d, "remote", "add", "origin", "https://ghp_secret:x-oauth@github.com/a/b.git"],
+                           check=True)
+            self.assertEqual(software.origin("external", d), "https://github.com/a/b.git")
+        self.assertEqual(software.public("ssh://user:pw@host.example/repo"), "ssh://host.example/repo")
+        self.assertEqual(software.public("https://github.com/a/b@v1"), "https://github.com/a/b@v1")
+        self.assertEqual(software.public("git@github.com:a/b.git"), "git@github.com:a/b.git")
+        source = (HERE.parent / "hypr/scripts/plugin-info").read_text()
+        self.assertIn(software.USERINFO.pattern, source)    # the same strip in plugin-info, which can't load software
 
 
 if __name__ == "__main__":

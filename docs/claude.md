@@ -186,11 +186,12 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
     kitty…, the lists `install.sh` uses), nor what would take one along.
   - *Plugins from other repositories*: off, Claude installs only Nightdrive's own plugins.
 
-  Its card says where the software comes from (Fedora, Flathub and whom it verified), and for a plugin the
-  repositories its installer adds. dnf then installs only from the repositories on the card and imports no signing
-  key (one not imported yet is yours to accept, from the Launcher), and with the choice off it won't remove what
-  Nightdrive needs whatever the transaction has come to. Looking at what an install would change asks Flathub about
-  the app, as a search does.
+  Its card says where the software comes from (Fedora, Flathub and whom it verified), for a Flatpak app what its
+  sandbox lets it reach (`files: home` is all your files), and for a plugin the repositories its installer adds. dnf
+  then installs only the packages and versions it found when it checked, from the repositories on the card, and
+  imports no signing key (one not imported yet is yours to accept, from the Launcher), and with the choice off it
+  won't remove what Nightdrive needs whatever the transaction has come to. Looking at what an install would change
+  asks Flathub about the app, as a search does.
 
 Sending, devices, installing and turning Do Not Disturb on (it hides alerts) **always ask**, whatever the level or
 your choice: where all of an area's Modify or Delete is such, the choice is only *Ask* or *No*. Turning it off is a
@@ -253,7 +254,8 @@ two quiet seconds, five at most, and otherwise gives up, so what you type doesn'
 - Hidden files and folders (`~/.ssh`, `~/.config`…): not listed, opened, trashed or sent with Ferry, on any level.
 - Nothing in `~/Mail`, `~/Notes`, `~/Projects`, another mail folder or a git repository goes to the trash, even on
   Open: a mail file trashed there would be deleted from the server by the next sync. Nor does Claude open a web page,
-  an SVG, XML, an event or a contact file (they load from the internet or import as they open); you can, in Files.
+  an SVG, XML, a playlist, an event or a contact file (they load from the internet or import as they open); you can,
+  in Files.
 - Anything that can't be taken back without asking: no permanent delete (mail goes to Trash, files and notes to the
   trash), no recurring events deleted, no attachments Claude adds to a mail (your own draft's go, and the card names them).
 - Shutting down, users, the clipboard history.

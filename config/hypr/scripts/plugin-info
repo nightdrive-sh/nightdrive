@@ -158,6 +158,8 @@ if len(p) > 9 and p[9]:
     fields.append(["Author", p[9]])
 if external:      # where it came from: the clone's origin (plugins add), else just the folder
     origin = subprocess.run(["git", "-C", folder, "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
+    # Without the URL's userinfo (https://TOKEN@host/…), as software's origin: this goes to Claude (software_info)
+    origin = re.sub(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#]*@", r"\1", origin)
     fields.append(["Source", "external, " + (origin or folder)])
 fields += extra + [["Installer", installer(inst)]]
 # setup: plugin.conf's command that sets the plugin up with Claude, as the command line the page runs (in the folder)

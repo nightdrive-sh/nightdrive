@@ -57,7 +57,7 @@
     {
       "name": "software_preview",
       "title": "What installing or removing would do",
-      "description": "What installing or removing a package or Flatpak app would change, without changing anything: packages, the list of every package it would install, upgrade or remove (\"name · repository\"; with dnf, its dependencies, and for a removal the packages that need it), and the disk space. When the user's Access doesn't let you make the change, it says so (claude_can_install or claude_can_remove false, and why): tell the user that instead of trying. Otherwise show the user this list, then give it as is to software_install or software_remove. Look closely at a removal's list: removing one package can take others the user needs along.",
+      "description": "What installing or removing a package or Flatpak app would change, without changing anything: packages, the list of every package it would install, upgrade or remove (\"name · repository\"; with dnf, its dependencies, and for a removal the packages that need it), the disk space and, for a Flatpak app to install, its sandbox's permissions (permissions). When the user's Access doesn't let you make the change, it says so (claude_can_install or claude_can_remove false, and why): tell the user that instead of trying. Otherwise show the user this list, then give it as is to software_install or software_remove. Look closely at a removal's list: removing one package can take others the user needs along.",
       "inputSchema": {
         "type": "object",
         "properties": {

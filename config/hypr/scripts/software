@@ -8,7 +8,7 @@ tools (config/mcp/tools/software.json). `nightdrive software …` runs it.
   software preview|install|remove|plugin-install …   what changes something: software-apply
 The launcher's own fields (icons, screenshots) are left out: this is what a reader needs. For Claude, search marks
 what Access doesn't let it install (claude_can_install false, and why: software-claude)."""
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 from importlib.machinery import SourceFileLoader
 from importlib.util import module_from_spec, spec_from_loader
 
@@ -19,6 +19,8 @@ _loader = SourceFileLoader("software_claude", os.path.join(HERE, "software-claud
 claude = module_from_spec(spec_from_loader("software_claude", _loader))
 _loader.exec_module(claude)
 APPLY = ("preview", "install", "remove", "plugin-install")
+# A URL's user[:password]@ (a scheme://, then up to the host): an scp-style git@host:path has none to hide
+USERINFO = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#]*@")
 
 
 def call(*cmd, timeout=90):
@@ -116,7 +118,13 @@ def origin(kind, folder):
     if kind != "external":
         return "Nightdrive"
     url = subprocess.run(["git", "-C", folder, "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
-    return url or folder
+    return public(url) or folder
+
+
+def public(url):
+    """A remote's address without its userinfo: a clone made from https://TOKEN@host/… keeps the token in its origin,
+    and this goes to Claude and its card (plugin-info strips it the same way)"""
+    return USERINFO.sub(r"\1", url)
 
 
 def text(cmd, r):

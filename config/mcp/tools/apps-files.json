@@ -101,7 +101,7 @@
     {
       "name": "files_open",
       "title": "Open a file",
-      "description": "Opens a file or folder in the user's home folder in its default app (a PDF in the viewer, a folder in Files). Only documents, pictures, sound, video, text and folders: never a program, a script or a launcher, nor what does something as it opens (a web page, an SVG, XML, an event or a contact file), nor anything hidden (no part of the path starting with a dot), outside home or outside the folders the user lets Claude use (a link counts where it points). Not while the user is typing, as windows_focus.",
+      "description": "Opens a file or folder in the user's home folder in its default app (a PDF in the viewer, a folder in Files). Only documents, pictures, sound, video, text and folders: never a program, a script or a launcher, nor what does something as it opens (a web page, an SVG, XML, a playlist, an event or a contact file), nor anything hidden (no part of the path starting with a dot), outside home or outside the folders the user lets Claude use (a link counts where it points). Not while the user is typing, as windows_focus.",
       "inputSchema": {
         "type": "object",
         "properties": {

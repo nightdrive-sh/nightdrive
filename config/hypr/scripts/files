@@ -17,9 +17,9 @@ file tools keep:
   it lies and where it points, is in one of them or below it, so a link can't lead into one or out of one. Without
   that list (a tool that doesn't get it, one that can't be read) Claude may use none. Nor does it open or send a hard
   link (a file with another name too, which nothing says where: one_name), nor open what does something as it opens
-  (a web page, an SVG, XML, an event or a contact file: ACTIVE), nor trash anything in your mail, notes or projects,
-  a mail folder or a git repository (GUARDED). Your own use has no such limit, nor has restore: it only ever puts
-  back, where it was, what a trash moved after this check (its undo).
+  (a web page, an SVG, XML, a playlist, an event or a contact file: active), nor trash anything in your mail, notes or
+  projects, a mail folder or a git repository (GUARDED). Your own use has no such limit, nor has restore: it only ever
+  puts back, where it was, what a trash moved after this check (its undo).
 
   files recent [--in downloads|pictures|documents …] [--name TEXT] [--limit N] [--json]
                                    the newest files first (default 10, at most 50), in those folders and DEPTH levels
@@ -59,9 +59,12 @@ OPENABLE = ("text/", "image/", "audio/", "video/", "inode/directory", "applicati
 NOT_OPENED = ("text/x-shellscript", "text/x-python", "text/x-perl", "text/x-ruby", "application/x-desktop")
 # Not opened for Claude (#1883): what does something as it opens. A web page or an SVG opens in the browser, whose
 # requests (images, scripts, a form sent by itself) go out with no card; XML can fetch too; an event or a contact
-# file opens an import
+# file opens an import. Also any XML dialect (+xml, image/svg+xml-compressed among them: an .svgz is an SVG) and a
+# playlist, which the player fetches its addresses from: they pass OPENABLE's image/ and audio/ prefixes (active)
 ACTIVE = ("text/html", "application/xhtml+xml", "image/svg+xml", "text/xml", "application/xml", "text/calendar",
           "text/vcard", "text/x-vcard", "text/directory")
+PLAYLISTS = ("audio/x-mpegurl", "audio/mpegurl", "audio/x-scpls", "audio/x-ms-asx", "audio/x-iriver-pla",
+             "video/vnd.mpegurl")
 # Where Claude's trash never reaches, whatever folders it may use (#1883): the mail store, whose next sync deletes on
 # the server what went from here (mbsync's Expunge Both); the notes; code. Also any mail folder (cur, new and tmp)
 # elsewhere, and any git repository, Nightdrive's own among them (its undo runs from it)
@@ -277,13 +280,19 @@ def cmd_recent(a):
 
 # --- open --------------------------------------------------------------------------------------------------------
 
+def active(ctype):
+    """Whether a type does something as it opens (ACTIVE, PLAYLISTS): matched whole, so a variant must be listed or
+    caught by its +xml"""
+    return ctype in ACTIVE or ctype in PLAYLISTS or "+xml" in ctype
+
+
 def cmd_open(a):
     path = checked(a.path, moving=False)
     ctype, runnable = content_type(path.resolve())
     if (runnable and not path.is_dir()) or ctype.startswith(NOT_OPENED) or not ctype.startswith(OPENABLE):
         die(f"{a.path} is {'a program or script' if runnable else ctype or 'of an unknown type'}: only documents, "
             "pictures, sound, video, text and folders are opened.")
-    if claude_folders() is not None and ctype in ACTIVE:
+    if claude_folders() is not None and active(ctype):
         die(f"{a.path} is {ctype}, which does something as it opens (a web page loads from the internet): Claude "
             "doesn't open it. The user can, in Files.")
     os.execv(str(SCRIPTS / "windows"), ["windows", "open", "--file", str(path), *(["--json"] if a.json else []),

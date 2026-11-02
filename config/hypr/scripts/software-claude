@@ -169,17 +169,22 @@ def remove_refusal(packages):
             "Remove › Software) if they're sure; don't try it another way.")
 
 
-def dnf_options(action, packages):
+def dnf_options(action, packages, pin=None):
     """What keeps the transaction dnf runs (as root, worked out again) to the one the card showed: Claude's call only.
-    An install draws only on the repositories of its rows, so one whose metadata changed meanwhile can't add a row from
-    another (RPM Fusion's, say). No repository's signing key is imported: the card doesn't show one, and -y would say
-    yes to it, so a package only a key not yet imported can verify fails instead. And what Nightdrive needs dnf itself
-    won't remove (protected_packages adds to dnf's own list), whatever the transaction comes to by then."""
+    An install draws only on the repositories of the packages it brings in, and from each only on those packages in the
+    very versions the preview found (pin: {repository: [NEVRA]}, as each one's includepkgs), so metadata that changed
+    meanwhile can't add a package, another version or a row from another repository (RPM Fusion's, say): dnf fails
+    instead. No repository's signing key is imported: the card doesn't show one, and -y would say yes to it, so a
+    package only a key not yet imported can verify fails instead. And what Nightdrive needs dnf itself won't remove
+    (protected_packages adds to dnf's own list), whatever the transaction comes to by then."""
     if options() is None:
         return []
     out = ["--setopt=*.gpgkey="]
     if action == "install":
-        out += [f"--repo={r}" for r in sorted({r for _, r in rows(packages) if r})]
+        # A repository with no package pinned isn't used at all: an empty includepkgs would let all of it in. dnf5
+        # adds a --setopt includepkgs to the .repo file's own (the COPR's), so an empty one clears that first
+        for r, nevras in sorted((pin or {}).items()):
+            out += [f"--repo={r}", f"--setopt={r}.includepkgs=", f"--setopt={r}.includepkgs={','.join(nevras)}"]
     if not allowed("nightdrive_packages"):
         out.append("--setopt=protected_packages=" + ",".join(sorted(needed())))
     return out
