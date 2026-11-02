@@ -18,6 +18,9 @@ whose tool says `"undo_asks": true`, runs only once the user allows it on the ca
 Claude's undo_change keeps to Access as the tool's own call would now (#1924): the area's Modify No refuses it, Ask
 shows the card, whatever it was when the change was made. A redo is the tool's call again, so one its `asks_if` says
 reaches further (a speaker on the network, a shared calendar) asks on the tool's own card, from the notification too.
+So does Claude's undo that is the tool's own command with other values (sound_output back to an AirPlay speaker,
+a light back to its brightness): its asks_if gets the values read off the undo's argv (#1945). One whose tool has an
+asks_if but whose undo isn't its command shows the undo's card, as asks_if can't speak for it.
 An undo that refuses for now (the user is typing) leaves Try again on the row.
 The log is a file of the user's, which what they run can write (Claude Code's own Write too), so an undo or redo runs
 only what the tool the entry names, as installed now, would: its undo template word for word, its command with the
@@ -259,10 +262,16 @@ def ask(entry_id, action, argv, tool, claude=False):
     entry = changes.get(entry_id)
     decision = allowed(entry_id, action, tool) if claude else "allow"
     if action == "redo":
-        return ask_redo(entry, tool, decision)
+        return ask_call(entry, tool, entry.get("arguments") or {}, decision, "redoing")
     act = acts_like(entry, argv)
     if act is None and decision == "allow":
-        return None
+        # Claude's undo reaches as far as the call it is: one that is the tool's command asks when its asks_if says
+        # so (#1945). The notification's Undo is the user's own, and puts back what they had
+        if not (claude and tool.spec.get("asks_if")):
+            return None
+        call = as_call(tool.spec["command"], argv)
+        if call is not None:
+            return ask_call(entry, tool, call, "allow", "undoing")
     import confirm   # only now: the card needs Quickshell, a plain undo doesn't
     does = (act.spec.get("title") or act.name) if act not in (None, True) else " ".join(argv)
     area = tool.area or "nightdrive"
@@ -295,11 +304,11 @@ def allowed(entry_id, action, tool):
     return decision
 
 
-def ask_redo(entry, tool, decision):
-    """A redo is the tool's call again: the tool's own card, with the logged arguments, when Access asks (decision)
-    or its asks_if says this call reaches further than its right (#1887), as the call itself asked."""
+def ask_call(entry, tool, arguments, decision, doing):
+    """A redo is the tool's call again, with the logged arguments, and so is Claude's undo that is its command (with
+    the values as_call read off it): the tool's own card when Access asks (decision) or its asks_if says this call
+    reaches further than its right (#1887), as the call itself would ask. doing: "redoing" or "undoing"."""
     import registry   # here, not at the top: registry imports this module as its seam
-    arguments = entry.get("arguments") or {}
     tool.said = None
     tool.options, tool.options_from = {}, {}
     for name, value in choices(tool).items():
@@ -313,10 +322,42 @@ def ask_redo(entry, tool, decision):
     with registry.first_time(tool, first):   # a calendar Claude hasn't added to yet: allowing it remembers (#1929)
         ok = confirm.ask(tool, arguments)
     if not ok:
-        raise ToolError(f"The user didn't allow redoing change {entry['id']} ({entry['notice']}) on screen, so it "
-                        "wasn't redone. Don't try it another way.")
+        done = "redone" if doing == "redoing" else "undone"
+        raise ToolError(f"The user didn't allow {doing} change {entry['id']} ({entry['notice']}) on screen, so it "
+                        f"wasn't {done}. Don't try it another way.")
     registry.allowed_once(tool, first)
     return tool.said
+
+
+def as_call(template, argv):
+    """The arguments that make a command template give argv word for word (run.expand), or None when none do: an
+    undo that is its tool's own command with other values is that tool's call (#1945). A whole {name} is one word, a
+    {name} inside a word any text, a group there or not; what fits is checked by expanding it again, so a reading
+    that only looks right (a group's switch taken for a value) is no call."""
+    def bind(t, a, got):
+        if not t:
+            try:
+                return got if not a and run.expand(template, got) == list(argv) else None
+            except ToolError:
+                return None
+        head, rest = t[0], t[1:]
+        if isinstance(head, list):
+            taken = bind(head + rest, a, got)
+            return taken if taken is not None else bind(rest, a, got)
+        if not a:
+            return None
+        names = run.PLACEHOLDER.findall(head)
+        if not names:
+            return bind(rest, a[1:], got) if head == a[0] else None
+        parts = run.PLACEHOLDER.split(head)[::2]   # split puts the names at the odd places
+        found = re.fullmatch("(.*)".join(map(re.escape, parts)), a[0], re.S)
+        if found is None:
+            return None
+        values = dict(zip(names, found.groups()))
+        if any(got.get(n, v) != v for n, v in values.items()):   # a name used twice reads the same both times
+            return None
+        return bind(rest, a[1:], {**got, **values})
+    return bind(list(template), list(argv), {})
 
 
 def choices(tool):

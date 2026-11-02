@@ -65,7 +65,8 @@ A change that couldn't be undone isn't offered as a change at all. An undo that 
 Disturb back on, deleting an event Claude added) asks on the card too, and one that would move the focus
 waits while you type: **Try again** on the notification runs it. When you ask Claude to undo, the area's Access
 applies as it is now: Modify No refuses, Ask shows the card. A Redo that would put the sound on a speaker on the
-network, or an event in a calendar others see, asks on the card as the change itself did. Asked which changes it made, Claude sees what a change
+network, or an event in a calendar others see, asks on the card as the change itself did, and so does Claude's
+undo that puts the sound back on such a speaker or a light back to its brightness. Asked which changes it made, Claude sees what a change
 was made with (a draft's text) only for an area it may read now without asking, masked as that area's reads are.
 
 **How much:** an area takes 20 changes a minute without asking; past that each one asks on the card, which says how

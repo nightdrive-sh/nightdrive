@@ -207,13 +207,13 @@ class Redo(unittest.TestCase):
     def test_redo_asks_first_and_remembers(self):
         self.answer = False
         with self.assertRaises(ToolError):
-            undo.ask_redo(self.entry, self.tool, "allow")
+            undo.ask_call(self.entry, self.tool, self.entry["arguments"], "allow", "redoing")
         self.assertFalse(allowed.has("calendar_add", KEY))
         self.answer = True
-        undo.ask_redo(self.entry, self.tool, "allow")
+        undo.ask_call(self.entry, self.tool, self.entry["arguments"], "allow", "redoing")
         self.assertIn("from now on", self.cards[-1])
         self.assertTrue(allowed.has("calendar_add", KEY))
-        undo.ask_redo(self.entry, self.tool, "allow")
+        undo.ask_call(self.entry, self.tool, self.entry["arguments"], "allow", "redoing")
         self.assertEqual(len(self.cards), 2)
 
 

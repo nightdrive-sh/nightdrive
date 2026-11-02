@@ -3,9 +3,9 @@
 tool does asks on the card, from Claude and from the notification; an undo that refuses can be tried again. A log
 written by something else runs nothing its tool wouldn't, undo_change without an id takes only its own server's change,
 and a deletion's Undo isn't pushed out of the log while it is on screen (#1881). undo_change keeps to the area's Access
-as it is now, and a redo asks again when its asks_if says so (#1924). Nothing here runs a real command or shows a
-card: the log is a file of its own, and the card, the commands and the desktop are stand-ins. The tools' own undos
-(a window, Deck's queue, Tasks) are undo_tools_test.py's."""
+as it is now, and a redo asks again when its asks_if says so (#1924), as does Claude's undo that is the tool's own
+command (#1945). Nothing here runs a real command or shows a card: the log is a file of its own, and the card, the
+commands and the desktop are stand-ins. The tools' own undos (a window, Deck's queue, Tasks) are undo_tools_test.py's."""
 
 import json
 import os
@@ -41,6 +41,22 @@ class Matching(unittest.TestCase):
         self.assertTrue(undo.same_command(grouped, ["x", "--opt=1", "a", "b"]))
         self.assertTrue(undo.same_command(grouped, ["x", "--limit", "5", "--opt=", "a"]))
         self.assertFalse(undo.same_command(grouped, ["x", "--other=1", "a"]))
+
+    def test_as_call(self):
+        """An undo read as its tool's own call (#1945): the values that give its argv word for word, or None"""
+        out = ["nightdrive", "sound", "output", "{output}"]
+        self.assertEqual(undo.as_call(out, ["nightdrive", "sound", "output", "AirPlay"]), {"output": "AirPlay"})
+        self.assertIsNone(undo.as_call(out, ["nightdrive", "sound", "output", "a", "b"]))
+        light = ["home-assistant", "brightness", "{entity}", "{brightness}"]
+        self.assertEqual(undo.as_call(light, ["home-assistant", "brightness", "light.desk", "40"]),
+                         {"entity": "light.desk", "brightness": "40"})
+        volume = ["nightdrive", "sound", "volume", ["{volume}"], ["--mute", "{mute}"]]
+        self.assertEqual(undo.as_call(volume, ["nightdrive", "sound", "volume", "40", "--mute", "false"]),
+                         {"volume": "40", "mute": "false"})
+        self.assertEqual(undo.as_call(["x", "--to={dest}.txt"], ["x", "--to=a=b.txt"]), {"dest": "a=b"})
+        self.assertIsNone(undo.as_call(["x", "{a}", "{a}"], ["x", "1", "2"]))   # one name, one value
+        # calendar_add's undo deletes: not its call (calendar_delete's card asks for that one)
+        self.assertIsNone(undo.as_call(["calendar", "add", "--json"], ["calendar", "delete", "Family", "uid-1"]))
 
     def test_only_dnd_off_acts(self):
         """Of the tools as shipped, only dnd_off's undo turning Do Not Disturb on is an act tool's command."""
@@ -353,6 +369,42 @@ class Gated(Log):
         undo.perform(e["id"], "redo")
         self.assertEqual(self.ran, [self.SPEAKER])
         self.assertEqual(changes.get(e["id"])["state"], "done")
+
+    def test_claudes_undo_asks_when_its_call_would(self):
+        """An undo that puts the sound back on a speaker on the network is that call: Claude's asks as it would
+        (#1945), the notification's Undo is the user's and doesn't"""
+        e = self.entry("sound_output", self.SPEAKER, "Switched the sound to Speakers", area="sound-display",
+                       do=["nightdrive", "sound", "output", "Speakers"], arguments={"output": "Speakers"})
+        self.remote, self.answer = "yes", False
+        with self.assertRaises(ToolError) as said:
+            undo.undo_change({"id": e["id"]})
+        self.assertIn("didn't allow undoing", str(said.exception))
+        self.assertIn("wasn't undone", str(said.exception))
+        self.assertEqual(self.asked, [["nightdrive", "sound", "remote", "AirPlay"]])
+        self.assertEqual((self.cards, self.ran), ([("Switch the sound output", {"output": "AirPlay"})], []))
+        self.answer = True
+        undo.undo_change({"id": e["id"]})
+        self.assertEqual((len(self.cards), self.ran), (2, [self.SPEAKER]))
+        changes.mark(e["id"], "done")
+        self.ran, self.asked, self.pressed = [], [], ["undo", None]
+        undo.notice(e["id"], "undo")
+        self.assertEqual((len(self.cards), self.asked, self.ran), (2, [], [self.SPEAKER]))
+
+    def test_claudes_undo_asks_nothing_when_its_call_wouldnt(self):
+        e = self.entry("sound_output", ["nightdrive", "sound", "output", "Speakers"], area="sound-display",
+                       do=self.SPEAKER, arguments={"output": "AirPlay"})
+        undo.undo_change({"id": e["id"]})
+        self.assertEqual(self.asked, [["nightdrive", "sound", "remote", "Speakers"]])
+        self.assertEqual((self.cards, len(self.ran)), ([], 1))
+
+    def test_an_undo_asks_if_cant_read_shows_the_card(self):
+        """A tool with asks_if whose undo isn't its command: asks_if can't speak for it, so the undo's card asks"""
+        e = self.entry("sound_output", self.SPEAKER, area="sound-display")
+        with mock.patch.object(undo, "as_call", return_value=None):
+            undo.undo_change({"id": e["id"]})
+        self.assertEqual(self.asked, [])
+        self.assertEqual(self.cards, [("Undo: A change", {"does": " ".join(self.SPEAKER)})])
+        self.assertEqual(self.ran, [self.SPEAKER])
 
     def test_claudes_redo_keeps_to_access(self):
         e = self.speaker()
