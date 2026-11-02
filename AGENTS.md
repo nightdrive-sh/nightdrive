@@ -79,6 +79,12 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
 - A push to `main` rebuilds the website's pages by itself (`.github/workflows/website.yml`; the site's README explains
   it), but that build stops on such a missing place too: check `tools/build.sh --ref dev` there before a release.
 
+**Done**: a new feature or command is finished when it also has
+- its documentation (above), and `--json` output where a script or tool would read it;
+- a tool for Claude where one fits: the plugin's `mcp.json` or the core's `config/mcp/tools/` (plugins/README.md › Tools
+  for Claude: its class, its area in Access). A plugin that has none on purpose says `mcp=none`, else `plugin check` warns;
+- a line in the next release's notes (Dashboard note 86) when users will see it.
+
 **Recipes**
 - *App* (one of Nightdrive's own, a window: Mail, Deck): a plugin folder whose `app/shell.qml` is a Quickshell config of
   its own, built from the apps' kit (`config/quickshell/kit/README.md`: sidebar, rows, buttons, panels, key sheet). A

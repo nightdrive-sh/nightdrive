@@ -82,6 +82,7 @@ author=@jarilehtinen
 | `setup` | A shell command, run in the folder, that sets the installed plugin up with Claude: Claude Code in a terminal, going through the README's steps with the user. The plugin's page gets a button Set up with Claude (and the key C) for it. For a plugin whose use needs more than its installer can ask, such as Mail's account (`bin/nightmail setup`). Start Claude through `~/.config/hypr/scripts/claude-setup ID NAME`, with your steps on its stdin: it holds the session to them, and Welcome to Nightdrive sees it running. Installed plugins with a `setup` are rows in Welcome to Nightdrive (Launcher › System › Set up Nightdrive) |
 | `configured` | A shell test, run in the folder, like `installed`: the setup is done while it succeeds (an account written, a login made). Welcome shows the plugin's row as Done by it. Quick, as `installed`. Without it, a setup counts as done once its Claude session has closed |
 | `welcome` | The plugin's row in Welcome to Nightdrive: one line, in plain words, of what setting it up gives you (with Claude or without). Default: `description` |
+| `mcp` | `none`: the plugin gives Claude no tools, on purpose. Without it, a plugin with a command in `bin/` and no [`mcp.json`](#tools-for-claude-mcpjson) gets a warning from `nightdrive plugin check` |
 | `order` | A number, default 50: `install.sh` installs the plugins in this order, and the lists show them in it. Lower goes first; the same order keeps the folders' (alphabetical) order, then `plugins.txt`'s lines. Home Assistant has 90: its installer asks for addresses, so it runs last |
 
 An `app` (Mail, Contacts, Deck, Ferry) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
@@ -427,7 +428,8 @@ something is off. `nightdrive sandbox check` runs it too. It checks a plugin fol
 
 For a `plugins.txt` line it checks the eight fields, the icon, `default` and `group`, and `docs/plugins/<id>.md` (if
 there is one) as its README, with the same rules as above. Findings are `file:line: message` lines; an unknown id
-exits with 2.
+exits with 2. Warnings (`file:line: warning: …`, on stderr) don't change the exit: a plugin with a command in `bin/`
+but no `mcp.json` and no `mcp=none`.
 
 ## Off and on
 
