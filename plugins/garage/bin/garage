@@ -4,7 +4,7 @@
 # the terminal. Without a NAME, start, stop, kill, pause, resume, display, hide and ssh take the only VM there is. ssh
 # is `ssh NAME`, through the Host block garage-ctl keeps in ~/.ssh/config.d/garage. install puts Garage among the
 # desktop's apps, uninstall takes it out (the VMs and qemu stay). Anything else goes to garage-ctl as such (create,
-# snapshot, restore, delete…: `garage help` lists them).
+# snapshot, restore, delete…: `garage help` lists them, usage below).
 set -u
 
 APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
@@ -60,6 +60,22 @@ list() {
     | column -t -s $'\t'
 }
 
+# For the user: the commands, as the README's "In a terminal" has them, then garage-ctl's, which garage passes on
+# (all but list, garage's own; the comment at the top above is for the code)
+usage() {
+  cat <<'EOF2'
+garage                                   open Garage, or bring it forward
+garage list                              the VMs, one line each
+garage start|stop|kill|pause|resume|display|hide [NAME]    a VM by its name, or the only one there is
+garage ssh [NAME [COMMAND…]]             ssh NAME: a shell in it, or a command
+garage install|uninstall                 Garage among your apps, or out of them (the VMs and qemu stay)
+garage restart|quit|log                  after a change to Garage, and its QML errors
+
+EOF2
+  "$GARAGE_CTL" help | awk '/^garage-ctl list /{ skip = 1; next } /^garage-ctl /{ skip = 0 } !skip' \
+    | sed -E 's/^garage-ctl ([^ ]+( [^ ]+)*)( {2,})/garage \1    \3/; s/^garage-ctl /garage /'   # its columns kept
+}
+
 case ${1:-open} in
   start|stop|kill|pause|resume|display|hide)
     name=$(vm_name "${2:-}") || exit 1
@@ -73,6 +89,6 @@ case ${1:-open} in
   list)     list ;;
   install)  install_app ;;
   uninstall) uninstall_app ;;
-  help|-h|--help) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; echo; "$GARAGE_CTL" help || true ;;
+  help|-h|--help) usage ;;
   *)        app_command "$@"; rc=$?; ((rc == 2)) && exec "$GARAGE_CTL" "$@"; exit $rc ;;
 esac

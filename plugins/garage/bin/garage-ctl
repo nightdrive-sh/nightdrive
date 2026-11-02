@@ -13,7 +13,10 @@
 # What differs between an Asahi Mac and a PC is lib/arch.sh's; qemu itself, its command line and its sockets, are
 # lib/qemu.sh's; the ready-made images are lib/images.sh's.
 #
-#   garage-ctl list                          JSON: [{ name, mem, cpus, disk, used, iso, running (qemu is), state (lib/state.sh: stopped, booting, running, stopping, paused), slow (stopping for long), acpi (stopping by the power button), shown (its window on a workspace that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
+#
+# The commands, which `garage-ctl help` prints (and `garage help`, as garage passes them on): from the first
+# "garage-ctl" line below to `set`, so the folder's layout above stays the code's
+#   garage-ctl list                          JSON: the VMs, their state and snapshots (the fields: list, below)
 #   garage-ctl states                        NAME STATE a line, cheaply (the top bar's icon)
 #   garage-ctl create NAME ISO MEM_GB DISK_GB [CPUS]
 #   garage-ctl images                        JSON: the ready-made disk images for this host, and how far each has come
@@ -145,6 +148,9 @@ duplicate() {
   [[ -z ${5:-} ]] || label "$2" "$4" "$5"
 }
 
+# JSON: [{ name, mem, cpus, disk, used, iso, running (qemu is), state (lib/state.sh: stopped, booting, running,
+# stopping, paused), slow (stopping for long), acpi (stopping by the power button), shown (its window on a workspace
+# that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
 list() {
   local first=1 shown='{}'
   # One look at Hyprland for all the VMs, and none while none runs
@@ -256,6 +262,9 @@ isos() {
   ls -t "$HOME"/Downloads/*.iso "$HOME"/vm/*.iso 2>/dev/null | grep -viE "[-_.](${OTHER_ISO})[-_.]" || true
 }
 
+# The commands, as the header lists them (not the folder's layout before them: that is for the code)
+usage() { sed -n '/^#   garage-ctl /,/^set /{/^#   /p}' "$0" | sed 's/^#   //'; }
+
 case ${1:-} in
   list)     list ;;
   states)   states ;;
@@ -284,5 +293,6 @@ case ${1:-} in
   unsnap)   snap "$@"; qemu-img snapshot -d "$3" "$(dir "$2")/disk.qcow2"; label "$2" "$3" "" ;;
   duplicate) duplicate "$@" ;;
   rename)   rename "$@" ;;
-  *)        sed -n '2,/^set /{/^#/p}' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  help|-h|--help) usage ;;
+  *)        { [[ -z ${1:-} ]] || echo "No command $1"; usage; } >&2; exit 2 ;;
 esac
