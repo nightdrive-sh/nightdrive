@@ -1,8 +1,9 @@
 import QtQuick
 import qs.kit
 
-// A name asked for in a panel (a snapshot's, or a VM's to delete it): the question over a field with its text picked,
-// Return answers, Esc or a click outside doesn't. ask() opens it; done gets the trimmed text.
+// A name asked for in a panel (Garage: a snapshot's, or a VM's to delete it): the question over a field with its text
+// picked, so typing replaces it. Return answers, Esc or a click outside doesn't. ask(title, initial, then) opens it;
+// then gets the trimmed text, and closed comes out either way, for the app to take the focus back.
 AppPanel {
     id: root
     property var done: null
@@ -25,7 +26,7 @@ AppPanel {
         closed()
     }
 
-    Field {
+    AppField {
         id: field
         c: root.c
         width: parent.width

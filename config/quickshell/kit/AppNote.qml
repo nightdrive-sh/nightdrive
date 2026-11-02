@@ -2,9 +2,9 @@ import QtQuick
 import qs
 import qs.kit
 
-// What went wrong, at the foot of the page: garage-ctl's message (a line it means to be read: "Another VM has the ssh port"),
-// in the danger colour, until ✕ or the next call, which starts with no error (VmCtl.next). Two lines at most; the whole
-// of a longer one is in the log (`garage log`).
+// What went wrong, at the foot of the page: the app's backend's message, a line it means to be read (Garage: "Another
+// VM has the ssh port"), in the danger colour, until ✕ (dismissed) or the app clears text, e.g. on its next call. Two
+// lines at most, so it never covers the page: the whole of a longer one belongs in the app's log.
 Rectangle {
     id: root
     required property QtObject c

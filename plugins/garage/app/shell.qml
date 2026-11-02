@@ -110,7 +110,7 @@ ShellRoot {
                     onNewVm: win.showNew = true
                 }
 
-                NoteLine {
+                AppNote {
                     id: note
                     anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
                     anchors.margins: 20
@@ -163,14 +163,14 @@ ShellRoot {
             onDeleteVm: { win.showSettings = false; page.deleteVm() }
         }
 
-        NamePanel {
+        AppPrompt {
             id: namePanel
             behind: content
             c: win.look
             onClosed: page.refocus()
         }
 
-        ConfirmPanel {
+        AppConfirm {
             id: confirmPanel
             behind: content
             visible: win.confirmDone !== null

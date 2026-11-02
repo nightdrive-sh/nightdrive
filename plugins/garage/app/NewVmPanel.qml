@@ -87,12 +87,12 @@ AppPanel {
         color: root.c.danger; font.family: root.c.font; font.pixelSize: 12
     }
 
-    Field { id: name; c: root.c; width: parent.width; label: "Name"; hint: "letters, digits, - . _"; onAccepted: root.create(); onEscaped: root.done() }
+    AppField { id: name; c: root.c; width: parent.width; label: "Name"; hint: "letters, digits, - . _"; onAccepted: root.create(); onEscaped: root.done() }
     Row {
         visible: root.fromImage
         spacing: 16
-        Field { id: user; c: root.c; width: 200; label: "User"; onAccepted: root.create(); onEscaped: root.done() }
-        Field {
+        AppField { id: user; c: root.c; width: 200; label: "User"; onAccepted: root.create(); onEscaped: root.done() }
+        AppField {
             id: pass; c: root.c; width: 200; label: "Password"
             input.echoMode: TextInput.Password
             onAccepted: root.create(); onEscaped: root.done()
@@ -101,7 +101,7 @@ AppPanel {
     Row {
         visible: !root.fromImage
         spacing: 8
-        Field {
+        AppField {
             id: iso; c: root.c; label: "ISO"
             width: root.cardWidth - 80 - choose.width - 8
             onAccepted: root.create(); onEscaped: root.done()
@@ -115,9 +115,9 @@ AppPanel {
     }
     Row {
         spacing: 16
-        Field { id: mem; c: root.c; width: 120; label: "Memory"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
-        Field { id: cpus; c: root.c; width: 120; label: "CPUs"; hint: "1 to 8"; onAccepted: root.create(); onEscaped: root.done() }
-        Field { id: disk; c: root.c; width: 120; label: "Disk"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
+        AppField { id: mem; c: root.c; width: 120; label: "Memory"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
+        AppField { id: cpus; c: root.c; width: 120; label: "CPUs"; hint: "1 to 8"; onAccepted: root.create(); onEscaped: root.done() }
+        AppField { id: disk; c: root.c; width: 120; label: "Disk"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
     }
 
     Text {
@@ -129,11 +129,11 @@ AppPanel {
     }
     Row {
         spacing: 8
-        PanelButton {
+        AppPanelButton {
             c: root.c; strong: true; keys: ["Ctrl", "Enter"]
             label: root.fromImage && root.image.state !== "ready" ? "Download and create" : "Create and start"
             onClicked: root.create()
         }
-        PanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.done() }
+        AppPanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.done() }
     }
 }

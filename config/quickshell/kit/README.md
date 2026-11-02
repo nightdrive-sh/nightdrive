@@ -24,6 +24,11 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppIconButton` | A glyph-only button (Back, Settings) with a tip (`tipSide`, `tipAlign`) |
 | `AppSearchField` | The search glyph and a field; Return, ↓ and Esc come out as signals |
 | `AppPanel` | A card over the dimmed window (settings, a question, a first start); a click outside comes out as a signal |
+| `AppPanelButton` | A panel's answer (Create, Cancel): its keys in the theme colour, then the word; `strong` for the one Return gives |
+| `AppConfirm` | A yes-or-no `AppPanel` before what can't be undone: `question`, `detail`, `action`; Return yes, Esc no |
+| `AppPrompt` | An `AppPanel` that asks for a name: `ask(title, initial, then)`, the text picked; `then` gets it trimmed |
+| `AppField` | A labelled text field in a frame for the panels, with a `hint` ("GB"); typing into a read-only one comes out as `refused` |
+| `AppNote` | What went wrong, at the foot of the page, in the danger colour, until ✕; two lines at most |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |
 | `Tip` | A button's tip: what it does and its key |
 | `Spinner` | A turning glyph while something runs in the background (Mail's fetch), shown at least a moment; a tip says what runs |

@@ -42,7 +42,7 @@ AppPanel {
     // As Garage's questions: the yes first, filled, each with its key
     Row {
         spacing: 8
-        PanelButton { c: root.c; label: root.action; strong: true; keys: ["Enter"]; onClicked: root.answer(true) }
-        PanelButton { c: root.c; label: root.keepText; keys: ["Esc"]; onClicked: root.answer(false) }
+        AppPanelButton { c: root.c; label: root.action; strong: true; keys: ["Enter"]; onClicked: root.answer(true) }
+        AppPanelButton { c: root.c; label: root.keepText; keys: ["Esc"]; onClicked: root.answer(false) }
     }
 }

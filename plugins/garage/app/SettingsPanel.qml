@@ -58,9 +58,9 @@ AppPanel {
 
     Row {
         spacing: 16
-        Field { id: mem; c: root.c; width: 130; label: "Memory"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
-        Field { id: cpus; c: root.c; width: 130; label: "CPUs"; hint: "1 to 8"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
-        Field { id: disk; c: root.c; width: 130; label: "Disk"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
+        AppField { id: mem; c: root.c; width: 130; label: "Memory"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
+        AppField { id: cpus; c: root.c; width: 130; label: "CPUs"; hint: "1 to 8"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
+        AppField { id: disk; c: root.c; width: 130; label: "Disk"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
     }
     Text {
         width: parent.width
@@ -74,7 +74,7 @@ AppPanel {
     // boots its disk with one in.
     Row {
         spacing: 8
-        Field {
+        AppField {
             id: iso
             c: root.c
             width: root.cardWidth - 80 - choose.width - eject.width - 16
@@ -99,7 +99,7 @@ AppPanel {
     }
 
     // Who `ssh NAME` logs in as: an image's VM has its first boot's, an installed one the user typed in its installer
-    Field {
+    AppField {
         id: user
         c: root.c
         width: 200
@@ -122,8 +122,8 @@ AppPanel {
         Row {
             id: answers
             spacing: 8
-            PanelButton { c: root.c; label: "Save"; strong: true; keys: ["Enter"]; onClicked: root.save() }
-            PanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.done() }
+            AppPanelButton { c: root.c; label: "Save"; strong: true; keys: ["Enter"]; onClicked: root.save() }
+            AppPanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.done() }
         }
         AppButton {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter

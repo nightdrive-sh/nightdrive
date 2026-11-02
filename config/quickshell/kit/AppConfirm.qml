@@ -1,14 +1,15 @@
 import QtQuick
 import qs.kit
 
-// A yes-or-no question before what can't be undone (deleting or restoring a snapshot): the question, a line on what it
-// means, and the button that does it (action, glyph). Return answers yes, Esc or a click outside no.
+// A yes-or-no question before what can't be undone (Garage: deleting or restoring a snapshot): the question, a line on
+// what it means, and the button that does it (action). Return answers yes, Esc or a click outside no; the app shows and
+// hides it (visible) and acts on answered.
 AppPanel {
     id: root
     property string question
     property string detail
     property string action: "Delete"
-    property string glyph: "trash-2"
+    property string glyph: "trash-2"      // what the action is, for the app to keep with it; the card draws no glyph
     signal answered(bool ok)
     cardWidth: 440
     onOutsideTapped: answered(false)
@@ -32,7 +33,7 @@ AppPanel {
     }
     Row {
         spacing: 8
-        PanelButton { c: root.c; label: root.action; strong: true; keys: ["Enter"]; onClicked: root.answered(true) }
-        PanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.answered(false) }
+        AppPanelButton { c: root.c; label: root.action; strong: true; keys: ["Enter"]; onClicked: root.answered(true) }
+        AppPanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.answered(false) }
     }
 }

@@ -1,7 +1,7 @@
 import QtQuick
-import qs.kit
+import qs
 
-// A panel's answer button (Delete, Leave, Cancel); Garage's own, until it moves to the kit (Dashboard #1641), bigger than AppButton as it is what the panel is for: its keys first
+// A panel's answer button (Create, Restore, Cancel), bigger than AppButton as it is what the panel is for: its keys first
 // in the theme colour (ctrl ⏎, esc), then what it does, as the desktop's Claude writes card has them. No frame: a lighter
 // ground sets it off the card, and the one the key answers yes with (strong) has the selection's colour. ⏎ is a Lucide
 // glyph, as there.

@@ -1,8 +1,8 @@
 import QtQuick
 
-// A labelled one-line text field in a frame, for the panels (a new VM's name, its ISO, a snapshot's name). Return comes
-// out as accepted, Esc as escaped (the panel closes). Typing into one that is read-only comes out as refused, so the
-// panel can say why.
+// A labelled one-line text field in a frame, for the panels (Garage: a new VM's name, its ISO, a snapshot's name).
+// Return comes out as accepted, Esc as escaped (the panel closes). Typing into one that is read-only comes out as
+// refused, so the panel can say why rather than the keys doing nothing.
 Column {
     id: root
     required property QtObject c
