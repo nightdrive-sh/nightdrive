@@ -127,6 +127,66 @@
       "area": "apps-files"
     },
     {
+      "name": "files_mkdir",
+      "title": "Make a folder",
+      "description": "Makes one new folder in the user's home folder, in a folder that exists (one level at a time). To make a folder and move files into it, use files_move alone: it makes its folder. Only in the folders the user lets Claude use; nothing hidden (no name starting with a dot), nothing in ~/Mail, ~/Notes, ~/Projects, a mail folder or a git repository. Undo removes it while it is empty.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "description": "The new folder: an absolute path, or one relative to home (~ works too)"}
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "mkdir", "--json", "--", "{path}"],
+      "card": ["nightdrive", "files", "mkdir", "--check", "--", "{path}"],
+      "undo": ["nightdrive", "files", "move-back", "--made", "{made}", "--", "{back}"],
+      "notice": "Made the folder {what}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_move",
+      "title": "Move files",
+      "description": "Moves files or folders in the user's home folder into a folder, which is made if it isn't there (its own folder must exist): \"make a folder for today in Downloads and move its files there\" is one call. Several paths go together: all or none, with one Undo that puts them all back (and removes the folder it made). Nothing is ever overwritten: a name already in the folder stops the call, which names every one in the way; then ask the user, or rename first. Moves within one disk only. The same limits as files_trash, for the paths and for the folder: not home's own folders (Downloads, Documents…) themselves, nothing out of or into ~/Mail, ~/Notes, ~/Projects, a mail folder or a git repository, nothing hidden, nothing outside the folders the user lets Claude use (a link counts where it points). A move of a folder, of over 50 files, or from one of those folders into another asks the user on screen first, with every path.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "What to move: absolute paths, or relative to home"},
+          "folder": {"type": "string", "description": "The folder they go into, kept by their own names: absolute, or relative to home"}
+        },
+        "required": ["paths", "folder"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "move", "--json", "--into", "{folder}", "--", "{paths}"],
+      "card": ["nightdrive", "files", "move", "--check", "--into", "{folder}", "--", "{paths}"],
+      "asks_if": ["nightdrive", "files", "move", "--asks", "--into", "{folder}", "--", "{paths}"],
+      "undo": ["nightdrive", "files", "move-back", "--made", "{made}", "--", "{back}"],
+      "notice": "Moved {what} to {into}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_rename",
+      "title": "Rename a file",
+      "description": "Gives a file or folder in the user's home folder a new name in the same folder (to move it elsewhere, use files_move). The name is one part: no /, not starting with a dot, no newlines. Nothing is overwritten: a name that is taken stops it; ask the user for another. The same limits as files_move.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "description": "What to rename: an absolute path, or relative to home"},
+          "name": {"type": "string", "maxLength": 255, "description": "The new name, with its extension (report.pdf)"}
+        },
+        "required": ["path", "name"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "rename", "--json", "--", "{path}", "{name}"],
+      "card": ["nightdrive", "files", "rename", "--check", "--", "{path}", "{name}"],
+      "undo": ["nightdrive", "files", "move-back", "--made", "{made}", "--", "{back}"],
+      "notice": "Renamed {what} to {name}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
       "name": "files_trash",
       "title": "Move to the trash",
       "description": "Moves files or folders in the user's home folder to the trash, where Files shows them and can put them back; nothing is deleted for good (there is no tool for that). Not home's own folders (Downloads, Documents…), nothing in ~/Mail, ~/Notes, ~/Projects, a mail folder or a git repository, nothing hidden, nothing outside home or the folders the user lets Claude use. Several paths go together: all or none. The user is usually asked on screen first, with every path and how many files each folder holds, so trash what belongs together in one call.",

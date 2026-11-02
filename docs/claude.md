@@ -42,7 +42,7 @@ private asks each time), and turn it all off with its switch ([Turning it off](#
 | Kind | Examples | What happens |
 | --- | --- | --- |
 | **Reads** | search mail, today's events, what plays, the newest downloads, the docs | at once |
-| **Changes** | the wallpaper, the volume, a new task, a note, a draft, a file to the trash | at once, with a notification that has **Undo** |
+| **Changes** | the wallpaper, the volume, a new task, a note, a draft, files moved into a new folder, a file to the trash | at once, with a notification that has **Undo** |
 | **Actions with consequences** | sending mail, a Home Assistant device, installing software, a screen's resolution, Do Not Disturb on | only after you allow it on Nightdrive's card |
 
 Any read, change or delete can ask on the card too: that is your choice in Access, area by area (below). On the
@@ -166,7 +166,7 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
 
   A list that hides can't be read (edited by hand, say): its area's Read goes to *No* until it is fixed.
 
-  Apps and files has *Folders Claude can use*: Claude finds, opens, trashes and sends (Ferry) files, and takes a new
+  Apps and files has *Folders Claude can use*: Claude finds, opens, moves, trashes and sends (Ferry) files, and takes a new
   wallpaper, only in these folders and those inside them. Strict has none, Normal Downloads, Documents, Pictures and
   Desktop, wherever they are (`~/Lataukset` in Finnish), Open the whole home. A path counts where it really is: a link
   can't lead into one of them or out of one, and a hard link (a file with another name too, which could be anywhere)
@@ -250,21 +250,26 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
-| Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †) | **files to the trash** |
+| Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †) | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
 
 Claude doesn't bring a window forward while you type, nor open an app, a file or an address: it waits until you pause
 for a second (half a minute at most, then Claude tries again later), so what you type doesn't land in another window.
 
+Claude moves and renames files within one disk and never over another file: a name already there stops the whole move,
+and Claude asks you for another. Its Undo puts everything back where it was and removes the folder the move made,
+while it is empty; if something new is in the way, nothing moves back.
+
 ## What Claude never gets
 
 - Passwords and the keyring, and the windows Send to Claude leaves out (password managers, private browser windows, the
   apps you list there): Claude sees no title of theirs and no picture.
-- Hidden files and folders (`~/.ssh`, `~/.config`…): not listed, opened, trashed or sent with Ferry, on any level.
-- Nothing in `~/Mail`, `~/Notes`, `~/Projects`, another mail folder or a git repository goes to the trash, even on
-  Open: a mail file trashed there would be deleted from the server by the next sync. Nor does Claude open a web page,
-  an SVG, XML, a playlist, an event or a contact file (they load from the internet or import as they open); you can,
-  in Files.
+- Hidden files and folders (`~/.ssh`, `~/.config`…): not listed, opened, moved, renamed, trashed or sent with Ferry,
+  on any level, and nothing is moved into one or given a name that starts with a dot.
+- Nothing in `~/Mail`, `~/Notes`, `~/Projects`, another mail folder or a git repository goes to the trash or is moved
+  out of it or into it, even on Open: a mail file trashed or moved away there would be deleted from the server by the
+  next sync. Nor does Claude open a web page, an SVG, XML, a playlist, an event or a contact file (they load from the
+  internet or import as they open); you can, in Files.
 - Anything that can't be taken back without asking: no permanent delete (mail goes to Trash, files and notes to the
   trash), no recurring events deleted, no attachments Claude adds to a mail (your own draft's go, and the card names them).
 - Shutting down, users, the clipboard history.

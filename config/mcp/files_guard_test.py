@@ -27,7 +27,7 @@ class Guard(unittest.TestCase):
         root = Path(self.tmp.name).resolve()
         self.home, self.bin = root / "home", root / "scripts"
         self.bin.mkdir()
-        for name in ("files", "wallpaper"):
+        for name in ("files", "files_rules.py", "files_move.py", "wallpaper"):
             shutil.copy(SCRIPTS / name, self.bin / name)
         self.opened = root / "opened"
         windows = self.bin / "windows"

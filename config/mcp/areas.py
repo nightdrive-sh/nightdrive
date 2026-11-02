@@ -166,13 +166,14 @@ AREAS = {
                ]},
     "apps-files": {"name": "Apps and files", "glyph": "folder",
                    "read": "lists your open windows and the newest files in your folders",
-                   "modify": "opens apps, files and web addresses, brings a window forward",
+                   "modify": "opens apps, files and web addresses, brings a window forward; makes folders, moves and "
+                             "renames files (a folder, or many files, asks)",
                    "delete": "moves files to the trash",
                    "options": [
                        # #1849: the one limit every tool with a path keeps (config/hypr/scripts/files › checked)
                        {"id": "folders", "name": "Folders Claude can use", "list": True, "offer": "folders",
                         "item": FOLDER_ENTRY, "item_words": "a folder in home (~/Projects)",
-                        "words": "Claude opens, finds, trashes and sends files (Ferry, a new wallpaper) only in "
+                        "words": "Claude opens, finds, moves, trashes and sends files (Ferry, a new wallpaper) only in "
                                  "these folders and those inside them, wherever a link points; hidden files never. "
                                  "~/Projects isn't on Normal's: code and its keys. Notes and Mail keep their own. "
                                  "Ferry and the wallpaper keep to it also when Apps and files is No.",
