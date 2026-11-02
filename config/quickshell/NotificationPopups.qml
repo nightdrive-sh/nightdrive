@@ -7,7 +7,7 @@ import "NotifGroups.js" as Groups
 // NotificationCard.qml). Pinned ones first, then an app's notifications stacked, newest on top (#1982). Click = open (the
 // app's default action or its window), right click, × or a two-finger swipe right = dismiss (a closed stack: all of it),
 // the mouse over a stack keeps it.
-// Hyprland blurs what's behind the cards (layer rule in hyprland.lua, namespace nightdrive-notifications).
+// Hyprland blurs what's behind the cards (layer rule in hypr/rules.lua, namespace nightdrive-notifications).
 PanelWindow {
     id: win
 

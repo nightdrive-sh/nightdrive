@@ -3,7 +3,8 @@
 address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/apps-files.json.
 
   windows [list] [--json]          the open windows, the most recently used first. --json: {focused, windows: [{address,
-                                   app, class, title, workspace, monitor, focused, onScreen, hidden, private}]}.
+                                   app, class, title, workspace, monitor, focused, onScreen, hidden, private, size, floating,
+                                   xwayland}]}. size: [width, height] in the screen's logical pixels.
                                    A window Send to Claude leaves out (claude-write blocked) has no title here
   windows focus WINDOW [--json] [--unless-typing]
                                    brings it forward (from the background too, as its key does). WINDOW is an address
@@ -206,7 +207,9 @@ def row(c, apps, focused, visible):
     return {"address": c["address"], "app": app_name(c["class"], apps), "class": c["class"],
             "title": "" if private else c["title"], "workspace": "background" if ws == BACKGROUND else ws,
             "monitor": c.get("monitor"), "focused": c["address"] == focused,
-            "onScreen": ws in visible and not c.get("hidden"), "hidden": ws == BACKGROUND, "private": private}
+            "onScreen": ws in visible and not c.get("hidden"), "hidden": ws == BACKGROUND, "private": private,
+            # Size and kind say why a window looks wrong: a tile smaller than the app's minimum (#1890), an X11 app
+            "size": c.get("size"), "floating": c.get("floating", False), "xwayland": c.get("xwayland", False)}
 
 
 def cmd_list(a):
