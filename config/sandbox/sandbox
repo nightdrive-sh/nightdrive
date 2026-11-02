@@ -69,9 +69,11 @@ up() {
   [[ -d $repo/config/hypr/local.d ]] && opts+=(-v "$state/local.d":/home/nd/nightdrive/config/hypr/local.d:ro)
   # A file mounted inside the read-only repo needs a file to mount over: Podman would create a missing one in the repo
   # itself, owned by a subordinate uid. An empty one made here instead, and down removes it again.
-  for f in local.lua xdph.conf; do
-    [[ -e $repo/config/hypr/$f || -L $repo/config/hypr/$f ]] && continue
-    : > "$repo/config/hypr/$f" && echo "$f" >> "$state/placeholders"
+  # foot's local.ini isn't mounted over, but link.sh makes a missing one in the repo, which it can't do read-only:
+  # a fresh worktree has none (git-ignored), so it gets its placeholder here too.
+  for f in config/hypr/local.lua config/hypr/xdph.conf config/foot/local.ini; do
+    [[ -e $repo/$f || -L $repo/$f ]] && continue
+    : > "$repo/$f" && echo "$f" >> "$state/placeholders"
   done
   # The Hyprland window in KWin's virtual screen: big enough for both display sizes
   local w h kw kh
@@ -102,7 +104,8 @@ down() {
   podman rm -f -t 0 "$NAME" >/dev/null 2>&1
   local f p
   while read -r f; do
-    p=$repo/config/hypr/$f
+    [[ $f == */* ]] || f=config/hypr/$f   # a list written before paths were repo-relative
+    p=$repo/$f
     [[ -f $p && ! -L $p && ! -s $p ]] && rm -f "$p"   # only if still the empty placeholder
   done < <(cat "$state/placeholders" 2>/dev/null)
   rm -f "$state/placeholders"
