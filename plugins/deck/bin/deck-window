@@ -54,7 +54,7 @@ start_player() {
   return 1
 }
 
-# What Deck's config has, as the window reads it (app/shell.qml): your own Spotify app, and Curated's taste (Last.fm, or a
+# What Deck's config has, as the window reads it (app/CurateSetup.qml): your own Spotify app, and Curated's taste (Last.fm, or a
 # few lines of your own in taste.md). Both there is Deck set up: `configured`, plugin.conf's test for Welcome.
 has_app() { grep -qE '^\s*client_id\s*=\s*"[^"]+"' "$DECK_CONFIG" 2>/dev/null; }
 has_taste() {
