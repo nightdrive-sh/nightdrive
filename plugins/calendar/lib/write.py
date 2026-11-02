@@ -5,7 +5,8 @@
         --calendar ID --title T --start S [--end E] [--location L] [--notes N]
     write.py delete [--check] CALENDAR UID   --check: stdin's JSON must name the event (title, start), as Claude's
                                              confirmation card showed it, or nothing is deleted
-    write.py shared [--calendar ID]          calendar_add's asks_if: yes when add would put the event in a calendar
+    write.py shared [--calendar ID] [--from ID]
+                                             calendar_add's (and calendar_update's) asks_if: yes when add would put the event in a calendar
                                              others see (calendars.conf's `shared`), so the card asks every time;
                                              otherwise `first NAME (ID)`, so it asks until the user allows one add
                                              to that calendar (Nightdrive remembers it, #1929)
@@ -15,8 +16,8 @@ end is its last day (not iCalendar's day after). Without end: an hour, or the on
 
 The event is a new .ics in the calendar's folder, then `calendar sync SOURCE/CALENDAR` takes it to the server (or the next
 round does, when it can't now). Only a calendar of a CalDAV account that isn't read-only takes one: the ICS ones are
-read from an address, and a read-only account's sync would take a new event away again. Calendar never edits an
-event; a recurring one isn't deleted (that is the phone's, for now).
+read from an address, and a read-only account's sync would take a new event away again. A recurring event isn't
+deleted (that is the phone's, for now); changing an event is change.py's.
 """
 
 import datetime as dt
@@ -168,8 +169,9 @@ def event_file(cal, uid):
     return None
 
 
-def delete(calendar_id, uid, check):
-    cal = writable(calendar_id)
+def one_event(cal, uid, doing):
+    """The file, its calendar and the VEVENT of a single event (not a recurring one, which `doing`, "delete" or
+    "change", isn't done to yet); exits with what to do instead"""
     path = event_file(cal, uid)
     if path is None:
         sys.exit(f"No event {uid} in {cal['name']}: calendar_events gives the uids.")
@@ -179,8 +181,14 @@ def delete(calendar_id, uid, check):
         sys.exit(f"No event {uid} in {cal['name']}.")
     main = next((e for e in events if "recurrence-id" not in e), events[0])
     if "rrule" in main or "rdate" in main or len(events) > 1:
-        sys.exit("That event repeats: Calendar doesn't delete a recurring event yet. The user can delete it on "
+        sys.exit(f"That event repeats: Calendar doesn't {doing} a recurring event yet. The user can do it on "
                  "their phone or at icloud.com.")
+    return path, ics, main
+
+
+def delete(calendar_id, uid, check):
+    cal = writable(calendar_id)
+    path, _, main = one_event(cal, uid, "delete")
     title, start = str(main.get("summary", "")), shown(main.decoded("dtstart"))
     if check is not None and (check.get("title", "").strip() != title.strip() or check.get("start") != start):
         sys.exit(f"Nothing deleted: the event is {title!r} at {start}, not what the card showed. Read it again with "
@@ -207,7 +215,14 @@ def main(argv):
     if argv[0] == "shared":
         # The calendar add would take, or its reason why none (which add would give too). The key has the id, which
         # only this calendar has, and the name the card shows: a calendar renamed on the server asks again
-        cal = writable((options(argv[1:]).get("calendar") or "").strip())
+        # --from: calendar_update's event's calendar, --calendar where it goes (move_to); an event moved out of a
+        # shared calendar, or into one, changes what others see, so either asks every time
+        opts = options(argv[1:])
+        source = (opts.get("from") or "").strip()
+        if source and writable(source)["shared"]:
+            print("yes")
+            return
+        cal = writable((opts.get("calendar") or source).strip())
         name = " ".join(cal["name"].split())[:NAME_MAX]
         print("yes" if cal["shared"] else f"first {name} ({cal['id']})")
         return

@@ -75,3 +75,14 @@ function payload(f) {
     if (f.notes.trim()) out.notes = f.notes.trim()
     return out
 }
+
+// What `calendar edit` reads on stdin (lib/change.py): every field, so an emptied location or notes is cleared there
+// (payload leaves them out), and move_to only when the calendar was changed from the one the event was in
+function edits(f, was) {
+    const out = payload(f)
+    delete out.calendar
+    out.location = f.location.trim()
+    out.notes = f.notes.trim()
+    if (f.calendar !== was) out.move_to = f.calendar
+    return out
+}

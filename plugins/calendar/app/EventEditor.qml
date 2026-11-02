@@ -4,10 +4,10 @@ import qs
 import qs.kit
 import "Form.js" as Form
 
-// A new event, in a panel over the window: its title, first and last day with the times (or all day), the calendar it
-// goes in, where and notes. Saved by `calendar add` (lib/write.py), which writes it here and syncs it up at once; the
-// panel waits for that, so what went wrong (the server, a calendar gone) is said here, where it can still be fixed.
-// ⏎ in a field or Ctrl+⏎ adds it, Esc leaves it. Editing an existing event comes next (#2002), in this same panel.
+// A new event, or one being changed, in a panel over the window: its title, first and last day with the times (or all
+// day), the calendar it goes in, where and notes. Saved by `calendar add` (lib/write.py) or `calendar edit`
+// (lib/change.py), which write it here and sync it up at once; the panel waits for that, so what went wrong (the server,
+// a calendar gone) is said here, where it can still be fixed. ⏎ in a field or Ctrl+⏎ saves, Esc leaves it.
 AppPanel {
     id: root
     required property var app           // the window: calendars, command, today
@@ -15,8 +15,9 @@ AppPanel {
     property bool busy: false
     property int duration: 60           // minutes from start to end, kept when the start moves
     property string lastCalendar: ""    // the one used last, picked again for the next event
+    property var editing: null          // the event being changed (calendar events' JSON), null for a new one
     readonly property var writable: app.calendars.filter(x => !x.read_only)
-    signal added(var event)             // calendar add's JSON: uid, calendar_name, title, start, when, synced…
+    signal saved(var event, bool edited) // calendar add's or edit's JSON: uid, calendar_name, title, when, synced…
     signal closed()
     visible: false
     // As wide as the window lets it (#2025: every panel works in a narrow window): 600, or the window less a margin
@@ -26,6 +27,7 @@ AppPanel {
     // dayText "YYYY-MM-DD"; hour and minute when the event starts at a clicked time
     function open(dayText, hour, minute) {
         const f = Form.blank(dayText, new Date(), hour, minute)
+        editing = null
         title.text = ""
         startDay.text = f.startDay; startTime.text = f.startTime
         endDay.text = f.endDay; endTime.text = f.endTime
@@ -33,6 +35,21 @@ AppPanel {
         location.text = ""; notes.text = ""
         duration = 60
         picker.picked = writable.some(x => x.id === lastCalendar) ? lastCalendar : (writable.length ? writable[0].id : "")
+        error = ""
+        visible = true
+        title.input.forceActiveFocus()
+    }
+    // An event of calendar events, its fields as they are: an all-day event's end is its last day there, as here
+    function edit(e) {
+        editing = e
+        title.text = e.title
+        allDay.on = e.all_day
+        startDay.text = e.start.slice(0, 10); startTime.text = e.all_day ? "" : e.start.slice(11, 16)
+        endDay.text = e.end.slice(0, 10); endTime.text = e.all_day ? "" : e.end.slice(11, 16)
+        location.text = e.location || ""; notes.text = e.notes || ""
+        duration = e.all_day ? Form.between(startDay.text, "00:00", endDay.text, "00:00")
+                             : Form.between(startDay.text, startTime.text, endDay.text, endTime.text)
+        picker.picked = e.calendar
         error = ""
         visible = true
         title.input.forceActiveFocus()
@@ -84,33 +101,40 @@ AppPanel {
             if (!f.title.trim()) title.input.forceActiveFocus()    // the one field everyone forgets: the keys go there
             return
         }
-        lastCalendar = f.calendar
-        adder.input = JSON.stringify(Form.payload(f))
         busy = true
-        adder.running = true
+        if (editing) {
+            writer.command = [app.command, "edit", "--json", editing.calendar, editing.uid]
+            writer.input = JSON.stringify(Form.edits(f, editing.calendar))
+        } else {
+            lastCalendar = f.calendar
+            writer.command = [app.command, "add", "--json"]
+            writer.input = JSON.stringify(Form.payload(f))
+        }
+        writer.running = true
     }
 
-    // calendar add --json, the event on stdin: no option parsing to trip over a title that starts with "--"
+    // calendar add or edit --json, the event on stdin: no option parsing to trip over a title that starts with "--"
     Process {
-        id: adder
+        id: writer
         property string input: ""
-        command: [root.app.command, "add", "--json"]
         stdinEnabled: true
         onStarted: { write(input); stdinEnabled = false }   // the end of stdin ends its read
-        stdout: StdioCollector { id: addOut }
-        stderr: StdioCollector { id: addErr }
+        stdout: StdioCollector { id: writeOut }
+        stderr: StdioCollector { id: writeErr }
         onExited: code => {
             root.busy = false
             stdinEnabled = true
             let result = null
-            if (code === 0) try { result = JSON.parse(addOut.text) } catch (e) {}
+            if (code === 0) try { result = JSON.parse(writeOut.text) } catch (e) {}
             if (!result) {
                 // write.py's own words (sys.exit), the last line: the rest is a traceback, if anything
-                root.error = addErr.text.trim().split("\n").pop() || "The event wasn't added: calendar log says why."
+                root.error = writeErr.text.trim().split("\n").pop()
+                             || (root.editing ? "The event wasn't changed" : "The event wasn't added") + ": calendar log says why."
                 return
             }
+            const edited = !!root.editing
             root.close()
-            root.added(result)
+            root.saved(result, edited)
         }
     }
 
@@ -124,7 +148,7 @@ AppPanel {
     }
 
     Text {
-        text: "New event"
+        text: root.editing ? "Edit event" : "New event"
         color: root.c.title; font.family: root.c.font; font.pixelSize: 16; font.weight: Font.Medium
     }
     AppField {
@@ -225,6 +249,7 @@ AppPanel {
         anchors.right: parent.right
         spacing: 10
         AppPanelButton { c: root.c; keys: ["Esc"]; label: "Cancel"; onClicked: root.close() }
-        AppPanelButton { c: root.c; keys: ["Ctrl", "Enter"]; label: root.busy ? "Adding…" : "Add"; strong: true; onClicked: root.save() }
+        AppPanelButton { c: root.c; keys: ["Ctrl", "Enter"]; strong: true
+                         label: root.editing ? (root.busy ? "Saving…" : "Save") : (root.busy ? "Adding…" : "Add"); onClicked: root.save() }
     }
 }

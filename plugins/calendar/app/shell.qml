@@ -7,8 +7,9 @@ import qs.kit
 import "Dates.js" as Dates
 
 // Nightdrive Calendar: the calendars in the sidebar, the month or the week on the right, over the events the sync keeps
-// in ~/.local/share/calendar (`calendar events` reads them by khal). A new event is added in EventEditor (`calendar
-// add`); editing and deleting are still the command's and Claude's (mcp.json).
+// in ~/.local/share/calendar (`calendar events` reads them by khal). An event opens in EventPanel; a new one is added,
+// and one opened is changed, in EventEditor (`calendar add`, `calendar edit`); deleting is still the command's and
+// Claude's (mcp.json).
 ShellRoot {
     id: shell
     FloatingWindow {
@@ -266,7 +267,9 @@ ShellRoot {
             id: eventPanel
             behind: content
             c: win.look
+            app: win
             onClosed: keys.forceActiveFocus()
+            onEditRequested: ev => editor.edit(ev)
         }
         EventEditor {
             id: editor
@@ -276,9 +279,10 @@ ShellRoot {
             onClosed: keys.forceActiveFocus()
             // The window shows it at once: `calendar add` asks a running Calendar to reload, but this one may have been
             // started apart from the command (qs -p), so reload here too
-            onAdded: ev => {
+            onSaved: (ev, edited) => {
                 win.reload()
-                win.say("Added to " + ev.calendar_name + ": " + ev.title + (ev.synced ? "" : ". The next sync takes it to the server."))
+                win.say((edited ? "Saved in " : "Added to ") + ev.calendar_name + ": " + ev.title
+                        + (ev.synced ? "" : ". The next sync takes it to the server."))
             }
         }
 
@@ -291,7 +295,8 @@ ShellRoot {
                                            ["t", "Today"], ["m  w", "Month, week"], ["⏎", "Open the day's first event"], ["n", "New event"],
                                            ["Double click", "A day's week; in the week's hours, a new event there"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
-                { title: "New event", keys: [["⏎  Ctrl ⏎", "Add it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["Esc", "Leave it"]] }
+                { title: "An event", keys: [["e", "Edit it"], ["Esc  ⏎", "Close it"]] },
+                { title: "New or edited event", keys: [["⏎  Ctrl ⏎", "Save it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["Esc", "Leave it"]] }
             ]
         }
         // Last, so it shows over the panels too

@@ -1,6 +1,6 @@
 # Calendar
 
-Your iCloud calendars, and Google calendars by their private address, on your computer: the month or the week in a window of its own, kept in sync every 15 minutes. A first version: you add events in the window; they are changed and deleted with the `calendar` command, or by Claude when you ask it to.
+Your iCloud calendars, and Google calendars by their private address, on your computer: the month or the week in a window of its own, kept in sync every 15 minutes. A first version: you add and change events in the window; they are deleted with the `calendar` command, or by Claude when you ask it to.
 
 ## Using it
 
@@ -14,12 +14,14 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | `m`, `w` | Month, week |
 | `Enter` | Open the day's first event (a click opens any) |
 | `n` | New event on the day picked (also New, or a double click in the week's hours) |
+| `e` | Edit the event open (also Edit on it) |
 | `1`–`9` or Ctrl+↑ Ctrl+↓ | A calendar of the sidebar, or All calendars |
 | ⌘R | Sync now |
 | ⌘B | Hide or show the sidebar |
 
-- A new event: `Tab` moves between its fields, `Enter` or Ctrl+Enter adds it, `Esc` leaves it. A time is typed as 9:30 or 930, a day as 2026-11-05 or 5.11.2026; the end moves with the start. It goes in a calendar that isn't read only (below), the one you used last.
+- A new or edited event: `Tab` moves between its fields, `Enter` or Ctrl+Enter saves it, `Esc` leaves it. A time is typed as 9:30 or 930, a day as 2026-11-05 or 5.11.2026; the end moves with the start. It goes in a calendar that isn't read only (below), the one you used last.
 - In a narrow window the buttons show as icons, and below about 500 px the month or week shows as a list of its days.
+- Editing keeps what Calendar doesn't show (alarms, invitees); another calendar moves the event there. A recurring event, or one in a read-only calendar, isn't changed here: the card says so.
 - A double click on a day in the month opens its week. A recurring event shows at each of its times.
 - The events are kept as `.ics` files in `~/.local/share/calendar`, a folder per account and calendar, and vdirsyncer syncs them. khal reads them, recurring events and all.
 
@@ -38,7 +40,7 @@ caldav-url = https://caldav.example.com/
 
 ## Claude
 
-With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add an event (you can undo it from the notification), and delete one after you allow it on Nightdrive's card. It doesn't delete recurring events, nor change anything in a read-only calendar.
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add or change an event (you can undo either from the notification), and delete one after you allow it on Nightdrive's card. It doesn't change or delete recurring events, nor anything in a read-only calendar. Changing an event asks on the card the first time in each calendar, and every time in or out of a `shared` one.
 
 The first event Claude adds to a calendar asks on the card, and once you allow it, Claude adds to that calendar without asking; a `shared` one asks every time, and a refusal remembers nothing. `nightdrive mcp access allowed` lists the calendars allowed so, and `nightdrive mcp access forget calendar_add` makes them all ask again (or `forget calendar_add "Family (icloud/family)"`, one of them).
 
@@ -52,6 +54,7 @@ The first event Claude adds to a calendar asks on the card, and once you allow i
 | `calendar calendars` | The calendars and how many events each has (`--json`) |
 | `calendar events FROM TO` | The events from FROM up to TO, not included (YYYY-MM-DD; `--json`, `--calendar ID`, `--search TEXT`, `--limit N`) |
 | `calendar add --title T --start S [--end E]` | A new event (`--calendar ID`, `--location L`, `--notes N`); S and E are YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day |
+| `calendar edit CALENDAR UID` | Changes an event: a JSON object on stdin of what changes (`title`, `start`, `end`, `location`, `notes`, `move_to` another calendar); prints the id `calendar restore UNDO` takes to put it back (`--json`) |
 | `calendar delete CALENDAR UID` | Deletes an event here and on the server (not a recurring one) |
 | `calendar subscribe NAME [TITLE]` | A Google (or other) calendar by its private ICS address |
 | `calendar sync [NAME…]` | Syncs every account's calendars now (or these) |
