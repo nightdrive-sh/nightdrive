@@ -24,7 +24,7 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | `steps.md` | Its setup by hand, a step at a time, for Welcome to Nightdrive without Claude (see [below](#setting-up-by-hand-stepsmd)) | — (Mail's [steps.md](mail/steps.md)) |
 | `module.jsonc` | A top bar module | [module.jsonc](ferry/module.jsonc) |
 | `status` | The module's state, one line of JSON | [status](ferry/status) |
-| `icons/` | The module's own SVG icons, for a logo Lucide hasn't got | — (Tailscale's [icons/](tailscale/icons)) |
+| `icons/` | The module's own SVG icons, for one the bar's Lucide set hasn't got | — (Tailscale's [icons/](tailscale/icons)) |
 | `<Name>Menu.qml` | The menu a click on the module opens (more `.qml` files beside it if it needs them) | [FerryMenu.qml](ferry/FerryMenu.qml) |
 | `<Name>Levels.qml` | Its pages in the Launcher, and rows of its own at the root, in the root search and above the search field | — (Deck's [MusicLevels.qml](deck/MusicLevels.qml)) |
 | `bindings.lua` | Keys | — (Deck's [bindings.lua](deck/bindings.lua)) |
@@ -121,7 +121,7 @@ explains every key), with a few differences:
 
 `status` is an executable script in the folder (the module runs it without a `status` key). It prints one line of JSON,
 `{"icon": "inbox", "text": "2", "class": "active"}`: the icon is a Lucide name (or `pack:name` from Iconify, or the name
-of an SVG in the plugin's `icons/`, drawn in `currentColor`: Tailscale's logo), the text comes after it, and the class is one of `off` (dimmed), `warning`, `critical`, `active` (highlighted), `pulse` (highlighted, the icon fading in and out: something in progress) or `stale`.
+of an SVG in the plugin's `icons/`, drawn in `currentColor`: Tailscale's shield), the text comes after it, and the class is one of `off` (dimmed), `warning`, `critical`, `active` (highlighted), `pulse` (highlighted, the icon fading in and out: something in progress) or `stale`.
 `"dot": true` adds a small red dot to the icon, for something that waits for you. No icon and no text hides the module. The shared helper prints that line:
 
 ```bash
