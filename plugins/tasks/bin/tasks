@@ -48,7 +48,9 @@ usage() {
 Usage: tasks [command]
 
   (none), open   open Tasks, or bring it forward if it is open
+  new [LIST]     open Tasks with a new task in LIST (its name; the list it shows, or the one used last, without one)
   lists          the lists and how many open tasks each has (--json)
+  when WHEN      how a due reads ("fri 930": Fri 6 Nov 09:30)
   list           the open tasks (--json; --list NAME; --view today|scheduled|done|all; --query TEXT)
   add TITLE      a new task (--list NAME, a new list if there is none; --due WHEN; --note TEXT; --priority high|low)
   done ID        mark a task done (ID: from list, or the start of one)
@@ -61,12 +63,14 @@ Usage: tasks [command]
   restart, quit, log
   help           this text
 
-WHEN: YYYY-MM-DD, YYYY-MM-DD HH:MM, HH:MM, today, tomorrow (with HH:MM or not), +30m, +2h, +3d.
+WHEN: [DAY] [TIME]. DAY: today, tomorrow, mon … sun (the next one), 5.11., 5.11.2027, 2026-11-05, +3d.
+TIME: 9:30, 930, 14 (alone: the next such time). Or +30m, +2h.
 USAGE
 }
 
 case ${1:-open} in
-  lists|list) cli "$@" ;;
+  new)        open_ready; ipc newTask "${2:-}" ;;
+  lists|list|when) cli "$@" ;;
   add|done|snooze|trash|restore) change "$@" ;;
   due)        python3 "$APP_DIR/lib/due.py" check ;;
   enable)     enable ;;

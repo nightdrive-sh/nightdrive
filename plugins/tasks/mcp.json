@@ -26,7 +26,7 @@
         "type": "object",
         "properties": {
           "title": {"type": "string", "title": "Task", "description": "What to do, short", "minLength": 1},
-          "due": {"type": "string", "title": "Due", "description": "YYYY-MM-DD, YYYY-MM-DD HH:MM, HH:MM (the next such time), today, tomorrow, tomorrow HH:MM, or +30m, +2h, +3d. Leave it out for a task without a date"},
+          "due": {"type": "string", "title": "Due", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD or D.M. (5.11.), +3d; TIME is HH:MM (alone: the next such time). Or +30m, +2h. Leave it out for a task without a date"},
           "list": {"type": "string", "title": "List", "description": "The list's name (default Tasks)"},
           "note": {"type": "string", "title": "Note", "description": "More about it, as plain text"},
           "priority": {"type": "string", "enum": ["high", "normal", "low"], "title": "Priority"}
@@ -67,7 +67,7 @@
         "type": "object",
         "properties": {
           "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"},
-          "until": {"type": "string", "title": "Until", "description": "YYYY-MM-DD, YYYY-MM-DD HH:MM, HH:MM, today, tomorrow, tomorrow HH:MM, or +30m, +2h, +3d"}
+          "until": {"type": "string", "title": "Until", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD or D.M. (5.11.), +3d; TIME is HH:MM (alone: the next such time). Or +30m, +2h"}
         },
         "required": ["id"],
         "additionalProperties": false

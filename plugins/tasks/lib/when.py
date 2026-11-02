@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """When a task is due, as the command takes it and as it is shown.
 
-    parse(text, now) -> date | datetime     YYYY-MM-DD, YYYY-MM-DD HH:MM (or T), HH:MM (the next such time), today,
-                                            tomorrow (with a time or not), +30m, +2h, +3d
+    parse(text, now) -> date | datetime     [DAY] [TIME]: today, tomorrow, fri, +3d, 5.11., 2026-11-05 and 9:30,
+                                            930, 14 (a time alone: the next such time), or +30m, +2h
+    at(day, time, now) -> … | None          the window's two fields, either may be empty
     later(due, now) -> date | datetime      what the notification's Later moves a task to
     due_at(due) -> datetime                 when a due task is notified: a date at MORNING
     label(due, now) -> str                  "Today 14:00", "Tomorrow", "Fri 30 Oct", "3 Nov 2027"
@@ -15,39 +16,83 @@ MORNING = time(9, 0)   # an all-day task's notification, on its day
 LATER = timedelta(hours=1)   # Later on a task with a time; one with only a date goes to the next day
 
 
+WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+WEEKDAYS_FULL = {d[:3]: d for d in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")}
+HELP = ("give a day (today, tomorrow, fri, 5.11., 5.11.2027, 2026-11-05, +3d), a time (9:30, 930, 14) or both "
+        "(tomorrow 10, fri 930), or +30m, +2h")
+
+
 def parse(text, now=None):
+    """One text, as --due and Claude give it: [DAY] [TIME], or +30m / +2h / +3d. A time alone is the next such time"""
     now = now or datetime.now()
     t = " ".join(text.strip().lower().split())
-    m = re.fullmatch(r"\+(\d+)\s*([mhd])", t)
+    t = re.sub(r"^(\d{4}-\d{2}-\d{2})t", r"\1 ", t)    # ISO's 2026-11-05T10:00
+    m = re.fullmatch(r"\+(\d+)\s*([mh])", t)
     if m:
-        n, unit = int(m.group(1)), m.group(2)
-        if unit == "d":
-            return now.date() + timedelta(days=n)
-        return (now + timedelta(minutes=n if unit == "m" else 60 * n)).replace(second=0, microsecond=0)
-    m = re.fullmatch(r"(today|tomorrow)(?: (\d{1,2})[:.](\d{2}))?", t)
-    if m:
-        day = now.date() + timedelta(days=1 if m.group(1) == "tomorrow" else 0)
-        return datetime.combine(day, clock(m.group(2), m.group(3))) if m.group(2) else day
-    m = re.fullmatch(r"(\d{1,2})[:.](\d{2})", t)
-    if m:
-        at = datetime.combine(now.date(), clock(m.group(1), m.group(2)))
-        return at if at > now else at + timedelta(days=1)
-    m = re.fullmatch(r"(\d{4}-\d{2}-\d{2})(?:[ t](\d{1,2}):(\d{2})(?::\d{2})?)?", t)
-    if m:
-        try:
-            day = date.fromisoformat(m.group(1))
-        except ValueError:
-            raise ValueError(f"No such date: {m.group(1)}") from None
-        return datetime.combine(day, clock(m.group(2), m.group(3))) if m.group(2) else day
-    raise ValueError(f"Can't read the time {text!r}: give YYYY-MM-DD, YYYY-MM-DD HH:MM, HH:MM, today, tomorrow "
-                     "(with HH:MM or not), or +30m, +2h, +3d")
+        n = int(m.group(1))
+        return (now + timedelta(minutes=n if m.group(2) == "m" else 60 * n)).replace(second=0, microsecond=0)
+    words = t.split()
+    # The last word is the time when it reads as one. So "5.11" alone is 05:11, and a day in one text needs its last
+    # dot (5.11.); the window's day field has no such doubt (at())
+    at_ = clock_of(words[-1]) if words else None
+    if at_ is not None:
+        words = words[:-1]
+    if not words:
+        if at_ is None:
+            raise ValueError(f"Can't read the time {text!r}: " + HELP)
+        x = datetime.combine(now.date(), at_)
+        return x if x > now else x + timedelta(days=1)
+    day = day_of(" ".join(words), now)
+    return datetime.combine(day, at_) if at_ is not None else day
 
 
-def clock(h, m):
+def at(day_text, time_text, now=None):
+    """The window's two fields, a day and a time, either may be empty: None when both are. A time without a day is the
+    next such time, as in parse()"""
+    now = now or datetime.now()
+    d = " ".join((day_text or "").lower().split())
+    t = (time_text or "").strip().lower()
+    clk = clock_of(t) if t else None
+    if t and clk is None:
+        raise ValueError(f"Can't read the time {time_text.strip()!r}: 9:30, 930 or 14.")
+    if not d:
+        return parse(t, now) if t else None
+    day = day_of(d, now)
+    return datetime.combine(day, clk) if clk is not None else day
+
+
+def clock_of(word):
+    """9, 14, 930, 9:30, 09.30, 9:30:00 -> time; None when the word isn't a time of day"""
+    m = re.fullmatch(r"(\d{1,2})(?:[:.]?(\d{2}))?(?::\d{2})?", word)
+    if not m:
+        return None
+    h, mi = int(m.group(1)), int(m.group(2) or 0)
+    return time(h, mi) if h < 24 and mi < 60 else None
+
+
+def day_of(text, now):
+    """today, tomorrow, mon … sun (or monday: the next one, not today), +3d, 2026-11-05, 5.11., 5.11, 5.11.2027 (a day
+    without a year is this year's)"""
+    t = text.strip().lower()
+    if t in ("today", "tomorrow"):
+        return now.date() + timedelta(days=1 if t == "tomorrow" else 0)
+    if t[:3] in WEEKDAYS and (len(t) == 3 or WEEKDAYS_FULL.get(t[:3]) == t):
+        ahead = (WEEKDAYS.index(t[:3]) - now.weekday() - 1) % 7 + 1
+        return now.date() + timedelta(days=ahead)
+    m = re.fullmatch(r"\+(\d+)\s*d", t)
+    if m:
+        return now.date() + timedelta(days=int(m.group(1)))
+    m = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", t)
+    ymd = m.groups() if m else None
+    m = re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.?(\d{4})?", t)
+    if m:
+        ymd = (m.group(3) or str(now.year), m.group(2), m.group(1))
+    if ymd is None:
+        raise ValueError(f"Can't read the day {text!r}: " + HELP)
     try:
-        return time(int(h), int(m))
+        return date(int(ymd[0]), int(ymd[1]), int(ymd[2]))
     except ValueError:
-        raise ValueError(f"No such time: {h}:{m}") from None
+        raise ValueError(f"No such date: {text.strip()}") from None
 
 
 def due_at(due):

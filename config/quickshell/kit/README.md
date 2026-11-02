@@ -29,6 +29,9 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppConfirm` | A yes-or-no `AppPanel` before what can't be undone: `question`, `detail`, `action`; Return yes, Esc no |
 | `AppPrompt` | An `AppPanel` that asks for a name: `ask(title, initial, then)`, the text picked; `then` gets it trimmed |
 | `AppField` | A labelled text field in a frame for the panels, with a `hint` ("GB"); typing into a read-only one comes out as `refused` |
+| `AppTextArea` | A labelled text of a few lines in a frame (a task's note): ⏎ a new line, Ctrl+⏎ `save`, Tab the next field |
+| `AppChips` | One of a few as chips in a row (the list a task goes in): `options` `[{ id, name, color? }]`, `picked`; ← → move it |
+| `AppCheck` | A box to tick and its word (Important): `on`, Space or a click turns it (`toggled`), ⏎ `accepted` |
 | `AppNote` | What went wrong, at the foot of the page, in the danger colour, until ✕; two lines at most |
 | `AppToast` | What just happened, in a rounded card at the top of the window: `show(text, { sticky, danger, duration })`, gone after 4 s (a failure 8 s), sticky until the next; a click dismisses it |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |

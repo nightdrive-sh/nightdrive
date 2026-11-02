@@ -5,9 +5,9 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// Nightdrive Tasks: Today, Scheduled and the lists in the sidebar, their tasks on the right. The window only shows them:
-// tasks are added and changed by Claude (mcp.json), the `tasks` command and the notifications' Done and Later, which
-// all ask it to read them again (`tasks …` calls refresh). lib/cli.py reads the VTODO files.
+// Nightdrive Tasks: Today, Scheduled and the lists in the sidebar, their tasks on the right. New (n) adds one in a panel
+// (TaskEditor); the other changes come from Claude (mcp.json), the `tasks` command and the notifications' Done and
+// Later, which all ask it to read them again (`tasks …` calls refresh). lib/cli.py reads and writes the VTODO files.
 ShellRoot {
     id: shell
     FloatingWindow {
@@ -26,6 +26,11 @@ ShellRoot {
             target: "tasks"
             function refresh(): void { win.load() }
             function openSettings(): void {}     // the kit's `tasks settings`: Tasks has none yet
+            // `tasks new [LIST]`: the new task panel, in that list (its name or id) when there is one
+            function newTask(list: string): void {
+                const l = win.lists.find(x => x.id === list || x.name.toLowerCase() === list.toLowerCase())
+                win.newTask(l ? l.id : "")
+            }
             // A row of the sidebar by its name (Today, Scheduled, a list, Done), and a task in it by number from 1
             function pick(name: string, row: int): void {
                 const i = win.sources.findIndex(s => s.name.toLowerCase() === name.toLowerCase())
@@ -57,6 +62,7 @@ ShellRoot {
         property var shown: []
         property int current: -1
 
+        property string keepNext: ""        // a task to pick once the next read is in (the one just added)
         function load() { loader.running = true }
         Process {
             id: loader
@@ -65,7 +71,8 @@ ShellRoot {
                 onStreamFinished: {
                     let d
                     try { d = JSON.parse(text) } catch (e) { console.warn("cli.py list: " + e); return }
-                    const keep = win.shown[win.current] ? win.shown[win.current].id : ""
+                    const keep = win.keepNext || (win.shown[win.current] ? win.shown[win.current].id : "")
+                    win.keepNext = ""
                     const was = win.view.kind === "list" ? win.view.id : ""
                     win.tasks = d.tasks
                     win.lists = d.lists
@@ -113,6 +120,13 @@ ShellRoot {
             if (i < 0 || i >= sources.length) return
             source = i; filter("")
         }
+        // The new task panel: in the list the window shows, or listId; due today when the view is Today, where a task
+        // without a day wouldn't show
+        function newTask(listId) {
+            editor.open(listId || (view.kind === "list" ? view.id : ""), view.kind === "today" ? "today" : "")
+        }
+        // What just happened, at the top of the window (the kit's toast)
+        function say(t, danger) { toast.show(t, { danger: !!danger }) }
         function move(d) {
             if (!shown.length) return
             current = Math.max(0, Math.min(shown.length - 1, current + d))
@@ -134,6 +148,7 @@ ShellRoot {
         onSidebarShownChanged: if (!sidebarShown) pane = "list"
 
         RowLayout {
+            id: content
             anchors.fill: parent
             spacing: 0
             AppPointer { c: win.look }
@@ -189,6 +204,7 @@ ShellRoot {
                     else if (k === Qt.Key_Home) win.move(-win.shown.length)
                     else if (k === Qt.Key_End) win.move(win.shown.length)
                     else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
+                    else if (k === Qt.Key_N && !ctrl) win.newTask("")
                     else return
                     e.accepted = true
                 }
@@ -214,6 +230,12 @@ ShellRoot {
                             textFormat: Text.PlainText
                             text: win.shown.length ? win.shown.length + (win.view.kind === "done" ? " done" : " open") : ""
                             color: c.faint; font.family: c.font; font.pixelSize: 11
+                        }
+                        // Higher than the header's text (AppButton's 28): it reaches a little over and under it
+                        AppButton {
+                            Layout.leftMargin: 12
+                            c: win.look; glyph: "plus"; label: "New"; tip: "New task"; keys: "n"; tipAlign: "right"
+                            onClicked: win.newTask("")
                         }
                     }
                     Rectangle { Layout.fillWidth: true; Layout.topMargin: 17; Layout.preferredHeight: 1; color: c.divider }
@@ -257,7 +279,7 @@ ShellRoot {
                             Text {
                                 visible: win.tasks.length === 0
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                text: "Ask Claude to add one, or in a terminal: tasks add TITLE"
+                                text: "n adds one, or ask Claude to"
                                 color: c.faint; font.family: c.font; font.pixelSize: 11
                             }
                         }
@@ -272,8 +294,28 @@ ShellRoot {
             groups: [
                 { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
-                { title: "Changing them", keys: [["Claude", "Adds, moves, marks done"], ["tasks", "The same in a terminal: tasks help"], ["Notification", "Done, Later"]] }
+                { title: "Changing them", keys: [["n", "New task"], ["Claude", "Adds, moves, marks done"], ["tasks", "The same in a terminal: tasks help"], ["Notification", "Done, Later"]] },
+                { title: "New task", keys: [["⏎  Ctrl ⏎", "Add it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["Esc", "Leave it"]] }
             ]
         }
+
+        TaskEditor {
+            id: editor
+            behind: content
+            c: win.look
+            app: win
+            onClosed: win.toList()
+            // `cli.py add` doesn't ask the window to read again (only the `tasks` command does): read here, and pick it
+            onAdded: task => {
+                win.keepNext = task.id
+                win.load()
+                const here = win.view.kind === "list" ? win.view.id === task.list_id
+                           : win.view.kind === "today" ? task.due && task.due.slice(0, 10) <= win.today
+                           : win.view.kind === "scheduled" ? !!task.due : false
+                win.say(here ? "Added" : "Added to " + task.list + (task.due ? ", " + task.due_label : ""))
+            }
+        }
+        // Last, over the panel too
+        AppToast { id: toast; c: win.look }
     }
 }

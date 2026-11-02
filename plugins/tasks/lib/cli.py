@@ -4,6 +4,8 @@
     cli.py lists [--json]
     cli.py list [--json] [--list NAME] [--view open|today|scheduled|done|all] [--query TEXT]
     cli.py add [--json] [--list NAME] [--due WHEN] [--note TEXT] [--priority high|normal|low] TITLE
+    cli.py add --json --stdin       the same as JSON on stdin: {title, list, day, time, note, priority} (the window)
+    cli.py when [--json] [--day DAY] [--time TIME] [WHEN]     how a due reads: {due, label}
     cli.py done [--json] ID         cli.py snooze [--json] [--until WHEN] ID
     cli.py trash [--json] ID        cli.py restore [--json] UNDO
 
@@ -108,13 +110,29 @@ def changed(lst, task, sid, a, verb):
     return r if a.json else f"{verb}: {text_row(r)}"
 
 
+def from_stdin(a):
+    """The window's new task as JSON on stdin, so a title that starts with "--" is no option, and the day and the time
+    come as the two fields they were typed in (when.at)"""
+    try:
+        d = json.load(sys.stdin)
+    except ValueError:
+        raise ValueError("The new task wasn't readable JSON.") from None
+    a.title = [str(d.get("title") or "")]
+    a.list, a.note = d.get("list") or None, d.get("note") or ""
+    a.priority = d.get("priority") or "normal"
+    if a.priority not in PRIORITY:
+        raise ValueError(f"No priority {a.priority!r}: high, normal or low.")
+    return when.at(d.get("day"), d.get("time"))
+
+
 def cmd_add(a):
+    due = from_stdin(a) if a.stdin else when.parse(a.due) if a.due else None
     title = " ".join(a.title).strip()
     if not title:
         raise ValueError("A task needs a title.")
     task = ics.Task.new(title)
-    if a.due:
-        task.set_time("DUE", when.parse(a.due))
+    if due is not None:
+        task.set_time("DUE", due)
     task.set("DESCRIPTION", a.note or "")
     task.set("PRIORITY", PRIORITY[a.priority])
     lst = store.find_list(a.list, make=True)
@@ -122,6 +140,14 @@ def cmd_add(a):
     sid = store.snapshot([path], made=lst if lst.get("made") else None)
     store.save(path, task)
     return changed(lst, task, sid, a, "Added")
+
+
+def cmd_when(a):
+    """The window's reading of its day and time fields as they are typed (or a --due text): what the task will say"""
+    due = when.at(a.day, a.time) if a.day is not None or a.time is not None else when.parse(" ".join(a.text))
+    now = datetime.now()
+    out = {"due": ics.as_text(due), "label": when.label(due, now) if due is not None else ""}
+    return out if a.json else out["label"] or "No due"
 
 
 def cmd_done(a):
@@ -183,7 +209,12 @@ def parser():
     c.add_argument("--due")
     c.add_argument("--note")
     c.add_argument("--priority", choices=tuple(PRIORITY), default="normal")
-    c.add_argument("title", nargs="+")
+    c.add_argument("--stdin", action="store_true")
+    c.add_argument("title", nargs="*")
+    c = command("when", cmd_when)
+    c.add_argument("--day")
+    c.add_argument("--time")
+    c.add_argument("text", nargs="*")
     command("done", cmd_done).add_argument("id")
     c = command("snooze", cmd_snooze)
     c.add_argument("--until")
