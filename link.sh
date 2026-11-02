@@ -136,9 +136,9 @@ if [[ -s $cg ]] && jq -e '.preferredNotifChannel == null or .preferredNotifChann
   jq '.preferredNotifChannel = "notifications_disabled"' "$cg" > "$cg.tmp" && mv "$cg.tmp" "$cg" || rm -f "$cg.tmp"
 fi
 
-# The nightdrive command (bin/nightdrive)
+# The nightdrive command (bin/nightdrive). Its parts in bin/nightdrive.d are sourced from the repo, not commands: not linked
 mkdir -p "$HOME/.local/bin"
-for f in "$repo"/bin/*; do link "$f" "$HOME/.local/bin/$(basename "$f")"; done
+for f in "$repo"/bin/*; do [[ -d $f ]] || link "$f" "$HOME/.local/bin/$(basename "$f")"; done
 
 # Plugin folders (plugins/<id>/ and the external ones, see plugins/README.md): their commands (bin/), user units
 # (systemd/) and Files extensions (nautilus-python/, which show only while the plugin is on), whether installed or not: an

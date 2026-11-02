@@ -102,4 +102,5 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
   listed in `qmldir` and in `exts` in `Launcher.qml`; the row that opens it goes in `rootItems`/`statics` there.
 - *Keybinding:* `hypr/bindings.lua`, and the same entry in `hypr/SHORTCUTS.md` (the launcher reads that file). An app opens
   with Hyper + a letter (`"MOD3 + X"`, `Hyper X` in SHORTCUTS.md); desktop features use ⌘⇧ / ⌘⌥; ⌘ + a letter is the apps'.
-- *Command:* a subcommand in the case at the bottom of `bin/nightdrive` (link.sh links it to `~/.local/bin`).
+- *Command:* a subcommand in the case at the bottom of `bin/nightdrive` (link.sh links it to `~/.local/bin`), its code in
+  a file of `bin/nightdrive.d/` (sourced by it) or a script of its own.
