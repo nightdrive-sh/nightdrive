@@ -38,3 +38,7 @@ On a computer that already runs Nightdrive, [Garage](../plugins/garage/README.md
 machines, makes the VM for you: ⌘N and a
 ready-made Fedora 44 image, with no installer to click through. Start it, `ssh NAME` into it and install as above.
 Snapshots let you go back and try again.
+
+In a QEMU/KVM virtual machine (Garage, GNOME Boxes, virt-manager, UTM) the installer adds `qemu-guest-agent`, through
+which the host shuts the VM down and sets its clock. A VM without Nightdrive needs it too for Garage's Stop and clock:
+`sudo dnf install qemu-guest-agent`.

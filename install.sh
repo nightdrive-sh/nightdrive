@@ -131,6 +131,10 @@ case $machine in
 esac
 # The machine's own packages (packages-pc.txt, packages-asahi.txt; a VM has none)
 own_pkgs=$repo/packages-$machine.txt; [[ -f $own_pkgs ]] || own_pkgs=""
+# Under QEMU/KVM (Garage, GNOME Boxes, virt-manager, UTM) its guest agent, which Fedora Minimal lacks: without it the host
+# can't shut the VM down (the power button it falls back to is Nightdrive's to ignore) or set its clock (#1577)
+guest_agent=0
+[[ $(systemd-detect-virt --vm 2>/dev/null) == @(qemu|kvm) ]] && ! rpm -q qemu-guest-agent >/dev/null 2>&1 && guest_agent=1
 
 # --- What Fedora Minimal leaves as a server's (Fedora KDE has the desktop's): done after the packages ---
 # It starts to a text console (multi-user.target), where no login screen starts
@@ -237,6 +241,7 @@ if (( dry )); then
   (( kb_ask )) && echo "Would ask for the keyboard layout (still Asahi Minimal's us)"
   [[ -z $kb_set ]] || echo "Would set the keyboard layout: $kb_set"
   (( to_graphical )) && echo "Would boot to the login screen: systemctl set-default graphical.target"
+  (( guest_agent )) && echo "Would install qemu-guest-agent (a QEMU/KVM virtual machine: the host's shutdown and clock)"
   (( greeter || other_dm )) || echo "Would make greetd's text login the login screen (--no-greeter, no other login screen here)"
   (( fw_desktop )) && echo "Would give the firewall the desktop's settings: the FedoraWorkstation zone, firewalld's desktop polkit rule"
   (( ssh_preset )) && echo "Would turn SSH off (on by Fedora Minimal's preset) unless Remote login looks after it already"
@@ -287,6 +292,12 @@ if [[ -n $own_pkgs ]]; then
   sudo dnf install -y --skip-unavailable $(pkgs "$own_pkgs")
   keep=$(installed $(pkgs "$own_pkgs" | tr ' ' '\n' | grep -v '^@'))
   [[ -z $keep ]] || sudo dnf mark user -y $keep >/dev/null
+fi
+if (( guest_agent )); then
+  echo "==> QEMU guest agent (a virtual machine: the host shuts it down and sets its clock through it)"
+  sudo dnf install -y qemu-guest-agent
+  # udev starts it when the host's channel (virtio-port org.qemu.guest_agent.0) is there; started now for this boot
+  sudo systemctl start qemu-guest-agent.service 2>/dev/null || true
 fi
 # The system locale's languages (localectl: LANG and the LC_ ones, e.g. fi_FI's times with en_US's messages). The
 # netinstall installs only the language picked there; Asahi's image has them all (glibc-all-langpacks)
