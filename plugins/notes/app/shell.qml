@@ -5,10 +5,10 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// Notes, Nightdrive's window to read the Markdown notes in ~/Notes: the notes in the sidebar, newest first, the picked
-// one beside it. It doesn't write: Apostrophe does (Open in Apostrophe), and Claude through the notes command
-// (mcp.json). This file holds the window together: the narrow window's turns, the IPC and the keys (their sheet:
-// KeyHelp.qml).
+// Notes, Nightdrive's window for the Markdown notes in ~/Notes: the notes in the sidebar, newest first, the picked
+// one beside it, to read or to write in (NoteEditor, Enter). Apostrophe still opens one (⇧Enter), and Claude writes
+// through the notes command (mcp.json). This file holds the window together: the narrow window's turns, the IPC, the
+// reading keys (their sheet: KeyHelp.qml) and quitting once what was written is saved.
 ShellRoot {
     FloatingWindow {
         id: win
@@ -16,7 +16,7 @@ ShellRoot {
         implicitWidth: 900
         implicitHeight: 620
         color: c.bg
-        onClosed: Qt.quit()
+        onClosed: win.quit()
 
         AppLook { id: c }
         Store { id: store }
@@ -36,7 +36,16 @@ ShellRoot {
         readonly property bool sidebarShown: onePane ? listOpen : sidebarChoice !== null ? sidebarChoice : true
         onOnePaneChanged: listOpen = false
         function toggleSidebar() { if (onePane) listOpen = !listOpen; else sidebarChoice = !sidebarShown }
-        function pick(id) { store.picked = id; listOpen = false; view.home() }
+        // Another note leaves the one being written, saved (not with a conflict to settle: NoteView.leave)
+        function pick(id) { if (!view.leave()) return; store.picked = id; listOpen = false; view.home() }
+        function step(d) { if (!view.leave()) return; store.step(d); view.home() }
+
+        // What was written is saved before Notes goes: the last keys' save, and any still running
+        property bool quitting: false
+        function quit() { view.flush(true); quitting = true; if (!view.busy) Qt.quit() }
+        Connections { target: view; function onBusyChanged() { if (win.quitting && !view.busy) Qt.quit() } }
+        // A save that never answers (notes.py stuck): gone after a moment all the same; --md5 keeps a cut one out
+        Timer { running: win.quitting; interval: 5000; onTriggered: Qt.quit() }
 
         IpcHandler {
             target: "notes"
@@ -45,7 +54,7 @@ ShellRoot {
         }
 
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
-        Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
+        Shortcut { sequence: "Ctrl+Q"; onActivated: win.quit() }
 
         RowLayout {
             anchors.fill: parent
@@ -73,22 +82,25 @@ ShellRoot {
                 store: store
                 onePane: win.onePane
                 focus: true
-                onBack: win.listOpen = true
+                onBack: if (view.leave()) win.listOpen = true
+                onMessage: (text, danger) => toast.show(text, { danger: danger })
 
                 Keys.onPressed: e => {
                     const k = e.key, shift = e.modifiers & Qt.ShiftModifier
                     win.look.moved(e)              // Tab and the arrows show the keys' frame (AppPointer)
                     sheet.pressed(e)
-                    if (e.accepted) return
-                    if (k === Qt.Key_Down || k === Qt.Key_J) { store.step(1); view.home() }
-                    else if (k === Qt.Key_Up || k === Qt.Key_K) { store.step(-1); view.home() }
+                    // Writing: the editor has the keys, and what it lets through (an arrow at the text's end) isn't a reading key
+                    if (e.accepted || view.editing) return
+                    if (k === Qt.Key_Down || k === Qt.Key_J) win.step(1)
+                    else if (k === Qt.Key_Up || k === Qt.Key_K) win.step(-1)
                     else if (k === Qt.Key_Home && store.notes.length) win.pick(store.notes[0].id)
                     else if (k === Qt.Key_End && store.notes.length) win.pick(store.notes[store.notes.length - 1].id)
                     else if (k === Qt.Key_Space) view.scroll((shift ? -1 : 1) * (view.height - 120))
                     else if (k === Qt.Key_PageDown) view.scroll(view.height - 120)
                     else if (k === Qt.Key_PageUp) view.scroll(-(view.height - 120))
                     else if (win.onePane && win.listOpen && (k === Qt.Key_Return || k === Qt.Key_Enter)) win.listOpen = false
-                    else if (k === Qt.Key_Return || k === Qt.Key_Enter || e.text === "e") store.edit()
+                    else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift) store.edit()
+                    else if (k === Qt.Key_Return || k === Qt.Key_Enter || e.text === "e") view.edit()
                     else if (win.onePane && !win.listOpen && k === Qt.Key_Escape && store.notes.length) win.listOpen = true
                     else return
                     e.accepted = true
@@ -97,5 +109,6 @@ ShellRoot {
         }
 
         KeySheet { id: sheet; c: win.look; groups: keyHelp.groups }
+        AppToast { id: toast; c: win.look }
     }
 }

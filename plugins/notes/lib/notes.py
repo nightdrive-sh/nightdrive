@@ -8,20 +8,32 @@ terminal and Claude's tools (mcp.json), and the three changes Claude can make, e
     notes.py create [--json] TITLE               a new note: "# TITLE", then the text on stdin
     notes.py append [--json] NOTE                the text on stdin added to the end of the note
     notes.py unappend NOTE BEFORE AFTER          append's undo: back to BEFORE bytes, if it is still AFTER long
+    notes.py write [--json] [--expect MD5] [--md5 MD5] NOTE
+                                                 the note's whole text replaced by stdin (the window's editor); with
+                                                 --expect only while the file is still the text of that MD5, else
+                                                 exit status 3: it was saved elsewhere meanwhile; with --md5 only if
+                                                 stdin is the text of that MD5, all of it
     notes.py trash [--json] NOTE                 to the desktop's trash (`nightdrive files trash`), where Files puts
                                                  it back; nothing is deleted for good
 
 Without --json they print text for a terminal. An error goes to stderr in plain words, with exit status 1.
 """
 
+import hashlib
 import json
 import os
+import tempfile
 import subprocess
 import sys
 from pathlib import Path
 
 import store
 from store import NoteError
+
+
+class Conflict(NoteError):
+    """write's --expect didn't hold: exit status 3, so the window can tell it from any other failure."""
+    status = 3
 
 LIST_LIMIT = 50       # list's default: the recent ones, which is what Claude and a terminal usually want
 SEARCH_LIMIT = 25
@@ -84,6 +96,37 @@ def append(who, text):
     with open(p, "a", encoding="utf-8") as f:
         f.write(("" if ends_in_newline else "\n") + text.rstrip("\n") + "\n")
     return dict(store.brief(p), size_before=before, size_after=p.stat().st_size)
+
+
+def digest(text):
+    """The MD5 of a note's text as the window has it (Qt.md5 of the string: its UTF-8), for write's --expect."""
+    return hashlib.md5(text.encode("utf-8")).hexdigest()
+
+
+def write(nid, text, expect=None, md5=None):
+    """The note's whole text replaced, from the window's editor. Only by id: a title could name another note by the
+    time it saves. With expect, only while the file still holds the text the editor started from: a save in Apostrophe
+    or Claude's append meanwhile is not written over without the user saying so (Conflict). The new text goes to a
+    hidden file beside it, then over it in one step (os.replace), so a crash or a full disk never leaves half a note.
+    With md5, only the text the window sent, whole: a window that quit before its text reached stdin leaves an empty or
+    cut stdin, which must never become the note (it once emptied one)."""
+    if md5 is not None and digest(text) != md5:
+        raise NoteError(f"{nid} wasn't saved: the text didn't arrive whole, so the note was left as it was.")
+    p = store.path_of(nid)
+    target = p.resolve()     # a symlink inside the folder (store.inside) keeps pointing at the note it names
+    # As bytes: Python's text mode would turn \r\n into \n, which the window's text still has
+    if expect is not None and digest(target.read_bytes().decode("utf-8", "replace")) != expect:
+        raise Conflict(f"{nid} was saved elsewhere since you began writing: your text wasn't written over it.")
+    fd, tmp = tempfile.mkstemp(prefix=".", suffix=".tmp", dir=target.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+        os.chmod(tmp, target.stat().st_mode & 0o7777)
+        os.replace(tmp, target)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+    return dict(store.brief(p), md5=digest(text))
 
 
 def unappend(who, before, after):
@@ -151,11 +194,15 @@ def options(rest, default_limit):
     return as_json, limit, " ".join(rest).strip()
 
 
-def stdin_text():
-    """The text on stdin, at most TEXT_MAX characters: more is refused rather than read whole into memory (#1882)."""
+def stdin_text(exact=False):
+    """The text on stdin, at most TEXT_MAX characters: more is refused rather than read whole into memory (#1882).
+    exact (write): as it came, \r\n and all, where text mode would make it \n."""
     if sys.stdin.isatty():
         return ""
-    text = sys.stdin.read(TEXT_MAX + 1)
+    if exact:
+        text = sys.stdin.buffer.read(4 * TEXT_MAX + 1).decode("utf-8", "replace")
+    else:
+        text = sys.stdin.read(TEXT_MAX + 1)
     if len(text) > TEXT_MAX:
         raise NoteError(f"The text is longer than {TEXT_MAX} characters: nothing was written.")
     return text
@@ -187,6 +234,17 @@ def main(argv):
         except (IndexError, ValueError):
             raise NoteError("Usage: notes unappend NOTE BEFORE AFTER (sizes in bytes, as append --json gives them)")
         output(unappend(who, before, after), as_json, lambda n: f"Took the added text off {n['id']}")
+    elif command == "write":
+        plain = [a for a in rest if a != "--json"]
+        hashes = {}
+        for flag in ("--expect", "--md5"):
+            if flag in plain:
+                i = plain.index(flag)
+                if i + 1 >= len(plain):
+                    raise NoteError(f"{flag} takes an MD5 (notes help).")
+                hashes[flag[2:]] = plain[i + 1]
+                del plain[i:i + 2]
+        output(write(" ".join(plain), stdin_text(exact=True), **hashes), as_json, lambda n: f"Wrote {n['id']}")
     elif command == "trash":
         output(trash(arg), as_json, lambda n: f"Moved {n['id']} to the trash")
     else:
@@ -197,4 +255,5 @@ if __name__ == "__main__":
     try:
         main(sys.argv[1:])
     except NoteError as e:
-        sys.exit(str(e))
+        print(e, file=sys.stderr)
+        sys.exit(getattr(e, "status", 1))

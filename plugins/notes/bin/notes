@@ -1,6 +1,6 @@
 #!/bin/bash
-# notes: Nightdrive Notes, the Markdown files in ~/Notes (plugins/notes, README.md): its window to read them, Apostrophe
-# to write them, and the commands the window and Claude's tools (mcp.json) use.
+# notes: Nightdrive Notes, the Markdown files in ~/Notes (plugins/notes, README.md): its window to read and write them,
+# Apostrophe as another way to write them, and the commands the window and Claude's tools (mcp.json) use.
 set -uo pipefail   # read --json | jq: a note not found fails the whole line
 
 APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
@@ -62,6 +62,8 @@ Usage: notes [command]
   read NOTE        a note's whole text (--json: with its id, title and path)
   create TITLE     a new note, its text from stdin (--json)
   append NOTE      the text from stdin added to the end of NOTE (--json)
+  write NOTE       NOTE's whole text replaced by stdin (--json; --expect MD5: only while it is still that text,
+                   else exit status 3; --md5 MD5: only if stdin is that text, whole), as the window's editor saves
   trash NOTE       NOTE to the trash, where Files puts it back (--json)
   restore NAME…    back from the trash (the names trash --json gives)
   install          Notes among the desktop's apps (the installer), and ~/Notes
@@ -77,7 +79,7 @@ case ${1:-open} in
   show)      id=$(python3 "$NOTES_PY" read --json "${*:2}" | jq -r .id) || exit 1; open_ready; ipc pick "$id" ;;
   edit)      edit "${@:2}" ;;
   list|search|read) python3 "$NOTES_PY" "$@" ;;
-  create|append|unappend|trash) python3 "$NOTES_PY" "$@"; changed ;;
+  create|append|unappend|write|trash) python3 "$NOTES_PY" "$@"; changed ;;
   restore)   "$APP_DIR/../../bin/nightdrive" files restore "${@:2}"; changed ;;   # trash's undo: back from the trash
   install)   install_app ;;
   uninstall) uninstall_app ;;

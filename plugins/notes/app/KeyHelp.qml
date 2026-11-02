@@ -7,10 +7,15 @@ QtObject {
         { title: "Notes", keys: [
             ["↑ ↓  j k", "Move"],
             ["Home  End", "The newest, the oldest"],
-            ["⏎  e", "Open in Apostrophe, to write in it"],
+            ["⏎  e", "Write in it"],
+            ["⇧⏎", "Open in Apostrophe"],
             ["Space  ⇧Space", "Scroll the note"],
             ["⌘B", "Show or hide the notes"],
             ["Esc", "Narrow window: the notes"]] },
+        { title: "Writing", keys: [
+            ["Esc", "Back to reading"],
+            ["⌘S", "Save now (it saves by itself); changed elsewhere: keep mine"],
+            ["⌘Z  ⇧⌘Z", "Undo, redo"]] },
         { title: "Window", keys: [
             ["?", "These keys"],
             ["⌘Q", "Quit"]] }

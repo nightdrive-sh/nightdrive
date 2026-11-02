@@ -2,16 +2,35 @@ import QtQuick
 import qs.kit
 import "Markdown.js" as Markdown
 
-// The open note, to read: its title and when it was saved in the header, with Open in Apostrophe (where it is written:
-// the window doesn't edit), then its Markdown as formatted text (Markdown.js). A link opens in the browser. The keys are shell.qml's.
+// The open note: its title and when it was saved in the header, then its Markdown as formatted text to read
+// (Markdown.js), or, while it is written in (edit(), Enter), as it is in the file in NoteEditor. A link opens in the
+// browser. Apostrophe is still a click away (Open in Apostrophe). The reading keys are shell.qml's, the writing ones
+// NoteEditor's.
 Item {
     id: root
     required property QtObject c
     required property QtObject store
     property bool onePane: false
     signal back()
+    signal message(string text, bool danger)   // for the window's toast
     readonly property var note: store.note
     readonly property int margin: width < 520 ? 24 : 40
+    readonly property bool editing: editor.open
+    readonly property bool busy: editor.busy     // a save still running: quitting waits for it
+
+    function edit() { if (note && !editing) editor.begin(note.id, store.text) }
+    // Back to reading, saved first. Not with a conflict unsettled: leaving would drop the text that wasn't saved.
+    function leave() {
+        if (!editing) return true
+        if (editor.conflicted) {
+            message("Saved elsewhere while you wrote: keep yours or theirs first", true)
+            return false
+        }
+        editor.end()
+        forceActiveFocus()
+        return true
+    }
+    function flush(close) { editor.flush(close) }
 
     // The heading the note starts with is its title, which the header shows already
     readonly property string body: {
@@ -44,31 +63,94 @@ Item {
                 text: root.note ? root.note.title : ""
                 font.family: root.c.font; font.pixelSize: 17; font.weight: Font.Medium; color: root.c.title
             }
-            Text {
-                textFormat: Text.PlainText
-                width: parent.width; elide: Text.ElideMiddle
-                text: root.note ? Qt.formatDateTime(new Date(root.note.modified), "d MMM yyyy  HH:mm") + "   " + root.store.folder + "/" + root.note.id : ""
-                font.family: root.c.font; font.pixelSize: 11; color: root.c.faint
+            // When it was saved, or while writing whether it is: whole, as it matters more. The path takes what room is
+            // left, shortened in the middle.
+            Row {
+                width: parent.width
+                spacing: 12
+                Text {
+                    id: stateText
+                    textFormat: Text.PlainText
+                    text: !root.note ? "" : root.editing ? editor.status
+                        : Qt.formatDateTime(new Date(root.note.modified), "d MMM yyyy  HH:mm")
+                    font.family: root.c.font; font.pixelSize: 11
+                    color: editor.conflicted ? root.c.danger : root.c.faint
+                }
+                Text {
+                    textFormat: Text.PlainText
+                    width: Math.max(0, parent.width - stateText.width - parent.spacing)
+                    elide: Text.ElideMiddle
+                    text: root.note ? root.store.folder + "/" + root.note.id : ""
+                    font.family: root.c.font; font.pixelSize: 11; color: root.c.faint
+                }
             }
         }
-        AppButton {
+        // Reading: Edit and Apostrophe. Writing: Done, or with a conflict its two ways out.
+        Row {
             id: editButton
             visible: !!root.note
             anchors.right: parent.right; anchors.rightMargin: 20; anchors.verticalCenter: parent.verticalCenter
-            c: root.c; glyph: "pencil"; label: root.width < 480 ? "" : "Open in Apostrophe"
-            tip: "Write in it in Apostrophe"; keys: "⏎  e"
-            onClicked: root.store.edit()
+            spacing: 8
+            readonly property bool narrow: root.width < 520
+            AppIconButton {
+                visible: !root.editing
+                c: root.c; glyph: "external-link"; tip: "Open in Apostrophe"; keys: "⇧⏎"
+                onClicked: root.store.edit()
+            }
+            AppButton {
+                visible: !root.editing
+                c: root.c; glyph: "pencil"; label: editButton.narrow ? "" : "Edit"; strong: true
+                tip: "Write in it here"; keys: "⏎  e"
+                onClicked: root.edit()
+            }
+            AppButton {
+                visible: editor.conflicted
+                c: root.c; glyph: "rotate-ccw"; label: editButton.narrow ? "" : "Keep theirs"
+                tip: "Drop what you wrote since, take the saved one"
+                onClicked: editor.keepTheirs()
+            }
+            AppButton {
+                visible: editor.conflicted
+                c: root.c; glyph: "save"; label: editButton.narrow ? "" : "Keep mine"; strong: true
+                tip: "Write yours over the one saved elsewhere"; keys: "⌘S"
+                onClicked: editor.keepMine()
+            }
+            AppButton {
+                visible: root.editing && !editor.conflicted
+                c: root.c; glyph: "check"; label: editButton.narrow ? "" : "Done"
+                tip: "Back to reading (it saves by itself)"; keys: "Esc"
+                onClicked: root.leave()
+            }
         }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: root.c.divider }
     }
 
+    NoteEditor {
+        id: editor
+        visible: open
+        anchors.top: header.bottom; anchors.bottom: parent.bottom
+        width: parent.width
+        c: root.c
+        store: root.store
+        margin: root.margin
+        onDone: root.leave()
+        onMessage: (text, danger) => root.message(text, danger)
+    }
+
     Flickable {
         id: flick
+        visible: !root.editing
         anchors.top: header.bottom; anchors.bottom: parent.bottom
         width: parent.width
         clip: true
-        contentHeight: page.implicitHeight + 64
+        contentHeight: Math.max(page.implicitHeight + 64, height)   // the whole view takes the double click
         boundsBehavior: Flickable.StopAtBounds
+        // A double click writes in the note (the cursor at its end, as Edit: a place in the formatted text doesn't map
+        // to one in the Markdown). Inside the Flickable, which would take the press from a handler outside it.
+        TapHandler {
+            enabled: !!root.note
+            onDoubleTapped: root.edit()
+        }
         Text {
             id: page
             x: root.margin; y: 24
