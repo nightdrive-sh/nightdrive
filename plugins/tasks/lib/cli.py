@@ -6,7 +6,9 @@
     cli.py add [--json] [--list NAME] [--due WHEN] [--note TEXT] [--priority high|normal|low] TITLE
     cli.py add --json --stdin       the same as JSON on stdin: {title, list, day, time, note, priority} (the window)
     cli.py when [--json] [--day DAY] [--time TIME] [WHEN]     how a due reads: {due, label}
-    cli.py done [--json] ID         cli.py snooze [--json] [--until WHEN] ID
+    cli.py edit [--json] [--title T] [--due WHEN | --no-due] [--note T] [--list NAME] [--priority P] ID
+    cli.py edit --json --stdin      the same as JSON: {id, and what changes of title, day, time, list, note, priority}
+    cli.py done [--json] ID         cli.py undone [--json] ID       cli.py snooze [--json] [--until WHEN] ID
     cli.py trash [--json] ID        cli.py restore [--json] UNDO
 
 Each change prints, with --json, the task as `list` gives it and `undo`: the id `restore` takes to put back what the
@@ -150,6 +152,65 @@ def cmd_when(a):
     return out if a.json else out["label"] or "No due"
 
 
+def set_due(task, due):
+    """A new due, or none; a DTSTART after it would make the task invalid, so it goes (an earlier one stays)"""
+    task.set_time("DUE", due)
+    start = task.time("DTSTART")
+    if start is not None and (due is None or when.due_at(start) > when.due_at(due)):
+        task.remove("DTSTART")
+
+
+def edit_stdin(a):
+    """The window's edit as JSON: only the keys of what was changed, so a field left alone (a low priority, a due in
+    another zone) stays exactly as the file has it"""
+    try:
+        d = json.load(sys.stdin)
+    except ValueError:
+        raise ValueError("The change wasn't readable JSON.") from None
+    a.id = str(d.get("id") or "")
+    a.title = d.get("title")
+    a.note = d.get("note")
+    a.list = d.get("list")
+    a.priority = d.get("priority")
+    if "day" in d or "time" in d:
+        a.due_value = when.at(d.get("day"), d.get("time"))
+        a.due_set = True
+
+
+def cmd_edit(a):
+    a.due_set = False
+    if a.stdin:
+        edit_stdin(a)
+    elif a.no_due or a.due:
+        a.due_set, a.due_value = True, None if a.no_due else when.parse(a.due)
+    if a.priority is not None and a.priority not in PRIORITY:
+        raise ValueError(f"No priority {a.priority!r}: high, normal or low.")
+    if a.title is None and a.note is None and a.list is None and a.priority is None and not a.due_set:
+        raise ValueError("Nothing to change: give --title, --due (or --no-due), --note, --list or --priority.")
+    lst, path, task = store.find(a.id)
+    if a.title is not None:
+        if not a.title.strip():
+            raise ValueError("A task needs a title.")
+        task.set("SUMMARY", a.title.strip())
+    if a.note is not None:
+        task.set("DESCRIPTION", a.note.strip())
+    if a.priority is not None:
+        task.set("PRIORITY", PRIORITY[a.priority])
+    if a.due_set:
+        set_due(task, a.due_value)
+    # Another list is another folder: the same file name there, the old one gone, both in the snapshot so the undo
+    # puts it back where it was
+    dest_list = store.find_list(a.list, make=True) if a.list is not None else lst
+    dest = dest_list["path"] / path.name
+    if dest != path and dest.exists():
+        raise ValueError(f"{dest_list['name']} has a task with this file name already: nothing was changed.")
+    sid = store.snapshot([path] if dest == path else [path, dest], made=dest_list if dest_list.get("made") else None)
+    store.save(dest, task)
+    if dest != path:
+        path.unlink()
+    return changed(dest_list, task, sid, a, "Changed")
+
+
 def cmd_done(a):
     lst, path, task = store.find(a.id)
     if is_done(task):
@@ -162,16 +223,25 @@ def cmd_done(a):
     return changed(lst, task, sid, a, "Done")
 
 
+def cmd_undone(a):
+    """Back among the open ones, as before it was ticked: the window's Space in Done"""
+    lst, path, task = store.find(a.id)
+    if not is_done(task):
+        raise ValueError(f"{task.get('SUMMARY')!r} isn't done.")
+    sid = store.snapshot([path])
+    task.set("STATUS", "NEEDS-ACTION")
+    task.remove("COMPLETED")
+    task.remove("PERCENT-COMPLETE")
+    store.save(path, task)
+    return changed(lst, task, sid, a, "Not done")
+
+
 def cmd_snooze(a):
     lst, path, task = store.find(a.id)
     now = datetime.now()
     due = when.parse(a.until, now) if a.until else when.later(task.time("DUE"), now)
     sid = store.snapshot([path])
-    task.set_time("DUE", due)
-    # A DTSTART after the new due would make the task invalid; an earlier one stays
-    start = task.time("DTSTART")
-    if start is not None and when.due_at(start) > when.due_at(due):
-        task.remove("DTSTART")
+    set_due(task, due)
     store.save(path, task)
     return changed(lst, task, sid, a, "Moved")
 
@@ -215,7 +285,17 @@ def parser():
     c.add_argument("--day")
     c.add_argument("--time")
     c.add_argument("text", nargs="*")
+    c = command("edit", cmd_edit)
+    c.add_argument("--title")
+    c.add_argument("--due")
+    c.add_argument("--no-due", action="store_true")
+    c.add_argument("--note")
+    c.add_argument("--list")
+    c.add_argument("--priority", choices=tuple(PRIORITY))
+    c.add_argument("--stdin", action="store_true")
+    c.add_argument("id", nargs="?", default="")
     command("done", cmd_done).add_argument("id")
+    command("undone", cmd_undone).add_argument("id")
     c = command("snooze", cmd_snooze)
     c.add_argument("--until")
     c.add_argument("id")

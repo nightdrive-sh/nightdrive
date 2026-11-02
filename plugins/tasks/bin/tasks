@@ -53,6 +53,7 @@ Usage: tasks [command]
   when WHEN      how a due reads ("fri 930": Fri 6 Nov 09:30)
   list           the open tasks (--json; --list NAME; --view today|scheduled|done|all; --query TEXT)
   add TITLE      a new task (--list NAME, a new list if there is none; --due WHEN; --note TEXT; --priority high|low)
+  edit ID        change a task (--title T; --due WHEN or --no-due; --note TEXT; --list NAME, moves it; --priority P)
   done ID        mark a task done (ID: from list, or the start of one)
   snooze ID      move a task on: an hour, or a day without a time (--until WHEN for another time)
   trash ID       move a task to the trash
@@ -71,7 +72,7 @@ USAGE
 case ${1:-open} in
   new)        open_ready; ipc newTask "${2:-}" ;;
   lists|list|when) cli "$@" ;;
-  add|done|snooze|trash|restore) change "$@" ;;
+  add|edit|done|snooze|trash|restore) change "$@" ;;
   due)        python3 "$APP_DIR/lib/due.py" check ;;
   enable)     enable ;;
   disable)    disable ;;

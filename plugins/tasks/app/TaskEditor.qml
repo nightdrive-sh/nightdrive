@@ -3,11 +3,12 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// A new task, in a panel over the window: its title, the day and time it is due (either may stay empty), the list it
-// goes in, Important and a note. Saved by `cli.py add --stdin`, the same code Claude's and the command's adds run, so
-// what a due may look like is decided in one place (lib/when.py); the panel only shows how it reads it, as it is typed
-// ("930" → 09:30), and what went wrong. ⏎ in a one-line field or Ctrl+⏎ adds it, Esc leaves it. Editing a task comes
-// next (#2020), in this same panel.
+// A new task, or a change to one, in a panel over the window: its title, the day and time it is due (either may stay
+// empty), the list it goes in, Important and a note. Saved by `cli.py add --stdin` or `cli.py edit --stdin`, the same
+// code Claude's and the command's changes run, so what a due may look like is decided in one place (lib/when.py); the
+// panel only shows how it reads it, as it is typed ("930" → 09:30), and what went wrong. ⏎ in a one-line field or
+// Ctrl+⏎ saves, Esc leaves it. An edit sends only the fields that were changed: one left alone (a low priority, a due
+// another app wrote in its own zone) stays exactly as the file has it.
 AppPanel {
     id: root
     required property var app           // the window: lists, helper
@@ -18,7 +19,10 @@ AppPanel {
     property bool unreadable: false
     // With no list yet, the one the first task makes (store.DEFAULT)
     readonly property var options: app.lists.length ? app.lists.map(l => ({ id: l.id, name: l.name })) : [{ id: "", name: "Tasks" }]
+    property var editing: null          // the task being changed (the window's row of it), null for a new one
+    property var before: ({})           // the fields as they were opened, to tell what was changed
     signal added(var task)              // cli.py's row of it: id, title, list, due_label…
+    signal edited(var task)
     signal closed()
     visible: false
     // Narrower with the window: a card wider than it would be cut at both sides
@@ -27,14 +31,31 @@ AppPanel {
 
     // listId: the list the window shows, if it shows one; day: what the day field starts with ("today" in Today)
     function open(listId, day) {
-        title.text = ""; dayField.text = day || ""; timeField.text = ""
-        important.on = false; note.text = ""
+        editing = null
         const has = id => options.some(o => o.id === id)
-        lists.picked = has(listId) ? listId : has(lastList) ? lastList : options[0].id
+        fill({ title: "", day: day || "", time: "", important: false, note: "",
+               list: has(listId) ? listId : has(lastList) ? lastList : options[0].id })
+    }
+    // task: a row of the window's (id, title, due, list_id, priority, note)
+    function edit(task) {
+        editing = task
+        const due = task.due || ""
+        fill({ title: task.title, day: due ? dayText(due) : "", time: due.slice(11, 16), important: task.priority === "high",
+               note: task.note, list: task.list_id })
+    }
+    function fill(f) {
+        before = f
+        title.text = f.title; dayField.text = f.day; timeField.text = f.time
+        important.on = f.important; note.text = f.note; lists.picked = f.list
         error = ""
         visible = true
         readDue()
         title.input.forceActiveFocus()
+    }
+    // A due's day as the field takes it back: 5.11., with the year only when it isn't this one
+    function dayText(iso) {
+        const [y, m, d] = iso.slice(0, 10).split("-").map(Number)
+        return d + "." + m + "." + (y === new Date().getFullYear() ? "" : y)
     }
     function close() { if (!busy) { visible = false; closed() } }
 
@@ -61,20 +82,31 @@ AppPanel {
             title.input.forceActiveFocus()   // the one field everyone forgets: the keys go there
             return
         }
-        const out = { title: title.text.trim(), day: dayField.text, time: timeField.text, note: note.text.trim(),
-                      priority: important.on ? "high" : "normal" }
-        if (lists.picked) out.list = lists.picked
+        const out = editing ? changes() : { title: title.text.trim(), day: dayField.text, time: timeField.text,
+                                            note: note.text.trim(), priority: important.on ? "high" : "normal" }
+        if (!editing && lists.picked) out.list = lists.picked
+        if (editing && Object.keys(out).length === 1) { close(); return }   // nothing changed: nothing to write
         lastList = lists.picked
-        adder.input = JSON.stringify(out)
+        saver.input = JSON.stringify(out)
+        saver.command = ["python3", app.helper, editing ? "edit" : "add", "--json", "--stdin"]
         busy = true
-        adder.running = true
+        saver.running = true
+    }
+    // An edit's JSON: the id, and only what differs from how it was opened
+    function changes() {
+        const out = { id: editing.id }
+        if (title.text.trim() !== before.title.trim()) out.title = title.text.trim()
+        if (dayField.text !== before.day || timeField.text !== before.time) { out.day = dayField.text; out.time = timeField.text }
+        if (lists.picked !== before.list) out.list = lists.picked
+        if (important.on !== before.important) out.priority = important.on ? "high" : "normal"
+        if (note.text.trim() !== before.note.trim()) out.note = note.text.trim()
+        return out
     }
 
     // The task as JSON on stdin: no option parsing to trip over a title that starts with "--"
     Process {
-        id: adder
+        id: saver
         property string input: ""
-        command: ["python3", root.app.helper, "add", "--json", "--stdin"]
         stdinEnabled: true
         onStarted: { write(input); stdinEnabled = false }   // the end of stdin ends its read
         stdout: StdioCollector { id: addOut }
@@ -86,11 +118,14 @@ AppPanel {
             if (code === 0) try { task = JSON.parse(addOut.text) } catch (e) {}
             if (!task) {
                 // cli.py's own words (sys.exit), the last line: the rest is a traceback, if anything
-                root.error = addErr.text.trim().split("\n").pop() || "The task wasn't added: tasks log says why."
+                root.error = addErr.text.trim().split("\n").pop()
+                          || (root.editing ? "The change wasn't saved" : "The task wasn't added") + ": tasks log says why."
                 return
             }
+            const was = root.editing
             root.close()
-            root.added(task)
+            if (was) root.edited(task)
+            else root.added(task)
         }
     }
 
@@ -104,7 +139,7 @@ AppPanel {
     }
 
     Text {
-        text: "New task"
+        text: root.editing ? "Edit task" : "New task"
         color: root.c.title; font.family: root.c.font; font.pixelSize: 16; font.weight: Font.Medium
     }
     AppField {
@@ -182,6 +217,6 @@ AppPanel {
         anchors.right: parent.right
         spacing: 10
         AppPanelButton { c: root.c; keys: ["Esc"]; label: "Cancel"; onClicked: root.close() }
-        AppPanelButton { c: root.c; keys: ["Ctrl", "Enter"]; label: root.busy ? "Adding…" : "Add"; strong: true; onClicked: root.save() }
+        AppPanelButton { c: root.c; keys: ["Ctrl", "Enter"]; label: root.editing ? (root.busy ? "Saving…" : "Save") : root.busy ? "Adding…" : "Add"; strong: true; onClicked: root.save() }
     }
 }

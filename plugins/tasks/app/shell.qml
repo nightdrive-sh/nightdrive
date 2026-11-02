@@ -5,9 +5,10 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// Nightdrive Tasks: Today, Scheduled and the lists in the sidebar, their tasks on the right. New (n) adds one in a panel
-// (TaskEditor); the other changes come from Claude (mcp.json), the `tasks` command and the notifications' Done and
-// Later, which all ask it to read them again (`tasks …` calls refresh). lib/cli.py reads and writes the VTODO files.
+// Nightdrive Tasks: Today, Scheduled and the lists in the sidebar, their tasks on the right. New (n) adds one and ⏎ or e
+// changes one, in a panel (TaskEditor); changes come from Claude (mcp.json), the `tasks` command and the notifications'
+// Done and Later too, which all ask it to read them again (`tasks …` calls refresh). lib/cli.py reads and writes the
+// VTODO files.
 ShellRoot {
     id: shell
     FloatingWindow {
@@ -31,6 +32,8 @@ ShellRoot {
                 const l = win.lists.find(x => x.id === list || x.name.toLowerCase() === list.toLowerCase())
                 win.newTask(l ? l.id : "")
             }
+            // The panel for a task of the view by number from 1 (0: the picked one), as ⏎ opens it
+            function edit(row: int): void { win.editTask(row > 0 ? row - 1 : win.current) }
             // A row of the sidebar by its name (Today, Scheduled, a list, Done), and a task in it by number from 1
             function pick(name: string, row: int): void {
                 const i = win.sources.findIndex(s => s.name.toLowerCase() === name.toLowerCase())
@@ -81,7 +84,7 @@ ShellRoot {
                     // The same list stays picked when one before it comes or goes
                     if (was) { const i = win.sources.findIndex(s => s.id === was); if (i >= 0) win.source = i }
                     win.source = Math.min(win.source, win.sources.length - 1)
-                    win.filter(keep)
+                    win.filter(keep, win.current)
                 }
             }
         }
@@ -98,7 +101,8 @@ ShellRoot {
             }
             return ""
         }
-        function filter(keep) {
+        // keep: the task to pick again; at: the row to stay at when it has gone (done, moved, trashed), else the first
+        function filter(keep, at) {
             let rows
             if (view.kind === "done")
                 rows = tasks.filter(t => t.done).sort((a, b) => (b.completed || "").localeCompare(a.completed || "")).slice(0, doneMax)
@@ -113,7 +117,7 @@ ShellRoot {
                 rows = rows.filter(t => t.overdue).concat(rows.filter(t => !t.overdue))
             shown = rows.map(t => Object.assign({}, t, { section: sectionOf(t) }))
             const i = keep ? shown.findIndex(t => t.id === keep) : -1
-            current = i >= 0 ? i : shown.length ? 0 : -1
+            current = i >= 0 ? i : shown.length ? Math.max(0, Math.min(at || 0, shown.length - 1)) : -1
             if (shown.length) listView.positionViewAtIndex(current, ListView.Contain)
         }
         function pickSource(i) {
@@ -124,6 +128,18 @@ ShellRoot {
         // without a day wouldn't show
         function newTask(listId) {
             editor.open(listId || (view.kind === "list" ? view.id : ""), view.kind === "today" ? "today" : "")
+        }
+        // The picked task (or the one at index) in the panel, to change it
+        function editTask(index) {
+            const t = shown[index === undefined ? current : index]
+            if (t) editor.edit(t)
+        }
+        // Whether a task (cli.py's row of it) shows in the view the window has: if not, the toast says where it went
+        function inView(task) {
+            return view.kind === "list" ? view.id === task.list_id
+                 : view.kind === "today" ? !!task.due && task.due.slice(0, 10) <= today && !task.done
+                 : view.kind === "scheduled" ? !!task.due && !task.done
+                 : task.done
         }
         // What just happened, at the top of the window (the kit's toast)
         function say(t, danger) { toast.show(t, { danger: !!danger }) }
@@ -205,6 +221,7 @@ ShellRoot {
                     else if (k === Qt.Key_End) win.move(win.shown.length)
                     else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
                     else if (k === Qt.Key_N && !ctrl) win.newTask("")
+                    else if ((k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_E) && !ctrl) win.editTask()
                     else return
                     e.accepted = true
                 }
@@ -293,10 +310,10 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"]] },
+                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it (a double click too)"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
-                { title: "Changing them", keys: [["n", "New task"], ["Claude", "Adds, moves, marks done"], ["tasks", "The same in a terminal: tasks help"], ["Notification", "Done, Later"]] },
-                { title: "New task", keys: [["⏎  Ctrl ⏎", "Add it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["Esc", "Leave it"]] }
+                { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Claude", "Adds, moves, marks done"], ["tasks", "The same in a terminal: tasks help"], ["Notification", "Done, Later"]] },
+                { title: "New task, edit", keys: [["⏎  Ctrl ⏎", "Add or save it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["Esc", "Leave it"]] }
             ]
         }
 
@@ -310,10 +327,13 @@ ShellRoot {
             onAdded: task => {
                 win.keepNext = task.id
                 win.load()
-                const here = win.view.kind === "list" ? win.view.id === task.list_id
-                           : win.view.kind === "today" ? task.due && task.due.slice(0, 10) <= win.today
-                           : win.view.kind === "scheduled" ? !!task.due : false
-                win.say(here ? "Added" : "Added to " + task.list + (task.due ? ", " + task.due_label : ""))
+                win.say(win.inView(task) ? "Added" : "Added to " + task.list + (task.due ? ", " + task.due_label : ""))
+            }
+            // Out of the view after the change (another list, a later day): where it went, and the row in its place
+            onEdited: task => {
+                win.keepNext = win.inView(task) ? task.id : ""
+                win.load()
+                win.say(win.inView(task) ? "Saved" : "Moved to " + task.list + (task.due ? ", " + task.due_label : ""))
             }
         }
         // Last, over the panel too

@@ -15,7 +15,10 @@ AppRow {
     implicitHeight: body.implicitHeight + 20
     selected: index === app.current
     active: app.listFocused
-    TapHandler { onTapped: { row.app.current = row.index; row.app.toList() } }
+    TapHandler {
+        onTapped: { row.app.current = row.index; row.app.toList() }
+        onDoubleTapped: row.app.editTask(row.index)
+    }
 
     Text {
         id: mark

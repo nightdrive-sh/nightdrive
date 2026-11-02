@@ -113,6 +113,20 @@ class Restore(unittest.TestCase):
         self.assertEqual([t["title"] for t in listed], ["Bread"])
         self.assertEqual(list((self.home / "state/nightdrive/tasks/trash").glob("*/*.ics")), [])
 
+    def test_edit_to_another_list_and_back(self):
+        # A move is two files (gone from one folder, new in another) and a list made: its undo puts all three back
+        made = self.add("Milk")
+        p = self.tasks("edit", "--json", "--list", "Shopping", "--title", "Oat milk", "--", made["id"])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        moved = json.loads(p.stdout)
+        self.assertEqual((moved["list"], moved["title"], moved["id"]), ("Shopping", "Oat milk", made["id"]))
+        self.assertEqual([f.parent.name for f in self.data.glob("*/*.ics")], ["shopping"])
+        p = self.tasks("restore", "--json", moved["undo"])
+        self.assertEqual(p.returncode, 0, p.stderr)
+        listed = json.loads(self.tasks("list", "--json").stdout)["tasks"]
+        self.assertEqual([(t["title"], t["list"]) for t in listed], [("Milk", "Tasks")])
+        self.assertFalse((self.data / "shopping").exists(), "the list the move made goes with it")
+
 
 if __name__ == "__main__":
     unittest.main()
