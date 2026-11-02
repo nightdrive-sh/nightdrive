@@ -13,6 +13,19 @@ apply() {
   logger -t nightdrive-vm-display "$(hyprctl monitors | sed -n 2p | tr -d '\t')"
 }
 
+# A line each time the host's scale changes. Not when the file is empty: Garage's agent has opened it to write, not yet
+# written. Nor at the start: the load that started the watcher has read it already
+HOST_SCALE_FILE=/run/nightdrive-host-scale
+SCALE_POLL=2
+host_scale_changes() {
+  local last="" now
+  read -r last 2>/dev/null < "$HOST_SCALE_FILE" || true
+  while sleep "$SCALE_POLL"; do
+    now=""; read -r now 2>/dev/null < "$HOST_SCALE_FILE" || true
+    [[ -n $now && $now != "$last" ]] && { last=$now; echo scale; }
+  done
+}
+
 case $1 in
   apply) apply ;;
   watch)
@@ -23,8 +36,11 @@ case $1 in
     flock -n 9 || exit 0
     # Only this shell holds the lock (9>&-): a udevadm or grep left behind by a watcher that was killed would keep it,
     # and the next watcher would quit at once
-    udevadm monitor --udev --subsystem-match=drm 9>&- \
-      | grep --line-buffered ' change ' 9>&- \
-      | while read -r _; do apply; done ;;
+    # And the host's scale, which Garage writes when the window goes to a screen of another scale (vm-display.lua):
+    # looked at every few seconds, with bash's own read
+    {
+      udevadm monitor --udev --subsystem-match=drm | grep --line-buffered ' change ' &
+      host_scale_changes
+    } 9>&- | while read -r _; do apply; done ;;
   *) echo "usage: vm-display watch | apply" >&2; exit 1 ;;
 esac

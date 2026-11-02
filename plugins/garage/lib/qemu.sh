@@ -183,6 +183,26 @@ synctime() {
   ((rc == 0 || rc == 3)) || [[ ! -S $(dir "$1")/qga.sock ]] || die "$1: its clock wasn't set"
 }
 
+# The host screen's scale, that of the screen its window is on, into the guest (#1630): a Nightdrive guest takes it
+# (config/hypr/vm-display.lua) until one is picked in its Settings › Display, so its text is as big as the host's.
+# The overlay (overlay/shell.qml) sends it by qemu's pid, the window's, when the window comes and when it goes to a
+# screen of another scale. Through the guest agent: a file in the guest's /run, as Fedora's SELinux lets the agent
+# write only there and in /tmp. Exit 3 while the guest has no agent (booting): the overlay tries again
+GUEST_SCALE_FILE=/run/nightdrive-host-scale
+guest_scale() {
+  local pid=$1 scale=$2 d name="" h
+  [[ $pid =~ ^[0-9]+$ ]] || die "guest-scale PID SCALE: qemu's pid"
+  [[ $scale =~ ^[0-9]+(\.[0-9]+)?$ ]] || die "Bad scale: $scale"
+  for d in "$ROOT"/*/; do
+    [[ $(cat "$d/pid" 2>/dev/null) == "$pid" ]] && { name=$(basename "$d"); break; }
+  done
+  [[ -n $name ]] && running "$name" || die "No running VM with pid $pid"
+  [[ $(vm_state "$name") == paused* ]] && exit 3
+  h=$(qga "$name" guest-file-open "{\"path\": \"$GUEST_SCALE_FILE\", \"mode\": \"w\"}") || exit $?
+  qga "$name" guest-file-write "{\"handle\": $h, \"buf-b64\": \"$(printf '%s\n' "$scale" | base64 -w0)\"}" >/dev/null
+  qga "$name" guest-file-close "{\"handle\": $h}" >/dev/null
+}
+
 # Its SDL window's address and workspace, found by qemu's pid ("" while it has none)
 window_of() {
   hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \

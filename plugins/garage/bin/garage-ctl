@@ -282,6 +282,7 @@ case ${1:-} in
   pause)    pause "$2" ;;
   resume)   resume "$2" ;;
   synctime) synctime "$2" ;;
+  guest-scale) guest_scale "${2:-}" "${3:-}" ;;   # the overlay's: PID SCALE (lib/qemu.sh)
   display)  display "$2" ;;
   hide)     hide "$2" ;;
   cmdline)  cmdline "$2" ;;

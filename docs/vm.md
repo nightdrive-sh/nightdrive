@@ -10,7 +10,8 @@ computer you already have, Mac or PC.
 3. In Fedora's installer pick *Fedora Custom Operating System* in Software Selection, and create your user with *Make
    this user administrator* ticked.
 4. Reboot, log in and install as in [Install](../README.md#install). The installer recognises the VM (`--vm` forces it)
-   and sets the display scale to 2: pick another in the Launcher › Settings › Display.
+   and sets the display scale to 2 (in Garage, that of the host screen its window is on): pick another in the
+   Launcher › Settings › Display.
 
 ## Which app
 
@@ -40,5 +41,5 @@ ready-made Fedora 44 image, with no installer to click through. Start it, `ssh N
 Snapshots let you go back and try again.
 
 In a QEMU/KVM virtual machine (Garage, GNOME Boxes, virt-manager, UTM) the installer adds `qemu-guest-agent`, through
-which the host shuts the VM down and sets its clock. A VM without Nightdrive needs it too for Garage's Stop and clock:
+which the host shuts the VM down and sets its clock (and Garage its scale). A VM without Nightdrive needs it too for Garage's Stop and clock:
 `sudo dnf install qemu-guest-agent`.

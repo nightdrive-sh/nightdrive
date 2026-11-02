@@ -9,9 +9,23 @@
 -- fractional scale only when it divides the size into whole pixels: 1.5 on 1891 falls back to 1, tiny text (#1629). So the
 -- mode is cut to the next size down that the scale divides, a pixel or a few that SDL's stretch to the window hides.
 
--- The scale until one is picked in Settings › Display: the installer's for a VM, right in a window on a Retina screen
--- (2 pixels to a point there). A guest that came with another local.lua (a converted desktop's "auto" gives 1) gets it too.
+-- The scale until one is picked in Settings › Display: the host screen's, that of the screen the window is on, which
+-- Garage writes to HOST_SCALE_FILE through the guest agent (plugins/garage/lib/qemu.sh: guest_scale), and again when the
+-- window goes to a screen of another scale (#1630); the window's pixels are the host's, so the same scale gives the same
+-- size of text. VM_SCALE without it (another host's qemu, no guest agent): right in a window on a Retina screen. A guest
+-- that came with another local.lua (a converted desktop's "auto" gives 1) gets them too.
 local VM_SCALE = 2.0
+local HOST_SCALE_FILE = "/run/nightdrive-host-scale"
+
+-- The host's scale, or nil: anyone in the guest may write the file, so only a plausible number counts
+local function hostScale()
+    local f = io.open(HOST_SCALE_FILE)
+    if not f then return nil end
+    local s = tonumber(f:read("*l") or "")
+    f:close()
+    if s and s >= 0.5 and s <= 4 then return s end
+    return nil
+end
 
 -- The virtual GPU's outputs and their preferred modes, from sysfs: { name = { w, h } }. Not hl.get_monitors(): at
 -- Hyprland's start the config is read before the output is plugged in, so that list is empty, and the output would get
@@ -43,17 +57,19 @@ local function step(scale)
 end
 
 -- At a load the rule is made whether the size has changed or not: without it, the "" rule's "preferred" would be
--- Hyprland's old one again. From the watcher, only an output whose size has changed is set.
+-- Hyprland's old one again. From the watcher, only an output whose size or scale has changed is set.
 return function(scales, modes)
     function NightdriveVmDisplay(changedOnly)
         local current = {}
-        for _, m in ipairs(hl.get_monitors()) do current[m.name] = m.width .. "x" .. m.height end
+        for _, m in ipairs(hl.get_monitors()) do current[m.name] = { m.width .. "x" .. m.height, m.scale } end
+        local host = hostScale()
         for name, size in pairs(virtualOutputs()) do
             if not modes[name] then
-                local scale = scales[name] or VM_SCALE
+                local scale = scales[name] or host or VM_SCALE
                 local n = step(scale)
                 local mode = (size[1] - size[1] % n) .. "x" .. (size[2] - size[2] % n)
-                if not (changedOnly and mode == current[name]) then
+                local now = current[name]
+                if not (changedOnly and now and mode == now[1] and math.abs(scale - now[2]) < 0.01) then
                     hl.monitor({ output = name, mode = mode, position = "auto", scale = scale })
                 end
             end
