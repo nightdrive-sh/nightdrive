@@ -3,6 +3,7 @@
 
     config.py write     write VDIRSYNCER_CONFIG from ACCOUNTS, print the account names (one a line)
     config.py names     only print them
+    config.py pairs [NAME…]  the vdirsyncer pair of each account named (all without names), one a line
 
 accounts.conf is what the user (or Claude) edits: one section per account, in Mail's account.conf's form. vdirsyncer's
 config follows from it, so its pairs, paths and the two-way sync stay the same for everyone and a change to them here
@@ -31,6 +32,13 @@ MERGE = Path(__file__).resolve().parent / "merge.py"
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
+def pair_name(name):
+    """vdirsyncer's name for the account: its pair and storage names take only a-z, 0-9 and _, while an account's name
+    (its folder, what the app and the user see) may have - too. A name without - stays as it is, so an account synced
+    before keeps its pair and status and nothing is fetched twice."""
+    return name.replace("-", "_")
+
+
 def accounts():
     """[(name, section)] in the file's order; exits with a message on a section it can't use."""
     parser = configparser.ConfigParser(interpolation=None)
@@ -50,6 +58,8 @@ def accounts():
             problem = "address and password-cmd are needed"
         elif values["type"] == "carddav" and not values.get("url"):
             problem = "a carddav account needs url"
+        elif any(pair_name(other) == pair_name(name) for other, _ in found):
+            problem = "another account's name differs from it only by - and _, and vdirsyncer can't tell them apart"
         if problem:
             sys.exit(f"{ACCOUNTS}: [account {name}]: {problem}")
         found.append((name, values))
@@ -64,22 +74,23 @@ def storage_pair(name, values):
     single = kind == "google"
     local = DATA_DIR / name / "default" if single else DATA_DIR / name
     fetch = ["command", "sh", "-c", values["password-cmd"]]
+    pair = pair_name(name)
     return f"""
-[pair {name}]
-a = "{name}_remote"
-b = "{name}_local"
+[pair {pair}]
+a = "{pair}_remote"
+b = "{pair}_local"
 collections = {"null" if single else '["from a"]'}
 # Both ways: an edit here goes up, one on the phone comes down. A card changed on both sides since the last sync is
 # merged a field at a time (merge.py)
 conflict_resolution = {json.dumps(["command", str(MERGE)])}
 
-[storage {name}_remote]
+[storage {pair}_remote]
 type = "carddav"
 url = {json.dumps(url)}
 username = {json.dumps(values["address"])}
 password.fetch = {json.dumps(fetch)}
 
-[storage {name}_local]
+[storage {pair}_local]
 type = "filesystem"
 path = {json.dumps(str(local))}
 fileext = ".vcf"
@@ -107,6 +118,9 @@ if __name__ == "__main__":
         found = write()
     elif command == "names":
         found = accounts()
+    elif command == "pairs":
+        names = sys.argv[2:] or [name for name, _ in accounts()]
+        found = [(pair_name(name), None) for name in names]
     else:
         sys.exit(__doc__)
     for name, _ in found:

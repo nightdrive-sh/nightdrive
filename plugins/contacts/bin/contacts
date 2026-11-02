@@ -36,9 +36,12 @@ sync_now() {
   [[ -n $out ]] || names=()
   (($#)) && names=("$@")
   ((${#names[@]})) || { echo "No accounts in $ACCOUNTS." >&2; return 1; }
+  # vdirsyncer knows an account by its pair, whose name has _ for the account name's - (config.py pair_name)
+  local -a pairs
+  mapfile -t pairs < <(python3 "$APP_DIR/lib/config.py" pairs "${names[@]}")
   # discover finds an account's address books (and new ones later); it asks before making their folders, so say yes
-  yes | vds discover "${names[@]}" >/dev/null || return 1
-  vds sync "${force[@]}" "${names[@]}" || return 1
+  yes | vds discover "${pairs[@]}" >/dev/null || return 1
+  vds sync "${force[@]}" "${pairs[@]}" || return 1
   # iCloud's photos are apart from the cards, behind the sign-in: the new ones into the cache (a failure is only a photo)
   python3 "$APP_DIR/lib/photos.py" fetch "${names[@]}" || echo "Some photos didn't come: they show at the next sync." >&2
   # The edits are on the server now: what they were made over is no longer needed to merge

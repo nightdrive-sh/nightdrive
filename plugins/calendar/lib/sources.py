@@ -40,7 +40,8 @@ FEED = "default"    # an ICS source's one calendar folder
 
 ICLOUD_URL = "https://caldav.icloud.com/"
 YES = ("yes", "true", "on", "1")
-# vdirsyncer's pair and storage names take only letters, digits and _ (Contacts' account names allow - too)
+# vdirsyncer's pair and storage names take only letters, digits and _ (Contacts' account names allow - too: their
+# source here is named by contacts.pair_name, - as _)
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_]*$")
 
 sys.path.insert(0, str(REPO / "plugins/contacts/lib"))
@@ -97,13 +98,13 @@ def sources():
         theirs = []
     names = {name for name, _ in theirs}
     for name, values in theirs:
-        s = caldav(name, values, sections.get(f"account {name}", {}))
+        s = caldav(contacts.pair_name(name), values, sections.get(f"account {name}", {}))
         if s:
             found.append(s)
     for section, values in sections.items():
         kind, _, name = section.partition(" ")
         problem = None
-        if not NAME_RE.match(name):
+        if not NAME_RE.match(name) and not (kind == "account" and name in names):  # a Contacts account's own -
             problem = "the name takes only a-z, 0-9 and _"
         elif kind == "ics":
             if not values.get("url-cmd"):
