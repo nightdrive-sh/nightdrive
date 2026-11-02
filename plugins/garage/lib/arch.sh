@@ -4,6 +4,7 @@
 #   QEMU, MACHINE   qemu's binary and its machine
 #   FW_CODE, FW_VARS  the UEFI firmware (read-only) and the template each new VM's vars.raw is copied from
 #   GPU             the virgl GPU behind SDL's GL window (the rest of the screen: lib/qemu.sh, screen_args)
+#   SOUND           the guest's sound card, output only (lib/qemu.sh, sound_args: PipeWire's on the host)
 #   PIN             the host CPUs a VM runs on (taskset), empty for any
 #   TTY             the guest's serial console (lib/firstboot.sh: its user is made before the login prompt there)
 #   OTHER_ISO       a regex for ISO names that are another architecture's (garage-ctl isos leaves them out)
@@ -19,12 +20,15 @@ case $ARCH in
     FW_CODE=/usr/share/edk2/aarch64/QEMU_EFI-silent-pflash.raw
     FW_VARS=/usr/share/edk2/aarch64/vars-template-pflash.raw
     GPU=virtio-gpu-gl-pci
+    # virtio-snd: Fedora's and Arch Linux ARM's kernels have its driver (CONFIG_SND_VIRTIO). Stream 0 is the output,
+    # 1 the input: one stream, so no microphone
+    SOUND=(-device virtio-sound-pci,audiodev=snd0,streams=1)
     # The M2 Max's performance cluster: a vCPU must not move to an E-core (another MIDR, and KVM stops it)
     PIN=4-11
     TTY=ttyAMA0
     OTHER_ISO='x86_64|amd64|i[3-6]86'
     HOST="this Mac runs ARM (aarch64) VMs"; ISO_HINT="an aarch64 or ARM64 download"
-    PACKAGES="qemu-system-aarch64-core edk2-aarch64 qemu-img qemu-ui-sdl qemu-ui-opengl qemu-device-display-virtio-gpu-pci-gl"
+    PACKAGES="qemu-system-aarch64-core edk2-aarch64 qemu-img qemu-ui-sdl qemu-ui-opengl qemu-device-display-virtio-gpu-pci-gl qemu-audio-pipewire"
     ;;
   x86_64)
     QEMU=qemu-system-x86_64
@@ -35,12 +39,15 @@ case $ARCH in
     FW_VARS=/usr/share/edk2/ovmf/OVMF_VARS.fd
     # virtio-vga rather than -gpu: the same virgl GPU, with a VGA side for the firmware and an early boot
     GPU=virtio-vga-gl
+    # Intel HD Audio: every PC's guest has its driver, Windows' too (virtio-snd needs one added there). Output only,
+    # so no microphone
+    SOUND=(-device ich9-intel-hda -device hda-output,audiodev=snd0)
     # A hybrid Intel's P- and E-cores are the same architecture to KVM: a vCPU may run on any
     PIN=""
     TTY=ttyS0
     OTHER_ISO='aarch64|arm64'
     HOST="this PC runs x86_64 VMs"; ISO_HINT="an x86_64 or amd64 download"
-    PACKAGES="qemu-system-x86-core edk2-ovmf qemu-img qemu-ui-sdl qemu-ui-opengl qemu-device-display-virtio-vga-gl"
+    PACKAGES="qemu-system-x86-core edk2-ovmf qemu-img qemu-ui-sdl qemu-ui-opengl qemu-device-display-virtio-vga-gl qemu-audio-pipewire"
     ;;
   *) die "Garage runs VMs on aarch64 and x86_64, not on $ARCH" ;;
 esac

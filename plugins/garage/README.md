@@ -26,6 +26,7 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 - A VM is *Booting up* until its guest agent or sshd answers (at most two minutes), and *Shutting down* until qemu has gone. A shutdown that hasn't happened in a minute offers Force off.
 - A paused VM frees its CPUs but keeps its memory. Resume sets its clock (with qemu-guest-agent in it); snapshots and settings still need it shut down.
 - Nightdrive in a VM follows its window's size, as in UTM and Parallels, from its login screen on, at scale 2 until you pick another in its Settings › Display. Nightdrive older than 0.6 in it keeps the size it started with, stretched: update it.
+- A VM's sound plays through your speakers, as an app of its own in the mixer; it gets no microphone. If Garage was installed before VMs had sound, add it with `sudo dnf install qemu-audio-pipewire`.
 - A snapshot's duplicate shares its space on the disk. Beside each snapshot is the space it alone keeps.
 - `ssh NAME` reaches a running VM: each has a port of its own, kept in ~/.ssh/config.d/garage (Garage adds `Include config.d/garage` to ~/.ssh/config).
 - Your VMs live in ~/.local/share/nightdrive/garage, and stay there if you remove Garage.

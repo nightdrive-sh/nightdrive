@@ -33,6 +33,18 @@ screen_args() {
   fi
 }
 
+# The guest's sound (lib/arch.sh's SOUND), played through PipeWire as a stream named for the VM (in the host's
+# mixer, as its own app). None without qemu-audio-pipewire (a Garage installed before sound came: the VM starts
+# anyway, silent). Headless, the card is there but plays into nothing: a test VM mustn't play on the user's speakers
+sound_args() {
+  local backend
+  if [[ -n ${GARAGE_HEADLESS:-} ]]; then backend=none,id=snd0
+  elif "$QEMU" -audiodev help 2>/dev/null | grep -qx pipewire; then backend="pipewire,id=snd0,out.stream-name=$(qv "$1")"
+  else return 0
+  fi
+  printf '%s\n' -audiodev "$backend" "${SOUND[@]}"
+}
+
 # qemu_cmd NAME: its command line, into QEMU_CMD (start runs it, garage-ctl cmdline prints it). Run from the VM's
 # folder: the sockets go there by a short path (qmp, qga)
 qemu_cmd() {
@@ -46,6 +58,7 @@ qemu_cmd() {
   [[ -n $ISO ]] && cd=(-device virtio-scsi-pci -device scsi-cd,drive=cd,bootindex=1
                        -drive "if=none,id=cd,media=cdrom,readonly=on,format=raw,file=$(qv "$ISO")")
   local screen=(); mapfile -t screen < <(screen_args)
+  local sound=(); mapfile -t sound < <(sound_args "$name")
   # A disk image's first boot: its user and the rest, until they have run (lib/firstboot.sh)
   local firstboot=(); mapfile -t firstboot < <(firstboot_args "$name")
   local pin=(); [[ -n $PIN ]] && pin=(taskset -c "$PIN")
@@ -58,6 +71,7 @@ qemu_cmd() {
     -device virtio-blk-pci,drive=disk,bootindex=0
     "${screen[@]}"
     -device qemu-xhci -device usb-kbd -device usb-tablet
+    "${sound[@]}"
     "${cd[@]}"
     # The guest's sshd on the host's loopback, at its own port (lib/ssh.sh: `ssh NAME`), as SDL shares no clipboard
     -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22"
