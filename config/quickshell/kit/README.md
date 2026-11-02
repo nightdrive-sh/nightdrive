@@ -29,6 +29,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppPrompt` | An `AppPanel` that asks for a name: `ask(title, initial, then)`, the text picked; `then` gets it trimmed |
 | `AppField` | A labelled text field in a frame for the panels, with a `hint` ("GB"); typing into a read-only one comes out as `refused` |
 | `AppNote` | What went wrong, at the foot of the page, in the danger colour, until ✕; two lines at most |
+| `AppToast` | What just happened, in a rounded card at the top of the window: `show(text, { sticky, danger, duration })`, gone after 4 s (a failure 8 s), sticky until the next; a click dismisses it |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |
 | `Tip` | A button's tip: what it does and its key |
 | `Spinner` | A turning glyph while something runs in the background (Mail's fetch), shown at least a moment; a tip says what runs |

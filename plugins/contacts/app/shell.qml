@@ -189,11 +189,9 @@ ShellRoot {
             return year && year !== "-" ? date + " " + year : date
         }
 
-        // A quiet line under the list for what just happened
-        property string note: ""
+        // What just happened, in the kit's toast at the top of the window (a line under the list went unnoticed);
         // sticky: it stays until the next one (a sync, which tells when it's done)
-        function say(t, sticky) { note = t; if (sticky) noteTimer.stop(); else noteTimer.restart() }
-        Timer { id: noteTimer; interval: 4000; onTriggered: win.note = "" }
+        function say(t, sticky) { toast.show(t, { sticky: sticky }) }
 
         // Without an account yet, Contacts offers to set one up (setupPanel), and looks again now and then, so the
         // contacts show once the setup's first sync has fetched them
@@ -441,15 +439,6 @@ ShellRoot {
                             }
                         }
                     }
-                    Text {
-                        textFormat: Text.PlainText
-                        Layout.fillWidth: true
-                        Layout.margins: 28
-                        Layout.topMargin: 8
-                        visible: win.note !== ""
-                        elide: Text.ElideRight
-                        text: win.note; color: c.dim; font.family: c.font; font.pixelSize: 11
-                    }
                 }
                 Rectangle { visible: !win.onePane; anchors.right: parent.right; width: 1; height: parent.height; color: c.divider }
             }
@@ -473,16 +462,6 @@ ShellRoot {
                 c: win.look
                 onDone: win.endEdit()
             }
-        }
-
-        // What just happened (Copied: …), where the list's line for it is away: under the card, in one pane
-        Text {
-            textFormat: Text.PlainText
-            visible: win.note !== "" && win.onePane && win.cardOpen
-            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-            anchors.margins: 24
-            elide: Text.ElideRight
-            text: win.note; color: c.dim; font.family: c.font; font.pixelSize: 11
         }
 
         // Contacts' first start, before an account: Enter (or the button) opens Claude Code in a terminal, which sets
@@ -547,5 +526,6 @@ ShellRoot {
                                          ["Click", "Copy a number, write to an address"]] }
             ]
         }
+        AppToast { id: toast; c: win.look }
     }
 }

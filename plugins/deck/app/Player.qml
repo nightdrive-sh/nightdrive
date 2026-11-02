@@ -27,7 +27,7 @@ Item {
     }
     readonly property var queue: info && info.queue ? info.queue : []
     readonly property var radio: info && info.radio ? info.radio : null
-    // Deck's latest error (a failed search, an empty station…): shown on the note line when it changes
+    // Deck's latest error (a failed search, an empty station…): shown as a toast (danger) when it changes
     readonly property string deckError: info && info.error ? info.error : ""
     onDeckErrorChanged: if (deckError !== "") { win.act.showNote(deckError, true); win.act.radioStarting = "" }
 

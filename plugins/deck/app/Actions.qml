@@ -1,7 +1,7 @@
 import QtQuick
 
-// What the keys and clicks do to a row or the view (open, play, queue, shelve, take out, a favourite), and the quiet
-// note line that says what just happened. Its own file so the list's keys, the header's buttons and the player act the
+// What the keys and clicks do to a row or the view (open, play, queue, shelve, take out, a favourite), and the note
+// that says what just happened (the window's AppToast). Its own file so the list's keys, the header's buttons and the player act the
 // same way, through one set of functions.
 Item {
     id: root
@@ -80,15 +80,10 @@ Item {
         note = (row.fav ? "Not a favourite: " : "A favourite: ") + row.title
     }
 
-    // A quiet line for what just happened; Deck's errors in the danger colour, and longer
+    // What just happened, in the window's toast at the top (it was a line in the player bar, easily missed). act.note =
+    // "…" is the short way the callers have; it empties itself at once, so the same note again shows again. Deck's
+    // errors come through showNote(text, true): in the danger colour, and longer.
     property string note: ""
-    property bool noteDanger: false
-    onNoteChanged: { noteDanger = false; if (note !== "") { noteTimer.interval = 3000; noteTimer.restart() } }
-    Timer { id: noteTimer; onTriggered: root.note = "" }
-    function showNote(text, danger) {
-        note = ""
-        note = text
-        noteDanger = danger
-        if (danger) { noteTimer.interval = 8000; noteTimer.restart() }
-    }
+    onNoteChanged: if (note !== "") { showNote(note, false); note = "" }
+    function showNote(text, danger) { win.toast.show(text, danger ? { danger: true } : { duration: 3000 }) }
 }

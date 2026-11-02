@@ -55,7 +55,7 @@ Item {
             }
             Row {
                 width: parent.width
-                visible: !!root.player.info && !playerNote.visible
+                visible: !!root.player.info
                 spacing: 8
                 Text {
                     width: Math.min(implicitWidth, parent.width - (shelfButton.visible ? shelfButton.width + 8 : 0))
@@ -85,14 +85,7 @@ Item {
                 }
             }
             Text {
-                id: playerNote
-                visible: root.narrow && root.act.note !== ""
-                width: parent.width; elide: Text.ElideRight
-                text: root.act.note
-                color: root.act.noteDanger ? c.danger : c.dim; font.family: c.font; font.pixelSize: 11
-            }
-            Text {
-                visible: !root.player.alive && !playerNote.visible
+                visible: !root.player.alive
                 text: "Start Deck"
                 color: sth.hovered ? c.primary : c.text; font.family: c.font; font.pixelSize: 12
                 HoverHandler { id: sth; cursorShape: Qt.PointingHandCursor }
@@ -160,18 +153,6 @@ Item {
         Item {
             Layout.preferredWidth: root.narrow ? speakerIcon.width + (heart.visible ? 18 + heart.width : 0) : 260
             Layout.fillHeight: true
-            Text {
-                visible: !root.narrow
-                anchors.right: speakerIcon.left; anchors.rightMargin: 18
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                horizontalAlignment: Text.AlignRight
-                elide: Text.ElideRight
-                maximumLineCount: 2
-                wrapMode: Text.WordWrap
-                text: root.act.note
-                color: root.act.noteDanger ? c.danger : c.dim; font.family: c.font; font.pixelSize: 11
-            }
             // Where the sound goes: the same list as the Sound menu's
             Text {
                 id: speakerIcon

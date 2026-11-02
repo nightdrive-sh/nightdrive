@@ -38,11 +38,12 @@ ShellRoot {
         readonly property Navigation nav: Navigation { win: win }          // the section and the views opened in it
         readonly property Commands deck: Commands { win: win }             // Deck's JSON commands and the search
         readonly property Rows page: Rows { win: win }                     // the rows and titles of the view on top
-        readonly property Actions act: Actions { win: win }                // what the keys and clicks do, the note line
+        readonly property Actions act: Actions { win: win }                // what the keys and clicks do, the note (toast)
         readonly property Item list: viewList
         readonly property Item searchField: viewHeader.searchField
         readonly property Item outputs: outputsPopup
         readonly property Item sheet: keySheet
+        readonly property Item toast: appToast                               // what just happened (act.note)
 
         // `deck-window search QUERY` (the launcher's "Search Spotify" row)
         IpcHandler {
@@ -186,5 +187,6 @@ ShellRoot {
             speaker: playerBar.speaker
             anchors.fill: parent
         }
+        AppToast { id: appToast; c: win.look }
     }
 }

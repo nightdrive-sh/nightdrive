@@ -304,10 +304,9 @@ ShellRoot {
         property var confirm: null
         onConfirmChanged: if (confirm) confirmPanel.forceActiveFocus(); else list.forceActiveFocus()
 
-        // A quiet line under the list for what just happened.
-        property string note: ""
-        function say(t) { note = t; noteTimer.restart() }
-        Timer { id: noteTimer; interval: 4000; onTriggered: win.note = "" }
+        // What just happened, in the kit's toast at the top of the window (a line under the list went unnoticed);
+        // say("") takes it away
+        function say(t) { toast.show(t) }
 
         // Opens the thread of a message in the inbox (or wherever it is now, if it has left it), then calls then().
         function openMessage(id, then) {
@@ -456,6 +455,7 @@ ShellRoot {
         SettingsPanel { id: settingsPanel; behind: content; win: win }
         ConfirmPanel { id: confirmPanel; behind: content; win: win }
         SetupPanel { id: setupPanel; behind: content; win: win }
+        AppToast { id: toast; c: win.look }
 
         property alias cheats: sheet.shown
 

@@ -80,20 +80,11 @@ Rectangle {
         AppKeyAction {
             Layout.leftMargin: 28
             Layout.topMargin: 8
-            Layout.bottomMargin: win.note === "" ? 24 : 0
+            Layout.bottomMargin: 24
             visible: win.folders[win.folder].dir === "Trash" && win.threads.length > 0
             c: win.look
             keys: "⌘⇧⌫"; label: "Empty Trash"; hoverColor: c.danger
             onClicked: ops.emptyTrash()
-        }
-        Text {
-            textFormat: Text.PlainText
-            Layout.fillWidth: true
-            Layout.margins: 28
-            Layout.topMargin: 8
-            visible: win.note !== ""
-            elide: Text.ElideRight
-            text: win.note; color: c.dim; font.family: c.font; font.pixelSize: 11
         }
     }
     Rectangle { visible: !win.onePane; anchors.right: parent.right; width: 1; height: parent.height; color: c.divider }
