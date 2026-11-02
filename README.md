@@ -552,7 +552,9 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
 - **Hyprland comes from Nightdrive's own COPR.** Fedora's own repositories have no Hyprland, so on every machine the
   installer takes the Hyprland packages from [`@nightdrive/nightdrive`](https://copr.fedorainfracloud.org/coprs/g/nightdrive/nightdrive/)
   (aarch64 and x86_64; specs in [nightdrive-packages](https://github.com/nightdrive-sh/nightdrive-packages)) and limits
-  that repository to them. Ghostty comes from there too, and VNC Display's wayvnc (Fedora 44's is too old).
+  that repository to them. Its signing key is checked by fingerprint before dnf trusts it (`nightdrive update` asks
+  for sudo once to set this up on an existing install). Ghostty comes from there too, and VNC Display's wayvnc
+  (Fedora 44's is too old).
 - **The Claude menu** reads your plan's limits with Claude Code's own sign-in, so Claude Code must have been run once.
 - **Claude writes (⌘⇧C)** sends the selected text (or what you type in its card), and the window's class and title, to
   Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers

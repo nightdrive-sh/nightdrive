@@ -15,6 +15,24 @@ set -euo pipefail
 COPR=@nightdrive/nightdrive
 OLD=(arcaneon/arcos jarilehtinen/nightdrive)
 INCLUDE=hypr*,aquamarine,xdg-desktop-portal-hyprland,uwsm,lua5.5,ghostty,deck,wayvnc
+# The COPR's signing key, pinned by fingerprint as setup-rpmfusion.sh pins RPM Fusion's. dnf copr enable points gpgkey=
+# at the URL, and dnf would import whatever key it serves when the first package needs it (trust on first use): the key
+# is fetched and checked here first, kept as a file, and the repo's gpgkey= points at that file instead. The key was
+# made with the project on 21.10.2026 and expires on 20.10.2031; COPR extends a key keeping its fingerprint, so a key
+# that expires within 30 days makes --check fail and the setup fetch it again.
+KEY_FPR=C8DCC359F1A7C1B7652FC281EE395CC6112CEF40
+KEY_URL=https://download.copr.fedorainfracloud.org/results/$COPR/pubkey.gpg
+KEY_FILE=/etc/pki/rpm-gpg/RPM-GPG-KEY-copr-nightdrive
+# The fingerprint of the file's key, only when it holds exactly one (a second key would be imported along with it)
+key_fpr() {
+  gpg --show-keys --with-colons "$1" 2>/dev/null | awk -F: '$1=="pub" {n++} $1=="fpr" && !f {f=$10} END {if (n==1) print f}'
+}
+key_ok() {
+  local expires
+  [[ $(key_fpr "$1") == "$KEY_FPR" ]] || return 1
+  expires=$(gpg --show-keys --with-colons "$1" 2>/dev/null | awk -F: '$1=="pub" {print $7; exit}')
+  [[ -z $expires ]] || (( expires > $(date +%s) + 30 * 86400 ))
+}
 # A group project's repo file says group_<name> (_copr:copr.fedorainfracloud.org:group_nightdrive:nightdrive.repo)
 repo_file() {
   local owner=${1%/*}; owner=${owner/#@/group_}
@@ -38,18 +56,31 @@ vendors() {
 current() {
   local f; f=$(repo_file "$COPR")
   [[ -n $f ]] && grep -qxF "includepkgs=$INCLUDE" "$f" && grep -q '^enabled=1' "$f" && [[ -z $(old_repos) ]] &&
-    [[ $(cat "$VENDORS" 2>/dev/null) == "$(vendors)" ]]
+    grep -qxF "gpgkey=file://$KEY_FILE" "$f" && key_ok "$KEY_FILE" && [[ $(cat "$VENDORS" 2>/dev/null) == "$(vendors)" ]]
 }
 if [[ ${1:-} == --check ]]; then current; exit; fi
 current && exit 0
 
 sudo=sudo; (( EUID == 0 )) && sudo=
+# The key first, before the repo exists: nothing from the COPR is trusted until it is the pinned one
+if ! key_ok "$KEY_FILE"; then
+  key=$(mktemp); trap 'rm -f "$key"' EXIT
+  curl -fsSL -o "$key" "$KEY_URL"
+  if ! key_ok "$key"; then
+    echo "$COPR: its signing key ($KEY_URL) isn't $KEY_FPR, or expires within 30 days. Not set up." >&2
+    exit 1
+  fi
+  $sudo install -m 644 "$key" "$KEY_FILE"
+  $sudo rpmkeys --import "$KEY_FILE"
+  echo "    $COPR: signing key $KEY_FPR"
+fi
 if [[ -z $(repo_file "$COPR") ]]; then
   dnf copr --help >/dev/null 2>&1 || $sudo dnf -y install dnf5-plugins >/dev/null   # dnf copr (in Fedora's images already)
   $sudo dnf copr enable -y "$COPR"
 fi
 f=$(repo_file "$COPR")
-$sudo sed -i -e '/^includepkgs=/d' -e "/^\[copr:/a includepkgs=$INCLUDE" -e 's/^enabled=0/enabled=1/' "$f"
+$sudo sed -i -e '/^includepkgs=/d' -e "/^\[copr:/a includepkgs=$INCLUDE" -e 's/^enabled=0/enabled=1/' \
+  -e "s|^gpgkey=.*|gpgkey=file://$KEY_FILE|" "$f"
 echo "    $COPR: Hyprland's own packages only ($INCLUDE)"
 if [[ $(cat "$VENDORS" 2>/dev/null) != "$(vendors)" ]]; then
   $sudo mkdir -p "${VENDORS%/*}"; vendors | $sudo tee "$VENDORS" >/dev/null
