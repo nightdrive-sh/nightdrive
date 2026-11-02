@@ -6,8 +6,9 @@
 # one question, commits, tags vX.Y.Z, moves main to it, pushes dev, main and the tag, and publishes the GitHub release
 # with the section as its notes. Last, the website's tools/publish.sh (if there is a checkout of it) waits for the
 # website's rebuild from the new main and publishes it on its server. --notes FILE takes the notes from a file instead of the editor, --yes answers the
-# question (both for an agent, with notes the maintainer has read). --dry-run only shows what it would do, and with
-# --notes also opens the website's Changelog page with them on it in the browser (release-preview); --preview only that.
+# question (both for an agent, with notes the maintainer has read). --dry-run only shows what it would do, reminds of
+# the security audit that comes before a release, and with --notes also opens the website's Changelog page with them
+# on it in the browser (release-preview); --preview only that.
 # --name gives the release its name beside the number (Afterglow): the heading "## 0.6.0 Afterglow – date" and the GitHub
 # release "Nightdrive 0.6 Afterglow". The name is for people; the tag, nightdrive update and version keep the number.
 # A picture of what's new goes in the notes as a line of its own, ![What it shows](docs/releases/X.Y.Z-name.jpg): the
@@ -117,6 +118,10 @@ if (( dry )); then
   docs_check || echo "    fails: the release would stop here"
   if [[ -x $WEBSITE/tools/publish.sh ]]; then echo "==> Website: published after its rebuild ($WEBSITE/tools/publish.sh)"
   else echo "==> Website: not published from here (no $WEBSITE/tools/publish.sh)"; fi
+  # The commits go to every machine with sudo in nightdrive update, so a security read of them comes first: a
+  # reminder here, as the audit is Claude Code's (no command to run from this script) and takes a while
+  echo "==> Before releasing: a DevSecOps audit of ${last:-the start}..dev, and of Ferry and the website if they changed"
+  echo "    In Claude Code, read only: the devsecops-audit skill (souroldgeezer-audit plugin). Fix or track what it finds."
   [[ -z $notes_from ]] || preview_notes
   exit 0
 fi
