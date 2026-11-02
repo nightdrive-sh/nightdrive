@@ -199,10 +199,12 @@ files, is set in Claude Code, and a command can do what a tool here can't withou
 mcp access level open` changes these choices. Keep Claude Code asking before commands: if your `~/.claude/settings.json`
 or `settings.local.json` allows any command (`Bash`, `Bash(*)`, or any arguments to a shell, an interpreter,
 `nightdrive` or a command that runs or writes anything: `Bash(nightdrive *)`, `Bash(timeout *)`, `Bash(find *)`,
-`Bash(cp *)`, `Bash(uv run *)`), lets Edit or Write change these settings or Claude Code's own (`Edit`,
-`Edit(~/.config/**)`, `Write(~/.claude*)`), or has `defaultMode` `bypassPermissions` or `acceptEdits`, the Access
-window, its page in Settings and `nightdrive mcp status` warn you. A project's own `.claude/settings` aren't read: look
-at them yourself.
+`Bash(cp *)`, `Bash(uv run *)`), runs a command the card or these choices keep back (`Bash(nightmail send *)`,
+`Bash(nightdrive mcp *)`), types or clicks (`Bash(wtype *)`, `Bash(ydotool *)`: Enter on the card allows), lets Edit
+or Write change these settings, Claude Code's own or the code the tools run (`Edit`, `Edit(~/.config/**)`,
+`Write(~/.cache/**)`, `Edit(~/dotfiles/plugins/**)`), or has `defaultMode` `bypassPermissions` or `acceptEdits`, the
+Access window, its page in Settings and `nightdrive mcp status` warn you, naming each rule. A project's own
+`.claude/settings` aren't read: look at them yourself.
 
 The choices are in `~/.config/nightdrive/claude-access.json`, which `nightdrive mcp install` writes at *Normal* when
 there is none. Once it has, a missing file means *Strict*, as a broken one does, until you choose a level again.

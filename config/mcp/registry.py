@@ -247,6 +247,23 @@ def plugin_folders(active=ACTIVE):
     return out
 
 
+def all_tools(core=CORE, active=ACTIVE):
+    """All the tools by name, the core's first (a plugin can't take a core tool's name), and the problems. Also
+    claude_rules.py's: which commands Access keeps back."""
+    sources = [(p, HERE, None) for p in sorted(Path(core).glob("*.json"))]
+    sources += [(d / "mcp.json", d, pid) for pid, d in plugin_folders(active) if (d / "mcp.json").is_file()]
+    tools, problems = {}, []
+    for path, folder, plugin in sources:
+        found, wrong = read_file(path, folder, plugin)
+        problems += wrong
+        for tool in found:
+            if tool.name in tools:
+                problems.append(f"{path}: {tool.name} is {tools[tool.name].source}'s already: left out")
+            else:
+                tools[tool.name] = tool
+    return tools, problems
+
+
 def optional(module):
     """A phase 3 module (confirm, undo) if it is there yet; an error inside one isn't hidden."""
     try:
@@ -317,19 +334,7 @@ class Registry:
         self.rules = None     # the Access that visible() last read: call() decides by the same one it listed by
 
     def load(self):
-        """All the tools by name, the core's first (a plugin can't take a core tool's name), and the problems."""
-        sources = [(p, HERE, None) for p in sorted(self.core.glob("*.json"))]
-        sources += [(d / "mcp.json", d, pid) for pid, d in plugin_folders(self.active) if (d / "mcp.json").is_file()]
-        tools, problems = {}, []
-        for path, folder, plugin in sources:
-            found, wrong = read_file(path, folder, plugin)
-            problems += wrong
-            for tool in found:
-                if tool.name in tools:
-                    problems.append(f"{path}: {tool.name} is {tools[tool.name].source}'s already: left out")
-                else:
-                    tools[tool.name] = tool
-        return tools, problems
+        return all_tools(self.core, self.active)
 
     def visible(self):
         """The tools the user's Access lets Claude see, by name."""
