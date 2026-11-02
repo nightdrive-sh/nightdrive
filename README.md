@@ -182,9 +182,10 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   windows are kept. If it runs out, the next login asks whether to open them again, each on its workspace.
 - **Web apps**: any site as an app window, from Launcher › System › Install › Webapp; System › Remove › Webapps removes
   one, with its logins. Their notifications have the web app's own name and icon (and emoji: Slack's `:thumbsup:` as
-  👍), and a link to another site opens in your default browser. A page that tries to open Slack's, Zoom's or Teams'
-  desktop app (which have no Linux version here) gets a notification instead of an "Open With…" dialog: use the
-  page's link to the web version.
+  👍), and a link to another site opens in your default browser; a window of the app's own site (Slack's sign-in to
+  another workspace) stays an app window, never a Chromium one. A page that tries to open Slack's, Zoom's or Teams'
+  desktop app (which have no Linux version here) gets a notification instead of an "Open With…" dialog: use the page's
+  link to the web version.
 - **Default apps**: which app opens links, mail, folders, text, code, images, video, music, PDFs and calendar files, and
   which terminal ⌘Enter opens: Launcher › Settings › Apps › Default apps (or `nightdrive defaults`). Hyper B, F and E
   open the browser, Files and Email you chose. A link from another app opens in a new window, not as a tab: Firefox's
