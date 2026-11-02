@@ -32,6 +32,7 @@ ToastStack 1.0 ToastStack.qml
 Dictation 1.0 Dictation.qml
 DictationMeter 1.0 DictationMeter.qml
 DictationIndicator 1.0 DictationIndicator.qml
+AskClaudeListening 1.0 AskClaudeListening.qml
 AskClaudeToast 1.0 AskClaudeToast.qml
 AskClaudePanel 1.0 AskClaudePanel.qml
 AskClaudeStatus 1.0 AskClaudeStatus.qml

@@ -8,10 +8,10 @@ import "Words.js" as Words
 // - While Voxtype records it is the dictation indicator (DictationIndicator.qml), and it never takes a key: what you
 //   say is typed into the window you're in.
 // - ⌘⇧ + the dictation key (hypr/scripts/dictate) makes the dictation Claude's (dictating): Ask Claude's toast opens at
-//   once in the launcher's place (Dashboard #1996), with the conversation (as ⌘⌥Space opens it) and the dictation's
-//   indicator where the field is. While it only listens it leaves the keyboard to the window you're in; when the text
-//   comes (draft) it goes into the field to check before Enter sends it, and now the toast has the keyboard, as the
-//   launcher does. No text (cancel): a toast opened to listen closes again.
+//   once in the launcher's place (Dashboard #1996), with the conversation (as ⌘⌥Space opens it) and a listening wave
+//   where the field is (AskClaudeListening.qml, #1997). While it only listens it leaves the keyboard to the window
+//   you're in; when the text comes (draft) it goes into the field to check before Enter sends it, and now the toast has
+//   the keyboard, as the launcher does. No text (cancel): a toast opened to listen closes again.
 // - Esc, or a click beside it, closes it without stopping Claude; what was written stays in the field for next time.
 //   While Claude works, the card stays small (AskClaudeStatus.qml), and says for a while when it has answered; a click
 //   on it, or ⌘⌥Space (hypr/scripts/ask-claude --toggle), opens it again.

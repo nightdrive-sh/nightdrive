@@ -2,8 +2,8 @@ import QtQuick
 
 // Dictation's indicator (F5, docs/dictation.md) while Voxtype records or transcribes:
 //   mic icon | equalizer (DictationMeter) | LISTENING / PLEASE WAIT / TRANSCRIBING
-// The whole of the toast during dictation, and in Ask Claude's toast the field's place while you dictate more to it
-// (AskClaudeToast.qml). Its state comes from Dictation.qml.
+// The whole of the toast during dictation (AskClaudeToast.qml); Ask Claude's field has a wave of its own while you
+// dictate to it (AskClaudeListening.qml). Its state comes from Dictation.qml.
 Item {
     id: ind
     required property Dictation dictation

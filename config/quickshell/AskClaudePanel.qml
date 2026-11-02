@@ -3,8 +3,8 @@ import Quickshell
 
 // Ask Claude's toast once it is written in (AskClaudeToast.qml, Dashboard #1895): the field (AskClaudeField), the conversation (AskClaudeThread, from AskClaudeSession) and its keys (KeyFooter). As in a chat,
 // the field is under the conversation, so the newest message is always just above it, where you wrote (the user's
-// choice, #1895); a new conversation is the field alone, so dictated text still appears where the indicator was.
-// fieldOnTop puts it above instead. While you dictate, the indicator stands in the field's place.
+// choice, #1895); a new conversation is the field alone, so dictated text still appears where the wave was.
+// fieldOnTop puts it above instead. While you dictate, a wave across the field (AskClaudeListening) stands in its place.
 // A long conversation scrolls inside it: the toast stays within maxHeight.
 Item {
     id: p
@@ -12,7 +12,7 @@ Item {
     property bool fieldOnTop: false
     property bool dictating: false
     property bool listenOnly: false       // opened to listen (#1996): no keys yet, so no footer either
-    property var dictation: null          // Dictation, for the indicator
+    property var dictation: null          // Dictation, for the listening wave
     readonly property alias field: field
     signal close()
 
@@ -68,8 +68,9 @@ Item {
             onPaged: dir => thread.page(dir)
             copyElsewhere: () => { if (!thread.copySelection()) return false; p.copied = true; copiedTimer.restart(); return true }
         }
-        DictationIndicator {
+        AskClaudeListening {
             visible: p.dictating && p.dictation !== null
+            width: parent.width
             dictation: p.dictation
             running: visible
             anchors.verticalCenter: field.verticalCenter
