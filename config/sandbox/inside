@@ -46,19 +46,27 @@ check() {
   local fail=0 out
   # Hyprland and Quickshell reload a second or so after a save: a check right after an edit waits for that
   [[ -n $(find ~/nightdrive/config -newermt '-3 seconds' -print -quit 2>/dev/null) ]] && sleep 2
-  if ! out=$(Hyprland --verify-config -c ~/.config/hypr/hyprland.lua 2>&1); then
-    echo "== Hyprland --verify-config"
-    # only its result: the lines before it are Hyprland's start-up log
-    sed -n '/Config parsing result/,$p' <<<"$out" | sed '1d;/^$/d' | grep . || echo "$out"
+  # The result, not the exit code, decides: Hyprland 0.56.2 segfaults after printing it when the Lua config made a timer
+  # at load (layer-keys.lua's poll), because tearing down the config removes timers from an event loop that verify mode
+  # never made. stdbuf: through a pipe the result would sit in stdout's buffer and die with the crash.
+  local rc result
+  out=$(stdbuf -oL Hyprland --verify-config -c ~/.config/hypr/hyprland.lua 2>&1); rc=$?
+  # only its result: the lines before it are Hyprland's start-up log
+  result=$(sed -n '/Config parsing result/,$p' <<<"$out" | sed '1d;/^$/d')
+  if [[ $result != "config ok" ]]; then
+    echo "== Hyprland --verify-config (exit $rc)"
+    if [[ -n $result ]]; then echo "$result"; else echo "no result: it crashed before parsing ended"; echo "$out"; fi
     fail=1
   fi
   out=$(hyprctl configerrors 2>&1)
   if [[ -n ${out//[[:space:]]/} ]]; then echo "== hyprctl configerrors"; echo "$out"; fail=1; fi
   # Quickshell: only since its last (re)load, so an error that's fixed and reloaded no longer counts. A failed reload keeps
   # the old config running and logs ERROR lines; a QML runtime error is a WARN with its place, e.g. "@Osd.qml[13:-1]: …"
-  # (the other WARNs are Qt's own noise: propertyCache, portal registration).
+  # (the other WARNs are Qt's own noise: propertyCache, portal registration). The container has no PipeWire (no sound by
+  # design), so Quickshell's failure to connect to it at launch isn't a finding.
   out=$(qs log 2>&1 | sed 's/\x1b\[[0-9;]*m//g' \
         | awk '/INFO: (Launching config|Reloading configuration)/ { n = 0; delete l; next }
+               /ERROR quickshell\.service\.pipewire.*Failed to connect pipewire context/ { next }
                /^ *ERROR/ || (/^ *WARN/ && /@[^ ]+\.qml\[/) { l[++n] = $0 }
                END { for (i = 1; i <= n; i++) print l[i] }')
   if [[ -n $out ]]; then echo "== qs log (since the last reload)"; echo "$out"; fail=1; fi
