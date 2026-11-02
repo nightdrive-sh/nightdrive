@@ -10,7 +10,7 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
                                    or an app (its name or window class); "" does nothing. --json: {address, app, title,
                                    previous}. --unless-typing (Claude's tools, #1832): not while the user types (a key
                                    in the last QUIET s), so what they type (a password) doesn't go to another window.
-                                   It waits up to QUIET_WAIT s for the quiet (the Enter that sent the prompt), then
+                                   It waits for that pause, as Claude's card does (#1986), up to QUIET_WAIT s, then
                                    refuses
   windows shot WINDOW [--out FILE] [--json] [--inline] [--check]
                                    a picture of a window on screen (PNG, at most MAX_EDGE px on its long side): its
@@ -56,8 +56,9 @@ SEEN_MAX = 30                                 # titles kept for one app: the lat
 MAX_EDGE = 1568        # px: a bigger picture only costs Claude more, it doesn't see more
 WAIT = 8               # s an opened app or file has to show a window
 POLL = 0.25
-QUIET = 2              # s without a key before Claude's tools move the focus (--unless-typing)
-QUIET_WAIT = 5         # s to wait for that quiet before refusing
+QUIET = 1              # s without a key before Claude's tools move the focus (--unless-typing): the card's second
+QUIET_WAIT = 30        # s to wait for that pause before refusing: a sentence typed on, not a refusal (#1986). The
+                       # tools that wait have a timeout above it (config/mcp/tools/apps-files.json)
 SCHEMES = ("http://", "https://", "mailto:")
 MAILTO_FIELDS = {"to", "cc", "subject", "body"}   # a mailto:'s query may set these, not attach= or bcc= (#1866)
 BACKGROUND = "special:bg"
@@ -127,15 +128,18 @@ def key_age():
 
 def not_typing():
     """Waits until the user hasn't pressed a key for more than QUIET s, up to QUIET_WAIT s; dies if they go on. More
-    than QUIET whole seconds, as a key 2.9 s ago counts as 2."""
+    than QUIET whole seconds, as a key 1.9 s ago counts as 1: so a pause of 1–2 s. Typing in a terminal while Claude
+    works is usual, so this waits rather than refuses (#1986); the refusal tells Claude to call again by itself, as
+    asking the user to stop typing (or to type a word) only interrupts them."""
     end = time.monotonic() + QUIET_WAIT
     while True:
         age = key_age()
         if age is None or age > QUIET:
             return
         if time.monotonic() > end:
-            die(f"The user is typing (a key in the last {QUIET} s), so the focus wasn't moved: what they type mustn't "
-                "go to another window. Try again in a moment, or ask them.")
+            die(f"The user kept typing for {QUIET_WAIT} s without a pause, so the focus wasn't moved (what they type "
+                "mustn't go to another window). Nothing is wrong: call this tool again in a little while, as it is; "
+                "don't ask the user to stop typing or to type anything.")
         time.sleep(POLL)
 
 

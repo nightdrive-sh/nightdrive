@@ -198,6 +198,8 @@ def problem(spec, plugin, external=False):
         return f"{name}: {', '.join(sorted(unknown))} in its command isn't in inputSchema"
     if spec["class"] == "change" and not is_template(spec.get("undo")):
         return f"{name}: a change tool needs undo (the command that undoes it); one that can't be undone is act"
+    if not isinstance(spec.get("stops_on_cancel", False), bool):
+        return f"{name}: stops_on_cancel must be true or false"
     if not isinstance(spec.get("undo_asks", False), bool):
         return f"{name}: undo_asks must be true or false"
     if "before" in spec and not is_template(spec["before"]):

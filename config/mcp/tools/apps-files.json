@@ -32,7 +32,7 @@
     {
       "name": "windows_focus",
       "title": "Bring a window forward",
-      "description": "Brings a window forward and gives it the focus, switching to its workspace (one hidden in the background comes to the current one). Not while the user is typing: it waits a few seconds for a pause, then refuses, so what they type doesn't go to another window. Then try again a little later, or ask them.",
+      "description": "Brings a window forward and gives it the focus, switching to its workspace (one hidden in the background comes to the current one). While the user is typing it waits for a pause (up to 30 s), so what they type doesn't go to another window; if they type on, it refuses: then call it again a little later, without asking them.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -42,6 +42,8 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "windows", "focus", "{window}", "--json", "--unless-typing"],
+      "timeout": 60,
+      "stops_on_cancel": true,
       "undo": ["nightdrive", "windows", "focus", "{previous}", "--unless-typing"],
       "notice": "Brought {app} forward",
       "class": "change",
@@ -60,6 +62,8 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "windows", "open", "--app", "{app}", "--json", "--unless-typing"],
+      "timeout": 60,
+      "stops_on_cancel": true,
       "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}", "--unless-typing"],
       "notice": "Opened {opened}",
       "class": "change",
@@ -78,6 +82,8 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "windows", "open", "--url", "{url}", "--json", "--unless-typing"],
+      "timeout": 60,
+      "stops_on_cancel": true,
       "asks_if": ["nightdrive", "windows", "site", "{url}"],
       "first_note": "Once you allow it, Claude opens addresses on {key} without asking from now on. One that leads on to another address, or carries a long query, still asks.",
       "class": "act",
@@ -113,6 +119,8 @@
         "additionalProperties": false
       },
       "command": ["nightdrive", "files", "open", "--json", "--unless-typing", "--", "{path}"],
+      "timeout": 60,
+      "stops_on_cancel": true,
       "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}", "--unless-typing"],
       "notice": "Opened {opened}",
       "class": "change",

@@ -32,7 +32,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 from pathlib import Path
 
@@ -52,8 +51,8 @@ LONG = 80            # characters: a longer value, or one with a newline, gets a
 
 # Set by server.py when Claude Code cancels the call in progress (Esc, its own timeout) or goes away: the card closes
 # at once, rather than stay to be allowed for a call whose answer no one reads, which Claude might then try again
-# (a mail sent twice, #1865). Cleared as each call starts.
-CANCELLED = threading.Event()
+# (a mail sent twice, #1865). Cleared as each call starts. run.py's event, which also stops a stops_on_cancel tool
+CANCELLED = run.CANCELLED
 
 # What could make the text on the card read differently from what runs is shown as ⟨U+202E⟩ instead: every character
 # invisible.py counts as unseen (controls, line separators, format characters, Unicode's default-ignorables), the same

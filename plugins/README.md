@@ -366,6 +366,7 @@ card, undo, timeouts).
 | `image` | Optional: the field of the command's JSON output that holds a picture, `{"mimeType": "image/png", "data": "<base64>"}`. Claude gets it as an image, and the rest of the output as text (`windows_view`) |
 | `area` | The row in Settings › Claude › Access it belongs to: `mail`, `contacts`, `calendar`, `tasks`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `appearance`, `sound-display`, `screen`, `apps-files`, `software`, or the plugin's own id. A plugin from outside this repository: its own id only |
 | `timeout` | Optional: seconds before it's stopped (30, at most 300) |
+| `stops_on_cancel` | Optional: `true` stops the command when Claude Code cancels the call (Esc): for one that waits before it acts, as the window tools wait for the user to stop typing. Without it a cancelled command runs to its end |
 
 A `change` tool's call shows a notification with Undo (it stays in the history for an hour) and goes in
 `~/.local/state/nightdrive/claude-changes.jsonl` (the last 100), from which Claude can undo it too when asked

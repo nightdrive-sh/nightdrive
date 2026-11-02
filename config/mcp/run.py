@@ -12,6 +12,7 @@ import re
 import signal
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -29,6 +30,14 @@ CHUNK = 64 * 1024
 # all of a call's arguments together at most ARGUMENTS_MAX characters as JSON: a command reads its stdin whole
 STRING_MAX = 100_000
 ARGUMENTS_MAX = 1_000_000
+
+CANCEL_POLL = 0.2     # seconds between looks at CANCELLED while a stops_on_cancel tool runs
+
+# Set by server.py when Claude Code cancels the call in progress (Esc, its own timeout) or goes away; cleared as each
+# call starts. The confirmation card closes on it (confirm.CANCELLED is this event), and a tool whose spec says
+# stops_on_cancel is stopped: one that waits for the user to stop typing (#1986) mustn't open a window half a minute
+# after the user pressed Esc. Others run to their end, as a mail sent halfway is worse than one sent.
+CANCELLED = threading.Event()
 
 PLACEHOLDER = re.compile(r"\{([a-z_][a-z0-9_]*)\}")
 
@@ -280,15 +289,40 @@ def execute(tool, argv, stdin, timeout):
     for t in threads:
         t.start()
     try:
-        proc.wait(timeout=timeout)
+        wait(proc, timeout, CANCELLED if getattr(tool, "spec", {}).get("stops_on_cancel") else None)
     except subprocess.TimeoutExpired:
         os.killpg(proc.pid, signal.SIGKILL)
         proc.wait()
         raise ToolError(f"{tool.name} didn't finish in {timeout} s and was stopped.")
+    except Cancelled:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        raise ToolError(f"{tool.name} was stopped: the call was cancelled.")
     finally:
         for t in threads:
             t.join(timeout=5)   # what it started may hold its output open; that isn't waited for
     return out.decode("utf-8", "replace"), err.decode("utf-8", "replace"), proc.returncode
+
+
+class Cancelled(Exception):
+    pass
+
+
+def wait(proc, timeout, cancelled=None):
+    """proc.wait(timeout), raising Cancelled as soon as the event is set (looked at every CANCEL_POLL s)."""
+    if cancelled is None:
+        return proc.wait(timeout=timeout)
+    end = time.monotonic() + timeout
+    while True:
+        if cancelled.is_set():
+            raise Cancelled
+        left = end - time.monotonic()
+        if left <= 0:
+            raise subprocess.TimeoutExpired(proc.args, timeout)
+        try:
+            return proc.wait(timeout=min(CANCEL_POLL, left))
+        except subprocess.TimeoutExpired:
+            continue
 
 
 def drain(pipe, kept, limit, tail):

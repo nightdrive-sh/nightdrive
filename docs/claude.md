@@ -248,8 +248,8 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †) | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
 
-Claude doesn't bring a window forward while you type, nor open an app, a file or an address: after a key it waits for
-two quiet seconds, five at most, and otherwise gives up, so what you type doesn't land in another window.
+Claude doesn't bring a window forward while you type, nor open an app, a file or an address: it waits until you pause
+for a second (half a minute at most, then Claude tries again later), so what you type doesn't land in another window.
 
 ## What Claude never gets
 
