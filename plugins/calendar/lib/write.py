@@ -5,8 +5,10 @@
         --calendar ID --title T --start S [--end E] [--location L] [--notes N]
     write.py delete [--check] CALENDAR UID   --check: stdin's JSON must name the event (title, start), as Claude's
                                              confirmation card showed it, or nothing is deleted
-    write.py shared [--calendar ID]          yes when add would put the event in a calendar others see (calendars.conf's
-                                             `shared`), so Claude's calendar_add asks on the card first; no otherwise
+    write.py shared [--calendar ID]          calendar_add's asks_if: yes when add would put the event in a calendar
+                                             others see (calendars.conf's `shared`), so the card asks every time;
+                                             otherwise `first NAME (ID)`, so it asks until the user allows one add
+                                             to that calendar (Nightdrive remembers it, #1929)
 
 start and end are local times, "YYYY-MM-DDTHH:MM", or days, "YYYY-MM-DD", for an all-day event; an all-day event's
 end is its last day (not iCalendar's day after). Without end: an hour, or the one day.
@@ -32,6 +34,7 @@ import calendars
 COMMAND = Path(__file__).resolve().parents[1] / "bin/calendar"
 PRODID = "-//Nightdrive//Calendar//EN"
 SYNC_TIMEOUT = 90
+NAME_MAX = 100   # of a calendar's name in calendar_add's first-time key: the key is one line of 200 at most
 
 
 def local_zone():
@@ -202,8 +205,11 @@ def main(argv):
     if not argv or argv[0] not in ("add", "delete", "shared"):
         sys.exit(__doc__)
     if argv[0] == "shared":
-        # The calendar add would take, or its reason why none (which add would give too)
-        print("yes" if writable((options(argv[1:]).get("calendar") or "").strip())["shared"] else "no")
+        # The calendar add would take, or its reason why none (which add would give too). The key has the id, which
+        # only this calendar has, and the name the card shows: a calendar renamed on the server asks again
+        cal = writable((options(argv[1:]).get("calendar") or "").strip())
+        name = " ".join(cal["name"].split())[:NAME_MAX]
+        print("yes" if cal["shared"] else f"first {name} ({cal['id']})")
         return
     as_json = "--json" in argv
     args = [a for a in argv[1:] if a != "--json"]

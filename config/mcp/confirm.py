@@ -167,7 +167,7 @@ def card(tool, arguments, timeout=TIMEOUT):
         "source": visible(areas.name(tool.area)),
         "tool": tool.name,
         "heading": heading,
-        "note": note,
+        "note": visible(note) if note else note,   # a first-time call's note names a server's text (#1929)
         "glyph": glyph,
         "fields": rows + [field(n, props.get(n), arguments[n]) for n in names],
         "timeout": timeout,

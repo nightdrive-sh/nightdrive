@@ -95,7 +95,7 @@ class AsksIf(unittest.TestCase):
         for said in ("", "yes please", "YES", "true", "no\nyes"):
             with self.subTest(said=said), self.assertRaises(ToolError) as e:
                 self.call(said)
-            self.assertIn("didn't say yes or no", str(e.exception))
+            self.assertIn("didn't say yes, no or first KEY", str(e.exception))
         self.assertFalse((self.dir / "ran").exists())
 
     def test_a_failing_command_stops_the_call_with_its_message(self):
@@ -201,9 +201,10 @@ class SharedCalendar(unittest.TestCase):
         conf = "shared = Family, work\n"
         self.assertEqual(self.shared("--calendar", "Family", conf=conf)[:2], (0, "yes"))
         self.assertEqual(self.shared("--calendar", "acct/work", conf=conf)[:2], (0, "yes"))   # by id, any case
-        self.assertEqual(self.shared("--calendar", "Mine", conf=conf)[:2], (0, "no"))
+        # One not marked asks the first time (first_time_test.py, #1929)
+        self.assertEqual(self.shared("--calendar", "Mine", conf=conf)[:2], (0, "first Mine (acct/me)"))
         self.assertEqual(self.shared("--calendar", "Mine", conf="shared = yes\n")[:2], (0, "yes"))
-        self.assertEqual(self.shared("--calendar", "Family", conf="")[:2], (0, "no"))
+        self.assertEqual(self.shared("--calendar", "Family", conf="")[:2], (0, "first Family (acct/fam)"))
 
     def test_unknown_stops_with_adds_reason(self):
         status, _, err = self.shared("--calendar", "Nope; rm -rf ~", conf="shared = Family\n")

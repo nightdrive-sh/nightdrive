@@ -31,11 +31,13 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 caldav-url = https://caldav.example.com/
 ```
 
-- In the same file, `read-only = yes` in an account's section makes its sync only download, and `read-only = Family, Work` keeps Calendar from adding to or deleting from those calendars. `shared = Family` (or `yes`, the whole account) marks the calendars others see: Claude asks on Nightdrive's card before adding to them, as what it adds goes to those people too. `off = yes` leaves the account's calendars out.
+- In the same file, `read-only = yes` in an account's section makes its sync only download, and `read-only = Family, Work` keeps Calendar from adding to or deleting from those calendars. `shared = Family` (or `yes`, the whole account) marks the calendars others see: Claude asks on Nightdrive's card every time before adding to them, as what it adds goes to those people too. `off = yes` leaves the account's calendars out.
 
 ## Claude
 
-With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add an event (you can undo it from the notification; to a `shared` calendar only after you allow it on Nightdrive's card), and delete one after you allow it on Nightdrive's card. It doesn't delete recurring events, nor change anything in a read-only calendar.
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add an event (you can undo it from the notification), and delete one after you allow it on Nightdrive's card. It doesn't delete recurring events, nor change anything in a read-only calendar.
+
+The first event Claude adds to a calendar asks on the card, and once you allow it, Claude adds to that calendar without asking; a `shared` one asks every time, and a refusal remembers nothing. `nightdrive mcp access allowed` lists the calendars allowed so, and `nightdrive mcp access forget calendar_add` makes them all ask again (or `forget calendar_add "Family (icloud/family)"`, one of them).
 
 ## In a terminal
 

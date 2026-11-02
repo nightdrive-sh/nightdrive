@@ -28,6 +28,8 @@ the private areas); change → the level's; act is gone, the card's Ask is built
     access.py set AREA read|modify|delete allow|ask|no
     access.py option AREA OPTION on|off
     access.py option AREA OPTION add|remove VALUE      a list choice
+    access.py allowed                          what the user allowed once for good, a tool and its key a line (#1929)
+    access.py forget TOOL [KEY]                forget that (without KEY, all of the tool's): the card asks again
 """
 
 import json
@@ -39,7 +41,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import areas  # noqa: E402  (after the path above)
+import allowed  # noqa: E402  (after the path above)
+import areas  # noqa: E402
 from areas import AREAS, RIGHTS  # noqa: E402,F401  (registry.py checks a tool's area against AREAS)
 from levels import LEVELS, VALUES, option_preset, preset  # noqa: E402
 
@@ -327,7 +330,7 @@ def installed_tools():
 
 def main(argv):
     usage = ("usage: access.py [level strict|normal|open | set AREA read|modify|delete allow|ask|no | "
-             "option AREA OPTION on|off | option AREA LIST add|remove VALUE]")
+             "option AREA OPTION on|off | option AREA LIST add|remove VALUE | allowed | forget TOOL [KEY]]")
     try:
         if not argv:
             json.dump(load().summary(installed_tools()), sys.stdout, ensure_ascii=False, indent=2)
@@ -338,6 +341,11 @@ def main(argv):
             set_value(*argv[1:])
         elif argv[0] == "option" and len(argv) in (4, 5):
             set_option(*argv[1:])
+        elif argv[0] == "allowed" and len(argv) == 1:
+            print("\n".join(allowed.lines()) or "Nothing allowed for good: every first-time call asks.")
+        elif argv[0] == "forget" and len(argv) in (2, 3):
+            gone = allowed.forget(*argv[1:])
+            print(f"Forgot {gone}: the card asks again." if gone else "Nothing to forget.")
         else:
             print(usage, file=sys.stderr)
             return 2

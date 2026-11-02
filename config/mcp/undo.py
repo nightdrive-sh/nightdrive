@@ -304,12 +304,18 @@ def ask_redo(entry, tool, decision):
     tool.options, tool.options_from = {}, {}
     for name, value in choices(tool).items():
         setattr(tool, name, value)   # the card command and asks_if keep to the area's choices, as the call's did
-    if decision == "allow" and not (tool.spec.get("asks_if") and registry.asks(tool, arguments)):
+    ask, first = decision != "allow", None
+    if decision == "allow" and tool.spec.get("asks_if"):
+        ask, first = registry.asks(tool, arguments)
+    if not ask:
         return None
     import confirm
-    if not confirm.ask(tool, arguments):
+    with registry.first_time(tool, first):   # a calendar Claude hasn't added to yet: allowing it remembers (#1929)
+        ok = confirm.ask(tool, arguments)
+    if not ok:
         raise ToolError(f"The user didn't allow redoing change {entry['id']} ({entry['notice']}) on screen, so it "
                         "wasn't redone. Don't try it another way.")
+    registry.allowed_once(tool, first)
     return tool.said
 
 

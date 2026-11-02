@@ -12,7 +12,9 @@ Allow, Ask or No. No hides the tool; Ask, and an act tool always, runs it only o
 A change Access allows asks too once its area has had many in a minute, and a call the user just refused isn't shown
 to them again at once (pace.py, #1882).
 So does a call whose `asks_if` command says yes though Access allows the tool (asks): one that reaches further than
-its right says, sound to a speaker on the network or an event into a calendar others see (#1887).
+its right says, sound to a speaker on the network or an event into a calendar others see (#1887). One that prints
+`first KEY` asks only until the user allows a call for KEY once (an event into a calendar Claude hasn't added to yet,
+#1929): allowed.py remembers it, and a refusal or a timeout remembers nothing.
 An area's own choices (access.Access.options, #1830) go to the tool too (Tool.keep): what one that is off takes away
 isn't in its schema, and its command gets them all to keep to, and another area's too when its mcp.json names that
 area in `options_from` (the latest notifications keep to Mail's blocked list: a notification would tell what it hides).
@@ -30,11 +32,13 @@ import importlib
 import json
 import re
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import access  # noqa: E402  (after the path above)
+import allowed  # noqa: E402
 import mask  # noqa: E402
 import pace  # noqa: E402
 import run  # noqa: E402
@@ -254,15 +258,52 @@ def optional(module):
 
 
 def asks(tool, arguments):
-    """Whether a call asks on the card though Access allows its tool: its asks_if command prints yes or no. One that
-    fails, or says anything else, stops the call before anything runs, with its message."""
+    """Whether a call asks on the card though Access allows its tool, by its asks_if command: (ask, key). yes asks,
+    no doesn't; `first KEY` asks until the user has allowed this tool for KEY once, and key is what to remember when
+    they allow this call (None otherwise). One that fails, or says anything else, stops the call before anything runs,
+    with its message."""
     out, err, status = run.execute(tool, run.expand(tool.spec["asks_if"], arguments), None, run.timeout_of(tool))
     if status != 0:
         why = (err.strip() or out.strip() or f"exit status {status}")[-run.MESSAGE_MAX:]
         raise ToolError(f"{tool.name} wasn't run: {why}")
-    if out.strip() not in ("yes", "no"):
-        raise ToolError(f"{tool.name} wasn't run: its asks_if command didn't say yes or no.")
-    return out.strip() == "yes"
+    said = out.strip()
+    if said in ("yes", "no"):
+        return said == "yes", None
+    word, _, key = said.partition(" ")
+    if word != "first" or not allowed.KEY.fullmatch(key):
+        raise ToolError(f"{tool.name} wasn't run: its asks_if command didn't say yes, no or first KEY.")
+    if allowed.has(tool.name, key):
+        return False, None
+    return True, key
+
+
+@contextmanager
+def first_time(tool, key):
+    """The card says that allowing this call allows the next ones for key too (the user must know what Allow does);
+    the tool's own note is back after."""
+    if key is None:
+        yield
+        return
+    note = tool.spec.get("card_note")
+    said = f"Once you allow it, Claude does this for {key} without asking from now on."
+    tool.spec["card_note"] = f"{note} {said}" if note else said
+    try:
+        yield
+    finally:
+        if note is None:
+            tool.spec.pop("card_note", None)
+        else:
+            tool.spec["card_note"] = note
+
+
+def allowed_once(tool, key):
+    """The user allowed a first-time call: the next ones for key run without the card. A file that can't be written
+    only means the card again next time, so the call goes on."""
+    if key is not None:
+        try:
+            allowed.remember(tool.name, key)
+        except (OSError, ValueError) as e:
+            print(f"nightdrive mcp: {tool.name}: couldn't remember {key!r}: {e}", file=sys.stderr, flush=True)
 
 
 class Registry:
@@ -314,20 +355,22 @@ class Registry:
             raise UnknownTool(name)
         run.check(tool, arguments)
         tool.said = None   # what a card said is this call's alone (confirm.facts sets it)
-        decision = self.rules.decide(tool.cls, tool.area, tool.right)
-        if decision == "allow" and tool.spec.get("asks_if") and asks(tool, arguments):
-            decision = "ask"
+        decision, first = self.rules.decide(tool.cls, tool.area, tool.right), None
+        if decision == "allow" and tool.spec.get("asks_if"):
+            ask, first = asks(tool, arguments)
+            decision = "ask" if ask else decision
         paced = self.pace.due(tool, decision)
         if decision == "ask" or paced:
             if self.confirm is None:
                 raise ToolError(f"{name} wasn't run: the user's Access asks before it, and this version doesn't "
                                 "have Nightdrive's confirmation card.")
             self.pace.check(tool, arguments)
-            with self.pace.noted(tool, paced):
-                allowed = self.confirm.ask(tool, arguments)
-            if not allowed:
+            with self.pace.noted(tool, paced), first_time(tool, first):
+                ok = self.confirm.ask(tool, arguments)
+            if not ok:
                 self.pace.refused(tool, arguments)
                 raise ToolError(f"The user didn't allow {name} on screen, so it wasn't run. Don't try it another way.")
+            allowed_once(tool, first)
         self.pace.ran(tool)
         undoable = tool.cls == "change" and self.undo is not None
         state = self.undo.before(tool, arguments) if undoable else None  # ToolError: nothing is changed

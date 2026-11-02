@@ -212,6 +212,11 @@ session sees the new list. Welcome to Nightdrive asks for the level once, at the
 In a terminal: `nightdrive mcp access` shows what applies, `nightdrive mcp access level strict|normal|open`, `set mail
 read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 
+Some changes ask once: the first event Claude adds to a calendar shows the card, and once you allow it, Claude adds to
+that calendar without asking (a calendar marked shared asks every time). A refusal remembers nothing. `nightdrive mcp
+access allowed` lists what you allowed this way (in `~/.config/nightdrive/claude-allowed.json`), and `nightdrive mcp
+access forget calendar_add` forgets it, or `forget calendar_add "Family (icloud/family)"` one calendar.
+
 ## What each area gives
 
 *Ask* on Normal is in bold; † always asks.
@@ -221,7 +226,7 @@ read allow` (an area, `read`, `modify` or `delete`, and `allow`, `ask` or `no`).
 | Docs and status | the docs and keys of this version, the version, plugins, displays | undo Claude's own changes | |
 | Mail | **unread, search, threads, accounts** (without the senders, domains and tags you block) | a new draft, archive; send a draft † | **to Trash †** |
 | Contacts | **search, a card** (company, title, emails, numbers; addresses, birthday, web addresses, note: choices) | | |
-| Calendar | **calendars, events** | add an event (to a calendar marked shared: †) | **an event †** |
+| Calendar | **calendars, events** | add an event (the first one to each calendar asks; to a calendar marked shared: †) | **an event †** |
 | Tasks | lists and tasks | add, done, later | **to the trash** |
 | Notes | **list, search, read (`~/Notes`)** | a new note, add to the end of one | **to the trash** |
 | Deck | what plays, search, albums | play, queue, pause and skip, like, Pick for me | |
