@@ -65,6 +65,9 @@ echo "==> Default apps: images open in Loupe (instead of the browser); Markdown 
 "$repo/config/hypr/scripts/default-apps" set images org.gnome.Loupe.desktop --if-unset
 # The terminal: kitty (Nightdrive's settings and colours) until another is chosen; unset, xdg-terminal-exec would pick any
 "$repo/config/hypr/scripts/default-apps" set terminal kitty.desktop --if-unset
+# A Chromium browser (Brave…) chosen as the browser: links from other apps in a new window (its own entry, rewritten as
+# its Exec may change with the browser's update)
+"$repo/config/hypr/scripts/default-apps" refresh
 
 echo "==> Webapps: the window class Chromium gives them (their notifications, the launcher and Share find the window)"
 "$repo/config/hypr/scripts/webapp-add" --fix-classes

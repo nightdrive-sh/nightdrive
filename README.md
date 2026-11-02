@@ -181,7 +181,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   👍), and a link to another site opens in your default browser.
 - **Default apps**: which app opens links, mail, folders, text, code, images, video, music, PDFs and calendar files, and
   which terminal ⌘Enter opens: Launcher › Settings › Apps › Default apps (or `nightdrive defaults`). Hyper B, F and E
-  open the browser, Files and Email you chose.
+  open the browser, Files and Email you chose. A link from another app opens in a new window, not as a tab: Firefox's
+  is a setting there (Settings › Apps › Firefox), and Brave, Chromium and Chrome always do.
 - **App shortcuts**: which app Hyper + a letter or digit opens: Launcher › Settings › Apps › App shortcuts. Your choice
   replaces a default, Nightdrive's or a plugin's. The other shortcuts are in the config files ([Make it yours](#make-it-yours)).
 - **Mouse**: the wheel's scroll speed, from 0.5× to 3×, in Launcher › Settings › Mouse. The trackpad keeps its own.
