@@ -1,5 +1,6 @@
 #!/bin/bash
-# Installs Nightdrive in one line: the website serves this file at nightdrive.sh/install (its build copies it from main).
+# Installs Nightdrive in one line: the website serves this file at nightdrive.sh/install (its build copies it from main,
+# with PINNED filled in).
 #   curl -fsSL https://nightdrive.sh/install | bash
 #   curl -fsSL https://nightdrive.sh/install | bash -s -- --dev --with deck   # the options go on to install.sh
 # Clones the repo into ~/dotfiles (installing git first: a fresh Fedora lacks it) and runs ./install.sh there, which asks
@@ -12,6 +13,10 @@ set -euo pipefail
 
 REPO_URL=https://github.com/nightdrive-sh/nightdrive.git
 DIR=$HOME/dotfiles
+# The release commit the website vouches for: its build (tools/build-install.py) writes main's commit here, and its
+# publish.sh checks it against the release tag. A fresh stable install checks that commit out, so a commit pushed to
+# GitHub's main behind the release's back isn't what runs. Empty in the repo: run from a clone, nothing is pinned.
+PINNED=""
 
 # An existing clone is put on the asked channel's branch (--dev or not), as `nightdrive channel` would: without this a
 # --dev run over a stable clone went on silently with main. Never over uncommitted changes: it stops and says so.
@@ -38,6 +43,21 @@ use_clone() {
     }
   fi
   echo "==> Using the Nightdrive clone already in $DIR ($want)"
+}
+
+# The fresh clone's main is put on PINNED, which must be in its history; if it isn't, the clone goes and nothing is
+# installed. Later updates (nightdrive update) go forward from there as usual.
+pin_clone() {
+  [[ -n $PINNED ]] || return 0
+  if ! git -C "$DIR" merge-base --is-ancestor "$PINNED" HEAD 2>/dev/null; then
+    rm -rf "$DIR"
+    # A release only moves main forward, so this means a rewritten main or a tampered site: never install either.
+    echo "The release nightdrive.sh names ($PINNED) isn't in GitHub's main, so nothing was installed. Please report" \
+      "it: https://github.com/nightdrive-sh/nightdrive/issues" >&2
+    exit 1
+  fi
+  git -C "$DIR" reset -q --hard "$PINNED"
+  echo "==> Nightdrive at the release commit ${PINNED:0:7}"
 }
 
 main() {
@@ -68,6 +88,7 @@ main() {
     fi
     echo "==> Cloning Nightdrive ($branch) into $DIR"
     git clone --branch "$branch" "$REPO_URL" "$DIR"
+    [[ $branch != main ]] || pin_clone
   fi
   cd "$DIR"
   exec ./install.sh "${args[@]}"

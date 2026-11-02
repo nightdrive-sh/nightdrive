@@ -255,7 +255,8 @@ nmcli device wifi connect "Network name" --ask   # on Wi-Fi; a cable needs nothi
 curl -fsSL https://nightdrive.sh/install | bash
 ```
 
-That runs [`bootstrap.sh`](bootstrap.sh): it installs git, clones Nightdrive into `~/dotfiles` and starts its installer.
+That runs [`bootstrap.sh`](bootstrap.sh): it installs git, clones Nightdrive into `~/dotfiles`, checks out the release
+the site names (it stops if GitHub's `main` doesn't have it) and starts its installer.
 `bash -s -- --dev` clones the dev channel instead; the [installer options](#installer-options) go after `--` too. The
 same by hand:
 
