@@ -18,7 +18,10 @@ AppPanel {
     Keys.onEnterPressed: answered(true)
     Keys.onEscapePressed: answered(false)
 
+    // Plain text: a question may quote what others wrote (an event's title from an invitation), and rich text would
+    // style it or load an image it names
     Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         text: root.question
@@ -26,6 +29,7 @@ AppPanel {
     }
     Text {
         visible: root.detail !== ""
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
         text: root.detail

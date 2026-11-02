@@ -8,8 +8,8 @@ import "Dates.js" as Dates
 
 // Nightdrive Calendar: the calendars in the sidebar, the month or the week on the right, over the events the sync keeps
 // in ~/.local/share/calendar (`calendar events` reads them by khal). An event opens in EventPanel; a new one is added,
-// and one opened is changed, in EventEditor (`calendar add`, `calendar edit`); deleting is still the command's and
-// Claude's (mcp.json).
+// and one opened is changed, in EventEditor (`calendar add`, `calendar edit`), or deleted after EventDelete asks
+// (`calendar delete`).
 ShellRoot {
     id: shell
     FloatingWindow {
@@ -270,6 +270,19 @@ ShellRoot {
             app: win
             onClosed: keys.forceActiveFocus()
             onEditRequested: ev => editor.edit(ev)
+            onDeleteRequested: ev => deleter.ask(ev)
+        }
+        EventDelete {
+            id: deleter
+            behind: content
+            c: win.look
+            app: win
+            onClosed: keys.forceActiveFocus()
+            // As the editor's: this window may not be the one `calendar delete` asks to reload
+            onDeleted: r => {
+                win.reload()
+                win.say("Deleted: " + r.title + (r.synced ? "" : ". The next sync takes it from the server."))
+            }
         }
         EventEditor {
             id: editor
@@ -295,7 +308,7 @@ ShellRoot {
                                            ["t", "Today"], ["m  w", "Month, week"], ["⏎", "Open the day's first event"], ["n", "New event"],
                                            ["Double click", "A day's week; in the week's hours, a new event there"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
-                { title: "An event", keys: [["e", "Edit it"], ["Esc  ⏎", "Close it"]] },
+                { title: "An event", keys: [["e", "Edit it"], ["Del  ⌫", "Delete it (asks first)"], ["Esc  ⏎", "Close it"]] },
                 { title: "New or edited event", keys: [["⏎  Ctrl ⏎", "Save it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["Esc", "Leave it"]] }
             ]
         }

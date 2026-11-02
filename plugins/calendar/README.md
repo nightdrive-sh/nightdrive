@@ -1,6 +1,6 @@
 # Calendar
 
-Your iCloud calendars, and Google calendars by their private address, on your computer: the month or the week in a window of its own, kept in sync every 15 minutes. A first version: you add and change events in the window; they are deleted with the `calendar` command, or by Claude when you ask it to.
+Your iCloud calendars, and Google calendars by their private address, on your computer: the month or the week in a window of its own, kept in sync every 15 minutes. A first version: you add, change and delete events in the window, with the `calendar` command, or by Claude when you ask it to.
 
 ## Using it
 
@@ -15,13 +15,14 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | `Enter` | Open the day's first event (a click opens any) |
 | `n` | New event on the day picked (also New, or a double click in the week's hours) |
 | `e` | Edit the event open (also Edit on it) |
+| `Del` or `⌫` | Delete the event open, after you say yes (also Delete on it) |
 | `1`–`9` or Ctrl+↑ Ctrl+↓ | A calendar of the sidebar, or All calendars |
 | ⌘R | Sync now |
 | ⌘B | Hide or show the sidebar |
 
 - A new or edited event: `Tab` moves between its fields, `Enter` or Ctrl+Enter saves it, `Esc` leaves it. A time is typed as 9:30 or 930, a day as 2026-11-05 or 5.11.2026; the end moves with the start. It goes in a calendar that isn't read only (below), the one you used last.
 - In a narrow window the buttons show as icons, and below about 500 px the month or week shows as a list of its days.
-- Editing keeps what Calendar doesn't show (alarms, invitees); another calendar moves the event there. A recurring event, or one in a read-only calendar, isn't changed here: the card says so.
+- Editing keeps what Calendar doesn't show (alarms, invitees); another calendar moves the event there. A recurring event, or one in a read-only calendar, isn't changed or deleted here: the card says so. A deleted event goes from the server too, and the window has no undo for it.
 - A double click on a day in the month opens its week. A recurring event shows at each of its times.
 - The events are kept as `.ics` files in `~/.local/share/calendar`, a folder per account and calendar, and vdirsyncer syncs them. khal reads them, recurring events and all.
 

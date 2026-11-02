@@ -2,22 +2,23 @@ import QtQuick
 import qs.kit
 import "Dates.js" as Dates
 
-// An event, opened from a view: its title, when, where, its calendar and notes, and Edit (e), which opens it in the
-// editor. A recurring event, or one in a read-only calendar, says why it can't be changed here instead. Esc, Enter or
-// a click outside close it.
+// An event, opened from a view: its title, when, where, its calendar and notes, with Edit (e), which opens it in the
+// editor, and Delete (Del, ⌫), which asks first (EventDelete). A recurring event, or one in a read-only calendar, says
+// why it can't be changed here instead. Esc, Enter or a click outside close it.
 AppPanel {
     id: root
     required property var app           // the window: its calendars, to tell a read-only one
     property var event: null
-    // Why this event can't be changed here, or "" when it can: change.py refuses the same ones
+    // Why this event can't be changed or deleted here, or "" when it can: change.py and write.py refuse the same ones
     readonly property string fixed: {
         if (!event) return ""
-        if (event.recurring) return "It repeats: change it on your phone or at icloud.com."
+        if (event.recurring) return "It repeats: change or delete it on your phone or at icloud.com."
         const cal = app.calendars.find(x => x.id === event.calendar)
         return !cal || cal.read_only ? "Its calendar is read only here." : ""
     }
     signal closed()
     signal editRequested(var event)
+    signal deleteRequested(var event)
     visible: false
     cardWidth: Math.min(520, width - 24)     // a narrow window (#2025): the card fits in it
     spacing: 14
@@ -25,10 +26,12 @@ AppPanel {
     function show(e) { event = e; visible = true; forceActiveFocus() }
     function close() { visible = false; closed() }
     function edit() { if (event && !fixed) { const e = event; close(); editRequested(e) } }
+    function remove() { if (event && !fixed) { const e = event; close(); deleteRequested(e) } }
     onOutsideTapped: close()
     Keys.onPressed: e => {
         if (e.key === Qt.Key_Escape || e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space) close()
         else if (e.key === Qt.Key_E) edit()
+        else if (e.key === Qt.Key_Delete || e.key === Qt.Key_Backspace) remove()
         e.accepted = true
     }
 
@@ -73,7 +76,7 @@ AppPanel {
         text: root.event ? root.event.notes : ""
         color: c.body; font.family: c.font; font.pixelSize: 12
     }
-    // Why there is no Edit, in the hint's colour
+    // Why there is no Edit or Delete, in the hint's colour
     Text {
         textFormat: Text.PlainText
         visible: root.fixed !== ""
@@ -88,5 +91,6 @@ AppPanel {
         layoutDirection: Qt.RightToLeft
         AppPanelButton { c: root.c; keys: ["Esc"]; label: "Close"; onClicked: root.close() }
         AppPanelButton { c: root.c; keys: ["e"]; label: "Edit"; visible: root.fixed === ""; onClicked: root.edit() }
+        AppPanelButton { c: root.c; keys: ["Del"]; label: "Delete"; visible: root.fixed === ""; onClicked: root.remove() }
     }
 }
