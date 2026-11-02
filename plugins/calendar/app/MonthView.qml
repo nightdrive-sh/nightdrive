@@ -18,6 +18,7 @@ Item {
     readonly property real cellW: (width - weekCol) / 7
     readonly property real cellH: (height - headRow) / 6
     readonly property int line: 18          // an event's row in a cell
+    readonly property int gap: 2            // between stacked rows: a bar's colour mustn't run into the next (#1481)
     readonly property var dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     FontMetrics { id: small; font.family: root.c.font; font.pixelSize: 11 }
     // A chip's words: the time too only while "16:30 Ainon" fits, else the title alone ("16…" said nothing)
@@ -89,14 +90,14 @@ Item {
             Column {
                 x: 4; y: 28
                 width: parent.width - 8
-                spacing: 0
+                spacing: root.gap
                 Repeater {
                     model: cell.items.slice(0, cell.shown)
                     delegate: Rectangle {
                         id: chip
                         required property var modelData
                         readonly property bool bar: Dates.spansDays(modelData)
-                        width: parent.width; height: root.line - 2
+                        width: parent.width; height: root.line - root.gap      // with the gap, a row is still root.line
                         radius: 4
                         color: bar ? Qt.rgba(ev.r, ev.g, ev.b, 0.35) : chipHover.hovered ? root.c.hover : "transparent"
                         readonly property color ev: modelData.color

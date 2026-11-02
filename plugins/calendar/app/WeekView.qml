@@ -15,6 +15,7 @@ Item {
     readonly property int headRow: 40
     readonly property int hourH: 44
     readonly property int bar: 18           // a row of the all-day lane
+    readonly property int gap: 2            // between its stacked bars, so they don't touch (#1481)
     readonly property real colW: (width - timeCol) / 7
     // The all-day lane is as high as its fullest day needs, up to four rows (the rest: "+N")
     readonly property int laneRows: Math.min(4, Math.max(1, ...days.map(d => (app.byDay[d] || []).filter(Dates.spansDays).length)))
@@ -94,14 +95,14 @@ Item {
             x: root.timeCol + index * root.colW + 2
             y: root.headRow + 4
             width: root.colW - 4
-            spacing: 0
+            spacing: root.gap
             Repeater {
                 model: lane.items.length > root.laneRows ? lane.items.slice(0, root.laneRows - 1) : lane.items
                 delegate: Rectangle {
                     id: pill
                     required property var modelData
                     readonly property color ev: modelData.color
-                    width: lane.width; height: root.bar - 2; radius: 4
+                    width: lane.width; height: root.bar - root.gap; radius: 4      // with the gap, a row is still root.bar
                     color: Qt.rgba(ev.r, ev.g, ev.b, pillHover.hovered ? 0.5 : 0.35)
                     HoverHandler { id: pillHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: root.app.openEvent(pill.modelData) }
