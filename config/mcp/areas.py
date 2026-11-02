@@ -120,7 +120,8 @@ AREAS = {
                            {"id": "unlock", "name": "Unlock and open",
                             "on": "Claude may also unlock a lock and open a cover (a door, a gate, blinds), on "
                                   "the card.",
-                            "off": "Claude only locks and closes: unlocking and opening are yours to do."},
+                            "off": "Claude only locks and closes, and runs nothing that would open: unlocking and "
+                                   "opening are yours to do."},
                            {"id": "automations", "name": "Turn automations on or off",
                             "on": "Claude may also turn an automation on or off: one turned off stops running by "
                                   "itself.",

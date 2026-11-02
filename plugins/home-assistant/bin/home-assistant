@@ -36,12 +36,19 @@ Config: ~/.config/nightdrive/home-assistant (KEY=value, mode 600):
 Pinned devices: ~/.local/state/nightdrive/home-favorites, one entity id per line.
 
 Claude's calls (NIGHTDRIVE_MCP=1, from Nightdrive's MCP server) keep to Settings › Claude › Access › Home Assistant,
-which the server gives in NIGHTDRIVE_MCP_OPTIONS (#1830): unlock (unlock locks, open covers, run a scene that sets
-one), automations (turn one on or off), presence (presence, occupancy and motion sensors, the input_booleans that say
-whether anyone is home, and a phone's whereabouts from the companion app). One that isn't there is off. The launcher and the bar don't
-set it, so the user's own controls are as they were.
+which the server gives in NIGHTDRIVE_MCP_OPTIONS (#1830): unlock (unlock locks, open covers, run a scene, script or
+automation that would: lib/opens.py), automations (turn one on or off), presence (presence, occupancy and motion
+sensors, the input_booleans that say whether anyone is home, read or set, and a phone's whereabouts from the companion
+app). One that isn't there is off. The launcher and the bar don't set it, so the user's own controls are as they
+were.
 """
 import json, os, re, shlex, subprocess, sys, time, urllib.error, urllib.request
+
+# The checks beside this command's folder (it is linked to ~/.local/bin): what running a scene, a script or an
+# automation would open or unlock (#1923)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"))
+import opens  # noqa: E402
+from opens import ENTITY  # noqa: E402
 
 HOME = os.environ["HOME"]
 CONFIG = f"{HOME}/.config/nightdrive/home-assistant"
@@ -92,10 +99,6 @@ WHEREABOUTS = re.compile(r"_(geocoded_location|distance|ssid|bssid|activity|dire
 # A word of the id or the name; a sensor's "home" is a place's (sensor.home_temperature), so not counted there
 PRESENCE_WORDS = {"presence", "occupancy", "occupied", "motion", "away", "location", "whereabouts", "someone",
                   "anyone", "nobody", "läsnä", "läsnäolo", "kotona", "poissa", "liike", "paikalla", "sijainti"}
-ENTITY = re.compile(r"[a-z_]+\.[a-z0-9_]+")
-# What opens or unlocks: Access's unlock choice covers these domains, and a scene that sets one of them, which can't be
-# told from the scene's name (#1880). A group of them counts as they do
-OPENS = ("lock", "cover")
 # What a script, button or switch that may open something says in its id or name: no state shows what it does, so the
 # card says it. Whole words, or a word's start or end (etuovi, autotallinovi, garagedoor)
 OPENING_WORDS = {"lock", "unlock", "door", "garage", "gate", "latch", "opener", "ovi", "lukko", "autotalli", "portti",
@@ -238,7 +241,8 @@ class Client:
         try:
             return request(self.base, self.tok, method, path, body)
         except urllib.error.HTTPError as e:
-            if e.code == 401:
+            # The config API wants an admin's token: its 401 says the token's user isn't one, not that it's wrong
+            if e.code == 401 and not path.startswith("/api/config/"):
                 die("Home Assistant refused the token (401): make a new one in HA › Profile › Security")
             raise
         except (urllib.error.URLError, TimeoutError, OSError):
@@ -371,34 +375,6 @@ def refusal(domain, eid, state):
             "That is theirs to do; don't try it another way.")
 
 
-def opens_in(c, now, nested=False):
-    """The locks and covers a scene (or a group in it, one level down) sets, by id: running it does what they do"""
-    members = now.get("attributes", {}).get("entity_id")
-    members = [m for m in members if isinstance(m, str)] if isinstance(members, list) else []
-    out = [m for m in members if m.split(".", 1)[0] in OPENS]
-    for m in members:
-        if m.split(".", 1)[0] == "group" and not nested:
-            try:
-                group = c.call("GET", "/api/states/" + m) if ENTITY.fullmatch(m) else None
-                out += opens_in(c, group if isinstance(group, dict) else {}, nested=True)
-            except Exception:
-                out.append(m)   # a group that can't be read may hold one: counted, so it's refused rather than run
-    return out
-
-
-def scene_refusal(c, eid, now):
-    """Why Access doesn't let Claude run this scene: it sets a lock or a cover, which only the unlock choice allows,
-    and it may unlock or open them (#1880). None when it doesn't, or Access allows it."""
-    if allowed("unlock"):
-        return None
-    hit = opens_in(c, now)
-    if not hit:
-        return None
-    return (f"{eid} wasn't run: it sets {', '.join(sorted(set(hit)))}, and the user's Access (Settings › Claude › "
-            "Access › Home Assistant) lets Claude only lock locks and close covers. That is theirs to do; don't try "
-            "it another way.")
-
-
 def area_of(c, eid):
     """The device's area in Home Assistant, "" if none. The id goes in as a template variable, never into the
     template's text."""
@@ -423,11 +399,11 @@ def card(c, eid, now, extra=None):
     state, said = now.get("state", ""), detail(domain, now)
     if domain not in ONE_SHOT:   # a scene's state is when it last ran
         out["Now"] = state if said in ("", state) else said if said.startswith(state) else f"{state} · {said}"
-    if domain == "scene" and (hit := opens_in(c, now)):
-        out["Sets"] = ", ".join(sorted(set(hit)))
+    if domain in ("scene", "script", "automation") and (sets := opens.card_line(c, eid, now)):
+        out["Sets"] = sets
     elif domain in INDIRECT and opening(eid, now.get("attributes", {})):
-        # What it does can't be read, only what it's called: a script or a relay may open a door, which Access's
-        # unlock choice covers for locks and covers alone (#1880)
+        # What a relay does can't be read, only what it's called: a switch may open a door, and a script may turn
+        # one on, which Access's unlock choice covers for locks and covers alone (#1880)
         out["Note"] = "Its name says a door, gate or lock: this may open or unlock it"
     print(json.dumps({**out, **(extra or {})}, ensure_ascii=False))
 
@@ -450,7 +426,12 @@ def set_state(c, eid, state, check=False):
         if e.code == 404:
             die(f"Home Assistant has no {eid}: `home-assistant states` lists the devices")
         raise
-    no = scene_refusal(c, eid, before) if domain == "scene" else None
+    # Whether anyone is home is the presence choice's, to switch as to read: the card's Now would tell it (#1923)
+    if presence(domain, eid, before.get("attributes", {})) and not allowed("presence"):
+        die(f"{eid} wasn't set: it says whether anyone is home, which the user's Access (Settings › Claude › Access › "
+            "Home Assistant) keeps from Claude. That is theirs to do; don't try it another way.")
+    # Running one is held to the unlock choice by what it would do, as setting a lock or a cover is (#1880, #1923)
+    no = opens.refusal(c, eid, before) if state == "run" and not allowed("unlock") else None
     if no:
         die(no)
     if check:

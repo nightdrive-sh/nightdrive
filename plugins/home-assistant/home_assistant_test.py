@@ -19,6 +19,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
+from urllib.parse import unquote
 
 SCRIPT = Path(__file__).resolve().parent / "bin/home-assistant"
 loader = importlib.machinery.SourceFileLoader("home_assistant_script", str(SCRIPT))
@@ -84,10 +85,10 @@ class Automation(unittest.TestCase):
 
 
 class House:
-    """Home Assistant's states by id, and the services called"""
+    """Home Assistant's states by id, its scripts' and automations' configs by (kind, key), and the services called"""
 
-    def __init__(self, states):
-        self.states, self.posts = states, []
+    def __init__(self, states, configs=None):
+        self.states, self.configs, self.posts = states, configs or {}, []
 
     def call(self, method, path, data=None):
         if method == "POST":
@@ -95,6 +96,11 @@ class House:
                 return ""
             self.posts.append((path, data))
             return []
+        if path.startswith("/api/config/"):
+            kind, key = path.split("/")[3], unquote(path.rsplit("/", 1)[1])
+            if (kind, key) not in self.configs:
+                raise ha.urllib.error.HTTPError(path, 404, "not found", {}, None)
+            return self.configs[(kind, key)]
         eid = path.rsplit("/", 1)[1]
         if eid not in self.states:
             raise ha.urllib.error.HTTPError(path, 404, "not found", {}, None)
@@ -123,8 +129,13 @@ class Opening(unittest.TestCase):
         "script.goodnight": {"state": "off", "attributes": {"friendly_name": "Good night"}},
     }
 
+    # What the scripts do, which the card reads since #1923: neither opens anything it can tell
+    CONFIGS = {("script", "open_garage"): {"sequence": [{"action": "switch.turn_on",
+                                                         "target": {"entity_id": "switch.relay"}}]},
+               ("script", "goodnight"): {"sequence": [{"action": "light.turn_off", "target": {"area_id": "bedroom"}}]}}
+
     def set(self, eid, state="run", check=False, options="{}"):
-        house = House(self.STATES)
+        house = House(self.STATES, self.CONFIGS)
         out = io.StringIO()
         with mock.patch.dict(os.environ, {**CLAUDE, "NIGHTDRIVE_MCP_OPTIONS": options}), redirect_stdout(out):
             ha.set_state(house, eid, state, check=check)
