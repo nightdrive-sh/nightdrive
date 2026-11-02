@@ -9,7 +9,7 @@ address. `nightdrive windows …` runs it; Claude's tools are config/mcp/tools/a
                                    brings it forward (from the background too, as its key does). WINDOW is an address
                                    or an app (its name or window class); "" does nothing. --json: {address, app, title,
                                    previous}. --unless-typing (Claude's tools, #1832): not while the user types (a key
-                                   in the last QUIET s), so what they type (a password) doesn't go to another window.
+                                   in the last second or so), so what they type (a password) doesn't go elsewhere.
                                    It waits for that pause, as Claude's card does (#1986), up to QUIET_WAIT s, then
                                    refuses
   windows shot WINDOW [--out FILE] [--json] [--inline] [--check]
@@ -56,7 +56,6 @@ SEEN_MAX = 30                                 # titles kept for one app: the lat
 MAX_EDGE = 1568        # px: a bigger picture only costs Claude more, it doesn't see more
 WAIT = 8               # s an opened app or file has to show a window
 POLL = 0.25
-QUIET = 1              # s without a key before Claude's tools move the focus (--unless-typing): the card's second
 QUIET_WAIT = 30        # s to wait for that pause before refusing: a sentence typed on, not a refusal (#1986). The
                        # tools that wait have a timeout above it (config/mcp/tools/apps-files.json)
 SCHEMES = ("http://", "https://", "mailto:")
@@ -116,26 +115,22 @@ def blocked(c):
         return True
 
 
-def key_age():
-    """Whole seconds since the last key, as Hyprland counts them (hypr/last-key.lua; os.time, so 2 means 1–3 s); None
-    when it can't say (a config without that file, an older Hyprland): then nothing waits."""
+def typing():
+    """Whether the user is typing, by the rule Claude's card keeps too (hypr/last-key.lua: NightdriveTyping, a key in
+    the last 1–2 s); None when Hyprland can't say (a config without that file, an older Hyprland): then nothing waits."""
     try:
-        p = subprocess.run(["hyprctl", "repl", "return NightdriveKeyAge()"], capture_output=True, text=True, timeout=5)
-        return int(p.stdout.strip())
-    except (OSError, ValueError, subprocess.TimeoutExpired):
+        p = subprocess.run(["hyprctl", "repl", "return NightdriveTyping()"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
         return None
+    return {"true": True, "false": False}.get(p.stdout.strip())
 
 
 def not_typing():
-    """Waits until the user hasn't pressed a key for more than QUIET s, up to QUIET_WAIT s; dies if they go on. More
-    than QUIET whole seconds, as a key 1.9 s ago counts as 1: so a pause of 1–2 s. Typing in a terminal while Claude
-    works is usual, so this waits rather than refuses (#1986); the refusal tells Claude to call again by itself, as
-    asking the user to stop typing (or to type a word) only interrupts them."""
+    """Waits until the user pauses their typing, up to QUIET_WAIT s; dies if they go on. Typing in a terminal while
+    Claude works is usual, so this waits rather than refuses (#1986); the refusal tells Claude to call again by itself,
+    as asking the user to stop typing (or to type a word) only interrupts them."""
     end = time.monotonic() + QUIET_WAIT
-    while True:
-        age = key_age()
-        if age is None or age > QUIET:
-            return
+    while typing():
         if time.monotonic() > end:
             die(f"The user kept typing for {QUIET_WAIT} s without a pause, so the focus wasn't moved (what they type "
                 "mustn't go to another window). Nothing is wrong: call this tool again in a little while, as it is; "

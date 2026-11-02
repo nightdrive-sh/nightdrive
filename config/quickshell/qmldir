@@ -110,4 +110,5 @@ singleton AskClaudeSession 1.0 AskClaudeSession.qml
 PolkitWatch 1.0 PolkitWatch.qml
 ClaudeConfirm 1.0 ClaudeConfirm.qml
 ClaudeConfirmField 1.0 ClaudeConfirmField.qml
+Typing 1.0 Typing.qml
 FieldBox 1.0 FieldBox.qml

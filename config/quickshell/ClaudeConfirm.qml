@@ -16,14 +16,15 @@ import Quickshell.Wayland
 //   qs ipc call claudeConfirm answer <id>   allow | deny | timeout (once, then forgotten), pending, or gone
 //   qs ipc call claudeConfirm close <id>    refuses it (confirm.py gave up)
 // There is deliberately no IPC call that allows: only a key or a click on the card does.
-// The card doesn't take the keyboard from someone typing: it waits for a second without input (or a click on it), and
-// Enter counts only a moment after that, so a key already on its way doesn't answer it. Shown in Ask Claude's
-// conversation, its Enter is the field's, so the same wait arms it there, and every key in the field disarms it again
+// The card doesn't take the keyboard from someone typing: it shows at once but asks for no keyboard at all until the
+// typing pauses (Typing.qml, the rule Claude's window tools keep) or it is clicked, and only then takes it; Enter counts
+// only a moment after that, so a key already on its way doesn't answer it. Not OnDemand meanwhile: Hyprland gives an
+// on-demand layer the keyboard as it appears, which cut the user's typing off (Dashboard #1987). Shown in Ask Claude's
+// conversation, its Enter is the field's, so the same pause arms it there, and every key in the field disarms it again
 // (disarm()): an Enter meant to send what was typed never allows it (Dashboard #1921).
 // (Not named *Menu.qml: shell.qml treats those as top bar menus.)
 PanelWindow {
     id: win
-    readonly property int idleBeforeGrab: 1     // seconds without input before the card takes the keyboard
     readonly property int armDelay: 700         // ms after the card appears (a click) or gets the keyboard (Enter) before Allow counts
 
     property bool open: false
@@ -82,6 +83,7 @@ PanelWindow {
         if (!open || !inlined) return
         keyArmed = false
         keyTimer.stop()
+        inlineTyping.reset()
     }
     function grab() {
         if (!open || grabbed) return
@@ -106,20 +108,17 @@ PanelWindow {
 
     FileView { id: reqFile; blockLoading: true; printErrors: false }
 
-    // Input elsewhere keeps it from being idle: the card takes the keyboard once the typing has stopped
-    IdleMonitor {
-        enabled: win.open && !win.grabbed && !win.inlined
-        timeout: win.idleBeforeGrab
-        respectInhibitors: false   // a video playing mustn't hold the keyboard back, nor give it away
-        onIsIdleChanged: if (isIdle) win.grab()
+    // Typing elsewhere keeps the keyboard there: the card takes it once the typing has paused
+    Typing {
+        active: win.open && !win.grabbed && !win.inlined
+        onPaused: win.grab()
     }
-    // In the conversation the toast keeps the keyboard, so the quiet second arms Enter instead. Only going idle arms:
-    // the Enter that answers is input too, and disarming on input here could race it. The field disarms (disarm())
-    IdleMonitor {
-        enabled: win.open && win.inlined
-        timeout: win.idleBeforeGrab
-        respectInhibitors: false
-        onIsIdleChanged: if (isIdle) keyTimer.restart()
+    // In the conversation the toast keeps the keyboard, so the pause arms Enter instead. Only the pause arms: the Enter
+    // that answers is a key too, and disarming on typing here could race it. The field disarms (disarm())
+    Typing {
+        id: inlineTyping
+        active: win.open && win.inlined
+        onPaused: keyTimer.restart()
     }
     Timer { id: armTimer; interval: win.armDelay; onTriggered: win.armed = true }
     Timer { id: keyTimer; interval: win.armDelay; onTriggered: win.keyArmed = true }
@@ -135,7 +134,7 @@ PanelWindow {
     implicitHeight: card.height
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: grabbed ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
+    WlrLayershell.keyboardFocus: grabbed ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     WlrLayershell.namespace: "claude-confirm"
 
     Item {

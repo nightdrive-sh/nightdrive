@@ -52,7 +52,8 @@ delete do.
 dnf would install, every path a trash takes (a folder with how many files are in it), the app and title of the window
 Claude wants to see. **Enter** allows, **Esc** refuses, and so does no answer in 60 seconds, a locked screen (the lock
 covers the card and takes the keys) and stopping Claude in Claude Code (Esc there, or its own timeout for a tool):
-the card closes then, so nothing is allowed that Claude no longer waits for. A card too long for the screen
+the card closes then, so nothing is allowed that Claude no longer waits for. While you type elsewhere, the card
+shows but leaves your keys where they go: Enter and Esc reach it once you pause for a second, or click it. A card too long for the screen
 allows only once you have scrolled to its end. The card is Nightdrive's, not
 Claude Code's, so no Claude Code setting skips it, and a mail or a web page Claude reads can't send or switch anything
 without you seeing it first. A screen or network change also asks afterwards whether to keep it, and goes back by itself

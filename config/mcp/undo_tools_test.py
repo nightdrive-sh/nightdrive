@@ -67,13 +67,13 @@ class Windows(unittest.TestCase):
 
     def test_close_waits_while_typing(self):
         a = SimpleNamespace(address="0x2", focus="0x1", unless_typing=True)
-        with mock.patch.object(self.w, "key_age", return_value=0), \
+        with mock.patch.object(self.w, "typing", return_value=True), \
                 mock.patch.object(self.w, "clients", return_value=[self.window("0x2", "x"), self.window("0x1", "y")]), \
                 mock.patch.object(self.w, "dispatch") as dispatch, mock.patch("sys.stderr"):
             with self.assertRaises(SystemExit):
                 self.w.cmd_close(a)
             dispatch.assert_not_called()
-        with mock.patch.object(self.w, "key_age", return_value=9), \
+        with mock.patch.object(self.w, "typing", return_value=False), \
                 mock.patch.object(self.w, "clients", return_value=[self.window("0x2", "x"), self.window("0x1", "y")]), \
                 mock.patch.object(self.w, "dispatch") as dispatch:
             self.w.cmd_close(a)

@@ -2,7 +2,8 @@
 """The tools that move the focus wait for the user to stop typing (#1986): `python3 config/mcp/typing_wait_test.py`.
 They wait for a pause of about a second, for at most QUIET_WAIT s, and only then refuse, with words that have Claude
 call again rather than ask the user to type; their timeout leaves room for the wait, and a cancel (Esc in Claude Code)
-stops the wait, so nothing opens after it. hyprctl's key age is a stand-in."""
+stops the wait, so nothing opens after it. One rule says what typing is, for these tools and Claude's card (#1987):
+hypr/last-key.lua's NightdriveTyping; hyprctl's answer is a stand-in."""
 
 import sys
 import threading
@@ -39,24 +40,34 @@ class Waits(unittest.TestCase):
         self.w.POLL = 0.01
 
     def test_the_cards_second(self):
-        """A key a whole second ago (age 1) is still typing; 2 is the pause"""
-        self.assertEqual(self.w.QUIET, 1)
+        """A key a whole second ago (age 1) is still typing; 2 is the pause. The rule is last-key.lua's alone: the
+        card (quickshell/Typing.qml) and this script ask it, neither keeps a number of its own"""
+        lua = (HERE.parent / "hypr/last-key.lua").read_text()
+        self.assertIn("local QUIET = 1 ", lua)
+        self.assertIn("return os.time() - last <= QUIET", lua)
+        self.assertNotIn("QUIET =", (HERE.parent / "hypr/scripts/windows").read_text().replace("QUIET_WAIT =", ""))
+        self.assertIn("NightdriveTyping()", (HERE.parent / "quickshell/Typing.qml").read_text())
         self.assertGreaterEqual(self.w.QUIET_WAIT, 30)
 
-    def test_runs_once_the_typing_pauses(self):
-        ages = iter([0, 0, 1, 0, 1, 2])
-        with mock.patch.object(self.w, "key_age", side_effect=lambda: next(ages)) as age:
-            self.w.not_typing()
-        self.assertEqual(age.call_count, 6)
+    def test_reads_hyprlands_answer(self):
+        for out, want in (("true\n", True), ("false\n", False), ("", None), ("error: nil value\n", None)):
+            with mock.patch.object(self.w.subprocess, "run", return_value=SimpleNamespace(stdout=out)):
+                self.assertIs(self.w.typing(), want, out)
 
-    def test_no_key_age_doesnt_wait(self):
-        with mock.patch.object(self.w, "key_age", return_value=None):
+    def test_runs_once_the_typing_pauses(self):
+        answers = iter([True, True, True, False])
+        with mock.patch.object(self.w, "typing", side_effect=lambda: next(answers)) as typing:
+            self.w.not_typing()
+        self.assertEqual(typing.call_count, 4)
+
+    def test_no_answer_doesnt_wait(self):
+        with mock.patch.object(self.w, "typing", return_value=None):
             self.w.not_typing()
 
     def test_refuses_only_after_the_wait_and_says_to_call_again(self):
         self.w.QUIET_WAIT = 0.1
         start = time.monotonic()
-        with mock.patch.object(self.w, "key_age", return_value=0), mock.patch.object(self.w, "die") as die:
+        with mock.patch.object(self.w, "typing", return_value=True), mock.patch.object(self.w, "die") as die:
             die.side_effect = SystemExit
             with self.assertRaises(SystemExit):
                 self.w.not_typing()
