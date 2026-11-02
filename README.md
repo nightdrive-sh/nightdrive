@@ -302,7 +302,7 @@ picks the login screen:
 | `autologin` | Nightdrive's, the desktop behind it (the default) |
 | `on` | Nightdrive's, starting the desktop after the password |
 | `text` | A text login that starts the desktop after the password (`!bash` at its prompt for a text console), until the graphics are fixed |
-| `off` | On Fedora KDE, KDE's (KDE stays installed as a fallback); on Fedora Minimal, which has none, the text login |
+| `off` | The one in use before Nightdrive's (KDE's on Fedora KDE, which stays installed as a fallback; GNOME's gdm…); on Fedora Minimal, which has none, the text login |
 
 ### Installer options
 
