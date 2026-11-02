@@ -23,7 +23,9 @@ Item {
     readonly property int gap: 8            // between the field, the conversation and the footer
 
     readonly property var session: AskClaudeSession
-    readonly property bool hasThread: session.entries.length > 0 || session.busy
+    // A card from another Claude (a terminal's) can come with no conversation here: it is shown all the same, as Enter in
+    // the field answers it (Dashboard #1921)
+    readonly property bool hasThread: session.entries.length > 0 || session.busy || session.pendingCard
     readonly property real fieldH: field.height
     readonly property real threadH: hasThread ? thread.height + gap : 0
     readonly property real footerH: footer.visible ? footer.height + gap : 0

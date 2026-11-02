@@ -2,9 +2,9 @@ import QtQuick
 import qs.kit as Kit
 
 // Claude's confirmation card inside Ask Claude's conversation (AskClaudeThread.qml), for a short request while the
-// conversation is in view: ClaudeConfirm.qml decides that, and keeps its rules (the countdown, Enter only after a
-// moment); this only shows it, compactly. Enter allows and Esc denies, in Ask Claude's field (AskClaudeField.qml), and
-// its own buttons for the mouse.
+// conversation is in view: ClaudeConfirm.qml decides that, and keeps its rules (the countdown, Enter only once typing
+// has stopped); this only shows it, compactly. Enter allows and Esc denies, in Ask Claude's field (AskClaudeField.qml),
+// and its own buttons for the mouse.
 // A long request (a mail's text) gets the full card instead, which wants it read to the end.
 Rectangle {
     id: c

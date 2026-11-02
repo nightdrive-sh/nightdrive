@@ -17,7 +17,9 @@ import Quickshell.Wayland
 //   qs ipc call claudeConfirm close <id>    refuses it (confirm.py gave up)
 // There is deliberately no IPC call that allows: only a key or a click on the card does.
 // The card doesn't take the keyboard from someone typing: it waits for a second without input (or a click on it), and
-// Enter counts only a moment after that, so a key already on its way doesn't answer it.
+// Enter counts only a moment after that, so a key already on its way doesn't answer it. Shown in Ask Claude's
+// conversation, its Enter is the field's, so the same wait arms it there, and every key in the field disarms it again
+// (disarm()): an Enter meant to send what was typed never allows it (Dashboard #1921).
 // (Not named *Menu.qml: shell.qml treats those as top bar menus.)
 PanelWindow {
     id: win
@@ -67,7 +69,6 @@ PanelWindow {
         inlined = AskClaudeSession.viewing && r.fields.length <= inlineFields && r.fields.every(f => !f.long)
         open = true
         armTimer.restart()
-        if (inlined) keyTimer.restart()   // Ask Claude's toast has the keyboard: Enter counts after the same moment
         return "shown " + Qt.md5(text)
     }
     function decide(v) {
@@ -75,6 +76,12 @@ PanelWindow {
         verdicts[req.id] = v
         open = false; grabbed = false; armed = false; keyArmed = false; inlined = false
         armTimer.stop(); keyTimer.stop()
+    }
+    // A key in Ask Claude's field while the card is shown there: typing, so Enter waits for the next quiet second
+    function disarm() {
+        if (!open || !inlined) return
+        keyArmed = false
+        keyTimer.stop()
     }
     function grab() {
         if (!open || grabbed) return
@@ -105,6 +112,14 @@ PanelWindow {
         timeout: win.idleBeforeGrab
         respectInhibitors: false   // a video playing mustn't hold the keyboard back, nor give it away
         onIsIdleChanged: if (isIdle) win.grab()
+    }
+    // In the conversation the toast keeps the keyboard, so the quiet second arms Enter instead. Only going idle arms:
+    // the Enter that answers is input too, and disarming on input here could race it. The field disarms (disarm())
+    IdleMonitor {
+        enabled: win.open && win.inlined
+        timeout: win.idleBeforeGrab
+        respectInhibitors: false
+        onIsIdleChanged: if (isIdle) keyTimer.restart()
     }
     Timer { id: armTimer; interval: win.armDelay; onTriggered: win.armed = true }
     Timer { id: keyTimer; interval: win.armDelay; onTriggered: win.keyArmed = true }

@@ -83,14 +83,19 @@ Item {
             selectByMouse: true
             font { family: Theme.font; pixelSize: Math.round(f.size); weight: f.fontWeight }
             onCursorRectangleChanged: view.follow(cursorRectangle)
+            // Text changed by other means than a key here (⌘⌫ over IPC, a paste with the mouse) is typing too
+            onTextChanged: if (AskClaudeSession.pendingCard) AskClaudeSession.card.disarm()
             Keys.onPressed: event => {
                 const shift = event.modifiers & Qt.ShiftModifier
                 // ⌘N arrives as Ctrl+N or as Meta+N, depending on what's between (keyd)
                 const cmd = event.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
                 const card = AskClaudeSession.pendingCard ? AskClaudeSession.card : null
-                // Claude's card in the conversation: Enter allows (not a held key, and only a moment after it came, as
-                // the card's own rule), Esc denies; the rest still edits the text
-                if (card && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+                // Claude's card in the conversation: Enter allows (not a held key, and only after a quiet second and a
+                // moment, as the card's own rule), Esc denies; the rest still edits the text. Any other key, and an
+                // Enter too early, is typing: it disarms the card, so an Enter meant to send the text never allows it
+                const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                if (card && !(enter && !event.isAutoRepeat && card.keyArmed) && event.key !== Qt.Key_Escape) card.disarm()
+                if (card && enter) {
                     if (!event.isAutoRepeat && card.keyArmed) card.decide("allow")
                     event.accepted = true
                 } else if (card && event.key === Qt.Key_Escape) {
