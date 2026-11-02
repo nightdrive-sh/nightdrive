@@ -2,14 +2,15 @@ import QtQuick
 import qs.kit
 import "Dates.js" as Dates
 
-// The view's header. In the middle the month's or week's name between the arrows that change it: < November 2026 >.
-// On the left Today and the switch between Week and Month (the kit's AppSegments, its fill sliding to the one shown),
-// on the right New, apart as the one that makes something (Jari 2.11.). A long name gives way to the buttons.
+// The view's header. In the middle the month's or week's name between the arrows that change it: < November 2026 >,
+// and after them Today while another day is picked (its room is kept, so the arrows don't move when it comes). On the
+// left the switch between Week and Month (the kit's AppSegments, its fill sliding to the one shown), on the right New,
+// apart as the one that makes something (Jari 2.11.). A long name gives way to the buttons.
 // In a narrow window (#2025) the words don't fit: the buttons become their glyphs and the name its short form
 // ("Nov 2026", "W45 · 2–8 Nov"), rather than the buttons running into each other and Month losing its last letter.
 Item {
     id: root
-    required property var app           // the window: day, view, page(), pickDay(), newEvent()
+    required property var app           // the window: day, today, view, page(), pickDay(), newEvent()
     required property QtObject c
     // Below about 500 px the views are a list of the days either way (#2025): the switch would change little there
     property bool switchable: true
@@ -32,8 +33,8 @@ Item {
     // and 2 for the frame. The middle is centred, so it needs twice the wider side's room around it
     FontMetrics { id: words; font.family: root.c.font; font.pixelSize: 12 }
     FontMetrics { id: big; font.family: root.c.font; font.pixelSize: 15; font.weight: Font.Medium }
-    readonly property real leftWide: 24 + words.advanceWidth("Today")
-        + (switchable ? 8 + 2 * 24 + words.advanceWidth("Week") + words.advanceWidth("Month") + 2 : 0)
+    readonly property real leftWide: switchable ? 2 * 24 + words.advanceWidth("Week") + words.advanceWidth("Month") + 2 : 0
+    readonly property real todayWide: 24 + words.advanceWidth("Today") + 8
     readonly property real newWide: 13 + 8 + 24 + words.advanceWidth("New")
     // The widest name the view can have, so the arrows stay put as the months go by: every month's name this year,
     // and for a week the widest month's short name with two-digit numbers
@@ -48,13 +49,12 @@ Item {
         if (app.view === "month") return w
         return big.advanceWidth(short ? "W00 · 00 " + m3 + "–00 " + m3 : "Week 00  ·  00 " + m3 + " – 00 " + m3 + " 0000")
     }
-    readonly property bool compact: 2 * (Math.max(leftWide, newWide) + 16) + 2 * (26 + 4) + 12 + widest(false) > width
+    readonly property bool compact: 2 * (Math.max(leftWide, todayWide + newWide) + 16) + 2 * (26 + 4) + 12 + widest(false) > width
 
     Row {
         id: left
         anchors.verticalCenter: parent.verticalCenter
         spacing: root.compact ? 4 : 8       // glyphs need less air than words
-        AppButton { c: root.c; glyph: root.compact ? "calendar-check" : ""; label: root.compact ? "" : "Today"; tip: "Go to today"; keys: "t"; tipAlign: "left"; onClicked: root.app.pickDay(Dates.iso(new Date())) }
         AppSegments {
             visible: root.switchable
             c: root.c; compact: root.compact
@@ -66,12 +66,14 @@ Item {
     }
 
     // The name between its arrows, in the middle of the header; pushed aside by the left group when the room is short,
-    // and the name elided before it reaches New
+    // and the name elided before Today's room and New
     Row {
         id: middle
         anchors.verticalCenter: parent.verticalCenter
-        readonly property real room: newButton.x - root.gap - (left.width + root.gap)
-        x: Math.max(left.width + root.gap, Math.min((root.width - width) / 2, newButton.x - root.gap - width))
+        readonly property real leftEdge: left.width > 0 ? left.width + root.gap : 0
+        readonly property real rightEdge: newButton.x - root.gap - today.width - 8
+        readonly property real room: rightEdge - leftEdge
+        x: Math.max(leftEdge, Math.min((root.width - width) / 2, rightEdge - width))
         spacing: 4
         AppIconButton { c: root.c; glyph: "chevron-left"; tip: "Previous " + root.unit; keys: "PgUp"; tipAlign: "left"; onClicked: root.app.page(-1) }
         Text {
@@ -87,6 +89,13 @@ Item {
         AppIconButton { c: root.c; glyph: "chevron-right"; tip: "Next " + root.unit; keys: "PgDn"; tipAlign: "left"; onClicked: root.app.page(1) }
     }
 
+    AppButton {
+        id: today
+        anchors.left: middle.right; anchors.leftMargin: 8; anchors.verticalCenter: parent.verticalCenter
+        visible: root.app.day !== root.app.today
+        c: root.c; glyph: root.compact ? "calendar-check" : ""; label: root.compact ? "" : "Today"; tip: "Go to today"; keys: "t"; tipAlign: "left"
+        onClicked: root.app.pickDay(root.app.today)
+    }
     AppButton {
         id: newButton
         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter

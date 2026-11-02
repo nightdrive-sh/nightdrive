@@ -45,7 +45,7 @@ ListView {
         readonly property bool picked: modelData === root.app.day
         readonly property bool isToday: modelData === root.app.today
         width: root.width
-        bottomPadding: 8
+        bottomPadding: 18      // the days apart, so each reads as its own group (Jari 2.11.)
 
         // The day: its name and number, the picked one on the selection's colour, today's number in the accent
         Rectangle {

@@ -51,6 +51,9 @@ Item {
         }
     }
 
+    // Under the weekdays' names, edge to edge as in the week (the cells' own top lines start after the week numbers)
+    Rectangle { y: root.headRow; width: parent.width; height: 1; color: root.c.line }
+
     Repeater {
         model: root.days
         delegate: Rectangle {

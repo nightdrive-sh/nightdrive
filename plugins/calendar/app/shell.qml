@@ -195,8 +195,8 @@ ShellRoot {
                 spacing: 0
                 Header {
                     Layout.fillWidth: true
-                    // In line with the sidebar's title; over the list of days (a narrow window), with the list's edges
-                    Layout.leftMargin: keys.listed ? 12 : 28; Layout.rightMargin: keys.listed ? 12 : 18; Layout.topMargin: 16
+                    // As far from both edges, Today as New; over the list of days (a narrow window), with the list's edges
+                    Layout.leftMargin: keys.listed ? 12 : 16; Layout.rightMargin: keys.listed ? 12 : 16; Layout.topMargin: 16
                     // As high as the buttons (AppButton's 28): the name stays level with the sidebar's title
                     Layout.preferredHeight: Math.max(win.headerHeight, 28)
                     // Over the divider and the view that come after it, which would otherwise draw over its buttons' tips
@@ -246,14 +246,15 @@ ShellRoot {
                     }
                     MonthView {
                         anchors.fill: parent
-                        anchors.margins: 12; anchors.topMargin: 4
+                        // The grids reach the edges: the week numbers and the hours give the left its room (Jari 2.11.)
+                        anchors.topMargin: 4
                         visible: win.view === "month" && !keys.listed
                         app: win
                         c: win.look
                     }
                     WeekView {
                         anchors.fill: parent
-                        anchors.margins: 12; anchors.topMargin: 4
+                        anchors.topMargin: 4
                         visible: win.view === "week" && !keys.listed
                         app: win
                         c: win.look
