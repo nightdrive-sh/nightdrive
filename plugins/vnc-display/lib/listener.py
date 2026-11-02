@@ -7,14 +7,22 @@ capturing"), as wayvnc begins capturing the pointer before its first capture of 
 ~0.15 s later is fine, and the device knocks before the display, and so wayvnc, even exists. So a connection waits
 here until wayvnc has had READY seconds, and with wayvnc 0.10 until lib/warmup.py has had a look, so the device's first
 size is the display's own.
+
+A connection counts as the device's only once wayvnc lists it as a client, which it does after the login (#1926): until
+then it is pending, for at most AUTH_WAIT seconds, and the listener takes no other connection meanwhile, so which one
+logged in is never in doubt. A socket that knocks and never logs in keeps the display for AUTH_WAIT, not for as long as
+it likes.
 """
 import functools
+import json
 import os
 import re
 import socket
 import subprocess
 import threading
 import time
+
+from gate import allowed
 
 try:
     from warmup import warm_up
@@ -26,6 +34,8 @@ START_WAIT = 5   # seconds to wait for wayvnc's socket
 CHUNK = 1 << 18
 DES_SINCE = (0, 10)   # the first wayvnc with the old VNC password (allow_broken_crypto); 0.9 stops at an unknown key
 WARM_SINCE = (0, 10)  # the first wayvnc whose blank picture has the logical size (lib/warmup.py)
+AUTH_WAIT = 60   # seconds a connection gets to log in: the device's user may be typing the password on first connect
+MAX_OPEN = 3     # connections at once on one address: the device, and a reconnect while its old one still lingers
 
 
 def log(msg):
@@ -79,13 +89,20 @@ class Listener:
     password (DES, macOS's Screen Sharing: only the password's first 8 characters count) then leave the picture
     unencrypted, which is fine inside Tailscale's encryption but not on the home network."""
 
-    def __init__(self, name, kind, conf, relax, run_dir, key, fps):
+    def __init__(self, name, kind, conf, relax, run_dir, key, fps, rate):
         self.name, self.kind, self.conf, self.relax = name, kind, conf, relax
-        self.run_dir, self.key, self.fps = run_dir, key, fps
+        self.run_dir, self.key, self.fps, self.rate = run_dir, key, fps, rate
         self.sock, self.proc, self.address, self.since = None, None, "", 0.0
+        self.networks = ()   # where a peer may come from (lib/gate.py)
         self.warm = False   # lib/warmup.py has had its look at this wayvnc
         self.lock = threading.Lock()
-        self.open = 0   # connections being relayed now, by their threads
+        self.open = 0   # connections being relayed now, by their threads, the pending one included
+        self.pending = None   # (client, since, wayvnc's client ids before it): the connection not logged in yet
+
+    @property
+    def active(self):
+        """Something keeps the display: a logged-in connection, or one with time left to log in (check())."""
+        return self.open > 0
 
     def path(self, ext):
         return os.path.join(self.run_dir, f"{self.name}-{self.kind}.{ext}")
@@ -107,8 +124,10 @@ class Listener:
             log(f"stopped listening on {self.address}:{self.conf['port']} ({self.kind})")
         self.sock, self.address = None, ""
 
-    def follow(self, address):
-        """Listens on address, or nowhere if it is "": moved when the address changed."""
+    def follow(self, address, networks):
+        """Listens on address, or nowhere if it is "": moved when the address changed. networks: where peers may
+        come from."""
+        self.networks = networks
         if address and not local(address):
             address = ""
         if self.sock and self.address != address:
@@ -167,7 +186,7 @@ class Listener:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
                 self.proc.wait()
-        self.proc, self.warm = None, False
+        self.proc, self.warm, self.pending = None, False, None   # its connections end with it
         for ext in ("conf", "sock", "vnc"):
             try:
                 os.remove(self.path(ext))
@@ -175,13 +194,64 @@ class Listener:
                 pass
 
     def accept(self):
+        """The next connection, or None when it was refused: from outside the listener's networks, over its peer's
+        rate (lib/gate.py) or past MAX_OPEN. All before the display is made."""
         try:
-            return self.sock.accept()[0]
+            client, peer = self.sock.accept()
         except OSError:
             return None
+        host = peer[0]
+        if not allowed(host, self.networks):
+            why = "not from the home network" if self.kind == "home" else "not from Tailscale"
+        elif not self.rate.allow(host):
+            why = "too many connections from it in a minute"
+        elif self.open >= MAX_OPEN:
+            why = f"already {self.open} connections"
+        else:
+            return client
+        log(f"refused {host} ({self.kind}): {why}")
+        client.close()
+        return None
+
+    def ids(self):
+        """The ids of the clients wayvnc lists (logged in), from its control socket, or None when it can't be asked."""
+        try:
+            r = subprocess.run(["wayvncctl", "-S", self.path("sock"), "-j", "client-list"],
+                               capture_output=True, text=True, timeout=3)
+            return {str(c["id"]) for c in json.loads(r.stdout)} if r.returncode == 0 else None
+        except (OSError, subprocess.TimeoutExpired, ValueError, TypeError, KeyError):
+            return None
+
+    def check(self):
+        """The pending connection: the device's once wayvnc lists a client it didn't before; closed once AUTH_WAIT
+        has passed without that. serve.py calls this every second or so."""
+        pending = self.pending   # once: its relay's thread may clear it meanwhile
+        if not pending:
+            return
+        client, since, before = pending
+        now = self.ids()
+        if now is None:
+            log(f"couldn't ask wayvnc ({self.kind}) for its clients")
+        elif now - before:
+            log(f"the device logged in ({self.kind})")
+            self.pending = None
+            return
+        if time.monotonic() - since > AUTH_WAIT:
+            log(f"a connection ({self.kind}) didn't log in within {AUTH_WAIT} s: closed")
+            self.pending = None
+            try:
+                client.shutdown(socket.SHUT_RDWR)   # its relay ends, and the connection with it
+            except OSError:
+                pass
 
     def relay(self, client):
-        """The client to wayvnc, both ways, in threads of their own; `open` counts it until it ends."""
+        """The client to wayvnc, both ways, in threads of their own; `open` counts it until it ends. It is pending
+        until it has logged in (check()): wayvnc's clients now, after lib/warmup.py's look, are the ones it isn't."""
+        before = self.ids()
+        if before is None:
+            log(f"couldn't ask wayvnc ({self.kind}) for its clients")
+            client.close()
+            return
         try:
             vnc = socket.socket(socket.AF_UNIX)
             vnc.connect(self.path("vnc"))
@@ -191,6 +261,7 @@ class Listener:
             return
         with self.lock:
             self.open += 1
+            self.pending = (client, time.monotonic(), before)
 
         def run():
             back = threading.Thread(target=relay, args=(vnc, client), daemon=True)
@@ -201,4 +272,6 @@ class Listener:
             vnc.close()
             with self.lock:
                 self.open -= 1
+                if self.pending and self.pending[0] is client:
+                    self.pending = None
         threading.Thread(target=run, daemon=True).start()

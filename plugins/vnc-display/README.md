@@ -53,7 +53,8 @@ On a Mac, use TigerVNC Viewer (free, no account: tigervnc.org, or `brew install 
 
 ## Privacy
 
-- Nothing listens until you add a device. Each one has its own port, from 5900 up, and listens only on this computer's Tailscale addresses (IPv4 and IPv6), which only your own devices can reach. With `--home`, also on the home Wi-Fi it was added on, and only while you're on that network.
+- Nothing listens until you add a device. Each one has its own port, from 5900 up, and listens only on this computer's Tailscale addresses (IPv4 and IPv6), taking connections only from Tailscale's own addresses: your devices, not a machine on the same café Wi-Fi. With `--home`, also on the home Wi-Fi it was added on, from that network, and only while you're on it.
+- A connection that hasn't logged in within a minute is closed, and its display goes. One device may connect 10 times a minute.
 - The QR code holds only the address. Every device has its own random password; `remove` makes it useless. The passwords are kept in `~/.config/nightdrive/vnc-display`, readable only by you.
 - The connection is encrypted (RSA-AES). Apps that use Apple's own login (such as Screens), and macOS's Screen Sharing with the old VNC password, are let in without it over Tailscale, which encrypts everything anyway, but not on the home Wi-Fi.
 

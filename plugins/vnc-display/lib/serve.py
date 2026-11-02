@@ -12,6 +12,10 @@ place and workspace come from config/hypr/virtual-display.lua, which reads the s
 output brings), starts wayvnc on it and relays the connection to it. Once no connection is left for GRACE seconds,
 wayvnc stops, the windows on the display go to workspace 1, and the output is removed: its icon leaves the top bar.
 
+Before any of that, a connection must come from where its listener expects (Tailscale's ranges, or the home subnet)
+and within its peer's rate (lib/gate.py), and it keeps the display only once it has logged in, or for AUTH_WAIT seconds
+while it does (lib/listener.py, #1926).
+
 The output going away while it's in use stops wayvnc at once: it would otherwise move to the desk's own screen ("Selected
 output went away, rotating to previous output") and show it to the device. Hyprland's event socket tells us.
 """
@@ -24,6 +28,7 @@ import subprocess
 import sys
 import time
 
+from gate import TAILSCALE, Rate, subnet
 from listener import Listener
 
 CONF_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "nightdrive", "vnc-display")
@@ -66,15 +71,18 @@ def outputs():
 
 
 def tailscale_address(family):
-    return out("tailscale", "ip", family).split("\n")[0]
+    """(the computer's Tailscale address, where its peers may come from)"""
+    return out("tailscale", "ip", family).split("\n")[0], TAILSCALE
 
 
 def home_address(uuid):
-    """The computer's address on the home network (the NetworkManager connection the device was added on), or "" while
-    that connection isn't the active one: never a café's network that happens to hand out the same address."""
+    """(the computer's address on the home network (the NetworkManager connection the device was added on), its
+    subnet), or ("", ()) while that connection isn't the active one: never a café's network that happens to hand out
+    the same address."""
     if not uuid:
-        return ""
-    return out("nmcli", "-g", "IP4.ADDRESS", "connection", "show", uuid).split(" | ")[0].split("/")[0]
+        return "", ()
+    interface = out("nmcli", "-g", "IP4.ADDRESS", "connection", "show", uuid).split(" | ")[0]
+    return interface.split("/")[0], subnet(interface)
 
 
 def keyboard():
@@ -174,9 +182,11 @@ def main(name):
     # Left over from a run that didn't end cleanly: the display comes only with a device
     remove_output(output)
     kb = keyboard()
-    listeners = [(Listener(name, "tailscale", conf, True, RUN_DIR, KEY, FPS), lambda: tailscale_address("-4")),
-                 (Listener(name, "tailscale6", conf, True, RUN_DIR, KEY, FPS), lambda: tailscale_address("-6")),
-                 (Listener(name, "home", conf, False, RUN_DIR, KEY, FPS), lambda: home_address(conf.get("home", "")))]
+    rate = Rate()   # one for all the listeners: a peer may come on IPv4 and IPv6 alike
+    listeners = [(Listener(name, "tailscale", conf, True, RUN_DIR, KEY, FPS, rate), lambda: tailscale_address("-4")),
+                 (Listener(name, "tailscale6", conf, True, RUN_DIR, KEY, FPS, rate), lambda: tailscale_address("-6")),
+                 (Listener(name, "home", conf, False, RUN_DIR, KEY, FPS, rate),
+                  lambda: home_address(conf.get("home", "")))]
     shown, last_seen = False, 0.0   # shown: the output is there
 
     def hide(why):
@@ -192,19 +202,22 @@ def main(name):
         while True:
             if time.monotonic() >= due:
                 for listener, address in listeners:
-                    listener.follow(address())
+                    listener.follow(*address())
                 due = time.monotonic() + TICK
+            for listener, _ in listeners:
+                listener.check()
             if shown:
-                if any(listener.open for listener, _ in listeners):
+                if any(listener.active for listener, _ in listeners):
                     last_seen = time.monotonic()
                 elif time.monotonic() - last_seen > GRACE:
                     hide("the device disconnected")
-            socks = [listener.sock for listener, _ in listeners if listener.sock]
+            # A listener with a connection still logging in takes the next only after it: they wait in its backlog
+            socks = [listener.sock for listener, _ in listeners if listener.sock and not listener.pending]
             ready = select.select([ev] + socks, [], [], min(1.0, max(0.0, due - time.monotonic())))[0]
             for listener, _ in listeners:
                 if not (listener.sock and listener.sock in ready):
                     continue
-                client = listener.accept()
+                client = listener.accept()   # the peer's address, rate and the cap: before the display is made
                 if not client:
                     continue
                 if not shown:
