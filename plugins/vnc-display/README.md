@@ -27,7 +27,7 @@ In RealVNC Viewer, Touch panel mode under the connection's settings makes your f
 
 Another device works the same way with Tailscale and any VNC app: RealVNC Viewer on Android, Remmina or TigerVNC on Linux.
 
-On a Mac, use TigerVNC Viewer (free, no account: tigervnc.org, or `brew install --cask tigervnc-viewer`). macOS's own Screen Sharing (Finder › ⌘K, `vnc://nightdrive:5903`) connects over Tailscale: it asks only for the password, and only its first 8 characters count. RealVNC Viewer on a Mac wants an account. TigerVNC draws one pixel per point, not Retina's two, so `macbook-16` is 1728 × 1080 at scale 1: in full screen (F8 › Full screen) it fills the screen below the notch at the Mac's default size, softer than the Mac's own apps. It asks for the password every time.
+On a Mac, use TigerVNC Viewer (free, no account: tigervnc.org, or `brew install --cask tigervnc-viewer`). macOS's own Screen Sharing (Finder › ⌘K, `vnc://nightdrive:5903`) connects over Tailscale once macOS Screen Sharing is on on the device's page in Settings › Other displays (on by itself for a MacBook Pro 16-inch): it asks only for the password, and only its first 8 characters count. RealVNC Viewer on a Mac wants an account. TigerVNC draws one pixel per point, not Retina's two, so `macbook-16` is 1728 × 1080 at scale 1: in full screen (F8 › Full screen) it fills the screen below the notch at the Mac's default size, softer than the Mac's own apps. It asks for the password every time.
 
 ## Limits
 
@@ -39,7 +39,7 @@ On a Mac, use TigerVNC Viewer (free, no account: tigervnc.org, or `brew install 
 
 | Command | What it does |
 | --- | --- |
-| `vnc-display add DEVICE [NAME]` | A new display for a device, with a password of its own. `--home`: also on the home Wi-Fi. `--beside` or `--away` changes where it goes |
+| `vnc-display add DEVICE [NAME]` | A new display for a device, with a password of its own. `--home`: also on the home Wi-Fi. `--beside` or `--away` changes where it goes. `--screen-sharing`: lets macOS's Screen Sharing in |
 | `vnc-display show NAME` | The addresses, user name and password (`--json` for scripts) |
 | `vnc-display qr NAME` | The connection as a QR code (an SVG file) |
 | `vnc-display list` | The devices, their workspaces and whether they're on or connected (`--json` for scripts) |
@@ -47,6 +47,7 @@ On a Mac, use TigerVNC Viewer (free, no account: tigervnc.org, or `brew install 
 | `vnc-display place NAME PLACE` | Puts its display right, left, above or below yours, or away (out of the pointer's reach) |
 | `vnc-display size NAME DEVICE` | Changes its display's size and scale: a size as `add` takes it (`ipad-13`, `2560x1600@2`). A connected device reconnects |
 | `vnc-display rename NAME NEW` | Renames it; the new name is also its user name in the VNC app |
+| `vnc-display screen-sharing NAME on\|off` | Lets macOS's Screen Sharing in for it with the old VNC password, over Tailscale, or not. A connected device reconnects |
 | `vnc-display off NAME` | Turns it off: nothing listens for it, and a connected device's display goes, its windows back to yours |
 | `vnc-display on NAME` | Turns it back on, with the same password: its display comes when the device connects |
 | `vnc-display remove NAME` | Forgets the device: its display and its password |
@@ -56,7 +57,7 @@ On a Mac, use TigerVNC Viewer (free, no account: tigervnc.org, or `brew install 
 - Nothing listens until you add a device. Each one has its own port, from 5900 up, and listens only on this computer's Tailscale addresses (IPv4 and IPv6), taking connections only from Tailscale's own addresses: your devices, not a machine on the same café Wi-Fi. With `--home`, also on the home Wi-Fi it was added on, from that network, and only while you're on it.
 - A connection that hasn't logged in within a minute is closed, and its display goes. One device may connect 10 times a minute.
 - The QR code holds only the address. Every device has its own random password; `remove` makes it useless. The passwords are kept in `~/.config/nightdrive/vnc-display`, readable only by you.
-- The connection is encrypted (RSA-AES). Apps that use Apple's own login (such as Screens), and macOS's Screen Sharing with the old VNC password, are let in without it over Tailscale, which encrypts everything anyway, but not on the home Wi-Fi.
+- The connection is encrypted (RSA-AES). Apps that use Apple's own login (such as Screens), and macOS's Screen Sharing with the old VNC password for a device that has it on, are let in without it over Tailscale, which encrypts everything anyway, but not on the home Wi-Fi.
 
 Homepage: https://github.com/any1/wayvnc
 Needs: Tailscale on this computer and on the device, and a VNC app on the device

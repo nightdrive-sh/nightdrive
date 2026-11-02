@@ -98,6 +98,9 @@ Item {
             if (i.home_name)
                 rows.push({ kind: "stat", name: "At home", glyph: "house", copy: i.home ? addr(i.home, i.port) : undefined,
                             summary: i.home ? addr(i.home, i.port) + " · on " + i.home_name : "on " + i.home_name + " · not on it now" })
+            // DES, the only login macOS's Screen Sharing has for wayvnc: off unless this device needs it (#1926)
+            rows.push({ kind: "vncshare", name: "macOS Screen Sharing", glyph: "laptop", switchOn: i.screen_sharing === true,
+                        summary: "the old VNC password, over Tailscale" })
             rows.push({ kind: "stat", name: "User", glyph: "user", summary: i.username, copy: i.username },
                       // Enter shows it; shown, Enter and ⌘C copy it past the clipboard history (the launcher's `sensitive`)
                       reveal ? { kind: "stat", name: "Password", glyph: "eye", summary: i.password, copy: i.password, sensitive: true }
@@ -165,6 +168,11 @@ Item {
             const text = l.query
             l.clearQuery()
             if (text.trim() !== "") commitField(it, text)
+            return true
+        }
+        if (it.kind === "vncshare") {
+            run(info.screen_sharing ? "Turning Screen Sharing off…" : "Turning Screen Sharing on…",
+                ["screen-sharing", cur, info.screen_sharing ? "off" : "on"])
             return true
         }
         if (it.kind === "vncpass") { l.keepSelection(); reveal = true; return true }

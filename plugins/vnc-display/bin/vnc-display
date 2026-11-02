@@ -1,7 +1,7 @@
 #!/bin/bash
 # VNC Display (plugins/vnc-display): an iPad or iPhone as a screen of its own, shown in a VNC app on the device.
 #
-#   vnc-display add DEVICE [NAME] [--home] [--beside|--away]
+#   vnc-display add DEVICE [NAME] [--home] [--beside|--away] [--screen-sharing]
 #                                  a new screen for a device, with a password of its own: there while the device is
 #                                  connected, listening for it also after a login
 #   vnc-display show NAME [--json] how to connect: the addresses, the user name and the password
@@ -12,6 +12,8 @@
 #   vnc-display place NAME PLACE   where its screen is: right, left, above or below your screens, or away (out of reach)
 #   vnc-display size NAME DEVICE   its display's size and scale (DEVICE as for add): a connected device reconnects
 #   vnc-display rename NAME NEW    its name, which is also the user name the device logs in with
+#   vnc-display screen-sharing NAME on|off
+#                                  macOS's Screen Sharing's old VNC password (DES) for it over Tailscale, or not
 #   vnc-display on|off NAME        listening for the device, or off (nothing listening) while it keeps its password
 #   vnc-display remove NAME        forgets the device: its screen, its password
 #   vnc-display run NAME           the screen itself (nightdrive-vnc-display@NAME.service, lib/serve.py)
@@ -21,7 +23,10 @@
 # config/hypr/virtual-display.lua reads (its size, place and workspace), and wayvnc on it as a user service of its own.
 # wayvnc listens on the Tailscale address only, and with --home also on the home network (the Wi-Fi it was added on)
 # while the computer is on it. The address shown is the computer's Tailscale name (MagicDNS), the IP when it has none.
-# The passwords are in ~/.config/nightdrive/vnc-display/NAME.conf, readable only by you.
+# The passwords are in ~/.config/nightdrive/vnc-display/NAME.conf, readable only by you, and they stay out of every
+# command line (/proc/PID/cmdline is readable by every user): printf, a shell builtin, hands them on through a pipe.
+# The old VNC password (DES, broken crypto, the only one macOS's Screen Sharing speaks to wayvnc) is let in only for a
+# device that has screen_sharing=1: added as macbook-16 or with --screen-sharing (#1926).
 set -euo pipefail
 
 here=$(dirname "$(dirname "$(realpath "$0")")")
@@ -40,6 +45,21 @@ die() { echo "vnc-display: $*" >&2; exit 1; }
 unit() { echo "nightdrive-vnc-display@$1.service"; }
 conf() { echo "$conf_dir/$1.conf"; }
 get() { sed -n "s/^$2=//p" "$(conf "$1")" | head -1; }
+# set_conf NAME KEY VALUE: the key replaced, or added last
+set_conf() {
+  local f tmp
+  f=$(conf "$1")
+  tmp=$(mktemp "$f.XXXXXX")   # 0600 from mktemp: the password stays readable only by you
+  awk -v k="$2" -v v="$3" 'index($0, k "=") == 1 { print k "=" v; done = 1; next } { print } END { if (!done) print k "=" v }' "$f" > "$tmp"
+  mv "$tmp" "$f"
+}
+# A device added before screen_sharing= (#1926): on for the one added as macbook-16, the size Screen Sharing came with,
+# so that Mac keeps working; off for the rest, which never needed DES
+migrate_conf() {
+  [[ -n $(sed -n '/^screen_sharing=/p' "$(conf "$1")") ]] && return
+  if head -1 "$(conf "$1")" | grep -q '^# vnc-display add macbook-16:'; then set_conf "$1" screen_sharing 1
+  else set_conf "$1" screen_sharing 0; fi
+}
 output_of() { echo "HEADLESS-${1^^}"; }
 names() { local f; for f in "$conf_dir"/*.conf; do [[ -f $f ]] && basename "$f" .conf; done; }
 known() { [[ -f $(conf "${1:-}") ]] || die "no device ${1:-}: see vnc-display list"; }
@@ -142,10 +162,11 @@ turn() {   # turn on|off NAME
 }
 
 cmd_add() {
-  local device="" name="" home=0 place="" size mode scale default_place port ws pass net="" uuid="" netname=""
+  local device="" name="" home=0 place="" size mode scale default_place port ws pass net="" uuid="" netname="" share=""
   while (($#)); do
     case $1 in
       --home) home=1 ;;
+      --screen-sharing) share=1 ;;
       --beside|--away) place=${1#--} ;;
       -*) die "unknown option $1" ;;
       *) if [[ -z $device ]]; then device=$1; elif [[ -z $name ]]; then name=$1; else die "too many words: $1"; fi ;;
@@ -167,11 +188,13 @@ cmd_add() {
     IFS=$'\t' read -r uuid netname <<<"$net"
   fi
   pass=$(new_password)
+  # DES only where it's needed: the Mac whose Screen Sharing came with macbook-16, or a device that asked for it
+  [[ -n $share || $device == macbook-16 ]] && share=1 || share=0
   (
     umask 077
     mkdir -p "$conf_dir"
     printf '%s\n' "# vnc-display add $device: this device's login (vnc-display show $name)" "output=$(output_of "$name")" \
-      "port=$port" "username=$name" "password=$pass" "home=$uuid" "home_name=$netname" > "$(conf "$name")"
+      "port=$port" "username=$name" "password=$pass" "home=$uuid" "home_name=$netname" "screen_sharing=$share" > "$(conf "$name")"
   )
   set_state "$name" "$(output_of "$name") ${mode}@60 $scale $place $ws"
   turn on "$name"
@@ -203,12 +226,14 @@ show_json() {
   local n=$1 on=false conn=false
   systemctl --user -q is-active "$(unit "$n")" && on=true
   connected "$n" && conn=true
-  jq -n --arg name "$n" --argjson on "$on" --argjson connected "$conn" --arg ws "$(state_line "$n" | awk '{ print $5 }')" --arg host "$(tailscale_host)" \
+  # The password on jq's stdin (-R reads it as .), not in its arguments
+  printf '%s\n' "$(get "$n" password)" |
+  jq -R --arg name "$n" --argjson on "$on" --argjson connected "$conn" --arg ws "$(state_line "$n" | awk '{ print $5 }')" --arg host "$(tailscale_host)" \
     --arg ip "$(tailscale_ip)" --arg home "$(home_ip "$(get "$n" home)")" --arg home_name "$(get "$n" home_name)" \
-    --arg port "$(get "$n" port)" --arg password "$(get "$n" password)" \
+    --arg port "$(get "$n" port)" --argjson share "$([[ $(get "$n" screen_sharing) == 1 ]] && echo true || echo false)" \
     '{name: $name, on: $on, connected: $connected, workspace: ($ws | tonumber? // null), tailscale: $host, tailscale_ip: $ip, port: ($port | tonumber),
       home: (if $home == "" then null else $home end), home_name: (if $home_name == "" then null else $home_name end),
-      username: $name, password: $password}'
+      username: $name, password: ., screen_sharing: $share}'
 }
 
 # A vnc:// link with the address only: RealVNC Viewer refuses one with a user name or password in it ("no longer
@@ -347,6 +372,21 @@ cmd_rename() {
   echo "$n is now $new: in the VNC app, the user name is $new."
 }
 
+# serve.py reads the device's conf as it starts, and writes wayvnc's as wayvnc starts: a restart takes it in (a connected
+# device reconnects)
+cmd_screen_sharing() {
+  known "${1:-}"
+  local n=$1
+  case ${2:-} in
+    on) set_conf "$n" screen_sharing 1 ;;
+    off) set_conf "$n" screen_sharing 0 ;;
+    *) die "on or off: vnc-display screen-sharing $n on" ;;
+  esac
+  systemctl --user try-restart "$(unit "$n")"
+  if [[ $2 == on ]]; then echo "$n lets macOS's Screen Sharing in over Tailscale, with the old VNC password (its first 8 characters)."
+  else echo "$n takes RSA-AES and Apple's own login only: macOS's Screen Sharing can't log in."; fi
+}
+
 cmd_remove() {
   known "${1:-}"
   turn off "$1"
@@ -367,7 +407,8 @@ case ${1:-} in
   place) cmd_place "${2:-}" "${3:-}" ;;
   size) cmd_size "${2:-}" "${3:-}" ;;
   rename) cmd_rename "${2:-}" "${3:-}" ;;
+  screen-sharing) cmd_screen_sharing "${2:-}" "${3:-}" ;;
   remove) cmd_remove "${2:-}" ;;
-  run) known "${2:-}"; exec python3 "$here/lib/serve.py" "$2" ;;
-  *) sed -n '4,17s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
+  run) known "${2:-}"; migrate_conf "$2"; exec python3 "$here/lib/serve.py" "$2" ;;
+  *) sed -n '4,19s/^# \{0,1\}//p' "$0" >&2; exit 1 ;;
 esac

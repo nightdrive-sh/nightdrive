@@ -85,9 +85,10 @@ def relay(src, dst):
 
 
 class Listener:
-    """relax: Apple's own login (Diffie-Hellman, used by e.g. the Screens app) and, with wayvnc 0.10 on, the old VNC
-    password (DES, macOS's Screen Sharing: only the password's first 8 characters count) then leave the picture
-    unencrypted, which is fine inside Tailscale's encryption but not on the home network."""
+    """relax: Apple's own login (Diffie-Hellman, used by e.g. the Screens app) and, with wayvnc 0.10 on and the
+    device's screen_sharing=1, the old VNC password (DES, macOS's Screen Sharing: only the password's first 8 characters
+    count) then leave the picture unencrypted, which is fine inside Tailscale's encryption but not on the home
+    network."""
 
     def __init__(self, name, kind, conf, relax, run_dir, key, fps, rate):
         self.name, self.kind, self.conf, self.relax = name, kind, conf, relax
@@ -152,7 +153,8 @@ class Listener:
             with os.fdopen(fd, "w") as f:
                 f.write(f"enable_auth=true\nusername={self.conf['username']}\npassword={self.conf['password']}\n"
                         f"rsa_private_key_file={self.key}\nrelax_encryption={'true' if self.relax else 'false'}\n")
-                if self.relax and has_des():
+                # DES only for a device that needs it (bin/vnc-display: screen_sharing=1, #1926), never on the home network
+                if self.relax and self.conf.get("screen_sharing") == "1" and has_des():
                     f.write("allow_broken_crypto=true\n")
                 f.writelines(f"{k}={v}\n" for k, v in kb.items() if v)
             try:

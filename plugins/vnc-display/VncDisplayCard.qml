@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import qs
 
@@ -24,7 +25,7 @@ PanelWindow {
     // A click on a value, or ⌘C for the password (Hyprland sends Ctrl+Insert). The password past the clipboard history
     // and cleared after 45 s, as the launcher's password row (SystemLevels.copyText)
     function copy(v, sensitive) {
-        if (sensitive) Quickshell.execDetached(["bash", "-c", 'printf %s "$1" | wl-copy --sensitive; sleep 45; [ "$(wl-paste -n 2>/dev/null)" = "$1" ] && wl-copy --clear', "_", v])
+        if (sensitive) clipper.createObject(c, { input: v })
         else Quickshell.execDetached(["wl-copy", v])
         copied = v
         copiedTimer.restart()
@@ -48,6 +49,21 @@ PanelWindow {
             if ((event.modifiers & Qt.ControlModifier) && (event.key === Qt.Key_C || event.key === Qt.Key_Insert) && c.info) {
                 c.copy(c.info.password, true); event.accepted = true
             }
+        }
+    }
+
+    // The password on the shell's stdin, kept in its variable, not in its arguments: a command line is readable by every
+    // user in /proc/PID/cmdline, for the 45 s it waits (#1926). printf and [ are builtins, so it's in no other's either.
+    // One per copy, gone once it has cleared (or found the clipboard changed)
+    Component {
+        id: clipper
+        Process {
+            property string input
+            running: true
+            stdinEnabled: true
+            command: ["bash", "-c", 'IFS= read -r -d "" p; printf %s "$p" | wl-copy --sensitive; sleep 45; [ "$(wl-paste -n 2>/dev/null)" = "$p" ] && wl-copy --clear']
+            onStarted: { write(input); input = ""; stdinEnabled = false }   // the end of stdin ends the read
+            onExited: destroy()
         }
     }
 
