@@ -79,127 +79,139 @@ Variants {
         // external display is connected or while it exists; the laptop's screen then shows only it. Number size: the `workspaces` row in adjust.conf.
         // What exists is read from the windows and the screens, not Hyprland.workspaces: a workspace given a new id
         // (⌘⌥1–0, hypr/bindings.lua) stays there under its old id with its windows, as Hyprland sends no event for it.
-        Row {
-            id: leftSide
-            x: 10; anchors.verticalCenter: parent.verticalCenter
-            spacing: 4
-            onWidthChanged: Qt.callLater(win.layout)   // the modules give way to the workspaces (layout)
-            // The logo (N█) opens the launcher, for those who don't know ⌘Space yet. Settings › Top bar › Logo hides it
-            // ("logo" in bar-items.json's hidden list); the Row then starts with the workspaces at the edge.
-            Rectangle {
-                visible: TopBar.hidden.indexOf("logo") < 0
-                width: logo.width + 20; height: 27; radius: 8
-                // Bright like the bar's text (a grey N looked disabled), highlighted while the launcher is open on this screen
-                readonly property bool open: bar.launcherOpen && win.focused
-                color: open ? TopBar.c("wsBg") : "transparent"
-                // logo/nightdrive-icon-small.svg without its square: the N and the block, cut to their ink
-                Image {
-                    id: logo
-                    readonly property real h: Math.round(TopBar.size("workspaces").size * 0.88 * win.dpr) / win.dpr   // 11 px with the default 12.5
-                    function rgb(v) { const c = Qt.color(v); return "rgb(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + ")\" fill-opacity=\"" + c.a }
-                    x: 10; y: Math.round((parent.height - h) / 2 * win.dpr) / win.dpr
-                    width: h * 19.42 / 14.13; height: h
-                    sourceSize { width: Math.round(width * win.dpr); height: Math.round(height * win.dpr) }
-                    source: "data:image/svg+xml;utf8," + encodeURIComponent(
-                        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="6.88 8.97 19.42 14.13">'
-                        + '<path fill="' + rgb(TopBar.c("hlFg")) + '" d="M6.88 22.84H9.39V16.76C9.39 15.45 9.24 13.32 9.12 12.11L12.68 22.84H16V8.97H13.49V14.67C13.49 15.98 13.66 18.32 13.8 19.7L10.21 8.97H6.88Z"/>'
-                        + '<rect x="18.3" y="9.0" width="8.0" height="14.1" fill="' + rgb(Theme.primary) + '" opacity="' + (parent.open ? 1 : 0.9) + '"/></svg>')
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Quickshell.execDetached(["qs", "ipc", "call", "launcher", "toggle"])
-                }
-            }
-            Repeater {
-                model: {
-                    const ids = [1, 2, 3, 4, 5]
-                    const add = w => { if (w && w.id > 0 && ids.indexOf(w.id) < 0) ids.push(w.id) }
-                    for (const t of Hyprland.toplevels.values) add(t.workspace)
-                    for (const m of Hyprland.monitors.values) add(m.activeWorkspace)
-                    // A virtual screen shows only its own workspace, as the laptop's screen beside an external display
-                    if (win.isVirtual) return Hyprland.workspaces.values.filter(w => win.virtualWorkspaces[w.id]
-                        && w.monitor.name === win.modelData.name).map(w => w.id)
-                    const desk = Quickshell.screens.filter(s => !s.name.startsWith("HEADLESS-"))
-                    const docked = desk.length > 1 && desk.some(s => s.name.startsWith("eDP"))
-                    // The laptop's screen then has only its own workspace: 1–9 are the external display's
-                    if (docked && win.modelData.name.startsWith("eDP")) return [win.laptopWorkspace]
-                    if (docked && ids.indexOf(win.laptopWorkspace) < 0) ids.push(win.laptopWorkspace)
-                    return ids.sort((a, b) => a - b)
-                }
+        // On a screen too narrow even with the modules tucked away, the left side gives way too (layout's squeeze), and
+        // as a last resort is cut at the clock, so the two never overlap.
+        Item {
+            width: win.leftRoom; height: parent.height
+            clip: true
+            Row {
+                id: leftSide
+                x: 10; anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+                onWidthChanged: Qt.callLater(win.layout)   // the modules give way to the workspaces (layout)
+                // The logo (N█) opens the launcher, for those who don't know ⌘Space yet. Settings › Top bar › Logo hides it
+                // ("logo" in bar-items.json's hidden list); the Row then starts with the workspaces at the edge.
                 Rectangle {
-                    id: ws
-                    required property int modelData
-                    readonly property bool windows: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === modelData)
-                    readonly property bool active: { const m = Hyprland.monitorFor(win.modelData); return !!m && !!m.activeWorkspace && m.activeWorkspace.id === modelData }
-                    // A device's own workspace is its icon: the laptop's screen, a virtual screen's tablet or phone
-                    readonly property string device: modelData === win.laptopWorkspace ? "laptop" : win.virtualWorkspaces[modelData] || ""
-                    // Its name, once renamed (Launcher › Rename current space): a device's workspace then shows both
-                    readonly property string label: { const w = Hyprland.workspaces.values.find(w => w.id === modelData); return w && w.name ? w.name : String(modelData) }
-                    readonly property bool named: label !== String(modelData)
-                    readonly property int gap: device && named ? 6 : 0
-                    readonly property color fg: active ? TopBar.c("hlFg") : windows ? TopBar.c("dim") : TopBar.c("off")
-                    width: (device ? icon.implicitWidth : 0) + gap + (num.visible ? num.implicitWidth : 0) + 20; height: 27; radius: 8
-                    color: active ? TopBar.c("wsBg") : "transparent"
-                    // Half while the drawer is over it, and on a screen without the focus (with more than one screen):
-                    // the bright one shows where the keyboard goes
-                    opacity: active && (drawer.open || !win.focused) ? 0.5 : 1
-                    BarText {
-                        id: num
-                        visible: !ws.device || ws.named
-                        element: "workspaces"
-                        dpr: win.dpr
-                        x: Math.round((ws.device ? 10 + icon.implicitWidth + ws.gap : (parent.width - implicitWidth) / 2) * win.dpr) / win.dpr
-                        text: ws.label
-                        color: ws.fg
-                    }
-                    Text {
-                        id: icon
-                        visible: !!ws.device
-                        x: ws.named ? 10 : (parent.width - implicitWidth) / 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: Icons.g(ws.device === "tablet-wide" ? "tablet" : ws.device || "laptop")
-                        rotation: ws.device === "tablet-wide" ? 90 : 0
-                        color: ws.fg
-                        font { family: Icons.family; pixelSize: Math.round(num.sz.size * 1.1) }
+                    id: logoBox
+                    readonly property bool wanted: TopBar.hidden.indexOf("logo") < 0
+                    visible: wanted && win.squeeze < 1
+                    width: logo.width + 20; height: 27; radius: 8
+                    // Bright like the bar's text (a grey N looked disabled), highlighted while the launcher is open on this screen
+                    readonly property bool open: bar.launcherOpen && win.focused
+                    color: open ? TopBar.c("wsBg") : "transparent"
+                    // logo/nightdrive-icon-small.svg without its square: the N and the block, cut to their ink
+                    Image {
+                        id: logo
+                        readonly property real h: Math.round(TopBar.size("workspaces").size * 0.88 * win.dpr) / win.dpr   // 11 px with the default 12.5
+                        function rgb(v) { const c = Qt.color(v); return "rgb(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + ")\" fill-opacity=\"" + c.a }
+                        x: 10; y: Math.round((parent.height - h) / 2 * win.dpr) / win.dpr
+                        width: h * 19.42 / 14.13; height: h
+                        sourceSize { width: Math.round(width * win.dpr); height: Math.round(height * win.dpr) }
+                        source: "data:image/svg+xml;utf8," + encodeURIComponent(
+                            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="6.88 8.97 19.42 14.13">'
+                            + '<path fill="' + rgb(TopBar.c("hlFg")) + '" d="M6.88 22.84H9.39V16.76C9.39 15.45 9.24 13.32 9.12 12.11L12.68 22.84H16V8.97H13.49V14.67C13.49 15.98 13.66 18.32 13.8 19.7L10.21 8.97H6.88Z"/>'
+                            + '<rect x="18.3" y="9.0" width="8.0" height="14.1" fill="' + rgb(Theme.primary) + '" opacity="' + (parent.open ? 1 : 0.9) + '"/></svg>')
                     }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ workspace = " + ws.modelData + " })"])
+                        onClicked: Quickshell.execDetached(["qs", "ipc", "call", "launcher", "toggle"])
                     }
                 }
-            }
-            // The drawer (⌘D, hypr/bindings.lua) after the workspaces, as a dot: highlighted while open on this screen, dimmed when empty
-            Rectangle {
-                id: drawer
-                property bool open: false
-                readonly property bool full: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.name === "special:drawer")
-                Connections {
-                    target: Hyprland
-                    function onRawEvent(e) {
-                        if (e.name !== "activespecial") return
-                        const [ws, mon] = e.data.split(",")
-                        if (mon === win.modelData.name) drawer.open = ws === "special:drawer"
+                Repeater {
+                    id: wsRep
+                    model: {
+                        const ids = [1, 2, 3, 4, 5]
+                        const add = w => { if (w && w.id > 0 && ids.indexOf(w.id) < 0) ids.push(w.id) }
+                        for (const t of Hyprland.toplevels.values) add(t.workspace)
+                        for (const m of Hyprland.monitors.values) add(m.activeWorkspace)
+                        // A virtual screen shows only its own workspace, as the laptop's screen beside an external display
+                        if (win.isVirtual) return Hyprland.workspaces.values.filter(w => win.virtualWorkspaces[w.id]
+                            && w.monitor.name === win.modelData.name).map(w => w.id)
+                        const desk = Quickshell.screens.filter(s => !s.name.startsWith("HEADLESS-"))
+                        const docked = desk.length > 1 && desk.some(s => s.name.startsWith("eDP"))
+                        // The laptop's screen then has only its own workspace: 1–9 are the external display's
+                        if (docked && win.modelData.name.startsWith("eDP")) return [win.laptopWorkspace]
+                        if (docked && ids.indexOf(win.laptopWorkspace) < 0) ids.push(win.laptopWorkspace)
+                        return ids.sort((a, b) => a - b)
+                    }
+                    Rectangle {
+                        id: ws
+                        required property int modelData
+                        readonly property bool windows: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === modelData)
+                        readonly property bool active: { const m = Hyprland.monitorFor(win.modelData); return !!m && !!m.activeWorkspace && m.activeWorkspace.id === modelData }
+                        // A device's own workspace is its icon: the laptop's screen, a virtual screen's tablet or phone
+                        readonly property string device: modelData === win.laptopWorkspace ? "laptop" : win.virtualWorkspaces[modelData] || ""
+                        // Its name, once renamed (Launcher › Rename current space): a device's workspace then shows both
+                        readonly property string label: { const w = Hyprland.workspaces.values.find(w => w.id === modelData); return w && w.name ? w.name : String(modelData) }
+                        readonly property bool named: label !== String(modelData)
+                        readonly property int gap: device && named ? 6 : 0
+                        // An empty, unnamed workspace not shown on this screen: the first to go when the bar is short of room
+                        readonly property bool spare: !active && !windows && !named
+                        visible: win.squeeze < 2 || !spare
+                        readonly property color fg: active ? TopBar.c("hlFg") : windows ? TopBar.c("dim") : TopBar.c("off")
+                        width: (device ? icon.implicitWidth : 0) + gap + (num.visible ? num.implicitWidth : 0) + 20; height: 27; radius: 8
+                        color: active ? TopBar.c("wsBg") : "transparent"
+                        // Half while the drawer is over it, and on a screen without the focus (with more than one screen):
+                        // the bright one shows where the keyboard goes
+                        opacity: active && (drawer.open || !win.focused) ? 0.5 : 1
+                        BarText {
+                            id: num
+                            visible: !ws.device || ws.named
+                            element: "workspaces"
+                            dpr: win.dpr
+                            x: Math.round((ws.device ? 10 + icon.implicitWidth + ws.gap : (parent.width - implicitWidth) / 2) * win.dpr) / win.dpr
+                            text: ws.label
+                            color: ws.fg
+                        }
+                        Text {
+                            id: icon
+                            visible: !!ws.device
+                            x: ws.named ? 10 : (parent.width - implicitWidth) / 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Icons.g(ws.device === "tablet-wide" ? "tablet" : ws.device || "laptop")
+                            rotation: ws.device === "tablet-wide" ? 90 : 0
+                            color: ws.fg
+                            font { family: Icons.family; pixelSize: Math.round(num.sz.size * 1.1) }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ workspace = " + ws.modelData + " })"])
+                        }
                     }
                 }
-                width: dot.implicitWidth + 20; height: 27; radius: 8
-                color: open ? TopBar.c("wsBg") : "transparent"
-                BarText {
-                    id: dot
-                    element: "workspaces"
-                    dpr: win.dpr
-                    x: Math.round((parent.width - implicitWidth) / 2 * win.dpr) / win.dpr
-                    text: "•"
-                    color: drawer.open ? TopBar.c("hlFg") : drawer.full ? TopBar.c("dim") : TopBar.c("off")
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    // On this screen: the drawer opens on the focused one, and clicking the bar doesn't focus it
-                    onClicked: Quickshell.execDetached(["sh", "-c", 'hyprctl dispatch "hl.dsp.focus({ monitor = \\"$1\\" })"; ' +
-                                                        'hyprctl dispatch "hl.dsp.workspace.toggle_special(\\"drawer\\")"',
-                                                        "sh", win.modelData.name])
+                // The drawer (⌘D, hypr/bindings.lua) after the workspaces, as a dot: highlighted while open on this screen, dimmed when empty
+                Rectangle {
+                    id: drawer
+                    property bool open: false
+                    readonly property bool full: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.name === "special:drawer")
+                    Connections {
+                        target: Hyprland
+                        function onRawEvent(e) {
+                            if (e.name !== "activespecial") return
+                            const [ws, mon] = e.data.split(",")
+                            if (mon === win.modelData.name) drawer.open = ws === "special:drawer"
+                        }
+                    }
+                    width: dot.implicitWidth + 20; height: 27; radius: 8
+                    color: open ? TopBar.c("wsBg") : "transparent"
+                    BarText {
+                        id: dot
+                        element: "workspaces"
+                        dpr: win.dpr
+                        x: Math.round((parent.width - implicitWidth) / 2 * win.dpr) / win.dpr
+                        text: "•"
+                        color: drawer.open ? TopBar.c("hlFg") : drawer.full ? TopBar.c("dim") : TopBar.c("off")
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        // On this screen: the drawer opens on the focused one, and clicking the bar doesn't focus it
+                        onClicked: Quickshell.execDetached(["sh", "-c", 'hyprctl dispatch "hl.dsp.focus({ monitor = \\"$1\\" })"; ' +
+                                                            'hyprctl dispatch "hl.dsp.workspace.toggle_special(\\"drawer\\")"',
+                                                            "sh", win.modelData.name])
+                    }
                 }
             }
         }
@@ -222,6 +234,8 @@ Variants {
         property var xs: []
         property var tucked: []         // the modules' defs in the "…", in the bar's order
         property real moreX: -1         // the "…"'s left edge; -1 = none
+        property int squeeze: 0         // what the left side leaves out: 1 the logo, 2 also the spare workspaces
+        property real leftRoom: width   // the left side is cut here (the leftmost module's edge)
         readonly property real moreWidth: more.width
         // The modules' x from the right edge leftwards, without the ones in drop (rep's indices) and with a "…" left of
         // the rest if withMore; left = the leftmost edge used
@@ -245,7 +259,14 @@ Variants {
         }
         function layout() {
             const order = dragOrder.length === rep.count ? dragOrder : Array.from({ length: rep.count }, (_, i) => i)
-            const limit = leftSide.x + leftSide.width + 12
+            // The left side's full width, from its parts: the Row's own is that of the current squeeze (and may not be
+            // laid out yet), and the modules are tucked against the full one, so a squeeze doesn't bring them back
+            const sp = leftSide.spacing
+            const logoW = logoBox.wanted ? logoBox.width + sp : 0
+            let wsW = 0
+            for (let i = 0; i < wsRep.count; i++) { const w = wsRep.itemAt(i); if (w) wsW += w.width + sp }
+            const full = logoW + wsW + drawer.width
+            const limit = leftSide.x + full + 12
             const drop = []
             let p = place(order, drop, false)
             for (const i of order) {
@@ -255,6 +276,11 @@ Variants {
                 drop.push(i)
                 p = place(order, drop, true)
             }
+            // Still short of room with all it can tuck: the logo goes, then the spare workspaces, and the rest is cut
+            const room = p.left - 12 - leftSide.x
+            const sq = room >= full ? 0 : room >= full - logoW ? 1 : 2
+            if (sq !== squeeze) squeeze = sq
+            leftRoom = Math.max(0, p.left - 6)
             xs = p.xs
             moreX = p.more
             const t = drop.map(i => rep.itemAt(i).def)

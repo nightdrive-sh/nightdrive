@@ -128,7 +128,8 @@ Click an icon and a small menu opens under it:
   number of sessions).
 
 ⌘⇧Space walks through the menus with the arrow keys, and ⌘+drag moves an icon. On a narrow screen the icons that don't
-fit go into a **…** menu, the ones farthest from the clock first.
+fit go into a **…** menu, the ones farthest from the clock first. If that's still not enough, the logo and then the empty
+workspaces make room.
 
 ![The music, home and headphones menus in the top bar](docs/screenshots/menus.jpg)
 
