@@ -4,7 +4,10 @@
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
-sudo dnf install -y vdirsyncer khal python3-icalendar libsecret python3
+# Only when one is missing: nightdrive update installs Calendar on an install that never had it, and with the packages
+# there (Contacts brings vdirsyncer) it needs no password
+rpm -q vdirsyncer khal python3-icalendar libsecret python3 >/dev/null 2>&1 \
+  || sudo dnf install -y vdirsyncer khal python3-icalendar libsecret python3
 
 bin/calendar enable
 if [[ -z $(python3 lib/sources.py names 2>/dev/null) ]]; then
