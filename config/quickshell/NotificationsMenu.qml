@@ -1,18 +1,22 @@
 import QtQuick
 import Quickshell
+import "NotifGroups.js" as Groups
 
 // Hamburger menu: notifications (Notifs.qml's history + do-not-disturb toggle), ⌘Esc / F3.
-// A bare menu (shell.qml draws no card around it): a bar with the title and the controls, then each notification as its
-// own card, the same as the popups (NotificationCard.qml) and in the same place, so one is easy to find again.
-// Click = open the app, ×, right click or a two-finger swipe right = remove it, Clear = remove all (the cards slide
-// a little to the right and fade out one after another, NotificationCard.sweep()). A screenshot's preview drags out
-// as a file; the menu closes when it lands. A notification still open has its app's buttons, as in the popup.
+// A bare menu (shell.qml draws no card around it): a bar with the title and the controls, then the notifications as
+// cards, the same as the popups and in the same place, so one is easy to find again (#1982): under Needs you the pinned
+// ones still waiting for an answer (critical, Claude's permission requests), then under Earlier a stack per app, newest
+// on top (NotificationStack.qml: "+N more" opens it).
+// Click = open the app, ×, right click or a two-finger swipe right = remove it (a closed stack: all of it), Clear =
+// remove all (the stacks slide a little to the right and fade out one after another, NotificationStack.sweep()). A
+// screenshot's preview drags out as a file; the menu closes when it lands. A notification still open has its app's
+// buttons, as in the popup.
 // The power actions (lock, suspend, log out, reboot, shut down) live in the launcher (⌘Space › Power).
 Column {
     id: m
 
     // --- Tunables ---
-    readonly property int maxCards: 6          // shown whole, then the list scrolls (no sliver of the next one)
+    readonly property int maxCards: 6          // stacks shown whole, then the list scrolls (no sliver of the next one)
     readonly property real bgOpacity: 0.85     // the same as the popups (NotificationPopups.qml)
 
     readonly property bool bare: true
@@ -20,7 +24,17 @@ Column {
     width: parent ? parent.width : 300
     spacing: 10                                 // the popups' gap
 
-    property real lastShownBottom: -1           // the bottom of card number maxCards (set by that card)
+    property real lastShownBottom: -1           // the bottom of stack number maxCards (set by that stack)
+
+    // Pinned ones still open first, then a stack per app. The Repeater's model is the units' keys (NotificationPopups.qml
+    // says why).
+    readonly property var units: Groups.units(Notifs.history, r => !!Notifs.live[r.uid])
+    readonly property var byKey: {
+        const m = {}
+        for (const u of units) m[u.key] = u
+        return m
+    }
+    readonly property bool anyPinned: units.length > 0 && units[0].pinned
     property int dragging: 0                    // previews being dragged out: shell.qml lets the drop through to the windows below
 
     // Clear: the cards in view go one after another from the top, the history empties when the last is gone
@@ -33,7 +47,7 @@ Column {
         for (let i = 0; i < rep.count; i++) {
             const c = rep.itemAt(i)
             if (!c || c.y + c.height <= flick.contentY || c.y >= flick.contentY + flick.height) continue
-            c.sweep(n * 40)
+            c.stack.sweep(n * 40)
             n++
         }
         sweeping = n
@@ -115,25 +129,47 @@ Column {
             move: Transition { NumberAnimation { property: "y"; duration: 200; easing.type: Easing.OutCubic } }
             Repeater {
                 id: rep
-                // ScriptModel keeps the other cards when one goes (a plain array would make them all again)
-                model: ScriptModel { values: Notifs.history }
-                NotificationCard {
-                    id: card
+                model: ScriptModel { values: m.units.map(u => u.key) }
+                Column {
+                    id: unitItem
                     required property var modelData
                     required property int index
-                    row: modelData
-                    // Its notification while the app keeps it open: the app's buttons answer from here too (Salli, Kiellä)
-                    n: Notifs.live[modelData.uid] || null
+                    readonly property var unit: m.byKey[modelData] || ({ key: modelData, pinned: false, rows: [] })
+                    readonly property alias stack: stack
                     width: cards.width
-                    enabled: !m.clearing
-                    color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, m.bgOpacity)
-                    onSwept: m.sweptOne()
-                    onDraggingChanged: m.dragging += dragging ? 1 : -1
-                    onDropped: m.close()
-                    onViewed: m.close()
-                    onActivated: { Notifs.openApp(modelData); m.close() }
-                    onDismissed: Notifs.forget(modelData.uid)
-                    Binding { when: card.index === m.maxCards - 1; target: m; property: "lastShownBottom"; value: card.y + card.height }
+                    spacing: 10
+
+                    // Needs you above the first pinned one, Earlier above the first stack after them
+                    Rectangle {
+                        readonly property string text: unitItem.unit.pinned ? "NEEDS YOU" : "EARLIER"
+                        visible: m.anyPinned && (unitItem.index === 0
+                                 || (!unitItem.unit.pinned && m.units[unitItem.index - 1] && m.units[unitItem.index - 1].pinned))
+                        width: sectionText.implicitWidth + 16; height: 18; radius: 9
+                        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, m.bgOpacity)
+                        Text {
+                            id: sectionText
+                            anchors.centerIn: parent
+                            text: parent.text
+                            color: Theme.dim
+                            font { family: Theme.font; pixelSize: 9; letterSpacing: 1.2 }
+                        }
+                    }
+                    NotificationStack {
+                        id: stack
+                        unit: unitItem.unit
+                        width: cards.width
+                        enabled: !m.clearing
+                        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, m.bgOpacity)
+                        onSwept: m.sweptOne()
+                        property int counted: 0        // its drags already in m.dragging
+                        onDragsChanged: { m.dragging += drags - counted; counted = drags }
+                        onDropped: m.close()
+                        onViewed: m.close()
+                        onActivated: row => { Notifs.openApp(row); m.close() }
+                        onDismissed: row => Notifs.forget(row.uid)
+                        onDismissedAll: { for (const r of stack.rows.slice()) Notifs.forget(r.uid) }
+                    }
+                    Binding { when: unitItem.index === m.maxCards - 1; target: m; property: "lastShownBottom"; value: unitItem.y + unitItem.height }
                 }
             }
         }
