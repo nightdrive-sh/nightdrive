@@ -5,6 +5,8 @@ import QtQuick
 // it runs, dim once done, red with ✕ when it failed), a robot's head while it thinks, and its answer's text as it is
 // written.
 // It knows nothing of where it is shown (Ask Claude's toast, AskClaudePanel.qml): give it a width, maxHeight and the font.
+// The requests and answers can be selected with the mouse (#1904), one message at a time; copySelection() copies it.
+// The keyboard stays with the field: the text takes no focus, and the view's owner asks for the copy (⌘C there).
 Item {
     id: t
     property int maxHeight: 400
@@ -19,6 +21,15 @@ Item {
     readonly property real youShare: 0.7    // the most of the width your request's box takes
 
     readonly property var session: AskClaudeSession
+    // The message whose text is selected: selecting in another clears it, so there is one selection to copy
+    property var selection: null
+    readonly property string selectedText: selection ? selection.selectedText : ""
+    function copySelection() {
+        if (selectedText === "") return false
+        clip.copy(selectedText)
+        return true
+    }
+    ClipCopy { id: clip }
     readonly property bool thinking: session.busy && session.live === "" && !session.entries.some(e => e.kind === "step" && e.state === "run")
     implicitHeight: Math.min(col.implicitHeight, maxHeight)
     clip: true
@@ -68,14 +79,28 @@ Item {
             font { family: Icons.family; pixelSize: 14 }
         }
     }
-    component Said: Text {
+    // Read-only TextEdit rather than Text, for the selection. activeFocusOnPress off: a click must not take the keys from
+    // the field (Enter would no longer send); persistentSelection keeps the selection drawn without focus.
+    component Said: TextEdit {
+        id: said
         width: t.width
         leftPadding: t.inset
         rightPadding: t.inset
-        wrapMode: Text.Wrap
-        textFormat: Text.PlainText
+        wrapMode: TextEdit.Wrap
+        textFormat: TextEdit.PlainText
+        readOnly: true
+        selectByMouse: true
+        activeFocusOnPress: false
+        persistentSelection: true
+        selectionColor: Theme.sel
+        selectedTextColor: color
         color: Theme.text
         font { family: Theme.font; pixelSize: t.fontSize; weight: t.fontWeight }
+        onSelectedTextChanged: {
+            if (selectedText === "") { if (t.selection === said) t.selection = null; return }
+            if (t.selection && t.selection !== said) t.selection.deselect()
+            t.selection = said
+        }
     }
     // Claude's own words: the robot's head beside them, the text a little smaller than the field's and in line with the
     // steps' text; an error (no glyph) in the same place
@@ -112,6 +137,8 @@ Item {
         contentWidth: width
         contentHeight: col.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
+        // A mouse drag selects text rather than scrolling (#1904); the touchpad (TouchScroll) and the wheel (below) scroll
+        interactive: false
         // The newest stays in view as the conversation grows, unless you scrolled up to read: then it stays where you are
         // until you scroll back to the end
         property bool pinned: true
@@ -120,6 +147,13 @@ Item {
         onContentHeightChanged: if (pinned) toEnd()
         onHeightChanged: if (pinned) toEnd()
         TouchScroll { view: view; step: t.stepHeight }
+        // Flickable's own wheel scrolling needs interactive: three steps a notch
+        WheelHandler {
+            target: null
+            acceptedDevices: PointerDevice.Mouse
+            onWheel: e => view.contentY = Math.max(0, Math.min(view.contentHeight - view.height,
+                                                            view.contentY - e.angleDelta.y / 120 * 3 * t.stepHeight))
+        }
 
         Column {
             id: col

@@ -9,6 +9,7 @@ Enter on the **Ask Claude** row (the first, and after the hits when what you typ
 typed it opens the toast to write in, Shift+Enter for a new line). The Launcher closes, and a toast in its place shows
 the conversation: each step Claude takes, then its answer as it is written, and the field to write back. ⌃C stops it,
 ⌘N starts a new chat (so does a request from the search, or one after 15 minutes), PgUp and PgDn scroll a long answer,
+text dragged over with the mouse is copied with ⌘C,
 and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again, in manual mode: what the
 tools read came along, so each tool asks first until you change the mode (⇧Tab). Esc, or a click beside the
 toast, closes it without stopping Claude: a small card says it is working, then for a moment that it answered (the

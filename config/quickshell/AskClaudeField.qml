@@ -20,6 +20,8 @@ Item {
     signal leaving(string text)
     signal refused()                            // Enter with nothing to send
     signal paged(int dir)                       // PgUp (-1) / PgDn (1): the conversation's, not the field's
+    // ⌘C / ⌃C with nothing selected here: the view copies what is selected in the conversation (#1904); true = it did
+    property var copyElsewhere: () => false
 
     // --- Tunables ---
     readonly property int bigSize: baseSize + 2   // the search field's size, for a short request
@@ -104,6 +106,11 @@ Item {
                     if (shift) insert(cursorPosition, "\n")
                     else if (text.trim() === "") f.refused()
                     else f.sent(text)
+                    event.accepted = true
+                } else if (((cmd && event.key === Qt.Key_C) || ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_Insert))
+                           && selectedText === "" && f.copyElsewhere()) {
+                    // The conversation's selection: a copy wins over stopping Claude. ⌘C comes as Ctrl+Insert
+                    // (Hyprland's send_shortcut, hypr/bindings.lua), ⌃C as itself
                     event.accepted = true
                 } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C && selectedText === "" && AskClaudeSession.busy) {
                     AskClaudeSession.stop(); event.accepted = true   // ⌃C as in a terminal; with a selection it copies

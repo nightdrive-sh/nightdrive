@@ -36,10 +36,15 @@ Item {
     // over IPC (askClaude key in Launcher.qml) and goes on with the conversation in a terminal (AskClaudeLevels.terminal),
     // as ⌘Enter on the launcher's Ask Claude row does (#1980); without one yet, what was written is a new session's prompt.
     readonly property string terminalKey: "Cmd+Enter: open in terminal"
-    readonly property string keys: session.pendingCard ? ""
+    // A selection in the conversation (#1904): ⌘C copies it, and the footer says so for a moment once it has. Last in the
+    // footer, so the main key stays at its right edge
+    property bool copied: false
+    Timer { id: copiedTimer; interval: 1500; onTriggered: p.copied = false }
+    readonly property string copyKey: copied ? "Cmd+C: copied" : thread.selectedText !== "" ? "Cmd+C: copy" : ""
+    readonly property string keys: [session.pendingCard ? ""
         : session.busy ? "Ctrl+C: stop  ·  " + terminalKey
         : session.entries.length ? "Enter: send  ·  " + terminalKey + "  ·  Cmd+N: new chat"
-        : "Enter: ask Claude  ·  " + terminalKey
+        : "Enter: ask Claude  ·  " + terminalKey, copyKey].filter(k => k !== "").join("  ·  ")
 
     Item {
         id: fieldRow
@@ -60,6 +65,7 @@ Item {
             onLeaving: p.close()
             onRefused: p.refuse()
             onPaged: dir => thread.page(dir)
+            copyElsewhere: () => { if (!thread.copySelection()) return false; p.copied = true; copiedTimer.restart(); return true }
         }
         DictationIndicator {
             visible: p.dictating && p.dictation !== null
