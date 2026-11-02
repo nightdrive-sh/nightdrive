@@ -196,6 +196,9 @@ Column {
 }
 ```
 
+A menu taller than the screen scrolls by itself (the card stops at the screen's bottom edge), so it needs no scroller of
+its own for that; give one only to a list that may grow long (Bluetooth's devices), to keep the rest in sight.
+
 A change to a plugin's menu doesn't reload on save like the core menus: restart Quickshell to see
 it (`nightdrive restart`).
 

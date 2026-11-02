@@ -103,26 +103,32 @@ ShellRoot {
         out.sort((a, b) => navY(a) - navY(b))
         return out
     }
-    // The scrolling list (Flickable, ListView) a row is in, or null
+    // The scrolling list (Flickable, ListView) a row is in, or null. Stops at the card's own scroller (menuFlick):
+    // that one holds every row.
     function flickOf(it) {
-        for (let p = it.parent; p; p = p.parent)
+        for (let p = it.parent; p && p !== menuFlick; p = p.parent)
             if (p.contentItem !== undefined && p.contentY !== undefined) return p
         return null
     }
-    // A row's place in the menu, top to bottom. A row in a scrolling list counts within the list's own box, so a row
-    // scrolled out of sight still comes before the rows under the list
+    // A row's place in the menu, top to bottom, in the whole menu's (menuFlick's content) coordinates. A row in a
+    // scrolling list of the menu's own counts within the list's box, so a row scrolled out of sight still comes before
+    // the rows under the list
     function navY(it) {
         const f = flickOf(it)
-        if (!f) return it.mapToItem(card, 0, 0).y
+        if (!f) return it.mapToItem(menuFlick.contentItem, 0, 0).y
         const y = it.mapToItem(f.contentItem, 0, 0).y
-        return f.mapToItem(card, 0, 0).y + y / Math.max(1, f.contentHeight) * f.height
+        return f.mapToItem(menuFlick.contentItem, 0, 0).y + y / Math.max(1, f.contentHeight) * f.height
     }
+    // Scrolls the row into sight: in the menu's own list first, then the card (a menu taller than the screen)
     function navShow(it) {
+        const scroll = f => {
+            const y = it.mapToItem(f.contentItem, 0, 0).y
+            if (y < f.contentY) f.contentY = y
+            else if (y + it.height > f.contentY + f.height) f.contentY = y + it.height - f.height
+        }
         const f = flickOf(it)
-        if (!f) return
-        const y = it.mapToItem(f.contentItem, 0, 0).y
-        if (y < f.contentY) f.contentY = y
-        else if (y + it.height > f.contentY + f.height) f.contentY = y + it.height - f.height
+        if (f) scroll(f)
+        if (menuFlick.interactive) scroll(menuFlick)
     }
     function navMove(d) {
         const rows = navRows()
@@ -133,6 +139,7 @@ ShellRoot {
         navItem = rows[i]
         navItem.navSelected = true
         navShow(navItem)
+        if (i === 0) menuFlick.contentY = 0   // back at the first row: the header shows again
     }
     function navAct(a) {     // a: left | right | up | down | enter
         if (!navMode) return false
@@ -294,7 +301,10 @@ ShellRoot {
             // Center below the icon, but keep a 10 px margin from the screen edges
             x: root.anchorX < 0 ? parent.width - width - 10
                                 : Math.max(10, Math.min(parent.width - width - 10, root.anchorX - width / 2))
-            height: loader.item ? loader.item.implicitHeight + (bare ? 0 : 26) : 0   // 10 px top and 16 px bottom margin
+            // 10 px top and 16 px bottom margin. Never taller than the screen below the bar (a low display, a long System or
+            // Display menu): the menu then scrolls in menuFlick, so every menu gets it without a scroller of its own.
+            readonly property real fullHeight: loader.item ? loader.item.implicitHeight + (bare ? 0 : 26) : 0
+            height: Math.min(fullHeight, parent.height - anchors.topMargin - 10)
             radius: 10
             color: bare ? "transparent" : Theme.bg
             border.width: 0   // no border (the dividers inside the menu stay)
@@ -302,13 +312,27 @@ ShellRoot {
 
             MouseArea { anchors.fill: parent }   // a click inside the card doesn't close the menu
 
-            Loader {
-                id: loader
-                anchors { top: parent.top; left: parent.left; right: parent.right; leftMargin: card.bare ? 0 : 16; rightMargin: card.bare ? 0 : 16
-                          topMargin: card.bare ? 0 : 10 }
-                source: root.current === "" ? ""
-                      : TopBar.plugin.menus[root.current] ? "file://" + TopBar.plugin.menus[root.current]
-                      : (root.localMenus.indexOf(root.current) >= 0 ? "local/" : "") + root.current.charAt(0).toUpperCase() + root.current.slice(1) + "Menu.qml"
+            // Interactive only when the menu doesn't fit: otherwise a drag or wheel stays the menu's own (sliders, its lists)
+            Flickable {
+                id: menuFlick
+                anchors.fill: parent
+                contentHeight: card.fullHeight
+                interactive: card.fullHeight > card.height + 0.5
+                clip: interactive
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.VerticalFlick
+                TouchScroll { view: menuFlick; enabled: menuFlick.interactive }
+                // A new menu starts at its top
+                Connections { target: root; function onCurrentChanged() { menuFlick.contentY = 0 } }
+
+                Loader {
+                    id: loader
+                    anchors { top: parent.top; left: parent.left; right: parent.right; leftMargin: card.bare ? 0 : 16; rightMargin: card.bare ? 0 : 16
+                              topMargin: card.bare ? 0 : 10 }
+                    source: root.current === "" ? ""
+                          : TopBar.plugin.menus[root.current] ? "file://" + TopBar.plugin.menus[root.current]
+                          : (root.localMenus.indexOf(root.current) >= 0 ? "local/" : "") + root.current.charAt(0).toUpperCase() + root.current.slice(1) + "Menu.qml"
+                }
             }
             Connections {
                 target: loader.item
