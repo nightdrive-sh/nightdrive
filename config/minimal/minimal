@@ -393,15 +393,24 @@ mkdir -p "${UNDO%/*}"
   echo "# with \"Group state for \"\" not found\" (dnf5 putting back KDE's group reasons): the packages are back all the same"
   echo "sudo dnf history rollback --ignore-extras $before"
   echo "$repo/config/greeter/switch.sh off    # KDE's login screen again"
-  (( ${#configs[@]} )) && echo "mv $BACKUP/* ~/.config/ && rmdir $BACKUP    # KDE's settings"
+  # Before Plasma's first login: it makes kdedefaults and the like anew, and a mv onto them fails ("Directory not
+  # empty"); cp -a merges (#1634)
+  settings="cp -a $BACKUP/. ~/.config/ && rm -r $BACKUP    # KDE's settings, before you log in to Plasma"
+  (( ${#configs[@]} )) && echo "$settings"
+  echo "sudo reboot"
   if (( snapshot )); then
     echo
-    echo "# If dnf can't (an old version gone from the repos): the root as it was, from the snapshot. /home isn't in it,"
-    echo "# nor /boot when it's a partition of its own"
+    echo "# If dnf can't (an old version gone from the repos): the root as it was, from the snapshot. /home isn't in it, so"
+    echo "# KDE's settings and this file stay where they are; nor is /boot when it's a partition of its own"
     echo "sudo mount -o subvolid=5 $root_dev /mnt"
     echo "sudo mv /mnt${root_sub} /mnt${root_sub}.minimal"
     echo "sudo btrfs subvolume snapshot /mnt/$snap_name /mnt${root_sub}"
-    echo "sudo umount /mnt && sudo reboot    # afterwards: sudo btrfs subvolume delete /mnt${root_sub}.minimal (mounted as above)"
+    (( ${#configs[@]} )) && echo "$settings"
+    echo "sudo umount /mnt && sudo reboot"
+    echo "# After the reboot, in Nightdrive (the snapshot was taken once its login screen was in place) or a text console:"
+    echo "$repo/config/greeter/switch.sh off    # KDE's login screen again"
+    echo "sudo mount -o subvolid=5 $root_dev /mnt && sudo btrfs subvolume delete /mnt${root_sub}.minimal && sudo umount /mnt"
+    echo "rm ${UNDO/#$HOME/\~}    # this file: its dnf rollback no longer applies"
     echo
     echo "# Happy with Minimal: the snapshot holds on to the old files, so delete it to free the space"
     echo "sudo mount -o subvolid=5 $root_dev /mnt && sudo btrfs subvolume delete /mnt/$snap_name && sudo umount /mnt"

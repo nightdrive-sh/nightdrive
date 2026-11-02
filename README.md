@@ -396,8 +396,10 @@ man pages…) stay too, as do a VPN plugin one of your connections uses and cron
 networks whose password was in KDE's wallet ask for it again.
 
 The way back is printed at the end and kept in `~/.local/state/nightdrive/minimal-undo.txt`: `sudo dnf history rollback`
-while the repos still have KDE's versions, or the snapshot in the root's place. Once you're happy with Minimal, delete
-the snapshot (the same file says how), as it holds on to KDE's files.
+while the repos still have KDE's versions, or the snapshot in the root's place. Either way, put KDE's settings back
+before you log in to Plasma (the file's `cp -a` line), as Plasma makes its own anew; `/home` isn't in the snapshot, so
+they wait there. Once you're happy with Minimal, delete the snapshot (the same file says how), as it holds on to KDE's
+files.
 
 ### Updating
 
