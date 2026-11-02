@@ -60,7 +60,7 @@ ACCESS_COMMANDS = tuple(f"nightdrive mcp access {w}" for w in ("level", "set", "
 # their tools come from (#1928), and Claude Code's settings. A rule whose path covers one of them (Edit, Write(**),
 # Edit(~/.config/**), Write(~/.cache/**)) is named like a rule that runs anything.
 GUARDED_FILES = (".config/nightdrive/claude-access.json", ".config/nightdrive/claude-allowed.json",
-                 ".local/state/nightdrive/mcp-install.json", ".cache/nightdrive/plugins.d/active",
+                 ".local/state/nightdrive/mcp-install.json", ".local/state/nightdrive/plugins.d/active",
                  ".claude/settings.json", ".claude/settings.local.json", ".claude.json")
 # And the code that runs: the server, its command, the desktop scripts its tools run, the plugins (their mcp.json and
 # commands); each plugin that is on from outside this checkout too. Their docs (*.md) don't run.

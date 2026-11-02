@@ -3,7 +3,7 @@
 #   ref = name        Lucide icon (https://lucide.dev/icons), or an own SVG icons/<name>.svg
 #   ref = pack:name   any Iconify icon set (https://icon-sets.iconify.design), e.g. mdi:wifi, tabler:battery
 # Looked up in: ~/.config/topbar/local-icons (a private overlay), ~/.config/topbar/icons (the repo),
-# ~/.cache/nightdrive/plugins.d/icons (the plugins' own, icons/ in their folders: hypr/scripts/plugin-parts),
+# ~/.local/state/nightdrive/plugins.d/icons (the plugins' own, icons/ in their folders: hypr/scripts/plugin-parts),
 # ~/.local/share/topbar/icons (downloaded). A missing icon is downloaded from Iconify into the last one.
 # Draw the icon in currentColor: the bar replaces it with the icon colour (fixed colours stay as they are).
 set -uo pipefail
@@ -11,7 +11,7 @@ ref=${1:?usage: icon <name | pack:name>}
 [[ $ref =~ ^([a-z0-9-]+:)?[a-z0-9-]+$ ]] || { echo "bad icon name: $ref" >&2; exit 2; }
 if [[ $ref == *:* ]]; then pack=${ref%%:*}; name=${ref#*:}; else pack=lucide; name=$ref; fi
 dl="$HOME/.local/share/topbar/icons"
-for root in "$HOME/.config/topbar/local-icons" "$HOME/.config/topbar/icons" "$HOME/.cache/nightdrive/plugins.d/icons" "$dl"; do
+for root in "$HOME/.config/topbar/local-icons" "$HOME/.config/topbar/icons" "$HOME/.local/state/nightdrive/plugins.d/icons" "$dl"; do
   [[ $ref != *:* && -f $root/$name.svg ]] && exec cat "$root/$name.svg"
   [[ -f $root/$pack/$name.svg ]] && exec cat "$root/$pack/$name.svg"
 done

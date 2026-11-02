@@ -25,7 +25,7 @@ reenable=()
 for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,systemd/user/wireplumber.service.d,keyd,alsa,voxtype,gtk-3.0,gtk-4.0}/* \
   "$HOME"/.config/systemd/user/*.wants/* "$HOME"/.config/fontconfig/conf.d/* "$HOME"/.config/wireplumber/wireplumber.conf.d/* \
   "$HOME"/.local/bin/* "$HOME"/.local/share/* "$HOME"/.local/share/{applications,nightdrive,easyeffects/output,voxtype/quickshell}/* \
-  "$HOME"/.local/share/nautilus-python/extensions/* "$HOME"/.bashrc.d/* "$HOME"/.cache/nightdrive/plugins.d/icons/*; do
+  "$HOME"/.local/share/nautilus-python/extensions/* "$HOME"/.bashrc.d/* "$HOME"/.local/state/nightdrive/plugins.d/icons/*; do
   [[ -L $l && ! -e $l ]] || continue
   t=$(readlink "$l")
   if [[ $l == *.wants/* && ${l##*/} == nightdrive-* ]] || [[ $t == "$repo/"* || $t == "$external/"* ]]; then

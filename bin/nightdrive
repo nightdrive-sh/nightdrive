@@ -105,8 +105,8 @@ behind() { git -C "$1" rev-list --count "HEAD..$(upstream "$1")" 2>/dev/null || 
 # own changes (against its first parent); the merged commits count one by one.
 behind_nightdrive() {
   local on
-  [[ -e $cache/plugins.d/active ]] || plugins_installed >/dev/null
-  on=$(cut -f1 "$cache/plugins.d/active" 2>/dev/null | tr '\n' ' ')
+  [[ -e $HOME/.local/state/nightdrive/plugins.d/active ]] || plugins_installed >/dev/null
+  on=$(cut -f1 "$HOME/.local/state/nightdrive/plugins.d/active" 2>/dev/null | tr '\n' ' ')
   git -C "$repo" log --format=tformat:@ --name-only --diff-merges=first-parent "HEAD..$(upstream "$repo")" 2>/dev/null | awk -v on=" $on" '
     function count() { if (started && (keep || !paths)) n++ }
     $0 == "@" { count(); started = 1; keep = 0; paths = 0; next }
@@ -550,7 +550,7 @@ plugins_table() {
 # The installed ones that are on: their ids, also to ~/.cache/nightdrive/plugins (Plugins.qml watches it,
 # hypr/bindings.lua reads it). One that is off (plugins off) is left out, so the desktop treats it as not installed.
 # When the list changes, Hyprland reloads: the keybindings of an added or removed part. The plugin folders' parts (bar
-# module, menus, keys, shortcut lines) are gathered in ~/.cache/nightdrive/plugins.d (hypr/scripts/plugin-parts).
+# module, menus, keys, shortcut lines) are gathered in ~/.local/state/nightdrive/plugins.d (hypr/scripts/plugin-parts).
 plugins_installed() {
   local list ids old
   list=$(plugins | awk -F'\t' '$7 == 1 && $10 == 0')

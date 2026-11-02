@@ -148,7 +148,7 @@ end
 -- { id, dir, mod, scripts } as its ... (`nightdrive plugins installed` lists them in plugins.d/active). One that fails is
 -- left out with a line in Hyprland's log, so it can't take the rest of the keys with it.
 do
-    local f = io.open(os.getenv("HOME") .. "/.cache/nightdrive/plugins.d/active")
+    local f = io.open(os.getenv("HOME") .. "/.local/state/nightdrive/plugins.d/active")
     if f then
         for line in f:lines() do
             local id, dir = line:match("^([^\t]+)\t(.+)$")

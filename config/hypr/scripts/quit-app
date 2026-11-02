@@ -36,7 +36,7 @@ esac
 # (Quickshell's windows: Deck, Mail). The core's, yours (.local) and those of the plugins that are on.
 plugin_commands() {
   local id dir
-  while IFS=$'\t' read -r id dir; do cat "$dir/quit-commands" 2>/dev/null; done < "$HOME/.cache/nightdrive/plugins.d/active"
+  while IFS=$'\t' read -r id dir; do cat "$dir/quit-commands" 2>/dev/null; done < "$HOME/.local/state/nightdrive/plugins.d/active"
 }
 while IFS= read -r line; do
   [[ $line =~ ^[[:space:]]*(#|$) ]] && continue

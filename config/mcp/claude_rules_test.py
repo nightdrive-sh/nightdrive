@@ -57,7 +57,7 @@ EDITS = ["Edit", "Write", "Edit(*)", "Write(**)", "Edit(/**)", "Edit(//**)", "Ed
          "Edit(~/.local/state/**)", "MultiEdit(.config/**)", "Edit(//home/**)", "Edit(~/.config)", "Edit(~/.c*/**)",
          "Edit(~/dotfiles/**)", "Edit(//home/u/dotfiles/config/mcp/*.py)",
          # #1928: the list of plugins that are on, first-time allowances, the plugins' and scripts' code
-         "Write(~/.cache/**)", "Edit(~/.cache/nightdrive/plugins.d/*)",
+         "Edit(~/.local/state/nightdrive/plugins.d/*)", "Write(~/.local/state/nightdrive/plugins.d/active)",
          "Edit(~/.config/nightdrive/claude-allowed.json)",
          "Edit(~/dotfiles/plugins/**)", "Write(~/dotfiles/plugins/mail/mcp.json)", "Edit(~/dotfiles/plugins/*/bin/*)",
          "Edit(~/dotfiles/config/hypr/scripts/*)", "Edit(~/dotfiles/bin/nightdrive)", "Edit(//opt/outside/**)",
@@ -65,6 +65,8 @@ EDITS = ["Edit", "Write", "Edit(*)", "Write(**)", "Edit(/**)", "Edit(//**)", "Ed
 NOT_EDITS = ["Edit(~/Notes/**)", "Write(~/Downloads/*)", "Edit(src/**)", "Read(~/.config/**)", "Bash(cp *)", "Edit(",
              None, "Edit(~/.config/kitty/**)", "Edit(//tmp/**)", "Edit(~/dotfiles/docs/**)",
              "Edit(~/.cache/thumbnails/**)",
+             # #1950: the list of plugins that are on is no longer in ~/.cache
+             "Write(~/.cache/**)", "Edit(~/.cache/nightdrive/plugins.d/*)",
              "Edit(~/dotfiles/plugins/**/*.md)", "Edit(~/dotfiles/config/quickshell/kit/**)", "Edit(//opt/other/**)"]
 
 
@@ -133,14 +135,14 @@ class Rules(unittest.TestCase):
 
     def test_each_rule_named(self):
         allow = ["Bash(git status)", "Bash(nightdrive *)", "Bash(sqlite3 *)", "Bash(nightmail send *)",
-                 "Bash(nightdrive mcp access *)", "Bash(wtype *)", "Bash(ydotool *)", "Write(~/.cache/**)"]
+                 "Bash(nightdrive mcp access *)", "Bash(wtype *)", "Bash(ydotool *)", "Write(~/.local/state/**)"]
         out = claude_rules.wide_open({"permissions": {"allow": allow}}, "s.json", ["nightmail send",
-                                     *claude_rules.ACCESS_COMMANDS], {str(Path.home() / ".cache/nightdrive")})
+                                     *claude_rules.ACCESS_COMMANDS], {str(Path.home() / ".local/state/nightdrive")})
         self.assertEqual(len(out), 4, out)
         self.assertIn("(Bash(nightdrive *), Bash(sqlite3 *) allowed in s.json)", out[0])
         self.assertIn("(Bash(nightmail send *), Bash(nightdrive mcp access *) allowed in s.json)", out[1])
         self.assertIn("(Bash(wtype *), Bash(ydotool *) allowed in s.json)", out[2])
-        self.assertIn("(Write(~/.cache/**) allowed in s.json)", out[3])
+        self.assertIn("(Write(~/.local/state/**) allowed in s.json)", out[3])
 
     def test_accept_edits_mode(self):
         self.assertIn("acceptEdits", claude_rules.wide_open({"permissions": {"defaultMode": "acceptEdits"}})[0])

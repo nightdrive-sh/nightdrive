@@ -6,7 +6,7 @@ import Quickshell.Io
 // The top bar's data (Bar.qml draws it). Everything is read from files that are watched, so edits show at once:
 //   ~/.config/topbar/modules.jsonc (+ local.modules.jsonc)   the modules, in order
 //   ~/.config/topbar/adjust.conf   (+ local.adjust.conf)     icon and text sizes
-//   ~/.cache/nightdrive/plugins.d/bar.json                    the installed plugin folders' modules, menus and icon sizes
+//   ~/.local/state/nightdrive/plugins.d/bar.json             the installed plugin folders' modules, menus and icon sizes
 //                                                             (hypr/scripts/plugin-parts)
 //   ~/.cache/nightdrive/bar.json                              colours (hypr/scripts/bar-style)
 //   ~/.local/state/nightdrive/bar-items.json                  {hidden, order}: modules turned off and their order
@@ -24,7 +24,7 @@ Singleton {
     // levels: [paths of its <Name>Levels.qml, the launcher's] }
     property var plugin: ({ modules: [], menus: ({}), sizes: ({}), levels: [] })
     FileView {
-        path: Quickshell.env("HOME") + "/.cache/nightdrive/plugins.d/bar.json"; watchChanges: true; onFileChanged: reload(); printErrors: false
+        path: Quickshell.env("HOME") + "/.local/state/nightdrive/plugins.d/bar.json"; watchChanges: true; onFileChanged: reload(); printErrors: false
         onLoaded: {
             let v = null
             try { v = JSON.parse(text()) } catch (e) {}

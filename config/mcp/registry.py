@@ -47,8 +47,12 @@ from run import ToolError  # noqa: E402,F401  (server.py takes both errors from 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 CORE = HERE / "tools"
-# id<TAB>folder of each plugin that is installed and on, written by `nightdrive plugins installed` (plugin-parts)
-ACTIVE = Path.home() / ".cache/nightdrive/plugins.d/active"
+# id<TAB>folder of each plugin that is installed and on, written by `nightdrive plugins installed` (plugin-parts). In
+# ~/.local/state, not ~/.cache (#1950): what it lists gives the server its tools
+ACTIVE = Path.home() / ".local/state/nightdrive/plugins.d/active"
+# Where an external plugin's folder is (`nightdrive plugins add`): the only place a listed folder outside this checkout
+# may be, so a line written there by something else can't bring in the tools of a folder anywhere else
+EXTERNAL = Path.home() / ".local/share/nightdrive/plugins"
 
 NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 CLASSES = ("read", "change", "act")
@@ -231,9 +235,10 @@ def read_file(path, folder, plugin):
     return tools, problems
 
 
-def plugin_folders(active=ACTIVE):
+def plugin_folders(active=ACTIVE, external=EXTERNAL):
     """(id, folder) of each plugin that is installed and on. This checkout's folder when it has the plugin, so a
-    worktree's server reads the worktree's mcp.json; else the one listed (an external plugin's)."""
+    worktree's server reads the worktree's mcp.json; else the one listed when it is the external plugin's own,
+    external/<id>. A line that names any other folder, or an id that isn't a folder's name, is left out."""
     try:
         lines = Path(active).read_text().splitlines()
     except OSError:
@@ -241,9 +246,13 @@ def plugin_folders(active=ACTIVE):
     out = []
     for line in lines:
         pid, _, listed = line.partition("\t")
-        if pid:
-            own = REPO / "plugins" / pid
-            out.append((pid, own if own.is_dir() else Path(listed)))
+        if not pid or "/" in pid or pid.startswith("."):
+            continue
+        own = REPO / "plugins" / pid
+        if own.is_dir():
+            out.append((pid, own))
+        elif listed and Path(listed) == Path(external) / pid:
+            out.append((pid, Path(listed)))
     return out
 
 

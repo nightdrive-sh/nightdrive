@@ -2,7 +2,7 @@
 """Gathers the parts of the plugin folders that are on (installed) where the desktop reads them. `nightdrive plugins
 installed` runs this with one line per such folder on stdin: id<TAB>folder.
   plugin-parts
-Writes, in ~/.cache/nightdrive/plugins.d (only when the content changes, so the file watches don't fire for nothing):
+Writes, in ~/.local/state/nightdrive/plugins.d (only when the content changes, so the file watches don't fire for nothing):
   active    the same id<TAB>folder lines: hypr/bindings.lua runs each folder's bindings.lua, hypr/scripts/shortcuts adds
             its SHORTCUTS.md
   bar.json  {modules, menus, sizes, levels} for Quickshell (TopBar.qml, shell.qml, Launcher.qml): module.jsonc's modules,
@@ -11,10 +11,14 @@ Writes, in ~/.cache/nightdrive/plugins.d (only when the content changes, so the 
   icons/    links to the folders' own bar icons (icons/<name>.svg), which topbar/scripts/icon looks up after the core's:
             a plugin's icon can't replace a Lucide one or the bar's own
 Outside the repo, so a read-only checkout (nightdrive sandbox) works too. Folders that aren't on aren't in any of them,
-so their module, menu, icons, keys and shortcut lines don't show anywhere."""
-import glob, json, os, shlex, sys
+so their module, menu, icons, keys and shortcut lines don't show anywhere.
+State, not cache: what is listed here runs (Hyprland loads each folder's Lua, the bar its commands and menus, the MCP
+server its tools), so a cache cleaner or a rule that lets Claude write in ~/.cache mustn't change it (#1950). Until
+11.2026 it was ~/.cache/nightdrive/plugins.d: the first run here removes that one."""
+import glob, json, os, shlex, shutil, sys
 
-OUT = os.path.expanduser("~/.cache/nightdrive/plugins.d")
+OUT = os.path.expanduser("~/.local/state/nightdrive/plugins.d")
+OLD = os.path.expanduser("~/.cache/nightdrive/plugins.d")    # before #1950
 COMMANDS = ("status", "right", "middle", "drop")   # module.jsonc keys holding shell commands
 
 
@@ -87,6 +91,7 @@ def main():
     icons(folders)
     write("active", "".join(f"{pid}\t{d}\n" for pid, d in folders))
     write("bar.json", json.dumps({"modules": modules, "menus": menus, "sizes": sizes, "levels": levels}, indent=1) + "\n")
+    shutil.rmtree(OLD, ignore_errors=True)   # once the new one is there: an old list nothing reads any more
 
 
 if __name__ == "__main__":

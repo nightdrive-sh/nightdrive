@@ -757,7 +757,7 @@ end)
 -- as its ...: start(cmd) runs cmd once when the session starts, with the programs above (NightdriveLocked). One that
 -- fails is left out with a line in Hyprland's log. Their keys are in bindings.lua.
 do
-    local f = io.open(HOME .. "/.cache/nightdrive/plugins.d/active")
+    local f = io.open(HOME .. "/.local/state/nightdrive/plugins.d/active")
     if f then
         for line in f:lines() do
             local id, dir = line:match("^([^\t]+)\t(.+)$")
