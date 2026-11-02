@@ -31,6 +31,8 @@
 #   garage-ctl ssh-sync                      ~/.ssh/config.d/garage written again from the VMs
 #   garage-ctl ssh-key                       JSON: the ssh key a VM from an image gets ({ from, type, name }, {} for none)
 #   garage-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
+#   garage-ctl type NAME [--keymap fi]       the text on stdin (--clipboard: the clipboard's) typed into it as keys,
+#                                            on a US keyboard as an installer's console has (fi: a Finnish one)
 #   garage-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
 #   garage-ctl restore|unsnap NAME TAG       go back to one, delete one
 #   garage-ctl duplicate NAME TAG NEWTAG [LABEL]   a copy of one in the same disk, under NEWTAG (shown as LABEL)
@@ -282,6 +284,7 @@ case ${1:-} in
   pause)    pause "$2" ;;
   resume)   resume "$2" ;;
   synctime) synctime "$2" ;;
+  type)     type_text "${@:2}" ;;
   guest-scale) guest_scale "${2:-}" "${3:-}" ;;   # the overlay's: PID SCALE (lib/qemu.sh)
   display)  display "$2" ;;
   hide)     hide "$2" ;;

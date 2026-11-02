@@ -17,7 +17,8 @@ QtObject {
             ["d", "Bring its display forward, or hide it while it shows"],
             ["p", "Pause, or resume"],
             ["x", "Shut down"],
-            ["⇧X", "Force off: pull the plug"]] },
+            ["⇧X", "Force off: pull the plug"],
+            ["v", "Type the clipboard into it, as on a US keyboard"]] },
         { title: "Snapshots", keys: [
             ["t", "Take one, while it is stopped"],
             ["Tab", "To the list, and back"],

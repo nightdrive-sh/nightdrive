@@ -43,6 +43,12 @@ Item {
     }
     function shutDown() { if (root.running && (!root.stopping || root.slow)) root.ctl.power("stop", root.vm.name) }
     function forceOff() { if (root.running) root.ctl.power("kill", root.vm.name) }
+    // v: the clipboard's text typed into its console as keys on a US keyboard, as an installer's has, which has no
+    // clipboard of its own (#1872: garage-ctl type)
+    function typeClipboard() {
+        if (!root.running || root.paused) root.ctl.error = "Start " + root.vm.name + " to type into it"
+        else root.act(["type", root.vm.name, "--clipboard"])
+    }
     function takeSnapshot() { snapshots.take() }
     function focusSnapshots() { snapshots.focusList() }
     readonly property bool snapshotsFocused: snapshots.focused

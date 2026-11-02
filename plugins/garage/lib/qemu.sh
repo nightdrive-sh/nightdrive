@@ -203,6 +203,30 @@ guest_scale() {
   qga "$name" guest-file-close "{\"handle\": $h}" >/dev/null
 }
 
+# Text typed into it (#1872), for an installer's console, which has no clipboard: lib/typekeys.py, on stdin or from the
+# host's clipboard (--clipboard: the window's v). --keymap: the layout the guest's console has, us (an installer's) or fi
+TYPEKEYS=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/typekeys.py
+type_text() {
+  local name=${1:-} keymap=us clip=0
+  shift || true
+  while (($#)); do
+    case $1 in
+      --keymap) keymap=${2:-}; shift 2 || die "--keymap us|fi" ;;
+      --clipboard) clip=1; shift ;;
+      *) die "type NAME [--keymap us|fi] [--clipboard]" ;;
+    esac
+  done
+  need "$name"; running "$name" || die "$name isn't running"
+  [[ $(vm_state "$name") == paused* ]] && die "$name is paused: resume it first"
+  [[ $keymap == us || $keymap == fi ]] || die "Keymap: us or fi"
+  if ((clip)); then
+    local text; text=$(wl-paste -n -t text 2>/dev/null) && [[ -n $text ]] || die "Nothing to type: the clipboard has no text"
+    printf '%s' "$text" | (cd "$(dir "$name")" && python3 -I "$TYPEKEYS" qmp.sock "$name" "$keymap")
+  else
+    (cd "$(dir "$name")" && python3 -I "$TYPEKEYS" qmp.sock "$name" "$keymap")
+  fi
+}
+
 # Its SDL window's address and workspace, found by qemu's pid ("" while it has none)
 window_of() {
   hyprctl -j clients | jq -r --argjson pid "$(cat "$(dir "$1")/pid")" \

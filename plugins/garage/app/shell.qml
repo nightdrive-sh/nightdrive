@@ -135,6 +135,7 @@ ShellRoot {
                     else if (e.text === "x") page.shutDown()
                     else if (e.text === "X") page.forceOff()
                     else if (e.text === "t") page.takeSnapshot()
+                    else if (e.text === "v") page.typeClipboard()
                     else if (k === Qt.Key_Tab) page.focusSnapshots()
                     else if (k === Qt.Key_F2) page.renameVm()
                     else return
