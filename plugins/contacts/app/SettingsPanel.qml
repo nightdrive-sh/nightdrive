@@ -13,7 +13,7 @@ AppPanel {
     cardWidth: 520
     spacing: 22
 
-    property string lastSync: ""        // HH:MM of the timer's last round today, else its date
+    property string lastSync: ""        // the timer's last round: its time today, else its day and time
     property bool syncing: false
 
     function open() { visible = true; forceActiveFocus(); when.running = true }
@@ -41,8 +41,9 @@ AppPanel {
         stdout: StdioCollector {
             onStreamFinished: {
                 const m = text.match(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/)
-                const today = Qt.formatDate(new Date(), "yyyy-MM-dd")
-                root.lastSync = !m ? "" : m[1] === today ? m[2] : Qt.formatDate(new Date(m[1]), "d MMMM") + " " + m[2]
+                // The region's way: 14:30 today (2:30 PM in the US), else "Yesterday 14:30", "Tue 14:30", "28.10. 14:30"
+                const today = Regional.iso(new Date())
+                root.lastSync = !m ? "" : m[1] === today ? Regional.time(m[2]) : Regional.relative(m[1]) + " " + Regional.time(m[2])
             }
         }
     }

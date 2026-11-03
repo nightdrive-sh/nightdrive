@@ -180,13 +180,13 @@ ShellRoot {
             if (onePane && !cardOpen) openCard()
             card.chooseEmail()
         }
+        // The birthday on the card, the region's way: "3 May 1980", "May 3, 1980"; without the year "3 May", "May 3"
+        // (the region's medium date, its year left out). cards.py has YYYY-MM-DD or --MM-DD
         function when(b) {
-            // YYYY-MM-DD or --MM-DD (no year)
-            const m = b.match(/^(\d{4}|-)-(\d{2})-(\d{2})$/) || b.match(/^--(\d{2})-(\d{2})$/)
+            const m = b.match(/^(\d{4}|-)-(\d{2})-(\d{2})$/) || b.match(/^--()(\d{2})-(\d{2})$/)
             if (!m) return b
-            const year = m.length === 4 ? m[1] : "", mo = parseInt(m.length === 4 ? m[2] : m[1]), d = parseInt(m.length === 4 ? m[3] : m[2])
-            const date = Qt.formatDate(new Date(2000, mo - 1, d), "d MMMM")
-            return year && year !== "-" ? date + " " + year : date
+            if (/^\d{4}$/.test(m[1])) return Regional.format(b, "medium")
+            return Regional.format("2000-" + m[2] + "-" + m[3], Regional.region.medium.replace(/,? *y+/, ""))
         }
 
         // What just happened, in the kit's toast at the top of the window (a line under the list went unnoticed);

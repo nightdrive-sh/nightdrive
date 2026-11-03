@@ -33,7 +33,7 @@ Your contacts from iCloud, Google or another CardDAV server, kept in sync both w
 
 ## Editing
 
-- The labels (mobile, home, work…) take your own too (Custom…). The birthday is 3.5.1980, or 3.5. without the year. The photo keeps the middle square, 512 pixels at most.
+- The labels (mobile, home, work…) take your own too (Custom…). The birthday is written your region's way (Settings › Region): 3.5.1980, or 3.5. without the year (5/3/1980 and 5/3 in the US). The photo keeps the middle square, 512 pixels at most.
 - ⌘S (or ⌘⏎) saves, `Esc` leaves, asking first if something changed. A new contact goes in the account the sidebar is on; with several accounts, the editor's top line picks another.
 - A person whose cards in several accounts show as one is edited a card at a time; `Delete` deletes them all.
 - Saving writes only what you changed: whatever else the card holds (an iPhone's related names, Google's own fields) stays. Offline, the change goes at the next sync.

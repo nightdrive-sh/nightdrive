@@ -76,13 +76,14 @@ function time(hhmm, r) {
 
 // A day as typed → "YYYY-MM-DD", or "" when it isn't a day of the calendar (31.11. isn't). Always read: ISO 2026-11-05.
 // Then by the region's order (dmy 5.11.2026, 5/11/26; mdy 11/5/2026), with . / - or a space between, and without the
-// year (5.11., 11/5) the year of base ("YYYY-MM-DD", else this year). A two-digit year is this century's
+// year (5.11., 11/5; read in the order of the region's day) the year of base ("YYYY-MM-DD", else this year). A two-digit year is this century's
 function parse(text, r, base) {
     const t = (text || "").trim().replace(/\.$/, "")
     let y, mo, d, m
     if ((m = /^(\d{4})[-./ ](\d{1,2})[-./ ](\d{1,2})$/.exec(t))) { y = +m[1]; mo = +m[2]; d = +m[3] }
     else if ((m = /^(\d{1,2})[-./ ](\d{1,2})(?:[-./ ](\d{2}|\d{4}))?$/.exec(t))) {
-        const us = r && r.order === "mdy"
+        // Without the year, the order of the region's own day (ISO's MM-dd is month first, Sweden's d/M not)
+        const us = r && (m[3] ? r.order === "mdy" : /^M/.test(r.day))
         mo = us ? +m[1] : +m[2]
         d = us ? +m[2] : +m[1]
         y = m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : +(base || iso(new Date())).slice(0, 4)

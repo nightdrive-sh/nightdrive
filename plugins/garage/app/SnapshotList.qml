@@ -43,12 +43,18 @@ ColumnLayout {
         return stopped
     }
 
+    // When a snapshot was taken, the region's way (Settings › Region): "Today 14:30", "Yesterday 14:30", "Tue 14:30",
+    // "28.10. 14:30", 2:30 PM in the US. The day is Regional.relative's, which is the time itself for today
+    function when(v) {
+        const d = Regional.relative(v)
+        return (v.slice(0, 10) === Regional.iso(new Date()) ? "Today" : d) + " " + Regional.format(v, "time")
+    }
     function take() {
         if (!whenStopped("take a snapshot")) return
         const name = vmName
         // The tag is the time (unique, no spaces); the name is what shows, and can change. Its row stays until the list
         // shows it (onSnapsChanged), so it doesn't blink out between garage-ctl's exit and the next list; a failure takes it
-        ask(() => askName("Name the snapshot", "Snapshot " + Qt.formatDateTime(new Date(), "d.M. hh:mm"), n => {
+        ask(() => askName("Name the snapshot", "Snapshot " + Regional.format(new Date(), "day") + " " + Regional.format(new Date(), "time"), n => {
             if (!n) return
             const tag = "s" + Math.floor(Date.now() / 1000)
             root.saving = { vm: name, tag: tag, name: n }
@@ -58,7 +64,7 @@ ColumnLayout {
     function restore(i) {
         if (i < 0 || i >= snaps.length || !whenStopped("restore a snapshot")) return
         const name = vmName, s = snaps[i]
-        ask(() => askConfirm("Go back to " + s.name + "?", name + "'s disk returns to " + s.date + ": what changed since is lost.",
+        ask(() => askConfirm("Go back to " + s.name + "?", name + "'s disk returns to " + when(s.date) + ": what changed since is lost.",
                    "Restore", "rotate-ccw", () => ctl.run(["restore", name, s.tag])))
     }
     function rename(i) {
@@ -179,7 +185,7 @@ ColumnLayout {
                 Text {
                     id: about
                     anchors.verticalCenter: parent.verticalCenter
-                    text: row.modelData.date + (row.modelData.size != null ? "  ·  " + root.bytes(row.modelData.size) : "")
+                    text: root.when(row.modelData.date) + (row.modelData.size != null ? "  ·  " + root.bytes(row.modelData.size) : "")
                     color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
                 }
             }

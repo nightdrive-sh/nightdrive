@@ -153,7 +153,7 @@ duplicate() {
 
 # JSON: [{ name, mem, cpus, disk, used, iso, running (qemu is), state (lib/state.sh: stopped, booting, running,
 # stopping, paused), slow (stopping for long), acpi (stopping by the power button), shown (its window on a workspace
-# that shows), ssh (its port), user, snapshots: [{ tag, name, date, size }], newest first }]
+# that shows), ssh (its port), user, snapshots: [{ tag, name, date (local YYYY-MM-DDTHH:MM: the app writes it the region's way), size }], newest first }]
 list() {
   local first=1 shown='{}'
   # One look at Hyprland for all the VMs, and none while none runs
@@ -178,7 +178,7 @@ list() {
          ssh: (if $ssh == "" then null else ($ssh | tonumber) end), user: $user,
          disk: ($info["virtual-size"] / 1073741824 | floor),
          used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
-         snapshots: [($info.snapshots // []) | sort_by(-.["date-sec"])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%d.%m. %H:%M")), size: $sizes[.name] }] }'
+         snapshots: [($info.snapshots // []) | sort_by(-.["date-sec"])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%Y-%m-%dT%H:%M")), size: $sizes[.name] }] }'
   done
   echo "]"
 }

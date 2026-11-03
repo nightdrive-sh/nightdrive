@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import qs.kit
 
 // Deck's own files, read and watched: the shelf, Curated, what you have listened to and played lately, and the genres
 // for the radio with your favourites. Its own file so the views and the actions share one copy of them, and what is
@@ -42,16 +43,9 @@ Item {
         onFileChanged: reload()
         onLoaded: { try { root.history = JSON.parse(text()) } catch (e) { root.history = [] } }
     }
-    // When: today's with its time, then yesterday, a weekday this week, and a date before that
-    function when(at) {
-        const d = new Date(at * 1000), now = new Date()
-        const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-        const days = Math.round((day(now) - day(d)) / 86400000)
-        if (days === 0) return "Today " + Qt.formatTime(d, "hh:mm")
-        if (days === 1) return "Yesterday"
-        if (days < 7) return Qt.formatDate(d, "dddd")
-        return Qt.formatDate(d, "ddd d MMM")
-    }
+    // When, as the other apps' lists say it (the kit's Regional, Settings › Region): the time today, Yesterday, the
+    // weekday this week, then the day (28.10., 10/28 in the US)
+    function when(at) { return Regional.relative(new Date(at * 1000)) }
     function heard(uri) {
         const l = listened[uri]
         if (!l) return ""
