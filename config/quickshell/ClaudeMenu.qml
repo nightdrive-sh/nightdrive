@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import qs.kit
 import Quickshell.Io
 
 // Claude: the Claude Code sessions on this desktop (Claude.qml: a click goes to its window; the ones that finished while
@@ -43,7 +44,7 @@ Column {
             const h = Math.floor(d / 3600), mi = Math.floor(d % 3600 / 60)
             return "resets in " + (h > 0 ? h + "h " : "") + mi + "m"
         }
-        return "resets " + Qt.formatDateTime(t, "ddd HH:mm")
+        return "resets " + Regional.dayName(t.getDay(), true) + " " + Regional.format(t, "time")   // the region's time: 1:00 AM in the US
     }
 
     MenuHeader { width: parent.width; title: "Claude"; subtitle: m.usage && m.usage.plan ? m.usage.plan : "" }

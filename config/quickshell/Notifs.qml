@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import Quickshell.Wayland
+import qs.kit
 import "NotifGroups.js" as Groups
 
 // Notification server (org.freedesktop.Notifications; replaced mako on 14.10.2026). NotificationPopups.qml draws the popups,
@@ -114,13 +115,14 @@ Singleton {
         }
     }
 
-    // "now", "5 min", "2 h", then the time of day
+    // "now", "5 min", "2 h", then when as the apps' lists say it, the region's way (Settings › Region): the time today
+    // (14:30, 2:30 PM in the US), Yesterday, the weekday this week, then the day
     function ago(t) {
         const m = Math.floor((now - t) / 60000)
         if (m < 1) return "now"
         if (m < 60) return m + " min"
         if (m < 6 * 60) return Math.floor(m / 60) + " h"
-        return Qt.formatTime(new Date(t), "HH:mm")
+        return Regional.relative(new Date(t))
     }
 
     // Icons for names the icon theme doesn't have (blueman's headphones), recoloured by hypr/scripts/theme

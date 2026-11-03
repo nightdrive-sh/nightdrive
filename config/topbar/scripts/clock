@@ -1,9 +1,9 @@
 #!/bin/bash
-# The top bar clock (the calendar module). Right click cycles its format, from long to short (here in the dmy style):
-#   0  Thu 15.10. 13:48     1  Thu 15. 13:48     2  15.10. 13:48     3  13:48
-# The day and month follow the date style: auto = the order and separator of the region's date (Settings › Region, LC_TIME
-# in ~/.config/locale.conf, else the session's: fi 15.10., en_GB 15/10, en_US 10/15, sv 10-15), or one of dmy (15.10.),
-# mdy (10/15), iso (10-15) set with `clock style`.
+# The top bar clock (the calendar module). Right click cycles its format, from long to short (here in Finland's way):
+#   0  Tue 3.11. 13:48     1  Tue 3. 13:48     2  3.11. 13:48     3  13:48
+# The day, the month and the time are the region's (Settings › Region, `nightdrive region`: regions.json's day and time,
+# as the apps' Regional writes them: 3.11. 13:48, 11/3 1:48 PM in the US), or the date in one of the styles set with
+# `clock style`: dmy (3.11.), mdy (11/3), iso (11-03); auto is the region's.
 # Weekdays are always in English.
 # Usage: clock [text|next]   the clock's text now | the next format
 #        clock style [auto|dmy|mdy|iso]   shows or sets the date style (`nightdrive topbar date …`)
@@ -11,16 +11,16 @@ state=${XDG_STATE_HOME:-$HOME/.local/state}/nightdrive
 mode=$(cat "$state/clock-mode" 2>/dev/null); [[ $mode =~ ^[0-3]$ ]] || mode=0
 style=$(cat "$state/date-style" 2>/dev/null); [[ $style =~ ^(dmy|mdy|iso)$ ]] || style=auto
 
-# The region's own date, e.g. 31.12.2000 / 31/12/00 / 12/31/2000 / 2000-12-31: the order and the separator. LC_TIME from
-# locale.conf, as hypr/scripts/region writes it: the bar was started before a change, with the LC_TIME of then
-locale_dm() {
-  local lt; lt=$(sed -n 's/^[[:space:]]*LC_TIME=["'"'"']\{0,1\}\([^"'"'"' ]*\).*/\1/p' "${XDG_CONFIG_HOME:-$HOME/.config}/locale.conf" 2>/dev/null | tail -1)
-  local x; x=$(LC_TIME=${lt:-${LC_TIME:-}} date -d 2000-12-31 +%x 2>/dev/null)
-  local sep; sep=$(grep -o '[^0-9]' <<<"$x" | head -1); sep=${sep:-.}
-  if [[ $x == 2000* || $x == 00[^0-9]* ]]; then echo "%m-%d|%d"
-  elif [[ $x == 12* ]]; then echo "%m$sep%d|%d"
-  elif [[ $sep == . ]]; then echo "%d.%m.|%d."
-  else echo "%d$sep%m|%d"; fi
+# The region's day and time as date(1) formats, one a line: "%-d.%-m." and "%-H:%M" in Finland, "%-m/%-d" and
+# "%-I:%M %p" in the US. hypr/scripts/region reads locale.conf each time, so a change shows at the next tick (the bar
+# was started before it, with the LC_TIME of then). Without it, ISO's
+region_fmt() {
+  local out
+  out=$(~/.config/hypr/scripts/region --json 2>/dev/null | jq -r '
+    def strf: gsub("(?<t>dd|d|MM|M|HH|H|hh|h|mm|AP|ap)"; {dd: "%d", d: "%-d", MM: "%m", M: "%-m", HH: "%H", H: "%-H",
+                                                         hh: "%I", h: "%-I", mm: "%M", AP: "%p", ap: "%P"}[.t]);
+    (.day | strf), (.time | strf)' 2>/dev/null)
+  if [[ $out == ?*$'\n'?* ]]; then echo "$out"; else printf '%s\n' '%m-%d' '%H:%M'; fi
 }
 
 case ${1:-text} in
@@ -32,13 +32,14 @@ case ${1:-text} in
     mkdir -p "$state" && echo "$2" > "$state/date-style"
     command -v qs >/dev/null && qs ipc call bar refresh >/dev/null 2>&1 || true ;;
   text)
+    { read -r full; read -r tm; } < <(region_fmt)
     case $style in
-      dmy) dm="%d.%m.|%d." ;;
-      mdy) dm="%m/%d|%d" ;;
-      iso) dm="%m-%d|%d" ;;
-      *)   dm=$(locale_dm) ;;
+      dmy) full="%-d.%-m." ;;
+      mdy) full="%-m/%-d" ;;
+      iso) full="%m-%d" ;;
     esac
-    full=${dm%|*} day=${dm#*|}
-    fmt=("%a $full %H:%M" "%a $day %H:%M" "$full %H:%M" "%H:%M")
-    LC_TIME=en_GB.UTF-8 date "+${fmt[mode]}" ;;
+    # The day alone: "3." where the date has dots, else "3"
+    if [[ $full == *.* ]]; then day="%-d."; else day="%-d"; fi
+    fmt=("%a $full $tm" "%a $day $tm" "$full $tm" "$tm")
+    LC_TIME=C date "+${fmt[mode]}" ;;
 esac

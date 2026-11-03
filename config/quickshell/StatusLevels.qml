@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import qs.kit
 
 // The launcher's System › Status: the top bar's SystemMenu and ClaudeMenu as launcher rows (topbar/scripts/sysinfo menu
 // and claude-usage). Launcher.qml asks it like its other Levels files (levels, titles, parents, items, activate, footer,
@@ -54,7 +55,7 @@ Item {
         const d = Math.round((t - new Date()) / 1000)
         if (d <= 0) return "resetting now"
         if (d < 86400) { const h = Math.floor(d / 3600), mi = Math.floor(d % 3600 / 60); return "resets in " + (h > 0 ? h + "h " : "") + mi + "m" }
-        return "resets " + Qt.formatDateTime(t, "ddd HH:mm")
+        return "resets " + Regional.dayName(t.getDay(), true) + " " + Regional.format(t, "time")   // the region's time: 1:00 AM in the US
     }
     function statusLive(key) {
         const d = sysData

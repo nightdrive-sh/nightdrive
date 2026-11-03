@@ -1,6 +1,8 @@
 import QtQuick
+import qs.kit
 
-// Calendar: month view (Monday first, week numbers). Opens by clicking the date.
+// Calendar: month view, its weeks from the region's first day (Settings › Region: Monday, Sunday in the US), with ISO
+// week numbers. Opens by clicking the date. The names are the kit's Regional, as in the apps.
 // ‹ › browse months, clicking the title returns to the current month.
 Column {
     id: m
@@ -12,15 +14,14 @@ Column {
     property int month: today.getMonth()      // 0-11
     signal close()
 
-    readonly property var monthNames: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-    readonly property var dayNames: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+    readonly property var dayNames: Regional.weekdays.map(wd => Regional.dayName(wd, true).slice(0, 2))
     readonly property int cell: 34
     readonly property int weekCol: 28
 
     // 42 cells (6 weeks): { d, inMonth, isToday, week }
     readonly property var cells: {
         const first = new Date(year, month, 1)
-        const offset = (first.getDay() + 6) % 7
+        const offset = (first.getDay() - Regional.weekStart + 7) % 7
         const out = []
         for (let i = 0; i < 42; i++) {
             const dt = new Date(year, month, 1 - offset + i)
@@ -28,7 +29,8 @@ Column {
                 d: dt.getDate(),
                 inMonth: dt.getMonth() === month,
                 isToday: dt.getFullYear() === today.getFullYear() && dt.getMonth() === today.getMonth() && dt.getDate() === today.getDate(),
-                week: i % 7 === 0 ? isoWeek(dt) : 0
+                // A week from Sunday is numbered by its Monday, the ISO week most of its days are in
+                week: i % 7 === 0 ? isoWeek(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + (dt.getDay() === 0 ? 1 : 0))) : 0
             })
         }
         return out
@@ -59,7 +61,7 @@ Column {
         }
         Text {
             anchors.centerIn: parent
-            text: m.monthNames[m.month] + " " + m.year
+            text: Regional.format(new Date(m.year, m.month, 1), "month")
             color: titleArea.containsMouse ? Theme.accent : Theme.text
             font { family: Theme.font; pixelSize: 14; bold: true }
             MouseArea { cursorShape: Qt.PointingHandCursor; id: titleArea; anchors { fill: parent; margins: -4 } hoverEnabled: true; onClicked: m.reset() }

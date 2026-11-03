@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import qs.kit
 
 // The launcher's Settings › Top bar (opacity, icon colors, highlight, the clock's date format, the N█ logo, which items it shows and
 // in what order) and Screensaver (style, start after, screen off after). The values apply as they are chosen, so they
@@ -16,8 +17,9 @@ Item {
     property int barIconOp: -1                // icon and text opacity
     property string barHl: ""                 // Top bar › Highlight: theme | white | black
     property string barDate: ""               // Top bar › Date format: auto | dmy | mdy | iso (topbar/scripts/clock style)
-    // The clock's date styles, shown with today's date in each
-    readonly property var dateStyles: [["auto", "As the system", ""], ["dmy", "Day first", "dd.MM."], ["mdy", "Month first", "MM/dd"],
+    // The clock's date styles, shown with today's date in each (topbar/scripts/clock writes the same); auto is the
+    // region's day (Settings › Region, the kit's Regional)
+    readonly property var dateStyles: [["auto", "As the region", ""], ["dmy", "Day first", "d.M."], ["mdy", "Month first", "M/d"],
                                        ["iso", "ISO", "MM-dd"]]
     property int idleSaver: -1                // Screensaver: minutes until the screensaver / screen off, 0 = never,
     property int idleOff: -1                  // -1 = not read yet (hypr/scripts/idle)
@@ -105,7 +107,8 @@ Item {
         }
         if (level === "bardate") {
             return dateStyles.map(d => ({ kind: "bardate", value: d[0], name: d[1], glyph: barDate === d[0] ? "check" : "calendar",
-                                          summary: d[2] !== "" ? Qt.formatDate(new Date(), d[2]) : "the order of the system's language" }))
+                                          summary: d[2] !== "" ? Regional.format(new Date(), d[2])
+                                                   : Regional.format(new Date(), "day") + ", " + Regional.name + " (Settings › Region)" }))
         }
         if (level === "baritems") {
             // What the bar shows, in its order (left to right); Enter turns one on or off
