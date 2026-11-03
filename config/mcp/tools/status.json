@@ -3,7 +3,7 @@
     {
       "name": "nightdrive_status",
       "title": "Nightdrive status",
-      "description": "What this desktop is and runs: Nightdrive's version and update channel, Fedora's version, the theme and wallpaper, the displays (resolution, scale), and which of Nightdrive's apps and plugins are installed, turned off or available. Use it before answering about this machine's setup.",
+      "description": "What this desktop is and runs: Nightdrive's version and update channel, Fedora's version, the theme and wallpaper, the region (how the user writes dates and times: write them so), the displays (resolution, scale), and which of Nightdrive's apps and plugins are installed, turned off or available. Use it before answering about this machine's setup.",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
       "command": ["python3", "status.py", "nightdrive_status"],
       "stdin": "json",

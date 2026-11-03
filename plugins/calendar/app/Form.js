@@ -1,32 +1,12 @@
 .pragma library
-// The event editor's fields as people type them, and what `calendar add` takes from them. Kept apart from the panel so
-// the rules (what a time or a day may look like, what an event needs) are in one place and the QML only shows them.
-// Days are "YYYY-MM-DD" and times "HH:MM" as text, as Dates.js has them: compared as text, no time zone in between.
+// The event editor's fields, and what `calendar add` takes from them. Kept apart from the panel so the rules (what an
+// event needs) are in one place and the QML only shows them. Days are "YYYY-MM-DD" and times "HH:MM" as text, as
+// Dates.js has them: compared as text, no time zone in between. How a day or a time is typed and shown is the
+// region's (Settings › Region): the kit's Regional.parse and Regional.format, which the panel calls.
 
 function pad(n) { return (n < 10 ? "0" : "") + n }
 
 function iso(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) }
-
-// A time as typed: "9", "930", "9:30", "09.30" → "09:30"; "" when it isn't one. Without the colon it is still read,
-// as the fields are small and quick typing is the point
-function time(text) {
-    const m = /^(\d{1,2})(?:[:.]?(\d{2}))?$/.exec((text || "").trim())
-    if (!m) return ""
-    const h = +m[1], min = m[2] ? +m[2] : 0
-    return h > 23 || min > 59 ? "" : pad(h) + ":" + pad(min)
-}
-
-// A day as typed: "2026-11-05", or the Finnish way "5.11.2026" and "5.11." (the year of base, "YYYY-MM-DD") → ISO;
-// "" when it isn't a day of the calendar (31.11. isn't)
-function day(text, base) {
-    const t = (text || "").trim()
-    let y, mo, d, m
-    if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t))) { y = +m[1]; mo = +m[2]; d = +m[3] }
-    else if ((m = /^(\d{1,2})\.(\d{1,2})\.?(\d{4})?$/.exec(t))) { d = +m[1]; mo = +m[2]; y = m[3] ? +m[3] : +(base || iso(new Date())).slice(0, 4) }
-    else return ""
-    const x = new Date(y, mo - 1, d)
-    return x.getFullYear() === y && x.getMonth() === mo - 1 && x.getDate() === d ? iso(x) : ""
-}
 
 // [day, time] minutes after day's time: an hour past 23:30 is the next day
 function later(dayText, timeText, minutes) {
@@ -54,12 +34,13 @@ function blank(dayText, now, hour, minute) {
 }
 
 // What is wrong with the fields, in words for the panel, or "" when the event can be added. f's days and times are
-// already normalised by day() and time() (an unreadable one is "")
-function problem(f) {
+// already read by Regional.parse and parseTime (an unreadable one is ""); day and time are examples the region's way
+// ("5.11.2026", "9:30" or "9:30 AM")
+function problem(f, day, time) {
     if (!f.title.trim()) return "An event needs a title."
-    if (!f.startDay) return "The first day is 2026-11-05 or 5.11.2026."
-    if (!f.endDay) return "The last day is 2026-11-05 or 5.11.2026."
-    if (!f.allDay && (!f.startTime || !f.endTime)) return "A time is 9:30 or 0930."
+    if (!f.startDay) return "The first day is written " + day + "."
+    if (!f.endDay) return "The last day is written " + day + "."
+    if (!f.allDay && (!f.startTime || !f.endTime)) return "A time is written " + time + "."
     if (f.endDay < f.startDay) return "It ends before it starts."
     if (!f.allDay && between(f.startDay, f.startTime, f.endDay, f.endTime) <= 0) return "It ends before it starts."
     if (!f.calendar) return "Pick a calendar for it."

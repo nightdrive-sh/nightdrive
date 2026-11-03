@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Settings › Region (`nightdrive region`): how dates and times are written, apart from the language.
+
+The region is LC_TIME in ~/.config/locale.conf, so programs other than Nightdrive's follow it too: hyprland.lua reads it
+at start and this script hands it to the running Hyprland (hyprctl eval hl.env), so what starts next has it at once;
+what is already open keeps its own until it restarts. The kit's Regional.qml reads the same file, so Nightdrive's apps
+change at once. The regions are config/quickshell/kit/regions.json, the one list (Regional.qml reads it too).
+
+  region                  the current region's id (fi, us, …)
+  region list             the regions, the current one marked
+  region set ID           write LC_TIME for it (the language, LANG, stays)
+  region … --json         as JSON: { id, name, locale, short, time, weekStart, … } or the list
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+CONF = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "locale.conf")
+REGIONS = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "quickshell", "kit", "regions.json")
+FALLBACK = "iso"   # a locale none of the regions has, or none set: the unambiguous one
+
+
+def regions():
+    with open(REGIONS) as f:
+        return {k: v for k, v in json.load(f).items() if not k.startswith("_")}
+
+
+def conf_lines():
+    try:
+        with open(CONF) as f:
+            return f.read().splitlines()
+    except FileNotFoundError:
+        return []
+
+
+def conf_time():
+    """LC_TIME in locale.conf, or "" when it has none"""
+    for line in conf_lines():
+        m = re.match(r'\s*LC_TIME=["\']?([^"\'\s]*)', line)
+        if m:
+            return m.group(1)
+    return ""
+
+
+def region_of(locale, table):
+    """The region whose locale is this one (fi_FI.utf8 matches fi_FI.UTF-8), else FALLBACK"""
+    base = locale.split(".")[0]
+    for rid, r in table.items():
+        if r["locale"].split(".")[0] == base:
+            return rid
+    return FALLBACK
+
+
+def current(table):
+    # locale.conf first. Without it the session's own LC_TIME or LANG, but not en_US: it is Fedora's default for
+    # everyone who keeps English, so it says nothing of where they are, and the apps wrote ISO dates and 24 h before
+    # there was a region (Regional.qml does the same)
+    if conf_time():
+        return region_of(conf_time(), table)
+    rid = region_of(os.environ.get("LC_TIME") or os.environ.get("LANG") or "", table)
+    return FALLBACK if rid == "us" else rid
+
+
+def write(locale):
+    lines = [l for l in conf_lines() if not re.match(r"\s*LC_TIME=", l)]
+    lines.append("LC_TIME=" + locale)
+    os.makedirs(os.path.dirname(CONF), exist_ok=True)
+    tmp = CONF + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, CONF)   # whole, so Regional.qml's watch never reads half a file
+
+
+def tell_session(locale):
+    """What starts from now on gets the new LC_TIME: Hyprland's children, systemd's and D-Bus's services. Each may be
+    missing (a tty, the sandbox): the file is what counts, the rest only spares a new login"""
+    for cmd in (["hyprctl", "eval", 'hl.env("LC_TIME", "%s")' % locale],
+                ["systemctl", "--user", "set-environment", "LC_TIME=" + locale],
+                ["dbus-update-activation-environment", "LC_TIME=" + locale]):
+        try:
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    # The top bar's clock reads the region for its "As the system" date style (topbar/scripts/clock)
+    try:
+        subprocess.run(["qs", "ipc", "call", "bar", "refresh"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def main(argv):
+    as_json = "--json" in argv
+    args = [a for a in argv if a != "--json"]
+    table = regions()
+    cmd = args[0] if args else "show"
+    if cmd == "show":
+        rid = current(table)
+        print(json.dumps(dict(table[rid], id=rid, set=bool(conf_time()))) if as_json else rid)
+    elif cmd == "list":
+        rid = current(table)
+        if as_json:
+            print(json.dumps([dict(r, id=k, current=k == rid) for k, r in table.items()]))
+        else:
+            for k, r in table.items():
+                print("%s %-4s %-15s %s" % ("*" if k == rid else " ", k, r["name"], r["locale"]))
+    elif cmd == "set" and len(args) == 2:
+        rid = args[1].lower()
+        if rid not in table:
+            print("region: no region %r (%s)" % (args[1], ", ".join(table)), file=sys.stderr)
+            return 1
+        write(table[rid]["locale"])
+        tell_session(table[rid]["locale"])
+        print(json.dumps(dict(table[rid], id=rid)) if as_json else rid)
+    else:
+        print(__doc__.strip().split("\n\n")[-1], file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

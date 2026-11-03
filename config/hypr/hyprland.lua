@@ -15,6 +15,7 @@ local BUILTIN_DISPLAY = "eDP-1"   -- a laptop's own screen (a desktop has none)
 local BAR_HEIGHT    = 37      -- the top bar in logical px (Theme.barHeight in quickshell/Theme.qml): the top corners start under it
 
 local HOME = os.getenv("HOME")
+require("region")   -- LC_TIME of Settings › Region for what starts here: region.lua
 
 -- Each load of this config (a reload, a screen that comes or goes, the lid) leaves its time here: Hyprland announces the
 -- screens again, which crashes GStreamer's waylandsink in UxPlay, and its restart loop doesn't count those crashes

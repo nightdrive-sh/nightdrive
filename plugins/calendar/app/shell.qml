@@ -70,7 +70,7 @@ ShellRoot {
         // What the view shows: the month's six weeks, or the week
         function viewRange() {
             const d = Dates.parse(day)
-            const from = view === "month" ? Dates.monthDays(d.getFullYear(), d.getMonth())[0] : Dates.monday(d)
+            const from = view === "month" ? Dates.monthDays(d.getFullYear(), d.getMonth(), Regional.weekStart)[0] : Dates.weekFirst(d, Regional.weekStart)
             return [Dates.iso(from), Dates.iso(Dates.addDays(from, view === "month" ? 42 : 7))]
         }
         function load(force) {

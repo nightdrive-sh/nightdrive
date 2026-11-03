@@ -41,6 +41,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `KeyCap` | Keys as caps: "⌘N  c" is [⌘][N] [c] (`or`: a "/" between the alternatives); `tint` colours them |
 | `Key` | One key cap, Raycast's way: a square a little lighter than its ground, a name (esc, HYPER) wider. The launcher uses it too (`import qs.kit as Kit`) |
 | `KeySheet` | The window's keys, on ? and Ctrl+? |
+| `Regional` | Dates and times the user's way (Settings › Region, `regions.json`): `format(dateOrIso, "short" \| "day" \| "medium" \| "long" \| "time" \| "month")` (3.11.2026, Tue 3 November 2026; 11/3/2026 in the US), `time("14:30")`, `range(a, b)` ("2 – 8 Nov 2026"), `parse(text, baseIso)` and `parseTime(text)` back to "YYYY-MM-DD" and "HH:MM" ("" when unreadable), `weekStart`, `weekdays`, `h24`, `example`. Names stay English. A singleton over `Dates.js`, whose pure functions take the region as an argument |
 
 The app's command (`nightmail`, `deck-window`) sources `kit/app.sh` through the same link, after setting `QS_DIR`,
 `APP_TITLE` (the window's title) and `APP_IPC` (its IpcHandler's target): it starts the window or brings it forward,

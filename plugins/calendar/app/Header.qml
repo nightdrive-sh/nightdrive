@@ -16,14 +16,13 @@ Item {
     property bool switchable: true
 
     readonly property date day: Dates.parse(app.day)
-    readonly property date monday: Dates.monday(day)
-    readonly property date sunday: Dates.addDays(monday, 6)
-    readonly property string longName: app.view === "month" ? Qt.formatDate(day, "MMMM yyyy")
-        : "Week " + Dates.week(monday) + "  ·  " + Qt.formatDate(monday, monday.getMonth() === sunday.getMonth() ? "d" : "d MMM")
-          + " – " + Qt.formatDate(sunday, "d MMM yyyy")
-    readonly property string shortName: app.view === "month" ? Qt.formatDate(day, "MMM yyyy")
-        : "W" + Dates.week(monday) + " · " + Qt.formatDate(monday, monday.getMonth() === sunday.getMonth() ? "d" : "d MMM")
-          + "–" + Qt.formatDate(sunday, "d MMM")
+    // The week shown, from its first day: Monday, or Sunday in the US (Settings › Region)
+    readonly property date first: Dates.weekFirst(day, Regional.weekStart)
+    readonly property date last: Dates.addDays(first, 6)
+    readonly property string longName: app.view === "month" ? Regional.format(day, "month")
+        : "Week " + Dates.weekNumber(first) + "  ·  " + Regional.range(first, last)
+    readonly property string shortName: app.view === "month" ? Regional.format(day, "MMM yyyy")
+        : "W" + Dates.weekNumber(first) + " · " + Regional.range(first, last, true)
     readonly property string unit: app.view === "month" ? "month" : "week"
     readonly property var views: ["week", "month"]
     readonly property int gap: compact ? 10 : 16        // between the groups
@@ -37,17 +36,18 @@ Item {
     readonly property real todayWide: 24 + words.advanceWidth("Today") + 8
     readonly property real newWide: 13 + 8 + 24 + words.advanceWidth("New")
     // The widest name the view can have, so the arrows stay put as the months go by: every month's name this year,
-    // and for a week the widest month's short name with two-digit numbers
+    // and for a week every pair of months' with two-digit days, written the region's way (Regional.range)
     function widest(short) {
-        let w = 0, m3 = "", m3w = 0
+        let w = 0
         for (let i = 0; i < 12; i++) {
-            const d = new Date(day.getFullYear(), i, 1)
-            w = Math.max(w, big.advanceWidth(Qt.formatDate(d, short ? "MMM yyyy" : "MMMM yyyy")))
-            const s = Qt.formatDate(d, "MMM")
-            if (big.advanceWidth(s) > m3w) { m3 = s; m3w = big.advanceWidth(s) }
+            const y = day.getFullYear()
+            if (app.view === "month")
+                w = Math.max(w, big.advanceWidth(Regional.format(new Date(y, i, 1), short ? "MMM yyyy" : "month")))
+            else   // a week over two months, two-digit days: the widest the name gets
+                w = Math.max(w, big.advanceWidth((short ? "W00 · " : "Week 00  ·  ")
+                                                 + Regional.range(new Date(y, i, 28), new Date(y, i + 1, 3), short)))
         }
-        if (app.view === "month") return w
-        return big.advanceWidth(short ? "W00 · 00 " + m3 + "–00 " + m3 : "Week 00  ·  00 " + m3 + " – 00 " + m3 + " 0000")
+        return w
     }
     readonly property bool compact: 2 * (Math.max(leftWide, todayWide + newWide) + 16) + 2 * (26 + 4) + 12 + widest(false) > width
 

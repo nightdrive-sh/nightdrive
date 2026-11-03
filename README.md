@@ -194,6 +194,10 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **App shortcuts**: which app Hyper + a letter or digit opens: Launcher › Settings › Apps › App shortcuts. Your choice
   replaces a default, Nightdrive's or a plugin's. The other shortcuts are in the config files ([Make it yours](#make-it-yours)).
 - **Mouse**: the wheel's scroll speed, from 0.5× to 3×, in Launcher › Settings › Mouse. The trackpad keeps its own.
+- **Region**: how dates and times are written, apart from the language: Finland 3.11.2026, the US 11/3/2026 and 2:30 PM
+  with weeks from Sunday, ISO 2026-11-03 and a few more, in Launcher › Settings › Region (or `nightdrive region set fi`).
+  Nightdrive's apps follow at once; it is `LC_TIME` in `~/.config/locale.conf`, so other programs started after follow
+  it too, and write their month and day names in the region's language. Not chosen, the apps write ISO dates and 24 h.
 - **Remote login**: SSH into this computer from another one, off by default. Turn it on in Launcher › Settings › Remote
   login. It works over Tailscale from anywhere, and on the networks you allow: the one you turn it on at, and each new
   one asks with a notification (safe at home or work, not at a café).
@@ -455,7 +459,8 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive windows` | The open windows (`--json`); `focus WINDOW` brings one forward (an address or an app), `shot WINDOW` takes a picture of one on screen (never of one Send to Claude leaves out), `open firefox` opens an app or brings it forward, `open https://…` an address |
 | `nightdrive files recent` | The newest files in Downloads, Pictures and Documents (`--in downloads`, `--name TEXT`, `--json`); `open PATH` opens one in its default app, `trash PATH…` moves to the trash, `restore NAME…` puts back, `mkdir PATH` makes a folder, `move --into FOLDER PATH…` and `rename PATH NAME` move and rename (never over a file; `move-back` is their undo) and `check PATH…` lists what a send (Claude's Ferry tool) would take. Only in your home folder and nothing hidden; programs and scripts aren't opened. Claude's tools keep also to the folders in Access (docs/claude.md); `folders` lists those it offers |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
-| `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also Launcher › Settings › Top bar › Date format |
+| `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the region's order, Settings › Region); also Launcher › Settings › Top bar › Date format |
+| `nightdrive region set fi` | How dates and times are written: `fi`, `se`, `de`, `uk`, `us` or `iso`; `nightdrive region` shows it, `list` lists them (`--json`); also Launcher › Settings › Region |
 | `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage, Notes, Tasks, Calendar) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
 | `nightdrive plugins` | Optional parts and whether each is installed and on; `nightdrive plugins install home-assistant` runs one's installer |
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |

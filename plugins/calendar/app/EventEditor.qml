@@ -3,6 +3,7 @@ import Quickshell.Io
 import qs
 import qs.kit
 import "Form.js" as Form
+import "kit/Dates.js" as KitDates
 
 // A new event, or one being changed, in a panel over the window: its title, first and last day with the times (or all
 // day), the calendar it goes in, where and notes. Saved by `calendar add` (lib/write.py) or `calendar edit`
@@ -16,6 +17,7 @@ AppPanel {
     property int duration: 60           // minutes from start to end, kept when the start moves
     property string lastCalendar: ""    // the one used last, picked again for the next event
     property var editing: null          // the event being changed (calendar events' JSON), null for a new one
+    readonly property int timeWidth: Regional.h24 ? 72 : 88   // "12:30 PM" needs more than "12:30"
     readonly property var writable: app.calendars.filter(x => !x.read_only)
     signal saved(var event, bool edited) // calendar add's or edit's JSON: uid, calendar_name, title, when, synced…
     signal closed()
@@ -29,8 +31,8 @@ AppPanel {
         const f = Form.blank(dayText, new Date(), hour, minute)
         editing = null
         title.text = ""
-        startDay.text = f.startDay; startTime.text = f.startTime
-        endDay.text = f.endDay; endTime.text = f.endTime
+        startDay.text = showDay(f.startDay); startTime.text = showTime(f.startTime)
+        endDay.text = showDay(f.endDay); endTime.text = showTime(f.endTime)
         allDay.on = false
         location.text = ""; notes.text = ""
         duration = 60
@@ -44,11 +46,11 @@ AppPanel {
         editing = e
         title.text = e.title
         allDay.on = e.all_day
-        startDay.text = e.start.slice(0, 10); startTime.text = e.all_day ? "" : e.start.slice(11, 16)
-        endDay.text = e.end.slice(0, 10); endTime.text = e.all_day ? "" : e.end.slice(11, 16)
+        startDay.text = showDay(e.start.slice(0, 10)); startTime.text = e.all_day ? "" : showTime(e.start.slice(11, 16))
+        endDay.text = showDay(e.end.slice(0, 10)); endTime.text = e.all_day ? "" : showTime(e.end.slice(11, 16))
         location.text = e.location || ""; notes.text = e.notes || ""
-        duration = e.all_day ? Form.between(startDay.text, "00:00", endDay.text, "00:00")
-                             : Form.between(startDay.text, startTime.text, endDay.text, endTime.text)
+        duration = e.all_day ? Form.between(e.start.slice(0, 10), "00:00", e.end.slice(0, 10), "00:00")
+                             : Form.between(e.start.slice(0, 10), e.start.slice(11, 16), e.end.slice(0, 10), e.end.slice(11, 16))
         picker.picked = e.calendar
         error = ""
         visible = true
@@ -56,27 +58,47 @@ AppPanel {
     }
     function close() { if (!busy) { visible = false; closed() } }
 
+    // The days and times are shown and typed the region's way (Settings › Region: 5.11.2026 14:30, 11/5/2026 2:30 PM)
+    // and kept as Form.js has them ("YYYY-MM-DD", "HH:MM"): the kit's Regional writes and reads them
+    function showDay(iso) { return iso ? Regional.format(iso, "short") : "" }
+    function showTime(hhmm) { return hhmm ? Regional.time(hhmm) : "" }
+    // A day typed without its year (5.11.) is in the start's year, the start's in this one
+    function readDay(text) { return Regional.parse(text, Regional.parse(startDay.text) || app.today) }
     // The fields as Form.js reads them, each day and time normalised ("" when unreadable)
     function fields() {
-        const base = startDay.text
-        return { title: title.text, startDay: Form.day(startDay.text, base), startTime: Form.time(startTime.text),
-                 endDay: Form.day(endDay.text, base), endTime: Form.time(endTime.text), allDay: allDay.on,
+        return { title: title.text, startDay: readDay(startDay.text), startTime: Regional.parseTime(startTime.text),
+                 endDay: readDay(endDay.text), endTime: Regional.parseTime(endTime.text), allDay: allDay.on,
                  calendar: picker.picked, location: location.text, notes: notes.text }
     }
-    // A day or time field left: shown the way it was read, so "930" becomes 09:30 before the eyes
-    function tidy(field, read) { const v = read(field.text); if (v) field.text = v }
+    // A day or time field left: shown the way it was read, so "930" becomes 09:30 and "5.11." 5.11.2026 before the eyes
+    function tidyDay(field) { const v = readDay(field.text); if (v) field.text = showDay(v) }
+    function tidyTime(field) { const v = Regional.parseTime(field.text); if (v) field.text = showTime(v) }
+    // The region changed while the panel is open (Settings › Region): the days typed the old way are read that way and
+    // shown the new way, or 5.11.2026 would turn into May 11 in the US
+    property string shownRegion: Regional.key
+    Connections {
+        target: Regional
+        function onKeyChanged() {
+            const was = Regional.table[root.shownRegion]
+            root.shownRegion = Regional.key
+            if (!root.visible || !was) return
+            const base = KitDates.parse(startDay.text, was, root.app.today) || root.app.today
+            for (const f of [startDay, endDay]) { const v = KitDates.parse(f.text, was, base); if (v) f.text = root.showDay(v) }
+            for (const f of [startTime, endTime]) { const v = Regional.parseTime(f.text); if (v) f.text = root.showTime(v) }
+        }
+    }
     // The start moved: the end moves with it, the length kept. Without this an event moved to the afternoon would end
     // in the morning, before it starts
     function startMoved() {
-        tidy(startDay, t => Form.day(t, startDay.text)); tidy(startTime, Form.time)
+        tidyDay(startDay); tidyTime(startTime)
         const f = fields()
         if (!f.startDay || (!f.allDay && !f.startTime)) return
         const end = Form.later(f.startDay, f.allDay ? "00:00" : f.startTime, duration)
-        endDay.text = end[0]
-        if (!f.allDay) endTime.text = end[1]
+        endDay.text = showDay(end[0])
+        if (!f.allDay) endTime.text = showTime(end[1])
     }
     function endMoved() {
-        tidy(endDay, t => Form.day(t, startDay.text)); tidy(endTime, Form.time)
+        tidyDay(endDay); tidyTime(endTime)
         const f = fields()
         if (!f.startDay || !f.endDay) return
         const m = f.allDay ? Form.between(f.startDay, "00:00", f.endDay, "00:00")
@@ -87,16 +109,16 @@ AppPanel {
     function toggleAllDay() {
         allDay.on = !allDay.on
         // All day keeps the days; back to times, an hour from the start's time
-        duration = allDay.on ? Form.between(startDay.text, "00:00", endDay.text, "00:00") : 60
+        const f = fields()
+        duration = allDay.on && f.startDay && f.endDay ? Form.between(f.startDay, "00:00", f.endDay, "00:00") : 60
         if (!allDay.on) startMoved()
     }
 
     function save() {
         if (busy) return
-        tidy(startDay, t => Form.day(t, startDay.text)); tidy(endDay, t => Form.day(t, startDay.text))
-        tidy(startTime, Form.time); tidy(endTime, Form.time)
+        tidyDay(startDay); tidyDay(endDay); tidyTime(startTime); tidyTime(endTime)
         const f = fields()
-        error = Form.problem(f)
+        error = Form.problem(f, Regional.example, Regional.h24 ? "9:30 or 0930" : "9:30 AM or 2pm")
         if (error) {
             if (!f.title.trim()) title.input.forceActiveFocus()    // the one field everyone forgets: the keys go there
             return
@@ -167,12 +189,12 @@ AppPanel {
         Row {
             spacing: 8
             AppField { id: startDay; c: root.c; width: 136; label: "Starts"; onAccepted: root.save(); onEscaped: root.close() }
-            AppField { id: startTime; c: root.c; width: 72; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
+            AppField { id: startTime; c: root.c; width: root.timeWidth; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
         }
         Row {
             spacing: 8
             AppField { id: endDay; c: root.c; width: 136; label: "Ends"; onAccepted: root.save(); onEscaped: root.close() }
-            AppField { id: endTime; c: root.c; width: 72; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
+            AppField { id: endTime; c: root.c; width: root.timeWidth; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
         }
     }
     // A day or time field: picked whole when the keys come to it, so typing replaces it (9:00 → 1430, not 9:001430);

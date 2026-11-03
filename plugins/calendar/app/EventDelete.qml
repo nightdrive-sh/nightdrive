@@ -19,7 +19,7 @@ AppConfirm {
     action: busy ? "Deleting…" : "Delete"
     question: event ? "Delete “" + event.title + "”?" : ""
     detail: error !== "" ? error
-          : event ? Dates.span(event) + " · " + event.calendar_name + ". It goes from the server and your other devices too."
+          : event ? Dates.span(event, Regional) + " · " + event.calendar_name + ". It goes from the server and your other devices too."
           : ""
 
     function ask(e) { event = e; error = ""; visible = true }

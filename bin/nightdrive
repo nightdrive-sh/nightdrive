@@ -46,6 +46,7 @@ usage() {
   row "restart"                  "Restart the top bar, menus and notifications (Quickshell), e.g. after it crashed"
   row "topbar adjust"            "The top bar's icon and text sizes, live"
   row "topbar date [STYLE]"      "The clock's date order: auto, dmy, mdy or iso"
+  row "region [list|set ID]"     "How dates and times are written (LC_TIME): fi, se, de, uk, us or iso (--json)"
   row "snippets [COMMAND]"       "Text snippets: list, set, remove, status, enable, disable"
   row "defaults [set KIND APP]"  "Default apps (browser, email, files…), e.g. nightdrive defaults set pdf org.gnome.Papers"
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
@@ -88,6 +89,7 @@ case ${1:-} in
   channel) channel "${2:-}" "${3:-}" ;;
   version|--version) version ;;
   release) exec "$scripts/release" "${@:2}" ;;                          # AGENTS.md › Branches
+  region) exec "$repo/config/hypr/scripts/region" "${@:2}" ;;         # Settings › Region
   topbar) case ${2:-} in
             adjust) exec "$repo/config/topbar/scripts/adjust" "${@:3}" ;;
             date) exec "$repo/config/topbar/scripts/clock" style "${@:3}" ;;

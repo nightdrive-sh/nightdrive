@@ -1,4 +1,5 @@
 import QtQuick
+import qs.kit
 import "Dates.js" as Dates
 
 // The days as a list, in a window too narrow for the month's or the week's grid (#2025; Jari 2.11.: "a small window
@@ -12,7 +13,7 @@ ListView {
     readonly property date at: Dates.parse(app.day)
     readonly property var days: {
         if (app.view === "week") {
-            const m = Dates.monday(at)
+            const m = Dates.weekFirst(at, Regional.weekStart)
             return [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(m, i)))
         }
         const out = []
@@ -20,7 +21,6 @@ ListView {
             out.push(Dates.iso(d))
         return out
     }
-    readonly property var dayNames: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     readonly property int line: 22
 
     // A day's events, all-day and multi-day ones first, then by their start
@@ -69,7 +69,7 @@ ListView {
                 }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.dayNames[dayItem.date.getDay()] + (dayItem.items.length ? "" : "  ·  nothing")
+                    text: Regional.dayName(dayItem.date.getDay(), true) + (dayItem.items.length ? "" : "  ·  nothing")
                     color: dayItem.date.getDay() % 6 === 0 ? root.c.faint : root.c.dim
                     font.family: root.c.font; font.pixelSize: 12
                 }
@@ -95,7 +95,7 @@ ListView {
                 Text {
                     id: when
                     x: 24; width: 62; anchors.verticalCenter: parent.verticalCenter
-                    text: row.allDay ? "all day" : Dates.time(row.modelData)
+                    text: row.allDay ? "all day" : Regional.time(Dates.time(row.modelData))
                     color: root.c.dim; font.family: root.c.font; font.pixelSize: 11
                 }
                 Text {

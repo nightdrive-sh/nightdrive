@@ -68,6 +68,19 @@ def displays():
             + (", focused" if m.get("focused") else "") for m in monitors]
 
 
+def region():
+    """Settings › Region: how dates and times are written, e.g. "Finland (fi_FI.UTF-8): 3.11.2026, H:mm, weeks from
+    Monday", so Claude writes a date the user's way (nightdrive region)"""
+    out = run(NIGHTDRIVE, "region", "--json")
+    try:
+        r = json.loads(out)
+    except (TypeError, ValueError):
+        return None
+    note = "" if r.get("set") else "; not chosen, the default"
+    return (f"{r['name']} ({r['locale']}): dates {r['short']}, times {r['time']}, weeks from "
+            f"{'Sunday' if r['weekStart'] == 0 else 'Monday'}{note}")
+
+
 def nightdrive_status(args):
     lines, missing = [], []
 
@@ -88,6 +101,7 @@ def nightdrive_status(args):
         name = ""
     add("Theme", theme and (f"{name}, colour {theme}" if name else f"colour {theme}"))
     add("Wallpaper", WALLPAPER.is_symlink() and os.path.basename(os.readlink(WALLPAPER)))
+    add("Region", region())
     shown = displays()
     add("Displays", shown and "\n  " + "\n  ".join(shown))
     parts = plugins()

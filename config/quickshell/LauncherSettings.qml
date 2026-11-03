@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import qs.kit
 
 // Settings and Settings › Apps: their rows, titles and parents, the search words that find a setting from the root search,
 // and Display's rows for it. In a file of its own because Settings is to become an app of its own (#1833): then this
@@ -41,6 +42,7 @@ Item {
         ], lv.behave.crashReportItems, [
             { kind: "header", name: "System" },
             { kind: "nav", name: "Launcher", glyph: "text-search", target: "launcherprefs" },
+            { kind: "nav", name: "Region", glyph: "calendar-clock", target: "region", summary: Regional.name },   // dates and times (RegionLevels)
             { kind: "nav", name: "Computer name", glyph: "laptop", target: "compname", summary: lv.behave.compName }   // what phones see
         ], lv.behave.remoteLoginItems, [
             { kind: "nav", name: "Update channel", glyph: "git-branch", target: "channel",
@@ -72,6 +74,7 @@ Item {
                                               "Top bar": "waybar panel menu bar",
                                               "Firefox": "browser tabs tab bar links new window",
                                               "Launcher": "search fuzzy typos shortcuts hints spotlight",
+                                              "Region": "date format time clock 24 hour 12 hour am pm week starts monday sunday locale lc_time country",
                                               "Computer name": "hostname rename device localsend airplay ferry phone",
                                               "Remote login": "ssh sshd server remote access terminal sharing",
                                               "Update channel": "stable development dev beta branch updates",

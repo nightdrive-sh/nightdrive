@@ -1,8 +1,9 @@
 import QtQuick
 import QtQuick.Layouts
+import qs.kit
 import "Dates.js" as Dates
 
-// The month: six weeks from the Monday on or before the 1st, with week numbers, and as many of each day's events as
+// The month: six weeks from the week's first day (Monday, Sunday in the US: Settings › Region) on or before the 1st, with week numbers, and as many of each day's events as
 // fit in its cell (all-day ones first, as a coloured bar; then the times). A click on a day picks it, a double click
 // opens its week; a click on an event opens it (EventPanel). A narrower window (#2025) keeps them readable: below a
 // width the time goes and the title stays, and "+4 more" becomes "+4"; narrower still, DayList takes the month's place.
@@ -11,7 +12,7 @@ Item {
     required property var app           // the window: day, today, now, byDay, dayPicked, dayHover, pickDay(), openEvent(), newEvent()
     required property QtObject c
     readonly property date first: Dates.parse(app.day)
-    readonly property var days: Dates.monthDays(first.getFullYear(), first.getMonth())
+    readonly property var days: Dates.monthDays(first.getFullYear(), first.getMonth(), Regional.weekStart)
     readonly property string today: app.today
     readonly property int weekCol: 34
     readonly property int headRow: 26
@@ -19,10 +20,10 @@ Item {
     readonly property real cellH: (height - headRow) / 6
     readonly property int line: 18          // an event's row in a cell
     readonly property int gap: 2            // between stacked rows: a bar's colour mustn't run into the next (#1481)
-    readonly property var dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    readonly property var dayNames: Regional.weekdays.map(wd => Regional.dayName(wd, true))
     FontMetrics { id: small; font.family: root.c.font; font.pixelSize: 11 }
     // A chip's words: the time too only while "16:30 Ainon" fits, else the title alone ("16…" said nothing)
-    readonly property bool withTime: cellW - 8 - 18 >= small.advanceWidth("00:00 Abcd")
+    readonly property bool withTime: cellW - 8 - 18 >= small.advanceWidth(Regional.time("00:00") + " Abcd")
 
     // The weekdays' names over the columns
     Repeater {
@@ -34,7 +35,7 @@ Item {
             height: root.headRow
             verticalAlignment: Text.AlignVCenter
             text: root.dayNames[index]
-            color: index >= 5 ? root.c.faint : root.c.dim
+            color: Regional.weekdays[index] % 6 === 0 ? root.c.faint : root.c.dim   // the weekend
             font.family: root.c.font; font.pixelSize: 11; font.weight: Font.Medium
         }
     }
@@ -46,7 +47,7 @@ Item {
             x: 0; y: root.headRow + index * root.cellH + 8
             width: root.weekCol - 6
             horizontalAlignment: Text.AlignRight
-            text: Dates.week(root.days[index * 7])
+            text: Dates.weekNumber(root.days[index * 7])
             color: root.c.faint; font.family: root.c.font; font.pixelSize: 10
         }
     }
@@ -130,7 +131,7 @@ Item {
                             width: parent.width - x - 4
                             anchors.verticalCenter: parent.verticalCenter
                             elide: Text.ElideRight
-                            text: (chip.bar || !root.withTime ? "" : Dates.time(chip.modelData) + " ") + chip.modelData.title
+                            text: (chip.bar || !root.withTime ? "" : Regional.time(Dates.time(chip.modelData)) + " ") + chip.modelData.title
                             color: root.c.text; font.family: root.c.font; font.pixelSize: 11
                         }
                     }

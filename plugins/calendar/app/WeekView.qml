@@ -9,7 +9,7 @@ Item {
     id: root
     required property var app           // the window: day, today, now, byDay, dayPicked, pickDay(), openEvent(), newEvent()
     required property QtObject c
-    readonly property date first: Dates.weekFirst(Dates.parse(app.day), Region.weekStart)
+    readonly property date first: Dates.weekFirst(Dates.parse(app.day), Regional.weekStart)
     readonly property var days: [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(first, i)))
     readonly property string today: app.today
     readonly property int timeCol: 46
@@ -24,7 +24,7 @@ Item {
     // The all-day lane is as high as its fullest day needs, up to four rows (the rest: "+N")
     readonly property int laneRows: Math.min(4, Math.max(1, ...days.map(d => (app.byDay[d] || []).filter(Dates.spansDays).length)))
     readonly property int laneH: laneRows * bar + 8
-    readonly property var dayNames: Region.weekdays.map(wd => Region.dayName(wd, true))
+    readonly property var dayNames: Regional.weekdays.map(wd => Regional.dayName(wd, true))
     readonly property int scrollTo: 7       // the hour at the top when the week opens
     // A narrow window (#2025): a day's name is its letter once "Mon" and the date's circle no longer fit side by side,
     // and an event too narrow for a word is its colour alone (its title elided to "…" said nothing)
@@ -69,7 +69,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: root.colW >= 44
                     text: root.shortNames ? root.dayNames[index][0] : root.dayNames[index]
-                    color: Region.weekdays[index] % 6 === 0 ? root.c.faint : root.c.dim   // the weekend
+                    color: Regional.weekdays[index] % 6 === 0 ? root.c.faint : root.c.dim   // the weekend
                     font.family: root.c.font; font.pixelSize: 11; font.weight: Font.Medium
                 }
                 Rectangle {
@@ -153,8 +153,8 @@ Item {
                     visible: index > 0
                     width: root.timeCol - 8; y: -7
                     horizontalAlignment: Text.AlignRight
-                    // 09:00, or 9 AM where the clock is 12 h: "9:00 AM" is too wide for the column
-                    text: Region.h24 ? Dates.pad(index) + ":00" : Region.format(new Date(2000, 0, 1, index), "h AP")
+                    // 9:00 or 09:00 as the region writes it, or 9 AM where the clock is 12 h: "9:00 AM" is too wide here
+                    text: Regional.h24 ? Regional.time(Dates.pad(index) + ":00") : Regional.format(new Date(2000, 0, 1, index), "h AP")
                     color: root.c.faint; font.family: root.c.font; font.pixelSize: 10
                 }
             }
@@ -214,7 +214,7 @@ Item {
                                 textFormat: Text.PlainText
                                 visible: block.height > 34
                                 width: parent.width; elide: Text.ElideRight
-                                text: Region.time(block.modelData.e.start.slice(11, 16)) + " – " + Region.time(block.modelData.e.end.slice(11, 16))
+                                text: Regional.time(block.modelData.e.start.slice(11, 16)) + " – " + Regional.time(block.modelData.e.end.slice(11, 16))
                                     + (block.modelData.e.location ? "  " + block.modelData.e.location.split("\n")[0] : "")
                                 color: root.c.dim; font.family: root.c.font; font.pixelSize: 10
                             }

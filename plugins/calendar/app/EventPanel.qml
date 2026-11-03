@@ -45,7 +45,7 @@ AppPanel {
     Text {
         textFormat: Text.PlainText
         width: parent.width; wrapMode: Text.Wrap
-        text: root.event ? Dates.span(root.event) + (root.event.recurring ? "  ·  repeats" : "") : ""
+        text: root.event ? Dates.span(root.event, Regional) + (root.event.recurring ? "  ·  repeats" : "") : ""
         color: c.text; font.family: c.font; font.pixelSize: 12
     }
     Text {

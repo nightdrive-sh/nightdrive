@@ -16,8 +16,12 @@ function parse(text) {
 
 function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n) }
 
-// The Monday of d's week (weeks start on Monday, as the top bar's calendar)
-function monday(d) { return addDays(d, -((d.getDay() + 6) % 7)) }
+// The first day of d's week: ws 1 Monday, 0 Sunday (Settings › Region, Regional.weekStart)
+function weekFirst(d, ws) { return addDays(d, -((d.getDay() - ws + 7) % 7)) }
+
+// The ISO 8601 week number of a week that starts on first: its Monday's, so a week from Sunday has the number of the
+// Monday after (the US has no week numbers of its own in use)
+function weekNumber(first) { return week(addDays(first, (8 - first.getDay()) % 7)) }
 
 // ISO 8601 week number
 function week(d) {
@@ -26,9 +30,9 @@ function week(d) {
     return 1 + Math.round(((t - first) / 86400000 - 3 + (first.getDay() + 6) % 7) / 7)
 }
 
-// The month view's 42 days: six weeks from the Monday on or before the 1st
-function monthDays(year, month) {
-    const start = monday(new Date(year, month, 1))
+// The month view's 42 days: six weeks from the week's first day on or before the 1st
+function monthDays(year, month, ws) {
+    const start = weekFirst(new Date(year, month, 1), ws)
     const out = []
     for (let i = 0; i < 42; i++) out.push(addDays(start, i))
     return out
@@ -55,16 +59,17 @@ function minutes(text, day) {
     return +text.slice(11, 13) * 60 + +text.slice(14, 16)
 }
 
-// "14:30", or "" for an all-day event
+// "14:30" as it is stored, or "" for an all-day event; Regional.time writes it the region's way
 function time(e) { return e.all_day ? "" : e.start.slice(11, 16) }
 
-// The event's when, in words: "Thu 29 October, 14:00 – 15:00", "29 – 31 October", "All day"
-function span(e) {
+// The event's when, in words, the region's way (R is the kit's Regional): "Thu 29 October 2026, 14:00 – 15:00",
+// "Thu, October 29, 2026, 2:00 PM – 3:00 PM", "Thu 29 October 2026, all day"
+function span(e, R) {
     const s = parse(e.start), l = parse(lastDay(e))
-    const date = d => Qt.formatDate(d, "ddd d MMMM yyyy")
+    const date = d => R.format(d, "long")
     if (e.all_day)
         return iso(s) === iso(l) ? date(s) + ", all day" : date(s) + " – " + date(l)
-    const t0 = e.start.slice(11, 16), t1 = e.end.slice(11, 16)
+    const t0 = R.time(e.start.slice(11, 16)), t1 = R.time(e.end.slice(11, 16))
     return e.start.slice(0, 10) === e.end.slice(0, 10) ? date(s) + ", " + t0 + " – " + t1
         : date(s) + " " + t0 + " – " + date(parse(e.end)) + " " + t1
 }

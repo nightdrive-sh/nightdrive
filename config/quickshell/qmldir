@@ -69,6 +69,7 @@ BluetoothLevels 1.0 BluetoothLevels.qml
 SoundLevels 1.0 SoundLevels.qml
 TailscaleLevels 1.0 TailscaleLevels.qml
 StatusLevels 1.0 StatusLevels.qml
+RegionLevels 1.0 RegionLevels.qml
 MirroringLevels 1.0 MirroringLevels.qml
 HomeLevels 1.0 HomeLevels.qml
 DefaultAppsLevels 1.0 DefaultAppsLevels.qml

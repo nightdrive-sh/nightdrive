@@ -1,8 +1,9 @@
 #!/bin/bash
 # The top bar clock (the calendar module). Right click cycles its format, from long to short (here in the dmy style):
 #   0  Thu 15.10. 13:48     1  Thu 15. 13:48     2  15.10. 13:48     3  13:48
-# The day and month follow the date style: auto = the order and separator of the locale's date (LC_TIME: fi 15.10.,
-# en_GB 15/10, en_US 10/15, sv 10-15), or one of dmy (15.10.), mdy (10/15), iso (10-15) set with `clock style`.
+# The day and month follow the date style: auto = the order and separator of the region's date (Settings › Region, LC_TIME
+# in ~/.config/locale.conf, else the session's: fi 15.10., en_GB 15/10, en_US 10/15, sv 10-15), or one of dmy (15.10.),
+# mdy (10/15), iso (10-15) set with `clock style`.
 # Weekdays are always in English.
 # Usage: clock [text|next]   the clock's text now | the next format
 #        clock style [auto|dmy|mdy|iso]   shows or sets the date style (`nightdrive topbar date …`)
@@ -10,9 +11,11 @@ state=${XDG_STATE_HOME:-$HOME/.local/state}/nightdrive
 mode=$(cat "$state/clock-mode" 2>/dev/null); [[ $mode =~ ^[0-3]$ ]] || mode=0
 style=$(cat "$state/date-style" 2>/dev/null); [[ $style =~ ^(dmy|mdy|iso)$ ]] || style=auto
 
-# The locale's own date, e.g. 31.12.2000 / 31/12/00 / 12/31/2000 / 2000-12-31: the order and the separator
+# The region's own date, e.g. 31.12.2000 / 31/12/00 / 12/31/2000 / 2000-12-31: the order and the separator. LC_TIME from
+# locale.conf, as hypr/scripts/region writes it: the bar was started before a change, with the LC_TIME of then
 locale_dm() {
-  local x; x=$(date -d 2000-12-31 +%x 2>/dev/null)
+  local lt; lt=$(sed -n 's/^[[:space:]]*LC_TIME=["'"'"']\{0,1\}\([^"'"'"' ]*\).*/\1/p' "${XDG_CONFIG_HOME:-$HOME/.config}/locale.conf" 2>/dev/null | tail -1)
+  local x; x=$(LC_TIME=${lt:-${LC_TIME:-}} date -d 2000-12-31 +%x 2>/dev/null)
   local sep; sep=$(grep -o '[^0-9]' <<<"$x" | head -1); sep=${sep:-.}
   if [[ $x == 2000* || $x == 00[^0-9]* ]]; then echo "%m-%d|%d"
   elif [[ $x == 12* ]]; then echo "%m$sep%d|%d"
