@@ -2,11 +2,16 @@
 """The `notes` command's work on the notes (bin/notes runs it): listing, finding and reading them for the window, a
 terminal and Claude's tools (mcp.json), and the three changes Claude can make, each one the user can undo.
 
-    notes.py list [--json] [--limit N]           newest first (N: 50 by default, 0 for all)
+    notes.py list [--json] [--limit N] [--folder F] [--tag T]
+                                                 newest first (N: 50 by default, 0 for all); only those in folder F
+                                                 and under it, those with #T (or a tag nested in it); with --json also
+                                                 every folder and tag and their counts (folders.py)
     notes.py search [--json] [--limit N] WORDS…  the notes that have every word, in the title or the text
     notes.py read [--json] NOTE                  one note's whole text: NOTE is an id, or a title
-    notes.py create [--json] TITLE               a new note: "# TITLE", then the text on stdin
-    notes.py create [--json] --untitled          a new note to write its title in: "Untitled.md", its text "# "
+    notes.py create [--json] [--folder F] TITLE  a new note: "# TITLE", then the text on stdin (in folder F, made
+                                                 if it isn't there)
+    notes.py create [--json] [--folder F] --untitled
+                                                 a new note to write its title in: "Untitled.md", its text "# "
     notes.py append [--json] NOTE                the text on stdin added to the end of the note
     notes.py unappend NOTE BEFORE AFTER          append's undo: back to BEFORE bytes, if it is still AFTER long
     notes.py write [--json] [--expect MD5] [--md5 MD5] NOTE
@@ -22,6 +27,7 @@ terminal and Claude's tools (mcp.json), and the three changes Claude can make, e
     notes.py refile [--json] [--] NOTE WAS       the file named after the note's title, if it was named after WAS
     notes.py trash [--json] NOTE                 to the desktop's trash (`nightdrive files trash`), where Files puts
                                                  it back; nothing is deleted for good
+    notes.py folders | mkdir | rmdir | move …    the folders and tags, and a note moved between folders (folders.py)
 
 Without --json they print text for a terminal. An error goes to stderr in plain words, with exit status 1.
 """
@@ -33,8 +39,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import folders
 import rename as renaming
 import store
+import tags as tagging
 from store import NoteError
 
 
@@ -50,10 +58,14 @@ MATCH_LINES = 3       # lines of a found note that show where the words are
 NIGHTDRIVE = Path(__file__).resolve().parents[3] / "bin/nightdrive"   # this checkout's, for its files trash
 
 
-def list_notes(limit):
-    paths = store.all_paths()
-    shown = paths if limit == 0 else paths[:limit]
-    return {"folder": store.home(store.ROOT), "count": len(paths), "notes": [store.brief(p) for p in shown]}
+def list_notes(limit, folder="", tag=""):
+    """Every note's brief is read, for the folders' and tags' counts (the window's sidebar, Claude's overview); the
+    list itself is those in folder (and under it) with tag, at most limit of them."""
+    notes = [store.brief(p) for p in store.all_paths()]
+    result = folders.overview(notes)
+    folder = folders.checked(folder) if folder else ""
+    picked = [n for n in notes if folders.under(folder, n["folder"]) and (not tag or tagging.has_tag(n["tags"], tag))]
+    return dict(result, count=len(picked), total=len(notes), notes=picked if limit == 0 else picked[:limit])
 
 
 def search(query, limit):
@@ -74,17 +86,19 @@ def read(who):
     return dict(store.brief(p, text), path=str(p), text=text)
 
 
-def create(title, text, untitled=False):
+def create(title, text, untitled=False, folder=""):
     """untitled: the window's New, whose title is written in the note itself: "# " and the cursor after it, the file
-    named after the heading once the window leaves the note (refile)."""
+    named after the heading once the window leaves the note (refile). folder: where it goes (the window's folder
+    picked in the sidebar), made if it isn't there."""
     title = " ".join(title.split())
     if not title and not untitled:
         raise NoteError("A new note needs a title.")
-    store.ROOT.mkdir(parents=True, exist_ok=True)
+    where = store.ROOT / folders.checked(folder, must_exist=False)
+    where.mkdir(parents=True, exist_ok=True)
     body = text.strip("\n")
     # "x": never onto a file or link that is already there, one made after new_path looked included (then the next name)
     while True:
-        p = store.new_path(UNTITLED if untitled else title)
+        p = store.new_path(UNTITLED if untitled else title, where)
         try:
             with open(p, "x", encoding="utf-8") as f:
                 f.write("# \n" if untitled else f"# {title}\n" + (f"\n{body}\n" if body else ""))
@@ -183,7 +197,7 @@ def when(note):
 
 def text_list(result):
     if not result["notes"]:
-        return f"No notes in {result['folder']} yet."
+        return "No notes there." if result["total"] else f"No notes in {result['folder']} yet."
     rows = [f"{when(n)}  {n['title']}    ({n['id']})" for n in result["notes"]]
     more = result["count"] - len(result["notes"])
     return "\n".join(rows + ([f"… and {more} more: --limit 0 lists them all"] if more > 0 else []))
@@ -200,6 +214,18 @@ def text_search(result):
 
 def output(result, as_json, text):
     print(json.dumps(result, ensure_ascii=False) if as_json else text(result))
+
+
+def valued(rest, flag):
+    """A flag's value taken out of rest: --folder F, --tag T ("" without it)."""
+    if flag not in rest:
+        return ""
+    i = rest.index(flag)
+    if i + 1 >= len(rest):
+        raise NoteError(f"{flag} takes a name.")
+    value = rest[i + 1]
+    del rest[i:i + 2]
+    return value
 
 
 def options(rest, default_limit):
@@ -275,9 +301,14 @@ def main(argv):
     if not argv:
         sys.exit(__doc__)
     command, rest = argv[0], argv[1:]
+    if command in ("folders", "mkdir", "rmdir", "move"):
+        return folders.main(command, rest, output)
+    # list's filters and create's folder: taken out before the rest is read as the note or its title
+    rest = list(rest)
+    folder, tag = (valued(rest, "--folder"), valued(rest, "--tag")) if command in ("list", "create") else ("", "")
     as_json, limit, arg = options(rest, SEARCH_LIMIT if command == "search" else LIST_LIMIT)
     if command == "list":
-        output(list_notes(limit), as_json, text_list)
+        output(list_notes(limit, folder, tag), as_json, text_list)
     elif command == "search":
         if not arg:
             raise NoteError("Usage: notes search WORDS…")
@@ -285,13 +316,13 @@ def main(argv):
     elif command in ("rename", "unrename", "refile"):
         renamed(command, rest, as_json)
     elif command == "create" and arg == "--untitled":
-        output(create("", "", untitled=True), as_json, lambda n: f"Created {n['path']}")
+        output(create("", "", untitled=True, folder=folder), as_json, lambda n: f"Created {n['path']}")
     elif not arg:
         raise NoteError(f"Usage: notes {command} {'TITLE' if command == 'create' else 'NOTE'} (see notes help)")
     elif command == "read":
         output(read(arg), as_json, lambda n: n["text"].rstrip("\n"))
     elif command == "create":
-        output(create(arg, stdin_text()), as_json, lambda n: f"Created {n['path']}")
+        output(create(arg, stdin_text(), folder=folder), as_json, lambda n: f"Created {n['path']}")
     elif command == "append":
         output(append(arg, stdin_text()), as_json, lambda n: f"Added to {n['id']}")
     elif command == "unappend":

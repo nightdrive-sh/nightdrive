@@ -5,10 +5,10 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// Notes, Nightdrive's window for the Markdown notes in ~/Notes: the notes in the sidebar, newest first, the picked
-// one beside it, to read or to write in (NoteEditor, Enter). Apostrophe still opens one (⇧Enter), and Claude writes
-// through the notes command (mcp.json). This file holds the window together: the narrow window's turns, the IPC, the
-// reading keys (their sheet: KeyHelp.qml) and quitting once what was written is saved.
+// Notes, Nightdrive's window for the Markdown notes in ~/Notes: the folders and tags (NavSidebar), the notes in the one
+// picked, newest first (NoteList), and the open one, to read or to write in (NoteEditor, Enter). Apostrophe still opens
+// one (⇧Enter), and Claude writes through the notes command (mcp.json). This file holds the window together: the narrow
+// window's turns, the IPC, the reading keys (their sheet: KeyHelp.qml) and quitting once what was written is saved.
 ShellRoot {
     FloatingWindow {
         id: win
@@ -30,6 +30,7 @@ ShellRoot {
         // The notes changed (a save, Claude, another app): the search's answer may have too
         Connections { target: store; function onRawChanged() { if (search.active && store.raw) search.run() } }
         NoteActions { id: actions; command: store.command }
+        NoteDrag { id: drag; c: win.look; sidebar: nav; onDropped: (id, folder) => win.moveNote(id, folder) }
         KeyHelp { id: keyHelp }
         readonly property QtObject look: c
 
@@ -37,17 +38,40 @@ ShellRoot {
         // meanwhile, and Quickshell has no folder watcher (the open note's own file is watched: Store.qml)
         Timer { interval: 5000; running: true; repeat: true; onTriggered: store.refresh() }
 
-        // Narrow windows: below onePaneMax the list and the note take turns, as in Garage: Esc on the note shows the
-        // list, a click or Enter on a note the note. ⌘B shows and hides the sidebar, in a wide window too.
+        // Narrow windows, as Mail's: below navMin the folders and tags hide (f or the list's button shows them), and
+        // below onePaneMax the list and the note take turns, as in Garage: Esc on the note shows the list, a click or
+        // Enter on a note the note; there f shows the folders in the list's place. ⌘B shows and hides the sidebars.
+        readonly property int navMin: 960
         readonly property int onePaneMax: 620
         readonly property bool onePane: width < onePaneMax
         property var sidebarChoice: null            // ⌘B's, in a wide window
+        property var navChoice: null                // f's, over what the width says
         property bool listOpen: false               // in one pane: the list shows instead of the note
-        readonly property bool sidebarShown: onePane ? listOpen : sidebarChoice !== null ? sidebarChoice : true
-        onOnePaneChanged: listOpen = false
-        function toggleSidebar() { if (onePane) listOpen = !listOpen; else sidebarChoice = !sidebarShown }
+        property bool navOpen: false                // in one pane, with the list open: the folders show instead of it
+        readonly property bool sidebarShown: onePane ? listOpen && !navOpen : sidebarChoice !== null ? sidebarChoice : true
+        readonly property bool navShown: onePane ? listOpen && navOpen
+            : sidebarShown && (navChoice !== null ? navChoice : width >= navMin)
+        onOnePaneChanged: { listOpen = false; navOpen = false }
+        function toggleSidebar() { if (onePane) { listOpen = !listOpen; navOpen = false } else sidebarChoice = !sidebarShown }
+        // f: the folders and tags shown and the keys in them (NavSidebar's), or back to the notes; hidden again on the
+        // way back only if f showed them
+        property bool navForKeys: false
+        function toFolders() {
+            if (nav.activeFocus) return fromFolders()
+            if (!view.leave()) return
+            navForKeys = !navShown
+            if (onePane) { listOpen = true; navOpen = true }
+            else if (navForKeys) { sidebarChoice = true; navChoice = true }
+            nav.forceActiveFocus()
+        }
+        function fromFolders() {
+            if (onePane) navOpen = false
+            else if (navForKeys) navChoice = null
+            navForKeys = false
+            view.forceActiveFocus()
+        }
         // Another note leaves the one being written, saved (not with a conflict to settle: NoteView.leave)
-        function pick(id) { if (!view.leave()) return; store.picked = id; listOpen = false; view.home() }
+        function pick(id) { if (!view.leave()) return; store.picked = id; listOpen = false; navOpen = false; view.home() }
         function step(d) { if (!view.leave()) return; store.step(d); view.home() }
 
         // Search (/, ⌘F): the field in the sidebar, shown first if it was hidden; the note being written left, saved.
@@ -105,6 +129,44 @@ ShellRoot {
                 }, win.failed))
             })
         }
+        // Move (m, a drag onto a folder): the note into the folder ("" the top; one not there yet is made). Moved out of
+        // the folder or tag shown, the open one gives way to the note below it, as when trashed; Undo moves it back.
+        function moveNote(id, folder) {
+            if (id === store.picked && !view.leave(false)) return
+            win.whenSaved(() => actions.move(id, folder, r => {
+                if (!r.moved) return
+                if (store.under(store.scopeFolder, r.folder) && store.picked === id) store.follow(r.id)
+                else if (store.picked === id) store.forget(id)
+                else store.refresh()
+                toast.show("Moved " + r.title + " to " + (r.folder || "Notes"), { action: "Undo", run: () =>
+                    actions.unmove(r, back => store.follow(back.id), win.failed) })
+            }, win.failed))
+        }
+        function askMove() {
+            if (!view.leave(false) || !store.note) return
+            const id = store.note.id
+            movePanel.ask(store.note, folder => win.moveNote(id, folder))
+        }
+        // New folder (+ by the sidebar's title): in the folder picked, shown at once
+        function newFolder() {
+            const inside = store.scopeTag ? "" : store.scopeFolder
+            namePanel.ask(inside ? "New folder in " + inside : "New folder", "", name => {
+                if (name) actions.mkdir(inside ? inside + "/" + name : name, r => {
+                    store.pickFolder(r.path); store.raw = ""; store.refresh()
+                }, win.failed)
+            })
+        }
+        // An empty one only (notes rmdir refuses the rest); Undo makes it again
+        function removeFolder(path) {
+            actions.rmdir(path, r => {
+                store.pickFolder(path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "")
+                store.raw = ""; store.refresh()
+                toast.show("Removed the folder " + path, { action: "Undo", run: () =>
+                    actions.mkdir(path, () => { store.pickFolder(path); store.raw = ""; store.refresh() }, win.failed) })
+            }, win.failed)
+        }
+        function pickTag(tag) { store.pickTag(tag); if (onePane) { listOpen = true; navOpen = false } }
+
         function unrename(r) { actions.unrename(r, back => store.follow(back.id), win.failed) }
         // No question first: the trash keeps it, and the toast's Undo (⌘Z) puts it back
         function trashNote() {
@@ -139,9 +201,9 @@ ShellRoot {
         // While writing, ⌘B is bold (EditorHelp.qml)
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; enabled: !view.editing; onActivated: win.toggleSidebar() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: win.quit() }
-        Shortcut { sequences: ["Ctrl+N", "Meta+N"]; enabled: !namePanel.visible; onActivated: win.newNote("") }
-        Shortcut { sequence: "F2"; enabled: !namePanel.visible; onActivated: win.renameNote() }
-        Shortcut { sequences: ["Ctrl+F", "Meta+F"]; enabled: !namePanel.visible; onActivated: win.find() }
+        Shortcut { sequences: ["Ctrl+N", "Meta+N"]; enabled: !namePanel.visible && !movePanel.visible; onActivated: win.newNote("") }
+        Shortcut { sequence: "F2"; enabled: !namePanel.visible && !movePanel.visible; onActivated: win.renameNote() }
+        Shortcut { sequences: ["Ctrl+F", "Meta+F"]; enabled: !namePanel.visible && !movePanel.visible; onActivated: win.find() }
 
         RowLayout {
             id: content
@@ -149,12 +211,29 @@ ShellRoot {
             spacing: 0
             AppPointer { c: win.look }      // the pointer hides the keys' frame
 
+            NavSidebar {
+                id: nav
+                visible: win.navShown
+                Layout.preferredWidth: win.onePane ? -1 : win.width < 1100 ? 180 : 210
+                Layout.fillWidth: win.onePane
+                z: 1                        // a folder's tip lies over the list
+                c: win.look
+                store: store
+                active: activeFocus
+                onNewFolder: win.newFolder()
+                onRemoveFolder: path => win.removeFolder(path)
+                onDone: win.fromFolders()
+                onChosen: if (win.onePane) win.navOpen = false
+            }
             NoteList {
                 id: list
                 visible: win.sidebarShown
                 showNew: win.onePane
+                navShown: win.navShown
+                drag: drag
+                onShowNav: win.toFolders()
                 onNewNote: win.newNote("")
-                Layout.preferredWidth: win.onePane ? -1 : 280
+                Layout.preferredWidth: win.onePane ? -1 : win.navShown && win.width < 1100 ? 250 : 280
                 Layout.fillWidth: win.onePane
                 c: win.look
                 store: store
@@ -176,11 +255,12 @@ ShellRoot {
                 onePane: win.onePane
                 marks: search.words
                 focus: true
-                onBack: if (view.leave()) win.listOpen = true
+                onBack: if (view.leave()) { win.listOpen = true; win.navOpen = false }
                 onNewNote: win.newNote("")
                 onRename: win.renameNote()
                 onTrash: win.trashNote()
                 onWroteIn: (id, was) => win.refile(id, was)
+                onTagPicked: tag => win.pickTag(tag)
                 onMessage: (text, danger) => toast.show(text, { danger: danger })
 
                 Keys.onPressed: e => {
@@ -196,6 +276,8 @@ ShellRoot {
                     else if (e.text === "/") win.find()
                     else if (e.text === "n") win.newNote("")
                     else if (e.text === "r") win.renameNote()
+                    else if (e.text === "m") win.askMove()
+                    else if (e.text === "f") win.toFolders()
                     else if (k === Qt.Key_Delete || (k === Qt.Key_Backspace && (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier))))
                         win.trashNote()
                     else if (k === Qt.Key_Z && (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)) && toast.act()) {}
@@ -218,6 +300,15 @@ ShellRoot {
             behind: content
             c: win.look
             cardWidth: Math.min(440, win.width - 32)      // a narrow window: the card inside it
+            onClosed: if (!view.editing) view.forceActiveFocus()
+        }
+
+        MovePanel {
+            id: movePanel
+            behind: content
+            c: win.look
+            store: store
+            cardWidth: Math.min(440, win.width - 32)
             onClosed: if (!view.editing) view.forceActiveFocus()
         }
 

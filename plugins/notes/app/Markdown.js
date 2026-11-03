@@ -25,7 +25,18 @@ function inline(text, c) {
     s = s.replace(/(^|[^\w*])\*(\S(?:.*?\S)?)\*(?!\w)|(^|[^\w_])_(\S(?:.*?\S)?)_(?!\w)/g,
                   (m, p1, a, p2, b) => `${p1 || p2 || ""}<i>${a || b}</i>`)
     s = s.replace(/~~(\S(?:.*?\S)?)~~/g, "<s>$1</s>")
+    s = tags(s, c)
     return s.replace(/\u0000(\d+)\u0000/g, (m, i) => `<code style="color:${c.accent}">${escape(codes[+i])}</code>`)
+}
+
+// A note's #tags as links ("tag:NAME": a click shows the tag's notes, NoteView.qml), by lib/tags.py's pattern: keep the
+// two alike. Not inside a link already made (its text or address), nor in code, which is still a placeholder here.
+// QML's JavaScript has no \p{L}: a letter is Latin (with its accents), Greek or Cyrillic, as there.
+const L = "A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u0370-\u03FF\u0400-\u04FF"
+const TAG = new RegExp(`(^|[\\s(\\[])#([${L}][${L}0-9_/-]*[${L}0-9_]|[${L}])`, "g")
+function tags(s, c) {
+    return s.split(/(<a [^>]*>.*?<\/a>)/).map((part, i) => i % 2 ? part : part.replace(TAG, (m, before, tag) =>
+        `${before}<a href="tag:${tag}" style="color:${c.primary}; text-decoration:none">#${tag}</a>`)).join("")
 }
 
 // The column a list marker's indent reaches, a tab as four

@@ -2,19 +2,37 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// The notes as `notes list` gives them (lib/notes.py, newest first), and the open one's text, read from its file. The
-// list is read again every few seconds (shell.qml's timer) and at once when the notes command changed something (its
-// `ipc refresh`); the open note's file is watched, so a save in Apostrophe shows at once.
+// The notes as `notes list` gives them (lib/notes.py, newest first), with the folders and tags (lib/folders.py), and the
+// open one's text, read from its file. The list is read again every few seconds (shell.qml's timer) and at once when the
+// notes command changed something (its `ipc refresh`); the open note's file is watched, so a save in Apostrophe shows at
+// once. The folder or tag picked in the sidebar (NavSidebar.qml) narrows what shows: a folder with what is under it, a
+// tag with the tags nested in it, as `notes list --folder/--tag` has them.
 Item {
     id: store
     property var notes: []
+    property var folders: []                   // { path, name, depth, own, count }, empty ones too
+    property var tags: []                      // { name, count }
+    // The sidebar's pick: one folder ("" the top, with everything) or one tag, never both
+    property string scopeFolder: ""
+    property string scopeTag: ""
+    readonly property string scopeName: scopeTag ? "#" + scopeTag : scopeFolder ? scopeFolder.split("/").pop() : "All notes"
+    function under(folder, sub) { return !folder || sub === folder || sub.startsWith(folder + "/") }
+    function tagged(n, tag) {
+        const want = tag.toLowerCase()
+        return (n.tags || []).some(t => t.toLowerCase() === want || t.toLowerCase().startsWith(want + "/"))
+    }
+    function inScope(n) { return under(scopeFolder, n.folder || "") && (!scopeTag || tagged(n, scopeTag)) }
+    // Picking one shows its newest note, unless the one open is in it; an empty folder shows none
+    function pickFolder(f) { scopeTag = ""; scopeFolder = f; keepInScope() }
+    function pickTag(t) { scopeFolder = ""; scopeTag = t; keepInScope() }
+    function keepInScope() { if (index < 0) picked = shown.length ? shown[0].id : "" }
     property bool loaded: false
     property string folder: "~/Notes"
     property string error: ""
     property string picked: ""                 // the open note's id
     // A search's notes (NoteSearch.found), null without one: the list shows them instead, and the keys move in them
     property var found: null
-    readonly property var shown: found !== null ? found : notes
+    readonly property var shown: (found !== null ? found : notes).filter(inScope)
     readonly property int index: shown.findIndex(n => n.id === picked)     // in shown: -1 when a search left it out
     readonly property var note: notes.find(n => n.id === picked) || null
     property string text: ""                   // the open note's Markdown, as its file has it now
@@ -34,6 +52,7 @@ Item {
     property string before: ""
     function add(note) {
         before = picked
+        if (scopeTag) pickFolder(note.folder || "")      // in a tag the new note (without it yet) wouldn't show
         notes = [note].concat(notes.filter(n => n.id !== note.id))
         if (found !== null) found = [note].concat(found)      // shown while a search is on too, as the note written in
         picked = note.id
@@ -48,12 +67,14 @@ Item {
     }
 
     // New: `notes create --json TITLE`, its stdin empty, or without a title `--untitled` ("Untitled.md", its text "# ",
-    // the title written in it); then gets the new note, failed notes.py's words
+    // the title written in it), in the folder picked; then gets the new note, failed notes.py's words. A tag picked
+    // isn't written in for the user: the note shows all the same while it is being written (add), and leaves the
+    // list if it doesn't get the tag.
     function create(title, then, failed) {
         if (creator.running) return
         creator.then = then
         creator.failed = failed
-        creator.command = [command, "create", "--json", title || "--untitled"]
+        creator.command = [command, "create", "--json", "--folder", scopeFolder, title || "--untitled"]
         creator.running = true
     }
     Process {
@@ -78,8 +99,9 @@ Item {
         const i = shown.findIndex(n => n.id === id)
         notes = notes.filter(n => n.id !== id)
         if (found !== null) found = found.filter(n => n.id !== id)
+        // Not one outside the folder or tag shown: a folder left empty shows no note
         if (picked === id) picked = i >= 0 && shown.length ? shown[Math.min(i, shown.length - 1)].id
-            : notes.length ? notes[0].id : ""
+            : notes.length && !scopeFolder && !scopeTag ? notes[0].id : ""
         raw = ""
         refresh()
     }
@@ -101,14 +123,20 @@ Item {
                 try {
                     const r = JSON.parse(text)
                     store.notes = r.notes
+                    store.folders = r.folders
+                    store.tags = r.tags
                     store.folder = r.folder
+                    // A folder gone (Files) or a tag no note has any more: back to every note
+                    if (store.scopeFolder && !r.folders.some(f => f.path === store.scopeFolder)) store.scopeFolder = ""
+                    if (store.scopeTag && !r.tags.some(t => t.name.toLowerCase() === store.scopeTag.toLowerCase()))
+                        store.scopeTag = ""
                     store.error = ""
                 } catch (e) {
                     store.error = "The notes couldn't be read: " + e
                 }
                 store.loaded = true
-                // The open note gone (trashed): the newest shows instead
-                if (!store.note && store.notes.length) store.picked = store.notes[0].id
+                // The open note gone (trashed): the newest of those shown instead (none in an empty folder)
+                if (!store.note && store.shown.length) store.picked = store.shown[0].id
             }
         }
         stderr: StdioCollector { onStreamFinished: if (text.trim()) store.error = text.trim() }

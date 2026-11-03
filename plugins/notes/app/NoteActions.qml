@@ -2,9 +2,9 @@ import QtQuick
 import Quickshell.Io
 
 // The window's changes to a note as a whole, each through the notes command as Claude's tools make them, so the window,
-// a terminal and Claude rename and trash a note the same way (lib/rename.py, notes.py trash) and undo it the same way:
-// rename and its undo unrename, trash and its undo restore. One at a time: a key pressed again while one runs does
-// nothing. then gets the command's JSON answer, failed its words for the window's toast.
+// a terminal and Claude rename, move and trash a note the same way (lib/rename.py, folders.py, notes.py trash) and undo
+// it the same way: rename and its undo unrename, move and a move back, trash and its undo restore. One at a time: a key
+// pressed again while one runs does nothing. then gets the command's JSON answer, failed its words for the window's toast.
 Item {
     id: root
     required property string command          // the plugin's bin/notes, by its path
@@ -22,6 +22,13 @@ Item {
     function trash(id, then, failed) { run(["trash", "--json", id], then, failed) }
     // names: trash's answer's names in the trash. restore prints no JSON: then gets null
     function restore(names, then, failed) { run(["restore", "--"].concat(names), then, failed, true) }
+
+    // Folders (lib/folders.py): a note into one ("" the top; one not there yet is made), its undo the move back
+    // (r: move's answer); a folder made, and an empty one taken away
+    function move(id, folder, then, failed) { run(["move", "--json", "--", id, folder], then, failed) }
+    function unmove(r, then, failed) { run(["move", "--json", "--", r.id, r.old_folder], then, failed) }
+    function mkdir(folder, then, failed) { run(["mkdir", "--json", "--", folder], then, failed) }
+    function rmdir(folder, then, failed) { run(["rmdir", "--json", "--", folder], then, failed) }
 
     function run(args, then, failed, plain) {
         if (running) return

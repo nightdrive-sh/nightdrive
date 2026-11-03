@@ -13,6 +13,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from tags import tags_of
+
 ROOT = Path(os.environ.get("NOTES_DIR") or Path.home() / "Notes")
 SUFFIX = ".md"
 EXCERPT_MAX = 120     # characters of a note's first line of text in a listing
@@ -119,10 +121,13 @@ def modified(path):
 
 
 def brief(path, text=None):
-    """A row of a listing: what tells notes apart."""
+    """A row of a listing: what tells notes apart, and where it is found: its folder ("" at the top) and its tags
+    (tags.py)."""
     text = read_text(path) if text is None else text
-    return {"id": note_id(path), "title": title_of(path, text), "modified": modified(path),
-            "excerpt": excerpt(text), "size": path.stat().st_size}
+    nid = note_id(path)
+    return {"id": nid, "title": title_of(path, text), "modified": modified(path),
+            "excerpt": excerpt(text), "size": path.stat().st_size,
+            "folder": nid.rpartition("/")[0], "tags": tags_of(text)}
 
 
 def file_name(title):

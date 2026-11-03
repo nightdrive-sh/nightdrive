@@ -59,16 +59,21 @@ Usage: notes [command]
   find [WORDS]     open Notes on its search: the notes with every word, or the field to type them in
   show NOTE        open Notes on NOTE: an id (as list gives it: Shopping.md, Work/Plan.md) or a title
   edit NOTE        open NOTE in Apostrophe
-  list             the notes, newest first (--json; --limit N, 50 by default, 0 for all)
+  list             the notes, newest first (--json; --limit N, 50 by default, 0 for all; --folder F: those in
+                   folder F and under it; --tag T: those with #T)
   search WORDS     the notes that have every word (--json; --limit N, 25 by default)
   read NOTE        a note's whole text (--json: with its id, title and path)
-  create TITLE     a new note, its text from stdin (--json)
+  create TITLE     a new note, its text from stdin (--json; --folder F: in folder F)
   append NOTE      the text from stdin added to the end of NOTE (--json)
   write NOTE       NOTE's whole text replaced by stdin (--json; --expect MD5: only while it is still that text,
                    else exit status 3; --md5 MD5: only if stdin is that text, whole), as the window's editor saves
   rename NOTE TITLE  a new title: NOTE's heading, and its file named after it (--json)
   refile NOTE WAS  NOTE's file named after its title, if it was named after WAS (--json)
   trash NOTE       NOTE to the trash, where Files puts it back (--json)
+  folders          the folders and the #tags, each with how many notes (--json)
+  mkdir FOLDER     a new folder (Work, Work/Plans) (--json)
+  rmdir FOLDER     an empty folder taken away (--json)
+  move NOTE FOLDER NOTE into FOLDER ("" for the top), made if it isn't there (--json)
   restore NAME…    back from the trash (the names trash --json gives)
   install          Notes among the desktop's apps (the installer), and ~/Notes
   uninstall        take it out again (your notes stay)
@@ -84,8 +89,8 @@ case ${1:-open} in
   find)      open_ready; ipc find "${*:2}" ;;
   show)      id=$(python3 "$NOTES_PY" read --json "${*:2}" | jq -r .id) || exit 1; open_ready; ipc pick "$id" ;;
   edit)      edit "${@:2}" ;;
-  list|search|read) python3 "$NOTES_PY" "$@" ;;
-  create|append|unappend|write|discard|rename|unrename|refile|trash) python3 "$NOTES_PY" "$@"; changed ;;
+  list|search|read|folders) python3 "$NOTES_PY" "$@" ;;
+  create|append|unappend|write|discard|rename|unrename|refile|trash|mkdir|rmdir|move) python3 "$NOTES_PY" "$@"; changed ;;
   restore)   "$APP_DIR/../../bin/nightdrive" files restore "${@:2}"; changed ;;   # trash's undo: back from the trash
   install)   install_app ;;
   uninstall) uninstall_app ;;

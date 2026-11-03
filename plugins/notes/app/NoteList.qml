@@ -4,7 +4,9 @@ import qs.kit
 
 // The sidebar: the search field (/, ⌘F), then the notes, newest first, each with its title and when it was saved over its
 // first line of text; while a search is on, the notes it found, each over the first line where the words are. A click
-// opens one; in a narrow window the list takes the whole width while it shows (shell.qml's onePane).
+// opens one; in a narrow window the list takes the whole width while it shows (shell.qml's onePane). Its title is the
+// folder or tag picked (NavSidebar.qml), and while that sidebar is hidden a button by it shows it. A row dragged sideways
+// goes to a folder there (NoteDrag.qml).
 AppSidebar {
     id: root
     required property QtObject store
@@ -13,14 +15,27 @@ AppSidebar {
     signal searchDone(bool clear)        // ⏎ or ↓ in the field: to the notes found; Esc (clear): the search ended
     property bool active: false          // the keys move between the notes: the open one has the kit's frame
     property bool showNew: false         // one pane: the note's header, where New is, doesn't show beside the list
+    property bool navShown: true         // the folders and tags beside it
+    required property QtObject drag      // NoteDrag
     signal picked(string id)
     signal newNote()
-    title: "Notes"
-    titleItems: AppIconButton {
-        visible: root.showNew
-        c: root.c; glyph: "plus"; tip: "New note"; keys: "n"; tipAlign: "right"
-        onClicked: root.newNote()
-    }
+    signal showNav()
+    // Beside the folders, the one picked shows there, and the search field takes the title's line; without them the
+    // title says which folder or tag the list is
+    title: navShown ? "" : store.scopeName
+    contentTop: navShown ? 16 : headerHeight + 13
+    titleItems: [
+        AppIconButton {
+            visible: !root.navShown
+            c: root.c; glyph: "folder-tree"; tip: "Folders and tags"; keys: "f"; tipAlign: "right"
+            onClicked: root.showNav()
+        },
+        AppIconButton {
+            visible: root.showNew
+            c: root.c; glyph: "plus"; tip: "New note"; keys: "n"; tipAlign: "right"
+            onClicked: root.newNote()
+        }
+    ]
 
     // The region's way (Settings › Region): "14:05" today, Yesterday, "Tue" this week, "28.10." this year, else the whole date
     function when(iso) { return Regional.relative(new Date(iso)) }
@@ -29,7 +44,7 @@ AppSidebar {
         id: field
         Layout.fillWidth: true
         Layout.leftMargin: 28; Layout.rightMargin: 20
-        Layout.bottomMargin: 10
+        Layout.bottomMargin: root.navShown ? 29 : 10    // beside the folders, its first note level with All notes
         c: root.c
         pixelSize: 13
         placeholder: "Search notes"
@@ -46,7 +61,7 @@ AppSidebar {
         elide: Text.ElideRight
         textFormat: Text.PlainText
         text: !root.search.found ? "" : root.search.error
-            || (root.search.found.length === 1 ? "1 note" : root.search.found.length + " notes")
+            || (root.store.shown.length === 1 ? "1 note" : root.store.shown.length + " notes")
         font.family: root.c.font; font.pixelSize: 11
         color: root.search.error ? root.c.danger : root.c.faint
     }
@@ -74,6 +89,14 @@ AppSidebar {
             selected: index === root.store.index
             active: root.active
             TapHandler { onTapped: root.picked(row.modelData.id) }
+            // Dragged (towards the folders) it moves; the wheel still scrolls the list
+            DragHandler {
+                target: null
+                grabPermissions: PointerHandler.TakeOverForbidden
+                cursorShape: Qt.ClosedHandCursor
+                onActiveChanged: if (active) root.drag.start(row.modelData); else root.drag.end()
+                onCentroidChanged: if (active) root.drag.over(centroid.scenePosition)
+            }
             Column {
                 anchors.left: parent.left; anchors.leftMargin: 14
                 anchors.right: parent.right; anchors.rightMargin: 14
@@ -108,6 +131,20 @@ AppSidebar {
                     font.family: root.c.font; font.pixelSize: 11; color: root.c.faint
                 }
             }
+        }
+        // A folder or tag with no notes (a new folder, or a search that found none in it)
+        Text {
+            visible: root.store.loaded && !root.store.shown.length && root.store.notes.length > 0
+                     && !(root.search.active && root.search.found !== null && !root.search.found.length)
+            anchors.horizontalCenter: parent.horizontalCenter; y: 24
+            width: parent.width - 32
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            textFormat: Text.PlainText
+            text: root.search.active ? "None of them in " + root.store.scopeName
+                : root.store.scopeTag ? "No note has " + root.store.scopeName
+                : "No notes in " + root.store.scopeName + " yet.\nNew (n) writes one here; drag one here from All notes."
+            font.family: root.c.font; font.pixelSize: 12; font.weight: Font.Normal; color: root.c.faint
         }
         Text {
             visible: root.search.active && root.search.found !== null && !root.search.found.length && !root.search.error

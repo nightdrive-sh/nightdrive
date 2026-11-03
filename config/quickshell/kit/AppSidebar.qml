@@ -18,7 +18,8 @@ Rectangle {
     readonly property alias titleHovered: titleHover.hovered
     Layout.fillHeight: true
     color: "transparent"
-    AppTitle { x: 28; y: (root.headerHeight - height) / 2; c: root.c; text: root.title }
+    // Without a title (a second sidebar beside the first, as Notes' list), none: its first item can take the line
+    AppTitle { visible: root.title !== ""; x: 28; y: (root.headerHeight - height) / 2; c: root.c; text: root.title }
     // Over the title, the line's full width so the hover covers it all; above the column (z), so a card one of the
     // items opens under it (Mail's "Not sent") lies over the rows
     Item {

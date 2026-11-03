@@ -17,6 +17,7 @@ Item {
     signal rename()                            // Rename and Trash: shell.qml's, which wait for a save running
     signal trash()
     signal message(string text, bool danger)   // for the window's toast
+    signal tagPicked(string tag)               // a #tag clicked in the note: its notes in the list (Store.pickTag)
     signal wroteIn(string id, string was)      // NoteEditor's: its file may follow its title (shell.qml)
     readonly property var note: store.note
     readonly property int margin: width < 520 ? 24 : 40
@@ -194,6 +195,7 @@ Item {
             color: root.c.body
             onLinkActivated: link => {
                 if (/^box:\d+$/.test(link)) boxes.toggle(+link.slice(4))
+                else if (link.startsWith("tag:")) root.tagPicked(link.slice(4))
                 else if (/^(https?:\/\/|mailto:)/i.test(link)) Qt.openUrlExternally(link)
             }
             HoverHandler { cursorShape: page.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor }
@@ -203,7 +205,7 @@ Item {
     // The address a hovered link goes to, as a browser shows it: a link's text can name another address than its own
     // (a note Claude wrote, or one from the web), and this is the one a click opens (#1930)
     Rectangle {
-        visible: page.hoveredLink !== "" && !page.hoveredLink.startsWith("box:")
+        visible: page.hoveredLink !== "" && !/^(box|tag):/.test(page.hoveredLink)
         anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 8
         width: Math.min(linkText.implicitWidth + 20, parent.width - 16); height: linkText.implicitHeight + 10
         radius: 6; color: root.c.solid; border.width: 1; border.color: root.c.divider
@@ -223,7 +225,7 @@ Item {
         width: Math.min(parent.width - 48, 380)
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
-        text: root.store.error || (root.store.notes.length ? "Pick a note to read it."
+        text: root.store.error || (root.store.notes.length ? root.store.shown.length ? "Pick a note to read it." : ""
             : "No notes in " + root.store.folder + " yet.\nNew (n) writes one, and Claude can too.")
         font.family: root.c.font; font.pixelSize: 13; color: root.c.faint
     }

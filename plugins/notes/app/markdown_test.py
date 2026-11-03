@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """How Notes reads lists (Markdown.js, #2056): `python3 plugins/notes/app/markdown_test.py`. A numbered list goes on
 counting after a list nested in it (it started again at 1), lists nest at several levels, bullets and numbers mixed,
-task boxes keep their order for TaskBoxes.qml, a blank line between items keeps one list, and "7." starts at 7.
+task boxes keep their order for TaskBoxes.qml, a blank line between items keeps one list, and "7." starts at 7. A
+#tag is a link to its notes, where lib/tags.py reads one (#2016).
 
 Markdown.js is QML's JavaScript, so it runs in Quickshell (offscreen): the HTML it makes is read back here as an
 outline of what Qt shows, and the bug's case is also checked against Qt's own numbering (its document as Markdown)."""
@@ -58,6 +59,8 @@ CASES = {
     "back_out": "- a\n  - b\n    - c\n- d",
     "continued": "1. item\n   more of it\n2. next",
     "paragraph_ends": "1. a\n2. b\n\nAfter\n\n1. new",
+    # #2016: tags as lib/tags.py reads them
+    "tags": "#idea and #työ/koti, task #2016, page#part, `#code`, [#in a link](https://a.b/#x) (#paren)",
 }
 
 
@@ -157,6 +160,9 @@ class Lists(unittest.TestCase):
 
     def test_paragraph_ends_the_list(self):
         self.assertEqual(self.lines("paragraph_ends"), ["1. a", "2. b", "After", "1. new"])
+
+    def test_hash_tags_are_links(self):
+        self.assertEqual(re.findall(r'href="tag:([^"]+)"', self.out["tags"]["html"]), ["idea", "työ/koti", "paren"])
 
     def test_tags_balance(self):
         for name, result in self.out.items():
