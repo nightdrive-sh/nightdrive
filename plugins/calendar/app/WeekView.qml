@@ -1,26 +1,30 @@
 import QtQuick
+import qs.kit
 import "Dates.js" as Dates
 
-// The week, Monday to Sunday: a row on top for what takes whole days (all-day and multi-day events, as bars on each of
+// The week, Monday to Sunday (Sunday to Saturday in the US: Settings › Region): a row on top for what takes whole days (all-day and multi-day events, as bars on each of
 // their days), and under it the hours, scrolled to the morning, with each timed event a block from its start to its
 // end. Events that overlap share their day's width, side by side.
 Item {
     id: root
     required property var app           // the window: day, today, now, byDay, dayPicked, pickDay(), openEvent(), newEvent()
     required property QtObject c
-    readonly property date monday: Dates.monday(Dates.parse(app.day))
-    readonly property var days: [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(monday, i)))
+    readonly property date first: Dates.weekFirst(Dates.parse(app.day), Region.weekStart)
+    readonly property var days: [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(first, i)))
     readonly property string today: app.today
     readonly property int timeCol: 46
     readonly property int headRow: 40
-    readonly property int hourH: 44
+    // An hour is at least 44 px, more when the window is taller than the day: the 24 hours then fill it instead of
+    // leaving empty room under midnight (#2036); shorter, they scroll
+    readonly property int hourMin: 44
+    readonly property real hourH: Math.max(hourMin, (height - headRow - laneH - 1) / 24)
     readonly property int bar: 18           // a row of the all-day lane
     readonly property int gap: 2            // between its stacked bars, so they don't touch (#1481)
     readonly property real colW: (width - timeCol) / 7
     // The all-day lane is as high as its fullest day needs, up to four rows (the rest: "+N")
     readonly property int laneRows: Math.min(4, Math.max(1, ...days.map(d => (app.byDay[d] || []).filter(Dates.spansDays).length)))
     readonly property int laneH: laneRows * bar + 8
-    readonly property var dayNames: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    readonly property var dayNames: Region.weekdays.map(wd => Region.dayName(wd, true))
     readonly property int scrollTo: 7       // the hour at the top when the week opens
     // A narrow window (#2025): a day's name is its letter once "Mon" and the date's circle no longer fit side by side,
     // and an event too narrow for a word is its colour alone (its title elided to "…" said nothing)
@@ -65,7 +69,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: root.colW >= 44
                     text: root.shortNames ? root.dayNames[index][0] : root.dayNames[index]
-                    color: index >= 5 ? root.c.faint : root.c.dim
+                    color: Region.weekdays[index] % 6 === 0 ? root.c.faint : root.c.dim   // the weekend
                     font.family: root.c.font; font.pixelSize: 11; font.weight: Font.Medium
                 }
                 Rectangle {
@@ -134,21 +138,23 @@ Item {
         clip: true
         contentHeight: 24 * root.hourH
         boundsBehavior: Flickable.StopAtBounds
-        Component.onCompleted: contentY = root.scrollTo * root.hourH - 10     // its label whole, not cut at the top
+        // The morning at the top, its label whole, not cut; kept within the day, as a day that fits has nowhere to scroll
+        Component.onCompleted: contentY = Math.max(0, Math.min(contentHeight - height, root.scrollTo * root.hourH - 10))
         TouchScroll { view: hours }
 
         Repeater {
             model: 24
             delegate: Item {
                 required property int index
-                y: index * root.hourH
+                y: Math.round(index * root.hourH)       // a stretched hour isn't whole pixels: its line stays sharp
                 width: hours.width; height: root.hourH
                 Rectangle { x: root.timeCol; width: parent.width - root.timeCol; height: 1; color: root.c.line; visible: index > 0 }
                 Text {
                     visible: index > 0
                     width: root.timeCol - 8; y: -7
                     horizontalAlignment: Text.AlignRight
-                    text: Dates.pad(index) + ":00"
+                    // 09:00, or 9 AM where the clock is 12 h: "9:00 AM" is too wide for the column
+                    text: Region.h24 ? Dates.pad(index) + ":00" : Region.format(new Date(2000, 0, 1, index), "h AP")
                     color: root.c.faint; font.family: root.c.font; font.pixelSize: 10
                 }
             }
@@ -208,7 +214,7 @@ Item {
                                 textFormat: Text.PlainText
                                 visible: block.height > 34
                                 width: parent.width; elide: Text.ElideRight
-                                text: block.modelData.e.start.slice(11, 16) + " – " + block.modelData.e.end.slice(11, 16)
+                                text: Region.time(block.modelData.e.start.slice(11, 16)) + " – " + Region.time(block.modelData.e.end.slice(11, 16))
                                     + (block.modelData.e.location ? "  " + block.modelData.e.location.split("\n")[0] : "")
                                 color: root.c.dim; font.family: root.c.font; font.pixelSize: 10
                             }
