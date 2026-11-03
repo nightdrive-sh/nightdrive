@@ -358,7 +358,9 @@ PanelWindow {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    // OnDemand, not Exclusive: Hyprland gives it the keyboard as it maps all the same, but an Exclusive layer also takes
+    // every click, on every screen, so a click on another screen couldn't close it (OutsideClick in shell.qml, #2039)
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     MouseArea { anchors.fill: parent; onClicked: win.open = false }
 

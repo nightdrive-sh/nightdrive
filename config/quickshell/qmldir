@@ -41,6 +41,7 @@ Picker 1.0 Picker.qml
 PowerDialog 1.0 PowerDialog.qml
 CodeDialog 1.0 CodeDialog.qml
 Drawer 1.0 Drawer.qml
+OutsideClick 1.0 OutsideClick.qml
 Divider 1.0 Divider.qml
 Shelf 1.0 Shelf.qml
 OutputList 1.0 OutputList.qml

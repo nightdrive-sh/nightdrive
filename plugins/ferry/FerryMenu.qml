@@ -42,7 +42,6 @@ Column {
     property int dragging: 0           // files being dragged out: shell.qml lets the drop through to the windows below
     property int tileDrags: 0          // tiles with files over them
     readonly property bool dropping: outerDrop.containsDrag || tileDrags > 0 || dropHold.running
-    readonly property bool wantsKeyboard: mode === "write"   // shell.qml: the text field needs it
     readonly property int rowHeight: 56
     readonly property int listLift: 30   // how far the pill comes up over a long list
     readonly property int listFade: 64   // the fade at the bottom of a long list

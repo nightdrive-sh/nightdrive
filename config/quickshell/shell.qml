@@ -14,7 +14,9 @@ ShellRoot {
     property string current: ""
     property real anchorX: -1          // icon's horizontal coordinate (logical px); -1 = right edge
 
-    // --- Keyboard navigation (⌘⇧Space): ←/→ switch menu (in the bar's order), ↑/↓ select a row, Enter activates, Esc closes ---
+    // --- Keyboard navigation: ←/→ switch menu (in the bar's order), ↑/↓ select a row, Enter activates, Esc closes ---
+    // An open menu has the whole keyboard (below: keyboardFocus), never a few keys: a Hyprland submap that took
+    // only these six left the window being typed in with its letters but not its Enter (#2039)
     property bool navMode: false
     // Menus: <Name>Menu.qml here, a private overlay's in local/ (not in the repo; its bar modules come from
     // ~/.config/topbar/local.modules.jsonc) and the installed plugin folders' (TopBar.plugin.menus: name → path).
@@ -40,11 +42,10 @@ ShellRoot {
         const f = Hyprland.focusedMonitor
         return (f && Quickshell.screens.find(s => s.name === f.name)) || Quickshell.screens[0]
     }
-    property bool viaSubmap: false     // opened by click/shortcut: ←/→/↑/↓/Enter/Esc come from a Hyprland submap (hypr/bindings.lua: qsmenu), no keyboard focus
     property var navItem: null         // selected row / toggle
 
-    function submap(name) { Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.submap("' + name + '")']) }
-    Component.onCompleted: submap("reset")      // safety net: in case the previous session was left in the submap
+    // Safety net: before #2039 an open menu put Hyprland in a submap (qsmenu); one left in it after an update has no keys
+    Component.onCompleted: Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.submap("reset")'])
 
     // A reload on save or a restart only shows as the bar redrawing (an open menu closes), easy to miss: a short silent
     // popup says it happened. Not at login: qs's PID (the parent of this Process, not of an execDetached one) kept in the
@@ -71,8 +72,8 @@ ShellRoot {
 
     onCurrentChanged: {
         navItem = null
-        if (current === "") { navMode = false; viaSubmap = false }
-        submap(current !== "" && viaSubmap ? "qsmenu" : "reset")
+        if (current === "") navMode = false
+        else if (navMode) keyItem.forceActiveFocus()
     }
     function openNav(i) {
         const order = bar.navOrder()
@@ -85,7 +86,6 @@ ShellRoot {
     }
     function navToggle() {
         if (navMode) { current = ""; return }
-        viaSubmap = false
         navMode = true
         openNav(Math.max(0, bar.navIndex(current)))
         keyItem.forceActiveFocus()
@@ -167,7 +167,6 @@ ShellRoot {
             root.menuScreen = root.focusedScreen()
             root.anchorX = bar.xOf(name, root.menuScreen)      // below its bar icon; -1 (no icon in the bar) = the right edge
             const opening = root.current !== name
-            root.viaSubmap = opening
             root.navMode = opening
             root.current = opening ? name : ""
         }
@@ -185,14 +184,13 @@ ShellRoot {
         function workspaces(): void { Hyprland.refreshWorkspaces(); Hyprland.refreshMonitors(); Hyprland.refreshToplevels() }
     }
 
-    // A click on a bar module. The menu also enters keyboard mode (Esc closes, arrows/Enter work as with ⌘⇧Space).
+    // A click on a bar module. The menu also takes the keyboard (Esc closes, arrows/Enter work as with ⌘⇧Space).
     function clickMenu(name, x, screen) {
         anchorX = x
         menuScreen = screen
         const opening = current !== name
-        // The Wifi menu has a password field that needs real keyboard focus: no arrow-key navigation
-        viaSubmap = opening && name !== "wifi"
-        navMode = viaSubmap
+        // The Wifi menu has a password field: the keys are its own, no arrow-key navigation
+        navMode = opening && name !== "wifi"
         current = opening ? name : ""
     }
 
@@ -257,14 +255,29 @@ ShellRoot {
         // a password prompt or Claude's card goes over it
         stepAside: polkit.asking || (confirm.open && !confirm.inlined)
         extSource: root.localLauncher ? "local/LauncherExtension.qml" : ""
-        onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.current = name }   // below its bar icon (-1 = none: right edge)
+        onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.navMode = name !== "wifi"; root.current = name }   // below its bar icon (-1 = none: right edge)
     }
     // An open bar menu (the core's or a plugin's) and Ask Claude's toast close when the launcher opens: their keyboard
-    // focus (and the menus' qsmenu submap: arrows, Enter, Esc) would otherwise keep the keys from the launcher. A Connections: an
+    // focus would otherwise keep the keys from the launcher. A Connections: an
     // onOpenChanged on the Launcher instance above didn't run (Launcher has its own).
     Connections {
         target: launcher
-        function onOpenChanged() { if (launcher.open) { root.current = ""; askToast.close() } }
+        function onOpenChanged() { if (launcher.open) { root.launcherScreen = root.focusedScreen().name; root.current = ""; askToast.close() } }
+    }
+    // A click on another screen closes the launcher too. It has no screen of its own: Hyprland puts it on the focused one.
+    property string launcherScreen: ""
+    OutsideClick {
+        active: launcher.visible
+        exceptScreen: root.launcherScreen
+        onClicked: launcher.open = false
+    }
+
+    // A click on another screen closes the menu too; their bars stay clickable (a module there opens its menu at once)
+    OutsideClick {
+        active: root.current !== "" && !polkit.asking
+        exceptScreen: (root.menuScreen || Quickshell.screens[0]).name
+        topMargin: Theme.barHeight
+        onClicked: root.current = ""
     }
 
     PanelWindow {
@@ -276,11 +289,10 @@ ShellRoot {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "nightdrive-menu"   // hyprland.lua blurs behind a bare menu's translucent cards
-        // Keyboard focus only for a text field: the wifi menu's password, or a menu that asks for it while it shows one
-        // (wantsKeyboard: Ferry's text). With OnDemand all the time a second click on the top bar was lost until the
-        // mouse was moved.
-        WlrLayershell.keyboardFocus: root.navMode && !root.viaSubmap ? WlrKeyboardFocus.Exclusive
-            : (root.current === "wifi" || (loader.item && loader.item.wantsKeyboard === true) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+        // The whole keyboard while it is open: Hyprland gives an OnDemand layer the keyboard as it maps (a click on another
+        // window, which would take it back, closes the menu first: OutsideClick). Not Exclusive: Hyprland then sends every
+        // click, on every screen, to the menu, and neither the bar nor another screen could close it (#2039).
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
         // A menu dragging a file out (FerryMenu, NotificationsMenu: dragging > 0) takes input only on its card meanwhile, so the drop reaches
         // the windows below

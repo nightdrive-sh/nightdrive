@@ -47,8 +47,8 @@ end
 ------------------------
 local mod = "SUPER"
 
--- Every binding (also local.lua's and local.d's) is recorded, so that the top bar menu's submap (qsmenu, below) can repeat
--- them: inside a submap only its own keys work, and ⌘Enter, the volume keys etc. would be dead while a menu is open.
+-- No longer filled: the top bar menu's submap that repeated every binding is gone (#2039: an open menu has the keyboard
+-- or not). Kept empty, as a local.lua or local.d file may still edit it.
 NIGHTDRIVE_BINDS = {}
 -- Your own Hyper keys (launcher › Settings › Apps › App shortcuts, scripts/app-keys): KEY<TAB>app.desktop, or - for a key
 -- that does nothing. They win over every other Hyper + KEY binding, Nightdrive's, a plugin's or local.lua's, which are
@@ -78,7 +78,6 @@ end
 hl.bind = function (keys, action, opts)
     local hyper = keys:match("^%s*MOD3%s*%+%s*(%w)%s*$")
     if hyper and appKeys[hyper:upper()] and not ownKey then return end
-    if not NIGHTDRIVE_IN_SUBMAP then table.insert(NIGHTDRIVE_BINDS, { keys, action, opts }) end
     local copy = option_copy(keys)
     if copy then bind(copy, action, opts) end
     return bind(keys, action, opts)
@@ -505,28 +504,3 @@ hl.bind("XF86AudioNext",  hl.dsp.exec_cmd(scripts .. "/media next"),     { locke
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd(scripts .. "/media pause"),    { locked = true })   -- always pause, never toggle: Bluetooth headphones send PAUSE when taken off
 hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd(scripts .. "/media play"),     { locked = true })   -- F8: play/pause, or starts Deck (if installed) if no player is open
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd(scripts .. "/media previous"), { locked = true })
-
--- Top bar menu opened by clicking: keys are routed to Quickshell via a submap (no keyboard focus -> a second click on the bar
--- closes the menu normally). Quickshell (shell.qml) enters the submap when the menu opens and resets it when it closes.
--- Safety: Esc always returns to the default map. All other bindings work in it too (NIGHTDRIVE_BINDS, above).
--- hyprland.lua calls this after local.lua and local.d, so their bindings are included.
-local function qsnav(a) return hl.dsp.exec_cmd("qs ipc call menu navkey " .. a) end
-local menuKeys = { ESCAPE = true, LEFT = true, RIGHT = true, UP = true, DOWN = true, RETURN = true }
-function NIGHTDRIVE_DEFINE_MENU_SUBMAP()
-    hl.define_submap("qsmenu", function ()
-        NIGHTDRIVE_IN_SUBMAP = true
-        hl.bind("ESCAPE", function ()
-            hl.dispatch(hl.dsp.submap("reset"))
-            hl.dispatch(qsnav("esc"))
-        end)
-        hl.bind("LEFT",   qsnav("left"),  { repeating = true })
-        hl.bind("RIGHT",  qsnav("right"), { repeating = true })
-        hl.bind("UP",     qsnav("up"),    { repeating = true })
-        hl.bind("DOWN",   qsnav("down"),  { repeating = true })
-        hl.bind("RETURN", qsnav("enter"))
-        for _, b in ipairs(NIGHTDRIVE_BINDS) do
-            if not menuKeys[b[1]] then hl.bind(b[1], b[2], b[3]) end
-        end
-        NIGHTDRIVE_IN_SUBMAP = false
-    end)
-end

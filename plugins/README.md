@@ -166,8 +166,8 @@ calendar's grid, Ferry's drop zone and QR code are all fine).
   "/.local/bin/<command>"` (FerryMenu.qml's `ferry`), since Quickshell's PATH may not have that folder.
 - `Divider` is the separator line; `Slider`, `BusyDots` and `Plugins.has("tailscale")` (is another plugin on?) are there
   too.
-- **A text field** needs the keyboard, which a menu doesn't have by default: `readonly property bool wantsKeyboard`
-  true while one shows (Ferry's Aa).
+- **A text field** gets the keys once it has the focus (`forceActiveFocus()` as it shows, as Ferry's Aa): an open menu
+  has the whole keyboard, and a click outside it, on any screen, closes it.
 - **Settings with more room** (a window of its own, as AirPods settings and Theme Editor) use the `Setting…` parts, so
   they look and behave alike: `SettingToggle` (`title`, `desc`, `checked`, `onPicked: v => …`), `SettingLevel` (a slider:
   `value`, `to`, `unit`, `lowText`/`highText`, `labelWidth` for the title in front of it; `onPicked` when the mouse

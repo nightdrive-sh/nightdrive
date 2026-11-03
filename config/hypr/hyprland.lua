@@ -657,5 +657,4 @@ pcall(require, "local")
 local extras = io.popen('ls "' .. HOME .. '/.config/hypr/local.d/"*.lua 2>/dev/null')
 for f in extras:lines() do dofile(f) end
 extras:close()
-NIGHTDRIVE_DEFINE_MENU_SUBMAP()   -- bindings.lua: the top bar menu's submap, with every binding above in it
 update_corners()
