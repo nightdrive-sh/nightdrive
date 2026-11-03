@@ -12,8 +12,11 @@ Item {
     property string folder: "~/Notes"
     property string error: ""
     property string picked: ""                 // the open note's id
-    readonly property int index: notes.findIndex(n => n.id === picked)
-    readonly property var note: index >= 0 ? notes[index] : null
+    // A search's notes (NoteSearch.found), null without one: the list shows them instead, and the keys move in them
+    property var found: null
+    readonly property var shown: found !== null ? found : notes
+    readonly property int index: shown.findIndex(n => n.id === picked)     // in shown: -1 when a search left it out
+    readonly property var note: notes.find(n => n.id === picked) || null
     property string text: ""                   // the open note's Markdown, as its file has it now
     property string textId: ""                 // whose text that is: "" until the picked note's file has been read
     readonly property string root: Quickshell.env("NOTES_DIR") || Quickshell.env("HOME") + "/Notes"   // as lib/store.py's
@@ -30,12 +33,14 @@ Item {
     function add(note) {
         before = picked
         notes = [note].concat(notes.filter(n => n.id !== note.id))
+        if (found !== null) found = [note].concat(found)      // shown while a search is on too, as the note written in
         picked = note.id
         raw = ""
         refresh()
     }
     function drop(id) {
         notes = notes.filter(n => n.id !== id)
+        if (found !== null) found = found.filter(n => n.id !== id)
         if (picked === id) picked = notes.some(n => n.id === before) ? before : notes.length ? notes[0].id : ""
         raw = ""
     }
@@ -68,17 +73,18 @@ Item {
 
     // Trashed here: out of the list at once, the note below it (else above) shown instead
     function forget(id) {
-        const i = notes.findIndex(n => n.id === id)
-        if (i < 0) return
+        const i = shown.findIndex(n => n.id === id)
         notes = notes.filter(n => n.id !== id)
-        if (picked === id) picked = notes.length ? notes[Math.min(i, notes.length - 1)].id : ""
+        if (found !== null) found = found.filter(n => n.id !== id)
+        if (picked === id) picked = i >= 0 && shown.length ? shown[Math.min(i, shown.length - 1)].id
+            : notes.length ? notes[0].id : ""
         raw = ""
         refresh()
     }
     // Renamed or put back here: shown as soon as the list has it (the next read, at once)
     function follow(id) { picked = id; raw = ""; refresh() }
 
-    function step(d) { const n = notes.length; if (n) picked = notes[Math.max(0, Math.min(n - 1, index + d))].id }
+    function step(d) { const n = shown.length; if (n) picked = shown[Math.max(0, Math.min(n - 1, index + d))].id }
 
     Process {
         id: lister
@@ -100,7 +106,7 @@ Item {
                 }
                 store.loaded = true
                 // The open note gone (trashed): the newest shows instead
-                if (store.index < 0 && store.notes.length) store.picked = store.notes[0].id
+                if (!store.note && store.notes.length) store.picked = store.notes[0].id
             }
         }
         stderr: StdioCollector { onStreamFinished: if (text.trim()) store.error = text.trim() }

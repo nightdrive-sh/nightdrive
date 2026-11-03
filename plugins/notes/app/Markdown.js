@@ -85,3 +85,17 @@ function html(md, c) {
     flush()
     return out.join("\n")
 }
+
+// The search's words marked in the note's HTML (html()'s): in its text only, never inside a tag or an entity, each
+// match case aside, as notes.py finds them. words are lower case. The mark is the theme's primary, faded: its selection
+// colour is too near the background to find a word by.
+function mark(html, words, c) {
+    if (!words.length) return html
+    const pattern = new RegExp(words.map(w => escape(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                                    .sort((a, b) => b.length - a.length).join("|"), "gi")
+    const p = c.primary
+    const style = `background-color:${Qt.rgba(p.r, p.g, p.b, 0.4)}; color:${c.title}`
+    // Tags and entities kept as they are; the text between them marked
+    return html.split(/(<[^>]*>|&[#\w]+;)/).map((part, i) =>
+        i % 2 ? part : part.replace(pattern, m => `<span style="${style}">${m}</span>`)).join("")
+}

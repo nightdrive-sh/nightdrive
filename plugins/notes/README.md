@@ -8,6 +8,7 @@ Your notes as Markdown files in `~/Notes`, in a window to read and write them: t
 | --- | --- |
 | `?` | Notes' keys |
 | ↑ ↓ or `j` `k` | Move in the list (`Home` `End`: the newest, the oldest) |
+| `/` or ⌘F | Search: the notes whose title or text has every word, the first line with them under each; the words are marked in the note. `Enter` or ↓ to the notes found, `Esc` back to every note |
 | `n` or ⌘N | New note: it opens to write in, its title first after `# ` (New in the header too) |
 | F2 or `r` | Rename: the note's heading and its file name follow the new title |
 | `Delete` or ⌘⌫ | Move the note to the trash; Undo (⌘Z) in the notice puts it back |
@@ -33,6 +34,7 @@ In Settings › Claude › Access, the Notes row lets Claude list, search and re
 | --- | --- |
 | `notes` | Open the window |
 | `notes list`, `notes search WORDS` | The notes, newest first; the ones that have every word (`--json`) |
+| `notes find [WORDS]` | The window on its search, for WORDS or to type them in |
 | `notes new [TITLE]` | The window on a new note to write in (without TITLE, its title is the first thing you write) |
 | `notes read NOTE`, `notes show NOTE`, `notes edit NOTE` | A note's text; the note in the window; in Apostrophe. NOTE is its file name (`Work/Plan.md`) or its title |
 | `echo TEXT \| notes create TITLE` | A new note, named after its title |

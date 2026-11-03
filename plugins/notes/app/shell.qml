@@ -20,6 +20,15 @@ ShellRoot {
 
         AppLook { id: c }
         Store { id: store }
+        NoteSearch {
+            id: search
+            command: store.command
+            onFoundChanged: store.found = found
+            // The note shown is one it found: the first, unless the one shown already is
+            onArrived: if (found.length && store.index < 0) win.pick(found[0].id)
+        }
+        // The notes changed (a save, Claude, another app): the search's answer may have too
+        Connections { target: store; function onRawChanged() { if (search.active && store.raw) search.run() } }
         NoteActions { id: actions; command: store.command }
         KeyHelp { id: keyHelp }
         readonly property QtObject look: c
@@ -40,6 +49,19 @@ ShellRoot {
         // Another note leaves the one being written, saved (not with a conflict to settle: NoteView.leave)
         function pick(id) { if (!view.leave()) return; store.picked = id; listOpen = false; view.home() }
         function step(d) { if (!view.leave()) return; store.step(d); view.home() }
+
+        // Search (/, ⌘F): the field in the sidebar, shown first if it was hidden; the note being written left, saved.
+        // ⏎ or ↓ there goes to the notes found (the keys move in them), Esc ends the search: every note again.
+        function find() {
+            if (!view.leave()) return
+            if (onePane) listOpen = true; else sidebarChoice = true
+            list.field.forceActiveFocus()
+        }
+        function searchDone(clear) {
+            if (clear) { list.field.text = ""; search.query = "" }
+            if (onePane && !clear && store.note) listOpen = false
+            view.forceActiveFocus()
+        }
 
         // New (n, ⌘N, `notes new [TITLE]`): no question first. Without a title the note is "Untitled.md" with "# " in
         // it and the cursor after it, so its title is the first thing written, and its file is named after it once it
@@ -110,12 +132,15 @@ ShellRoot {
             function refresh(): void { store.refresh() }
             function pick(id: string): void { win.pick(id); store.refresh() }
             function newNote(title: string): void { win.newNote(title) }
+            // `notes find [WORDS]`: the search, its words given or to type
+            function find(words: string): void { win.find(); list.field.text = words; search.query = words }
         }
 
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: win.quit() }
         Shortcut { sequences: ["Ctrl+N", "Meta+N"]; enabled: !namePanel.visible; onActivated: win.newNote("") }
         Shortcut { sequence: "F2"; enabled: !namePanel.visible; onActivated: win.renameNote() }
+        Shortcut { sequences: ["Ctrl+F", "Meta+F"]; enabled: !namePanel.visible; onActivated: win.find() }
 
         RowLayout {
             id: content
@@ -132,6 +157,8 @@ ShellRoot {
                 Layout.fillWidth: win.onePane
                 c: win.look
                 store: store
+                search: search
+                onSearchDone: clear => win.searchDone(clear)
                 active: view.activeFocus
                 onPicked: id => win.pick(id)
             }
@@ -146,6 +173,7 @@ ShellRoot {
                 c: win.look
                 store: store
                 onePane: win.onePane
+                marks: search.words
                 focus: true
                 onBack: if (view.leave()) win.listOpen = true
                 onNewNote: win.newNote("")
@@ -162,8 +190,9 @@ ShellRoot {
                     if (e.accepted || view.editing) return
                     if (k === Qt.Key_Down || k === Qt.Key_J) win.step(1)
                     else if (k === Qt.Key_Up || k === Qt.Key_K) win.step(-1)
-                    else if (k === Qt.Key_Home && store.notes.length) win.pick(store.notes[0].id)
-                    else if (k === Qt.Key_End && store.notes.length) win.pick(store.notes[store.notes.length - 1].id)
+                    else if (k === Qt.Key_Home && store.shown.length) win.pick(store.shown[0].id)
+                    else if (k === Qt.Key_End && store.shown.length) win.pick(store.shown[store.shown.length - 1].id)
+                    else if (e.text === "/") win.find()
                     else if (e.text === "n") win.newNote("")
                     else if (e.text === "r") win.renameNote()
                     else if (k === Qt.Key_Delete || (k === Qt.Key_Backspace && (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier))))
@@ -176,6 +205,7 @@ ShellRoot {
                     else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && shift) store.edit()
                     else if (k === Qt.Key_Return || k === Qt.Key_Enter || e.text === "e") view.edit()
                     else if (win.onePane && !win.listOpen && k === Qt.Key_Escape && store.notes.length) win.listOpen = true
+                    else if (k === Qt.Key_Escape && search.active) win.searchDone(true)
                     else return
                     e.accepted = true
                 }

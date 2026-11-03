@@ -7,6 +7,7 @@ QtObject {
         { title: "Notes", keys: [
             ["↑ ↓  j k", "Move"],
             ["Home  End", "The newest, the oldest"],
+            ["/  ⌘F", "Search the titles and text (Esc: every note)"],
             ["⏎  e", "Write in it"],
             ["n  ⌘N", "New note: its title on the first line, then write"],
             ["F2  r", "Rename: its heading and file follow"],

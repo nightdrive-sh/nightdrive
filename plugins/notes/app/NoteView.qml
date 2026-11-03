@@ -11,6 +11,7 @@ Item {
     required property QtObject c
     required property QtObject store
     property bool onePane: false
+    property var marks: []                     // a search's words, marked where they are in the note (Markdown.mark)
     signal back()
     signal newNote()                           // New: an untitled note, written in at once (shell.qml)
     signal rename()                            // Rename and Trash: shell.qml's, which wait for a save running
@@ -186,7 +187,7 @@ Item {
             width: Math.min(root.width - 2 * root.margin, 760)
             wrapMode: Text.Wrap
             textFormat: Text.RichText
-            text: Markdown.html(root.body, root.c)
+            text: Markdown.mark(Markdown.html(root.body, root.c), root.marks, root.c)
             font.family: root.c.font; font.pixelSize: 14
             color: root.c.body
             onLinkActivated: link => { if (/^(https?:\/\/|mailto:)/i.test(link)) Qt.openUrlExternally(link) }
