@@ -30,6 +30,7 @@ Rectangle {
     Text {
         anchors { left: drIcon.right; leftMargin: 12; right: drState.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
         text: dr.label
+        textFormat: Text.PlainText   // a device names itself: never markup
         elide: Text.ElideRight
         color: dr.picked ? Theme.accent : Theme.text
         font { family: Theme.font; pixelSize: 13 }

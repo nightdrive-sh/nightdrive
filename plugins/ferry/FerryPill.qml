@@ -39,6 +39,7 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: pw.menu.target ? pw.menu.target.name : "Add Device"
+                textFormat: Text.PlainText   // a device names itself: never markup
                 color: Theme.accent
                 font { family: Theme.font; pixelSize: 12 }
             }

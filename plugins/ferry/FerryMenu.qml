@@ -284,6 +284,7 @@ Column {
                     visible: textEdit.text === ""
                     anchors { left: textEdit.left; top: textEdit.top }
                     text: m.target ? "A text for " + m.target.name : "A text"
+                    textFormat: Text.PlainText   // the device's name: never markup
                     color: Theme.dim
                     font: textEdit.font
                 }

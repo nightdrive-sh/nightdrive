@@ -28,6 +28,7 @@ Rectangle {
             width: Math.min(implicitWidth, dt.width - 16)
             elide: Text.ElideRight
             text: dt.dev.name
+            textFormat: Text.PlainText   // a device names itself: never markup
             color: dt.hot ? Theme.accent : Theme.text
             font { family: Theme.font; pixelSize: 12 }
         }

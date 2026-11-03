@@ -47,6 +47,7 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: b.label
+                textFormat: Text.PlainText   // may hold a device's name (Ferry's "Sent to …"): never markup
                 color: b.fg
                 font { family: Theme.font; pixelSize: 13; weight: Font.Medium }
             }

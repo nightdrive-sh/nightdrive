@@ -33,6 +33,7 @@ Item {
         id: titleText
         anchors { left: parent.left; verticalCenter: parent.verticalCenter; verticalCenterOffset: h.lead / 2 }
         text: h.title.toUpperCase()
+        textFormat: Text.PlainText   // a title may be a device's name: never markup
         color: Theme.primary
         font { family: Theme.font; pixelSize: h.apart ? 11 : 12; weight: h.apart ? Font.Normal : Font.Medium; letterSpacing: 0.6 }
     }
@@ -41,6 +42,7 @@ Item {
         anchors { right: h.action !== "" ? actionPill.left : parent.right; rightMargin: h.action !== "" ? 10 : h.edgeRoom
                   baseline: titleText.baseline }
         text: h.subtitle.toUpperCase()
+        textFormat: Text.PlainText
         color: Theme.dim
         font { family: Theme.font; pixelSize: 10; letterSpacing: 0.6 }
     }

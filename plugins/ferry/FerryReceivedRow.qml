@@ -93,6 +93,9 @@ Item {
             width: parent.width
             elide: Text.ElideRight
             text: r.isFile ? r.modelData.name : r.modelData.text.replace(/\s+/g, " ").trim()
+            // Another device's text or file name: AutoText would draw it as markup if it looked like a tag (a link, an
+            // <img> that loads from the net). The line under it holds the sender's name.
+            textFormat: Text.PlainText
             color: Theme.accent
             font { family: Theme.font; pixelSize: 12 }
         }
@@ -102,6 +105,7 @@ Item {
             text: r.menu.flash === r.modelData.id ? "copied"
                 : [r.isFile ? r.menu.size(r.modelData.size || 0) : "", r.menu.ago(r.modelData.time), r.modelData["from"] || ""]
                     .filter(x => x).join(" · ")
+            textFormat: Text.PlainText
             color: r.menu.flash === r.modelData.id ? Theme.accent : Theme.dim
             font { family: Theme.font; pixelSize: 11 }
         }
