@@ -175,7 +175,8 @@ Flickable {
                     width: parent.width
                     implicitHeight: card.narrow ? valueText.y + valueText.implicitHeight + 12 : Math.max(40, valueText.implicitHeight + 20)
                     radius: 8
-                    color: keyed ? c.sel : fh.hovered ? c.hover : "transparent"
+                    // The pointer's line waits after a key (c.pointerAway), as the kit's AppRow
+                    color: keyed ? c.sel : fh.hovered && !c.pointerAway ? c.hover : "transparent"
                     border.color: keyed ? c.frame : "transparent"
                     border.width: 2
                     HoverHandler { id: fh; cursorShape: Qt.PointingHandCursor }

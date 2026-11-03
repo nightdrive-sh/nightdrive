@@ -19,7 +19,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppAccountBar` | The accounts at the sidebar's foot under a line: each one's label and count, a click picks one (`picked`); one account is its label alone |
 | `AppTitle` | The app's name with the wordmark's block cursor: "Mail█" |
 | `AppNavRow` | A row of the sidebar: glyph, name, count; `selected`, `dropTarget`, `active` (the keyboard is in the sidebar) |
-| `AppPointer` | In the window's RowLayout: the pointer moving hides the keys' frame (`c.keyboard`: the app's key handlers call `c.moved(e)`, which only Tab and the arrows turn on) |
+| `AppPointer` | In the window's RowLayout: the pointer moving hides the keys' frame (`c.keyboard`: the app's key handlers call `c.moved(e)`, which only Tab and the arrows turn on) and brings back the hover colour any key put away (`c.pointerAway`: `AppRow`, `AppNavRow`) |
 | `AppRow` | A list row's ground, for a `ListView` delegate: `selected`, `marked` (the keyboard's place, list not focused), `active` (the keys are here: a frame) |
 | `AppButton` | A framed button with a glyph and a label (Play, New list); `strong`, `on`, a tip with its key (`tipAlign`) |
 | `AppIconButton` | A glyph-only button (Back, Settings) with a tip (`tipSide`, `tipAlign`) |

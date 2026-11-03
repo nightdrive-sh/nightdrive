@@ -13,10 +13,17 @@ QtObject {
     readonly property color hover: Qt.rgba(sel.r, sel.g, sel.b, 0.5)
     // The picked row where the keys are (active), framed only while the keys are in use (AppPointer.qml)
     property bool keyboard: false
+    // Any key but a lone modifier puts the pointer's hover colour away (AppRow), as a Mac does, till the mouse moves
+    // (AppPointer.qml). Not only the arrows: d or a in Mail moves the list under a resting pointer as well, and a list of
+    // such keys per app would never be whole. ⌘ alone stays out, as ⌘ + a click is still the pointer's.
+    property bool pointerAway: false
     // From the apps' key handlers: only the keys that move in the window (Tab, the arrows, j k) show the frame. Any key did,
     // so ⌘ alone or ⌘C over a message's selected text framed a list row, as if the keys had gone there.
     function moved(e) {
         const k = e.key
+        if (k !== Qt.Key_Shift && k !== Qt.Key_Control && k !== Qt.Key_Meta && k !== Qt.Key_Alt && k !== Qt.Key_AltGr
+            && k !== Qt.Key_Super_L && k !== Qt.Key_Super_R && k !== Qt.Key_Hyper_L && k !== Qt.Key_Hyper_R)
+            pointerAway = true
         if (k === Qt.Key_Tab || k === Qt.Key_Backtab || k === Qt.Key_Up || k === Qt.Key_Down || k === Qt.Key_Left
             || k === Qt.Key_Right || (k === Qt.Key_J || k === Qt.Key_K) && !(e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)))
             keyboard = true

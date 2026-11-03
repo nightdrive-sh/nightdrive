@@ -2,13 +2,15 @@ import QtQuick
 
 // A list row's ground, for a ListView's delegate: the selected row's colour, or the fainter hover colour for the keyboard's
 // place while the list isn't focused (marked) and under the pointer. It fills the list's width; what it shows goes inside.
+// The pointer's colour waits after a key (c.pointerAway), as on a Mac: a mouse left resting over the list kept its row
+// lit beside the keys' one as the arrows went through it. It comes back when the mouse moves (AppPointer.qml).
 Rectangle {
     id: root
     required property QtObject c
     property bool selected: false
     property bool marked: false
     property bool active: false         // the keys are in this list (Tab moves them between it and the sidebar): a frame
-    readonly property alias hovered: hover.hovered
+    readonly property bool hovered: hover.hovered && !c.pointerAway
     width: ListView.view ? ListView.view.width : implicitWidth
     radius: 8
     color: selected ? c.sel : marked || hovered ? c.hover : "transparent"

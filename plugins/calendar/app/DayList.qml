@@ -50,7 +50,7 @@ ListView {
         // The day: its name and number, the picked one on the selection's colour, today's number in the accent
         Rectangle {
             width: parent.width; height: 30; radius: 6
-            color: dayItem.picked ? root.app.dayPicked : dayHover.hovered ? root.app.dayHover : "transparent"
+            color: dayItem.picked ? root.app.dayPicked : dayHover.hovered && !root.c.pointerAway ? root.app.dayHover : "transparent"   // as MonthView's
             HoverHandler { id: dayHover }
             TapHandler { onTapped: root.app.pickDay(dayItem.modelData); onDoubleTapped: root.app.newEvent(dayItem.modelData) }
             Row {

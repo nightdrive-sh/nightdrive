@@ -70,7 +70,8 @@ Item {
             x: root.weekCol + (index % 7) * root.cellW
             y: root.headRow + Math.floor(index / 7) * root.cellH
             width: root.cellW; height: root.cellH
-            color: day === root.app.day ? root.app.dayPicked : hover.hovered ? root.app.dayHover : "transparent"
+            // The pointer's day waits after a key (c.pointerAway, the kit's AppRow)
+            color: day === root.app.day ? root.app.dayPicked : hover.hovered && !root.c.pointerAway ? root.app.dayHover : "transparent"
             Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: root.c.line }
             // Every day its left line, Monday's apart from the week numbers, and Sunday its right: the grid is closed at
             // both sides, as the week's hours are (Jari 2.11.)
