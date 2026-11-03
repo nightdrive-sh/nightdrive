@@ -65,7 +65,7 @@ Column {
         property string glyph
         signal clicked()
         width: 26; height: 26; radius: 5
-        color: hit.containsMouse ? Theme.hover : "transparent"
+        color: hit.containsMouse && !MenuPointer.pointerAway ? Theme.hover : "transparent"
         Text {
             anchors.centerIn: parent
             text: Icons.g(parent.glyph)

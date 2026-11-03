@@ -26,13 +26,15 @@ Rectangle {
     readonly property int pad: padded ? 10 : 0
     signal clicked()
     signal rightClicked()
-    readonly property bool hoverShown: hoverCheckIcon !== "" && (area.containsMouse || navSelected)
+    // The mouse's hover, put away by a key till the mouse moves (MenuPointer.qml)
+    readonly property bool pointed: area.containsMouse && !MenuPointer.pointerAway
+    readonly property bool hoverShown: hoverCheckIcon !== "" && (pointed || navSelected)
     readonly property bool hoverOnly: checkIcon === "" && hoverCheckIcon !== ""   // nothing to show until the mouse comes
 
     height: 34
     radius: 5
     // Action buttons (Open …, Disconnect) get a faint wash of the theme colour so they read as buttons
-    color: (area.containsMouse && interactive) || navSelected ? Theme.hover
+    color: (pointed && interactive) || navSelected ? Theme.hover
          : active && interactive ? Theme.sel
          : action || tinted ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.07) : "transparent"
     border { width: navSelected ? 1 : 0; color: Theme.primary }

@@ -115,3 +115,4 @@ ClaudeConfirm 1.0 ClaudeConfirm.qml
 ClaudeConfirmField 1.0 ClaudeConfirmField.qml
 Typing 1.0 Typing.qml
 FieldBox 1.0 FieldBox.qml
+singleton MenuPointer 1.0 MenuPointer.qml

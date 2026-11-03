@@ -16,7 +16,7 @@ Item {
     readonly property bool hasThumb: /^image\/(png|jpeg|gif|webp|bmp)$/.test(modelData.type || "")
     readonly property string thumbFile: menu.thumbDir + "/" + modelData.id + ".png"
     property bool fromCopy: true   // the small copy, until it turns out there's none yet
-    readonly property bool lit: rowArea.containsMouse || navSelected
+    readonly property bool lit: rowArea.containsMouse && !MenuPointer.pointerAway || navSelected
     property bool navSelected: false
     function navActivate() { r.menu.act(r.modelData) }
     height: menu.rowHeight

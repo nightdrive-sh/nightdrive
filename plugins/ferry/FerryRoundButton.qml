@@ -14,7 +14,7 @@ Rectangle {
     function navActivate() { rb.clicked() }
     signal clicked()
     width: 36; height: 36; radius: 18
-    color: on ? Theme.sel : rbArea.containsMouse || navSelected ? Theme.hover : Theme.card
+    color: on ? Theme.sel : rbArea.containsMouse && !MenuPointer.pointerAway || navSelected ? Theme.hover : Theme.card
     border { width: 1; color: on || navSelected ? Theme.primary : Theme.border }
     opacity: usable ? 1 : 0.4
     Text {

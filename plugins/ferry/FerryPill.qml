@@ -17,7 +17,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: pillRow.width + 26
         height: 28; radius: 14
-        color: pw.menu.mode === "pick" ? Theme.sel : pillArea.containsMouse || navSelected ? Theme.hover : Theme.card
+        color: pw.menu.mode === "pick" ? Theme.sel : pillArea.containsMouse && !MenuPointer.pointerAway || navSelected ? Theme.hover : Theme.card
         border { width: 1; color: pw.menu.mode === "pick" || navSelected ? Theme.primary : Theme.border }
         Row {
             id: pillRow

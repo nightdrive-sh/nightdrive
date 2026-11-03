@@ -85,7 +85,7 @@ Column {
             readonly property bool navEnabled: Notifs.history.length > 0
             function navActivate() { m.clearAll() }
             readonly property bool on: Notifs.history.length > 0 && !m.clearing
-            readonly property bool lit: on && (clearArea.containsMouse || navSelected)
+            readonly property bool lit: on && (clearArea.containsMouse && !MenuPointer.pointerAway || navSelected)
             anchors { right: parent.right; rightMargin: 61; verticalCenter: parent.verticalCenter }   // left of the toggle (17 + 34 + 10)
             width: clearText.implicitWidth + 18; height: 20; radius: 10
             color: lit ? Theme.sel : "transparent"

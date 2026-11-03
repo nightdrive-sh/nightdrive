@@ -17,7 +17,7 @@ Rectangle {
     function navActivate() { dr.clicked() }
     signal clicked()
     width: parent.width; height: 40; radius: 9
-    color: picked ? Theme.sel : drArea.containsMouse || navSelected ? Theme.hover : "transparent"
+    color: picked ? Theme.sel : drArea.containsMouse && !MenuPointer.pointerAway || navSelected ? Theme.hover : "transparent"
     border { width: navSelected ? 1 : 0; color: Theme.primary }
     opacity: usable ? 1 : 0.45
     Text {

@@ -164,6 +164,9 @@ calendar's grid, Ferry's drop zone and QR code are all fine).
   `Quickshell.execDetached([...])` for one that just starts something. Your own command's path:
   `Qt.resolvedUrl("bin/<command>")` without the `file://`; one in `~/.local/bin`, `Quickshell.env("HOME") +
   "/.local/bin/<command>"` (FerryMenu.qml's `ferry`), since Quickshell's PATH may not have that folder.
+- **A row of your own** that lights under the mouse does so only while `!MenuPointer.pointerAway`
+  (`area.containsMouse && !MenuPointer.pointerAway`): a key puts the mouse's colour away till the mouse moves, so a
+  pointer resting over the menu doesn't light a second row beside the keys' one. `MenuRow` and the rest do it already.
 - `Divider` is the separator line; `Slider`, `BusyDots` and `Plugins.has("tailscale")` (is another plugin on?) are there
   too.
 - **A text field** gets the keys once it has the focus (`forceActiveFocus()` as it shows, as Ferry's Aa): an open menu

@@ -8,6 +8,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Wayland
+import qs.kit as Kit
 
 ShellRoot {
     id: root
@@ -72,7 +73,7 @@ ShellRoot {
 
     onCurrentChanged: {
         navItem = null
-        if (current === "") navMode = false
+        if (current === "") { navMode = false; MenuPointer.pointerAway = false }   // the next menu starts with the mouse's hover
         else if (navMode) keyItem.forceActiveFocus()
     }
     function openNav(i) {
@@ -301,7 +302,7 @@ ShellRoot {
 
         // Clicking outside the menu closes it
         MouseArea { anchors.fill: parent; onClicked: root.current = "" }
-        Item { id: keyItem; anchors.fill: parent; focus: true; Keys.onEscapePressed: root.current = ""; Keys.onPressed: event => root.navKey(event) }
+        Item { id: keyItem; anchors.fill: parent; focus: true; Keys.onEscapePressed: root.current = ""; Keys.onPressed: event => { MenuPointer.moved(event); root.navKey(event) } }
 
         Rectangle {
             id: card
@@ -323,6 +324,8 @@ ShellRoot {
             Keys.onEscapePressed: root.current = ""
 
             MouseArea { anchors.fill: parent }   // a click inside the card doesn't close the menu
+            // A real move of the mouse over the menu brings back its hover colour a key put away (MenuPointer.qml)
+            Kit.AppPointer { c: MenuPointer }
 
             // Interactive only when the menu doesn't fit: otherwise a drag or wheel stays the menu's own (sliders, its lists)
             Flickable {

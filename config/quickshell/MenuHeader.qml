@@ -48,7 +48,7 @@ Item {
     Rectangle {
         id: actionPill
         visible: h.action !== ""
-        readonly property bool lit: h.actionEnabled && (actionArea.containsMouse || (h.navSelected && !h.showToggle))
+        readonly property bool lit: h.actionEnabled && (actionArea.containsMouse && !MenuPointer.pointerAway || (h.navSelected && !h.showToggle))
         anchors { right: parent.right; rightMargin: h.edgeRoom; verticalCenter: parent.verticalCenter; verticalCenterOffset: h.lead / 2 }
         width: actionText.implicitWidth + 18; height: 20; radius: 10
         color: lit ? Theme.sel : "transparent"
@@ -78,7 +78,7 @@ Item {
         property bool navSelected: false
         readonly property string label: h.toolLabel || h.tool   // `menu navkey` names it
         function navActivate() { h.toolClicked() }
-        readonly property bool lit: toolArea.containsMouse || navSelected
+        readonly property bool lit: toolArea.containsMouse && !MenuPointer.pointerAway || navSelected
         anchors { right: parent.right; rightMargin: h.showToggle ? 44 : 0; verticalCenter: parent.verticalCenter; verticalCenterOffset: h.lead / 2 }
         width: h.toolLabel !== "" ? toolRow.width + 18 : 20; height: 20; radius: 10
         color: lit ? Theme.sel : "transparent"
