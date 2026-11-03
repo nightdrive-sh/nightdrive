@@ -28,14 +28,45 @@ function inline(text, c) {
     return s.replace(/\u0000(\d+)\u0000/g, (m, i) => `<code style="color:${c.accent}">${escape(codes[+i])}</code>`)
 }
 
+// The column a list marker's indent reaches, a tab as four
+function columns(indent) {
+    let n = 0
+    for (const ch of indent) n = ch === "\t" ? n + 4 - n % 4 : n + 1
+    return n
+}
+
+// A list item's opening, in the lists open (html()'s): at the column of a list's own items it is the next of them, past
+// it it starts a list inside the item above, before it it closes lists until it is at one's level. The nesting is a
+// little looser than CommonMark's (an item's text column): two spaces nest under "1." too, as many notes are written,
+// and a kind that changes at a level starts a new list there, as CommonMark has it.
+function openItem(lists, out, at, marker, space) {
+    while (lists.length && at < lists[lists.length - 1].at) closeList(lists, out)
+    const kind = /\d/.test(marker) ? "ol" : "ul"
+    const top = lists[lists.length - 1]
+    if (top && at < Math.min(top.at + 2, top.text)) {
+        if (top.kind === kind) { out.push("</li>"); return }
+        closeList(lists, out)                  // its new list goes where this one was
+    }
+    // An ordered list starts at its first number ("3." goes on from a list broken by a paragraph)
+    const n = parseInt(marker)
+    out.push(kind === "ol" && n !== 1 ? `<ol start="${n}">` : `<${kind}>`)
+    lists.push({ kind, at, text: at + marker.length + space })
+}
+
+function closeList(lists, out) { out.push(`</li></${lists.pop().kind}>`) }
+
 // The whole note; c is the look, for the colours
 function html(md, c) {
     const lines = md.replace(/\r\n?/g, "\n").split("\n")
     const out = []
-    let para = [], list = null, fence = null, quote = [], boxes = 0
+    let para = [], fence = null, quote = [], boxes = 0
+    // The lists open, outermost first: each one's kind (ol, ul) and its marker's column. An item stays open (no </li>)
+    // until the next one at its level, so a list nested in it is inside it and Qt numbers the outer one on after it
+    // (with each item closed, every "1." under a nested list started again at 1).
+    let lists = [], gap = false
     const sizes = [0, 22, 19, 17, 15, 14, 14]
     function flushPara() { if (para.length) out.push(`<p>${para.map(l => inline(l, c)).join("<br>")}</p>`); para = [] }
-    function flushList() { if (list) out.push(`</${list}>`); list = null }
+    function flushList() { while (lists.length) closeList(lists, out); gap = false }
     function flushQuote() {
         if (!quote.length) return
         out.push(`<table width="100%" cellpadding="0" cellspacing="0"><tr><td width="3" bgcolor="${c.line}"></td>`
@@ -54,7 +85,8 @@ function html(md, c) {
         }
         let m
         if (/^\s*(```|~~~)/.test(line)) { flush(); fence = []; continue }
-        if (!line.trim()) { flush(); continue }
+        // A blank line between items keeps the list going ("1. a", "", "2. b" is one list): it ends at what isn't in it
+        if (!line.trim()) { flushPara(); flushQuote(); gap = lists.length > 0; continue }
         if ((m = line.match(/^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/))) {
             flush()
             const n = m[1].length
@@ -63,21 +95,23 @@ function html(md, c) {
         }
         if (/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); out.push("<hr>"); continue }
         if ((m = line.match(/^\s*>\s?(.*)$/))) { flushPara(); flushList(); quote.push(m[1]); continue }
-        if ((m = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/))) {
+        if ((m = line.match(/^(\s*)([-*+]|\d+[.)])(\s+)(.*)$/))) {
             flushPara(); flushQuote()
-            const kind = /\d/.test(m[2]) ? "ol" : "ul"
-            if (list !== kind) { flushList(); out.push(`<${kind}>`); list = kind }
-            let item = m[3]
+            openItem(lists, out, columns(m[1]), m[2], m[3].length)
+            gap = false
+            let item = m[4]
             const box = item.match(/^\[([ xX])\]\s+(.*)$/)
             // A box is a link to itself ("box:K", the K-th as ListEdit.boxes counts them): a click ticks it (TaskBoxes.qml)
             const mark = box ? `<a href="box:${boxes++}" style="color:${c.primary}; text-decoration:none">${box[1] === " " ? "☐" : "☑"}</a> ` : ""
             if (box) item = box[2]
-            out.push(`<li>${mark}${inline(item, c)}</li>`)
+            out.push(`<li>${mark}${inline(item, c)}`)
             continue
         }
-        // An indented line under an item goes on with it (Qt's rich text has no bulletless item)
-        if (list && /^\s{2,}\S/.test(line)) {
-            out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, `<br>${inline(line.trim(), c)}</li>`)
+        // An indented line under an item goes on with it, after a blank line too (Qt's rich text has no bulletless
+        // item). The last line out is that item's own, its </li> still to come.
+        if (lists.length && (m = line.match(/^(\s+)\S/)) && columns(m[1]) >= 2) {
+            out[out.length - 1] += `${gap ? "<br>" : ""}<br>${inline(line.trim(), c)}`
+            gap = false
             continue
         }
         flushList(); flushQuote()
