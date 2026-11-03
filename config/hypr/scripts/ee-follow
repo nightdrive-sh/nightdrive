@@ -1,0 +1,80 @@
+#!/bin/bash
+# EasyEffects (the headphone EQ) carries every app's sound: apps play into its sink, and it plays on to the default
+# output. It follows the default almost always, but EasyEffects 8.2.8 sometimes stays on the old one (#2038: on the
+# speakers after Headphones was picked in the Sound menu; on an AirPlay speaker before that), and then every app is
+# silent while the output looks right. It couldn't be reproduced, and EasyEffects logs nothing without --debug, so this
+# watches the result instead: a few seconds after the default output changes, appears or goes (and once at login),
+# EasyEffects must be linked to it. If it isn't, it is started again (sound stops for about a second), which makes it
+# link to the default afresh. Every restart is logged: journalctl --user -t ee-follow.
+# It also starts EasyEffects at login, so both starts are the same. With the file $DEBUG present, EasyEffects runs with
+# --debug and logs to the journal (journalctl --user -t easyeffects, a few hundred lines a start, then a few per change):
+# to see why it stayed behind the next time.
+# Started by hyprland.lua; listens to PipeWire (pactl subscribe) in the background. One instance only (flock).
+exec 9>"${XDG_RUNTIME_DIR:-/run/user/$UID}/ee-follow.lock"
+flock -n 9 || exit 0
+SETTLE=3      # seconds after the last change before checking: Bluetooth and AirPlay outputs take a moment to get ports
+MIN_GAP=60    # seconds between restarts at the least, so an output EasyEffects can never link to doesn't loop
+DEBUG=~/.local/state/nightdrive/easyeffects-debug
+run=${XDG_RUNTIME_DIR:-/run/user/$UID}
+conf=~/.config/easyeffects/db/easyeffectsrc
+log() { logger -t ee-follow "$*"; }
+
+# setsid, so it outlives this script; without the lock (fd 9, 8), or a new ee-follow couldn't start while it runs
+start_ee() {
+  local debug=()
+  [[ -e $DEBUG ]] && debug=(--debug)
+  setsid -f easyeffects --service-mode -w "${debug[@]}" >/dev/null 2>&1 9>&- 8>&-
+}
+
+# The node EasyEffects plays to: what the left output of its last stage is linked to (empty: nothing)
+ee_target() {
+  pw-link -l 2>/dev/null | awk '$0 == "ee_soe_output_level:output_FL" {
+    getline; if ($1 == "|->") { sub(/:[^:]*$/, "", $2); print $2 }; exit }'
+}
+# The default output, unless it is EasyEffects' own sink: then there is nothing to follow (EasyEffects ignores it too)
+wanted() { local d; d=$(pactl get-default-sink 2>/dev/null); [[ -n $d && $d != easyeffects_sink ]] && echo "$d"; }
+# An output picked in EasyEffects' own window instead of the system's: leave it there
+pinned() { grep -qx 'useDefaultOutputDevice=false' "$conf" 2>/dev/null; }
+follows() { want=$(wanted) || return 0; got=$(ee_target); [[ $got == "$want" ]]; }
+
+restart_ee() {
+  easyeffects -q >/dev/null 2>&1
+  for _ in {1..30}; do pgrep -x easyeffects >/dev/null || break; sleep 0.1; done
+  pgrep -x easyeffects >/dev/null && { pkill -x easyeffects; sleep 0.5; }
+  touch "$run/ee-follow.restarted"
+  start_ee
+}
+
+check() {
+  local want got
+  exec 8>"$run/ee-follow.check"; flock -n 8 || return 0   # one check at a time
+  pgrep -x easyeffects >/dev/null || return 0             # not running: apps play straight to the output
+  pinned && return 0
+  follows && return 0
+  sleep "$SETTLE"; follows && return 0                    # once more: it may still be linking
+  if [[ -n $(find "$run/ee-follow.restarted" -newermt "-$MIN_GAP seconds" 2>/dev/null) ]]; then
+    log "EasyEffects plays to '${got:-nothing}', not to the output $want; restarted it less than ${MIN_GAP}s ago, leaving it"
+    return 0
+  fi
+  log "EasyEffects plays to '${got:-nothing}', not to the output $want: restarting it"
+  restart_ee
+  sleep $((SETTLE + 2))
+  if follows; then log "EasyEffects plays to $want again"; else log "EasyEffects still plays to '${got:-nothing}', not to $want"; fi
+}
+
+# Checked SETTLE seconds after the last of a burst of events: n is this event's number, and a later one cancels it
+later() {
+  local n
+  n=$(( $(cat "$run/ee-follow.seq" 2>/dev/null || echo 0) + 1 )); echo "$n" >"$run/ee-follow.seq"
+  { sleep "$1"; [[ $(cat "$run/ee-follow.seq" 2>/dev/null) == "$n" ]] && check; } &
+}
+
+pgrep -x easyeffects >/dev/null || start_ee
+later 10   # at login: give EasyEffects time to link
+# pactl without the lock too: it outlives a killed ee-follow until its next event
+pactl subscribe 9>&- | while read -r line; do
+  case $line in
+    # the default output changed (server), or an output came or went
+    "Event 'change' on server"* | "Event 'new' on sink #"* | "Event 'remove' on sink #"*) later "$SETTLE" ;;
+  esac
+done

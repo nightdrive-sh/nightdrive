@@ -279,8 +279,8 @@ function NightdriveLocked()
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/idle start")   -- hypridle with the screensaver and screen-off times (launcher › Settings › Screensaver)
     -- Headphone EQ in the background (presets: config/easyeffects, picked from the headphone icon in the top bar). Only with
     -- PipeWire's socket (socket-activated, there before the session): without it EasyEffects aborts with a core dump, as in
-    -- the sandbox, which has no audio
-    hl.exec_cmd("sh -c '[ -S \"$XDG_RUNTIME_DIR/pipewire-0\" ] && exec easyeffects --service-mode -w'")
+    -- the sandbox, which has no audio. ee-follow starts it and starts it again when it stays on an old output (#2038).
+    hl.exec_cmd("sh -c '[ -S \"$XDG_RUNTIME_DIR/pipewire-0\" ] && exec \"$HOME/.config/hypr/scripts/ee-follow\"'")
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/bt-audio-follow")   -- Bluetooth headphones become the output when they connect
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/jack-volume")   -- headphones or speakers in the jack: a volume for each, starts quiet
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/airplay-volume")   -- AirPlay speakers start at most at 30 %: their volume is the speaker's own
