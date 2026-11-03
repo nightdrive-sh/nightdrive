@@ -313,8 +313,7 @@ ShellRoot {
             c: win.look
             groups: [
                 { title: "Calendar", keys: [["← →  h l", "Previous, next day"], ["↑ ↓  k j", "A week back, on"], ["PgUp PgDn  [ ]", "Previous, next month or week"],
-                                           ["t", "Today"], ["m  w", "Month, week"], ["⏎", "Open the day's first event"], ["n", "New event"],
-                                           ["Double click", "A day's week; in the week's hours, a new event there"]] },
+                                           ["t", "Today"], ["m  w", "Month, week"], ["⏎", "Open the day's first event"], ["n", "New event"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "An event", keys: [["e", "Edit it"], ["Del  ⌫", "Delete it (asks first)"], ["Esc  ⏎", "Close it"]] },
                 { title: "New or edited event", keys: [["⏎  Ctrl ⏎", "Save it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["Esc", "Leave it"]] }
