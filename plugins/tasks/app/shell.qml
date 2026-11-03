@@ -321,7 +321,7 @@ ShellRoot {
                 { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"]] },
-                { title: "New task, edit", keys: [["⏎  Ctrl ⏎", "Add or save it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["Esc", "Leave it"]] }
+                { title: "New task, edit", keys: [["⏎  Ctrl ⏎", "Add or save it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }
             ]
         }
 

@@ -6,7 +6,9 @@ import qs.kit
 // A new task, or a change to one, in a panel over the window: its title, the day and time it is due (either may stay
 // empty), the list it goes in, Important and a note. Saved by `cli.py add --stdin` or `cli.py edit --stdin`, the same
 // code Claude's and the command's changes run, so what a due may look like is decided in one place (lib/when.py); the
-// panel only shows how it reads it, as it is typed ("930" → 09:30), and what went wrong. ⏎ in a one-line field or
+// panel only shows how it reads it, as it is typed ("930" → 09:30), and what went wrong. The day is the kit's
+// AppDatePicker: typed the region's way (5.11.2026, 11/5/2026) or picked from its month grid, and sent on as ISO, so
+// lib/when.py needn't know the region; a word it reads itself (today, fri, +3d) goes as typed. ⏎ in a one-line field or
 // Ctrl+⏎ saves, Esc leaves it. An edit sends only the fields that were changed: one left alone (a low priority, a due
 // another app wrote in its own zone) stays exactly as the file has it.
 AppPanel {
@@ -40,8 +42,8 @@ AppPanel {
     function edit(task) {
         editing = task
         const due = task.due || ""
-        fill({ title: task.title, day: due ? dayText(due) : "", time: due.slice(11, 16), important: task.priority === "high",
-               note: task.note, list: task.list_id })
+        fill({ title: task.title, day: due ? Regional.format(due.slice(0, 10), "short") : "", time: due.slice(11, 16),
+               important: task.priority === "high", note: task.note, list: task.list_id })
     }
     function fill(f) {
         before = f
@@ -52,11 +54,9 @@ AppPanel {
         readDue()
         title.input.forceActiveFocus()
     }
-    // A due's day as the field takes it back: 5.11., with the year only when it isn't this one
-    function dayText(iso) {
-        const [y, m, d] = iso.slice(0, 10).split("-").map(Number)
-        return d + "." + m + "." + (y === new Date().getFullYear() ? "" : y)
-    }
+    // The day as cli.py gets it: ISO when the picker reads it as a day (the region's 11/5 isn't when.py's 11.5.),
+    // else the words as typed (today, fri, +3d), which when.py reads, or says why it can't
+    function dayValue() { return dayField.day || dayField.text }
     function close() { if (!busy) { visible = false; closed() } }
 
     // How the due fields read, a moment after the typing stops: one python start per pause, not per key
@@ -64,7 +64,7 @@ AppPanel {
     Timer { id: pause; interval: 250; onTriggered: if (root.visible) reader.running = true }
     Process {
         id: reader
-        command: ["python3", root.app.helper, "when", "--json", "--day", dayField.text, "--time", timeField.text]
+        command: ["python3", root.app.helper, "when", "--json", "--day", root.dayValue(), "--time", timeField.text]
         stdout: StdioCollector { id: readOut }
         stderr: StdioCollector { id: readErr }
         onExited: code => {
@@ -82,7 +82,7 @@ AppPanel {
             title.input.forceActiveFocus()   // the one field everyone forgets: the keys go there
             return
         }
-        const out = editing ? changes() : { title: title.text.trim(), day: dayField.text, time: timeField.text,
+        const out = editing ? changes() : { title: title.text.trim(), day: dayValue(), time: timeField.text,
                                             note: note.text.trim(), priority: important.on ? "high" : "normal" }
         if (!editing && lists.picked) out.list = lists.picked
         if (editing && Object.keys(out).length === 1) { close(); return }   // nothing changed: nothing to write
@@ -96,7 +96,7 @@ AppPanel {
     function changes() {
         const out = { id: editing.id }
         if (title.text.trim() !== before.title.trim()) out.title = title.text.trim()
-        if (dayField.text !== before.day || timeField.text !== before.time) { out.day = dayField.text; out.time = timeField.text }
+        if (dayField.text !== before.day || timeField.text !== before.time) { out.day = dayValue(); out.time = timeField.text }
         if (lists.picked !== before.list) out.list = lists.picked
         if (important.on !== before.important) out.priority = important.on ? "high" : "normal"
         if (note.text.trim() !== before.note.trim()) out.note = note.text.trim()
@@ -151,14 +151,16 @@ AppPanel {
         onEscaped: root.close()
     }
     // The day and the time, and how they read: the words are the ones the task will show. A Flow, so in a narrow
-    // window the reading goes under the fields rather than being cut to nothing
+    // window the reading goes under the fields rather than being cut to nothing. The day's month grid opens on a click
+    // into it, its calendar glyph or ↓, and is drawn over the window, so the panel doesn't cut it
     Flow {
         width: parent.width
         spacing: 8
-        AppField {
+        AppDatePicker {
             id: dayField
-            c: root.c; width: 150
-            label: "Due"; hint: "today, fri, 5.11."
+            c: root.c; width: 180            // the hint's example, ISO's the longest: "today, fri, 2026-11-05"
+            base: root.app.today
+            label: "Due"; hint: "today, fri, " + Regional.example
             onTextChanged: root.readDue()
             onAccepted: root.save(); onEscaped: root.close()
         }
