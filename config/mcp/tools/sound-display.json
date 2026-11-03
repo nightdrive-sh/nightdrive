@@ -116,7 +116,7 @@
     {
       "name": "network_status",
       "title": "Wi-Fi and network",
-      "description": "Whether networking and Wi-Fi are on, the active connections (name, type, device), the Wi-Fi network (ssid, signal %) and its link: band, Wi-Fi standard, rate, signal in dBm, IP address, router and the ping to it in ms.",
+      "description": "Whether networking and Wi-Fi are on, whether the internet answers (connectivity, NetworkManager's last check: full, limited = connected but no internet, portal = a captive portal wants a sign-in, none, unknown = not checked), the active connections (name, type, device), the Wi-Fi network (ssid, signal %) and its link: band, Wi-Fi standard, rate, signal in dBm, IP address, router and the ping to it in ms.",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
       "command": ["nightdrive", "network"],
       "class": "read",

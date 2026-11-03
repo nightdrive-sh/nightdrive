@@ -179,6 +179,11 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   command, one run outside the sandbox, a file edit or an MCP tool is answered in its session.
 - **Closed by mistake?** ⌘⇧U opens the window you closed with ⌘W again, in the same place. A terminal comes back in the
   same folder, with Claude Code in the same conversation. Press again for the one before it.
+- **No internet?** When Wi-Fi or a cable is connected but the internet doesn't answer for 10 s, a notification says
+  so, and **Back online** when it comes back; meanwhile the network icon is orange, Wi-Fi's with a "!". A hotel's or
+  café's sign-in page gets a notification of its own: click it to sign in. None when you turn Wi-Fi off or right after
+  waking up. It follows NetworkManager's own check, once a minute. Off: Launcher › Settings › Notifications › Internet
+  connection.
 - **Battery ran out?** When the battery is low (under 20 % as the laptop goes to sleep, and each minute from 5 %), the open
   windows are kept. If it runs out, the next login asks whether to open them again, each on its workspace.
 - **Web apps**: any site as an app window, from Launcher › System › Install › Webapp; System › Remove › Webapps removes
@@ -225,7 +230,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet, offline) | hold F5 or Fn (Mac), Insert (PC) to talk |
 | Network | NetworkManager, BlueZ, [Tailscale](plugins/tailscale/README.md) | Wi-Fi, Bluetooth and Tailscale menus |
 | Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 % and forgotten at the next login, as on a Mac), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
-| Notifications | Quickshell | the app's icon and buttons, history and Do Not Disturb in the bar, a low battery warning; a crashed app's notification can Ask Claude why |
+| Notifications | Quickshell | the app's icon and buttons, history and Do Not Disturb in the bar, a low battery warning, the internet dropping; a crashed app's notification can Ask Claude why |
 | Sounds | Nightdrive's own, made from scratch | notification sounds to choose from, and the desktop's own (volume, screenshot, charger, devices, lock); Launcher › Settings › Notifications turns them off |
 | Files and images | Nautilus, Loupe | |
 | Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) | `.md` files open in it, themed |
@@ -450,7 +455,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one, `mode eDP-1 2560x1440` the resolution (`auto` for either goes back to the default). With `--keep` last, a card asks whether to keep it and it goes back in 20 s unless you do. `display json` gives it all as JSON |
 | `nightdrive sound` | Volume and outputs as JSON; `sound volume 40` sets the volume (`--mute on`/`off`), `sound output NAME` the output |
 | `nightdrive brightness 60` | The screen's brightness in percent; without a number, prints it |
-| `nightdrive network` | Wi-Fi and the network as JSON; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |
+| `nightdrive network` | Wi-Fi and the network as JSON, with whether the internet answers; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |
 | `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |

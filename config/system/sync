@@ -19,6 +19,7 @@ config/system/logind-ignore-sleep-key.conf /etc/systemd/logind.conf.d/50-ignore-
 config/system/logind-power-key.conf /etc/systemd/logind.conf.d/50-power-key.conf 644
 config/system/nightdrive.actions /etc/dnf/libdnf5-plugins/actions.d/nightdrive.actions 644
 config/system/dnf-excludes.conf /etc/dnf/libdnf5.conf.d/90-nightdrive.conf 644
+config/system/nm-connectivity.conf /etc/NetworkManager/conf.d/90-nightdrive-connectivity.conf 644
 LIST
   # Asahi Macs: macOS's partitions out of the file manager's sidebar (26.10.2026)
   [[ $("$repo/config/hypr/scripts/platform" machine) == asahi ]] &&
@@ -43,9 +44,10 @@ if [[ ${1:-} == --check ]]; then
 fi
 
 # Each file's reader is told once, after its copy: logind re-reads its drop-ins on HUP, udev applies new rules to the
-# disks already there with a trigger, keyd starts again. Not `keyd reload`: keyd 2.6.0 segfaulted on the next key event
-# after one (the release of the Enter that ran this, held through the reload; 18.10. and 2.11.2026, #1917) and stayed down.
-failed=0 logind=0 udev=0 keyd=0
+# disks already there with a trigger, keyd starts again, NetworkManager reloads its config (the connectivity check).
+# Not `keyd reload`: keyd 2.6.0 segfaulted on the next key event after one (the release of the Enter that ran this,
+# held through the reload; 18.10. and 2.11.2026, #1917) and stayed down.
+failed=0 logind=0 udev=0 keyd=0 nm=0
 mapfile -t todo < <(stale)   # read first: sudo below keeps the terminal's stdin for its password prompt
 (( ${#todo[@]} )) || echo "    up to date"
 for line in "${todo[@]}"; do
@@ -56,9 +58,11 @@ for line in "${todo[@]}"; do
     /etc/systemd/logind.conf.d/*) logind=1 ;;
     /etc/udev/rules.d/*) udev=1 ;;
     /etc/keyd/*) keyd=1 ;;
+    /etc/NetworkManager/*) nm=1 ;;
   esac
 done
 (( logind )) && { sudo systemctl kill -s HUP systemd-logind || failed=1; }
 (( udev )) && { sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=block --action=change || failed=1; }
 (( keyd )) && { sudo systemctl restart keyd || failed=1; }
+(( nm )) && { sudo nmcli general reload conf || failed=1; }
 exit $failed

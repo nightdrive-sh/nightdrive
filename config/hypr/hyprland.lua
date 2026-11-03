@@ -287,6 +287,7 @@ function NightdriveLocked()
     hl.exec_cmd("playerctld daemon")   -- remembers which player played last, for the media keys (hypr/scripts/media)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/headphones-ctl")   -- Sony / AirPods: listening mode in the headphones menu, AirPods ear detection
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/remote-login watch")   -- Remote login on: a network joined for the first time asks whether to allow it
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/net-watch")   -- "No internet" and "Back online" from NetworkManager's connectivity check
     -- reset-failed: the previous session's agent crash-loops after logout (Restart=on-failure) and hits the start limit
     hl.exec_cmd("sh -c 'systemctl --user reset-failed hyprpolkitagent; systemctl --user restart hyprpolkitagent'")
     hl.exec_cmd("nm-applet --indicator")

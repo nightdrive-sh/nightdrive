@@ -408,6 +408,10 @@ sudo install -Dm644 "$repo/config/system/logind-ignore-sleep-key.conf" /etc/syst
 sudo install -Dm644 "$repo/config/system/logind-power-key.conf" /etc/systemd/logind.conf.d/50-power-key.conf
 sudo systemctl kill -s HUP systemd-logind
 
+echo "==> NetworkManager: the connectivity check \"No internet\" follows (config/system/nm-connectivity.conf)"
+sudo install -Dm644 "$repo/config/system/nm-connectivity.conf" /etc/NetworkManager/conf.d/90-nightdrive-connectivity.conf
+sudo nmcli general reload conf 2>/dev/null || true
+
 # Fedora Minimal's firewall is a server's (see fw_desktop above). The desktop's, as on Fedora KDE: the FedoraWorkstation
 # zone, which lets in ports 1025–65535 (LocalSend, AirPlay, mDNS; Remote login's zone copies it), and polkit's desktop
 # rule, so an admin in the session changes it without a password. Linked the way firewalld's own install does it, which

@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+"""Tells when the internet drops and comes back (#2057), from NetworkManager's own connectivity check, without a
+check of its own: it listens to NM's D-Bus properties and logind's PrepareForSleep, so it costs nothing while
+nothing changes. NM checks every `interval` seconds (config/system/nm-connectivity.conf, 60) and at once after any
+change of the link; when it finds trouble, it checks again every few seconds until it clears.
+  net-watch            run (hyprland.lua starts it at login; one at a time)
+  net-watch status     on | off: whether it notifies (Settings › Notifications › Internet connection)
+  net-watch on|off     turn the notifications on or off; the bar's icon shows the state either way
+When it tells is net_watch_rules.py's: a drop that holds 10 s, none for a while after login or waking, nothing when a
+connection is turned off. Lost: "No internet" (a card that stays in the list); back: a transient that takes its
+place; a captive portal: "Sign in to …", whose click opens the portal's page.
+"""
+import fcntl
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import gi
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib  # noqa: E402
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from net_watch_rules import CONNECTED_LOCAL, Watch  # noqa: E402
+
+PREFS = Path.home() / ".local/state/nightdrive/net-watch"   # "off" turns the notifications off
+LOCK = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "net-watch.lock"
+PORTAL_FALLBACK = "http://neverssl.com"   # a plain-HTTP page a portal can redirect, when NM has no check URI
+TAG = "net-watch"
+NM, NM_PATH = "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager"
+
+
+def enabled():
+    try:
+        return PREFS.read_text().strip() != "off"
+    except OSError:
+        return True
+
+
+class Daemon:
+    def __init__(self):
+        self.system = Gio.bus_get_sync(Gio.BusType.SYSTEM)
+        self.session = Gio.bus_get_sync(Gio.BusType.SESSION)
+        self.watch = Watch(time.monotonic())
+        self.timer = 0
+        self.note_id = 0           # the notification shown now (ours), 0 = none
+        self.nm = Gio.DBusProxy.new_sync(self.system, Gio.DBusProxyFlags.NONE, None, NM, NM_PATH, NM, None)
+        self.nm.connect("g-properties-changed", lambda *_: self.read())
+        self.nm.connect("notify::g-name-owner", lambda *_: self.read())   # NM restarted: its state anew
+        self.system.signal_subscribe("org.freedesktop.login1", "org.freedesktop.login1.Manager", "PrepareForSleep",
+                                     "/org/freedesktop/login1", None, Gio.DBusSignalFlags.NONE, self.on_sleep)
+        self.session.signal_subscribe("org.freedesktop.Notifications", "org.freedesktop.Notifications",
+                                      "ActionInvoked", "/org/freedesktop/Notifications", None,
+                                      Gio.DBusSignalFlags.NONE, self.on_action)
+        self.last_conn = None
+        self.read()
+
+    def prop(self, name, default=None):
+        v = self.nm.get_cached_property(name)
+        return v.unpack() if v is not None else default
+
+    def read(self):
+        conn = self.prop("Connectivity", 0)
+        up = bool(self.prop("NetworkingEnabled", False)) and self.prop("State", 0) >= CONNECTED_LOCAL
+        if conn != self.last_conn:
+            self.last_conn = conn
+            # The bar's network icon shows limited and none: at once, not at its next 5 s round
+            subprocess.Popen(["qs", "ipc", "call", "bar", "refresh"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.apply(*self.watch.step(time.monotonic(), conn=conn, up=up))
+
+    def on_sleep(self, _bus, _sender, _path, _iface, _signal, params):
+        self.apply(*self.watch.step(time.monotonic(), asleep=params.unpack()[0]))
+
+    def tick(self):
+        self.timer = 0
+        self.apply(*self.watch.step(time.monotonic()))
+        return False
+
+    def apply(self, actions, wake_at):
+        if self.timer:
+            GLib.source_remove(self.timer)
+            self.timer = 0
+        if wake_at is not None:
+            ms = max(0, int((wake_at - time.monotonic()) * 1000)) + 50
+            self.timer = GLib.timeout_add(ms, self.tick)
+        for a in actions:
+            try:
+                getattr(self, "do_" + a)()
+            except GLib.Error as e:   # no notification server (Quickshell restarting): the next change tells
+                print(f"net-watch: {a}: {e.message}", file=sys.stderr)
+
+    # --- What the user sees ---
+    def network_name(self):
+        """The connection the traffic goes out on (NM's primary), as the Wi-Fi menu names it."""
+        path = self.prop("PrimaryConnection", "/")
+        if not path or path == "/":
+            return ""
+        try:
+            v = self.system.call_sync(NM, path, "org.freedesktop.DBus.Properties", "Get",
+                                      GLib.Variant("(ss)", (NM + ".Connection.Active", "Id")),
+                                      GLib.VariantType("(v)"), Gio.DBusCallFlags.NONE, 2000, None)
+            return v.unpack()[0]
+        except GLib.Error:
+            return ""
+
+    def notify(self, icon, title, body, actions=(), transient=False):
+        # Not by replaces_id: the stack tag is what Notifs.qml replaces by (a transient one takes the earlier card's row
+        # away too), and it holds across a restart of this script
+        hints = {"x-dunst-stack-tag": GLib.Variant("s", TAG)}
+        if transient:
+            hints["transient"] = GLib.Variant("b", True)
+        r = self.session.call_sync(
+            "org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications",
+            "Notify", GLib.Variant("(susssasa{sv}i)", ("Network", 0, icon, title, body, list(actions),
+                                                         hints, -1)),
+            GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, 5000, None)
+        return r.unpack()[0]
+
+    def do_lost(self):
+        if not enabled():
+            return
+        name = self.network_name()
+        body = (f"Connected to “{name}”, but the internet isn't answering." if name
+                else "The network is connected, but the internet isn't answering.")
+        self.note_id = self.notify("lucide:globe-off", "No internet", body)
+
+    def do_portal(self):
+        if not enabled():
+            return
+        name = self.network_name()
+        self.note_id = self.notify("lucide:log-in", f"Sign in to “{name}”" if name else "Sign in to the network",
+                                   "This network wants you to sign in before the internet works. Click to open its page.",
+                                   actions=("default", "Sign in"))
+
+    def do_back(self):
+        if not self.note_id:   # nothing was told (notifications off): nothing to take back
+            return
+        self.notify("lucide:globe", "Back online", "The internet works again.", transient=True)
+        self.note_id = 0
+
+    def do_clear(self):
+        # Through Notifs.qml's IPC (as `nightdrive notifications remove`): CloseNotification closes the popup but
+        # leaves its row in the list, and a card about a connection turned off since would be stale there
+        if self.note_id:
+            subprocess.Popen(["qs", "ipc", "call", "notifications", "removeTag", "Network", TAG],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.note_id = 0
+
+    def on_action(self, _bus, _sender, _path, _iface, _signal, params):
+        nid, action = params.unpack()
+        if nid == self.note_id and self.watch.shown == "portal" and action == "default":
+            url = self.prop("ConnectivityCheckUri", "") or PORTAL_FALLBACK
+            subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def run():
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    lock = open(LOCK, "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0   # one is running already (a Hyprland reload starts it again)
+    Daemon()
+    GLib.MainLoop().run()
+    return 0
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "run"
+    if cmd == "run":
+        return run()
+    if cmd == "status":
+        print("on" if enabled() else "off")
+        return 0
+    if cmd in ("on", "off"):
+        PREFS.parent.mkdir(parents=True, exist_ok=True)
+        tmp = PREFS.with_suffix(".tmp")
+        tmp.write_text(cmd + "\n")
+        tmp.replace(PREFS)
+        return 0
+    print(__doc__, file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

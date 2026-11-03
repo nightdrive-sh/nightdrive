@@ -1,8 +1,10 @@
 #!/bin/bash
 # Wi-Fi and the network as JSON, and turning them off or on (NetworkManager), for scripts and Claude's tools
 # (config/mcp/tools/sound-display.json); the Wi-Fi menu (WifiMenu.qml) shows the same.
-#   network                         {networking, wifi, connections: [{name, type, device}], wifi_network: {ssid,
-#                                   signal}, link: {…}}: networking and wifi "on"/"off"; link is wifi-info's
+#   network                         {networking, wifi, connectivity, connections: [{name, type, device}],
+#                                   wifi_network: {ssid, signal}, link: {…}}: networking and wifi "on"/"off";
+#                                   connectivity is NetworkManager's last check (full, limited, portal, none, unknown:
+#                                   no check configured; config/system/nm-connectivity.conf); link is wifi-info's
 #                                   (band, standard, rate, ip, ping to the router…), {} without Wi-Fi
 #   network wifi|all on|off [--keep]
 #                                   the Wi-Fi radio, or all networking (wired too), on or off; prints {what, was, now}.
@@ -29,8 +31,8 @@ case ${1:-} in
     wnet=$(nmcli -t -f IN-USE,SIGNAL,SSID device wifi list --rescan no 2>/dev/null |
       awk -F: '$1 == "*" { s = $2; sub(/^[^:]*:[^:]*:/, ""); print s "\t" $0; exit }')
     link=$("$here/wifi-info" 2>/dev/null || echo '{}')
-    jq -nc --arg net "$(state all)" --arg w "$(state wifi)" --argjson c "$conns" --arg wn "$wnet" --argjson l "${link:-\{\}}" \
-      '{networking: $net, wifi: $w, connections: $c,
+    jq -nc --arg net "$(state all)" --arg w "$(state wifi)" --arg cy "$(nmcli networking connectivity 2>/dev/null || echo unknown)" --argjson c "$conns" --arg wn "$wnet" --argjson l "${link:-\{\}}" \
+      '{networking: $net, wifi: $w, connectivity: $cy, connections: $c,
         wifi_network: (if $wn == "" then null else ($wn | split("\t") | {ssid: .[1], signal: (.[0] | tonumber? // null)}) end),
         link: $l}' ;;
   wifi|all)
@@ -46,5 +48,5 @@ case ${1:-} in
         --with "$out" -- "$here/network" "$what" "$was"
     fi
     echo "$out" ;;
-  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 
 // The launcher's Settings › Mouse (the wheel's scroll speed), Launcher (fuzzy search, shortcut hints), Firefox (its links, tab bar and start), Computer name, Remote login (sshd), Notifications (how long a popup stays,
-// the two sounds, the desktop's own sounds on/off, FUMonitor's alerts), Crash reports and Update channel. Startup stays in Launcher.qml: its rows are the app rows.
+// the two sounds, the desktop's own sounds on/off, the internet connection's notifications, FUMonitor's alerts), Crash reports and Update channel. Startup stays in Launcher.qml: its rows are the app rows.
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered), shows compName
 // channel and the mouse's speed on Settings' own rows, and calls entered("settings") to read them.
 Item {
@@ -138,6 +138,7 @@ Item {
     // tick: on | off, "" = not read yet (shown on)
     property string systemSounds: ""
     property string volumeTick: ""
+    property string netWatch: ""              // "No internet" / "Back online" (hypr/scripts/net-watch): on | off, "" = not read yet (shown on)
     property string fumon: ""                 // uwsm's failed unit monitor (hypr/scripts/fumon): on | off | none, "" = not read yet
     function soundName(which, v) { return v === "none" ? "none" : (soundChoices[which].find(t => t[0] === v) || [])[1] }
     // Settings › Notifications › Show for: how long a popup stays (Notifs.timeout, read from its file)
@@ -155,7 +156,9 @@ Item {
             { kind: "syssound", key: "system", name: "System sounds", glyph: "volume-2", switchOn: systemSounds !== "off",
               sub: "Screenshot, charger, battery, devices, lock, log out, errors" },
             { kind: "syssound", key: "volume", name: "Volume key tick", glyph: "volume-1", switchOn: volumeTick !== "off",
-              sub: systemSounds === "off" ? "Off with the system sounds" : "A tick at the new level on each step" }
+              sub: systemSounds === "off" ? "Off with the system sounds" : "A tick at the new level on each step" },
+            { kind: "netwatch", name: "Internet connection", glyph: "globe", switchOn: netWatch !== "off",
+              sub: "“No internet”, “Back online” and sign-in pages" }
         ].concat(fumon === "on" || fumon === "off" ? [   // only where uwsm has fumon (up to 0.26)
             { kind: "fumon", name: "Failed service alerts", glyph: "triangle-alert", switchOn: fumon === "on",
               sub: "FUMonitor’s “Failed unit detected” and “Unit recovered”" }] : [])
@@ -189,6 +192,12 @@ Item {
         command: [b.scripts + "/crash-report", "status"]
         onResult: text => { b.crashReports = text.trim() }
     }
+    // Settings › Notifications: whether net-watch tells of the internet dropping (the bar's icon shows it either way)
+    Sh {
+        id: netWatchProc
+        script: '"$HOME/.config/hypr/scripts/net-watch" status'
+        onResult: text => { b.netWatch = text.trim() }
+    }
     // Settings › Notifications: whether FUMonitor runs (its row shows only where uwsm has it)
     Sh {
         id: fumonProc
@@ -198,7 +207,7 @@ Item {
 
     function footer(level, query) {
         const cur = launcher.results[launcher.selIndex] || {}
-        if (level === "launcherprefs" || cur.kind === "firefox" || cur.kind === "remotelogin" || cur.kind === "remotenet" || cur.kind === "fumon" || cur.kind === "crashreports") return "Enter: on/off"
+        if (level === "launcherprefs" || cur.kind === "firefox" || cur.kind === "remotelogin" || cur.kind === "remotenet" || cur.kind === "fumon" || cur.kind === "netwatch" || cur.kind === "crashreports") return "Enter: on/off"
         if (cur.kind === "syssound") return "Enter: on/off  ·  Shift+Enter: listen"
         if (cur.kind === "mousescroll") return "Enter: choose, then try the wheel"
         if (cur.kind === "sound") return "Enter: choose  ·  Shift+Enter: listen"
@@ -215,7 +224,7 @@ Item {
         if (level === "settings" || level === "browser") firefoxProc.running = true
         if (level === "settings" || level === "mousescroll") mouseScrollProc.running = true
         if (level === "sounds" || level === "soundregular" || level === "soundurgent") soundsProc.running = true
-        if (level === "sounds") fumonProc.running = true
+        if (level === "sounds") { fumonProc.running = true; netWatchProc.running = true }
         if (level === "settings" || level === "crashreports") crashReportsProc.running = true
         if (level === "notiftime") Qt.callLater(() => launcher.selectWhere(r => r.summary === "current"))   // the cursor on the current time
     }
@@ -316,6 +325,12 @@ Item {
         }
         if (it.kind === "remotelogin") { l.keepSelection(); setRemoteLogin(!it.switchOn); return true }
         if (it.kind === "remotenet") { l.keepSelection(); setRemoteNet(!it.switchOn); return true }
+        if (it.kind === "netwatch") {
+            l.keepSelection()
+            netWatch = netWatch === "off" ? "on" : "off"
+            Quickshell.execDetached([scripts + "/net-watch", netWatch])
+            return true
+        }
         if (it.kind === "fumon") {
             l.keepSelection()
             fumon = fumon === "on" ? "off" : "on"

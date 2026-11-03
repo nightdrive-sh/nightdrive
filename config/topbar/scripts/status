@@ -19,19 +19,24 @@ battery() {
 
 case $kind in
   wifi)
+    # Connected but no internet (NetworkManager's connectivity check: limited, none, or a captive portal's sign-in;
+    # config/hypr/scripts/net-watch notifies): the icon in orange, Wi-Fi's with a "!". Not a check of its own: NM's
+    # last result, which net-watch refreshes the bar on
+    cls=; case $(nmcli networking connectivity 2>/dev/null) in limited|none|portal) cls=warning ;; esac
+    wifi=wifi; [[ -n $cls ]] && wifi=wifi-alert
     # The traffic goes over a cable (NetworkManager prefers it to Wi-Fi, which stays connected as a standby): a cable,
     # whether Wi-Fi is on or not
-    if [[ $(~/.config/hypr/scripts/net-primary | jq -r '.type // ""') == ethernet ]]; then emit cable ""; exit; fi
+    if [[ $(~/.config/hypr/scripts/net-primary | jq -r '.type // ""') == ethernet ]]; then emit cable "" "$cls"; exit; fi
     # No Wi-Fi device (a VM, a PC on a cable) and no cable either: no network, which a crossed-out Wi-Fi wouldn't say
     if ! nmcli -t -f TYPE device 2>/dev/null | grep -qx wifi; then
-      if nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable ""; else emit unplug "" off; fi
+      if nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable "" "$cls"; else emit unplug "" off; fi
       exit
     fi
     if [[ $(nmcli radio wifi 2>/dev/null) != enabled ]]; then emit wifi-off "" off; exit; fi
-    if nmcli -t -f ACTIVE device wifi list --rescan no 2>/dev/null | grep -q '^yes'; then emit wifi ""
+    if nmcli -t -f ACTIVE device wifi list --rescan no 2>/dev/null | grep -q '^yes'; then emit "$wifi" "" "$cls"
     # Connecting (also after waking up): the arcs fill up one by one (BarModule.qml animates icons separated by |)
     elif nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^wifi:connecting'; then emit "wifi-zero|wifi-low|wifi-high|wifi" ""
-    elif nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable ""
+    elif nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable "" "$cls"
     else emit wifi-off "" off; fi ;;
   bluetooth)
     # Without an adapter (a VM) bluetooth.service is stopped and bluetoothctl would wait forever
