@@ -21,7 +21,7 @@ Item {
     readonly property var note: store.note
     readonly property int margin: width < 520 ? 24 : 40
     readonly property bool editing: editor.open
-    readonly property bool busy: editor.busy     // a save still running: quitting waits for it
+    readonly property bool busy: editor.busy || boxes.busy     // a save still running: quitting waits for it
 
     // Not before the note's file has been read: the editor would start from an empty text
     function edit() { if (note && !editing && store.textId === note.id) editor.begin(note.id, store.text, false, note.title) }
@@ -167,6 +167,8 @@ Item {
         onWroteIn: (id, was) => root.wroteIn(id, was)
     }
 
+    TaskBoxes { id: boxes; store: root.store; onMessage: (text, danger) => root.message(text, danger) }
+
     Flickable {
         id: flick
         visible: !root.editing
@@ -190,7 +192,10 @@ Item {
             text: Markdown.mark(Markdown.html(root.body, root.c), root.marks, root.c)
             font.family: root.c.font; font.pixelSize: 14
             color: root.c.body
-            onLinkActivated: link => { if (/^(https?:\/\/|mailto:)/i.test(link)) Qt.openUrlExternally(link) }
+            onLinkActivated: link => {
+                if (/^box:\d+$/.test(link)) boxes.toggle(+link.slice(4))
+                else if (/^(https?:\/\/|mailto:)/i.test(link)) Qt.openUrlExternally(link)
+            }
             HoverHandler { cursorShape: page.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor }
         }
     }
@@ -198,7 +203,7 @@ Item {
     // The address a hovered link goes to, as a browser shows it: a link's text can name another address than its own
     // (a note Claude wrote, or one from the web), and this is the one a click opens (#1930)
     Rectangle {
-        visible: page.hoveredLink !== ""
+        visible: page.hoveredLink !== "" && !page.hoveredLink.startsWith("box:")
         anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 8
         width: Math.min(linkText.implicitWidth + 20, parent.width - 16); height: linkText.implicitHeight + 10
         radius: 6; color: root.c.solid; border.width: 1; border.color: root.c.divider

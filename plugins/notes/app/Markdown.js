@@ -32,7 +32,7 @@ function inline(text, c) {
 function html(md, c) {
     const lines = md.replace(/\r\n?/g, "\n").split("\n")
     const out = []
-    let para = [], list = null, fence = null, quote = []
+    let para = [], list = null, fence = null, quote = [], boxes = 0
     const sizes = [0, 22, 19, 17, 15, 14, 14]
     function flushPara() { if (para.length) out.push(`<p>${para.map(l => inline(l, c)).join("<br>")}</p>`); para = [] }
     function flushList() { if (list) out.push(`</${list}>`); list = null }
@@ -69,8 +69,10 @@ function html(md, c) {
             if (list !== kind) { flushList(); out.push(`<${kind}>`); list = kind }
             let item = m[3]
             const box = item.match(/^\[([ xX])\]\s+(.*)$/)
-            if (box) item = (box[1] === " " ? "☐ " : "☑ ") + box[2]
-            out.push(`<li>${inline(item, c)}</li>`)
+            // A box is a link to itself ("box:K", the K-th as ListEdit.boxes counts them): a click ticks it (TaskBoxes.qml)
+            const mark = box ? `<a href="box:${boxes++}" style="color:${c.primary}; text-decoration:none">${box[1] === " " ? "☐" : "☑"}</a> ` : ""
+            if (box) item = box[2]
+            out.push(`<li>${mark}${inline(item, c)}</li>`)
             continue
         }
         // An indented line under an item goes on with it (Qt's rich text has no bulletless item)

@@ -16,10 +16,11 @@ Your notes as Markdown files in `~/Notes`, in a window to read and write them: t
 | ⇧Enter | Open the note in Apostrophe |
 | ⌘S | Save now: it saves by itself a moment after you stop typing, and when you leave the note |
 | `Space` ⇧Space | Scroll the note |
-| ⌘B | Hide or show the sidebar |
+| ⌘B | Hide or show the sidebar (while writing: bold) |
 
 - A note is any `.md` file in `~/Notes`, in subfolders too; hidden files and folders are left out. Its title is its first heading (`# …`), else its file name.
-- You write the Markdown as it is in the file; reading shows it formatted.
+- You write the Markdown as it is in the file; reading shows it formatted. While writing, `Enter` on a list item starts the next one (`- `, the next number, an empty `[ ]`), and on an empty item ends the list; `Tab` and ⇧Tab nest an item under the one above and take it back. ⌘B and ⌘I make the selection bold (`**`) and italic (`_`), or no longer; ⌘K makes it a link, to a copied address if there is one. ⌘Z undoes each of these as one step.
+- Reading, a click on a task box (`- [ ]`) ticks or unticks it, saved at once.
 - A note's file is named after its title (`~/Notes/Title.md`). A new one is `Untitled.md` until you leave it; then, and whenever you change the heading of a note whose file name was its title, the file follows the heading. A file you named otherwise keeps its name. A new note left with nothing written in it is deleted.
 - ⇧Enter opens the note in Apostrophe (Install › Recommended), or without it in what opens Markdown here.
 - What another app saves meanwhile (Apostrophe, Claude) shows at once. If it changes the note while you have unsaved text in it, Notes doesn't write over it: Keep mine (⌘S) or Keep theirs. Closed before you pick, what you wrote goes into a new note, "Title (not saved)".

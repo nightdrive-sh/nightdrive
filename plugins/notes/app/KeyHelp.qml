@@ -15,10 +15,15 @@ QtObject {
             ["⇧⏎", "Open in Apostrophe"],
             ["Space  ⇧Space", "Scroll the note"],
             ["⌘B", "Show or hide the notes"],
+            ["Click a box", "Tick or untick the task"],
             ["Esc", "Narrow window: the notes"]] },
         { title: "Writing", keys: [
             ["Esc", "Back to reading"],
             ["⌘S", "Save now (it saves by itself); changed elsewhere: keep mine"],
+            ["⏎", "In a list: the next item; on an empty one, the list ends"],
+            ["Tab  ⇧Tab", "Nest a list item under the one above, and back"],
+            ["⌘B  ⌘I", "Bold, italic (again: no longer)"],
+            ["⌘K", "Link: the selection its text, a copied address its target"],
             ["⌘Z  ⇧⌘Z", "Undo, redo"]] },
         { title: "Window", keys: [
             ["?", "These keys"],

@@ -22,6 +22,8 @@ Item {
     readonly property string root: Quickshell.env("NOTES_DIR") || Quickshell.env("HOME") + "/Notes"   // as lib/store.py's
     // The plugin's own command, by its path: the compositor's PATH may not have ~/.local/bin
     readonly property string command: Quickshell.shellDir + "/../bin/notes"
+    // The open note's file read again, as it is (a save that failed changed nothing for the watch to see)
+    function reread() { file.reload() }
     function edit() { if (note) Quickshell.execDetached([command, "edit", note.id]) }
 
     function refresh() { if (!lister.running) lister.running = true; else again = true }

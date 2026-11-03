@@ -136,7 +136,8 @@ ShellRoot {
             function find(words: string): void { win.find(); list.field.text = words; search.query = words }
         }
 
-        Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
+        // While writing, ⌘B is bold (EditorHelp.qml)
+        Shortcut { sequences: ["Ctrl+B", "Meta+B"]; enabled: !view.editing; onActivated: win.toggleSidebar() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: win.quit() }
         Shortcut { sequences: ["Ctrl+N", "Meta+N"]; enabled: !namePanel.visible; onActivated: win.newNote("") }
         Shortcut { sequence: "F2"; enabled: !namePanel.visible; onActivated: win.renameNote() }

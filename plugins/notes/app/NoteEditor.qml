@@ -51,6 +51,7 @@ Item {
         fresh = isNew ? text : ""
         conflicted = false
         area.text = text
+        help.reset()
         // At the end, past the last newline: a note is mostly added to, and the title is at its top. A new one's is
         // all there is, so its line below; or, still to be written, after its "# ".
         const first = text.split("\n")[0]
@@ -85,6 +86,7 @@ Item {
         const at = area.cursorPosition
         base = text
         area.text = text
+        help.reset()
         area.cursorPosition = Math.min(at, text.length)
     }
 
@@ -120,6 +122,9 @@ Item {
         onFailed: (id, message) => root.message(message, true)
         onDiscarded: (id, gone) => root.store.refresh()
     }
+
+    // Lists, bold, italic and links as one types (EditorHelp.qml): the editor's keys go there first
+    EditorHelp { id: help; area: area }
 
     Timer { id: autosave; interval: root.saveDelay; onTriggered: root.flush() }
 
@@ -158,6 +163,7 @@ Item {
             onTextChanged: if (root.dirty && !root.conflicted) autosave.restart()
 
             Keys.onPressed: e => {
+                if (help.key(e)) { e.accepted = true; return }
                 const ctrl = e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
                 if (e.key === Qt.Key_Escape) root.done()
                 else if (ctrl && e.key === Qt.Key_S) { if (root.conflicted) root.keepMine(); else root.flush() }
