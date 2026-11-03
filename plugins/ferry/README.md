@@ -10,7 +10,7 @@ Ferry is an app of its own, for Linux, the Mac and the iPhone, and comes with Ni
 
 - The menu lists what your other devices sent: a click copies a text or opens a file, and a file drags out into another app.
 - **Aa**, **Send Clipboard** and **+** send a text, the clipboard or files to the device in the pill above them. Click the pill to pick another device or add one. Files dragged over the menu can be dropped on any device's tile, or on the inbox icon in the top bar for the picked one.
-- A send to a phone waits in the box until that phone picks it up. A send to another computer goes straight there (not while it's asleep), and Send Clipboard puts it on that computer's clipboard.
+- A send to a phone waits in the box until that phone picks it up. A send to another computer goes straight there, and Send Clipboard puts it on that computer's clipboard. While that computer is asleep or off, the send waits at the top of the menu (Waiting for … · 3 d left) and goes once it's back, for 3 days at most; its × cancels it.
 - What arrives goes to Downloads, with a notification. The phone's Send Clipboard lands on the clipboard too.
 - Everything leaves the box after 7 days, a code or a password after 15 minutes or as soon as it's copied. Codes and passwords stay out of notifications and the clipboard history.
 - **Settings** (beside Clear) forgets a device on all your devices: click it twice. Add it back with Add Device.
@@ -44,6 +44,7 @@ ferry enable
 | `ferry get [n]` | An item from the phone (the newest without a number): a text printed, a file saved here |
 | `ferry open <n>` | Opens a file |
 | `ferry copy <n>` | Copies a text |
+| `ferry rm <n>` | Takes an item out of the box, or cancels a send that waits |
 | `ferry qr` | The page's QR code, for adding a phone |
 
 A new Ferry release reaches Nightdrive once `plugins/ferry/pin` has written its tag and sha256 to `release.conf` and that is committed. `FERRY_FROM=<a Ferry checkout's linux/>` installs one that isn't pinned (`plugins/ferry/install.sh`).

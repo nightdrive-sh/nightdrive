@@ -12,7 +12,8 @@ import qs
 // the settings in the menu's place (FerrySettings.qml): forgetting devices.
 // This file holds the menu's state and layout; its parts are files of their own beside it, each passed the menu:
 // FerryWarning, FerryReceivedList (FerryReceivedRow), FerryDropTile, FerryPill, FerryPicker (FerryDeviceRow),
-// FerryRoundButton and FerryAddDevice.
+// FerryRoundButton and FerryAddDevice. The sends waiting for a computer that is asleep or off are a card of their own
+// above the list (FerryWaiting), each with a Cancel.
 Column {
     id: m
     width: parent ? parent.width : 360
@@ -46,8 +47,9 @@ Column {
     readonly property int listLift: 30   // how far the pill comes up over a long list
     readonly property int listFade: 64   // the fade at the bottom of a long list
     // The big button says how every send went, its own and a drop's (here, on a tile or on the bar icon), a pick's (+)
-    // or `ferry send`'s: "Sent to …" for a moment once `ferry list` reports it (sent.json), "Not sent" when it failed
-    // (a notification says why). Its own send says "Sending…" until then, and gives up waiting after a while.
+    // or `ferry send`'s: "Sent to …" (or "Waiting for …", for a computer asleep or off) for a moment once `ferry list`
+    // reports it (sent.json), "Not sent" when it failed (a notification says why). Its own send says "Sending…" until
+    // then, and gives up waiting after a while.
     property real sendingSince: 0      // seconds: when the button sent, while waiting for it to show
     property real shownSent: 0         // the sent.json time the button has shown
     property bool justSent: false
@@ -72,8 +74,10 @@ Column {
     }
     function deviceIcon(d) { return !d ? "qr-code" : d.kind === "computer" ? "laptop" : d.kind === "tablet" ? "tablet" : "smartphone" }
     function deviceState(d) { return d.inUse ? "in use" : d.online ? "online" : d.kind === "computer" ? "asleep" : "offline" }
-    // An asleep computer can't take a send (it goes straight there); a phone picks it up later
-    function canTake(d) { return d.online || d.kind !== "computer" }
+    // A phone picks a send up later. A computer asleep or off takes one only from a Ferry whose sends wait for it
+    // (`ferry list --json` has waiting): an older one sends straight there, and the send would fail.
+    readonly property bool sendsWait: !!st && st.waiting !== undefined
+    function canTake(d) { return d.online || d.kind !== "computer" || m.sendsWait }
     function pick(d) { m.picked = d.id; m.run(["target", d.id]); m.mode = "list" }
     function paths(drop) {
         return Array.from(drop.urls, u => u.toString()).filter(u => u.startsWith("file://")).map(u => decodeURIComponent(u.slice(7)))
@@ -225,6 +229,14 @@ Column {
                 text: "No other device yet: add one with Add Device below the list."
             }
 
+            // ---- the sends waiting for a computer that is asleep or off ----
+            FerryWaiting {
+                id: waitingBox
+                menu: m
+                visible: !m.dropping && sends.length > 0
+                width: parent.width
+            }
+
             // ---- the list: what the other devices sent ----
             FerryReceivedList {
                 id: listBox
@@ -233,9 +245,9 @@ Column {
                 width: parent.width
             }
 
-            // ---- nothing received ----
+            // ---- nothing received (and nothing waiting above, which would say enough) ----
             Rectangle {
-                visible: !m.dropping && m.received.length === 0
+                visible: !m.dropping && m.received.length === 0 && !waitingBox.visible
                 width: parent.width
                 height: 120
                 radius: 14
@@ -322,8 +334,10 @@ Column {
                 MenuButton {
                     width: parent.width - 2 * (36 + parent.spacing)
                     usable: !!m.target && m.canTake(m.target) && !m.sendingSince && (m.mode !== "write" || textEdit.text.trim() !== "")
-                    icon: m.justSent ? "check" : m.sendFailed ? "circle-x" : m.sendingSince ? "loader" : m.mode === "write" ? "send" : "clipboard-copy"
-                    label: m.justSent ? "Sent to " + (m.st && m.st.sent ? m.st.sent.to : "") : m.sendFailed ? "Not sent" : m.sendingSince ? "Sending…"
+                    // A send to a computer asleep or off says "Waiting for …" (sent.json's waiting): it goes once it's back
+                    readonly property bool waits: !!(m.st && m.st.sent && m.st.sent.waiting)
+                    icon: m.justSent ? (waits ? "clock" : "check") : m.sendFailed ? "circle-x" : m.sendingSince ? "loader" : m.mode === "write" ? "send" : "clipboard-copy"
+                    label: m.justSent ? (waits ? "Waiting for " : "Sent to ") + (m.st && m.st.sent ? m.st.sent.to : "") : m.sendFailed ? "Not sent" : m.sendingSince ? "Sending…"
                          : m.mode === "write" ? "Send" : "Send Clipboard"
                     onClicked: if (m.mode === "write") m.sendText(); else m.sendFrom(["send-clipboard", "--to", m.target.id])
                 }

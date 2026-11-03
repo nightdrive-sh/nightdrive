@@ -3,10 +3,10 @@
     {
       "name": "ferry_status",
       "title": "Ferry's box and devices",
-      "description": "Ferry, the user's mailbox between their phone and computers over Tailscale: on (the server runs), tailscale, url (the phone's address), setup (what's missing, or null), devices (id, name, kind phone or computer, online) and the box's items, newest last: what came to this computer (to \"computer\", from a device: a text, or a file with its path in ~/Downloads) and what was sent from here (to \"phone\", for a device). Use it to read what the user sent from their phone, and for a device's id before ferry_send_files or ferry_send_text.",
+      "description": "Ferry, the user's mailbox between their phone and computers over Tailscale: on (the server runs), tailscale, url (the phone's address), setup (what's missing, or null), devices (id, name, kind phone or computer, online) and the box's items, newest last: what came to this computer (to \"computer\", from a device: a text, or a file with its path in ~/Downloads) and what was sent from here (to \"phone\", for a device); waiting: the sends from here to a computer that is asleep or off (deviceName, a text or a file's name, until: when Ferry drops it, after 3 days), which go once it is back. Use it to read what the user sent from their phone, and for a device's id before ferry_send_files or ferry_send_text.",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
       "command": ["ferry", "list", "--json"],
-      "mask": ["items.text"],
+      "mask": ["items.text", "waiting.text"],
       "class": "read",
       "area": "ferry"
     },
@@ -30,7 +30,7 @@
     {
       "name": "ferry_send_files",
       "title": "Send files with Ferry",
-      "description": "Sends files (a folder: its files) from this computer to one of the user's devices with Ferry: to a phone into its box, with a notification; to another computer straight into its Downloads. Only files in the folders the user lets Claude use (Settings › Claude › Access › Apps and files; a link counts where it points): nothing hidden (no part of the path starting with a dot, and a folder's hidden files are left out), no link that leads out of home, and not home or its own folders (Downloads, Documents…) whole; one path that breaks this stops the whole send, and that is the user's rule, so don't try another way. Call ferry_preview_files first and give its sends unchanged: the card shows it, and if the paths no longer send that, nothing is sent. The user allows it on screen first. Fails with the reason when the device is asleep or the files aren't there.",
+      "description": "Sends files (a folder: its files) from this computer to one of the user's devices with Ferry: to a phone into its box, with a notification; to another computer straight into its Downloads. Only files in the folders the user lets Claude use (Settings › Claude › Access › Apps and files; a link counts where it points): nothing hidden (no part of the path starting with a dot, and a folder's hidden files are left out), no link that leads out of home, and not home or its own folders (Downloads, Documents…) whole; one path that breaks this stops the whole send, and that is the user's rule, so don't try another way. Call ferry_preview_files first and give its sends unchanged: the card shows it, and if the paths no longer send that, nothing is sent. The user allows it on screen first. To a computer that is asleep or off, the send waits and goes once it is back (ferry_status's waiting). Fails with the reason when the files aren't there.",
       "inputSchema": {
         "type": "object",
         "properties": {
