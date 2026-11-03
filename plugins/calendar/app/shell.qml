@@ -6,7 +6,7 @@ import qs
 import qs.kit
 import "Dates.js" as Dates
 
-// Nightdrive Calendar: the calendars in the sidebar, the month or the week on the right, over the events the sync keeps
+// Nightdrive Calendar: the calendars in the sidebar, the month, the week or the day on the right, over the events the sync keeps
 // in ~/.local/share/calendar (`calendar events` reads them by khal). An event opens in EventPanel; a new one is added,
 // and one opened is changed, in EventEditor (`calendar add`, `calendar edit`), or deleted after EventDelete asks
 // (`calendar delete`).
@@ -35,8 +35,8 @@ ShellRoot {
             function today(): void { win.pickDay(Dates.iso(new Date())) }
             // A day, YYYY-MM-DD (`calendar show DAY`)
             function showDay(day: string): void { if (/^\d{4}-\d{2}-\d{2}$/.test(day)) win.pickDay(day) }
-            // "month" or "week" (`calendar month`, `calendar week`)
-            function setView(view: string): void { if (view === "month" || view === "week") win.view = view }
+            // "month", "week" or "day" (`calendar month`, `calendar week`, `calendar day`)
+            function setView(view: string): void { if (["month", "week", "day"].indexOf(view) >= 0) win.view = view }
             // The new event panel on a day, YYYY-MM-DD, or the picked one (`calendar new [DAY]`)
             function newEvent(day: string): void { win.newEvent(/^\d{4}-\d{2}-\d{2}$/.test(day) ? day : win.day) }
         }
@@ -49,7 +49,7 @@ ShellRoot {
         // The sidebar's rows: every calendar together, then each one
         readonly property var sources: [{ id: "", name: "All calendars", color: "", events: -1 }].concat(calendars)
         property int source: 0
-        property string view: "month"       // or "week"
+        property string view: "month"       // or "week", "day"
         property string day: Dates.iso(new Date())
         property var events: []             // the range's, every calendar's
         property string range: ""           // "FROM TO" of events, or of the read under way
@@ -67,9 +67,15 @@ ShellRoot {
             return out
         }
 
-        // What the view shows: the month's six weeks, or the week
+        // The week of the picked day, for the week view and its list
+        readonly property var weekDays: {
+            const first = Dates.weekFirst(Dates.parse(day), Regional.weekStart)
+            return [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(first, i)))
+        }
+        // What the view shows: the month's six weeks, the week, or the day
         function viewRange() {
             const d = Dates.parse(day)
+            if (view === "day") return [day, Dates.iso(Dates.addDays(d, 1))]
             const from = view === "month" ? Dates.monthDays(d.getFullYear(), d.getMonth(), Regional.weekStart)[0] : Dates.weekFirst(d, Regional.weekStart)
             return [Dates.iso(from), Dates.iso(Dates.addDays(from, view === "month" ? 42 : 7))]
         }
@@ -111,10 +117,10 @@ ShellRoot {
         Component.onCompleted: { calReader.running = true; load(true); keys.forceActiveFocus() }
 
         function pickDay(d) { day = d }
-        // The month or week before (-1) or after (1)
+        // The month, week or day before (-1) or after (1)
         function page(n) {
             const d = Dates.parse(day)
-            day = view === "month" ? Dates.iso(new Date(d.getFullYear(), d.getMonth() + n, 1)) : Dates.iso(Dates.addDays(d, 7 * n))
+            day = view === "month" ? Dates.iso(new Date(d.getFullYear(), d.getMonth() + n, 1)) : Dates.iso(Dates.addDays(d, (view === "week" ? 7 : 1) * n))
         }
         function moveDay(n) { day = Dates.iso(Dates.addDays(Dates.parse(day), n)) }
         function pickSource(i) { if (i >= 0 && i < sources.length) source = i }
@@ -196,12 +202,11 @@ ShellRoot {
                 Header {
                     Layout.fillWidth: true
                     // As far from both edges, Today as New; over the list of days (a narrow window), with the list's edges
-                    Layout.leftMargin: keys.listed ? 12 : 16; Layout.rightMargin: keys.listed ? 12 : 16; Layout.topMargin: 16
+                    Layout.leftMargin: keys.narrow ? 12 : 16; Layout.rightMargin: keys.narrow ? 12 : 16; Layout.topMargin: 16
                     // As high as the buttons (AppButton's 28): the name stays level with the sidebar's title
                     Layout.preferredHeight: Math.max(win.headerHeight, 28)
                     // Over the divider and the view that come after it, which would otherwise draw over its buttons' tips
                     z: 1
-                    switchable: !keys.listed
                     app: win
                     c: win.look
                 }
@@ -228,6 +233,7 @@ ShellRoot {
                         else if (k === Qt.Key_T) win.pickDay(Dates.iso(new Date()))
                         else if (k === Qt.Key_M) win.view = "month"
                         else if (k === Qt.Key_W && !ctrl) win.view = "week"
+                        else if (k === Qt.Key_D && !ctrl) win.view = "day"
                         else if (k === Qt.Key_N && !ctrl) win.newEvent(win.day)
                         else if (k === Qt.Key_Return || k === Qt.Key_Enter) win.openFirst()
                         else if (k === Qt.Key_Question) win.cheats = !win.cheats
@@ -235,8 +241,10 @@ ShellRoot {
                         else return
                         e.accepted = true
                     }
-                    // Narrower than this the grids' cells can't hold a word (#2025): the days as a list instead
-                    readonly property bool listed: width < 500
+                    // Narrower than this the grids' cells can't hold a word (#2025): the days as a list instead. Not the
+                    // day view's: its one column has the room at any width
+                    readonly property bool narrow: width < 500
+                    readonly property bool listed: narrow && win.view !== "day"
                     DayList {
                         anchors.fill: parent
                         anchors.margins: 12; anchors.topMargin: 8
@@ -252,10 +260,19 @@ ShellRoot {
                         app: win
                         c: win.look
                     }
-                    WeekView {
+                    HoursView {
                         anchors.fill: parent
                         anchors.topMargin: 4
                         visible: win.view === "week" && !keys.listed
+                        days: win.weekDays
+                        app: win
+                        c: win.look
+                    }
+                    HoursView {
+                        anchors.fill: parent
+                        anchors.topMargin: 4
+                        visible: win.view === "day"
+                        days: [win.day]
                         app: win
                         c: win.look
                     }
@@ -312,8 +329,8 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Calendar", keys: [["← →  h l", "Previous, next day"], ["↑ ↓  k j", "A week back, on"], ["PgUp PgDn  [ ]", "Previous, next month or week"],
-                                           ["t", "Today"], ["m  w", "Month, week"], ["⏎", "Open the day's first event"], ["n", "New event"]] },
+                { title: "Calendar", keys: [["← →  h l", "Previous, next day"], ["↑ ↓  k j", "A week back, on"], ["PgUp PgDn  [ ]", "Previous, next month, week or day"],
+                                           ["t", "Today"], ["m  w  d", "Month, week, day"], ["⏎", "Open the day's first event"], ["n", "New event"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "An event", keys: [["e", "Edit it"], ["Del  ⌫", "Delete it (asks first)"], ["Esc  ⏎", "Close it"]] },
                 { title: "New or edited event", keys: [["⏎  Ctrl ⏎", "Save it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }

@@ -2,15 +2,17 @@ import QtQuick
 import qs.kit
 import "Dates.js" as Dates
 
-// The week, Monday to Sunday (Sunday to Saturday in the US: Settings › Region): a row on top for what takes whole days (all-day and multi-day events, as bars on each of
-// their days), and under it the hours, scrolled to the morning, with each timed event a block from its start to its
-// end. Events that overlap share their day's width, side by side.
+// Days side by side over their hours: the week view's seven (Monday to Sunday, Sunday to Saturday in the US: Settings ›
+// Region) and the day view's one (#2004), the same grid so neither copies the other. A row on top for what takes whole
+// days (all-day and multi-day events, as bars on each of their days), and under it the hours, scrolled to the morning,
+// with each timed event a block from its start to its end. Events that overlap share their day's width, side by side.
 Item {
     id: root
     required property var app           // the window: day, today, now, byDay, dayPicked, pickDay(), openEvent(), newEvent()
     required property QtObject c
-    readonly property date first: Dates.weekFirst(Dates.parse(app.day), Regional.weekStart)
-    readonly property var days: [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(first, i)))
+    required property var days          // ["YYYY-MM-DD"], in order
+    // One day alone has the width for its name in full ("Tuesday") and for a block's time and place beside its title
+    readonly property bool single: days.length === 1
     readonly property string today: app.today
     readonly property int timeCol: 46
     readonly property int headRow: 40
@@ -20,11 +22,10 @@ Item {
     readonly property real hourH: Math.max(hourMin, (height - headRow - laneH - 1) / 24)
     readonly property int bar: 18           // a row of the all-day lane
     readonly property int gap: 2            // between its stacked bars, so they don't touch (#1481)
-    readonly property real colW: (width - timeCol) / 7
+    readonly property real colW: (width - timeCol) / Math.max(1, days.length)
     // The all-day lane is as high as its fullest day needs, up to four rows (the rest: "+N")
     readonly property int laneRows: Math.min(4, Math.max(1, ...days.map(d => (app.byDay[d] || []).filter(Dates.spansDays).length)))
     readonly property int laneH: laneRows * bar + 8
-    readonly property var dayNames: Regional.weekdays.map(wd => Regional.dayName(wd, true))
     readonly property int scrollTo: 7       // the hour at the top when the week opens
     // A narrow window (#2025): a day's name is its letter once "Mon" and the date's circle no longer fit side by side,
     // and an event too narrow for a word is its colour alone (its title elided to "…" said nothing)
@@ -59,6 +60,7 @@ Item {
         delegate: Item {
             required property string modelData
             required property int index
+            readonly property int wd: Dates.parse(modelData).getDay()
             x: root.timeCol + index * root.colW
             width: root.colW; height: root.headRow
             TapHandler { onTapped: root.app.pickDay(parent.modelData) }
@@ -68,13 +70,13 @@ Item {
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: root.colW >= 44
-                    text: root.shortNames ? root.dayNames[index][0] : root.dayNames[index]
-                    color: Regional.weekdays[index] % 6 === 0 ? root.c.faint : root.c.dim   // the weekend
+                    text: root.single ? Regional.dayName(wd, false) : Regional.dayName(wd, true).slice(0, root.shortNames ? 1 : 3)
+                    color: wd % 6 === 0 ? root.c.faint : root.c.dim   // the weekend
                     font.family: root.c.font; font.pixelSize: 11; font.weight: Font.Medium
                 }
                 Rectangle {
                     width: 26; height: 22; radius: 11
-                    color: modelData === root.today ? root.c.primary : modelData === root.app.day ? root.app.dayPicked : "transparent"
+                    color: modelData === root.today ? root.c.primary : modelData === root.app.day && !root.single ? root.app.dayPicked : "transparent"
                     Text {
                         anchors.centerIn: parent
                         text: Dates.parse(modelData).getDate()
@@ -138,8 +140,26 @@ Item {
         clip: true
         contentHeight: 24 * root.hourH
         boundsBehavior: Flickable.StopAtBounds
-        // The morning at the top, its label whole, not cut; kept within the day, as a day that fits has nowhere to scroll
-        Component.onCompleted: contentY = Math.max(0, Math.min(contentHeight - height, root.scrollTo * root.hourH - 10))
+        // The morning at the top, its label whole, not cut; kept within the day, as a day that fits has nowhere to scroll.
+        // The hour wanted at the top is kept apart from contentY, which the window's height clamps: a taller or lower
+        // window stretches the hours (hourH), and the same hour stays at the top, not the same pixel. Only a scroll
+        // moves it. Back to the morning each time the view comes up, as it was laid out hidden at another size
+        property real topHour: root.scrollTo - 10 / root.hourMin
+        property bool placing: false
+        function place() {
+            placing = true
+            contentY = Math.max(0, Math.min(24 * root.hourH - height, topHour * root.hourH))
+            placing = false
+        }
+        function toMorning() { topHour = root.scrollTo - 10 / root.hourH; place() }
+        onContentYChanged: if (!placing) topHour = contentY / root.hourH
+        onHeightChanged: place()
+        Component.onCompleted: toMorning()
+        Connections {
+            target: root
+            function onVisibleChanged() { if (root.visible) Qt.callLater(hours.toMorning) }
+            function onHourHChanged() { hours.place() }
+        }
         TouchScroll { view: hours }
 
         Repeater {
@@ -168,11 +188,12 @@ Item {
                 x: root.timeCol + index * root.colW
                 width: root.colW; height: 24 * root.hourH
                 Rectangle { width: 1; height: parent.height; color: root.c.line }
-                // Each day draws its left line: Sunday closes the week on its right too, as Monday opens it
-                Rectangle { visible: column.index === 6; anchors.right: parent.right; width: 1; height: parent.height; color: root.c.line }
+                // Each day draws its left line: the last closes the grid on its right too, as the first opens it
+                Rectangle { visible: column.index === root.days.length - 1; anchors.right: parent.right; width: 1; height: parent.height; color: root.c.line }
                 Rectangle {
-                    anchors.fill: parent; anchors.leftMargin: 1; anchors.rightMargin: column.index === 6 ? 1 : 0
-                    color: column.modelData === root.app.day ? Qt.rgba(root.c.sel.r, root.c.sel.g, root.c.sel.b, 0.35) : "transparent"
+                    anchors.fill: parent; anchors.leftMargin: 1; anchors.rightMargin: column.index === root.days.length - 1 ? 1 : 0
+                    // The picked day among the week's; the day view's one day is always the picked one
+                    color: column.modelData === root.app.day && !root.single ? Qt.rgba(root.c.sel.r, root.c.sel.g, root.c.sel.b, 0.35) : "transparent"
                 }
                 // A double click in the hours: a new event there, at the half hour it fell in. Not on an event: the
                 // block's own TapHandler opens it, and in Qt 6 this one gets the same taps (both grab passively)
@@ -201,19 +222,27 @@ Item {
                         Rectangle { width: 3; height: parent.height; radius: 2; color: block.ev }
                         HoverHandler { id: blockHover; cursorShape: Qt.PointingHandCursor }
                         TapHandler { onTapped: root.app.openEvent(block.modelData.e) }
-                        Column {
+                        // The title, and under it the time and place; in a block too low for two lines, the day view's
+                        // width takes them beside the title instead, as a half hour there is still a wide strip
+                        Item {
+                            id: words
+                            readonly property bool beside: root.single && block.height <= 34
                             visible: block.width >= root.wordMin
                             x: 8; y: 3; width: parent.width - 12
                             Text {
+                                id: titleText
                                 textFormat: Text.PlainText
-                                width: parent.width; elide: Text.ElideRight
+                                width: words.beside ? Math.min(implicitWidth, words.width * 0.6) : words.width
+                                elide: Text.ElideRight
                                 text: block.modelData.e.title
                                 color: root.c.title; font.family: root.c.font; font.pixelSize: 11; font.weight: Font.Medium
                             }
                             Text {
                                 textFormat: Text.PlainText
-                                visible: block.height > 34
-                                width: parent.width; elide: Text.ElideRight
+                                visible: block.height > 34 || words.beside
+                                x: words.beside ? titleText.width + 10 : 0
+                                y: words.beside ? 1 : titleText.height
+                                width: words.width - x; elide: Text.ElideRight
                                 text: Regional.time(block.modelData.e.start.slice(11, 16)) + " – " + Regional.time(block.modelData.e.end.slice(11, 16))
                                     + (block.modelData.e.location ? "  " + block.modelData.e.location.split("\n")[0] : "")
                                 color: root.c.dim; font.family: root.c.font; font.pixelSize: 10

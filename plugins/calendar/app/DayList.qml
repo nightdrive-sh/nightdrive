@@ -8,14 +8,11 @@ import "Dates.js" as Dates
 // reads at any width. A click on a day picks it, on an event opens it; the picked day (← → and the rest) stays in view.
 ListView {
     id: root
-    required property var app           // the window: day, view, today, byDay, dayPicked, dayHover, pickDay(), openEvent(), newEvent()
+    required property var app           // the window: day, view, today, weekDays, byDay, dayPicked, dayHover, pickDay(), openEvent(), newEvent()
     required property QtObject c
     readonly property date at: Dates.parse(app.day)
     readonly property var days: {
-        if (app.view === "week") {
-            const m = Dates.weekFirst(at, Regional.weekStart)
-            return [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(m, i)))
-        }
+        if (app.view === "week") return app.weekDays
         const out = []
         for (let d = new Date(at.getFullYear(), at.getMonth(), 1); d.getMonth() === at.getMonth(); d = Dates.addDays(d, 1))
             out.push(Dates.iso(d))

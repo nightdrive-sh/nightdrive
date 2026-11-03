@@ -113,7 +113,8 @@ Usage: calendar [command]
 
   (none), open   open Calendar, or bring it forward if it is open
   show [DAY]     open Calendar on DAY (YYYY-MM-DD; today without one)
-  month, week    open Calendar on the month or the week
+  month, week, day
+                 open Calendar on the month, the week or the day
   new [DAY]      open Calendar with a new event on DAY (YYYY-MM-DD; the day it shows without one)
   calendars      the calendars on this computer (--json)
   events FROM TO the events from FROM up to TO (YYYY-MM-DD; TO not included), recurring ones as each time
@@ -144,7 +145,7 @@ USAGE
 
 case ${1:-open} in
   show)      open_ready; ipc showDay "${2:-$(date +%F)}" ;;
-  month|week) open_ready; ipc setView "$1" ;;
+  month|week|day) open_ready; ipc setView "$1" ;;
   new)       open_ready; ipc newEvent "${2:-}" ;;
   calendars) python3 "$LIB/calendars.py" "${@:2}" ;;
   events)    python3 "$LIB/events.py" "${@:2}" ;;
