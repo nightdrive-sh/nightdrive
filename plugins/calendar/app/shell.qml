@@ -6,10 +6,10 @@ import qs
 import qs.kit
 import "Dates.js" as Dates
 
-// Nightdrive Calendar: the calendars in the sidebar, the month, the week or the day on the right, over the events the sync keeps
-// in ~/.local/share/calendar (`calendar events` reads them by khal). An event opens in EventPanel; a new one is added,
-// and one opened is changed, in EventEditor (`calendar add`, `calendar edit`), or deleted after EventDelete asks
-// (`calendar delete`).
+// Nightdrive Calendar: the calendars in the sidebar, the month, the week, the day or the agenda on the right, over the
+// events the sync keeps in ~/.local/share/calendar (`calendar events` reads them by khal). An event opens in EventPanel;
+// a new one is added, and one opened is changed, in EventEditor (`calendar add`, `calendar edit`), or deleted after
+// EventDelete asks (`calendar delete`). / searches them (SearchView).
 ShellRoot {
     id: shell
     FloatingWindow {
@@ -35,8 +35,10 @@ ShellRoot {
             function today(): void { win.pickDay(Dates.iso(new Date())) }
             // A day, YYYY-MM-DD (`calendar show DAY`)
             function showDay(day: string): void { if (/^\d{4}-\d{2}-\d{2}$/.test(day)) win.pickDay(day) }
-            // "month", "week" or "day" (`calendar month`, `calendar week`, `calendar day`)
-            function setView(view: string): void { if (["month", "week", "day"].indexOf(view) >= 0) win.view = view }
+            // "month", "week", "day" or "agenda" (`calendar month`, `week`, `day`, `agenda`)
+            function setView(view: string): void { if (["month", "week", "day", "agenda"].indexOf(view) >= 0) { win.searching = false; win.view = view } }
+            // The search, with these words (`calendar search [TEXT]`)
+            function search(text: string): void { win.openSearch(text) }
             // The new event panel on a day, YYYY-MM-DD, or the picked one (`calendar new [DAY]`)
             function newEvent(day: string): void { win.newEvent(/^\d{4}-\d{2}-\d{2}$/.test(day) ? day : win.day) }
         }
@@ -49,7 +51,7 @@ ShellRoot {
         // The sidebar's rows: every calendar together, then each one
         readonly property var sources: [{ id: "", name: "All calendars", color: "", events: -1 }].concat(calendars)
         property int source: 0
-        property string view: "month"       // or "week", "day"
+        property string view: "month"       // or "week", "day", "agenda"
         property string day: Dates.iso(new Date())
         property var events: []             // the range's, every calendar's
         property string range: ""           // "FROM TO" of events, or of the read under way
@@ -72,10 +74,23 @@ ShellRoot {
             const first = Dates.weekFirst(Dates.parse(day), Regional.weekStart)
             return [0, 1, 2, 3, 4, 5, 6].map(i => Dates.iso(Dates.addDays(first, i)))
         }
-        // What the view shows: the month's six weeks, the week, or the day
+        // The agenda: the days from the picked one on, a page of them at a time
+        readonly property int agendaDays: 30
+        // Its days that have events, each day's all-day and multi-day ones first, as DayList's
+        readonly property var agendaGroups: {
+            const out = []
+            for (let i = 0, d = Dates.parse(day); i < agendaDays; i++, d = Dates.addDays(d, 1)) {
+                const list = byDay[Dates.iso(d)]
+                if (list && list.length)
+                    out.push({ day: Dates.iso(d), events: list.slice().sort((a, b) => (Dates.spansDays(b) - Dates.spansDays(a)) || (a.start < b.start ? -1 : a.start > b.start ? 1 : 0)) })
+            }
+            return out
+        }
+        // What the view shows: the month's six weeks, the week, the day, or the agenda's days
         function viewRange() {
             const d = Dates.parse(day)
             if (view === "day") return [day, Dates.iso(Dates.addDays(d, 1))]
+            if (view === "agenda") return [day, Dates.iso(Dates.addDays(d, agendaDays))]
             const from = view === "month" ? Dates.monthDays(d.getFullYear(), d.getMonth(), Regional.weekStart)[0] : Dates.weekFirst(d, Regional.weekStart)
             return [Dates.iso(from), Dates.iso(Dates.addDays(from, view === "month" ? 42 : 7))]
         }
@@ -117,11 +132,13 @@ ShellRoot {
         Component.onCompleted: { calReader.running = true; load(true); keys.forceActiveFocus() }
 
         function pickDay(d) { day = d }
-        // The month, week or day before (-1) or after (1)
+        // The month, week, day or the agenda's days before (-1) or after (1)
         function page(n) {
             const d = Dates.parse(day)
-            day = view === "month" ? Dates.iso(new Date(d.getFullYear(), d.getMonth() + n, 1)) : Dates.iso(Dates.addDays(d, (view === "week" ? 7 : 1) * n))
+            day = view === "month" ? Dates.iso(new Date(d.getFullYear(), d.getMonth() + n, 1))
+                : Dates.iso(Dates.addDays(d, (view === "week" ? 7 : view === "agenda" ? agendaDays : 1) * n))
         }
+        function setView(v) { searching = false; view = v }
         function moveDay(n) { day = Dates.iso(Dates.addDays(Dates.parse(day), n)) }
         function pickSource(i) { if (i >= 0 && i < sources.length) source = i }
         function openEvent(e) { eventPanel.show(e) }
@@ -137,6 +154,17 @@ ShellRoot {
         }
         // ⏎ on a day: its first event
         function openFirst() { const list = byDay[day] || []; if (list.length) openEvent(list[0]) }
+
+        // The search (/) in place of the view, its words given or as they were; Esc there comes back
+        property bool searching: false
+        function openSearch(text) {
+            searching = true
+            if (text) { searchView.text = text; searchView.search() }
+            Qt.callLater(searchView.open)
+        }
+        function closeSearch() { searching = false; keys.forceActiveFocus() }
+        // The keys back where they were once a panel closes: the search's results, or the view
+        function refocus() { if (searching) searchView.focusList(); else keys.forceActiveFocus() }
 
         // A sync from the window (⌘R): the command's, which asks for a reload when it's done
         Process { id: syncer; command: [win.command, "sync"]; onExited: code => win.say(code === 0 ? "Synced" : "The sync didn't finish: calendar sync in a terminal says why", false, code !== 0) }
@@ -212,16 +240,28 @@ ShellRoot {
                 }
                 Rectangle { Layout.fillWidth: true; Layout.topMargin: 17; Layout.preferredHeight: 1; color: c.divider }
 
+                SearchView {
+                    id: searchView
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: win.searching
+                    app: win
+                    c: win.look
+                    onClosed: win.closeSearch()
+                }
                 FocusScope {
                     id: keys
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    visible: !win.searching
                     focus: true
                     Keys.onPressed: e => {
                         const k = e.key
                         win.look.moved(e)
                         if (win.cheats && k !== Qt.Key_Question && sheet.modifierKeys.indexOf(k) < 0) win.cheats = false
                         const ctrl = e.modifiers & Qt.ControlModifier
+                        // The agenda's list takes the arrows and ⏎; PgUp PgDn [ ] page its days as the other views'
+                        if (win.view === "agenda" && !ctrl && agenda.key(e)) { e.accepted = true; return }
                         if (ctrl && k === Qt.Key_Down) win.pickSource(win.source + 1)
                         else if (ctrl && k === Qt.Key_Up) win.pickSource(win.source - 1)
                         else if (k === Qt.Key_Left || k === Qt.Key_H) win.moveDay(-1)
@@ -234,6 +274,8 @@ ShellRoot {
                         else if (k === Qt.Key_M) win.view = "month"
                         else if (k === Qt.Key_W && !ctrl) win.view = "week"
                         else if (k === Qt.Key_D && !ctrl) win.view = "day"
+                        else if (k === Qt.Key_A && !ctrl) win.view = "agenda"
+                        else if (k === Qt.Key_Slash || e.text === "/") win.openSearch("")
                         else if (k === Qt.Key_N && !ctrl) win.newEvent(win.day)
                         else if (k === Qt.Key_Return || k === Qt.Key_Enter) win.openFirst()
                         else if (k === Qt.Key_Question) win.cheats = !win.cheats
@@ -244,7 +286,7 @@ ShellRoot {
                     // Narrower than this the grids' cells can't hold a word (#2025): the days as a list instead. Not the
                     // day view's: its one column has the room at any width
                     readonly property bool narrow: width < 500
-                    readonly property bool listed: narrow && win.view !== "day"
+                    readonly property bool listed: narrow && win.view !== "day" && win.view !== "agenda"
                     DayList {
                         anchors.fill: parent
                         anchors.margins: 12; anchors.topMargin: 8
@@ -276,6 +318,19 @@ ShellRoot {
                         app: win
                         c: win.look
                     }
+                    AgendaList {
+                        id: agenda
+                        anchors.fill: parent
+                        anchors.margins: 12; anchors.topMargin: 8
+                        visible: win.view === "agenda"
+                        app: win
+                        c: win.look
+                        groups: win.agendaGroups
+                        active: keys.activeFocus
+                        empty: win.calendars.length ? "Nothing in the " + win.agendaDays + " days from " + Regional.format(Dates.parse(win.day), "medium") + "." : ""
+                        // A new page of days starts at its first event
+                        Connections { target: win; function onDayChanged() { agenda.current = 0; agenda.positionViewAtBeginning() } }
+                    }
                     Text {
                         visible: win.loaded && win.calendars.length === 0
                         anchors.centerIn: parent
@@ -293,7 +348,7 @@ ShellRoot {
             behind: content
             c: win.look
             app: win
-            onClosed: keys.forceActiveFocus()
+            onClosed: win.refocus()
             onEditRequested: ev => editor.edit(ev)
             onDeleteRequested: ev => deleter.ask(ev)
         }
@@ -302,7 +357,7 @@ ShellRoot {
             behind: content
             c: win.look
             app: win
-            onClosed: keys.forceActiveFocus()
+            onClosed: win.refocus()
             // As the editor's: this window may not be the one `calendar delete` asks to reload
             onDeleted: r => {
                 win.reload()
@@ -314,7 +369,7 @@ ShellRoot {
             behind: content
             c: win.look
             app: win
-            onClosed: keys.forceActiveFocus()
+            onClosed: win.refocus()
             // The window shows it at once: `calendar add` asks a running Calendar to reload, but this one may have been
             // started apart from the command (qs -p), so reload here too
             onSaved: (ev, edited) => {
@@ -329,8 +384,9 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Calendar", keys: [["← →  h l", "Previous, next day"], ["↑ ↓  k j", "A week back, on"], ["PgUp PgDn  [ ]", "Previous, next month, week or day"],
-                                           ["t", "Today"], ["m  w  d", "Month, week, day"], ["⏎", "Open the day's first event"], ["n", "New event"]] },
+                { title: "Calendar", keys: [["← →  h l", "Previous, next day"], ["↑ ↓  k j", "A week back, on"], ["PgUp PgDn  [ ]", "Previous, next month, week, day, agenda's days"],
+                                           ["t", "Today"], ["m  w  d  a", "Month, week, day, agenda"], ["⏎", "Open the day's first event"], ["n", "New event"], ["/", "Search"]] },
+                { title: "Agenda, search", keys: [["↑ ↓  j k", "Previous, next event"], ["⏎", "Open it"], ["/", "To the search's words"], ["Esc", "Leave the search"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "An event", keys: [["e", "Edit it"], ["Del  ⌫", "Delete it (asks first)"], ["Esc  ⏎", "Close it"]] },
                 { title: "New or edited event", keys: [["⏎  Ctrl ⏎", "Save it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }

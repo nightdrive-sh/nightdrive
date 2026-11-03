@@ -1,6 +1,6 @@
 # Calendar
 
-Your iCloud calendars, and Google calendars by their private address, on your computer: the month, the week or the day in a window of its own, kept in sync every 15 minutes. A first version: you add, change and delete events in the window, with the `calendar` command, or by Claude when you ask it to.
+Your iCloud calendars, and Google calendars by their private address, on your computer: the month, the week, the day or the days ahead in a window of its own, searchable, kept in sync every 15 minutes. A first version: you add, change and delete events in the window, with the `calendar` command, or by Claude when you ask it to.
 
 ## Using it
 
@@ -9,10 +9,11 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | `?` | Calendar's keys |
 | ← → or `h` `l` | Previous, next day |
 | ↑ ↓ or `k` `j` | A week back, on |
-| PgUp PgDn or `[` `]` | Previous, next month, week or day |
+| PgUp PgDn or `[` `]` | Previous, next month, week, day or the agenda's 30 days |
 | `t` | Today |
-| `m`, `w`, `d` | Month, week, day |
-| `Enter` | Open the day's first event (a click opens any) |
+| `m`, `w`, `d`, `a` | Month, week, day, agenda |
+| `/` | Search |
+| `Enter` | Open the day's first event (a click opens any); in the agenda or a search, the one picked (↑ ↓ or `j` `k`) |
 | `n` | New event on the day picked (also New, or a double click on a day or in the week's hours) |
 | `e` | Edit the event open (also Edit on it) |
 | `Del` or `⌫` | Delete the event open, after you say yes (also Delete on it) |
@@ -22,6 +23,8 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 
 - A new or edited event: `Tab` moves between its fields, `Enter` or Ctrl+Enter saves it, `Esc` leaves it. Days and times are shown and typed the way Launcher › Settings › Region writes them (5.11.2026 and 9:30, or 11/5/2026 and 9:30 AM); 2026-11-05 and 930 are read too, and a day without its year (5.11.) is this year's. A click into a day's field, or `↓` there, opens the month to pick from: the arrows move a day or a week, `PgUp`/`PgDn` a month, `Enter` picks, `Esc` closes it. The end moves with the start. Weeks start on the region's day (Sunday in the US). It goes in a calendar that isn't read only (below), the one you used last.
 - The day view (`d`) is the week's hours for one day, wide enough for each event's time and place beside its title.
+- The agenda (`a`) lists the 30 days from the day picked that have events, under Today, Tomorrow and the days' names.
+- Search (`/`) finds the events whose title, place or notes have every word you type, half a year back and ahead of today, in the calendar picked in the sidebar. `↓` or `Enter` goes to the results, `/` back to the words, `Esc` leaves.
 - In a narrow window the buttons show as icons, and below about 500 px the month or week shows as a list of its days; the day keeps its hours.
 - Editing keeps what Calendar doesn't show (alarms, invitees); another calendar moves the event there. A recurring event, or one in a read-only calendar, isn't changed or deleted here: the card says so. A deleted event goes from the server too, and the window has no undo for it.
 - A recurring event shows at each of its times.
@@ -51,7 +54,8 @@ The first event Claude adds to a calendar asks on the card, and once you allow i
 | Command | What it does |
 | --- | --- |
 | `calendar` | Opens Calendar, or brings it forward |
-| `calendar show [DAY]`, `month`, `week`, `day` | Opens it on a day (YYYY-MM-DD), the month, the week or the day |
+| `calendar show [DAY]`, `month`, `week`, `day`, `agenda` | Opens it on a day (YYYY-MM-DD), the month, the week, the day or the agenda |
+| `calendar search [TEXT]` | Opens its search (on TEXT) |
 | `calendar new [DAY]` | Opens it with a new event on DAY (or the day it shows) |
 | `calendar calendars` | The calendars and how many events each has (`--json`) |
 | `calendar events FROM TO` | The events from FROM up to TO, not included (YYYY-MM-DD; `--json`, `--calendar ID`, `--search TEXT`, `--limit N`) |

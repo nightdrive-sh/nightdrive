@@ -73,3 +73,26 @@ function span(e, R) {
     return e.start.slice(0, 10) === e.end.slice(0, 10) ? date(s) + ", " + t0 + " – " + t1
         : date(s) + " " + t0 + " – " + date(parse(e.end)) + " " + t1
 }
+
+// A day's heading in a list of days (the agenda, a search's results): Today, Tomorrow, Yesterday, else its weekday and
+// date, the year only when it isn't this one's: "Thu 5 November", "Thu, November 5"; "Mon 3 May 2027". R is the kit's
+// Regional, today "YYYY-MM-DD"
+function heading(day, today, R) {
+    const d = parse(day), t = parse(today)
+    const n = Math.round((d - t) / 86400000)
+    if (n === 0) return "Today"
+    if (n === 1) return "Tomorrow"
+    if (n === -1) return R.relative(d)      // the kit's own word for it: "Yesterday"
+    const long = R.format(d, "long")
+    return d.getFullYear() === t.getFullYear() ? long.replace(/,? \d{4}$/, "") : long
+}
+
+// What an agenda row says of the event's time on day: "all day", the start ("9:30"; with end, "9:30 – 10:30"), and on a
+// later day of an event that began before it "until 14:00" (or all day, when it goes on past this day too)
+function when(e, day, R, withEnd) {
+    if (e.all_day) return "all day"
+    const s = e.start.slice(0, 10), last = lastDay(e)
+    if (s < day) return last > day ? "all day" : "until " + R.time(e.end.slice(11, 16))
+    const t = R.time(e.start.slice(11, 16))
+    return withEnd && last === day ? t + " – " + R.time(e.end.slice(11, 16)) : t
+}
