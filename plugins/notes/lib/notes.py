@@ -15,13 +15,15 @@ terminal and Claude's tools (mcp.json), and the three changes Claude can make, e
                                                  stdin is the text of that MD5, all of it
     notes.py discard [--json] --expect MD5 NOTE  a new note the window's editor left empty, deleted for good: only
                                                  while it is still the text of that MD5, else exit status 3
+    notes.py rename [--json] [--] NOTE TITLE     a new title: its heading, and its file named after it (rename.py)
+    notes.py unrename --expect MD5 [--] NOTE OLD_ID OLD_HEADING
+                                                 rename's undo, while the note is still the text of that MD5
     notes.py trash [--json] NOTE                 to the desktop's trash (`nightdrive files trash`), where Files puts
                                                  it back; nothing is deleted for good
 
 Without --json they print text for a terminal. An error goes to stderr in plain words, with exit status 1.
 """
 
-import hashlib
 import json
 import os
 import tempfile
@@ -29,6 +31,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import rename as renaming
 import store
 from store import NoteError
 
@@ -101,9 +104,7 @@ def append(who, text):
     return dict(store.brief(p), size_before=before, size_after=p.stat().st_size)
 
 
-def digest(text):
-    """The MD5 of a note's text as the window has it (Qt.md5 of the string: its UTF-8), for write's --expect."""
-    return hashlib.md5(text.encode("utf-8")).hexdigest()
+digest = store.digest
 
 
 def write(nid, text, expect=None, md5=None):
@@ -238,6 +239,28 @@ def hashed(rest):
     return " ".join(plain), hashes
 
 
+def renamed(command, rest, as_json):
+    """rename's and unrename's words: whole arguments, not joined as the others' are, since a note and its title both
+    may have spaces. A -- before them lets either begin with a dash."""
+    words = [a for a in rest if a != "--json"]
+    expect = None
+    if command == "unrename" and "--expect" in words[:words.index("--") if "--" in words else len(words)]:
+        i = words.index("--expect")
+        expect = words[i + 1] if i + 1 < len(words) else None
+        del words[i:i + 2]
+    if words[:1] == ["--"]:
+        words = words[1:]
+    if command == "rename":
+        if len(words) != 2:
+            raise NoteError("Usage: notes rename NOTE TITLE (quote each one that has spaces)")
+        output(renaming.rename(*words), as_json,
+               lambda n: f"Renamed {n['old_id']} to {n['id']}" if n["renamed"] else f"{n['id']} has that title already")
+    else:
+        if len(words) != 3 or not expect:
+            raise NoteError("Usage: notes unrename --expect MD5 NOTE OLD_ID OLD_HEADING (as rename --json gives them)")
+        output(renaming.unrename(*words, expect), as_json, lambda n: f"Renamed it back to {n['id']}")
+
+
 def main(argv):
     if not argv:
         sys.exit(__doc__)
@@ -249,6 +272,8 @@ def main(argv):
         if not arg:
             raise NoteError("Usage: notes search WORDS…")
         output(search(arg, limit or SEARCH_LIMIT), as_json, text_search)
+    elif command in ("rename", "unrename"):
+        renamed(command, rest, as_json)
     elif not arg:
         raise NoteError(f"Usage: notes {command} {'TITLE' if command == 'create' else 'NOTE'} (see notes help)")
     elif command == "read":

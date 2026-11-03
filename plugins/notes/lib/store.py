@@ -7,6 +7,7 @@ files count, and nothing hidden (no part of the path starts with a dot): Apostro
 id can't lead out of the folder.
 """
 
+import hashlib
 import os
 import re
 from datetime import datetime
@@ -124,19 +125,27 @@ def brief(path, text=None):
             "excerpt": excerpt(text), "size": path.stat().st_size}
 
 
-def new_path(title):
-    """Where a new note titled so goes: its title as the file name ("Shopping list.md"), with a number after it when
-    that is taken ("Shopping list 2.md")."""
+def new_path(title, folder=None, keep=None):
+    """Where a note titled so goes, in folder (the notes' own by default): its title as the file name ("Shopping
+    list.md"), with a number after it when that is taken ("Shopping list 2.md"). keep is a renamed note's own file,
+    which doesn't count as taken: its name is free for it."""
     name = re.sub(r"[/\\\x00-\x1f]", " ", title)
     # No leading dot once the spaces are squeezed: "../.bashrc" would be a hidden ".bashrc.md" that Notes doesn't list
     # and its undo can't trash (#1863)
     name = re.sub(r"^[\s.]+", "", re.sub(r"\s+", " ", name))[:NAME_MAX].strip() or "Note"
-    path, n = ROOT / f"{name}{SUFFIX}", 2
+    folder = ROOT if folder is None else folder
+    path, n = folder / f"{name}{SUFFIX}", 2
     # lexists, not exists: a dangling symlink there is taken too, so writing the new note can't follow it out of the
     # folder (create() opens with "x" as well, which refuses any name that is there by then)
-    while os.path.lexists(path):
-        path, n = ROOT / f"{name} {n}{SUFFIX}", n + 1
+    while os.path.lexists(path) and path != keep:
+        path, n = folder / f"{name} {n}{SUFFIX}", n + 1
     return path
+
+
+def digest(text):
+    """The MD5 of a note's text as the window has it (Qt.md5 of the string: its UTF-8), for the checks that a note is
+    still what the window or an undo last saw."""
+    return hashlib.md5(text.encode("utf-8")).hexdigest()
 
 
 def home(path):

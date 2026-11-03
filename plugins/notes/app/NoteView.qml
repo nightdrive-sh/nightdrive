@@ -13,6 +13,8 @@ Item {
     property bool onePane: false
     signal back()
     signal newNote()                           // New: the window asks for its title (shell.qml)
+    signal rename()                            // Rename and Trash: shell.qml's, which wait for a save running
+    signal trash()
     signal message(string text, bool danger)   // for the window's toast
     readonly property var note: store.note
     readonly property int margin: width < 520 ? 24 : 40
@@ -104,6 +106,16 @@ Item {
                 c: root.c; glyph: "plus"; label: editButton.narrow ? "" : "New"
                 tip: "New note"; keys: "n"
                 onClicked: root.newNote()
+            }
+            AppIconButton {
+                visible: !root.editing && !!root.note
+                c: root.c; glyph: "text-cursor-input"; tip: "Rename"; keys: "F2  r"
+                onClicked: root.rename()
+            }
+            AppIconButton {
+                visible: !root.editing && !!root.note
+                c: root.c; glyph: "trash-2"; tip: "Move to the trash"; keys: "Del"
+                onClicked: root.trash()
             }
             AppIconButton {
                 visible: !root.editing && !!root.note

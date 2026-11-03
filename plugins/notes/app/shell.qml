@@ -20,6 +20,7 @@ ShellRoot {
 
         AppLook { id: c }
         Store { id: store }
+        NoteActions { id: actions; command: store.command }
         KeyHelp { id: keyHelp }
         readonly property QtObject look: c
 
@@ -53,10 +54,46 @@ ShellRoot {
                 message => toast.show(message, { danger: true }))
         }
 
+        // Rename (F2, r) and Trash (Delete, ⌘⌫) act on the file, so they wait for what was written to be saved: the
+        // editor is left first (with a conflict unsettled, not at all), and whenSaved runs them once no save is running
+        property var afterSave: null
+        function whenSaved(fn) { if (view.busy) afterSave = fn; else fn() }
+        function failed(message) { toast.show(message, { danger: true }) }
+        function renameNote() {
+            if (!view.leave() || !store.note) return
+            const id = store.note.id, title = store.note.title
+            namePanel.ask("New title", title, t => {
+                if (t && t !== title) win.whenSaved(() => actions.rename(id, t, r => {
+                    store.follow(r.id)
+                    if (r.renamed) toast.show("Renamed to " + r.title, { action: "Undo", run: () => win.unrename(r) })
+                }, win.failed))
+            })
+        }
+        function unrename(r) { actions.unrename(r, back => store.follow(back.id), win.failed) }
+        // No question first: the trash keeps it, and the toast's Undo (⌘Z) puts it back
+        function trashNote() {
+            if (!view.leave() || !store.note) return
+            const id = store.note.id
+            win.whenSaved(() => actions.trash(id, r => {
+                store.forget(id)
+                toast.show("Moved " + r.title + " to the trash", { action: "Undo", run: () =>
+                    actions.restore(r.names, () => store.follow(id), win.failed) })
+            }, win.failed))
+        }
+
         // What was written is saved before Notes goes: the last keys' save, and any still running
         property bool quitting: false
         function quit() { view.flush(true); quitting = true; if (!view.busy) Qt.quit() }
-        Connections { target: view; function onBusyChanged() { if (win.quitting && !view.busy) Qt.quit() } }
+        Connections {
+            target: view
+            function onBusyChanged() {
+                if (view.busy) return
+                if (win.quitting) Qt.quit()
+                const fn = win.afterSave
+                win.afterSave = null
+                if (fn) fn()
+            }
+        }
         // A save that never answers (notes.py stuck): gone after a moment all the same; --md5 keeps a cut one out
         Timer { running: win.quitting; interval: 5000; onTriggered: Qt.quit() }
 
@@ -70,6 +107,7 @@ ShellRoot {
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: win.quit() }
         Shortcut { sequences: ["Ctrl+N", "Meta+N"]; enabled: !namePanel.visible; onActivated: win.newNote("") }
+        Shortcut { sequence: "F2"; enabled: !namePanel.visible; onActivated: win.renameNote() }
 
         RowLayout {
             id: content
@@ -103,6 +141,8 @@ ShellRoot {
                 focus: true
                 onBack: if (view.leave()) win.listOpen = true
                 onNewNote: win.newNote("")
+                onRename: win.renameNote()
+                onTrash: win.trashNote()
                 onMessage: (text, danger) => toast.show(text, { danger: danger })
 
                 Keys.onPressed: e => {
@@ -116,6 +156,10 @@ ShellRoot {
                     else if (k === Qt.Key_Home && store.notes.length) win.pick(store.notes[0].id)
                     else if (k === Qt.Key_End && store.notes.length) win.pick(store.notes[store.notes.length - 1].id)
                     else if (e.text === "n") win.newNote("")
+                    else if (e.text === "r") win.renameNote()
+                    else if (k === Qt.Key_Delete || (k === Qt.Key_Backspace && (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier))))
+                        win.trashNote()
+                    else if (k === Qt.Key_Z && (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)) && toast.act()) {}
                     else if (k === Qt.Key_Space) view.scroll((shift ? -1 : 1) * (view.height - 120))
                     else if (k === Qt.Key_PageDown) view.scroll(view.height - 120)
                     else if (k === Qt.Key_PageUp) view.scroll(-(view.height - 120))

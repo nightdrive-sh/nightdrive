@@ -92,6 +92,25 @@
       "area": "notes"
     },
     {
+      "name": "notes_rename",
+      "title": "Rename a note",
+      "description": "Gives one of the user's notes a new title: its first heading (# …) becomes the title, its level kept (a note without one gets \"# title\" at the top), and the file is named after it in the same folder (a number added when that name is taken), so its id changes: the new one is in the answer. note is an id or a title. Nothing else in the note changes. The user is told and can undo it while the note hasn't been edited since.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"},
+          "title": {"type": "string", "title": "New title", "description": "The note's new title, also its file name", "minLength": 1}
+        },
+        "required": ["note", "title"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "rename", "--json", "--", "{note}", "{title}"],
+      "undo": ["notes", "unrename", "--json", "--expect", "{md5}", "--", "{id}", "{old_id}", "{old_head}"],
+      "notice": "Renamed the note to {title}",
+      "class": "change",
+      "area": "notes"
+    },
+    {
       "name": "notes_trash",
       "title": "Move a note to the trash",
       "description": "Moves one of the user's notes to the desktop's trash, where Files can put it back; nothing is deleted for good (there is no tool for that). note is an id or a title. The user is told and can undo it.",

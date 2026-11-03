@@ -65,6 +65,18 @@ Item {
         }
     }
 
+    // Trashed here: out of the list at once, the note below it (else above) shown instead
+    function forget(id) {
+        const i = notes.findIndex(n => n.id === id)
+        if (i < 0) return
+        notes = notes.filter(n => n.id !== id)
+        if (picked === id) picked = notes.length ? notes[Math.min(i, notes.length - 1)].id : ""
+        raw = ""
+        refresh()
+    }
+    // Renamed or put back here: shown as soon as the list has it (the next read, at once)
+    function follow(id) { picked = id; raw = ""; refresh() }
+
     function step(d) { const n = notes.length; if (n) picked = notes[Math.max(0, Math.min(n - 1, index + d))].id }
 
     Process {

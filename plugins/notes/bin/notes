@@ -65,6 +65,7 @@ Usage: notes [command]
   append NOTE      the text from stdin added to the end of NOTE (--json)
   write NOTE       NOTE's whole text replaced by stdin (--json; --expect MD5: only while it is still that text,
                    else exit status 3; --md5 MD5: only if stdin is that text, whole), as the window's editor saves
+  rename NOTE TITLE  a new title: NOTE's heading, and its file named after it (--json)
   trash NOTE       NOTE to the trash, where Files puts it back (--json)
   restore NAME…    back from the trash (the names trash --json gives)
   install          Notes among the desktop's apps (the installer), and ~/Notes
@@ -81,7 +82,7 @@ case ${1:-open} in
   show)      id=$(python3 "$NOTES_PY" read --json "${*:2}" | jq -r .id) || exit 1; open_ready; ipc pick "$id" ;;
   edit)      edit "${@:2}" ;;
   list|search|read) python3 "$NOTES_PY" "$@" ;;
-  create|append|unappend|write|discard|trash) python3 "$NOTES_PY" "$@"; changed ;;
+  create|append|unappend|write|discard|rename|unrename|trash) python3 "$NOTES_PY" "$@"; changed ;;
   restore)   "$APP_DIR/../../bin/nightdrive" files restore "${@:2}"; changed ;;   # trash's undo: back from the trash
   install)   install_app ;;
   uninstall) uninstall_app ;;
