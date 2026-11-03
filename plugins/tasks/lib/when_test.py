@@ -39,6 +39,30 @@ class Parse(unittest.TestCase):
                 when.parse(text, NOW)
 
 
+class Label(unittest.TestCase):
+    """The region's way (Settings › Region), with its entry given rather than read from the user's locale.conf"""
+    FI = {"day": "d.M.", "short": "d.M.yyyy", "time": "H:mm"}
+    US = {"day": "M/d", "short": "M/d/yyyy", "time": "h:mm AP"}
+
+    def test_finland(self):
+        self.assertEqual(when.label(datetime(2026, 11, 2, 15, 0), NOW, self.FI), "Today 15:00")
+        self.assertEqual(when.label(date(2026, 11, 3), NOW, self.FI), "Tomorrow")
+        self.assertEqual(when.label(date(2026, 11, 1), NOW, self.FI), "Yesterday")
+        self.assertEqual(when.label(date(2026, 11, 6), NOW, self.FI), "Fri 6.11.")
+        self.assertEqual(when.label(datetime(2026, 11, 20, 9, 5), NOW, self.FI), "20.11. 9:05")
+        self.assertEqual(when.label(date(2027, 1, 4), NOW, self.FI), "4.1.2027")
+
+    def test_us(self):
+        self.assertEqual(when.label(datetime(2026, 11, 2, 15, 0), NOW, self.US), "Today 3:00 PM")
+        self.assertEqual(when.label(datetime(2026, 11, 3, 0, 30), NOW, self.US), "Tomorrow 12:30 AM")
+        self.assertEqual(when.label(date(2026, 11, 6), NOW, self.US), "Fri 11/6")
+        self.assertEqual(when.label(datetime(2026, 11, 20, 12, 0), NOW, self.US), "11/20 12:00 PM")
+        self.assertEqual(when.label(date(2027, 1, 4), NOW, self.US), "1/4/2027")
+
+    def test_none(self):
+        self.assertEqual(when.label(None, NOW, self.US), "")
+
+
 class At(unittest.TestCase):
     def test_fields(self):
         self.assertIsNone(when.at("", "", NOW))

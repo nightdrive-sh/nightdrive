@@ -6,11 +6,14 @@
     at(day, time, now) -> … | None          the window's two fields, either may be empty
     later(due, now) -> date | datetime      what the notification's Later moves a task to
     due_at(due) -> datetime                 when a due task is notified: a date at MORNING
-    label(due, now) -> str                  "Today 14:00", "Tomorrow", "Fri 30 Oct", "3 Nov 2027"
+    label(due, now, r) -> str               "Today 14:00", "Tomorrow", "Fri 6.11.", "3.11.2027": the region's way
+                                            (region.py; r for tests), "Today 2:00 PM", "Fri 11/6" in the US
 """
 
 import re
 from datetime import date, datetime, time, timedelta
+
+import region
 
 MORNING = time(9, 0)   # an all-day task's notification, on its day
 LATER = timedelta(hours=1)   # Later on a task with a time; one with only a date goes to the next day
@@ -106,10 +109,11 @@ def later(due, now=None):
     return now.date() + timedelta(days=1)
 
 
-def label(due, now=None):
+def label(due, now=None, r=None):
     if due is None:
         return ""
     now = now or datetime.now()
+    r = r or region.current()
     day = due.date() if isinstance(due, datetime) else due
     diff = (day - now.date()).days
     if diff == 0:
@@ -119,7 +123,7 @@ def label(due, now=None):
     elif diff == -1:
         text = "Yesterday"
     elif 1 < diff < 7:
-        text = day.strftime("%a %-d %b")
+        text = region.fmt(day, "ddd " + r["day"])   # this week's: "Fri 6.11."
     else:
-        text = day.strftime("%-d %b" if day.year == now.year else "%-d %b %Y")
-    return f"{text} {due:%H:%M}" if isinstance(due, datetime) else text
+        text = region.fmt(day, r["day"] if day.year == now.year else r["short"])
+    return f"{text} {region.fmt(due, r['time'])}" if isinstance(due, datetime) else text

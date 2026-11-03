@@ -91,13 +91,34 @@ ShellRoot {
         Component.onCompleted: { load(); list.forceActiveFocus() }
         // Today moves on with the clock, and a sync or another app may change the files: read them again each minute
         Timer { interval: 60000; running: true; repeat: true; onTriggered: win.load() }
+        // Scheduled's headings are worked out with the rows: a change of region writes them again at once
+        Connections { target: Regional; function onRegionChanged() { win.filter(win.shown[win.current] ? win.shown[win.current].id : "", win.current) } }
 
-        function dayOf(iso) { return Qt.formatDate(new Date(iso.slice(0, 10) + "T12:00"), "d MMM") }
+        // When a task is due, the region's way (Settings › Region, the kit's Regional), as lib/when.py's label writes it
+        // for the notifications and Claude: "Today 14:00", "Tomorrow", "Fri 6.11." this week, "20.11.", "4.1.2027";
+        // "Today 2:00 PM", "Fri 11/6" in the US. Ahead, not behind, so not Regional.relative (a list's "when" it was).
+        // dayOnly leaves the time out: Scheduled's headings
+        function dueLabel(due, dayOnly) {
+            if (!due) return ""
+            const day = due.slice(0, 10)
+            const d = new Date(day + "T12:00"), now = new Date((today || Regional.iso(new Date())) + "T12:00")
+            const diff = Math.round((d - now) / 86400000)
+            const text = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : diff === -1 ? "Yesterday"
+                       : diff > 1 && diff < 7 ? Regional.dayName(d.getDay(), true) + " " + Regional.format(day, "day")
+                       : Regional.format(day, d.getFullYear() === now.getFullYear() ? "day" : "short")
+            return due.length > 10 && !dayOnly ? text + " " + Regional.time(due.slice(11, 16)) : text
+        }
+        // When it was ticked off, as Mail's and Notes' lists say when: "Done 14:30", "Done yesterday", "Done Tue"
+        function doneLabel(completed) {
+            if (!completed) return "Done"
+            const when = Regional.relative(completed)
+            return "Done " + (when === "Yesterday" ? "yesterday" : when)
+        }
         // The heading a row comes under: late ones first, then by day in Scheduled
         function sectionOf(t) {
             if (view.kind === "today" || view.kind === "scheduled") {
                 if (t.overdue) return "Overdue"
-                return view.kind === "today" ? "Today" : t.due_label.replace(/ \d\d:\d\d$/, "")
+                return view.kind === "today" ? "Today" : dueLabel(t.due, true)
             }
             return ""
         }
@@ -335,13 +356,13 @@ ShellRoot {
             onAdded: task => {
                 win.keepNext = task.id
                 win.load()
-                win.say(win.inView(task) ? "Added" : "Added to " + task.list + (task.due ? ", " + task.due_label : ""))
+                win.say(win.inView(task) ? "Added" : "Added to " + task.list + (task.due ? ", " + win.dueLabel(task.due) : ""))
             }
             // Out of the view after the change (another list, a later day): where it went, and the row in its place
             onEdited: task => {
                 win.keepNext = win.inView(task) ? task.id : ""
                 win.load()
-                win.say(win.inView(task) ? "Saved" : "Moved to " + task.list + (task.due ? ", " + task.due_label : ""))
+                win.say(win.inView(task) ? "Saved" : "Moved to " + task.list + (task.due ? ", " + win.dueLabel(task.due) : ""))
             }
         }
         // Last, over the panel too

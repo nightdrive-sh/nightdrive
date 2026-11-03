@@ -21,7 +21,7 @@ Claude › Access › Tasks). Lists in the window come next.
 | ⌘R | Read the tasks again |
 
 - A new task's due is a day and a time, either may stay empty: `today`, `fri`, `+3d` or a date the way Settings › Region writes it (`5.11.2026`, `11/5/2026`), and `9:30`, `930` or `14`. A click into the day, its calendar glyph or ↓ opens a month to pick from: ← → a day, ↑ ↓ a week, PgUp PgDn a month, ⏎ picks, Esc closes it. The panel says how it reads them as you type. A new task goes in the list you're looking at, else the one you used last. In an edit, another list moves the task there, and only what you changed is written: what another app set (a low priority, its own fields) stays.
-- Today has what is due today and what is late (in red); Scheduled every task with a date, by day; Done the last 100 done.
+- Today has what is due today and what is late (in red); Scheduled every task with a date, by day; Done the last 100 done. The window, the notifications and `tasks list` write when a task is due the way Settings › Region does (`Fri 6.11. 9:30`; `Fri 11/6 9:30 AM` in the US).
 - A task due on a day without a time is notified at 9:00 that day. Later moves it on an hour, or a day without a time, and it comes again then. Done ticks it off.
 - Ask Claude: "remind me to call the dentist tomorrow at 10", "what's due this week?", "move the bread to Saturday". Every change Claude makes shows a notification with Undo. A code, PIN or password in a task reaches Claude hidden (`[code hidden]`), unless Access › Tasks › *Codes, card numbers and passwords* is on.
 

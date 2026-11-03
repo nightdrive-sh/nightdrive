@@ -59,7 +59,7 @@ AppRow {
                 id: due
                 textFormat: Text.PlainText
                 visible: text !== ""
-                text: row.task.done ? (row.task.completed ? "Done " + row.app.dayOf(row.task.completed) : "Done") : row.task.due_label
+                text: row.task.done ? row.app.doneLabel(row.task.completed) : row.app.dueLabel(row.task.due)
                 font.family: row.c.font; font.pixelSize: 11
                 color: row.task.overdue ? row.c.danger : row.c.dim
             }

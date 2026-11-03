@@ -17,7 +17,7 @@ AppPanel {
     property string error: ""
     property bool busy: false
     property string lastList: ""        // the list used last, picked again when the view isn't a list
-    property string reading: ""         // the due as cli.py reads the two fields: "Fri 6 Nov 09:30"
+    property string reading: ""         // the due as cli.py reads the two fields, the region's way: "Fri 6.11. 9:30"
     property bool unreadable: false
     // With no list yet, the one the first task makes (store.DEFAULT)
     readonly property var options: app.lists.length ? app.lists.map(l => ({ id: l.id, name: l.name })) : [{ id: "", name: "Tasks" }]
@@ -71,7 +71,8 @@ AppPanel {
             let d = null
             if (code === 0) try { d = JSON.parse(readOut.text) } catch (e) {}
             root.unreadable = !d
-            root.reading = d ? (d.label ? "Due " + d.label : "No due date") : readErr.text.trim().split("\n").pop()
+            // cli.py reads, the window writes: the same label as the task's row will show (shell.qml dueLabel)
+            root.reading = d ? (d.due ? "Due " + root.app.dueLabel(d.due) : "No due date") : readErr.text.trim().split("\n").pop()
         }
     }
 
