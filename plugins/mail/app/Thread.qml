@@ -343,6 +343,7 @@ Flickable {
                         }
                         Text {
                             visible: !head.wide
+                            width: parent.width; elide: Text.ElideRight
                             text: app.fullDate(modelData.timestamp); color: c.faint; font.family: c.font; font.pixelSize: 12
                         }
                     }

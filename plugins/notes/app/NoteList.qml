@@ -18,13 +18,8 @@ AppSidebar {
         onClicked: root.newNote()
     }
 
-    // "14:05" today, "Tue" this week, "28 Oct" this year, else "28 Oct 2025"
-    function when(iso) {
-        const d = new Date(iso), now = new Date()
-        if (d.toDateString() === now.toDateString()) return Qt.formatTime(d, "HH:mm")
-        if (now - d < 6 * 86400000) return Qt.formatDate(d, "ddd")
-        return Qt.formatDate(d, d.getFullYear() === now.getFullYear() ? "d MMM" : "d MMM yyyy")
-    }
+    // The region's way (Settings › Region): "14:05" today, Yesterday, "Tue" this week, "28.10." this year, else the whole date
+    function when(iso) { return Regional.relative(new Date(iso)) }
 
     ListView {
         id: list

@@ -10,6 +10,7 @@ import "Dates.js" as D
 // Dates.js; these are the same functions with the current region filled in:
 //   Regional.format(dateOrIso, "short" | "day" | "medium" | "long" | "time" | "month")
 //   Regional.time("14:30")             2:30 PM in the US
+//   Regional.relative(dateOrIso)       a list's "when": 9:30 today, Yesterday, Tue, 28.10., 28.10.2025
 //   Regional.range(a, b, short)        "2 – 8 Nov 2026", "Nov 2 – 8, 2026"
 //   Regional.parse("5.11.", baseIso)   "2026-11-05", "" when it isn't a day
 //   Regional.parseTime("2:30 pm")      "14:30", "" when it isn't a time
@@ -43,6 +44,7 @@ Singleton {
 
     function format(v, kind) { return D.format(v, kind, region) }
     function time(hhmm) { return D.time(hhmm, region) }
+    function relative(v) { return D.relative(v, region) }
     function range(a, b, short) { return D.range(a, b, region, short) }
     function parse(text, base) { return D.parse(text, region, base) }
     function parseTime(text) { return D.parseTime(text) }

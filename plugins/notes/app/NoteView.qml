@@ -78,7 +78,7 @@ Item {
                     elide: Text.ElideRight
                     textFormat: Text.PlainText
                     text: !root.note ? "" : root.editing ? editor.status
-                        : Qt.formatDateTime(new Date(root.note.modified), "d MMM yyyy  HH:mm")
+                        : Regional.format(new Date(root.note.modified), "medium") + "  " + Regional.format(new Date(root.note.modified), "time")
                     font.family: root.c.font; font.pixelSize: 11
                     color: editor.conflicted ? root.c.danger : root.c.faint
                 }

@@ -119,6 +119,21 @@ function range(a, b, r, short) {
     return us ? pattern(x, "MMM d") + " – " + pattern(y, "MMM d" + yr) : pattern(x, "d MMM") + " – " + pattern(y, "d MMM" + yr)
 }
 
+// When something happened, as a list shows it beside a mail or a note: the time today ("9:30", "2:30 PM"), Yesterday,
+// the weekday within the week ("Tue"), the day this year ("28.10.", "10/28"), else the whole date ("28.10.2025").
+// By calendar days, not hours, so last night at 23:50 is Yesterday at 00:10. now is for tests; the apps leave it out
+function relative(v, r, now) {
+    const d = toDate(v)
+    if (!d) return ""
+    const n = now || new Date()
+    const days = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate())
+                             - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000)
+    if (days === 0) return pattern(d, r ? r.time : "HH:mm")
+    if (days === 1) return "Yesterday"
+    if (days > 1 && days < 7) return dayName(d.getDay(), true)
+    return format(d, d.getFullYear() === n.getFullYear() ? "day" : "short", r)
+}
+
 // What a field's hint says to type: "5.11.2026", "11/5/2026"
 function example(r) { return format(new Date(2026, 10, 5), "short", r) }
 

@@ -346,14 +346,12 @@ ShellRoot {
         function pickFolder(i, stay) { folder = i; search.text = ""; reload(false); if (!stay) panes.pane = "list"; list.forceActiveFocus() }
         Panes { id: panes; win: win }
 
-        function when(ts) {
-            const d = new Date(ts * 1000), now = new Date()
-            if (d.toDateString() === now.toDateString()) return Qt.formatTime(d, "HH:mm")
-            if (now - d < 6 * 86400000) return Qt.formatDate(d, "ddd")
-            if (d.getFullYear() === now.getFullYear()) return Qt.formatDate(d, "d MMM")
-            return Qt.formatDate(d, "d MMM yyyy")
+        // The region's way (Settings › Region): 9:30 today, Yesterday, Tue, 28.10.; in full in the read view
+        function when(ts) { return Regional.relative(new Date(ts * 1000)) }
+        function fullDate(ts) {
+            const d = new Date(ts * 1000)
+            return Regional.format(d, "long") + ", " + Regional.format(d, "time")
         }
-        function fullDate(ts) { return Qt.formatDateTime(new Date(ts * 1000), "ddd d MMM yyyy, HH:mm") }
         // A sender's name and address (sender.js: a name may hold text that looks like a tag)
         function name(from) { return Sender.name(from) }
         function address(from) { return Sender.address(from) }
