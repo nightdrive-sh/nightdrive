@@ -12,6 +12,8 @@ import QtQuick
 //
 // A note made here (New) and left empty, its heading alone or nothing at all, is deleted when the editor leaves it
 // rather than kept as clutter in the folder: by `notes discard`, only while the file is still what the editor last saw.
+// Any other note left says so (wroteIn), with the title it had when writing began: the window then names its file
+// after the title it has now, if it was named after that one (`notes refile`): a new note is "Untitled.md" until then.
 Item {
     id: root
     required property QtObject c
@@ -19,8 +21,10 @@ Item {
     required property int margin
     signal done()                              // Esc: back to reading
     signal message(string text, bool danger)   // for the window's toast
+    signal wroteIn(string id, string was)      // a note written in, left and saved: was is its title at begin()
 
     property string noteId: ""                 // the note being written, fixed while the editor is open
+    property string was: ""                    // its title when writing began
     property string base: ""
     property bool conflicted: false
     readonly property bool open: noteId !== ""
@@ -28,21 +32,29 @@ Item {
     readonly property bool busy: saver.busy
     property string fresh: ""                  // a new note's text as notes create made it; "" for any other note
     readonly property bool blankNew: open && fresh !== "" && (area.text.trim() === "" || area.text.trim() === fresh.trim())
+    // The title as it is being written, for the header: the first line's heading
+    readonly property string heading: {
+        const m = area.text.match(/^\s*#{1,6}[ \t]+(.*?)[ \t#]*(\n|$)/)
+        return m ? m[1] : ""
+    }
     readonly property string status: conflicted ? "Changed elsewhere" : blankNew ? "New: kept once you write in it"
         : saver.busy ? "Saving…" : dirty ? "Edited" : "Saved"
 
     readonly property int saveDelay: 800       // ms after the last key: soon enough that little is ever unsaved
 
-    // isNew: made by New just now, so the cursor goes below its heading, and it goes again if it is left empty
-    function begin(id, text, isNew) {
+    // isNew: made by New just now, so the cursor goes after its "# " (its title to write) or below its heading, and
+    // the note goes again if it is left empty
+    function begin(id, text, isNew, title) {
         noteId = id
+        was = title
         base = text
         fresh = isNew ? text : ""
         conflicted = false
         area.text = text
         // At the end, past the last newline: a note is mostly added to, and the title is at its top. A new one's is
-        // all there is, so its line below.
-        area.cursorPosition = isNew ? text.length : text.replace(/\s+$/, "").length
+        // all there is, so its line below; or, still to be written, after its "# ".
+        const first = text.split("\n")[0]
+        area.cursorPosition = !isNew ? text.replace(/\s+$/, "").length : /^#+\s*$/.test(first) ? first.length : text.length
         area.forceActiveFocus()
     }
     // closing: the window is going, so text that can't be saved into its note goes into a note of its own
@@ -55,7 +67,12 @@ Item {
         else if (dirty && !conflicted) saver.save(noteId, area.text, base)
     }
     function aside() { saver.keepAside(noteId, store.note ? store.note.title : noteId, area.text) }
-    function end() { if (blankNew) discard(); else flush(); noteId = ""; fresh = ""; conflicted = false }
+    // refile false: the window renames or trashes the note next, so its file isn't named after its title first
+    function end(refile) {
+        if (blankNew) discard()
+        else { flush(); if (refile !== false) wroteIn(noteId, was) }
+        noteId = ""; fresh = ""; conflicted = false
+    }
     // Out of the list at once; the list read again once the file is gone, or kept (saved elsewhere meanwhile)
     function discard() { saver.discard(noteId, base); store.drop(noteId) }
 

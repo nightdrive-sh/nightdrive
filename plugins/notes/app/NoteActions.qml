@@ -8,19 +8,24 @@ import Quickshell.Io
 Item {
     id: root
     required property string command          // the plugin's bin/notes, by its path
-    readonly property bool running: job.running
+    // From run() until its answer has been handed on: the window's next change (shell.qml's queue) waits for then()
+    // to have run, which job.running alone doesn't say
+    property bool running: false
 
     function rename(id, title, then, failed) { run(["rename", "--json", "--", id, title], then, failed) }
     // r: rename's answer, which holds what puts it back
     function unrename(r, then, failed) {
         run(["unrename", "--json", "--expect", r.md5, "--", r.id, r.old_id, r.old_head], then, failed)
     }
+    // The file named after the note's title, if it was named after was (a note left in the editor)
+    function refile(id, was, then, failed) { run(["refile", "--json", "--", id, was], then, failed) }
     function trash(id, then, failed) { run(["trash", "--json", id], then, failed) }
     // names: trash's answer's names in the trash. restore prints no JSON: then gets null
     function restore(names, then, failed) { run(["restore", "--"].concat(names), then, failed, true) }
 
     function run(args, then, failed, plain) {
-        if (job.running) return
+        if (running) return
+        running = true
         job.then = then
         job.failed = failed
         job.plain = !!plain
@@ -39,8 +44,12 @@ Item {
             let answer = null
             if (code === 0 && !plain) try { answer = JSON.parse(out.text) } catch (e) { code = -1 }
             // The last line: notes.py's message, after anything the shell printed on the way
-            if (code !== 0) failed(err.text.trim().split("\n").pop() || "That didn't work (notes log has more).")
-            else then(answer)
+            try {
+                if (code !== 0) failed(err.text.trim().split("\n").pop() || "That didn't work (notes log has more).")
+                else then(answer)
+            } finally {
+                root.running = false
+            }
         }
     }
 }

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """A note's new title (#2014): `python3 plugins/notes/lib/rename_test.py`. The heading and the file name follow it, in
 the note's own folder, never over another note; unrename puts back exactly what was there, and only while the note is
-still what rename left."""
+still what rename left. refile (#2049): the file follows a title changed in the window, when it was named after the
+old one."""
 
 import json
 import os
@@ -14,7 +15,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
 
-class Rename(unittest.TestCase):
+class Notes(unittest.TestCase):
+    """A folder of notes of its own for each test, and the notes command run on it."""
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.notes = Path(self.tmp.name) / "Notes"
@@ -41,6 +43,8 @@ class Rename(unittest.TestCase):
         (self.notes / name).write_text(text)
         return text
 
+
+class Rename(Notes):
     def test_heading_and_file_follow(self):
         before = self.note("Work/Plan.md", "\n## Plan ##\nsteps\n")
         r = self.ok("rename", "--json", "Work/Plan.md", "Next  year")
@@ -106,6 +110,44 @@ class Rename(unittest.TestCase):
         self.note("A.md", "# A\n")
         self.assertEqual(self.run_notes("rename", "A.md", "  ").returncode, 1)
         self.assertEqual((self.notes / "A.md").read_text(), "# A\n")
+
+
+class Refile(Notes):
+    """A title changed in the window (#2049): the file follows it when it was named after the old one."""
+
+    def test_new_note_named_by_its_heading(self):
+        r = self.ok("create", "--json", "--untitled")
+        self.assertEqual((r["id"], r["text"]), ("Untitled.md", "# \n"))
+        self.note("Untitled.md", "# Shopping\nmilk\n")
+        r = self.ok("refile", "--json", "--", "Untitled.md", "Untitled")
+        self.assertEqual((r["id"], r["renamed"]), ("Shopping.md", True))
+        self.assertEqual((self.notes / "Shopping.md").read_text(), "# Shopping\nmilk\n")
+        self.assertFalse((self.notes / "Untitled.md").exists())
+
+    def test_second_untitled_gets_a_number(self):
+        self.ok("create", "--json", "--untitled")
+        self.assertEqual(self.ok("create", "--json", "--untitled")["id"], "Untitled 2.md")
+
+    def test_follows_a_name_that_was_the_title(self):
+        self.note("Work/Plan 2.md", "# Next year\n")
+        r = self.ok("refile", "--json", "Work/Plan 2.md", "Plan")
+        self.assertEqual(r["id"], "Work/Next year.md")
+
+    def test_keeps_a_name_of_its_own(self):
+        self.note("2026-11-03.md", "# Standup\n")
+        r = self.ok("refile", "--json", "2026-11-03.md", "Monday")
+        self.assertEqual((r["id"], r["renamed"]), ("2026-11-03.md", False))
+
+    def test_no_heading_keeps_its_name(self):
+        self.note("Untitled.md", "just text\n")
+        self.assertFalse(self.ok("refile", "--json", "Untitled.md", "Untitled")["renamed"])
+
+    def test_never_over_another_note(self):
+        self.note("Shopping.md", "# Shopping\nold\n")
+        self.note("Untitled.md", "# Shopping\nnew\n")
+        r = self.ok("refile", "--json", "Untitled.md", "Untitled")
+        self.assertEqual(r["id"], "Shopping 2.md")
+        self.assertEqual((self.notes / "Shopping.md").read_text(), "# Shopping\nold\n")
 
 
 if __name__ == "__main__":

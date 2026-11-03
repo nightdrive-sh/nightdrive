@@ -40,12 +40,13 @@ Item {
         raw = ""
     }
 
-    // New: `notes create --json TITLE`, its stdin empty; then gets the new note, failed notes.py's words
+    // New: `notes create --json TITLE`, its stdin empty, or without a title `--untitled` ("Untitled.md", its text "# ",
+    // the title written in it); then gets the new note, failed notes.py's words
     function create(title, then, failed) {
         if (creator.running) return
         creator.then = then
         creator.failed = failed
-        creator.command = [command, "create", "--json", title]
+        creator.command = [command, "create", "--json", title || "--untitled"]
         creator.running = true
     }
     Process {

@@ -6,6 +6,7 @@ terminal and Claude's tools (mcp.json), and the three changes Claude can make, e
     notes.py search [--json] [--limit N] WORDS…  the notes that have every word, in the title or the text
     notes.py read [--json] NOTE                  one note's whole text: NOTE is an id, or a title
     notes.py create [--json] TITLE               a new note: "# TITLE", then the text on stdin
+    notes.py create [--json] --untitled          a new note to write its title in: "Untitled.md", its text "# "
     notes.py append [--json] NOTE                the text on stdin added to the end of the note
     notes.py unappend NOTE BEFORE AFTER          append's undo: back to BEFORE bytes, if it is still AFTER long
     notes.py write [--json] [--expect MD5] [--md5 MD5] NOTE
@@ -18,6 +19,7 @@ terminal and Claude's tools (mcp.json), and the three changes Claude can make, e
     notes.py rename [--json] [--] NOTE TITLE     a new title: its heading, and its file named after it (rename.py)
     notes.py unrename --expect MD5 [--] NOTE OLD_ID OLD_HEADING
                                                  rename's undo, while the note is still the text of that MD5
+    notes.py refile [--json] [--] NOTE WAS       the file named after the note's title, if it was named after WAS
     notes.py trash [--json] NOTE                 to the desktop's trash (`nightdrive files trash`), where Files puts
                                                  it back; nothing is deleted for good
 
@@ -42,6 +44,7 @@ class Conflict(NoteError):
 
 LIST_LIMIT = 50       # list's default: the recent ones, which is what Claude and a terminal usually want
 SEARCH_LIMIT = 25
+UNTITLED = "Untitled"  # a new note's file name until its heading names it (refile)
 TEXT_MAX = 1_000_000  # characters a create or append takes on stdin (Claude's are at most 100 000: config/mcp/run.py)
 MATCH_LINES = 3       # lines of a found note that show where the words are
 NIGHTDRIVE = Path(__file__).resolve().parents[3] / "bin/nightdrive"   # this checkout's, for its files trash
@@ -71,18 +74,20 @@ def read(who):
     return dict(store.brief(p, text), path=str(p), text=text)
 
 
-def create(title, text):
+def create(title, text, untitled=False):
+    """untitled: the window's New, whose title is written in the note itself: "# " and the cursor after it, the file
+    named after the heading once the window leaves the note (refile)."""
     title = " ".join(title.split())
-    if not title:
+    if not title and not untitled:
         raise NoteError("A new note needs a title.")
     store.ROOT.mkdir(parents=True, exist_ok=True)
     body = text.strip("\n")
     # "x": never onto a file or link that is already there, one made after new_path looked included (then the next name)
     while True:
-        p = store.new_path(title)
+        p = store.new_path(UNTITLED if untitled else title)
         try:
             with open(p, "x", encoding="utf-8") as f:
-                f.write(f"# {title}\n" + (f"\n{body}\n" if body else ""))
+                f.write("# \n" if untitled else f"# {title}\n" + (f"\n{body}\n" if body else ""))
             break
         except FileExistsError:
             continue
@@ -240,7 +245,7 @@ def hashed(rest):
 
 
 def renamed(command, rest, as_json):
-    """rename's and unrename's words: whole arguments, not joined as the others' are, since a note and its title both
+    """rename's, unrename's and refile's words: whole arguments, not joined as the others' are, since a note and its title both
     may have spaces. A -- before them lets either begin with a dash."""
     words = [a for a in rest if a != "--json"]
     expect = None
@@ -250,7 +255,12 @@ def renamed(command, rest, as_json):
         del words[i:i + 2]
     if words[:1] == ["--"]:
         words = words[1:]
-    if command == "rename":
+    if command == "refile":
+        if len(words) != 2:
+            raise NoteError("Usage: notes refile NOTE WAS (WAS: the title the note had, quoted)")
+        output(renaming.refile(*words), as_json,
+               lambda n: f"Renamed {n['old_id']} to {n['id']}" if n["renamed"] else f"{n['id']} keeps its name")
+    elif command == "rename":
         if len(words) != 2:
             raise NoteError("Usage: notes rename NOTE TITLE (quote each one that has spaces)")
         output(renaming.rename(*words), as_json,
@@ -272,8 +282,10 @@ def main(argv):
         if not arg:
             raise NoteError("Usage: notes search WORDS…")
         output(search(arg, limit or SEARCH_LIMIT), as_json, text_search)
-    elif command in ("rename", "unrename"):
+    elif command in ("rename", "unrename", "refile"):
         renamed(command, rest, as_json)
+    elif command == "create" and arg == "--untitled":
+        output(create("", "", untitled=True), as_json, lambda n: f"Created {n['path']}")
     elif not arg:
         raise NoteError(f"Usage: notes {command} {'TITLE' if command == 'create' else 'NOTE'} (see notes help)")
     elif command == "read":

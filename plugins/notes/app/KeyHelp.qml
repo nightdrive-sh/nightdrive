@@ -8,7 +8,7 @@ QtObject {
             ["↑ ↓  j k", "Move"],
             ["Home  End", "The newest, the oldest"],
             ["⏎  e", "Write in it"],
-            ["n  ⌘N", "New note: its title, then write"],
+            ["n  ⌘N", "New note: its title on the first line, then write"],
             ["F2  r", "Rename: its heading and file follow"],
             ["Del  ⌘⌫", "Move to the trash (⌘Z puts it back)"],
             ["⇧⏎", "Open in Apostrophe"],

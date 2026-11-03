@@ -8,7 +8,7 @@ Your notes as Markdown files in `~/Notes`, in a window to read and write them: t
 | --- | --- |
 | `?` | Notes' keys |
 | ↑ ↓ or `j` `k` | Move in the list (`Home` `End`: the newest, the oldest) |
-| `n` or ⌘N | New note: give its title, then write (New in the header too) |
+| `n` or ⌘N | New note: it opens to write in, its title first after `# ` (New in the header too) |
 | F2 or `r` | Rename: the note's heading and its file name follow the new title |
 | `Delete` or ⌘⌫ | Move the note to the trash; Undo (⌘Z) in the notice puts it back |
 | `Enter` or `e` | Write in the note, here in the window (`Esc`: back to reading) |
@@ -19,7 +19,7 @@ Your notes as Markdown files in `~/Notes`, in a window to read and write them: t
 
 - A note is any `.md` file in `~/Notes`, in subfolders too; hidden files and folders are left out. Its title is its first heading (`# …`), else its file name.
 - You write the Markdown as it is in the file; reading shows it formatted.
-- A new note is a file named after its title (`~/Notes/Title.md`) that starts with `# Title`. Left with nothing written in it, it is deleted when you leave it.
+- A note's file is named after its title (`~/Notes/Title.md`). A new one is `Untitled.md` until you leave it; then, and whenever you change the heading of a note whose file name was its title, the file follows the heading. A file you named otherwise keeps its name. A new note left with nothing written in it is deleted.
 - ⇧Enter opens the note in Apostrophe (Install › Recommended), or without it in what opens Markdown here.
 - What another app saves meanwhile (Apostrophe, Claude) shows at once. If it changes the note while you have unsaved text in it, Notes doesn't write over it: Keep mine (⌘S) or Keep theirs. Closed before you pick, what you wrote goes into a new note, "Title (not saved)".
 
@@ -33,7 +33,7 @@ In Settings › Claude › Access, the Notes row lets Claude list, search and re
 | --- | --- |
 | `notes` | Open the window |
 | `notes list`, `notes search WORDS` | The notes, newest first; the ones that have every word (`--json`) |
-| `notes new [TITLE]` | The window on a new note to write in (without TITLE, it asks) |
+| `notes new [TITLE]` | The window on a new note to write in (without TITLE, its title is the first thing you write) |
 | `notes read NOTE`, `notes show NOTE`, `notes edit NOTE` | A note's text; the note in the window; in Apostrophe. NOTE is its file name (`Work/Plan.md`) or its title |
 | `echo TEXT \| notes create TITLE` | A new note, named after its title |
 | `echo TEXT \| notes append NOTE` | The text added to the end of a note |

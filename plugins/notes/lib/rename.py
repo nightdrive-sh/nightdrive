@@ -1,4 +1,5 @@
-"""A note's new title (`notes rename`, the window's Rename and Claude's notes_rename), and its undo (`notes unrename`).
+"""A note's new title (`notes rename`, the window's Rename and Claude's notes_rename), and its undo (`notes unrename`);
+and refile, the file following a title changed in the window.
 
 The title is the note's first heading, so that is what changes: the heading's text, its level kept, or, in a note that
 doesn't start with one, a "# Title" put above it. The file follows the title as a new note's does (store.new_path), in
@@ -124,3 +125,24 @@ def unrename(nid, old_id, old_head, expect):
             raise NoteError(f"There's a note named {old_id} again, so {nid} keeps its name.")
     p.unlink()
     return dict(store.brief(old), restored=True)
+
+
+def refile(nid, was):
+    """The file named after the note's title again, its text untouched (`notes refile`: the window, on leaving a note it
+    wrote in). Only when the file was named after was, the title the note had when the window began writing: a new note
+    ("Untitled.md") or one whose name followed its title. A file named otherwise keeps its name, and so does a note
+    without a heading (its title is then its file name already). The same way as rename: the new name is linked first,
+    then the old one goes, never over another file."""
+    p = movable(nid)
+    title = store.title_of(p)
+    if not store.named_after(p, was) or store.new_path(title, p.parent, keep=p) == p:
+        return dict(store.brief(p), old_id=nid, renamed=False)
+    while True:
+        target = store.new_path(title, p.parent)
+        try:
+            os.link(p, target)
+            break
+        except FileExistsError:     # made meanwhile: the next name
+            continue
+    p.unlink()
+    return dict(store.brief(target), old_id=nid, renamed=True)

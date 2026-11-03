@@ -41,26 +41,40 @@ ShellRoot {
         function pick(id) { if (!view.leave()) return; store.picked = id; listOpen = false; view.home() }
         function step(d) { if (!view.leave()) return; store.step(d); view.home() }
 
-        // New (n, ⌘N, `notes new [TITLE]`): its title asked for unless given, the note made by notes create and written
-        // in at once. The note being written is left first, saved; one left empty on its own goes then (NoteEditor).
+        // New (n, ⌘N, `notes new [TITLE]`): no question first. Without a title the note is "Untitled.md" with "# " in
+        // it and the cursor after it, so its title is the first thing written, and its file is named after it once it
+        // is left (refile). The note being written is left first, saved; one left empty on its own goes then
+        // (NoteEditor).
         function newNote(title) {
             if (!view.leave()) return
-            if (namePanel.visible) namePanel.answer(false)     // `notes new TITLE` while the title was being asked
-            if (title.trim()) makeNote(title)
-            else namePanel.ask("Title of the new note", "", t => { if (t) win.makeNote(t) })
-        }
-        function makeNote(title) {
-            store.create(title, note => { win.listOpen = false; view.home(); view.editNew(note) },
-                message => toast.show(message, { danger: true }))
+            if (namePanel.visible) namePanel.answer(false)     // a rename being asked
+            store.create(title.trim(), note => { win.listOpen = false; view.home(); view.editNew(note) }, win.failed)
         }
 
-        // Rename (F2, r) and Trash (Delete, ⌘⌫) act on the file, so they wait for what was written to be saved: the
-        // editor is left first (with a conflict unsettled, not at all), and whenSaved runs them once no save is running
-        property var afterSave: null
-        function whenSaved(fn) { if (view.busy) afterSave = fn; else fn() }
+        // Rename (F2, r), Trash (Delete, ⌘⌫) and refile act on the file, so they wait for what was written to be saved:
+        // the editor is left first (with a conflict unsettled, not at all), and whenSaved runs them in turn, each once
+        // no save and no change before it is running
+        property var queue: []
+        function whenSaved(fn) { queue.push(fn); next() }
+        function next() {
+            if (view.busy || actions.running) return
+            const fn = queue.shift()
+            if (fn) { fn(); next() }
+            else if (quitting) Qt.quit()
+        }
         function failed(message) { toast.show(message, { danger: true }) }
+        // A note left in the editor: its file named after its title now, if it was named after the one it had
+        // (a new note's "Untitled.md" too). Shown under its new id if it is still the one shown.
+        function refile(id, was) {
+            whenSaved(() => actions.refile(id, was, r => {
+                if (!r.renamed) return
+                if (store.picked === r.old_id) store.follow(r.id)
+                else store.refresh()
+            }, win.failed))
+        }
+        // Rename and Trash leave the editor without refile: the file is renamed or gone next anyway
         function renameNote() {
-            if (!view.leave() || !store.note) return
+            if (!view.leave(false) || !store.note) return
             const id = store.note.id, title = store.note.title
             namePanel.ask("New title", title, t => {
                 if (t && t !== title) win.whenSaved(() => actions.rename(id, t, r => {
@@ -72,7 +86,7 @@ ShellRoot {
         function unrename(r) { actions.unrename(r, back => store.follow(back.id), win.failed) }
         // No question first: the trash keeps it, and the toast's Undo (⌘Z) puts it back
         function trashNote() {
-            if (!view.leave() || !store.note) return
+            if (!view.leave(false) || !store.note) return
             const id = store.note.id
             win.whenSaved(() => actions.trash(id, r => {
                 store.forget(id)
@@ -81,19 +95,13 @@ ShellRoot {
             }, win.failed))
         }
 
-        // What was written is saved before Notes goes: the last keys' save, and any still running
+        // What was written is saved before Notes goes: the note left as Esc leaves it (saved, refiled, or gone if
+        // a new one is empty), or with a conflict unsettled, its text kept aside (NoteEditor.flush); then what is
+        // still running or waiting (next)
         property bool quitting: false
-        function quit() { view.flush(true); quitting = true; if (!view.busy) Qt.quit() }
-        Connections {
-            target: view
-            function onBusyChanged() {
-                if (view.busy) return
-                if (win.quitting) Qt.quit()
-                const fn = win.afterSave
-                win.afterSave = null
-                if (fn) fn()
-            }
-        }
+        function quit() { quitting = true; if (!view.leave()) view.flush(true); next() }
+        Connections { target: view; function onBusyChanged() { win.next() } }
+        Connections { target: actions; function onRunningChanged() { win.next() } }
         // A save that never answers (notes.py stuck): gone after a moment all the same; --md5 keeps a cut one out
         Timer { running: win.quitting; interval: 5000; onTriggered: Qt.quit() }
 
@@ -143,6 +151,7 @@ ShellRoot {
                 onNewNote: win.newNote("")
                 onRename: win.renameNote()
                 onTrash: win.trashNote()
+                onWroteIn: (id, was) => win.refile(id, was)
                 onMessage: (text, danger) => toast.show(text, { danger: danger })
 
                 Keys.onPressed: e => {

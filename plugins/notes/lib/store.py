@@ -125,14 +125,24 @@ def brief(path, text=None):
             "excerpt": excerpt(text), "size": path.stat().st_size}
 
 
+def file_name(title):
+    """A title as a file name, without .md: what new_path names a note titled so, before any number."""
+    name = re.sub(r"[/\\\x00-\x1f]", " ", title)
+    # No leading dot once the spaces are squeezed: "../.bashrc" would be a hidden ".bashrc.md" that Notes doesn't list
+    # and its undo can't trash (#1863)
+    return re.sub(r"^[\s.]+", "", re.sub(r"\s+", " ", name))[:NAME_MAX].strip() or "Note"
+
+
+def named_after(path, title):
+    """Whether the file has the name new_path gives a note titled so: "Plan.md" or a numbered "Plan 2.md"."""
+    return re.fullmatch(re.escape(file_name(title)) + r"( \d+)?", path.stem) is not None
+
+
 def new_path(title, folder=None, keep=None):
     """Where a note titled so goes, in folder (the notes' own by default): its title as the file name ("Shopping
     list.md"), with a number after it when that is taken ("Shopping list 2.md"). keep is a renamed note's own file,
     which doesn't count as taken: its name is free for it."""
-    name = re.sub(r"[/\\\x00-\x1f]", " ", title)
-    # No leading dot once the spaces are squeezed: "../.bashrc" would be a hidden ".bashrc.md" that Notes doesn't list
-    # and its undo can't trash (#1863)
-    name = re.sub(r"^[\s.]+", "", re.sub(r"\s+", " ", name))[:NAME_MAX].strip() or "Note"
+    name = file_name(title)
     folder = ROOT if folder is None else folder
     path, n = folder / f"{name}{SUFFIX}", 2
     # lexists, not exists: a dangling symlink there is taken too, so writing the new note can't follow it out of the

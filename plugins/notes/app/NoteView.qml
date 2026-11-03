@@ -12,27 +12,29 @@ Item {
     required property QtObject store
     property bool onePane: false
     signal back()
-    signal newNote()                           // New: the window asks for its title (shell.qml)
+    signal newNote()                           // New: an untitled note, written in at once (shell.qml)
     signal rename()                            // Rename and Trash: shell.qml's, which wait for a save running
     signal trash()
     signal message(string text, bool danger)   // for the window's toast
+    signal wroteIn(string id, string was)      // NoteEditor's: its file may follow its title (shell.qml)
     readonly property var note: store.note
     readonly property int margin: width < 520 ? 24 : 40
     readonly property bool editing: editor.open
     readonly property bool busy: editor.busy     // a save still running: quitting waits for it
 
     // Not before the note's file has been read: the editor would start from an empty text
-    function edit() { if (note && !editing && store.textId === note.id) editor.begin(note.id, store.text, false) }
-    // A note New has just made (notes create's answer): written in at once, below its heading
-    function editNew(note) { editor.begin(note.id, note.text, true) }
+    function edit() { if (note && !editing && store.textId === note.id) editor.begin(note.id, store.text, false, note.title) }
+    // A note New has just made (notes create's answer): written in at once, its title first
+    function editNew(note) { editor.begin(note.id, note.text, true, note.title) }
     // Back to reading, saved first. Not with a conflict unsettled: leaving would drop the text that wasn't saved.
-    function leave() {
+    // refile: NoteEditor.end's
+    function leave(refile) {
         if (!editing) return true
         if (editor.conflicted) {
             message("Saved elsewhere while you wrote: keep yours or theirs first", true)
             return false
         }
-        editor.end()
+        editor.end(refile)
         forceActiveFocus()
         return true
     }
@@ -66,7 +68,8 @@ Item {
             Text {
                 textFormat: Text.PlainText
                 width: parent.width; elide: Text.ElideRight
-                text: root.note ? root.note.title : ""
+                // While writing, the heading as it is typed ("Untitled", the list's, until a new note has one)
+                text: !root.note ? "" : root.editing && editor.heading ? editor.heading : root.note.title
                 font.family: root.c.font; font.pixelSize: 17; font.weight: Font.Medium; color: root.c.title
             }
             // When it was saved, or while writing whether it is: whole, as it matters more. The path takes what room is
@@ -160,6 +163,7 @@ Item {
         margin: root.margin
         onDone: root.leave()
         onMessage: (text, danger) => root.message(text, danger)
+        onWroteIn: (id, was) => root.wroteIn(id, was)
     }
 
     Flickable {
