@@ -20,7 +20,7 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | ⌘R | Sync now |
 | ⌘B | Hide or show the sidebar |
 
-- A new or edited event: `Tab` moves between its fields, `Enter` or Ctrl+Enter saves it, `Esc` leaves it. Days and times are shown and typed the way Launcher › Settings › Region writes them (5.11.2026 and 9:30, or 11/5/2026 and 9:30 AM); 2026-11-05 and 930 are read too, and a day without its year (5.11.) is this year's. The end moves with the start. Weeks start on the region's day (Sunday in the US). It goes in a calendar that isn't read only (below), the one you used last.
+- A new or edited event: `Tab` moves between its fields, `Enter` or Ctrl+Enter saves it, `Esc` leaves it. Days and times are shown and typed the way Launcher › Settings › Region writes them (5.11.2026 and 9:30, or 11/5/2026 and 9:30 AM); 2026-11-05 and 930 are read too, and a day without its year (5.11.) is this year's. A click into a day's field, or `↓` there, opens the month to pick from: the arrows move a day or a week, `PgUp`/`PgDn` a month, `Enter` picks, `Esc` closes it. The end moves with the start. Weeks start on the region's day (Sunday in the US). It goes in a calendar that isn't read only (below), the one you used last.
 - In a narrow window the buttons show as icons, and below about 500 px the month or week shows as a list of its days (without the Week | Month switch: `m` and `w` still change it).
 - Editing keeps what Calendar doesn't show (alarms, invitees); another calendar moves the event there. A recurring event, or one in a read-only calendar, isn't changed or deleted here: the card says so. A deleted event goes from the server too, and the window has no undo for it.
 - A recurring event shows at each of its times.

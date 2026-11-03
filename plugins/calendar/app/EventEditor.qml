@@ -181,19 +181,22 @@ AppPanel {
         onAccepted: root.save()
         onEscaped: root.close()
     }
-    // The first day and time, the last day and time: an all-day event hides the times. A Flow, so in a narrow panel
+    // The first day and time, the last day and time: an all-day event hides the times. A day is typed or picked from
+    // the kit's month grid (a click, or ↓). A Flow, so in a narrow panel
     // Ends goes under Starts rather than out of the card
     Flow {
         width: parent.width
         spacing: 14
         Row {
             spacing: 8
-            AppField { id: startDay; c: root.c; width: 136; label: "Starts"; onAccepted: root.save(); onEscaped: root.close() }
+            AppDatePicker { id: startDay; c: root.c; width: 136; label: "Starts"; base: root.app.today
+                            onPicked: root.startMoved(); onAccepted: root.save(); onEscaped: root.close() }
             AppField { id: startTime; c: root.c; width: root.timeWidth; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
         }
         Row {
             spacing: 8
-            AppField { id: endDay; c: root.c; width: 136; label: "Ends"; onAccepted: root.save(); onEscaped: root.close() }
+            AppDatePicker { id: endDay; c: root.c; width: 136; label: "Ends"; base: startDay.day || root.app.today
+                            onPicked: root.endMoved(); onAccepted: root.save(); onEscaped: root.close() }
             AppField { id: endTime; c: root.c; width: root.timeWidth; visible: !allDay.on; label: "at"; onAccepted: root.save(); onEscaped: root.close() }
         }
     }

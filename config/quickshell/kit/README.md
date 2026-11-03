@@ -29,7 +29,9 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppPanelButton` | A panel's answer (Create, Cancel): its keys in the theme colour, then the word; `strong` for the one Return gives |
 | `AppConfirm` | A yes-or-no `AppPanel` before what can't be undone: `question`, `detail`, `action`; Return yes, Esc no |
 | `AppPrompt` | An `AppPanel` that asks for a name: `ask(title, initial, then)`, the text picked; `then` gets it trimmed |
-| `AppField` | A labelled text field in a frame for the panels, with a `hint` ("GB"); typing into a read-only one comes out as `refused` |
+| `AppField` | A labelled text field in a frame for the panels, with a `hint` ("GB"); typing into a read-only one comes out as `refused`; `keyFilter` sees each key first, for a part built on it |
+| `AppDatePicker` | An `AppField` for a day, the region's way (5.11.2026, 11/5/2026), typed or picked from a month grid (`AppMonthGrid`) that opens on a click, its calendar glyph or ↓: ← → a day, ↑ ↓ a week, PgUp PgDn a month, ⏎ picks, Esc closes. `day` is the text read back ("YYYY-MM-DD", "" when unreadable; a day without its year takes `base`'s), `set(day)`, `picked(day)`. The grid is drawn over the window, below or above the field, its days lower in a low window, so a scrolling panel doesn't cut it |
+| `AppMonthGrid` | A month of six weeks in the region's week order, the month's name between its arrows: `cursor` (the keys' day, its month shown), `picked`, `clicked(day)`, `monthMoved(n)`. Holds no keys: `AppDatePicker`'s field does |
 | `AppTextArea` | A labelled text of a few lines in a frame (a task's note): ⏎ a new line, Ctrl+⏎ `save`, Tab the next field |
 | `AppChips` | One of a few as chips in a row (the list a task goes in): `options` `[{ id, name, color? }]`, `picked`; ← → move it |
 | `AppCheck` | A box to tick and its word (Important): `on`, Space or a click turns it (`toggled`), ⏎ `accepted` |
