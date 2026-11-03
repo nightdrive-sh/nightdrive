@@ -9,8 +9,14 @@ Item {
     id: root
     required property var launcher
 
-    // Reference at startup: the app list only loads on first reference
-    property var apps: DesktopEntries.applications.values
+    // Reference at startup: the app list only loads on first reference.
+    // Once per id: Quickshell 0.2.1's ObjectModel.diffUpdate inserts an entry again, without removing its old row, when a
+    // rescan reorders the list (several .desktop files written in a row), so Apps showed most apps twice until a restart.
+    // Fixed upstream in 055e384 ("make diffUpdate handle reordering"); harmless to keep after that.
+    property var apps: {
+        const seen = {}
+        return DesktopEntries.applications.values.filter(e => seen[e.id] ? false : (seen[e.id] = true))
+    }
     property var syncHidden: []               // apps hidden by sync-apps: [{ path, name, icon, extra }]
     property var missingApps: ({})            // ids of entries whose program isn't installed (missing-apps.sh): left out
 
