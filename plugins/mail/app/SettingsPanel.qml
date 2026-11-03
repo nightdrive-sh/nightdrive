@@ -44,7 +44,9 @@ AppPanel {
             width: parent.width
             spacing: 10
             Text { text: modelData.title; color: index === settingsPanel.row ? c.title : c.text; font.family: c.font; font.pixelSize: 13 }
-            Row {
+            // A Flow and a wrapping hint, so a narrow card (#2030) takes them on more lines rather than past its edge
+            Flow {
+                width: parent.width
                 spacing: 8
                 Repeater {
                     model: settingRow.modelData.choices
@@ -63,7 +65,7 @@ AppPanel {
                     }
                 }
             }
-            Text { text: settingRow.modelData.hint; color: c.faint; font.family: c.font; font.pixelSize: 11 }
+            Text { width: parent.width; wrapMode: Text.Wrap; text: settingRow.modelData.hint; color: c.faint; font.family: c.font; font.pixelSize: 11 }
         }
     }
 }

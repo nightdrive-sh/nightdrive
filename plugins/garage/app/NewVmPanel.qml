@@ -18,6 +18,9 @@ AppPanel {
     readonly property bool fromImage: image !== null
     signal done()
     cardWidth: 560
+    // The panel is the window's size: below this the card is narrow (#2030), and the rows below share its width
+    // instead of keeping their fixed ones, Choose… becoming its glyph
+    readonly property bool narrow: width < 520
     onOutsideTapped: done()
 
     onVisibleChanged: if (visible) {
@@ -63,8 +66,9 @@ AppPanel {
     Text { text: "New machine"; color: root.c.title; font.family: root.c.font; font.pixelSize: 15; font.weight: Font.Medium }
 
     // Where it comes from: each ready-made image, or an ISO. The picked one has the picked row's ground, as AppButton's
-    // on lights only its glyph
-    Row {
+    // on lights only its glyph. A Flow, so a narrow card puts them on two lines rather than past its edge
+    Flow {
+        width: parent.width
         spacing: 8
         Repeater {
             model: root.images.list
@@ -91,11 +95,13 @@ AppPanel {
 
     AppField { id: name; c: root.c; width: parent.width; label: "Name"; hint: "letters, digits, - . _"; onAccepted: root.create(); onEscaped: root.done() }
     Row {
+        id: login
         visible: root.fromImage
         spacing: 16
-        AppField { id: user; c: root.c; width: 200; label: "User"; onAccepted: root.create(); onEscaped: root.done() }
+        readonly property real fieldWidth: Math.min(200, (parent.width - spacing) / 2)
+        AppField { id: user; c: root.c; width: login.fieldWidth; label: "User"; onAccepted: root.create(); onEscaped: root.done() }
         AppField {
-            id: pass; c: root.c; width: 200; label: "Password"
+            id: pass; c: root.c; width: login.fieldWidth; label: "Password"
             input.echoMode: TextInput.Password
             onAccepted: root.create(); onEscaped: root.done()
         }
@@ -114,24 +120,27 @@ AppPanel {
     }
     Row {
         visible: !root.fromImage
+        width: parent.width
         spacing: 8
         AppField {
             id: iso; c: root.c; label: "ISO"
-            width: root.cardWidth - 80 - choose.width - 8
+            width: parent.width - choose.width - 8
             onAccepted: root.create(); onEscaped: root.done()
         }
         AppButton {
             id: choose
             anchors.bottom: parent.bottom; anchors.bottomMargin: 2
-            c: root.c; glyph: "folder-open"; label: "Choose…"
+            c: root.c; glyph: "folder-open"; label: root.narrow ? "" : "Choose…"; tip: root.narrow ? "Choose an ISO" : ""
             onClicked: picker.pick(iso.text, p => iso.text = p)
         }
     }
     Row {
+        id: sizes
         spacing: 16
-        AppField { id: mem; c: root.c; width: 120; label: "Memory"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
-        AppField { id: cpus; c: root.c; width: 120; label: "CPUs"; hint: "1 to 8"; onAccepted: root.create(); onEscaped: root.done() }
-        AppField { id: disk; c: root.c; width: 120; label: "Disk"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
+        readonly property real fieldWidth: Math.min(120, (parent.width - 2 * spacing) / 3)
+        AppField { id: mem; c: root.c; width: sizes.fieldWidth; label: "Memory"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
+        AppField { id: cpus; c: root.c; width: sizes.fieldWidth; label: "CPUs"; hint: "1 to 8"; onAccepted: root.create(); onEscaped: root.done() }
+        AppField { id: disk; c: root.c; width: sizes.fieldWidth; label: "Disk"; hint: "GB"; onAccepted: root.create(); onEscaped: root.done() }
     }
 
     Text {
@@ -141,7 +150,9 @@ AppPanel {
         text: root.problem
         color: root.c.danger; font.family: root.c.font; font.pixelSize: 12
     }
-    Row {
+    // A Flow, so in a narrow card Cancel goes under Download and create rather than out of it
+    Flow {
+        width: parent.width
         spacing: 8
         AppPanelButton {
             c: root.c; strong: true; keys: ["Ctrl", "Enter"]
