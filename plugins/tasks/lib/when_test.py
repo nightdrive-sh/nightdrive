@@ -39,6 +39,37 @@ class Parse(unittest.TestCase):
                 when.parse(text, NOW)
 
 
+class TwelveHour(unittest.TestCase):
+    """am/pm, as a US user writes the time (#2046), in every region"""
+    def test_clock(self):
+        self.assertEqual(when.parse("3pm", NOW), datetime(2026, 11, 2, 15, 0))
+        self.assertEqual(when.parse("3:30 PM", NOW), datetime(2026, 11, 2, 15, 30))
+        self.assertEqual(when.parse("fri 3:30 pm", NOW), datetime(2026, 11, 6, 15, 30))
+        self.assertEqual(when.parse("tomorrow 9 a.m.", NOW), datetime(2026, 11, 3, 9, 0))
+        self.assertEqual(when.parse("5.11. 1030am", NOW), datetime(2026, 11, 5, 10, 30))
+        self.assertEqual(when.parse("2026-11-05 2p", NOW), datetime(2026, 11, 5, 14, 0))
+
+    def test_noon_and_midnight(self):
+        self.assertEqual(when.parse("tomorrow 12pm", NOW), datetime(2026, 11, 3, 12, 0))
+        self.assertEqual(when.parse("tomorrow 12am", NOW), datetime(2026, 11, 3, 0, 0))
+        self.assertEqual(when.parse("12am", NOW), datetime(2026, 11, 3, 0, 0))   # gone by today: tomorrow's
+
+    def test_fields(self):
+        self.assertEqual(when.at("5.11.", "3:30 PM", NOW), datetime(2026, 11, 5, 15, 30))
+        self.assertEqual(when.at("", "4pm", NOW), datetime(2026, 11, 2, 16, 0))
+
+    def test_a_day_is_not_a_time(self):
+        self.assertEqual(when.parse("5.11.", NOW), date(2026, 11, 5))   # the dot is no "a.m."
+
+    def test_not_twelve_hour(self):
+        for text in ("14pm", "0am", "fri 13:30pm", "3:75pm"):
+            with self.assertRaises(ValueError, msg=text) as e:
+                when.parse(text, NOW)
+            self.assertIn("time", str(e.exception), msg=text)
+        with self.assertRaises(ValueError):
+            when.at("today", "14 pm", NOW)
+
+
 class Label(unittest.TestCase):
     """The region's way (Settings › Region), with its entry given rather than read from the user's locale.conf"""
     FI = {"day": "d.M.", "short": "d.M.yyyy", "time": "H:mm"}

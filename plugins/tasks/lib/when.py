@@ -8,6 +8,9 @@
     due_at(due) -> datetime                 when a due task is notified: a date at MORNING
     label(due, now, r) -> str               "Today 14:00", "Tomorrow", "Fri 6.11.", "3.11.2027": the region's way
                                             (region.py; r for tests), "Today 2:00 PM", "Fri 11/6" in the US
+
+A time is read with am/pm too (3pm, 3:30 PM, 9 a.m.) in every region, as the kit's Regional.parseTime reads it: a US
+user writes 12 h, and anyone may.
 """
 
 import re
@@ -21,8 +24,9 @@ LATER = timedelta(hours=1)   # Later on a task with a time; one with only a date
 
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 WEEKDAYS_FULL = {d[:3]: d for d in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")}
-HELP = ("give a day (today, tomorrow, fri, 5.11., 5.11.2027, 2026-11-05, +3d), a time (9:30, 930, 14) or both "
-        "(tomorrow 10, fri 930), or +30m, +2h")
+HELP = ("give a day (today, tomorrow, fri, 5.11., 5.11.2027, 2026-11-05, +3d), a time (9:30, 930, 14, 3pm) or both "
+        "(tomorrow 10, fri 930, fri 3:30 pm), or +30m, +2h")
+TIME_HELP = "9:30, 930, 14 or 3pm."
 
 
 def parse(text, now=None):
@@ -30,6 +34,7 @@ def parse(text, now=None):
     now = now or datetime.now()
     t = " ".join(text.strip().lower().split())
     t = re.sub(r"^(\d{4}-\d{2}-\d{2})t", r"\1 ", t)    # ISO's 2026-11-05T10:00
+    t = re.sub(r"(\d)\s+([ap]\.?(?:m\.?)?)$", r"\1\2", t)   # "3:30 pm" is one word, the time: "3:30pm"
     m = re.fullmatch(r"\+(\d+)\s*([mh])", t)
     if m:
         n = int(m.group(1))
@@ -40,6 +45,8 @@ def parse(text, now=None):
     at_ = clock_of(words[-1]) if words else None
     if at_ is not None:
         words = words[:-1]
+    elif words and re.fullmatch(r"[\d:.]+[ap]\.?(?:m\.?)?", words[-1]):
+        raise ValueError(f"Can't read the time {words[-1]!r}: " + TIME_HELP)   # 14pm: a time, but not one
     if not words:
         if at_ is None:
             raise ValueError(f"Can't read the time {text!r}: " + HELP)
@@ -57,7 +64,7 @@ def at(day_text, time_text, now=None):
     t = (time_text or "").strip().lower()
     clk = clock_of(t) if t else None
     if t and clk is None:
-        raise ValueError(f"Can't read the time {time_text.strip()!r}: 9:30, 930 or 14.")
+        raise ValueError(f"Can't read the time {time_text.strip()!r}: " + TIME_HELP)
     if not d:
         return parse(t, now) if t else None
     day = day_of(d, now)
@@ -65,11 +72,16 @@ def at(day_text, time_text, now=None):
 
 
 def clock_of(word):
-    """9, 14, 930, 9:30, 09.30, 9:30:00 -> time; None when the word isn't a time of day"""
-    m = re.fullmatch(r"(\d{1,2})(?:[:.]?(\d{2}))?(?::\d{2})?", word)
+    """9, 14, 930, 9:30, 09.30, 9:30:00, and with am/pm 3pm, 3:30 pm, 9 a.m., 12am (midnight) -> time; None when it
+    isn't a time of day. The dots after a/p only with it, so a day's 5.11. never reads as 05:11"""
+    m = re.fullmatch(r"(\d{1,2})(?:[:.]?(\d{2}))?(?::\d{2})?(?:\s*([ap])\.?(?:m\.?)?)?", word.strip())
     if not m:
         return None
     h, mi = int(m.group(1)), int(m.group(2) or 0)
+    if m.group(3):
+        if not 1 <= h <= 12:
+            return None   # 14pm, 0am: not a 12 h time
+        h = h % 12 + (12 if m.group(3) == "p" else 0)
     return time(h, mi) if h < 24 and mi < 60 else None
 
 

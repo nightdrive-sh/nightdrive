@@ -6,7 +6,7 @@ import qs.kit
 // A new task, or a change to one, in a panel over the window: its title, the day and time it is due (either may stay
 // empty), the list it goes in, Important and a note. Saved by `cli.py add --stdin` or `cli.py edit --stdin`, the same
 // code Claude's and the command's changes run, so what a due may look like is decided in one place (lib/when.py); the
-// panel only shows how it reads it, as it is typed ("930" → 09:30), and what went wrong. The day is the kit's
+// panel only shows how it reads it, as it is typed ("930" → 9:30, "2pm" → 2:00 PM), and what went wrong. The day is the kit's
 // AppDatePicker: typed the region's way (5.11.2026, 11/5/2026) or picked from its month grid, and sent on as ISO, so
 // lib/when.py needn't know the region; a word it reads itself (today, fri, +3d) goes as typed. ⏎ in a one-line field or
 // Ctrl+⏎ saves, Esc leaves it. An edit sends only the fields that were changed: one left alone (a low priority, a due
@@ -42,7 +42,8 @@ AppPanel {
     function edit(task) {
         editing = task
         const due = task.due || ""
-        fill({ title: task.title, day: due ? Regional.format(due.slice(0, 10), "short") : "", time: due.slice(11, 16),
+        // The time as the region writes it ("2:30 PM" in the US), which when.py reads back as it does 14:30
+        fill({ title: task.title, day: due ? Regional.format(due.slice(0, 10), "short") : "", time: Regional.time(due.slice(11, 16)),
                important: task.priority === "high", note: task.note, list: task.list_id })
     }
     function fill(f) {
@@ -168,7 +169,7 @@ AppPanel {
         AppField {
             id: timeField
             c: root.c; width: 86
-            label: "at"; hint: "930"
+            label: "at"; hint: Regional.h24 ? "930" : "2pm"   // what's quickest to type; either is read anywhere
             onTextChanged: root.readDue()
             onAccepted: root.save(); onEscaped: root.close()
         }
