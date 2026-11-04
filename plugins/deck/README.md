@@ -32,7 +32,7 @@ A fast, clean Spotify player for whole albums. Keep the ones you love on a shelf
 | `o` | Where the sound plays |
 | ⌘B | Hide or show the sidebar |
 
-- **Curated** is a list of albums for you, made by Claude Code from your listening (`deck curate`, a few minutes on your Claude plan). New list makes a new one when you want; Not for me teaches the next. It shows which you have listened to, and how far.
+- **Curated** is a list of albums for you, made by Claude Code from your listening (`deck curate`, a few minutes on your Claude plan). New list makes a new one when you want; Not for me teaches the next. It shows each album's rough genre, and which you have listened to and how far.
 - **Pick for me** starts an album from your shelf or Curated that you haven't played in a while, drawn as from a hat: one comes again only once the others have played.
 - **Radio** plays Deck's genres, your favourites first, and your own (`deck genre add`).
 - **History** lists the albums you played in the last 30 days.

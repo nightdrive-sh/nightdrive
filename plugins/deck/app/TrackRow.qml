@@ -113,13 +113,26 @@ AppRow {
                 color: c.primary
             }
         }
-        Text {
-            id: subText
+        // The second line, and a Curated album's rough genre after it, fainter ("· jazz", "· rock, psych"),
+        // so the list can be skimmed by genre
+        Row {
+            width: parent.width
             visible: !!r.modelData.sub
-            bottomPadding: r.modelData.note ? 5 : 0     // a little air before the reason
-            width: parent.width; elide: Text.ElideRight
-            text: r.modelData.sub || ""; textFormat: Text.PlainText
-            font.family: c.font; font.pixelSize: 12; color: c.dim
+            Text {
+                id: subText
+                bottomPadding: r.modelData.note ? 5 : 0     // a little air before the reason
+                width: Math.min(implicitWidth, parent.width - (genreText.visible ? genreText.implicitWidth : 0))
+                elide: Text.ElideRight
+                text: r.modelData.sub || ""; textFormat: Text.PlainText
+                font.family: c.font; font.pixelSize: 12; color: c.dim
+            }
+            Text {
+                id: genreText
+                visible: !!r.modelData.genre
+                anchors.baseline: subText.baseline
+                text: " · " + (r.modelData.genre || ""); textFormat: Text.PlainText
+                font.family: c.font; font.pixelSize: 11; color: c.faint
+            }
         }
         Text {
             id: noteText

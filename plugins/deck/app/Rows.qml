@@ -20,7 +20,7 @@ QtObject {
         else if (v.kind === "history")
             for (const h of lib.history) out.push({ kind: "album", title: h.name, sub: h.artist, right: lib.when(h.at), data: { uri: h.uri, name: h.name, artist: h.artist }, cover: h.uri })
         else if (v.kind === "curated")
-            for (const a of lib.curated) out.push({ kind: "album", title: a.name, sub: a.artist + (a.year ? " · " + a.year : ""), note: a.reason || "", data: a, cover: a.uri, right: lib.heard(a.uri) })
+            for (const a of lib.curated) out.push({ kind: "album", title: a.name, sub: a.artist + (a.year ? " · " + a.year : ""), note: a.reason || "", genre: (a.genres || []).join(", "), data: a, cover: a.uri, right: lib.heard(a.uri) })
         else if (v.kind === "radio")
             for (const g of lib.genreRows) out.push({ kind: "genre", title: g.name, fav: lib.favorites.indexOf(g.id) >= 0, right: radio && radio.genre === g.id ? "Playing" : "", data: g })
         else if (v.kind === "station" && radio && radio.genre === v.genre.id)
