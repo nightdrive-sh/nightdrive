@@ -18,6 +18,7 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | `e` | Edit the event open (also Edit on it) |
 | `Del` or `⌫` | Delete the event open, after you say yes (also Delete on it) |
 | `1`–`9` or Ctrl+↑ Ctrl+↓ | A calendar of the sidebar, or All calendars |
+| `c` | The colour of the calendar picked (also its palette in the sidebar, or a right click on it) |
 | ⌘R | Sync now |
 | ⌘B | Hide or show the sidebar |
 
@@ -28,12 +29,13 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 - In a narrow window the buttons show as icons, and below about 500 px the month or week shows as a list of its days; the day keeps its hours.
 - Editing keeps what Calendar doesn't show (alarms, invitees); another calendar moves the event there. A recurring event, or one in a read-only calendar, isn't changed or deleted here: the card says so. A deleted event goes from the server too, and the window has no undo for it.
 - A recurring event shows at each of its times.
+- A calendar's colour, picked with `c`, is one of the theme's colours, or its own again (the one its server gives). It is kept on this computer, in `~/.config/calendar/colors.json`, so a sync doesn't change it, and your phone keeps its own. ⌘Z or Undo just after puts the one before back.
 - The events are kept as `.ics` files in `~/.local/share/calendar`, a folder per account and calendar, and vdirsyncer syncs them. khal reads them, recurring events and all.
 
 ## Your calendars
 
 - **iCloud**: Calendar uses the account you set up in Contacts (its README › Setting up an account): the same app password in the login keyring, nothing more to do. Your Reminders lists aren't shown (Tasks is for those).
-- **Google**: Google's calendars come by their private address, read only (Google wants OAuth for anything more). In Google Calendar on the web: the calendar's Settings › Integrate calendar › Secret address in iCal format. Then `calendar subscribe NAME`, which asks for the address without showing it and keeps it in the login keyring, never in a file: anyone with the address can read the calendar. Its colour: `color = #4F8FE6` in its section of `~/.config/calendar/calendars.conf`.
+- **Google**: Google's calendars come by their private address, read only (Google wants OAuth for anything more). In Google Calendar on the web: the calendar's Settings › Integrate calendar › Secret address in iCal format. Then `calendar subscribe NAME`, which asks for the address without showing it and keeps it in the login keyring, never in a file: anyone with the address can read the calendar. Its colour: `color = #4F8FE6` in its section of `~/.config/calendar/calendars.conf`, or pick one in the window.
 - **Another CalDAV server** (Fastmail, Nextcloud…): give its CalDAV address in Calendar's own `~/.config/calendar/calendars.conf`, for a Contacts account of `type = carddav`:
 
 ```
@@ -45,7 +47,7 @@ caldav-url = https://caldav.example.com/
 
 ## Claude
 
-With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add or change an event (you can undo either from the notification), and delete one after you allow it on Nightdrive's card. It doesn't change or delete recurring events, nor anything in a read-only calendar. Changing an event asks on the card the first time in each calendar, and every time in or out of a `shared` one.
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add or change an event or give a calendar its colour (you can undo each from the notification), and delete one after you allow it on Nightdrive's card. It doesn't change or delete recurring events, nor anything in a read-only calendar. Changing an event asks on the card the first time in each calendar, and every time in or out of a `shared` one.
 
 The first event Claude adds to a calendar asks on the card, and once you allow it, Claude adds to that calendar without asking; a `shared` one asks every time, and a refusal remembers nothing. `nightdrive mcp access allowed` lists the calendars allowed so, and `nightdrive mcp access forget calendar_add` makes them all ask again (or `forget calendar_add "Family (icloud/family)"`, one of them).
 
@@ -62,6 +64,7 @@ The first event Claude adds to a calendar asks on the card, and once you allow i
 | `calendar add --title T --start S [--end E]` | A new event (`--calendar ID`, `--location L`, `--notes N`); S and E are YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day |
 | `calendar edit CALENDAR UID` | Changes an event: a JSON object on stdin of what changes (`title`, `start`, `end`, `location`, `notes`, `move_to` another calendar); prints the id `calendar restore UNDO` takes to put it back (`--json`) |
 | `calendar delete CALENDAR UID` | Deletes an event here and on the server (not a recurring one) |
+| `calendar color [ID [COLOR]]` | The calendars' colours, or one's set to COLOR: a name `calendar color` lists, `#RRGGBB`, or `reset` for its server's (`--json`) |
 | `calendar subscribe NAME [TITLE]` | A Google (or other) calendar by its private ICS address |
 | `calendar sync [NAME…]` | Syncs every account's calendars now (or these) |
 | `calendar enable`, `disable` | Calendar among the apps and the sync every 15 minutes, on or off (your events stay) |

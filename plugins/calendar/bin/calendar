@@ -126,6 +126,9 @@ Usage: calendar [command]
                  change an event (not a recurring one): JSON on stdin of what changes (title, start, end, location,
                  notes, move_to: another calendar); prints the id restore takes (--json)
   restore UNDO   put an edited event back as it was
+  color [ID [COLOR|reset]]
+                 the calendars' colours, or set one's here (a name from the list, or #RRGGBB) over its server's;
+                 reset gives the server's back (--json)
   delete CALENDAR UID
                  delete an event (not a recurring one) here and on the server
   sync [NAME…]   sync every account's calendars (or these: an account, or a calendar as ACCOUNT/ID) now
@@ -156,6 +159,12 @@ case ${1:-open} in
     if [[ $1 == add || $1 == delete ]]; then python3 "$LIB/write.py" "$@"; else python3 "$LIB/change.py" "$@"; fi
     status=$?
     ((status == 0)) && running && ipc refresh >/dev/null 2>&1
+    exit $status ;;
+  color)
+    python3 "$LIB/colors.py" "${@:2}"; status=$?
+    # Only a change (ID and COLOR, --json aside) reloads the window: a look at the colours needn't
+    n=0; for a in "${@:2}"; do [[ $a == --json ]] || n=$((n + 1)); done
+    ((status == 0 && n >= 2)) && running && ipc refresh >/dev/null 2>&1
     exit $status ;;
   sync)      sync_now "${@:2}"; status=$?; running && ipc refresh >/dev/null 2>&1; exit $status ;;
   subscribe) subscribe "${@:2}" ;;

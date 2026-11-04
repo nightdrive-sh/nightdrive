@@ -152,6 +152,17 @@ ShellRoot {
             if (d !== day) day = d
             editor.open(d, hour, minute)
         }
+        // The colour picker for a calendar, or the one picked in the sidebar (c): All calendars has none of its own
+        function pickColor(cal) {
+            const it = cal || sources[source]
+            if (!it || !it.id) { say("Pick a calendar first (1–9 or Ctrl ↓), then c gives it a colour.", false, false); return }
+            colorPicker.open(it)
+        }
+        // Saved by the picker: said with an Undo, which gives back the colour it had
+        function colorSaved(r) {
+            say(r.name + (!r.custom ? " has its own colour back" : r.color_name ? " is " + r.color_name + " now" : " is " + r.color + " now"),
+                false, false, "Undo", () => colorUndo.run(r.id, r.previous))
+        }
         // ⏎ on a day: its first event
         function openFirst() { const list = byDay[day] || []; if (list.length) openEvent(list[0]) }
 
@@ -171,7 +182,12 @@ ShellRoot {
         function sync() { if (!syncer.running) { say("Syncing…", true); syncer.running = true } }
 
         // What just happened, at the top of the window (the kit's toast): seen where a line at the sidebar's foot wasn't
-        function say(t, sticky, danger) { toast.show(t, { sticky: !!sticky, danger: !!danger }) }
+        function say(t, sticky, danger, action, run) { toast.show(t, { sticky: !!sticky, danger: !!danger, action: action, run: run }) }
+        Process {
+            id: colorUndo
+            function run(id, value) { command = [win.command, "color", id, value]; running = true }
+            onExited: code => { if (code === 0) win.reload() }
+        }
 
         // The week's line for now, and today's circle, move along with the clock
         property date now: new Date()
@@ -180,6 +196,7 @@ ShellRoot {
 
         Shortcut { sequence: "Ctrl+R"; onActivated: win.sync() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
+        Shortcut { sequence: "Ctrl+Z"; onActivated: toast.act() }   // the toast's Undo (a colour)
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
 
         readonly property int sidebarMin: 820
@@ -217,6 +234,20 @@ ShellRoot {
                             x: 17; anchors.verticalCenter: parent.verticalCenter
                             width: 9; height: 9; radius: 5
                             color: nav.modelData.color || "transparent"
+                        }
+                        // Its colour (#2031): a right click, or the palette under the pointer, as Mail's gear shows
+                        TapHandler {
+                            enabled: nav.modelData.id !== ""
+                            acceptedButtons: Qt.RightButton
+                            onTapped: win.pickColor(nav.modelData)
+                        }
+                        AppIconButton {
+                            visible: nav.modelData.id !== "" && (nav.hovered || hovered)
+                            anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
+                            c: win.look
+                            glyph: "palette"; hoverColor: c.sel
+                            tip: "Colour"; keys: "c"; tipAlign: "right"
+                            onClicked: win.pickColor(nav.modelData)
                         }
                     }
                 }
@@ -277,6 +308,7 @@ ShellRoot {
                         else if (k === Qt.Key_A && !ctrl) win.view = "agenda"
                         else if (k === Qt.Key_Slash || e.text === "/") win.openSearch("")
                         else if (k === Qt.Key_N && !ctrl) win.newEvent(win.day)
+                        else if (k === Qt.Key_C && !ctrl) win.pickColor(null)
                         else if (k === Qt.Key_Return || k === Qt.Key_Enter) win.openFirst()
                         else if (k === Qt.Key_Question) win.cheats = !win.cheats
                         else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
@@ -343,6 +375,13 @@ ShellRoot {
             }
         }
 
+        ColorPicker {
+            id: colorPicker
+            behind: content
+            c: win.look
+            app: win
+            onClosed: win.refocus()
+        }
         EventPanel {
             id: eventPanel
             behind: content
@@ -387,7 +426,7 @@ ShellRoot {
                 { title: "Calendar", keys: [["← →  h l", "Previous, next day"], ["↑ ↓  k j", "A week back, on"], ["PgUp PgDn  [ ]", "Previous, next month, week, day, agenda's days"],
                                            ["t", "Today"], ["m  w  d  a", "Month, week, day, agenda"], ["⏎", "Open the day's first event"], ["n", "New event"], ["/", "Search"]] },
                 { title: "Agenda, search", keys: [["↑ ↓  j k", "Previous, next event"], ["⏎", "Open it"], ["/", "To the search's words"], ["Esc", "Leave the search"]] },
-                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
+                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["c", "The calendar's colour"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "An event", keys: [["e", "Edit it"], ["Del  ⌫", "Delete it (asks first)"], ["Esc  ⏎", "Close it"]] },
                 { title: "New or edited event", keys: [["⏎  Ctrl ⏎", "Save it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }
             ]

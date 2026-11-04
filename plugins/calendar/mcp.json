@@ -10,6 +10,25 @@
       "area": "calendar"
     },
     {
+      "name": "calendar_color",
+      "title": "A calendar's colour",
+      "description": "Give one of the user's calendars a colour of its own in Nightdrive Calendar, over the one its server gives (on this computer only: the phone keeps its own); the user can undo it. calendar is its id from calendar_calendars; color one of red, orange, amber, lime, green, teal, blue, violet, graphite (the theme's colours), or #RRGGBB, or reset for the server's colour again. Returns the calendar's id, name and color.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendar": {"type": "string", "title": "Calendar", "description": "The calendar's id"},
+          "color": {"type": "string", "title": "Colour", "description": "A colour's name, #RRGGBB, or reset"}
+        },
+        "required": ["calendar", "color"],
+        "additionalProperties": false
+      },
+      "command": ["calendar", "color", "--json", "{calendar}", "{color}"],
+      "class": "change",
+      "undo": ["calendar", "color", "--json", "{id}", "{previous}"],
+      "notice": "{name} is now {color}",
+      "area": "calendar"
+    },
+    {
       "name": "calendar_events",
       "title": "Events",
       "description": "The user's events from one day up to another (to not included), in every calendar or one, a recurring event as each of its times: uid, calendar id and name, title, start and end (local time YYYY-MM-DDTHH:MM, or YYYY-MM-DD for an all-day event, whose end is its last day), all_day, location, notes and recurring. search keeps only those whose title, location or notes have every word. A range of a few months at most: count says how many there were, events at most limit of them, the earliest first.",

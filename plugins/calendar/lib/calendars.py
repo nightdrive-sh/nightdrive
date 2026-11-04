@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """The calendars on this computer, as the sync has left them in DATA_DIR, and khal's config written from them.
 
-    calendars.py [--json]     the calendars: id, name, colour, source, read_only, shared, events
+    calendars.py [--json]     the calendars: id, name, colour, custom, source, read_only, shared, events
 
 A calendar is a folder DATA_DIR/<source>/<collection> (vdir: one .ics per event). Its id is "<source>/<collection>";
 its name and colour are the files vdirsyncer's metasync writes beside the events (displayname, color), an ICS
-source's name its calendars.conf `name`. A CalDAV collection that takes no events (components.py: iCloud's Reminders
-lists) isn't a calendar.
+source's name its calendars.conf `name`; a colour picked in the window or by `calendar color` (colors.py) goes over
+the colour. A CalDAV collection that takes no events (components.py: iCloud's Reminders lists) isn't a calendar.
 
 khal reads the events (events.py): its config lists every calendar under its id, and is written again whenever the
 calendars change, so a calendar added on the phone shows after the next sync.
@@ -17,6 +17,7 @@ import os
 import sys
 from pathlib import Path
 
+import colors
 import components
 import sources
 
@@ -43,9 +44,11 @@ def color(text):
 
 
 def calendars():
-    """[{id, name, color, source, read_only, shared, events, path}], the sources' order, then by name. shared: others
-    see it (calendars.conf's `shared`), so what goes in it goes to them too"""
+    """[{id, name, color, custom, own_color, source, read_only, shared, events, path}], the sources' order, then by
+    name. shared: others see it (calendars.conf's `shared`), so what goes in it goes to them too. color: the one picked
+    here (colors.py; custom true) over own_color, the server's or calendars.conf's"""
     out = []
+    own = colors.chosen()
     for s in sources.sources():
         base = sources.DATA_DIR / s["name"]
         folders = [base / sources.FEED] if s["kind"] == "ics" else sorted(p for p in base.glob("*") if p.is_dir())
@@ -57,7 +60,9 @@ def calendars():
             if comps and "VEVENT" not in comps.split():
                 continue
             name = s.get("title") if s["kind"] == "ics" else read(folder / "displayname", folder.name)
-            found.append({"id": f"{s['name']}/{folder.name}", "name": name, "color": color(s.get("color") or read(folder / "color")),
+            cid = f"{s['name']}/{folder.name}"
+            base = color(s.get("color") or read(folder / "color"))
+            found.append({"id": cid, "name": name, "color": own.get(cid) or base, "custom": cid in own, "own_color": base,
                           "source": s["name"],
                           "read_only": s["read_only"] or name.lower() in s.get("read_only_calendars", []),
                           "shared": s.get("shared", False) or name.lower() in s.get("shared_calendars", []),
