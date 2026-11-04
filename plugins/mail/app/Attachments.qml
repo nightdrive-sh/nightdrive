@@ -3,7 +3,7 @@ import qs
 import qs.kit
 
 // A message's attachments, as the last row of its header (Thread.qml), so they show as soon as the message opens
-// instead of below a long text: a click opens one, "Save" puts it in the downloads folder, and with two or more
+// instead of below a long text: a click opens one, its save icon puts it in the downloads folder, and with two or more
 // "Save all" puts them all there. The chips wrap onto more lines in a narrow pane.
 Flow {
     id: root
@@ -32,8 +32,8 @@ Flow {
                     id: fileName
                     textFormat: Text.PlainText
                     text: file.modelData.name; color: c.text; font.family: c.font; font.pixelSize: 12
-                    // The chip stays inside a narrow pane: the name gives way to its size and Save
-                    width: Math.min(implicitWidth, 280, root.width - fileSize.implicitWidth - saveText.implicitWidth - 48)
+                    // The chip stays inside a narrow pane: the name gives way to its size and the save icon
+                    width: Math.min(implicitWidth, 280, root.width - fileSize.implicitWidth - saveIcon.width - 48)
                     elide: Text.ElideMiddle
                 }
                 Text {
@@ -41,13 +41,20 @@ Flow {
                     text: app.size(file.modelData.size); color: c.faint; font.family: c.font; font.pixelSize: 11
                     anchors.baseline: fileName.baseline
                 }
-                Text {
-                    id: saveText
-                    text: "Save"; font.family: c.font; font.pixelSize: 11; anchors.baseline: fileName.baseline
-                    color: saveHover.hovered ? c.accent : c.dim
-                    opacity: fileHover.hovered ? 1 : 0
+                // Save, always in sight as a quiet icon: a "Save" shown only under the pointer left an empty gap in
+                // the chip the rest of the time. It says what it does when held under the pointer.
+                Item {
+                    id: saveIcon
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 18; height: 18
+                    Text {
+                        anchors.centerIn: parent
+                        text: Icons.g("download"); font.family: Icons.family; font.pixelSize: 13
+                        color: saveHover.hovered ? c.accent : fileHover.hovered ? c.dim : c.faint
+                    }
                     HoverHandler { id: saveHover }
                     TapHandler { onTapped: app.savePart(root.msg, file.modelData) }
+                    Tip { y: parent.height + 10; c: root.c; text: "Save to Downloads"; hovered: saveHover.hovered }
                 }
             }
         }
