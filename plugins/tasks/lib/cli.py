@@ -2,7 +2,7 @@
 """The `tasks` command's work (bin/tasks runs it): reading the tasks, and the changes Claude makes too (mcp.json).
 
     cli.py lists [--json]
-    cli.py list [--json] [--list NAME] [--view open|today|scheduled|done|all] [--query TEXT]
+    cli.py list [--json] [--list NAME] [--view open|today|upcoming|done|all] [--query TEXT]
     cli.py add [--json] [--list NAME] [--due WHEN] [--note TEXT] [--priority high|normal|low] TITLE
     cli.py add --json --stdin       the same as JSON on stdin: {title, list, day, time, note, priority} (the window)
     cli.py when [--json] [--day DAY] [--time TIME] [WHEN]     how a due reads: {due, label}
@@ -27,7 +27,7 @@ import lists
 import store
 import when
 
-VIEWS = ("open", "today", "scheduled", "done", "all")
+VIEWS = ("open", "today", "upcoming", "scheduled", "done", "all")   # scheduled: upcoming's name until #2023
 DONE_MAX = 50   # the done view's newest: a list someone keeps for years would be long
 PRIORITY = {"high": "1", "normal": "", "low": "9"}
 
@@ -71,7 +71,7 @@ def view(rows, name, now):
         rows = [r for r in rows if not r["done"]]
     if name == "today":
         rows = [r for r in rows if r["due"] and r["due"][:10] <= today]
-    elif name == "scheduled":
+    elif name in ("upcoming", "scheduled"):
         rows = [r for r in rows if r["due"]]
     return sorted(rows, key=order)
 

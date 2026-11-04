@@ -3,11 +3,11 @@
     {
       "name": "tasks_list",
       "title": "List tasks",
-      "description": "The user's tasks in Nightdrive Tasks (kept on this computer, a list per folder): each task's id, title, note, list, due (YYYY-MM-DD, or YYYY-MM-DDTHH:MM local time), due_label, overdue, priority (high, low or empty) and done. view: open (default: every task not done, soonest due first, those without a due last), today (due today or earlier, overdue included), scheduled (every open task with a due), done (the 50 done most recently), all. Also gives now (the local time, to work out dates from) and the lists with their open counts. Use the ids with tasks_edit, tasks_done, tasks_undone, tasks_snooze and tasks_trash.",
+      "description": "The user's tasks in Nightdrive Tasks (kept on this computer, a list per folder): each task's id, title, note, list, due (YYYY-MM-DD, or YYYY-MM-DDTHH:MM local time), due_label, overdue, priority (high, low or empty) and done. view: open (default: every task not done, soonest due first, those without a due last), today (due today or earlier, overdue included), upcoming (every open task with a due), done (the 50 done most recently), all. Also gives now (the local time, to work out dates from) and the lists with their open counts. Use the ids with tasks_edit, tasks_done, tasks_undone, tasks_snooze and tasks_trash.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "view": {"type": "string", "enum": ["open", "today", "scheduled", "done", "all"], "title": "Which", "description": "Which tasks (default open)"},
+          "view": {"type": "string", "enum": ["open", "today", "upcoming", "done", "all"], "title": "Which", "description": "Which tasks (default open)"},
           "list": {"type": "string", "title": "List", "description": "Only this list's, by its name"},
           "query": {"type": "string", "title": "Search", "description": "Words that must all be in the title or the note"}
         },

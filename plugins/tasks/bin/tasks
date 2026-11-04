@@ -49,9 +49,10 @@ Usage: tasks [command]
 
   (none), open   open Tasks, or bring it forward if it is open
   new [LIST]     open Tasks with a new task in LIST (its name; the list it shows, or the one used last, without one)
+  search [WORDS] open Tasks with the search over every list (WORDS in a task's title or note)
   lists          the lists and how many open tasks each has (--json)
   when WHEN      how a due reads ("fri 930": Fri 6 Nov 09:30)
-  list           the open tasks (--json; --list NAME; --view today|scheduled|done|all; --query TEXT)
+  list           the open tasks (--json; --list NAME; --view today|upcoming|done|all; --query TEXT)
   add TITLE      a new task (--list NAME, a new list if there is none; --due WHEN; --note TEXT; --priority high|low)
   edit ID        change a task (--title T; --due WHEN or --no-due; --note TEXT; --list NAME, moves it; --priority P)
   done ID        mark a task done (ID: from list, or the start of one)
@@ -75,6 +76,7 @@ USAGE
 
 case ${1:-open} in
   new)        open_ready; ipc newTask "${2:-}" ;;
+  search)     open_ready; shift; ipc search "$*" ;;
   lists|list|when) cli "$@" ;;
   add|edit|done|undone|snooze|trash|restore|list-new|list-rename|list-remove) change "$@" ;;
   due)        python3 "$APP_DIR/lib/due.py" check ;;

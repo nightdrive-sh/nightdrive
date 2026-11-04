@@ -67,7 +67,8 @@ AppRow {
                 id: where
                 textFormat: Text.PlainText
                 visible: text !== ""
-                text: row.app.mixed ? row.task.list : ""
+                // In the views that mix lists, unless its heading says it already (the search's open ones)
+                text: row.app.mixed && row.task.section !== row.task.list ? row.task.list : ""
                 font.family: row.c.font; font.pixelSize: 11; color: row.c.faint
             }
             Text {

@@ -4,8 +4,10 @@ import Quickshell
 import Quickshell.Io
 import qs
 import qs.kit
+import "Views.js" as Views
 
-// Nightdrive Tasks: Today, Scheduled and the lists in the sidebar, their tasks on the right. New (n) adds one and ⏎ or e
+// Nightdrive Tasks: Today, Upcoming and the lists in the sidebar, their tasks on the right (Views.js says which and
+// under which headings); / or ⌘F searches every list (SearchHeader). New (n) adds one and ⏎ or e
 // changes one, in a panel (TaskEditor); Space ticks one off and Delete trashes it, with Undo in the toast (Actions).
 // ⇧N, F2 and Delete in the sidebar make, rename and delete a list (ListActions, the buttons in ViewHeader).
 // Changes come from Claude (mcp.json), the `tasks` command and the notifications' Done and Later too, which all ask it
@@ -39,7 +41,9 @@ ShellRoot {
             function removeList(): void { if (win.view.kind === "list") listOps.remove(win.view) }
             // The panel for a task of the view by number from 1 (0: the picked one), as ⏎ opens it
             function edit(row: int): void { win.editTask(row > 0 ? row - 1 : win.current) }
-            // A row of the sidebar by its name (Today, Scheduled, a list, Done), and a task in it by number from 1
+            // The search with these words, as / and typing them would
+            function search(words: string): void { win.openSearch(words) }
+            // A row of the sidebar by its name (Today, Upcoming, a list, Done), and a task in it by number from 1
             function pick(name: string, row: int): void {
                 const i = win.sources.findIndex(s => s.name.toLowerCase() === name.toLowerCase())
                 if (i >= 0) win.pickSource(i)
@@ -59,13 +63,17 @@ ShellRoot {
         readonly property var sources: {
             const open = tasks.filter(t => !t.done)
             const rows = [{ kind: "today", name: "Today", glyph: "sun", count: open.filter(t => t.due && t.due.slice(0, 10) <= today).length },
-                          { kind: "scheduled", name: "Scheduled", glyph: "calendar", count: open.filter(t => t.due).length }]
+                          { kind: "upcoming", name: "Upcoming", glyph: "calendar", count: open.filter(t => t.due).length }]
             for (const l of lists) rows.push({ kind: "list", id: l.id, name: l.name, glyph: "list", count: l.open })
             rows.push({ kind: "done", name: "Done", glyph: "circle-check", count: "" })
             return rows
         }
         property int source: 0
-        readonly property var view: sources[source] || sources[0]
+        // The search shows in place of the view picked, which comes back when it ends
+        property bool searching: false
+        property string query: ""
+        onQueryChanged: if (searching) filter("", 0)
+        readonly property var view: searching ? { kind: "search", name: "Search" } : sources[source] || sources[0]
         readonly property bool mixed: view.kind !== "list"   // rows say their list
         property var shown: []
         property int current: -1
@@ -98,13 +106,13 @@ ShellRoot {
         Component.onCompleted: { load(); list.forceActiveFocus() }
         // Today moves on with the clock, and a sync or another app may change the files: read them again each minute
         Timer { interval: 60000; running: true; repeat: true; onTriggered: win.load() }
-        // Scheduled's headings are worked out with the rows: a change of region writes them again at once
+        // Upcoming's headings are worked out with the rows: a change of region writes them again at once
         Connections { target: Regional; function onRegionChanged() { win.filter(win.shown[win.current] ? win.shown[win.current].id : "", win.current) } }
 
         // When a task is due, the region's way (Settings › Region, the kit's Regional), as lib/when.py's label writes it
         // for the notifications and Claude: "Today 14:00", "Tomorrow", "Fri 6.11." this week, "20.11.", "4.1.2027";
         // "Today 2:00 PM", "Fri 11/6" in the US. Ahead, not behind, so not Regional.relative (a list's "when" it was).
-        // dayOnly leaves the time out: Scheduled's headings
+        // dayOnly leaves the time out: Upcoming's headings
         function dueLabel(due, dayOnly) {
             if (!due) return ""
             const day = due.slice(0, 10)
@@ -121,36 +129,34 @@ ShellRoot {
             const when = Regional.relative(completed)
             return "Done " + (when === "Yesterday" ? "yesterday" : when)
         }
-        // The heading a row comes under: late ones first, then by day in Scheduled
-        function sectionOf(t) {
-            if (view.kind === "today" || view.kind === "scheduled") {
-                if (t.overdue) return "Overdue"
-                return view.kind === "today" ? "Today" : dueLabel(t.due, true)
-            }
-            return ""
+        // What Views.js needs besides the tasks and the view
+        function viewOptions() {
+            return { today: today, query: query, lists: lists, doneMax: doneMax, dayLabel: day => dueLabel(day, true) }
         }
         // keep: the task to pick again; at: the row to stay at when it has gone (done, moved, trashed), else the first
         function filter(keep, at) {
-            let rows
-            if (view.kind === "done")
-                rows = tasks.filter(t => t.done).sort((a, b) => (b.completed || "").localeCompare(a.completed || "")).slice(0, doneMax)
-            else {
-                rows = tasks.filter(t => !t.done)
-                if (view.kind === "today") rows = rows.filter(t => t.due && t.due.slice(0, 10) <= today)
-                else if (view.kind === "scheduled") rows = rows.filter(t => t.due)
-                else rows = rows.filter(t => t.list_id === view.id)
-            }
-            // Late ones together at the top (a timed one from this morning sorts after today's all-day ones otherwise)
-            if (view.kind === "today" || view.kind === "scheduled")
-                rows = rows.filter(t => t.overdue).concat(rows.filter(t => !t.overdue))
-            shown = rows.map(t => Object.assign({}, t, { section: sectionOf(t) }))
+            shown = Views.rows(tasks, view, viewOptions())
             const i = keep ? shown.findIndex(t => t.id === keep) : -1
             current = i >= 0 ? i : shown.length ? Math.max(0, Math.min(at || 0, shown.length - 1)) : -1
             if (shown.length) listView.positionViewAtIndex(current, ListView.Contain)
         }
         function pickSource(i) {
             if (i < 0 || i >= sources.length) return
+            if (searching) endSearch()
             source = i; filter("")
+        }
+        // The search (/, ⌘F, `tasks search`): the field takes the keys; words given are searched at once
+        function openSearch(words) {
+            if (!searching) { searching = true; filter("", 0) }
+            if (words) { searchBar.field.text = words; query = words }
+            pane = "list"
+            searchBar.field.forceActiveFocus()
+        }
+        function endSearch() { searching = false; query = ""; searchBar.field.text = "" }
+        // Esc: the view picked before, with the task found still picked when it is there
+        function closeSearch() {
+            const keep = shown[current] ? shown[current].id : ""
+            endSearch(); filter(keep, 0); toList()
         }
         // The new task panel: in the list the window shows, or listId; due today when the view is Today, where a task
         // without a day wouldn't show
@@ -163,12 +169,7 @@ ShellRoot {
             if (t) editor.edit(t)
         }
         // Whether a task (cli.py's row of it) shows in the view the window has: if not, the toast says where it went
-        function inView(task) {
-            return view.kind === "list" ? view.id === task.list_id
-                 : view.kind === "today" ? !!task.due && task.due.slice(0, 10) <= today && !task.done
-                 : view.kind === "scheduled" ? !!task.due && !task.done
-                 : task.done
-        }
+        function inView(task) { return Views.shows(task, view, viewOptions()) }
         // What just happened, at the top of the window (the kit's toast)
         function say(t, danger) { toast.show(t, { danger: !!danger }) }
         function offer(t, undo) { toast.show(t, { action: "Undo", run: undo }) }
@@ -183,13 +184,15 @@ ShellRoot {
 
         // Tab moves the keys between the sidebar (↑ ↓ pick a row there) and the tasks, as in Contacts
         property string pane: "list"
-        readonly property bool listFocused: list.activeFocus && pane === "list"
-        function toList() { pane = "list"; list.forceActiveFocus() }
+        readonly property bool listFocused: list.activeFocus && pane === "list" && !searchBar.field.activeFocus
+        // The field is in the same focus scope: it lets go first, or the scope would hand the keys back to it
+        function toList() { pane = "list"; searchBar.field.focus = false; list.forceActiveFocus() }
 
         Shortcut { sequence: "Ctrl+R"; onActivated: win.load() }
         // The toast's Undo while it shows, else the window's newest change; not while a panel's field has the keys
         Shortcut { sequence: "Ctrl+Z"; enabled: !editor.visible && !listOps.busy; onActivated: if (!toast.act()) ops.undo() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
+        Shortcut { sequences: ["Ctrl+F", "Meta+F"]; enabled: !editor.visible && !listOps.busy; onActivated: win.openSearch("") }
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
 
         readonly property int sidebarMin: 640
@@ -220,14 +223,14 @@ ShellRoot {
                     delegate: AppNavRow {
                         required property var modelData
                         required property int index
-                        // A gap between Today and Scheduled and the lists, and before Done
+                        // A gap between Today and Upcoming and the lists, and before Done
                         Layout.topMargin: (modelData.kind === "list" && win.sources[index - 1].kind !== "list") || modelData.kind === "done" ? 14 : 0
                         c: win.look
                         glyph: modelData.glyph
                         label: modelData.name
                         count: modelData.count === 0 ? "" : modelData.count
                         countColor: modelData.kind === "today" && win.tasks.some(t => t.overdue) ? c.danger : c.faint   // something is late
-                        selected: index === win.source
+                        selected: index === win.source && !win.searching
                         active: win.pane === "sources" && list.activeFocus
                         onClicked: { win.pickSource(index); win.toList() }
                     }
@@ -258,6 +261,8 @@ ShellRoot {
                     else if (k === Qt.Key_Home) win.move(-win.shown.length)
                     else if (k === Qt.Key_End) win.move(win.shown.length)
                     else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
+                    else if (k === Qt.Key_Slash || e.text === "/") win.openSearch("")
+                    else if (k === Qt.Key_Escape && win.searching) win.closeSearch()
                     else if (k === Qt.Key_N && !ctrl && (e.modifiers & Qt.ShiftModifier)) listOps.create()
                     else if (k === Qt.Key_N && !ctrl) win.newTask("")
                     else if (k === Qt.Key_F2 && win.view.kind === "list") listOps.rename(win.view)
@@ -273,6 +278,7 @@ ShellRoot {
                     anchors.fill: parent
                     spacing: 0
                     ViewHeader {
+                        visible: !win.searching
                         Layout.fillWidth: true
                         Layout.leftMargin: 28
                         Layout.rightMargin: 28
@@ -282,6 +288,18 @@ ShellRoot {
                         app: win
                         onRenameList: listOps.rename(win.view)
                         onRemoveList: listOps.remove(win.view)
+                        onSearch: win.openSearch("")
+                    }
+                    SearchHeader {
+                        id: searchBar
+                        visible: win.searching
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 28
+                        Layout.rightMargin: 28
+                        Layout.topMargin: 18
+                        Layout.preferredHeight: win.headerHeight
+                        c: win.look
+                        app: win
                     }
                     Rectangle { Layout.fillWidth: true; Layout.topMargin: 17; Layout.preferredHeight: 1; color: c.divider }
 
@@ -318,11 +336,13 @@ ShellRoot {
                             spacing: 8
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                text: win.view.kind === "today" ? "Nothing due today" : win.view.kind === "done" ? "Nothing done yet" : "No tasks here"
+                                text: win.view.kind === "today" ? "Nothing due today" : win.view.kind === "done" ? "Nothing done yet"
+                                    : win.view.kind !== "search" ? "No tasks here"
+                                    : win.query.trim() ? "Nothing found for “" + win.query.trim() + "”" : "Words in a task's title or note"
                                 color: c.faint; font.family: c.font; font.pixelSize: 12
                             }
                             Text {
-                                visible: win.tasks.length === 0
+                                visible: win.tasks.length === 0 && !win.searching
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "n adds one, or ask Claude to"
                                 color: c.faint; font.family: c.font; font.pixelSize: 11
@@ -339,6 +359,7 @@ ShellRoot {
             groups: [
                 { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
+                { title: "Search", keys: [["/  ⌘F", "Search every list"], ["⏎  ↓", "To the tasks found"], ["Esc", "End the search"]] },
                 { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"]] },
                 { title: "Lists", keys: [["⇧N", "New list"], ["F2", "Rename the list"], ["Tab  Delete", "Delete the list (from the sidebar)"]] },
                 { title: "New task, edit", keys: [["⏎  Ctrl ⏎", "Add or save it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }
