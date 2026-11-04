@@ -314,8 +314,9 @@ ShellRoot {
             nm.run(["search", "--output=files", "--exclude=false", q], files => {
                 // …/<account>/<folder>/cur/<file>: the account shown becomes the message's (the one whose inbox has it,
                 // when it was mailed between two of your accounts)
-                const list = files.split("\n").filter(f => f !== "")
-                const m = (list.find(f => /\/INBOX\/(cur|new)\//.test(f)) || list[0] || "").match(/([^\/]+)\/([^\/]+)\/(cur|new)\/[^\/]+$/)
+                // (paths, not list: that name is the thread list's id, which forceActiveFocus() below needs)
+                const paths = files.split("\n").filter(f => f !== "")
+                const m = (paths.find(f => /\/INBOX\/(cur|new)\//.test(f)) || paths[0] || "").match(/([^\/]+)\/([^\/]+)\/(cur|new)\/[^\/]+$/)
                 if (!m) { say("That message is gone"); return }
                 const a = accounts.findIndex(x => x.maildir === m[1])
                 if (a >= 0 && a !== acct) { acct = a; setting("account", accounts[a].id) }
