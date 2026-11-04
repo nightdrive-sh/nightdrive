@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Settings › Region for what Tasks writes outside its window: the notifications, `tasks list` and Claude's due_label.
+"""Settings › Region for what the apps write outside their windows: Tasks' and Calendar's notifications, `tasks list`
+and Claude's due_label. Part of the apps' kit (README.md): an app's Python finds it in app/kit (sys.path).
 
-The window formats with the kit's Regional.qml; this is the same region (LC_TIME in locale.conf, the entry of
+A window formats with the kit's Regional.qml; this is the same region (LC_TIME in locale.conf, the entry of
 regions.json), read through hypr/scripts/region so there is one reading of it, and the same patterns (Dates.js):
 
     current() -> dict          the region's entry: short, day, time …; ISO's when it can't be read
@@ -14,9 +15,8 @@ import re
 from functools import cache
 from pathlib import Path
 
-# The kit's folder is linked into the app (app/kit), and the region script sits beside the kit in the config
-KIT = Path(__file__).resolve().parents[1] / "app" / "kit"
-SCRIPT = KIT.resolve().parents[1] / "hypr" / "scripts" / "region"
+# The region script sits beside the kit in the config: config/quickshell/kit/.. /.. /hypr/scripts/region
+SCRIPT = Path(__file__).resolve().parents[2] / "hypr" / "scripts" / "region"
 ISO = {"name": "ISO 8601", "order": "ymd", "short": "yyyy-MM-dd", "day": "MM-dd", "medium": "d MMM yyyy",
        "long": "ddd d MMMM yyyy", "time": "HH:mm", "weekStart": 1}   # Regional.qml's own fallback
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",

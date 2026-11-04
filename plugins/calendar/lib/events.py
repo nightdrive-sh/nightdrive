@@ -8,8 +8,10 @@ FROM is the first day, TO the day after the last (YYYY-MM-DD), so a week is MOND
 khal expands the recurring events (RRULE, RDATE, EXDATE, a changed occurrence) into each of their times and keeps an
 index of the .ics files in its own database, so a month is read in a moment after the first time.
 
-An event: uid, calendar (id), calendar_name, color, title, start, end, all_day, location, notes, recurring. start and
-end are local time, YYYY-MM-DDTHH:MM, or the day, YYYY-MM-DD, for an all-day event, whose end is its last day.
+An event: uid, calendar (id), calendar_name, color, title, start, end, all_day, location, notes, recurring, reminder.
+start and end are local time, YYYY-MM-DDTHH:MM, or the day, YYYY-MM-DD, for an all-day event, whose end is its last
+day. reminder: its first alarm in minutes before the start (alarms.py: 0 at the start; an all-day event's -540 is
+9:00 on the day), or null: read from the event's file, which khal doesn't tell.
 """
 
 import datetime as dt
@@ -17,6 +19,7 @@ import json
 import subprocess
 import sys
 
+import alarms
 import calendars
 
 LIMIT = 200         # the default: a busy month, short enough for Claude to read
@@ -74,8 +77,9 @@ def event(row, names):
     return e
 
 
-def events(first, after, calendar=None, search=""):
-    """Every event in the range, the earliest first"""
+def events(first, after, calendar=None, search="", reminders=True):
+    """Every event in the range, the earliest first; reminders=False leaves out reading their files (remind.py reads
+    every alarm itself)"""
     found = calendars.calendars()
     names = {c["id"]: c for c in found}
     if calendar and calendar not in names:
@@ -96,6 +100,12 @@ def events(first, after, calendar=None, search=""):
     words = search.lower().split()
     if words:
         out = [e for e in out if all(w in f"{e['title']}\n{e['location']}\n{e['notes']}".lower() for w in words)]
+    if reminders:
+        files = alarms.Files(found)
+        for e in out:
+            vevent = files.event(e["calendar"], e["uid"], alarms.local(dt.date.fromisoformat(e["start"]) if e["all_day"]
+                                                                        else dt.datetime.fromisoformat(e["start"])))
+            e["reminder"] = alarms.reminder(vevent) if vevent is not None else None
     # All-day ones first on their day, then by time
     out.sort(key=lambda e: (e["start"][:10], not e["all_day"], e["start"], e["title"].lower()))
     return out

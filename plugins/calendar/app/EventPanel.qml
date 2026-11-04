@@ -1,6 +1,7 @@
 import QtQuick
 import qs.kit
 import "Dates.js" as Dates
+import "Form.js" as Form
 
 // An event, opened from a view: its title, when, where, its calendar and notes, with Edit (e), which opens it in the
 // editor, and Delete (Del, ⌫), which asks first (EventDelete). A recurring event, or one in a read-only calendar, says
@@ -47,6 +48,15 @@ AppPanel {
         width: parent.width; wrapMode: Text.Wrap
         text: root.event ? Dates.span(root.event, Regional) + (root.event.recurring ? "  ·  repeats" : "") : ""
         color: c.text; font.family: c.font; font.pixelSize: 12
+    }
+    // Its reminder (#2006), when it has one: what the notification will say, and when
+    Text {
+        readonly property string said: root.event ? Form.reminderText(root.event, Regional.time("09:00")) : ""
+        textFormat: Text.PlainText
+        visible: said !== ""
+        width: parent.width; wrapMode: Text.Wrap
+        text: "Reminder " + said
+        color: c.dim; font.family: c.font; font.pixelSize: 12
     }
     Text {
         textFormat: Text.PlainText

@@ -30,7 +30,7 @@ function blank(dayText, now, hour, minute) {
     else start = "09:00"
     const end = later(dayText, start, 60)
     return { title: "", startDay: dayText, startTime: start, endDay: end[0], endTime: end[1], allDay: false,
-             calendar: "", location: "", notes: "" }
+             calendar: "", location: "", notes: "", reminder: "none" }
 }
 
 // What is wrong with the fields, in words for the panel, or "" when the event can be added. f's days and times are
@@ -54,16 +54,52 @@ function payload(f) {
                   end: f.allDay ? f.endDay : f.endDay + "T" + f.endTime }
     if (f.location.trim()) out.location = f.location.trim()
     if (f.notes.trim()) out.notes = f.notes.trim()
+    if (f.reminder !== "none") out.reminder = reminderValue(f.reminder)
     return out
 }
 
 // What `calendar edit` reads on stdin (lib/change.py): every field, so an emptied location or notes is cleared there
-// (payload leaves them out), and move_to only when the calendar was changed from the one the event was in
-function edits(f, was) {
+// (payload leaves them out), and move_to only when the calendar was changed from the one the event was in. The
+// reminder only when it was changed (reminderWas, a chip's id): it replaces every alarm the event has (the phone may
+// have set two), so an edit of the title alone leaves them be
+function edits(f, was, reminderWas) {
     const out = payload(f)
     delete out.calendar
+    delete out.reminder
+    if (f.reminder !== reminderWas) out.reminder = reminderValue(f.reminder)
     out.location = f.location.trim()
     out.notes = f.notes.trim()
     if (f.calendar !== was) out.move_to = f.calendar
     return out
+}
+
+// The editor's Reminder (#2006) as chips: ids are the minutes before the start as text, "none" for none (lib/alarms.py).
+// An all-day event starts at its midnight, so its choices are 9:00 on the day (-540) and the day before (900), as the
+// phone's; nine is nineAm, the region's way. A reminder the event has that isn't a choice (2 hours, set on the phone)
+// is one more chip, so it shows and stays as it is
+function reminderLabel(m) {
+    if (m === 0) return "At the start"
+    if (m % 1440 === 0) return m === 1440 ? "1 day" : (m / 1440) + " days"
+    if (m % 60 === 0) return m === 60 ? "1 hour" : (m / 60) + " hours"
+    return m + " min"
+}
+function reminderOptions(allDay, current, nineAm) {
+    const out = [{ id: "none", name: "None" }]
+    const list = allDay ? [[-540, "On the day, " + nineAm], [900, "The day before, " + nineAm]]
+                        : [0, 5, 15, 60, 1440].map(m => [m, reminderLabel(m)])
+    for (const x of list) out.push({ id: String(x[0]), name: x[1] })
+    if (current !== "none" && !out.some(o => o.id === current))
+        out.push({ id: current, name: allDay ? "Its own (" + current + " min)" : reminderLabel(+current) })
+    return out
+}
+// calendar events' reminder (minutes, or null) as a chip's id, and back as the JSON add and edit take
+function reminderId(m) { return m === null || m === undefined ? "none" : String(m) }
+function reminderValue(id) { return id === "none" ? null : +id }
+// The event panel's words for an event's reminder: "15 min before", "at the start", "9:00 the day before"; "" for none
+function reminderText(e, nineAm) {
+    const m = e.reminder
+    if (m === null || m === undefined) return ""
+    if (e.all_day && m === -540) return nineAm + " on the day"
+    if (e.all_day && m === 900) return nineAm + " the day before"
+    return m === 0 ? "at the start" : m < 0 ? reminderLabel(-m) + " after the start" : reminderLabel(m) + " before"
 }

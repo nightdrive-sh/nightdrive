@@ -1,0 +1,8 @@
+# Calendar's reminders (plugins/calendar): notifies the events' reminders whose time has come, with Open and Snooze. Run
+# every minute by nightdrive-calendar-remind.timer; each notification waits in a unit of its own (lib/remind.py).
+[Unit]
+Description=Nightdrive Calendar: notify the events' reminders
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/calendar remind

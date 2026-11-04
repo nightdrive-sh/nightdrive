@@ -14,9 +14,13 @@ user writes 12 h, and anyone may.
 """
 
 import re
+import sys
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 
-import region
+# The kit's region.py (Settings › Region), through the app's link to the kit
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app" / "kit"))
+import region  # noqa: E402
 
 MORNING = time(9, 0)   # an all-day task's notification, on its day
 LATER = timedelta(hours=1)   # Later on a task with a time; one with only a date goes to the next day

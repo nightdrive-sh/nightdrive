@@ -9,7 +9,8 @@ import "Dates.js" as Dates
 // Nightdrive Calendar: the calendars in the sidebar, the month, the week, the day or the agenda on the right, over the
 // events the sync keeps in ~/.local/share/calendar (`calendar events` reads them by khal). An event opens in EventPanel;
 // a new one is added, and one opened is changed, in EventEditor (`calendar add`, `calendar edit`), or deleted after
-// EventDelete asks (`calendar delete`). / searches them (SearchView).
+// EventDelete asks (`calendar delete`). / searches them (SearchView). ⌘, opens Settings (SettingsPanel: the reminders,
+// which lib/remind.py notifies; a reminder's Open comes back here as showEvent).
 ShellRoot {
     id: shell
     FloatingWindow {
@@ -41,6 +42,11 @@ ShellRoot {
             function search(text: string): void { win.openSearch(text) }
             // The new event panel on a day, YYYY-MM-DD, or the picked one (`calendar new [DAY]`)
             function newEvent(day: string): void { win.newEvent(/^\d{4}-\d{2}-\d{2}$/.test(day) ? day : win.day) }
+            // Settings (the kit's `calendar settings`)
+            function openSettings(): void { settingsPanel.open() }
+            // An event open on its day (a reminder's Open: `calendar open-event CALENDAR UID [DAY]`), once the day's
+            // events are read; DAY tells a recurring event's time apart
+            function showEvent(calendar: string, uid: string, day: string): void { win.showEvent(calendar, uid, day) }
         }
 
         readonly property int headerHeight: 22  // the sidebar's title line and the view's header, as Contacts'
@@ -101,7 +107,7 @@ ShellRoot {
             reader.command = [command, "events", "--json", "--limit", "100000", r[0], r[1]]
             reader.running = true
         }
-        function reload() { calReader.running = true; load(true) }
+        function reload() { calReader.running = true; load(true); if (settingsPanel.visible) settingsPanel.load() }
         onDayChanged: load(false)
         onViewChanged: load(false)
 
@@ -124,7 +130,7 @@ ShellRoot {
                     let d
                     try { d = JSON.parse(text) } catch (e) { return }
                     // Only the range asked last: a quick ‹ › ‹ mustn't leave an older month's events on screen
-                    if (d.from + " " + d.to === win.range) win.events = d.events
+                    if (d.from + " " + d.to === win.range) { win.events = d.events; win.openPending() }
                 }
             }
             stderr: StdioCollector { onStreamFinished: if (text.trim()) win.say(text.trim().split("\n").pop(), false, true) }
@@ -163,6 +169,24 @@ ShellRoot {
             say(r.name + (!r.custom ? " has its own colour back" : r.color_name ? " is " + r.color_name + " now" : " is " + r.color + " now"),
                 false, false, "Undo", () => colorUndo.run(r.id, r.previous))
         }
+        // showEvent's event, opened once the read of its day brings it (or said to be gone, as the phone may have moved it)
+        property var pending: null
+        function showEvent(cal, uid, d) {
+            const target = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : day
+            pending = { calendar: cal, uid: uid, day: target }
+            searching = false
+            if (settingsPanel.visible) settingsPanel.close()   // it would cover the event
+            if (target !== day) day = target    // a new range is read (load), and openPending follows the read
+            if (!reader.running) openPending()  // the range was read already
+        }
+        function openPending() {
+            if (!pending) return
+            const p = pending
+            pending = null
+            const e = events.find(x => x.calendar === p.calendar && x.uid === p.uid && Dates.onDay(x, p.day))
+            if (e) openEvent(e)
+            else say("That event isn't on " + Regional.format(Dates.parse(p.day), "medium") + " any more.", false, true)
+        }
         // ⏎ on a day: its first event
         function openFirst() { const list = byDay[day] || []; if (list.length) openEvent(list[0]) }
 
@@ -198,6 +222,7 @@ ShellRoot {
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
         Shortcut { sequence: "Ctrl+Z"; onActivated: toast.act() }   // the toast's Undo (a colour)
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
+        Shortcut { sequences: ["Ctrl+,", "Meta+,"]; onActivated: settingsPanel.visible ? settingsPanel.close() : settingsPanel.open() }
 
         readonly property int sidebarMin: 820
         property var sidebarChoice: null    // ⌘B's, over what the width says
@@ -403,6 +428,13 @@ ShellRoot {
                 win.say("Deleted: " + r.title + (r.synced ? "" : ". The next sync takes it from the server."))
             }
         }
+        SettingsPanel {
+            id: settingsPanel
+            behind: content
+            c: win.look
+            app: win
+            onClosed: win.refocus()
+        }
         EventEditor {
             id: editor
             behind: content
@@ -426,7 +458,7 @@ ShellRoot {
                 { title: "Calendar", keys: [["← →  h l", "Previous, next day"], ["↑ ↓  k j", "A week back, on"], ["PgUp PgDn  [ ]", "Previous, next month, week, day, agenda's days"],
                                            ["t", "Today"], ["m  w  d  a", "Month, week, day, agenda"], ["⏎", "Open the day's first event"], ["n", "New event"], ["/", "Search"]] },
                 { title: "Agenda, search", keys: [["↑ ↓  j k", "Previous, next event"], ["⏎", "Open it"], ["/", "To the search's words"], ["Esc", "Leave the search"]] },
-                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["c", "The calendar's colour"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"]] },
+                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["c", "The calendar's colour"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"], ["⌘,", "Settings: reminders"]] },
                 { title: "An event", keys: [["e", "Edit it"], ["Del  ⌫", "Delete it (asks first)"], ["Esc  ⏎", "Close it"]] },
                 { title: "New or edited event", keys: [["⏎  Ctrl ⏎", "Save it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }
             ]

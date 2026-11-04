@@ -3,16 +3,18 @@
 
     change.py edit [--json] CALENDAR UID   stdin: a JSON object of what changes, the rest stays as it is:
                                          title, start, end, location, notes ("" clears those two), move_to (a calendar
-                                         id or name the event goes to)
+                                         id or name the event goes to), reminder (minutes before
+                                         the start, alarms.py; null: none)
     change.py restore [--json] UNDO        puts the event back as it was before the edit that printed UNDO
 
 start and end are write.py's forms (YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day, whose end is its last day). A start
 without an end keeps the event's length, unless it turns a timed event into an all-day one or back (an hour, a day).
 
-The event keeps its UID and everything Calendar doesn't show (alarms, invitees, the phone's own fields): only the fields
-above are written, with SEQUENCE one up, so the server and the phone take it as a newer version. A move is the event
-written into the other calendar's folder and removed from its own, then both synced, the old one first: iCloud refuses
-a UID that is in two calendars of the account at once. A recurring event isn't changed (write.one_event says so).
+The event keeps its UID and everything Calendar doesn't show (invitees, the phone's own fields; its alarms, unless a
+reminder is given, which takes their place): only the fields above are written, with SEQUENCE one up, so the server
+and the phone take it as a newer version. A move is the event written into the other calendar's folder and removed
+from its own, then both synced, the old one first: iCloud refuses a UID that is in two calendars of the account at
+once. A recurring event isn't changed (write.one_event says so).
 
 Each edit keeps the files as they were (STATE_DIR/undo, the last KEEP_UNDO), and restore puts them back only while
 they are still as the edit left them: an undo an hour later mustn't write over a change made since, here or on the phone.
@@ -26,13 +28,14 @@ import sys
 import time
 from pathlib import Path
 
+import alarms
 import calendars
 import sources
 import write
 
 UNDO_DIR = sources.STATE_DIR / "undo"
 KEEP_UNDO = 100
-FIELDS = ("title", "start", "end", "location", "notes", "move_to")
+FIELDS = ("title", "start", "end", "location", "notes", "move_to", "reminder")
 
 
 def aware(value):
@@ -136,6 +139,8 @@ def edit(calendar_id, uid, data):
             event.pop(field, None)
             if (data[key] or "").strip():
                 event.add(field, data[key].strip())
+    if "reminder" in data:
+        alarms.set_reminder(event, alarms.minutes(data["reminder"]))
     old = path.read_bytes()
     event.add("sequence", seq + 1)
     now = dt.datetime.now(dt.timezone.utc)

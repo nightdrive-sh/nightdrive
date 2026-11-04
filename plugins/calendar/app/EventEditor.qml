@@ -6,7 +6,7 @@ import "Form.js" as Form
 import "kit/Dates.js" as KitDates
 
 // A new event, or one being changed, in a panel over the window: its title, first and last day with the times (or all
-// day), the calendar it goes in, where and notes. Saved by `calendar add` (lib/write.py) or `calendar edit`
+// day), its reminder, the calendar it goes in, where and notes. Saved by `calendar add` (lib/write.py) or `calendar edit`
 // (lib/change.py), which write it here and sync it up at once; the panel waits for that, so what went wrong (the server,
 // a calendar gone) is said here, where it can still be fixed. ⏎ in a field or Ctrl+⏎ saves, Esc leaves it.
 AppPanel {
@@ -17,6 +17,7 @@ AppPanel {
     property int duration: 60           // minutes from start to end, kept when the start moves
     property string lastCalendar: ""    // the one used last, picked again for the next event
     property var editing: null          // the event being changed (calendar events' JSON), null for a new one
+    property string reminderWas: "none" // its reminder as it was (Form.reminderId), so an edit changes it only when asked
     readonly property int timeWidth: Regional.h24 ? 72 : 88   // "12:30 PM" needs more than "12:30"
     readonly property var writable: app.calendars.filter(x => !x.read_only)
     signal saved(var event, bool edited) // calendar add's or edit's JSON: uid, calendar_name, title, when, synced…
@@ -35,6 +36,7 @@ AppPanel {
         endDay.text = showDay(f.endDay); endTime.text = showTime(f.endTime)
         allDay.on = false
         location.text = ""; notes.text = ""
+        reminderWas = "none"; reminder.picked = "none"
         duration = 60
         picker.picked = writable.some(x => x.id === lastCalendar) ? lastCalendar : (writable.length ? writable[0].id : "")
         error = ""
@@ -49,6 +51,7 @@ AppPanel {
         startDay.text = showDay(e.start.slice(0, 10)); startTime.text = e.all_day ? "" : showTime(e.start.slice(11, 16))
         endDay.text = showDay(e.end.slice(0, 10)); endTime.text = e.all_day ? "" : showTime(e.end.slice(11, 16))
         location.text = e.location || ""; notes.text = e.notes || ""
+        reminderWas = Form.reminderId(e.reminder); reminder.picked = reminderWas
         duration = e.all_day ? Form.between(e.start.slice(0, 10), "00:00", e.end.slice(0, 10), "00:00")
                              : Form.between(e.start.slice(0, 10), e.start.slice(11, 16), e.end.slice(0, 10), e.end.slice(11, 16))
         picker.picked = e.calendar
@@ -68,7 +71,7 @@ AppPanel {
     function fields() {
         return { title: title.text, startDay: readDay(startDay.text), startTime: Regional.parseTime(startTime.text),
                  endDay: readDay(endDay.text), endTime: Regional.parseTime(endTime.text), allDay: allDay.on,
-                 calendar: picker.picked, location: location.text, notes: notes.text }
+                 calendar: picker.picked, location: location.text, notes: notes.text, reminder: reminder.picked }
     }
     // A day or time field left: shown the way it was read, so "930" becomes 09:30 and "5.11." 5.11.2026 before the eyes
     function tidyDay(field) { const v = readDay(field.text); if (v) field.text = showDay(v) }
@@ -108,6 +111,8 @@ AppPanel {
     function entered(field) { if (field.input.activeFocus) field.input.selectAll() }
     function toggleAllDay() {
         allDay.on = !allDay.on
+        // A timed event's reminder means nothing to an all-day one, and back: none, unless it was the event's own
+        reminder.picked = reminderWas !== "none" && reminder.options.some(o => o.id === reminderWas) ? reminderWas : "none"
         // All day keeps the days; back to times, an hour from the start's time
         const f = fields()
         duration = allDay.on && f.startDay && f.endDay ? Form.between(f.startDay, "00:00", f.endDay, "00:00") : 60
@@ -126,7 +131,7 @@ AppPanel {
         busy = true
         if (editing) {
             writer.command = [app.command, "edit", "--json", editing.calendar, editing.uid]
-            writer.input = JSON.stringify(Form.edits(f, editing.calendar))
+            writer.input = JSON.stringify(Form.edits(f, editing.calendar, reminderWas))
         } else {
             lastCalendar = f.calendar
             writer.command = [app.command, "add", "--json"]
@@ -237,6 +242,16 @@ AppPanel {
             }
             Text { text: "All day"; color: root.c.text; font.family: root.c.font; font.pixelSize: 13 }
         }
+    }
+    // Its reminder, a notification that long before (lib/remind.py); the options follow All day
+    AppChips {
+        id: reminder
+        c: root.c
+        width: parent.width
+        label: "Reminder"
+        options: Form.reminderOptions(allDay.on, root.reminderWas, Regional.time("09:00"))
+        onAccepted: root.save()
+        onEscaped: root.close()
     }
     CalendarPicker {
         id: picker

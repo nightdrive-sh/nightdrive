@@ -2,7 +2,7 @@
 """Adding and deleting events: `calendar add` and `calendar delete` (Claude's calendar_add and calendar_delete).
 
     write.py add [--json]                    the event on stdin as JSON, or as options (below)
-        --calendar ID --title T --start S [--end E] [--location L] [--notes N]
+        --calendar ID --title T --start S [--end E] [--location L] [--notes N] [--reminder MINUTES]
     write.py delete [--check] CALENDAR UID   --check: stdin's JSON must name the event (title, start), as Claude's
                                              confirmation card showed it, or nothing is deleted
     write.py shared [--calendar ID] [--from ID]
@@ -12,7 +12,8 @@
                                              to that calendar (Nightdrive remembers it, #1929)
 
 start and end are local times, "YYYY-MM-DDTHH:MM", or days, "YYYY-MM-DD", for an all-day event; an all-day event's
-end is its last day (not iCalendar's day after). Without end: an hour, or the one day.
+end is its last day (not iCalendar's day after). Without end: an hour, or the one day. reminder: an alarm that many
+minutes before the start (alarms.py: 0 at the start, -540 9:00 on an all-day event's day), none without it.
 
 The event is a new .ics in the calendar's folder, then `calendar sync SOURCE/CALENDAR` takes it to the server (or the next
 round does, when it can't now). Only a calendar of a CalDAV account that isn't read-only takes one: the ICS ones are
@@ -30,6 +31,7 @@ from pathlib import Path
 
 import icalendar
 
+import alarms   # it imports this file too: each uses the other's functions only once loaded
 import calendars
 
 COMMAND = Path(__file__).resolve().parents[1] / "bin/calendar"
@@ -135,6 +137,7 @@ def add(data):
     for key, field in (("location", "location"), ("notes", "description")):
         if (data.get(key) or "").strip():
             event.add(field, data[key].strip())
+    alarms.set_reminder(event, alarms.minutes(data.get("reminder")))
     ics = icalendar.Calendar()
     ics.add("prodid", PRODID)
     ics.add("version", "2.0")

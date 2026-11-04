@@ -9,6 +9,7 @@ CALENDARS=$CONFIG_DIR/calendars.conf                    # Calendar's own additio
 VDIRSYNCER_CONFIG=$CONFIG_DIR/vdirsyncer                # written by lib/sources.py
 DATA_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/calendar  # the events, a folder per source and calendar
 SYNC_UNIT=nightdrive-calendar-sync.service              # systemd/, `calendar enable`
+REMIND_UNIT=nightdrive-calendar-remind.service          # systemd/: the reminders' notifications, every minute
 SYNC_LOCK=${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/calendar-sync.lock
 KEYRING_SERVICE=nightdrive-calendar                     # an ICS address's keyring entry: service … ics NAME
 QS_DIR=$APP_DIR/app                                     # Calendar's own Quickshell config, apart from the desktop's
@@ -95,16 +96,20 @@ uninstall_app() {
   rm -f "$data/applications/nightdrive-calendar.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-calendar.svg"
 }
 
-# The sync's units in the plugin's folder, enabled by their path (as Contacts': that links them again after a disable)
+# The sync's and the reminders' units in the plugin's folder, enabled by their path (as Contacts': that links them
+# again after a disable)
 enable() {
   install_app
-  systemctl --user link "$APP_DIR/systemd/$SYNC_UNIT" >/dev/null
-  systemctl --user enable --now "$APP_DIR/systemd/${SYNC_UNIT%.service}.timer"
+  local unit
+  for unit in "$SYNC_UNIT" "$REMIND_UNIT"; do
+    systemctl --user link "$APP_DIR/systemd/$unit" >/dev/null
+    systemctl --user enable --now "$APP_DIR/systemd/${unit%.service}.timer"
+  done
 }
 disable() {
-  systemctl --user disable --now "${SYNC_UNIT%.service}.timer" 2>/dev/null
+  systemctl --user disable --now "${SYNC_UNIT%.service}.timer" "${REMIND_UNIT%.service}.timer" 2>/dev/null
   uninstall_app
-  echo "The sync is off. Your events stay in $DATA_DIR."
+  echo "The sync and the reminders are off. Your events stay in $DATA_DIR."
 }
 
 usage() {
@@ -117,6 +122,9 @@ Usage: calendar [command]
                  open Calendar on the month, the week, the day or the agenda (the 30 days from today)
   search [TEXT]  open Calendar's search (on TEXT): half a year back and ahead
   new [DAY]      open Calendar with a new event on DAY (YYYY-MM-DD; the day it shows without one)
+  open-event CALENDAR UID [DAY]
+                 open Calendar on an event (a reminder's Open; DAY: the time of a recurring one, YYYY-MM-DD)
+  settings       open Calendar's settings
   calendars      the calendars on this computer (--json)
   events FROM TO the events from FROM up to TO (YYYY-MM-DD; TO not included), recurring ones as each time
                  (--json; --calendar ID, --search TEXT)
@@ -131,11 +139,18 @@ Usage: calendar [command]
                  reset gives the server's back (--json)
   delete CALENDAR UID
                  delete an event (not a recurring one) here and on the server
+  reminders [--days N]
+                 whether reminders are on, and those of the next N days (1) (--json)
+  reminders on|off
+                 the events' reminders as notifications, or none
+  reminders default none|MINUTES
+                 a timed event without a reminder of its own gets one MINUTES before (0, 5, 10, 15, 30, 60)
+  remind         notify the reminders whose time has come (the timer runs it every minute)
   sync [NAME…]   sync every account's calendars (or these: an account, or a calendar as ACCOUNT/ID) now
                  (--force-delete first: a calendar emptied here empties the server's too)
   subscribe NAME [TITLE]
                  a calendar read from its private ICS address (Google's), kept in the login keyring
-  enable         Calendar among the desktop's apps, and the sync every 15 minutes (the installer)
+  enable         Calendar among the desktop's apps, the sync every 15 minutes and the reminders (the installer)
   disable        take them away again (your events stay)
   restart        close and open again (after a change to the app)
   quit           close Calendar
@@ -152,6 +167,15 @@ case ${1:-open} in
   month|week|day|agenda) open_ready; ipc setView "$1" ;;
   search)    open_ready; ipc search "${*:2}" ;;
   new)       open_ready; ipc newEvent "${2:-}" ;;
+  open-event)
+    (($# >= 3)) || { echo "Usage: calendar open-event CALENDAR UID [DAY]" >&2; exit 2; }
+    open_ready; ipc showEvent "$2" "$3" "${4:-}" ;;
+  remind)    exec python3 "$LIB/remind.py" check ;;
+  reminders)
+    python3 "$LIB/remind.py" "${@:2}"; status=$?
+    # on, off and default change what the window's Settings show
+    [[ " ${*:2} " =~ \ (on|off|default)\  ]] && ((status == 0)) && running && ipc refresh >/dev/null 2>&1
+    exit $status ;;
   calendars) python3 "$LIB/calendars.py" "${@:2}" ;;
   events)    python3 "$LIB/events.py" "${@:2}" ;;
   shared)    exec python3 "$LIB/write.py" "$@" ;;   # Claude's calendar_add: whether it asks first

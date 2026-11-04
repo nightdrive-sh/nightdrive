@@ -1,0 +1,12 @@
+# The events' reminders every minute (plugins/calendar; `calendar enable` turns it on, the plugin's installer runs that)
+[Unit]
+Description=Nightdrive Calendar: look for reminders every minute
+
+[Timer]
+OnCalendar=minutely
+AccuracySec=5s
+# A reminder that came while the computer slept shows when it wakes
+Persistent=true
+
+[Install]
+WantedBy=timers.target
