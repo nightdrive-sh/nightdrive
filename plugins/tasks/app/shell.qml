@@ -7,6 +7,7 @@ import qs.kit
 
 // Nightdrive Tasks: Today, Scheduled and the lists in the sidebar, their tasks on the right. New (n) adds one and ⏎ or e
 // changes one, in a panel (TaskEditor); Space ticks one off and Delete trashes it, with Undo in the toast (Actions).
+// ⇧N, F2 and Delete in the sidebar make, rename and delete a list (ListActions, the buttons in ViewHeader).
 // Changes come from Claude (mcp.json), the `tasks` command and the notifications' Done and Later too, which all ask it
 // to read them again (`tasks …` calls refresh). lib/cli.py reads and writes the VTODO files.
 ShellRoot {
@@ -32,6 +33,10 @@ ShellRoot {
                 const l = win.lists.find(x => x.id === list || x.name.toLowerCase() === list.toLowerCase())
                 win.newTask(l ? l.id : "")
             }
+            // The lists' panels, as ⇧N, F2 and Delete in the sidebar open them, for the list on show
+            function newList(): void { listOps.create() }
+            function renameList(): void { if (win.view.kind === "list") listOps.rename(win.view) }
+            function removeList(): void { if (win.view.kind === "list") listOps.remove(win.view) }
             // The panel for a task of the view by number from 1 (0: the picked one), as ⏎ opens it
             function edit(row: int): void { win.editTask(row > 0 ? row - 1 : win.current) }
             // A row of the sidebar by its name (Today, Scheduled, a list, Done), and a task in it by number from 1
@@ -66,6 +71,7 @@ ShellRoot {
         property int current: -1
 
         property string keepNext: ""        // a task to pick once the next read is in (the one just added)
+        property string keepList: ""        // a list's id to show then (one just made, renamed or brought back)
         function load() { loader.running = true }
         Process {
             id: loader
@@ -76,13 +82,14 @@ ShellRoot {
                     try { d = JSON.parse(text) } catch (e) { console.warn("cli.py list: " + e); return }
                     const keep = win.keepNext || (win.shown[win.current] ? win.shown[win.current].id : "")
                     win.keepNext = ""
-                    const was = win.view.kind === "list" ? win.view.id : ""
+                    const was = win.keepList || (win.view.kind === "list" ? win.view.id : "")
+                    win.keepList = ""
                     win.tasks = d.tasks
                     win.lists = d.lists
                     win.today = d.now.slice(0, 10)
                     win.loaded = true
-                    // The same list stays picked when one before it comes or goes
-                    if (was) { const i = win.sources.findIndex(s => s.id === was); if (i >= 0) win.source = i }
+                    // The same list stays picked when one before it comes or goes; Today when it has gone itself
+                    if (was) { const i = win.sources.findIndex(s => s.id === was); win.source = i >= 0 ? i : 0 }
                     win.source = Math.min(win.source, win.sources.length - 1)
                     win.filter(keep, win.current)
                 }
@@ -181,7 +188,7 @@ ShellRoot {
 
         Shortcut { sequence: "Ctrl+R"; onActivated: win.load() }
         // The toast's Undo while it shows, else the window's newest change; not while a panel's field has the keys
-        Shortcut { sequence: "Ctrl+Z"; enabled: !editor.visible; onActivated: if (!toast.act()) ops.undo() }
+        Shortcut { sequence: "Ctrl+Z"; enabled: !editor.visible && !listOps.busy; onActivated: if (!toast.act()) ops.undo() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
 
@@ -201,6 +208,10 @@ ShellRoot {
                 visible: win.sidebarShown
                 c: win.look
                 title: "Tasks"
+                titleItems: AppIconButton {
+                    c: win.look; glyph: "list-plus"; tip: "New list"; keys: "⇧N"; tipAlign: "right"
+                    onClicked: listOps.create()
+                }
                 headerHeight: 2 * 18 + win.headerHeight
                 contentTop: 18 + win.headerHeight + win.headerGap
                 bottomMargin: 24
@@ -247,7 +258,10 @@ ShellRoot {
                     else if (k === Qt.Key_Home) win.move(-win.shown.length)
                     else if (k === Qt.Key_End) win.move(win.shown.length)
                     else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
+                    else if (k === Qt.Key_N && !ctrl && (e.modifiers & Qt.ShiftModifier)) listOps.create()
                     else if (k === Qt.Key_N && !ctrl) win.newTask("")
+                    else if (k === Qt.Key_F2 && win.view.kind === "list") listOps.rename(win.view)
+                    else if (k === Qt.Key_Delete && !ctrl && win.pane === "sources") { if (win.view.kind === "list") listOps.remove(win.view) }
                     else if ((k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_E) && !ctrl) win.editTask()
                     else if (k === Qt.Key_Space && !ctrl) win.toggleDone()
                     else if (k === Qt.Key_Delete && !ctrl) ops.trash(win.shown[win.current])
@@ -258,32 +272,16 @@ ShellRoot {
                 ColumnLayout {
                     anchors.fill: parent
                     spacing: 0
-                    // The view's name level with the sidebar's title
-                    RowLayout {
+                    ViewHeader {
                         Layout.fillWidth: true
                         Layout.leftMargin: 28
                         Layout.rightMargin: 28
                         Layout.topMargin: 18
                         Layout.preferredHeight: win.headerHeight
-                        Text {
-                            textFormat: Text.PlainText
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            text: win.view.name
-                            color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium
-                        }
-                        Text {
-                            textFormat: Text.PlainText
-                            text: win.shown.length ? win.shown.length + (win.view.kind === "done" ? " done" : " open") : ""
-                            color: c.faint; font.family: c.font; font.pixelSize: 11
-                        }
-                        // Higher than the header's text (AppButton's 28): it reaches a little over and under it
-                        AppButton {
-                            Layout.leftMargin: 12
-                            // The glyph alone in a narrow window, where the view's name needs the room
-                            c: win.look; glyph: "plus"; label: win.width < 560 ? "" : "New"; tip: "New task"; keys: "n"; tipAlign: "right"
-                            onClicked: win.newTask("")
-                        }
+                        c: win.look
+                        app: win
+                        onRenameList: listOps.rename(win.view)
+                        onRemoveList: listOps.remove(win.view)
                     }
                     Rectangle { Layout.fillWidth: true; Layout.topMargin: 17; Layout.preferredHeight: 1; color: c.divider }
 
@@ -342,6 +340,7 @@ ShellRoot {
                 { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"]] },
+                { title: "Lists", keys: [["⇧N", "New list"], ["F2", "Rename the list"], ["Tab  Delete", "Delete the list (from the sidebar)"]] },
                 { title: "New task, edit", keys: [["⏎  Ctrl ⏎", "Add or save it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }
             ]
         }
@@ -364,6 +363,14 @@ ShellRoot {
                 win.load()
                 win.say(win.inView(task) ? "Saved" : "Moved to " + task.list + (task.due ? ", " + win.dueLabel(task.due) : ""))
             }
+        }
+        ListActions {
+            id: listOps
+            c: win.look
+            app: win
+            ops: ops
+            behind: content
+            onClosed: win.toList()
         }
         // Last, over the panel too
         AppToast { id: toast; c: win.look }

@@ -10,6 +10,8 @@
     cli.py edit --json --stdin      the same as JSON: {id, and what changes of title, day, time, list, note, priority}
     cli.py done [--json] ID         cli.py undone [--json] ID       cli.py snooze [--json] [--until WHEN] ID
     cli.py trash [--json] ID        cli.py restore [--json] UNDO
+    cli.py list-new [--json] NAME   cli.py list-rename [--json] LIST NAME
+    cli.py list-remove [--json] [--with-tasks] LIST       (lists.py)
 
 Each change prints, with --json, the task as `list` gives it and `undo`: the id `restore` takes to put back what the
 change changed (Claude's undo, config/mcp/undo.py). Errors go to stderr, written for a reader, with exit status 1.
@@ -21,6 +23,7 @@ import sys
 from datetime import datetime
 
 import ics
+import lists
 import store
 import when
 
@@ -35,8 +38,7 @@ def priority(task):
     return "high" if 1 <= n <= 4 else "low" if n >= 6 else ""
 
 
-def is_done(task):
-    return task.get("STATUS").upper() in ("COMPLETED", "CANCELLED") or task.line("COMPLETED") is not None
+is_done = store.is_done
 
 
 def overdue(due, now):
@@ -301,6 +303,7 @@ def parser():
     c.add_argument("id")
     command("trash", cmd_trash).add_argument("id")
     command("restore", cmd_restore).add_argument("undo")
+    lists.add_commands(command)
     return p
 
 

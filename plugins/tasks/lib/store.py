@@ -83,6 +83,10 @@ def load(lst=None):
     return out
 
 
+def is_done(task):
+    return task.get("STATUS").upper() in ("COMPLETED", "CANCELLED") or task.line("COMPLETED") is not None
+
+
 def find(uid):
     """A task by its UID, or by the start of one when only one task's starts so"""
     every = load()
@@ -115,12 +119,14 @@ def snapshot(paths, made=None):
     return sid
 
 
-def settle(sid):
-    """After the change: the files as it left them (None for one it removed), so restore() can tell an edit made since"""
+def settle(sid, names=False):
+    """After the change: the files as it left them (None for one it removed), so restore() can tell an edit made since.
+    A list's name is left out, so a task added in a new list can be undone after the list is renamed, unless names:
+    a change of the lists themselves (lists.py), whose undo mustn't write over a list made or renamed since"""
     snap = UNDO / f"{sid}.json"
     data = json.loads(snap.read_text(encoding="utf-8"))
     for f in data["files"]:
-        if Path(f["path"]).name != "displayname":
+        if names or Path(f["path"]).name != "displayname":
             p = inside(f["path"])
             f["after"] = p.read_text(encoding="utf-8") if p.is_file() else None
     write(snap, json.dumps(data, ensure_ascii=False))
@@ -186,3 +192,11 @@ def trash(path):
     for old in TRASH.glob("*/*.ics"):
         if old.stat().st_mtime < cutoff:
             old.unlink(missing_ok=True)
+
+
+def remove_list(lst):
+    """A list's folder away, once its files are out of it (lists.py has trashed its tasks and kept the rest)"""
+    d = lst["path"].resolve()
+    if d.parent != DATA.resolve():
+        raise NotFound(f"{lst['name']} isn't a folder of the tasks: nothing was removed.")
+    shutil.rmtree(d)

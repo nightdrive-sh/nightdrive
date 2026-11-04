@@ -1,14 +1,15 @@
 import QtQuick
 import Quickshell.Io
 
-// The window's quick changes to a task: done (Space or its circle), back to open (the same in Done), to the trash
+// The window's quick changes to a task (and the lists', ListActions): done (Space or its circle), back to open (the same in Done), to the trash
 // (Delete), and their undo, from the toast's Undo or ⌘Z. Each runs the `cli.py` command Claude's tools and `tasks` run, so
 // a change from the window is undone the same way as theirs (`cli.py restore UNDO`, refused once the task has changed
 // since). Each call gets a process of its own: Space pressed down a list starts the next before the last has finished.
 QtObject {
     id: root
     required property var app           // the window: helper, load(), say(), offer()
-    property var undos: []              // the window's changes, newest last, for ⌘Z: [{ sid (restore's id), id (the task's) }]
+    // The window's changes, newest last, for ⌘Z: [{ sid (restore's id), id (the task's), list (a list's: ListActions) }]
+    property var undos: []
     readonly property int undoDepth: 20
 
     readonly property Component runner: Component {
@@ -44,10 +45,13 @@ QtObject {
         run(args, (d, why) => {
             app.load()
             if (!d) { app.say(why, true); return }
-            const step = { sid: d.undo, id: d.id }
-            undos = undos.concat([step]).slice(-undoDepth)
-            app.offer(said, () => undo(step))
+            remember({ sid: d.undo, id: d.id }, said)
         })
+    }
+    // A change made, for ⌘Z and the toast's Undo
+    function remember(step, said) {
+        undos = undos.concat([step]).slice(-undoDepth)
+        app.offer(said, () => undo(step))
     }
 
     // The newest change, or the one the toast's Undo names; the task is picked again where it comes back
@@ -56,7 +60,7 @@ QtObject {
         if (!step) { app.say("Nothing to undo"); return }
         undos = undos.filter(x => x.sid !== step.sid)
         run(["restore", step.sid], (d, why) => {
-            if (d) app.keepNext = step.id
+            if (d) { app.keepNext = step.id; app.keepList = step.list || "" }
             app.load()
             app.say(d ? "Undone" : why, !d)
         })

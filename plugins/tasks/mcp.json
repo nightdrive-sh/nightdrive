@@ -142,6 +142,63 @@
       "class": "change",
       "area": "tasks",
       "deletes": true
+    },
+    {
+      "name": "tasks_list_new",
+      "title": "Make a task list",
+      "description": "Makes a new, empty list in Nightdrive Tasks (a list is a folder; tasks_add and tasks_edit also make one when given a name that isn't one yet). Refused when a list has that name already (any case): tasks_list gives the lists.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "title": "Name", "description": "The new list's name", "minLength": 1}
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "list-new", "--json", "--", "{name}"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Made the task list {name}",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_list_rename",
+      "title": "Rename a task list",
+      "description": "Gives a list in Nightdrive Tasks another name; its tasks stay in it. Refused when another list has that name already.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {"type": "string", "title": "List", "description": "The list's name, as tasks_list gives the lists"},
+          "name": {"type": "string", "title": "New name", "description": "The list's new name", "minLength": 1}
+        },
+        "required": ["list", "name"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "list-rename", "--json", "--", "{list}", "{name}"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Renamed the task list {old} to {name}",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_list_remove",
+      "title": "Remove a task list",
+      "description": "Removes a list from Nightdrive Tasks. A list with tasks in it is refused (the error says how many) unless with_tasks is true: then its tasks go to the trash with it (kept for 30 days), and the user can undo the whole removal from the notification. Ask the user before removing a list that has open tasks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {"type": "string", "title": "List", "description": "The list's name, as tasks_list gives the lists"},
+          "with_tasks": {"type": "boolean", "title": "With its tasks", "description": "true moves the list's tasks to the trash with it"}
+        },
+        "required": ["list"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "list-remove", "--json", ["--with-tasks", "{with_tasks}"], "--", "{list}"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Removed the task list {name}",
+      "class": "change",
+      "area": "tasks",
+      "deletes": true
     }
   ]
 }

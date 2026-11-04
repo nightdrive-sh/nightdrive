@@ -59,6 +59,9 @@ Usage: tasks [command]
   snooze ID      move a task on: an hour, or a day without a time (--until WHEN for another time)
   trash ID       move a task to the trash
   restore UNDO   undo a change: UNDO is the id a change's --json gives
+  list-new NAME          a new list
+  list-rename LIST NAME  give a list another name (LIST: its name or id)
+  list-remove LIST       remove a list (--with-tasks: its tasks go to the trash with it, else one with tasks stays)
   due            notify the tasks that have come due (the timer runs it every minute)
   enable         Tasks among the desktop's apps, and its notifications on (the installer)
   disable        take them away again (your tasks stay)
@@ -73,7 +76,7 @@ USAGE
 case ${1:-open} in
   new)        open_ready; ipc newTask "${2:-}" ;;
   lists|list|when) cli "$@" ;;
-  add|edit|done|undone|snooze|trash|restore) change "$@" ;;
+  add|edit|done|undone|snooze|trash|restore|list-new|list-rename|list-remove) change "$@" ;;
   due)        python3 "$APP_DIR/lib/due.py" check ;;
   enable)     enable ;;
   disable)    disable ;;
