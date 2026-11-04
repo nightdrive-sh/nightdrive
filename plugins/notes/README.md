@@ -11,7 +11,7 @@ Your notes as Markdown files in `~/Notes`, in a window to read and write them: y
 | `?` | Notes' keys |
 | ↑ ↓ or `j` `k` | Move in the list (`Home` `End`: the newest, the oldest) |
 | `/` or ⌘F | Search: the notes whose title or text has every word, the first line with them under each; the words are marked in the note. `Enter` or ↓ to the notes found, `Esc` back to every note |
-| `n` or ⌘N | New note: it opens to write in, its title first after `# ` (New in the header too) |
+| `n` or ⌘N | New note: it opens to write in, its title first after `# ` (New in the bar over the note too) |
 | F2 or `r` | Rename: the note's heading and its file name follow the new title |
 | `m` | Move the note to a folder: type to find one, or a new name to make it (or drag the note onto a folder) |
 | `f` | The folders and tags: ↑ ↓ pick one, `Enter` back to the notes, `Delete` removes an empty folder |

@@ -2,8 +2,9 @@ import QtQuick
 import qs.kit
 import "Markdown.js" as Markdown
 
-// The open note: its title and when it was saved in the header, then its Markdown as formatted text to read
-// (Markdown.js), or, while it is written in (edit(), Enter), as it is in the file in NoteEditor. A link opens in the
+// The open note, laid out as Mail's message: its buttons in the bar at the top (NoteBar), then its header (NoteHeader:
+// title, when it was saved, its file) and its Markdown as formatted text to read (Markdown.js), scrolling together; or,
+// while it is written in (edit(), Enter), the text as it is in the file in NoteEditor under the bar. A link opens in the
 // browser. Apostrophe is still a click away (Open in Apostrophe). The reading keys are shell.qml's, the writing ones
 // NoteEditor's.
 Item {
@@ -51,108 +52,25 @@ Item {
     function scroll(d) { flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY + d)) }
     function home() { flick.contentY = 0 }
 
-    Item {
+    NoteBar {
         id: header
-        width: parent.width; height: 62
-        AppIconButton {
-            id: backButton
-            visible: root.onePane
-            anchors.left: parent.left; anchors.leftMargin: 16; anchors.verticalCenter: parent.verticalCenter
-            c: root.c; glyph: "arrow-left"; tip: "The notes"; keys: "Esc"
-            onClicked: root.back()
-        }
-        Column {
-            anchors.left: root.onePane ? backButton.right : parent.left
-            anchors.leftMargin: root.onePane ? 12 : root.margin
-            anchors.right: editButton.left; anchors.rightMargin: 16
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
-            Text {
-                textFormat: Text.PlainText
-                width: parent.width; elide: Text.ElideRight
-                // While writing, the heading as it is typed ("Untitled", the list's, until a new note has one)
-                text: !root.note ? "" : root.editing && editor.heading ? editor.heading : root.note.title
-                font.family: root.c.font; font.pixelSize: 17; font.weight: Font.Medium; color: root.c.title
-            }
-            // When it was saved, or while writing whether it is: whole, as it matters more. The path takes what room is
-            // left, shortened in the middle.
-            Row {
-                width: parent.width
-                spacing: 12
-                Text {
-                    id: stateText
-                    width: Math.min(implicitWidth, parent.width)
-                    elide: Text.ElideRight
-                    textFormat: Text.PlainText
-                    text: !root.note ? "" : root.editing ? editor.status
-                        : Regional.format(new Date(root.note.modified), "medium") + "  " + Regional.format(new Date(root.note.modified), "time")
-                    font.family: root.c.font; font.pixelSize: 11
-                    color: editor.conflicted ? root.c.danger : root.c.faint
-                }
-                Text {
-                    textFormat: Text.PlainText
-                    visible: width > 40      // a path cut to a few letters says nothing
-                    width: Math.max(0, parent.width - stateText.width - parent.spacing)
-                    elide: Text.ElideMiddle
-                    text: root.note ? root.store.folder + "/" + root.note.id : ""
-                    font.family: root.c.font; font.pixelSize: 11; color: root.c.faint
-                }
-            }
-        }
-        // Reading: New, Apostrophe and Edit (New also with no note at all). Writing: Done, or with a conflict its two
-        // ways out.
-        Row {
-            id: editButton
-            anchors.right: parent.right; anchors.rightMargin: 20; anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-            readonly property bool narrow: root.width < 520
-            AppButton {
-                visible: !root.editing
-                c: root.c; glyph: "plus"; label: editButton.narrow ? "" : "New"
-                tip: "New note"; keys: "n"
-                onClicked: root.newNote()
-            }
-            AppIconButton {
-                visible: !root.editing && !!root.note
-                c: root.c; glyph: "text-cursor-input"; tip: "Rename"; keys: "F2  r"
-                onClicked: root.rename()
-            }
-            AppIconButton {
-                visible: !root.editing && !!root.note
-                c: root.c; glyph: "trash-2"; tip: "Move to the trash"; keys: "Del"
-                onClicked: root.trash()
-            }
-            AppIconButton {
-                visible: !root.editing && !!root.note
-                c: root.c; glyph: "external-link"; tip: "Open in Apostrophe"; keys: "⇧⏎"
-                onClicked: root.store.edit()
-            }
-            AppButton {
-                visible: !root.editing && !!root.note
-                c: root.c; glyph: "pencil"; label: editButton.narrow ? "" : "Edit"; strong: true
-                tip: "Write in it here"; keys: "⏎  e"
-                onClicked: root.edit()
-            }
-            AppButton {
-                visible: editor.conflicted
-                c: root.c; glyph: "rotate-ccw"; label: editButton.narrow ? "" : "Keep theirs"
-                tip: "Drop what you wrote since, take the saved one"
-                onClicked: editor.keepTheirs()
-            }
-            AppButton {
-                visible: editor.conflicted
-                c: root.c; glyph: "save"; label: editButton.narrow ? "" : "Keep mine"; strong: true
-                tip: "Write yours over the one saved elsewhere"; keys: "⌘S"
-                onClicked: editor.keepMine()
-            }
-            AppButton {
-                visible: root.editing && !editor.conflicted
-                c: root.c; glyph: "check"; label: editButton.narrow ? "" : "Done"
-                tip: "Back to reading (it saves by itself)"; keys: "Esc"
-                onClicked: root.leave()
-            }
-        }
-        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: root.c.divider }
+        width: parent.width
+        c: root.c
+        onePane: root.onePane
+        editing: root.editing
+        hasNote: !!root.note
+        conflicted: editor.conflicted
+        status: editor.status
+        margin: root.margin
+        onBack: root.back()
+        onEdit: root.edit()
+        onNewNote: root.newNote()
+        onRename: root.rename()
+        onTrash: root.trash()
+        onApostrophe: root.store.edit()
+        onKeepTheirs: editor.keepTheirs()
+        onKeepMine: editor.keepMine()
+        onDone: root.leave()
     }
 
     NoteEditor {
@@ -176,7 +94,7 @@ Item {
         anchors.top: header.bottom; anchors.bottom: parent.bottom
         width: parent.width
         clip: true
-        contentHeight: Math.max(page.implicitHeight + 64, height)   // the whole view takes the double click
+        contentHeight: Math.max(page.y + page.implicitHeight + 40, height)   // the whole view takes the double click
         boundsBehavior: Flickable.StopAtBounds
         // A double click writes in the note (the cursor at its end, as Edit: a place in the formatted text doesn't map
         // to one in the Markdown). Inside the Flickable, which would take the press from a handler outside it.
@@ -184,9 +102,19 @@ Item {
             enabled: !!root.note
             onDoubleTapped: root.edit()
         }
+        // The note's title, date and file over its text, scrolling with it as a message's header does in Mail
+        NoteHeader {
+            id: noteHeader
+            visible: !!root.note
+            x: root.margin; y: 28
+            width: page.width
+            c: root.c
+            note: root.note
+            folder: root.store.folder
+        }
         Text {
             id: page
-            x: root.margin; y: 24
+            x: root.margin; y: noteHeader.visible ? noteHeader.y + noteHeader.height + 24 : 24
             width: Math.min(root.width - 2 * root.margin, 760)
             wrapMode: Text.Wrap
             textFormat: Text.RichText
