@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Window
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 
 // The toasts' place: one surface at the top centre, just below the bar, with the shown cards (Toast.qml) stacked
 // downwards in the order they're declared in shell.qml. A long-lived card (dictation, later Ask Claude) goes first, so
@@ -54,6 +55,21 @@ PanelWindow {
     // The whole screen, so the click catcher can cover it; nothing but the cards is drawn, and without a keyCard the
     // input region is the clickable card or nothing
     visible: anyShown
+    // The screen it will show on, chosen while hidden (#2062): left to Hyprland, the surface learned its screen only
+    // once mapped, so the first frame used the previous screen's height for Ask Claude's lowered (Screen.height) and
+    // the card jumped down a frame later. While shown it stays put, so focus moving doesn't carry a card along.
+    function followFocus() {
+        if (anyShown) return
+        const f = Hyprland.focusedMonitor
+        const s = (f && Quickshell.screens.find(x => x.name === f.name)) || Quickshell.screens[0]
+        if (s && screen !== s) screen = s
+    }
+    Component.onCompleted: followFocus()
+    onAnyShownChanged: followFocus()
+    Connections {
+        target: Hyprland
+        function onFocusedMonitorChanged() { stack.followFocus() }
+    }
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
