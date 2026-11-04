@@ -25,12 +25,6 @@ PanelWindow {
         }
         return null
     }
-    // A card changes size at once just now (Toast.instant): the stack's place changes at once with it
-    readonly property bool instantNow: {
-        for (let i = 0; i < column.children.length; i++)
-            if (column.children[i].instant) return true
-        return false
-    }
     // A card that takes the keys says when its first frame is on screen (Toast.drawn)
     property var drawPending: null
     onKeyCardChanged: drawPending = keyCard
@@ -82,10 +76,10 @@ PanelWindow {
     Column {
         id: column
         anchors { top: parent.top; topMargin: topGap; horizontalCenter: parent.horizontalCenter }
-        // A card with the keys (or sitsLow) sits lower (its lowered); it slides there when it changes, but a card that
-        // appears at its size (instant) is there at once
+        // A card with the keys (or sitsLow) sits lower (its lowered), there at once: no slide (#2062). Ask Claude's
+        // lowered follows Screen.height, which a hidden stack learns only once it's mapped, after the card's instant
+        // has ended, so a Behavior here slid the card down from the top on every open.
         property real topGap: Theme.barHeight + 8 + (stack.lowCard ? stack.lowCard.lowered : 0)
-        Behavior on topGap { enabled: !stack.instantNow; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
         spacing: 8
     }
 }
