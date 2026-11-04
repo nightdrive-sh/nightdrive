@@ -166,7 +166,11 @@ Item {
                 if (help.key(e)) { e.accepted = true; return }
                 const ctrl = e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
                 if (e.key === Qt.Key_Escape) root.done()
-                else if (ctrl && e.key === Qt.Key_S) { if (root.conflicted) root.keepMine(); else root.flush() }
+                // Said in the toast as well: it has mostly saved by itself already, and the bar's "Saved" wouldn't change
+                else if (ctrl && e.key === Qt.Key_S) {
+                    if (root.conflicted) root.keepMine()
+                    else { root.flush(); root.message("Saved", false) }
+                }
                 else return
                 e.accepted = true
             }

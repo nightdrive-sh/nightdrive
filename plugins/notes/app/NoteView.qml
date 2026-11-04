@@ -54,6 +54,7 @@ Item {
 
     NoteBar {
         id: header
+        z: 2                                   // its buttons' tips lie over the note under it
         width: parent.width
         c: root.c
         onePane: root.onePane
