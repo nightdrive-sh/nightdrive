@@ -199,6 +199,9 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   is a setting there (Settings › Apps › Firefox), and Brave, Chromium and Chrome always do.
 - **App shortcuts**: which app Hyper + a letter or digit opens: Launcher › Settings › Apps › App shortcuts. Your choice
   replaces a default, Nightdrive's or a plugin's. The other shortcuts are in the config files ([Make it yours](#make-it-yours)).
+- **Cleaning the keyboard**: search "clean keyboard" in the Launcher (or `nightdrive clean`): the keyboard and touchpad
+  stop working for 15 s, with a countdown, and come back by themselves (also if you close the lid). A mouse still works:
+  click the countdown to end it sooner.
 - **Mouse**: the wheel's scroll speed, from 0.5× to 3×, in Launcher › Settings › Mouse. The trackpad keeps its own.
 - **Region**: how dates and times are written, apart from the language: Finland 3.11.2026, the US 11/3/2026 and 2:30 PM
   with weeks from Sunday, ISO 2026-11-03 and a few more, in Launcher › Settings › Region (or `nightdrive region set fi`).

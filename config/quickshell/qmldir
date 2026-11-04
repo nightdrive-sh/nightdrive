@@ -27,6 +27,7 @@ LauncherList 1.0 LauncherList.qml
 LauncherRow 1.0 LauncherRow.qml
 LauncherWallGrid 1.0 LauncherWallGrid.qml
 Osd 1.0 Osd.qml
+CleanToast 1.0 CleanToast.qml
 Toast 1.0 Toast.qml
 ToastStack 1.0 ToastStack.qml
 Dictation 1.0 Dictation.qml

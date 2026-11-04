@@ -220,6 +220,7 @@ ShellRoot {
             onDrawn: if (handOff.running) { handOff.stop(); launcher.open = false }
         }
         Osd {}
+        CleanToast {}   // cleaning mode's countdown (hypr/scripts/clean-input)
     }
 
     Timer { id: handOff; interval: 250; onTriggered: launcher.open = false }

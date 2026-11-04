@@ -89,6 +89,11 @@ Item {
                 // Only found by searching: names the focused workspace (ToolsLevels › wsname)
                 [{ item: { kind: "nav", name: "Rename current space", glyph: "pencil", target: "wsname" }, text: "Rename current space",
                    extra: "workspace name label" }],
+                // Only found by searching, so it isn't hit by accident: the keyboards and the touchpad off for 15 s
+                // (hypr/scripts/clean-input, Dashboard #1489)
+                [{ item: { kind: "action", name: "Clean keyboard", glyph: "keyboard-off", sub: "locks the keyboard and touchpad for 15 s",
+                           cmd: ["bash", "-c", "sleep 0.4; exec \"$HOME/.config/hypr/scripts/clean-input\" start"] },
+                   text: "Clean keyboard", extra: "cleaning mode wipe lock keyboard touchpad trackpad dust" }],
                 // Power actions ("shut" → Shut down)
                 statics.power.map(t => ({ item: t, text: t.name, extra: powerAliases[t.name] || "" })),
                 // Apps ("1pas" → 1Password), also one named like a root item (e.g. a webapp next to its menu): the APPS tag and

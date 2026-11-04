@@ -1,0 +1,106 @@
+#!/bin/bash
+# Cleaning mode: the keyboards and the touchpad stop taking input for a while, so they can be wiped; a mouse still works.
+#   clean-input start [SECONDS]   lock for SECONDS (default 15, 5–60), with a countdown toast; returns when it ends
+#   clean-input stop              give the input back now (also the toast's End now); safe to run any time
+#   clean-input status [--json]   whether it's locked, and for how long still
+# Found only by searching the Launcher ("clean keyboard") and as `nightdrive clean`: no key, so it's never hit by accident.
+#
+# Nothing may leave the input locked, so the end doesn't depend on this script staying alive:
+# - before locking, a systemd user timer (its own unit, outside this process) is set to run `stop` just after the end;
+#   if it can't be set, nothing is locked;
+# - hypridle's before_sleep_cmd and after_sleep_cmd run `stop` (the timer's clock doesn't run during sleep);
+# - a crash of Hyprland ends it too: a new session starts with every device on (the config never turns one off).
+set -u
+
+UNIT=nightdrive-clean-restore
+STATE="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive-clean"   # line 1: the end (epoch s); then one device per line
+DEFAULT_SECS=15
+MIN_SECS=5
+MAX_SECS=60
+SELF=$(readlink -f "$0")
+log() { logger -t nightdrive-clean "$*"; }
+
+# What to lock: every keyboard but the lid and power switches (which Hyprland lists as keyboards), keyd's virtual
+# keyboard and pointer (keyd grabs the real keyboards, so they type through keyd-virtual-keyboard), the touchpad, and a
+# keyboard's own pointer device (Keychron's "…-keyboard-1": its media keys). Other mice stay usable, for End now.
+devices() {
+  hyprctl devices -j | jq -r '
+    (.keyboards[].name | select(test("lid|power|switch|video-bus|button"; "i") | not)),
+    (.mice[].name | select(test("touchpad|trackpad|multi-touch|keyboard|keyd"; "i")))' | sort -u
+}
+
+set_enabled() {   # NAME true|false
+  hyprctl eval "hl.device({ name = \"$1\", enabled = $2 })" >/dev/null
+}
+
+# The end time if a lock is on (its file is there and the end hasn't passed long ago), else nothing
+active_end() {
+  local end
+  end=$(head -n1 "$STATE" 2>/dev/null) || return 1
+  [[ $end =~ ^[0-9]+$ ]] || return 1
+  # A file left behind (Hyprland crashed mid-way, the timer's stop ran in a session that had gone) mustn't block a new one
+  (( end + 10 >= $(date +%s) )) || return 1
+  echo "$end"
+}
+
+toast() { qs ipc call clean "$@" >/dev/null 2>&1; }   # the countdown (CleanToast.qml); without Quickshell, no toast
+
+stop() {
+  local d
+  # Every device the lock took, and every one that would be locked now: a file lost or half written still restores all
+  { tail -n +2 "$STATE" 2>/dev/null; devices; } | sort -u | while read -r d; do
+    [[ -n $d ]] && set_enabled "$d" true
+  done
+  rm -f "$STATE"
+  systemctl --user stop "$UNIT.timer" >/dev/null 2>&1
+  toast hide
+  log "input back"
+}
+
+start() {
+  local secs=${1:-$DEFAULT_SECS} end d
+  [[ $secs =~ ^[0-9]+$ ]] || { echo "clean-input: SECONDS must be a number" >&2; exit 2; }
+  (( secs < MIN_SECS )) && secs=$MIN_SECS
+  (( secs > MAX_SECS )) && secs=$MAX_SECS
+  if active_end >/dev/null; then echo "clean-input: already on" >&2; exit 1; fi
+  end=$(( $(date +%s) + secs ))
+
+  # The safety net first: a timer of its own that gives the input back a moment after the end, even if this script is
+  # killed. A unit left from before (failed) would make systemd-run refuse the name.
+  systemctl --user reset-failed "$UNIT.timer" "$UNIT.service" >/dev/null 2>&1
+  systemctl --user stop "$UNIT.timer" >/dev/null 2>&1
+  if ! systemd-run --user --quiet --collect --unit="$UNIT" --on-active="$((secs + 2))" \
+       --timer-property=AccuracySec=500ms "$SELF" stop; then
+    echo "clean-input: couldn't set the timer that ends it, so nothing was locked" >&2
+    notify-send -a Nightdrive "Cleaning mode didn't start" "The timer that ends it couldn't be set." 2>/dev/null
+    exit 1
+  fi
+
+  mapfile -t locked < <(devices)
+  printf '%s\n' "$end" "${locked[@]}" > "$STATE"   # written before locking: stop restores from it
+  log "locking for ${secs}s: ${locked[*]}"
+  toast countdown "$secs"
+  for d in "${locked[@]}"; do set_enabled "$d" false; done
+
+  # Our own end, on time; the timer is the fallback. A stop meanwhile (End now, sleep) removed the file: nothing to do.
+  sleep "$secs"
+  [[ -f $STATE ]] && stop
+  exit 0
+}
+
+status() {
+  local end left=0 on=false
+  if end=$(active_end); then on=true; left=$(( end - $(date +%s) )); (( left < 0 )) && left=0; fi
+  if [[ ${1:-} == --json ]]; then
+    printf '{"locked": %s, "seconds_left": %d}\n' "$on" "$left"
+  elif $on; then echo "locked, ${left} s left"
+  else echo "off"
+  fi
+}
+
+case ${1:-} in
+  start) start "${2:-}" ;;
+  stop) stop ;;
+  status) status "${2:-}" ;;
+  *) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2 ;;
+esac
