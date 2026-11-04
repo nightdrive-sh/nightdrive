@@ -71,10 +71,11 @@ sidebar steps aside; narrower still, the list and the message take turns.
 - **[Deck](plugins/deck/README.md)**: Spotify (Premium) with your albums on a shelf, in the bar, the Launcher and the media keys
 - **[Garage](plugins/garage/README.md)**: virtual machines from a ready-made Fedora or an ISO, with snapshots to go back to
 - **[Ferry](plugins/ferry/README.md)**: a mailbox over Tailscale between your computers and your phone
-- **[Notes](plugins/notes/README.md)**, **[Tasks](plugins/tasks/README.md)** and **[Calendar](plugins/calendar/README.md)**:
-  new, and simple for now. Their windows show your Markdown notes, your tasks (a notification when one comes due) and
-  your iCloud and Google calendars, and you add and change things with their commands or by asking Claude
-  ([Claude and your desktop](docs/claude.md))
+- **[Notes](plugins/notes/README.md)**: your Markdown notes in `~/Notes`, written in its window, in folders and with
+  #tags, found as you type there and in the Launcher; Apostrophe still opens them, if you like it better
+- **[Tasks](plugins/tasks/README.md)** and **[Calendar](plugins/calendar/README.md)**: new, and simple for now. Their
+  windows show your tasks (a notification when one comes due) and your iCloud and Google calendars, and you add and
+  change things with their commands or by asking Claude ([Claude and your desktop](docs/claude.md))
 
 ![Mail four ways: folders, list and message; list and message; and in a narrow window the list, then the message](docs/releases/0.6.0-mail-sizes.jpg)
 

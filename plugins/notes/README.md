@@ -2,6 +2,8 @@
 
 Your notes as Markdown files in `~/Notes`, in a window to read and write them: your folders and #tags on the left, the notes in the one you pick newest first, the note you pick beside them. Claude can find, read and write them too. They are plain files, so any editor, Files and a sync folder work with them as they are.
 
+![Notes: the folders and tags, the notes in the one picked, and a note with its list and task boxes](notes.jpg)
+
 ## Using it
 
 | Keys | |
@@ -26,7 +28,8 @@ Your notes as Markdown files in `~/Notes`, in a window to read and write them: y
 - You write the Markdown as it is in the file; reading shows it formatted. While writing, `Enter` on a list item starts the next one (`- `, the next number, an empty `[ ]`), and on an empty item ends the list; `Tab` and ⇧Tab nest an item under the one above and take it back. ⌘B and ⌘I make the selection bold (`**`) and italic (`_`), or no longer; ⌘K makes it a link, to a copied address if there is one. ⌘Z undoes each of these as one step.
 - Reading, a click on a task box (`- [ ]`) ticks or unticks it, saved at once.
 - A note's file is named after its title (`~/Notes/Title.md`). A new one is `Untitled.md` until you leave it; then, and whenever you change the heading of a note whose file name was its title, the file follows the heading. A file you named otherwise keeps its name. A new note left with nothing written in it is deleted.
-- ⇧Enter opens the note in Apostrophe (Install › Recommended), or without it in what opens Markdown here.
+- The Launcher's search (⌘Space) finds your notes by title, folder or #tag, and `Enter` opens one here; its New note row starts one. Settings › Launcher › Include notes leaves the notes out.
+- Apostrophe is optional: ⇧Enter opens the note in it when it's installed (Install › Recommended), else in what opens Markdown here.
 - What another app saves meanwhile (Apostrophe, Claude) shows at once. If it changes the note while you have unsaved text in it, Notes doesn't write over it: Keep mine (⌘S) or Keep theirs. Closed before you pick, what you wrote goes into a new note, "Title (not saved)".
 
 ## With Claude

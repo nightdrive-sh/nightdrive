@@ -248,6 +248,8 @@ Item {
                       sub: "Your shelf and Curated in the search, and a row to search Spotify", switchOn: launcher.prefs.deck }] : [])
                 .concat(Plugins.has("contacts") ? [{ kind: "lpref", key: "contacts", name: "Include contacts", glyph: "contact",
                       sub: "People by name, company, address or number; Enter shows their numbers and addresses", switchOn: launcher.prefs.contacts }] : [])
+                .concat(Plugins.has("notes") ? [{ kind: "lpref", key: "notes", name: "Include notes", glyph: "notebook-pen",
+                      sub: "Notes by title, folder or #tag; Enter opens one in Notes", switchOn: launcher.prefs.notes }] : [])
         }
         if (level === "mousescroll") {
             const cur = Number(mouseScroll)

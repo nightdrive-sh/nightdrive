@@ -83,17 +83,17 @@ PanelWindow {
     readonly property var detail: details.item   // Install / Remove: the row whose details are shown (DetailCard.qml), null = none
     readonly property int detailWidth: 860    // the card's width while showing them
     property alias detailCard: details
-    // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts, light } in ~/.local/state/nightdrive/launcher.json (missing = on;
+    // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts, notes, light } in ~/.local/state/nightdrive/launcher.json (missing = on;
     // deck, the music player's albums and artists in the search, comma, the calculator's decimal comma, and light, only
     // when asked for)
-    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true, light: false })
+    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true, notes: true, light: false })
     readonly property string prefsFile: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
     FileView {
         path: win.prefsFile; watchChanges: true; onFileChanged: reload(); printErrors: false
         onLoaded: {
             let v = {}
             try { v = JSON.parse(text()) || {} } catch (e) {}
-            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true, contacts: v.contacts !== false, light: v.light === true }
+            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true, contacts: v.contacts !== false, notes: v.notes !== false, light: v.light === true }
             if (JSON.stringify(n) !== JSON.stringify(win.prefs)) win.prefs = n
         }
     }
