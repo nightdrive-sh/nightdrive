@@ -115,7 +115,7 @@ Click an icon and a small menu opens under it:
   yellow). The low battery warning at 10 % offers to turn it on, plugging in the charger turns it off; Launcher ›
   Settings › Battery has both switches
 - **System**: load, memory, temperatures and the heaviest processes
-- **Date and time**: a month's calendar with week numbers; ‹ › browse the months
+- **Date and time**: a month's calendar with week numbers; ‹ › browse the months. With Calendar, today's events under it: a click opens one
 - **Tailscale**: your devices, and on or off
 - **Sound**: volume and the output, the microphone's volume and which one
 - **Headphones**, while Bluetooth headphones are connected: their battery (AirPods per pod and case), an EQ preset made

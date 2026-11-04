@@ -21,16 +21,16 @@ Singleton {
     property var publicModules: []
     property var localModules: []
     // The plugin folders' parts: { modules, menus: { name: path of its <Name>Menu.qml }, sizes: { name: px },
-    // levels: [paths of its <Name>Levels.qml, the launcher's] }
-    property var plugin: ({ modules: [], menus: ({}), sizes: ({}), levels: [] })
+    // levels: [paths of its <Name>Levels.qml, the launcher's], today: [paths of its <Name>Today.qml, CalendarMenu's] }
+    property var plugin: ({ modules: [], menus: ({}), sizes: ({}), levels: [], today: [] })
     FileView {
         path: Quickshell.env("HOME") + "/.local/state/nightdrive/plugins.d/bar.json"; watchChanges: true; onFileChanged: reload(); printErrors: false
         onLoaded: {
             let v = null
             try { v = JSON.parse(text()) } catch (e) {}
-            if (v) tb.plugin = { modules: v.modules || [], menus: v.menus || {}, sizes: v.sizes || {}, levels: v.levels || [] }
+            if (v) tb.plugin = { modules: v.modules || [], menus: v.menus || {}, sizes: v.sizes || {}, levels: v.levels || [], today: v.today || [] }
         }
-        onLoadFailed: tb.plugin = ({ modules: [], menus: ({}), sizes: ({}), levels: [] })
+        onLoadFailed: tb.plugin = ({ modules: [], menus: ({}), sizes: ({}), levels: [], today: [] })
     }
     // The files' order: a plugin's module goes right of the one its "after" names, or left of its "before" (at the right
     // end without either). Either can be a list: the first name in the bar counts (Home Assistant: before Deck, or before

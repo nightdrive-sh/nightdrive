@@ -5,9 +5,10 @@ installed` runs this with one line per such folder on stdin: id<TAB>folder.
 Writes, in ~/.local/state/nightdrive/plugins.d (only when the content changes, so the file watches don't fire for nothing):
   active    the same id<TAB>folder lines: hypr/bindings.lua runs each folder's bindings.lua, hypr/scripts/shortcuts adds
             its SHORTCUTS.md
-  bar.json  {modules, menus, sizes, levels} for Quickshell (TopBar.qml, shell.qml, Launcher.qml): module.jsonc's modules,
-            with their commands run in the plugin's folder; the folder's <Name>Menu.qml files by menu name; the modules'
-            icon sizes; the folder's <Name>Levels.qml files (the launcher's levels)
+  bar.json  {modules, menus, sizes, levels, today} for Quickshell (TopBar.qml, shell.qml, Launcher.qml): module.jsonc's
+            modules, with their commands run in the plugin's folder; the folder's <Name>Menu.qml files by menu name; the
+            modules' icon sizes; the folder's <Name>Levels.qml files (the launcher's levels); its <Name>Today.qml files
+            (a part under the clock menu's month: Calendar's events today, later Tasks')
   icons/    links to the folders' own bar icons (icons/<name>.svg), which topbar/scripts/icon looks up after the core's:
             a plugin's icon can't replace a Lucide one or the bar's own
 Outside the repo, so a read-only checkout (nightdrive sandbox) works too. Folders that aren't on aren't in any of them,
@@ -59,7 +60,7 @@ def icons(folders):
 
 def main():
     folders = [l.rstrip("\n").split("\t", 1) for l in sys.stdin if "\t" in l]
-    modules, menus, sizes, levels = [], {}, {}, []
+    modules, menus, sizes, levels, today = [], {}, {}, [], []
     for pid, d in folders:
         here = "cd " + shlex.quote(d) + " && "
         path = os.path.join(d, "module.jsonc")
@@ -87,10 +88,11 @@ def main():
             base = os.path.basename(f)[:-len("Menu.qml")]
             menus[base[0].lower() + base[1:]] = f
         levels += sorted(glob.glob(os.path.join(d, "[A-Z]*Levels.qml")))
+        today += sorted(glob.glob(os.path.join(d, "[A-Z]*Today.qml")))
     os.makedirs(OUT, exist_ok=True)
     icons(folders)
     write("active", "".join(f"{pid}\t{d}\n" for pid, d in folders))
-    write("bar.json", json.dumps({"modules": modules, "menus": menus, "sizes": sizes, "levels": levels}, indent=1) + "\n")
+    write("bar.json", json.dumps({"modules": modules, "menus": menus, "sizes": sizes, "levels": levels, "today": today}, indent=1) + "\n")
     shutil.rmtree(OLD, ignore_errors=True)   # once the new one is there: an old list nothing reads any more
 
 

@@ -4,6 +4,9 @@ import qs.kit
 // Calendar: month view, its weeks from the region's first day (Settings › Region: Monday, Sunday in the US), with ISO
 // week numbers. Opens by clicking the date. The names are the kit's Regional, as in the apps.
 // ‹ › browse months, clicking the title returns to the current month.
+// Under the month, the installed plugins' parts for today (their <Name>Today.qml, TopBar.plugin.today: Calendar's
+// events, later Tasks'): one menu for the day rather than a menu each. A part sets `shown` when it has something, so
+// without one, or on a day with nothing, the menu is just the month; its `close()` closes the menu.
 Column {
     id: m
     width: parent ? parent.width : 300
@@ -131,6 +134,18 @@ Column {
                     }
                 }
             }
+        }
+    }
+
+    Repeater {
+        model: TopBar.plugin.today
+        delegate: Loader {
+            id: part
+            required property string modelData
+            width: m.width
+            visible: item ? item.shown === true : false
+            source: "file://" + modelData
+            Connections { target: part.item; ignoreUnknownSignals: true; function onClose() { m.close() } }
         }
     }
 }

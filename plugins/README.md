@@ -27,6 +27,7 @@ Only `plugin.conf` and `README.md` are required. The other files are used only w
 | `icons/` | The module's own SVG icons, for one the bar's Lucide set hasn't got | — (Tailscale's [icons/](tailscale/icons)) |
 | `<Name>Menu.qml` | The menu a click on the module opens (more `.qml` files beside it if it needs them) | [FerryMenu.qml](ferry/FerryMenu.qml) |
 | `<Name>Levels.qml` | Its pages in the Launcher, and rows of its own at the root, in the root search and above the search field | — (Deck's [MusicLevels.qml](deck/MusicLevels.qml)) |
+| `<Name>Today.qml` | Its part for today under the clock menu's month: a `MenuSection` and rows, `shown: true` when it has something, `close()` to close the menu | — (Calendar's [CalendarToday.qml](calendar/CalendarToday.qml)) |
 | `bindings.lua` | Keys | — (Deck's [bindings.lua](deck/bindings.lua)) |
 | `SHORTCUTS.md` | Its lines in the key list (⌘⇧K, Launcher › Keybindings) | — (Deck's [SHORTCUTS.md](deck/SHORTCUTS.md)) |
 | `hyprland.lua` | Hyprland settings: window rules, and programs that start with the session | — (Deck's [hyprland.lua](deck/hyprland.lua)) |
