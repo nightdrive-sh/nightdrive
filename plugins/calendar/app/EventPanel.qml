@@ -4,19 +4,21 @@ import "Dates.js" as Dates
 import "Form.js" as Form
 
 // An event, opened from a view: its title, when, where, its calendar and notes, with Edit (e), which opens it in the
-// editor, and Delete (Del, ⌫), which asks first (EventDelete). A recurring event, or one in a read-only calendar, says
-// why it can't be changed here instead. Esc, Enter or a click outside close it.
+// editor, and Delete (Del, ⌫), which asks first (EventDelete). A recurring event has neither (its date line says
+// Repeating: editing the series is #2009); one in a read-only calendar says why instead. Esc, Enter or a click outside
+// close it.
 AppPanel {
     id: root
     required property var app           // the window: its calendars, to tell a read-only one
     property var event: null
-    // Why this event can't be changed or deleted here, or "" when it can: change.py and write.py refuse the same ones
-    readonly property string fixed: {
-        if (!event) return ""
-        if (event.recurring) return "It repeats: change or delete it on your phone or at icloud.com."
+    readonly property bool readOnly: {
+        if (!event) return false
         const cal = app.calendars.find(x => x.id === event.calendar)
-        return !cal || cal.read_only ? "Its calendar is read only here." : ""
+        return !cal || cal.read_only
     }
+    // No Edit or Delete here: change.py and write.py refuse the same ones. A recurring one gets no hint (#2109):
+    // "Repeating" in its date line says enough
+    readonly property bool fixed: !!event && (event.recurring || readOnly)
     signal closed()
     signal editRequested(var event)
     signal deleteRequested(var event)
@@ -46,7 +48,7 @@ AppPanel {
     Text {
         textFormat: Text.PlainText
         width: parent.width; wrapMode: Text.Wrap
-        text: root.event ? Dates.span(root.event, Regional) + (root.event.recurring ? "  ·  repeats" : "") : ""
+        text: root.event ? Dates.span(root.event, Regional) + (root.event.recurring ? "  ·  Repeating" : "") : ""
         color: c.text; font.family: c.font; font.pixelSize: 12
     }
     // Its reminder (#2006), when it has one: what the notification will say, and when
@@ -89,9 +91,9 @@ AppPanel {
     // Why there is no Edit or Delete, in the hint's colour
     Text {
         textFormat: Text.PlainText
-        visible: root.fixed !== ""
+        visible: root.readOnly
         width: parent.width; wrapMode: Text.Wrap
-        text: root.fixed
+        text: "Its calendar is read only here."
         color: c.dim; font.family: c.font; font.pixelSize: 12; font.italic: true
     }
     // The answers, right as the editor's. A Flow, so in a narrow card they go on two lines rather than out of it
@@ -100,7 +102,7 @@ AppPanel {
         spacing: 10
         layoutDirection: Qt.RightToLeft
         AppPanelButton { c: root.c; keys: ["Esc"]; label: "Close"; onClicked: root.close() }
-        AppPanelButton { c: root.c; keys: ["e"]; label: "Edit"; visible: root.fixed === ""; onClicked: root.edit() }
-        AppPanelButton { c: root.c; keys: ["Del"]; label: "Delete"; visible: root.fixed === ""; onClicked: root.remove() }
+        AppPanelButton { c: root.c; keys: ["e"]; label: "Edit"; visible: !root.fixed; onClicked: root.edit() }
+        AppPanelButton { c: root.c; keys: ["Del"]; label: "Delete"; visible: !root.fixed; onClicked: root.remove() }
     }
 }
