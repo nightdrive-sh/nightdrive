@@ -93,6 +93,16 @@
 .urlbarView-row[selected] .urlbarView-url, .urlbarView-row[selected] .urlbarView-secondary { color: var(--jn-fg) !important; }
 .search-one-offs, .search-panel-one-offs-container { background: transparent !important; color: var(--jn-fg) !important; }
 
+/* A web form field's suggestions (form history, logins, addresses: #PopupAutoComplete, #2070). Our panel colours give
+   it the dark background, but its list sets color: FieldText from the popup's own colour scheme, which may be light:
+   black text on dark. Dark scheme, so the design tokens (hover, the dimmed second line) are the dark ones, and our text. */
+#PopupAutoComplete { color-scheme: dark !important; }
+#PopupAutoComplete > richlistbox { background: transparent !important; color: var(--jn-fg) !important; }
+#PopupAutoComplete > richlistbox > richlistitem { color: var(--jn-fg) !important; }
+#PopupAutoComplete > richlistbox > richlistitem > autocomplete-row-item { border-radius: 6px !important; }
+#PopupAutoComplete > richlistbox > richlistitem:hover > autocomplete-row-item { background: var(--jn-bg-hl) !important; }
+#PopupAutoComplete > richlistbox > richlistitem[selected] > autocomplete-row-item { background: var(--jn-bg-hl2) !important; }
+
 /* Hidden: the "Search with" button in the address bar and the "List all tabs" button */
 .searchmode-switcher, #urlbar-searchmode-switcher, #searchmode-switcher, #alltabs-button { display: none !important; }
 
