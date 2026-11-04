@@ -149,7 +149,9 @@ Variants {
                         // An empty, unnamed workspace not shown on this screen: the first to go when the bar is short of room
                         readonly property bool spare: !active && !windows && !named
                         visible: win.squeeze < 2 || !spare
-                        readonly property color fg: active ? TopBar.c("hlFg") : windows ? TopBar.c("dim") : TopBar.c("off")
+                        // One with windows in the bar's text colour, an empty one in its faintest: "dim" between them was
+                        // too close to "off" to tell which workspaces are in use (#2066)
+                        readonly property color fg: active ? TopBar.c("hlFg") : windows ? TopBar.c("fg") : TopBar.c("off")
                         width: (device ? icon.implicitWidth : 0) + gap + (num.visible ? num.implicitWidth : 0) + 20; height: 27; radius: 8
                         color: active ? TopBar.c("wsBg") : "transparent"
                         // Half while the drawer is over it, and on a screen without the focus (with more than one screen):
@@ -202,7 +204,7 @@ Variants {
                         dpr: win.dpr
                         x: Math.round((parent.width - implicitWidth) / 2 * win.dpr) / win.dpr
                         text: "•"
-                        color: drawer.open ? TopBar.c("hlFg") : drawer.full ? TopBar.c("dim") : TopBar.c("off")
+                        color: drawer.open ? TopBar.c("hlFg") : drawer.full ? TopBar.c("fg") : TopBar.c("off")   // as a workspace
                     }
                     MouseArea {
                         anchors.fill: parent

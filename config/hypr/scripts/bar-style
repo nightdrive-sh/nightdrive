@@ -36,8 +36,8 @@ apply() {
     *) if [[ $c == "#000000" ]]; then ws="$(tc deep "#5c247b") 0.30"; act="$(tc deep "#5c247b") 0.25"
        else ws="$(tc soft "#b17bcb") 0.30"; act="$(tc primary "#c071eb") 0.25"; fi ;;
   esac
-  # Colours as #AARRGGBB (Qt). dim = empty workspaces, off = off / no data (relative to the icon opacity); the open
-  # menu's highlight = the active workspace's, with the icon at full opacity.
+  # Colours as #AARRGGBB (Qt). dim = dimmed states, off = off / no data and empty workspaces (relative to the icon
+  # opacity); the open menu's highlight = the active workspace's, with the icon at full opacity.
   argb() { awk -v c="$1" -v a="$2" 'BEGIN { printf "#%02x%s", int(a * 255 + 0.5), substr(c, 2) }'; }
   mkdir -p "$(dirname "$out")"
   cat > "$out.tmp" <<JSON
