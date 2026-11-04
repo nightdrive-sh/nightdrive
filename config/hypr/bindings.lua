@@ -47,9 +47,6 @@ end
 ------------------------
 local mod = "SUPER"
 
--- No longer filled: the top bar menu's submap that repeated every binding is gone (#2039: an open menu has the keyboard
--- or not). Kept empty, as a local.lua or local.d file may still edit it.
-NIGHTDRIVE_BINDS = {}
 -- Your own Hyper keys (launcher › Settings › Apps › App shortcuts, scripts/app-keys): KEY<TAB>app.desktop, or - for a key
 -- that does nothing. They win over every other Hyper + KEY binding, Nightdrive's, a plugin's or local.lua's, which are
 -- left out here: those are the defaults.
