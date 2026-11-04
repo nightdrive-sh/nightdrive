@@ -1,0 +1,51 @@
+{
+  "tools": [
+    {
+      "name": "garage_list",
+      "title": "Garage's virtual machines",
+      "description": "The user's virtual machines in Garage, as a JSON list: name, mem (MB), cpus, disk and used (GB), iso, state (stopped, booting, running, stopping, paused), ssh (its port on this computer: ssh NAME reaches it) and user, and snapshots (tag, name, date, size), newest first. Use it for a VM's name before garage_power or garage_snapshot.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["garage-ctl", "list"],
+      "class": "read",
+      "area": "garage"
+    },
+    {
+      "name": "garage_power",
+      "title": "Start or shut down a VM",
+      "description": "Starts a virtual machine in Garage (its window opens), or shuts it down the way its power button does: the guest gets to close its programs, which may take a while (garage_list's state goes stopping, then stopped). The user allows it on screen first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {"type": "string", "enum": ["start", "stop"], "title": "Action"},
+          "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$", "title": "VM", "description": "Its name from garage_list"}
+        },
+        "required": ["action", "name"],
+        "additionalProperties": false
+      },
+      "command": ["garage-ctl", "{action}", "{name}"],
+      "class": "act",
+      "area": "garage",
+      "timeout": 60
+    },
+    {
+      "name": "garage_snapshot",
+      "title": "Take a VM's snapshot",
+      "description": "Takes a snapshot of a virtual machine's disk in Garage, which the user can go back to in Garage's window. Only while the VM is stopped (garage_list's state): fails with the reason otherwise. label is the name it shows (default: Snapshot and the date). Returns vm, tag and label.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$", "title": "VM", "description": "Its name from garage_list"},
+          "label": {"type": "string", "minLength": 1, "maxLength": 80, "title": "Name", "description": "What the snapshot is called in Garage, e.g. Before the upgrade"}
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "command": ["lib/mcp-snapshot", "{name}", ["--", "{label}"]],
+      "undo": ["garage-ctl", "unsnap", "{vm}", "{tag}"],
+      "notice": "Took a snapshot of {vm}: {label}",
+      "class": "change",
+      "area": "garage",
+      "timeout": 120
+    }
+  ]
+}

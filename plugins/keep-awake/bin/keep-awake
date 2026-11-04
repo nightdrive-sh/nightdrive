@@ -5,6 +5,7 @@
 #   keep-awake off       back to the usual idle times
 #   keep-awake toggle    on until turned off, or off (a right click on the top bar icon)
 #   keep-awake status    one line of JSON: {"on": true, "until": 1761397800, "minutes": 60} (until 0 = until turned off)
+#   keep-awake restore ON UNTIL MIN   back to a state status printed (the undo of Claude's keep_awake_set, mcp.json)
 #
 # hypridle (hypr/scripts/idle) honours logind's idle inhibitors: it skips the screensaver, the lock and the screen-off
 # while one is held. So "on" is `systemd-inhibit --what=idle:handle-lid-switch` in a transient user unit: it survives a
@@ -27,14 +28,15 @@ stop() {
   rm -f "$STATE"
 }
 
+# on MIN [UNTIL]: UNTIL, an end time already set (restore), keeps it and MIN only as the menu's label
 on() {
-  local min=${1:-0} until=0
+  local min=${1:-0} until=${2:-0}
   [[ $min =~ ^[0-9]+$ ]] || { echo "keep-awake: minutes are a number: $min" >&2; exit 2; }
   stop
   systemd-run --user --quiet --collect --unit="$UNIT" --description="Keep Awake: the idle and lid inhibitor" -- \
     systemd-inhibit --what="$WHAT" --who="Keep Awake" --why="Keep awake (Nightdrive)" --mode=block sleep infinity || exit 1
-  if (( min > 0 )); then
-    until=$(( $(date +%s) + min * 60 ))
+  if (( until > 0 || min > 0 )); then
+    (( until > 0 )) || until=$(( $(date +%s) + min * 60 ))
     systemd-run --user --quiet --collect --unit="$END" --description="Keep Awake: back to the usual idle times" \
       --on-calendar="$(date -d "@$until" '+%F %T')" -- "$SELF" off || { stop; exit 1; }
   fi
@@ -55,5 +57,10 @@ case $1 in
     else
       echo '{"on": false, "until": 0, "minutes": 0}'
     fi ;;
-  *) sed -n '4,7s/^# \?//p' "$0" >&2; exit 2 ;;
+  # status's on, until and minutes: off, on until turned off, or on until that time (off once it has passed)
+  restore)
+    [[ ${3:-0} =~ ^[0-9]+$ && ${4:-0} =~ ^[0-9]+$ ]] || { echo "keep-awake: restore ON UNTIL MIN" >&2; exit 2; }
+    if [[ $2 != true ]] || (( ${3:-0} > 0 && ${3:-0} <= $(date +%s) )); then stop; else on "${4:-0}" "${3:-0}"; fi
+    refresh ;;
+  *) sed -n '4,8s/^# \?//p' "$0" >&2; exit 2 ;;
 esac

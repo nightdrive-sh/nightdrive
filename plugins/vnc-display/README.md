@@ -52,6 +52,8 @@ On a Mac, use TigerVNC Viewer (free, no account: tigervnc.org, or `brew install 
 | `vnc-display on NAME` | Turns it back on, with the same password: its display comes when the device connects |
 | `vnc-display remove NAME` | Forgets the device: its display and its password |
 
+Claude can list the devices and whether they're connected (Settings › Claude › Access › Sound and display), never their passwords, and doesn't add or change them.
+
 ## Privacy
 
 - Nothing listens until you add a device. Each one has its own port, from 5900 up, and listens only on this computer's Tailscale addresses (IPv4 and IPv6), taking connections only from Tailscale's own addresses: your devices, not a machine on the same café Wi-Fi. With `--home`, also on the home Wi-Fi it was added on, from that network, and only while you're on it.

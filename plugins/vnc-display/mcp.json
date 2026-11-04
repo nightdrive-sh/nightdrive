@@ -1,0 +1,13 @@
+{
+  "tools": [
+    {
+      "name": "vnc_display_list",
+      "title": "VNC Display's devices",
+      "description": "The devices the user added as displays of their own over VNC (an iPad, an iPhone, a laptop in a VNC app), as a JSON list: name, output (its Hyprland monitor), size and scale, place (right, left, above, below or away from the screens), workspace, port, on (listening for it), connected (its VNC app is on it now), tailscale (the computer's address there) and home (the home network it is also reached on, or null). No passwords: Settings › Other displays shows how to connect.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["vnc-display", "list", "--json"],
+      "class": "read",
+      "area": "sound-display"
+    }
+  ]
+}

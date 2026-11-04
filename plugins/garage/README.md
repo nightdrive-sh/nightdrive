@@ -48,5 +48,9 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 | `garage install`, `uninstall` | Garage among your apps, or out of them (the VMs and qemu stay) |
 | `garage restart`, `quit`, `log` | After a change to Garage, and its QML errors |
 
+## Claude
+
+Claude can list your VMs and their snapshots, take a snapshot of a stopped VM (a notification with Undo, which deletes it), and start or shut down a VM only after you allow it on Nightdrive's card (Settings › Claude › Access › Garage). It doesn't restore or delete snapshots or VMs.
+
 Needs: qemu with KVM and UEFI firmware (its installer puts them in)
 Keys: Hyper G
