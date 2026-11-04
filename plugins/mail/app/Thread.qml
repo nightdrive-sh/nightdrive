@@ -14,7 +14,8 @@ Flickable {
     signal cycleHtml()
     signal openBrowser()
     signal resumeDraft()
-    // Buttons above the thread, for the mouse: [{ id, icon, text, short, tip, keys }]; a click sends act(id). Where they
+    // Buttons above the thread, for the mouse (the kit's AppBarButton, as Notes'): [{ id, icon, text, short, tip, keys, strong }];
+    // a click sends act(id), strong lights the one Enter presses. Where they
     // don't all fit beside the view button, the short names show, and where those don't either, only the icons. Held
     // under the pointer, a button says what it does and its key (tip, keys).
     property var actions: []
@@ -93,47 +94,24 @@ Flickable {
     // A mouse drag selects a message's text instead of dragging the page; the wheel and the touchpad still scroll
     acceptedButtons: Qt.NoButton
     TouchScroll { view: root }
-    component ActButton: Rectangle {
-        id: btn
-        property string icon
-        property string label
-        property string tip
-        property string keys
-        property bool compact: false
-        signal clicked()
-        Tip { y: btn.height + 6; c: root.c; text: btn.tip; keys: btn.keys; hovered: bh.hovered }
-        implicitWidth: btnRow.implicitWidth + 20
-        implicitHeight: 30
-        radius: 8
-        color: bh.hovered ? c.hover : "transparent"
-        HoverHandler { id: bh; cursorShape: Qt.PointingHandCursor }
-        TapHandler { onTapped: btn.clicked() }
-        Row {
-            id: btnRow
-            anchors.centerIn: parent
-            spacing: 7
-            Text { anchors.verticalCenter: parent.verticalCenter; text: Icons.g(btn.icon); font.family: Icons.family; font.pixelSize: 14; color: bh.hovered ? c.text : c.dim }
-            Text { visible: !btn.compact; anchors.verticalCenter: parent.verticalCenter; text: btn.label; font.family: c.font; font.pixelSize: 12; color: bh.hovered ? c.text : c.dim }
-        }
-    }
     // The buttons measured with their names and short names, to see which fit left of the view button
     Row {
         id: fullBar
         visible: false
         spacing: 2
-        Repeater { model: root.actions; delegate: ActButton { required property var modelData; icon: modelData.icon; label: modelData.text } }
+        Repeater { model: root.actions; delegate: AppBarButton { required property var modelData; c: root.c; glyph: modelData.icon; label: modelData.text } }
     }
     Row {
         id: shortBar
         visible: false
         spacing: 2
-        Repeater { model: root.actions; delegate: ActButton { required property var modelData; icon: modelData.icon; label: modelData.short || modelData.text } }
+        Repeater { model: root.actions; delegate: AppBarButton { required property var modelData; c: root.c; glyph: modelData.icon; label: modelData.short || modelData.text } }
     }
     Row {
         id: iconBar
         visible: false
         spacing: 2
-        Repeater { model: root.actions; delegate: ActButton { required property var modelData; icon: modelData.icon; compact: true } }
+        Repeater { model: root.actions; delegate: AppBarButton { required property var modelData; c: root.c; glyph: modelData.icon; compact: true } }
     }
     // The buttons stay at the top while the thread scrolls under them, on a solid band of the page's colour with a line
     // below it
@@ -164,12 +142,16 @@ Flickable {
         spacing: 2
         Repeater {
             model: root.actions
-            delegate: ActButton {
+            delegate: AppBarButton {
                 required property var modelData
                 required property int index
                 visible: !bar.compact || index < bar.fits
-                icon: modelData.icon; label: bar.full ? modelData.text : modelData.short || modelData.text; compact: bar.compact
+                c: root.c
+                glyph: modelData.icon; label: bar.full ? modelData.text : modelData.short || modelData.text; compact: bar.compact
+                strong: !!modelData.strong
                 tip: modelData.tip || ""; keys: modelData.keys || ""
+                // The last one, at the window's edge when there is no view button, keeps its tip inside the window
+                tipAlign: !viewButton.visible && index === root.actions.length - 1 ? "right" : "left"
                 onClicked: root.act(modelData.id)
             }
         }
