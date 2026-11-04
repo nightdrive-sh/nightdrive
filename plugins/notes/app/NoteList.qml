@@ -24,6 +24,7 @@ AppSidebar {
     // title says which folder or tag the list is
     title: navShown ? "" : store.scopeName
     contentTop: navShown ? 16 : headerHeight + 13
+    headerLine: true                     // the line under the note's header runs on under the search (or the title)
     titleItems: [
         AppIconButton {
             visible: !root.navShown

@@ -12,6 +12,9 @@ Rectangle {
     property int headerHeight: 62       // as high as the view's header beside it, so the two titles line up
     property int contentTop: headerHeight + 13
     property int bottomMargin: 18
+    // A line under the header, level with the one under the view's header beside it: for a sidebar whose header line holds
+    // a search (Notes' list), so the line runs on across the window under it
+    property bool headerLine: false
     property alias spacing: column.spacing
     default property alias content: column.data
     property alias titleItems: titleRow.data
@@ -40,5 +43,6 @@ Rectangle {
         anchors.bottomMargin: root.bottomMargin
         spacing: 2
     }
+    Rectangle { visible: root.headerLine; y: root.headerHeight - 1; width: parent.width; height: 1; color: root.c.divider }
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: root.c.divider }
 }
