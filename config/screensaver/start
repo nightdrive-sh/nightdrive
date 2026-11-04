@@ -4,7 +4,8 @@
 # One running already: the savers themselves (as stop matches them), not a command that names one, and this session's
 # only: a container's (nightdrive sandbox) run as the same user in another PID namespace
 pgrep --ns $$ --nslist pid -f '^(python3 -I|qs -p) .*/screensaver/(nightdrive-saver|nightdrive-rain|clock)$' >/dev/null && exit 0
-# Not under the lock (hypridle's timer runs on while locked): the lock covers it, and it would outlive the unlock
+# Not under the lock (hypridle's timer runs on while locked): the lock covers it, and it would outlive the unlock. The lock
+# shows the clock itself after the same idle time (greeter/LockSaver.qml)
 pgrep --ns $$ --nslist pid -u "$UID" -f '[q]s -p .*/greeter/lock\.qml' >/dev/null && exit 0
 dir=$(dirname "$(readlink -f "$0")")
 choice=${1:-$(awk '$1 == "style" { print $2 }' ~/.local/state/nightdrive/idle 2>/dev/null)}

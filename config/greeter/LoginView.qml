@@ -91,6 +91,9 @@ Item {
 
     // Gives the keyboard back to the field after busy (a disabled TextInput loses its focus)
     onBusyChanged: if (!busy) input.forceActiveFocus()
+    // Hidden under the lock's screensaver (lock.qml, LockSaver.qml): a half-typed password doesn't wait there for the
+    // next person, and the field takes the keyboard back when the view shows again
+    onVisibleChanged: { if (!visible) input.text = ""; else if (main) input.forceActiveFocus() }
 
     Rectangle { anchors.fill: parent; color: view.bg }
     // Already darkened in the middle (background.sh)
@@ -179,7 +182,8 @@ Item {
                     selectionColor: "#35253d"
                     // No ligatures: JetBrains Mono draws *** as one shape, its middle star raised
                     font { family: view.font; pixelSize: view.promptSize; weight: Font.Bold; features: { "liga": 0, "calt": 0 } }
-                    enabled: !view.busy
+                    // Hidden (the lock's screensaver over it) it takes no keys, even if it still has the focus
+                    enabled: !view.busy && view.visible
                     focus: true
                     onAccepted: { if (text !== "" && !view.busy) view.submitted(text); text = "" }
                     Keys.onEscapePressed: view.escapePressed()

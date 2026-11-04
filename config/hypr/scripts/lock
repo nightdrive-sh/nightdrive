@@ -12,6 +12,9 @@
 # With allow_session_lock_restore (hyprland.lua) the new one takes the lock over. Steps go to the journal (journalctl -t lock).
 # A new lock plays system/lock.wav (hypr/scripts/sounds event); not at boot (the login screen has its own sound), nor
 # at a relock after sleep or a restart here.
+# A screensaver running as the lock comes (the idle lock, 20 min after the saver by default): the lock starts with its own
+# screensaver, the clock (NIGHTDRIVE_LOCK_SAVING), instead of the prompt flashing up before the screen goes off. Only a
+# first start: after a restart or a relock the prompt shows.
 RESTARTS=5        # at most this many restarts within WINDOW seconds; then the "lock died" screen stays (still locked)
 WINDOW=60
 lock='[q]s -p .*/greeter/lock\.qml'
@@ -19,11 +22,14 @@ mine=(--ns $$ --nslist pid -u "$UID")
 [[ $1 == --replace ]] || ! pgrep "${mine[@]}" -f "$lock" >/dev/null || exit 0
 pam=login; [[ -e /etc/pam.d/nightdrive-lock ]] && pam=nightdrive-lock   # it also opens the keyring (switch.sh autologin)
 quick=1; [[ $1 == --boot ]] && quick=
+saving=0
+[[ -z $1 ]] && pgrep "${mine[@]}" -f '^(python3 -I|qs -p) .*/screensaver/(nightdrive-saver|nightdrive-rain|clock)$' >/dev/null && saving=1
 starts=()
 [[ -z $1 ]] && { "$HOME/.config/hypr/scripts/sounds" event lock >/dev/null 2>&1 & }
 while :; do
-  NIGHTDRIVE_LOCK_PAM=$pam NIGHTDRIVE_LOCK_QUICK=$quick qs -p "$HOME/.config/greeter/lock.qml"
+  NIGHTDRIVE_LOCK_PAM=$pam NIGHTDRIVE_LOCK_QUICK=$quick NIGHTDRIVE_LOCK_SAVING=$saving qs -p "$HOME/.config/greeter/lock.qml"
   status=$?
+  saving=0
   (( status == 0 )) && exit 0                                    # unlocked: lock.qml quits once the compositor has it
   pgrep "${mine[@]}" -f "$lock" >/dev/null && exit 0             # another lock took over (relock killed this one)
   hyprctl -j version >/dev/null 2>&1 || exit 0                   # Hyprland is gone (logout)

@@ -45,7 +45,12 @@ Item {
         idlestyle: ["idle", "style", "idleStyle"]
     })
 
-    function footer(level, query) { return level === "baritems" ? "Enter: show / hide  ·  Ctrl+Up+Down: reorder" : "" }
+    // The lock shows only the clock (greeter/LockSaver.qml): the other styles are windows, which the lock covers
+    function footer(level, query) {
+        if (level === "baritems") return "Enter: show / hide  ·  Ctrl+Up+Down: reorder"
+        if (level === "screensaver" || level === "saverstyle") return "While locked: the clock, after the same time"
+        return ""
+    }
     function opened() {}
     function entered(level) {
         if (level === "topbar" || level === "baropacity" || level === "baricons" || level === "barhl" || level === "bardate") barProc.running = true
