@@ -54,6 +54,8 @@ ShellRoot {
         }
         // Nightdrive Contacts' people, when it is installed: addresses to complete, a sender's card (ContactBook.qml)
         readonly property ContactBook book: ContactBook {}
+        // The calendar an invitation goes in (Invitation.qml): the one picked last, for the next one
+        property string inviteCalendar: ""
         // For components in their own files, which don't see this file's ids.
         readonly property QtObject look: c
         readonly property QtObject mailer: nm

@@ -134,6 +134,10 @@ Usage: calendar [command]
                  change an event (not a recurring one): JSON on stdin of what changes (title, start, end, location,
                  notes, move_to: another calendar); prints the id restore takes (--json)
   restore UNDO   put an edited event back as it was
+  invite [FILE|-]
+                 an invitation's .ics (a mail's; stdin without FILE): what it is, and whether its event is in a
+                 calendar already (--json); --add CALENDAR puts it in one, or updates the copy there; --remove takes
+                 a cancelled one out
   color [ID [COLOR|reset]]
                  the calendars' colours, or set one's here (a name from the list, or #RRGGBB) over its server's;
                  reset gives the server's back (--json)
@@ -177,6 +181,11 @@ case ${1:-open} in
     [[ " ${*:2} " =~ \ (on|off|default)\  ]] && ((status == 0)) && running && ipc refresh >/dev/null 2>&1
     exit $status ;;
   calendars) python3 "$LIB/calendars.py" "${@:2}" ;;
+  invite)
+    python3 "$LIB/invite.py" "${@:2}"; status=$?
+    # --add and --remove change an event the window may show
+    [[ " ${*:2} " =~ \ --(add|remove)\  ]] && ((status == 0)) && running && ipc refresh >/dev/null 2>&1
+    exit $status ;;
   events)    python3 "$LIB/events.py" "${@:2}" ;;
   shared)    exec python3 "$LIB/write.py" "$@" ;;   # Claude's calendar_add: whether it asks first
   add|delete|edit|restore)

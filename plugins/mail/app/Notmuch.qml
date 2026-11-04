@@ -178,7 +178,7 @@ QtObject {
     }
 
     function message(m) {
-        const parts = { plain: "", html: "", files: [] }
+        const parts = { plain: "", html: "", files: [], invite: false }
         collect(m.body || [], parts, "")
         return {
             id: m.id,
@@ -190,7 +190,8 @@ QtObject {
             draft: (m.filename || []).some(f => /\/Drafts\/(cur|new)\//.test(f)),
             body: (parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)).replace(/^\s+|\s+$/g, ""),
             html: parts.html !== "" ? safeHtml(parts.html) : "",
-            files: parts.files      // attachments: { part, name, size } (size in bytes, or -1)
+            files: parts.files,     // attachments: { part, name, size } (size in bytes, or -1)
+            invite: parts.invite    // a calendar invitation in it: Invitation.qml reads it by Calendar
         }
     }
 
@@ -200,6 +201,8 @@ QtObject {
         for (const part of list) {
             const type = (part["content-type"] || "").toLowerCase()
             if (Array.isArray(part.content)) { collect(part.content, parts, type); continue }
+            // An invitation's own text/calendar part (in multipart/alternative, no file name), or an .ics attached
+            if (type === "text/calendar" || type === "application/ics" || /\.ics$/i.test(part.filename || "")) parts.invite = true
             if (part["content-disposition"] === "attachment" || part.filename && type.indexOf("text/") !== 0) {
                 if (parent === "multipart/related" && part["content-id"] && part["content-disposition"] !== "attachment") continue
                 parts.files.push({ part: part.id, name: part.filename || "attachment", size: part["content-length"] || (part.content || "").length || -1 })

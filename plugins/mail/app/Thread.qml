@@ -332,6 +332,9 @@ Flickable {
                         // the address above them
                         Item { visible: attachments.visible; width: 1; height: 8 }
                         Attachments { id: attachments; width: parent.width; c: root.c; app: root.app; msg: modelData }
+                        // A calendar invitation in it, with Nightdrive Calendar: what, when, and Add to calendar
+                        Item { visible: invitation.visible; width: 1; height: 8 }
+                        Invitation { id: invitation; width: parent.width; c: root.c; app: root.app; msg: modelData }
                     }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: c.line }
                 }
