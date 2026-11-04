@@ -248,7 +248,7 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Home Assistant | devices and sensors (presence and location: a choice) | switch a device, dim a light (with Undo), lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
 | Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail) | send one, Do Not Disturb off; on † | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
-| Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Wi-Fi or networking off † | |
+| Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Low Power Mode, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
 | Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †) | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |

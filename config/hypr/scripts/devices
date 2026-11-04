@@ -5,7 +5,8 @@
 #                       battery is the device's own percentage when it reports one (headphones, a mouse), else null
 #   devices battery     {present, percent, state, time_left, power_w, health}: state charging, discharging,
 #                       fully-charged or pending-charge; time_left as UPower says it ("2.9 hours"), to empty or to full;
-#                       health the capacity left of the design's, in percent. {present: false} on a desktop
+#                       health the capacity left of the design's, in percent; low_power: Low Power Mode on (low-power).
+#                       {present: false} on a desktop
 set -euo pipefail
 
 # The same battery the top bar shows: the machine's own, not a Bluetooth mouse's (scope Device)
@@ -39,7 +40,8 @@ case ${1:-} in
     [[ -n $dev ]] || { echo '{"present": false}'; exit 0; }
     info=$(upower -i "$dev" 2>/dev/null) || true
     grep -q 'percentage:' <<<"$info" || { echo "UPower isn't running, so the battery can't be read." >&2; exit 1; }
-    awk -F': *' '
+    low=$([[ $("${0%/*}/low-power" status) == on ]] && echo true || echo false)
+    awk -F': *' -v low="$low" '
       { gsub(/^ +/, "", $1) }
       $1 == "percentage"     { pct = $2 + 0 }
       $1 == "state"          { st = $2 }
@@ -47,8 +49,8 @@ case ${1:-} in
       $1 == "energy-rate"    { rate = $2 + 0 }
       $1 == "capacity"       { cap = $2 + 0 }
       END {
-        printf "{\"present\": true, \"percent\": %d, \"state\": \"%s\", \"time_left\": %s, \"power_w\": %.1f, \"health\": %d}\n",
-          pct, st, left == "" ? "null" : "\"" left "\"", rate, cap + 0.5
+        printf "{\"present\": true, \"percent\": %d, \"state\": \"%s\", \"time_left\": %s, \"power_w\": %.1f, \"health\": %d, \"low_power\": %s}\n",
+          pct, st, left == "" ? "null" : "\"" left "\"", rate, cap + 0.5, low
       }' <<<"$info" ;;
-  *) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

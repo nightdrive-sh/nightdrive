@@ -37,6 +37,7 @@ usage() {
   row "brightness [PCT]"         "Screen brightness in percent (JSON), set when given"
   row "network [COMMAND]"        "Wi-Fi and network state as JSON; wifi|all on|off [--keep]"
   row "bluetooth|battery"        "Bluetooth devices or the battery as JSON"
+  row "low-power [on|off|toggle]" "Low Power Mode on a laptop: status (--json); suggest on|off at 10 %"
   row "bar-style COMMAND"        "The top bar's look: opacity, icons, highlight, icon-opacity"
   row "nightlight [on|off]"      "Night light's warm tint: status, on, off, toggle (--json)"
   row "appearance"               "Wallpaper, theme, night light and the top bar's look now, as JSON"
@@ -76,6 +77,7 @@ usage() {
   row "plugin check [NAME]"       "Check plugins against the rules (plugins/README.md): file:line findings, exit 1"
   section "Preview"
   row "preview login"            "The login screen, without locking (Esc closes)"
+  row "preview lock-saver"       "The lock's screensaver (the clock), without locking: a key brings the login screen"
   section "For developers"
   row "platform [WHAT]"          "What this runs on: arch, name, machine, gpu, keyboard, pagesize"
   row "sandbox COMMAND"          "Nightdrive in a headless container: up, check, shot, ipc, vnc, down"
@@ -120,6 +122,7 @@ case ${1:-} in
   # The login screen (config/greeter/lock.qml) without locking: it checks the password, then just closes
   preview) case ${2:-} in
              login) NIGHTDRIVE_LOCK_PREVIEW=1 exec qs -p "$repo/config/greeter/lock.qml" >/dev/null 2>&1 ;;
+             lock-saver) NIGHTDRIVE_LOCK_PREVIEW=1 NIGHTDRIVE_LOCK_SAVING=1 exec qs -p "$repo/config/greeter/lock.qml" >/dev/null 2>&1 ;;
              *) usage >&2; exit 1 ;;
            esac ;;
   agent-warn) exec "$scripts/agent-warn" "${@:2}" ;;                  # AGENTS.md
@@ -138,6 +141,7 @@ case ${1:-} in
   restart) exec "$scripts/desktop-shell" restart ;;                   # Quickshell, the supervised way (AGENTS.md)
   brightness) exec "$scripts/brightness" screen "${@:2}" ;;
   bluetooth|battery) exec "$scripts/devices" "$1" ;;
+  low-power) exec "$scripts/low-power" "${@:2}" ;;                    # Settings › Battery, the battery menu
   software) exec "$scripts/software" "${@:2}" ;;                       # Install/Remove › Software without the launcher
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there

@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 
 // The launcher's Settings › Display (brightness, night light, Screen Mirroring's rows from MirroringLevels.qml, where the
-// laptop's screen is next to an external one, the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, then the details, as in the top bar's battery menu).
+// laptop's screen is next to an external one, the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, Low Power Mode, then the details, as in the top bar's battery menu).
 // The brightness rows (screen, keyboard: the row's key) are sliders that Launcher.qml draws (bright, keys, setBright) and
 // ←/→ steps (stepBright), also in the root search; Launcher.qml's displayItems() puts them there.
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered).
@@ -21,6 +21,7 @@ Item {
     property var batt: null                   // Battery: { percent, state, timeText } (upower)
     property var battDetail: null             // and its details (topbar/scripts/sysinfo battery), null on a desktop
     property bool hasBattery: false           // the machine has its own battery: Settings lists Battery only then
+    property var low: null                    // Low Power Mode (hypr/scripts/low-power status --json), null until read
     readonly property int brightStep: 5       // ←/→ on the brightness row, the same step as the brightness keys (hypr/scripts/brightness)
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
@@ -49,7 +50,7 @@ Item {
     function opened() { brightProc.running = true; keysProc.running = true; nightProc.running = true }
     function entered(level) {
         if (level === "display") { displayProc.running = true; ratesProc.running = true; sideProc.running = true; brightProc.running = true; keysProc.running = true; nightProc.running = true }
-        if (level === "battery") { battProc.running = true; battDetailProc.running = true }
+        if (level === "battery") { battProc.running = true; battDetailProc.running = true; lowProc.running = true }
     }
     function shiftActivate(it) {}
 
@@ -114,6 +115,12 @@ Item {
             const rows = [{ kind: "stat", name: batt.percent + "%  " + stateText,
                             glyph: batt.state === "charging" ? "battery-charging" : batt.percent < 40 ? "battery-low" : batt.percent < 60 ? "battery-medium" : "battery-full",
                             summary: batt.timeText !== "" ? batt.timeText + (batt.state === "charging" ? " until full" : " remaining") : undefined }]
+            // Low Power Mode, and whether the 10 % warning offers it (without power-profiles-daemon: neither)
+            if (low && low.available)
+                rows.push({ kind: "lowpower", name: "Low Power Mode", glyph: "leaf", switchOn: low.state === "on",
+                            footer: "Enter: on/off  ·  tuned's power-saver until the charger goes in" },
+                          { kind: "lowsuggest", name: "Suggest at 10 %", glyph: "battery-warning", switchOn: low.suggest,
+                            footer: "Enter: on/off  ·  the low battery warning offers Low Power Mode" })
             if (b) {
                 rows.push({ kind: "header", name: "Details" })
                 for (const r of [["zap", "Power", b.watts > 0 ? b.watts + " W" : ""],
@@ -137,6 +144,14 @@ Item {
             l.keepSelection()
             night = night === "on" ? "off" : "on"
             Quickshell.execDetached([scripts + "/nightlight", night])
+            return true
+        }
+        if (it.kind === "lowpower" || it.kind === "lowsuggest") {   // Settings › Battery
+            l.keepSelection()
+            const on = it.kind === "lowpower" ? low.state !== "on" : !low.suggest
+            low = Object.assign({}, low, it.kind === "lowpower" ? { state: on ? "on" : "off" } : { suggest: on })
+            Quickshell.execDetached(it.kind === "lowpower" ? [scripts + "/low-power", on ? "on" : "off"]
+                                                           : [scripts + "/low-power", "suggest", on ? "on" : "off"])
             return true
         }
         if (it.kind === "side") {         // stays open like the scale rows; Hyprland reloads with the new arrangement
@@ -279,5 +294,10 @@ Item {
         command: ["bash", "-c", "~/.config/topbar/scripts/sysinfo battery"]
         onResult: text => { try { p.battDetail = JSON.parse(text) } catch (e) { p.battDetail = null } }
     }
-    Timer { interval: 5000; repeat: true; running: p.launcher !== null && p.launcher.open && p.launcher.level === "battery"; onTriggered: { battProc.running = true; battDetailProc.running = true } }
+    Sh {
+        id: lowProc
+        script: '"$HOME/.config/hypr/scripts/low-power" status --json'
+        onResult: text => { try { p.low = JSON.parse(text) } catch (e) { p.low = null } }
+    }
+    Timer { interval: 5000; repeat: true; running: p.launcher !== null && p.launcher.open && p.launcher.level === "battery"; onTriggered: { battProc.running = true; battDetailProc.running = true; lowProc.running = true } }
 }

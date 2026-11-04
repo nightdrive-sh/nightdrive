@@ -152,7 +152,7 @@ AREAS = {
                    "modify": "changes the wallpaper, theme, colour, night light and bar style"},
     "sound-display": {"name": "Sound and display", "glyph": "volume-2",
                       "read": "reads the volume, outputs, screens, network, Bluetooth and battery",
-                      "modify": "sets the volume, output and brightness; a screen's scale or resolution, the network off"},
+                      "modify": "sets the volume, output and brightness; a screen's scale or resolution, Low Power Mode, the network off"},
     "screen": {"name": "What's on screen", "glyph": "scan-eye",
                "read": "takes a picture of a window on screen and looks at it",
                "options": [

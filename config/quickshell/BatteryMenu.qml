@@ -2,7 +2,8 @@ import QtQuick
 import Quickshell
 
 // Battery: charging state and time remaining (upower), the battery's details (topbar/scripts/sysinfo battery:
-// power draw, temperature, health = capacity left of the original, cycles, voltage, age). Screen brightness is in
+// power draw, temperature, health = capacity left of the original, cycles, voltage, age), and Low Power Mode's switch
+// (hypr/scripts/low-power: tuned's power-saver until the charger goes in). Screen brightness is in
 // DisplayMenu, the keyboard's backlight in the launcher's Settings › Display.
 Column {
     id: m
@@ -13,6 +14,7 @@ Column {
     property string state: ""
     property string timeText: ""
     property var bat: null           // sysinfo battery
+    property string low: ""          // Low Power Mode: on | off ("" until read, or without power-profiles-daemon)
     signal close()
 
 
@@ -21,7 +23,7 @@ Column {
         const h = Math.floor(min / 60)
         return h > 0 ? h + " h " + (min % 60) + " min" : min + " min"
     }
-    function refresh() { battProc.running = true; detailProc.running = true }
+    function refresh() { battProc.running = true; detailProc.running = true; lowProc.running = true }
     Component.onCompleted: refresh()
     Timer { interval: 3000; repeat: true; running: true; onTriggered: m.refresh() }
 
@@ -44,6 +46,12 @@ Column {
         id: detailProc
         command: ["bash", "-c", "~/.config/topbar/scripts/sysinfo battery"]
         onResult: text => { try { m.bat = JSON.parse(text) } catch (e) { m.bat = null } }
+    }
+
+    Sh {
+        id: lowProc
+        script: 'l="$HOME/.config/hypr/scripts/low-power"; "$l" status --json'
+        onResult: text => { try { const j = JSON.parse(text); m.low = j.available ? j.state : "" } catch (e) { m.low = "" } }
     }
 
     MenuHeader { width: parent.width; title: "Battery" }
@@ -78,6 +86,43 @@ Column {
             text: (m.state === "discharging" ? "Discharging" : m.state === "charging" ? "Charging"
                  : m.state === "fully-charged" ? "Fully charged" : m.state === "pending-charge" ? "Not charging" : m.state)
                 + (m.timeText !== "" ? " · " + m.timeText + (m.state === "charging" ? " until full" : " remaining") : "")
+        }
+    }
+
+    // Low Power Mode: laid out like Display's night light row, the switch on the right
+    Item {
+        id: lowRow
+        visible: m.low !== ""
+        width: parent.width
+        height: 30
+        property bool navSelected: false
+        readonly property bool navEnabled: visible
+        function navActivate() { toggle() }
+        function toggle() {
+            m.low = m.low === "on" ? "off" : "on"
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/low-power", m.low])
+        }
+        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: lowRow.toggle() }
+        Text {
+            id: leafIcon
+            width: 22
+            anchors.verticalCenter: parent.verticalCenter
+            horizontalAlignment: Text.AlignHCenter
+            text: Icons.g("leaf")
+            color: m.low === "on" ? Theme.warning : Theme.text
+            font { family: Icons.family; pixelSize: 18 }
+        }
+        Text {
+            anchors { left: leafIcon.right; leftMargin: 10; verticalCenter: parent.verticalCenter }
+            text: "Low Power Mode"
+            color: Theme.text
+            font { family: Theme.font; pixelSize: 13 }
+        }
+        Toggle {
+            anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+            checked: m.low === "on"
+            navSelected: lowRow.navSelected
+            onToggled: lowRow.toggle()
         }
     }
 

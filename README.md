@@ -111,7 +111,9 @@ Click an icon and a small menu opens under it:
 - **Wi-Fi** (and Ethernet with your wired profiles) and **Bluetooth**
 - **Display**: brightness, night light, each screen's scale and refresh rate. **Other displays**: mirroring to a TV
   (Screen Mirroring plugin), an iPad or iPhone as a display of its own (VNC Display plugin)
-- **Battery**: time left and the battery's health
+- **Battery**: time left, the battery's health and **Low Power Mode** (tuned's power-saver profile; the icon turns
+  yellow). The low battery warning at 10 % offers to turn it on, plugging in the charger turns it off; Launcher ›
+  Settings › Battery has both switches
 - **System**: load, memory, temperatures and the heaviest processes
 - **Date and time**: a month's calendar with week numbers; ‹ › browse the months
 - **Tailscale**: your devices, and on or off
@@ -461,6 +463,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive brightness 60` | The screen's brightness in percent; without a number, prints it |
 | `nightdrive network` | Wi-Fi and the network as JSON, with whether the internet answers; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |
 | `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
+| `nightdrive low-power on` | Low Power Mode on a laptop, `off` or `toggle`; `status` (`--json`). `suggest off` stops the 10 % warning offering it |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
 | `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |

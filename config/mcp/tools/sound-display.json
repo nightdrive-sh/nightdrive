@@ -151,10 +151,29 @@
     {
       "name": "battery_status",
       "title": "Battery",
-      "description": "The laptop's battery: percent, state (charging, discharging, fully-charged, pending-charge), time_left to empty or to full, power_w being drawn, and health (capacity left of the original, %). present false on a desktop.",
+      "description": "The laptop's battery: percent, state (charging, discharging, fully-charged, pending-charge), time_left to empty or to full, power_w being drawn, and health (capacity left of the original, %), low_power (Low Power Mode on). present false on a desktop.",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
       "command": ["nightdrive", "battery"],
       "class": "read",
+      "area": "sound-display"
+    },
+    {
+      "name": "battery_low_power",
+      "title": "Low Power Mode",
+      "description": "Turn Low Power Mode on or off on a laptop (Settings › Battery): tuned's power-saver profile, for a longer battery life at some speed. Plugging in the charger turns it off by itself. Fails on a desktop without a battery.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {"type": "string", "enum": ["on", "off"]}
+        },
+        "required": ["state"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "low-power", "{state}", "--json"],
+      "before": ["nightdrive", "low-power", "status", "--json"],
+      "undo": ["nightdrive", "low-power", "{state}"],
+      "notice": "Turned Low Power Mode {state}",
+      "class": "change",
       "area": "sound-display"
     }
   ]

@@ -5,6 +5,8 @@ import Quickshell.Services.UPower
 // Low battery: a critical notification (it stays until clicked, with the urgent sound) at `warnAt` and again at `lastAt`,
 // with the charge as a red meter on the card (hint value: NotificationCard.qml) and the time left when UPower knows it.
 // Plugging in the charger takes the notification away. A desktop without a battery never gets one.
+// Low Power Mode (hypr/scripts/low-power): the 10 % warning offers to turn it on (`low-power offer` sends it, with the
+// button unless it's on already or Settings › Battery says not to), and plugging in the charger turns it off.
 // From `lastAt` on, the open windows are kept each minute, so the next login can open them again if the battery runs
 // out (hypr/scripts/reopen session); the charger drops them.
 // Sounds (hypr/scripts/sounds event): the warning plays system/battery-low instead of the urgent chime, and plugging in
@@ -60,6 +62,8 @@ Scope {
         onTriggered: {
             const was = w.settledOnBattery
             w.settledOnBattery = UPower.onBattery
+            if (was && !UPower.onBattery && w.present)
+                Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/low-power", "off"])
             if (was && !UPower.onBattery && w.present && Date.now() - w.lastCharger > w.chargerGap) {
                 w.lastCharger = Date.now()
                 w.sound("charger")
@@ -72,13 +76,18 @@ Scope {
         const left = mins >= 60 ? Math.floor(mins / 60) + " h " + (mins % 60) + " min" : mins + " min"
         const body = pct + " % left" + (mins > 0 ? ", about " + left : "") + ". "
             + (last ? "Plug in the charger now." : "Time to plug in the charger.")
+        const summary = last ? "Battery almost empty" : "Battery low"
+        sound("battery-low")
+        if (!last) {   // waits for the answer in the background
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/low-power", "offer", summary, body, String(pct)])
+            return
+        }
         // Straight over D-Bus like hypr/scripts/screenshot: notify-send -i sets the picture, not the app's icon
         Quickshell.execDetached(["gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
             "--object-path", "/org/freedesktop/Notifications", "--method", "org.freedesktop.Notifications.Notify",
-            "Battery", "0", "lucide:battery-warning", last ? "Battery almost empty" : "Battery low", body, "[]",
+            "Battery", "0", "lucide:battery-warning", summary, body, "[]",
             "{'urgency': <byte 2>, 'x-dunst-stack-tag': <'" + tag + "'>, 'value': <int32 " + pct + ">, 'suppress-sound': <true>}",
             "int32 -1"])
-        sound("battery-low")
     }
 
     Timer {

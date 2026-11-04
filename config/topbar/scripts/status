@@ -69,6 +69,8 @@ case $kind in
       (( pct <= 10 )) && cls=critical || { (( pct <= 20 )) && cls=warning; }
       if (( pct < 40 )); then icon=battery-low; elif (( pct < 60 )); then icon=battery-medium; else icon=battery-full; fi
     fi
+    # Low Power Mode (hypr/scripts/low-power) shows yellow, as on an iPhone; only the critical red wins over it
+    [[ -z $cls && $(~/.config/hypr/scripts/low-power status) == on ]] && cls=warning
     emit "$icon" "$pct%" "$cls" ;;
   claude)
     exec ~/.config/topbar/scripts/claude-bar status ;;   # its right click cycles what it shows
