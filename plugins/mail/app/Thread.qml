@@ -2,7 +2,7 @@ import QtQuick
 import qs
 import qs.kit
 
-// The open thread: its subject, then each message with its attachments. Mail's reading pane, and a message window's.
+// The open thread: its subject, then each message, its attachments in its header (Attachments.qml). Mail's reading pane, and a message window's.
 Flickable {
     id: root
     // From the window it is in: the look, notmuch, and Mail's helpers (name, fullDate, rich, openPart …).
@@ -346,6 +346,10 @@ Flickable {
                             width: parent.width; elide: Text.ElideRight
                             text: app.fullDate(modelData.timestamp); color: c.faint; font.family: c.font; font.pixelSize: 12
                         }
+                        // The attachments last in the header, in sight as the message opens, a little apart from
+                        // the address above them
+                        Item { visible: attachments.visible; width: 1; height: 8 }
+                        Attachments { id: attachments; width: parent.width; c: root.c; app: root.app; msg: modelData }
                     }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: c.line }
                 }
@@ -403,63 +407,6 @@ Flickable {
                         selectionColor: parent.paper ? root.paperSelection : c.sel
                         onLinkActivated: link => root.openLink(link)
                         HoverHandler { cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor }
-                    }
-                }
-                // Attachments: a click opens one, "Save" puts it in the downloads folder.
-                Flow {
-                    width: parent.width
-                    visible: !msgCol.isFolded && modelData.files.length > 0
-                    spacing: 8
-                    Repeater {
-                        model: modelData.files
-                        delegate: Rectangle {
-                            id: file
-                            required property var modelData
-                            readonly property var msg: msgCol.modelData
-                            implicitWidth: fileRow.implicitWidth + 28
-                            implicitHeight: 34
-                            radius: 8
-                            border.color: c.line
-                            color: fileHover.hovered ? c.hover : "transparent"
-                            HoverHandler { id: fileHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler { onTapped: app.openPart(file.msg, file.modelData) }
-                            Row {
-                                id: fileRow
-                                anchors.centerIn: parent
-                                spacing: 10
-                                Text {
-                                    id: fileName
-                                    textFormat: Text.PlainText
-                                    text: file.modelData.name; color: c.text; font.family: c.font; font.pixelSize: 12
-                                    width: Math.min(implicitWidth, 280); elide: Text.ElideMiddle
-                                }
-                                Text { text: app.size(file.modelData.size); color: c.faint; font.family: c.font; font.pixelSize: 11; anchors.baseline: fileName.baseline }
-                                Text {
-                                    text: "Save"; font.family: c.font; font.pixelSize: 11; anchors.baseline: fileName.baseline
-                                    color: saveHover.hovered ? c.accent : c.dim
-                                    opacity: fileHover.hovered ? 1 : 0
-                                    HoverHandler { id: saveHover }
-                                    TapHandler { onTapped: app.savePart(file.msg, file.modelData) }
-                                }
-                            }
-                        }
-                    }
-                    // Two or more: all of them to the downloads folder at once
-                    Rectangle {
-                        visible: msgCol.modelData.files.length > 1
-                        implicitWidth: allRow.implicitWidth + 24
-                        implicitHeight: 34
-                        radius: 8
-                        color: allHover.hovered ? c.hover : "transparent"
-                        HoverHandler { id: allHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: app.saveAll(msgCol.modelData) }
-                        Row {
-                            id: allRow
-                            anchors.centerIn: parent
-                            spacing: 7
-                            Text { anchors.verticalCenter: parent.verticalCenter; text: Icons.g("download"); font.family: Icons.family; font.pixelSize: 14; color: allHover.hovered ? c.accent : c.dim }
-                            Text { anchors.verticalCenter: parent.verticalCenter; text: "Save all"; font.family: c.font; font.pixelSize: 12; color: allHover.hovered ? c.accent : c.dim }
-                        }
                     }
                 }
                 // A draft is written on in the writing window.
