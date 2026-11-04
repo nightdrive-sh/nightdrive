@@ -76,7 +76,7 @@ Item {
     DisplayLevels { id: dispLv; launcher: root.launcher }
     RemoveLevels { id: rmLv; launcher: root.launcher }
     PasswordLevels { id: pwLv; launcher: root.launcher }
-    ThemeLevels { id: themesLv; launcher: root.launcher; behave: behaveLv }
+    ThemeLevels { id: themesLv; launcher: root.launcher }
     AboutLevels { id: aboutLv; launcher: root.launcher }
     Calculator { id: calcLv; launcher: root.launcher }
     Instantiator {

@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
 // The launcher's Settings › Theme: Themes (Nightdrive's and the ones saved in Theme Editor; ⌘⌫ deletes one of yours),
 // Color (the desktop's accent; the launcher recolors at once), Background (the wallpapers, yours and the bundled ones;
@@ -11,7 +12,6 @@ import Quickshell
 Item {
     id: t
     property var launcher: null
-    property var behave: null                 // BehaviourLevels: the update channel, which gates Font
 
     property var themeList: []                // Color: [{ value, name, swatch, current }] (hypr/scripts/theme list)
     property var fontList: []                 // Font: [{ family, installed, current }] (hypr/scripts/theme fonts)
@@ -33,13 +33,20 @@ Item {
         if (level === "theme" || level === "themecolor") themeProc.running = true
         if (level === "theme" || level === "themes") savedProc.running = true
         if (level === "theme" || level === "themefont") fontProc.running = true
-        if (level === "theme" && behave) behave.entered("channel")   // Font's gate, also when Theme is opened directly
     }
     function shiftActivate(it) {}
 
-    // #1839: the font picker is on trial (the UI font isn't chosen yet and the sizes are made for JetBrains Mono), so
-    // Font shows only on the dev channel and a release doesn't hand it to stable users unasked. To lift it: true.
-    readonly property bool fontOnTrial: behave !== null && behave.channel === "dev"
+    // #1839, #2061: the font picker is on trial (the UI font isn't chosen yet and the sizes are made for JetBrains Mono),
+    // so Font shows only where the git-ignored local slot local/trials has a line "font" (README › Make it yours), not on
+    // a channel: dev users would get it too. `nightdrive theme font` works without it. To lift it: true.
+    readonly property string trialsFile: Quickshell.env("HOME") + "/.config/quickshell/local/trials"
+    property var trials: []
+    readonly property bool fontOnTrial: trials.indexOf("font") >= 0
+    FileView {
+        path: t.trialsFile; watchChanges: true; onFileChanged: reload(); printErrors: false   // optional (an overlay)
+        onLoaded: t.trials = text().split("\n").map(l => l.replace(/#.*/, "").trim()).filter(l => l !== "")
+        onLoadFailed: t.trials = []
+    }
 
     // Theme: Color with its current value, and Background (the root search finds them too)
     function themeItems() {

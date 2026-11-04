@@ -449,7 +449,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive minimal --dry-run` | On an install on Fedora KDE: what turning it into Fedora Minimal would remove, and what stays as yours; without `--dry-run` it does it ([Install](#install)) |
 | `nightdrive theme color teal` | Theme colour: violet, blue, teal, green, amber, rose or graphite; aerc (if you use it) gets it too, unless you have picked a styleset of your own |
 | `nightdrive theme set background '#181722'` | The look: the terminals', the Launcher's, Firefox's and Thunderbird's background and opacity, the window borders and shadows; `nightdrive theme look` lists the settings, `default` puts one back (also Theme Editor, Launcher › Settings › Theme) |
-| `nightdrive theme font "DM Sans"` | The font of the menus, the Launcher and the apps (on the dev channel also Launcher › Settings › Theme › Font, which lists the fonts on trial): an installed family (`fc-list : family`); without a name, prints it; `default` goes back to JetBrains Mono. Sizes are made for JetBrains Mono, so another font may look a little small |
+| `nightdrive theme font "DM Sans"` | The font of the menus, the Launcher and the apps (with `font` in the local slot `trials`, also Launcher › Settings › Theme › Font, which lists the fonts on trial): an installed family (`fc-list : family`); without a name, prints it; `default` goes back to JetBrains Mono. Sizes are made for JetBrains Mono, so another font may look a little small |
 | `nightdrive theme save "My theme"` | Saves the colour and the look as a theme of your own; `nightdrive theme themes` lists them, `use ID` switches, `delete ID` removes one, `reset` goes back to Default |
 | `nightdrive wallpaper set <image>` | Changes the wallpaper (an image from elsewhere, such as Downloads, is copied to your own backgrounds first); `nightdrive wallpaper current` prints it |
 | `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one, `mode eDP-1 2560x1440` the resolution (`auto` for either goes back to the default). With `--keep` last, a card asks whether to keep it and it goes back in 20 s unless you do. `display json` gives it all as JSON |
@@ -547,7 +547,7 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   |---|---|
   | `config/hypr/local.d/*.lua` | autostart entries, window rules, keybindings |
   | `config/hypr/background-apps.local`, `reopen-commands.local`, `SHORTCUTS.local.md` | more background apps, more programs ⌘⇧U starts again, your own entries in the shortcut list |
-  | `config/quickshell/local/` | `<Name>Menu.qml` bar menus, and `LauncherExtension.qml` for your own Launcher levels |
+  | `config/quickshell/local/` | `<Name>Menu.qml` bar menus, `LauncherExtension.qml` for your own Launcher levels, and `trials`: a line per feature on trial to show (`font`: Launcher › Settings › Theme › Font) |
   | `config/fuzzel/apps-allow.local.txt` | more apps shown in the Launcher |
   | `config/kitty/local.conf`, `config/ghostty/local.ghostty`, `config/alacritty/local.toml`, `config/foot/local.ini` | your own kitty, Ghostty, Alacritty and foot settings (font, size, keys), over Nightdrive's |
   | `config/firefox/user.local.js` | your own Firefox prefs (`user_pref(…)`, e.g. the Browser Toolbox), after Nightdrive's; written into the profile by `nightdrive update` |
