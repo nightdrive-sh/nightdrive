@@ -1,0 +1,22 @@
+# Recorder
+
+Record from a microphone into `~/Recordings`: pause and go on as often as you like, and the pieces are saved as one WAV (48 kHz mono). The recording goes on with the window closed. Its window, the top bar icon and transcription into text are on their way; for now it works from a terminal and your own keys.
+
+## In a terminal
+
+| Command | What it does |
+| --- | --- |
+| `recorder record` | Start recording, from the default microphone (`--mic NODE`: a PipeWire source by its node name; `--name NAME`), or go on after a pause |
+| `recorder pause` | Pause |
+| `recorder toggle` | Record, pause or go on: one key for all three |
+| `recorder save` | End the recording and save it as `NAME.wav` (`--name NAME`); a new recording is named by its day and time |
+| `recorder new` | Save, and start the next recording at once |
+| `recorder status` | What is being recorded and for how long |
+| `recorder list`, `recorder info NAME` | The recordings, newest first; one recording |
+| `recorder rename NAME NEW` | A new name for the recording, its transcript and exports |
+| `recorder trash NAME` | The recording and its files to the trash, where Files puts them back |
+| `recorder config [KEY VALUE]` | The settings: `folder`, `mic` (a node name, empty for the default), `model`, `language`, `transcribe_on_save` |
+
+Each takes `--json`. A saved name is never overwritten: the new one is `NAME (2)`. If a recording is cut off (a crash, a power cut), the next `recorder` command saves what it had as `NAME (recovered)`. `RECORDINGS_DIR` points the commands at another folder.
+
+Needs: nothing to set up (PipeWire's `pw-record`, which Nightdrive has)

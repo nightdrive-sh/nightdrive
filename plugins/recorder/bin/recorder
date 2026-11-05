@@ -1,0 +1,99 @@
+#!/bin/bash
+# recorder: Nightdrive Recorder (plugins/recorder, README.md): sound from a microphone recorded into ~/Recordings, its
+# window, and the commands the window, the keys, the top bar and Claude's tools use. The recording itself is pw-record
+# run by lib/capture.py as a process of its own, so it goes on with the window closed.
+set -uo pipefail
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app                                     # Recorder's own Quickshell config, apart from the desktop's shell
+LIB=$APP_DIR/lib
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+APP_TITLE=Recorder
+APP_IPC=recorder
+. "$QS_DIR/kit/app.sh"
+
+# A change made outside the window (a key, the top bar, Claude, a terminal) shows in it, and in the bar, at once
+changed() {
+  local status=$?
+  running && ipc refresh
+  qs ipc call bar refreshModule recorder >/dev/null 2>&1
+  return $status
+}
+
+# Puts Recorder among the desktop's apps (share/recorder.desktop), with Exec's full path filled in: the compositor's
+# PATH may not have ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons" "$(python3 "$LIB/settings.py" get --json | jq -r .path)"
+  cp "$APP_DIR/share/recorder.svg" "$icons/nightdrive-recorder.svg"
+  sed "s|^Exec=recorder|Exec=$HOME/.local/bin/recorder|" "$APP_DIR/share/recorder.desktop" > "$apps/nightdrive-recorder.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Installed: $apps/nightdrive-recorder.desktop"
+}
+
+# Takes Recorder out of the desktop's apps; a recording being made is saved first, and the recordings stay
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  python3 "$LIB/capture.py" status --json | jq -e '.state != "idle"' >/dev/null && python3 "$LIB/capture.py" save
+  app_command quit >/dev/null 2>&1 || true
+  rm -f "$data/applications/nightdrive-recorder.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-recorder.svg"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$data/applications" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Recorder is out of your apps; your recordings stay in $(python3 "$LIB/settings.py" get --json | jq -r .path)."
+}
+
+usage() {
+  cat <<USAGE
+Usage: recorder [command]
+
+  (none), open     open Recorder, or bring it forward if it is open
+  record           start recording (--mic NODE: from that PipeWire source; --name NAME), or go on after a pause
+  pause            pause; record or toggle goes on
+  toggle           record, pause or go on: one key for all three
+  save             end the recording and save it as NAME.wav in ~/Recordings (--name NAME: under that name)
+  new              save, and start the next recording at once
+  status           what is being recorded and for how long (--json: {state: idle|recording|paused, name, mic,
+                   elapsed, started})
+  list             the recordings, newest first (--json; --limit N)
+  info NAME        one recording: its length, transcript and exports (--json)
+  rename NAME NEW  a new name for the recording, its transcript and exports (--json)
+  trash NAME       the recording and its files to the trash, where Files puts them back (--json)
+  restore NAME…    back from the trash (the names trash --json gives)
+  config           the settings (--json); config KEY VALUE changes one: folder, mic, model (parakeet|whisper),
+                   language (auto|fi|en), transcribe_on_save (on|off)
+  install          Recorder among the desktop's apps (the installer), and ~/Recordings
+  uninstall        take it out again (your recordings stay)
+  restart          close and open again (after a change to the app)
+  quit             close the window (a recording goes on)
+  log              follow the app's log (QML errors show up here)
+  help             this text
+
+A command's --json prints the state after it, for the window, the bar and Claude's tools.
+USAGE
+}
+
+case ${1:-open} in
+  record|pause|toggle|save|new) python3 "$LIB/capture.py" "$@"; changed ;;
+  status)    python3 "$LIB/capture.py" "$@" ;;
+  list|info) python3 "$LIB/recordings.py" "$@" ;;
+  rename|trash) python3 "$LIB/recordings.py" "$@"; changed ;;
+  restore)   "$APP_DIR/../../bin/nightdrive" files restore "${@:2}"; changed ;;   # trash's undo: back from the trash
+  config)
+    if (($# > 2)) || { (($# == 2)) && [[ $2 != --json ]]; }; then
+      python3 "$LIB/settings.py" set "${@:2}"; changed
+    else
+      python3 "$LIB/settings.py" get "${@:2}"
+    fi
+    ;;
+  install)   install_app ;;
+  uninstall) uninstall_app ;;
+  help|-h|--help) usage ;;
+  *)
+    app_command "$@"; status=$?        # open (the default), settings, restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac
