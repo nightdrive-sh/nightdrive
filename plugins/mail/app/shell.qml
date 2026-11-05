@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs
 import qs.kit
 import "sender.js" as Sender
+import "links.js" as Links
 
 // Nightdrive Mail: folders, thread list and the open thread, over notmuch.
 // This file holds the window's state (account, folder, threads, the open and picked ones), reading them over notmuch
@@ -358,14 +359,8 @@ ShellRoot {
         // A sender's name and address (sender.js: a name may hold text that looks like a tag)
         function name(from) { return Sender.name(from) }
         function address(from) { return Sender.address(from) }
-        // Plain text to rich text: links clickable, quoted lines quiet.
-        function rich(t) {
-            const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-            return t.replace(/\r/g, "").split("\n").map(l => {
-                let h = esc(l).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:' + c.accent + '">$1</a>')
-                return /^\s*&gt;/.test(h) ? '<span style="color:' + c.faint + '">' + h + '</span>' : h
-            }).join("<br>")
-        }
+        // Plain text to rich text: links clickable, quoted lines quiet (links.js)
+        function rich(t) { return Links.rich(t, c.accent, c.faint) }
 
         Component.onCompleted: {
             // Marks of mark-all-read steps that can't be undone any more (the last run's)
