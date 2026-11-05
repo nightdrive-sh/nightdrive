@@ -3,7 +3,7 @@ import Quickshell.Widgets
 import qs
 
 // Ferry's menu › what the other devices sent (FerryReceivedList.qml): one item. A click does what the round mark says
-// (copies a text, opens a file); a file can be dragged into another app. A picture shows its own small copy, kept in
+// (copies a text, opens a file); a file or a text can be dragged into another app. A picture shows its own small copy, kept in
 // the menu's thumbDir so the next opening doesn't read every photo again.
 Item {
     id: r
@@ -35,19 +35,29 @@ Item {
         color: r.lit ? Theme.hover : "transparent"
         border { width: r.navSelected ? 1 : 0; color: Theme.primary }
     }
-    // The file itself under the cursor while it's dragged out (the row stays)
+    // While it's dragged out, the row stays and its picture follows the cursor: a file's row as it is, a text's start in
+    // a small box (FerryTextDragImage.qml). A text goes as plain text; both types, as some apps ask only for the one
+    // with the charset (GTK's) and others only for the plain one.
     Item {
         id: dragSource
         anchors.fill: parent
         Drag.active: rowArea.drag.active
-        Drag.hotSpot: Qt.point(30, height / 2)
+        Drag.hotSpot: r.isFile ? Qt.point(30, height / 2) : Qt.point(12, 12)
         Drag.dragType: Drag.Automatic
         Drag.supportedActions: Qt.CopyAction
-        Drag.mimeData: ({ "text/uri-list": "file://" + encodeURI(r.modelData.path || "") + "\r\n" })
+        Drag.mimeData: r.isFile ? { "text/uri-list": "file://" + encodeURI(r.modelData.path || "") + "\r\n" }
+            : { "text/plain": r.modelData.text || "", "text/plain;charset=utf-8": r.modelData.text || "" }
         Drag.onActiveChanged: r.menu.dragging += Drag.active ? 1 : -1
         Drag.onDragFinished: r.menu.close()
     }
     Item { id: dragDummy; visible: false }   // drag.target: the row stays, its image follows
+    // A text's picture, drawn out of sight (left of the menu) so grabToImage has something rendered to take
+    Loader {
+        id: textImage
+        active: !r.isFile
+        x: -1000
+        sourceComponent: FerryTextDragImage { text: r.modelData.text || ""; secret: !!r.modelData.secret }
+    }
 
     Rectangle {
         id: tile
@@ -110,14 +120,14 @@ Item {
             font { family: Theme.font; pixelSize: 11 }
         }
     }
-    // A click anywhere on the row does what the round mark says; a file drags out from here
+    // A click anywhere on the row does what the round mark says; a file or a text drags out from here
     MouseArea {
         id: rowArea
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        drag.target: r.isFile ? dragDummy : null
-        onPressed: if (r.isFile) r.grabToImage(res => { dragSource.Drag.imageSource = res.url })
+        drag.target: dragDummy
+        onPressed: (r.isFile ? r : textImage.item).grabToImage(res => { dragSource.Drag.imageSource = res.url })
         onClicked: r.menu.act(r.modelData)
     }
     // What a click does: copy a text, open a file

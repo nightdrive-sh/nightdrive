@@ -8,7 +8,7 @@ Ferry is an app of its own, for Linux, the Mac and the iPhone, and comes with Ni
 
 ## On the computer
 
-- The menu lists what your other devices sent: a click copies a text or opens a file, and a file drags out into another app.
+- The menu lists what your other devices sent: a click copies a text or opens a file, and either one drags out into another app (a text as plain text; a code or a password without showing it).
 - **Aa**, **Send Clipboard** and **+** send a text, the clipboard or files to the device in the pill above them. Click the pill to pick another device or add one. Files dragged over the menu can be dropped on any device's tile, or on the inbox icon in the top bar for the picked one.
 - A send to a phone waits in the box until that phone picks it up. A send to another computer goes straight there, and Send Clipboard puts it on that computer's clipboard. While that computer is asleep or off, the send waits at the top of the menu (Waiting for … · 3 d left) and goes once it's back, for 3 days at most; its × cancels it.
 - What arrives goes to Downloads, with a notification. The phone's Send Clipboard lands on the clipboard too.
