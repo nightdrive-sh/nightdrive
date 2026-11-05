@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import qs.kit
 
-// The folders, with each one's unread count (✓ under the pointer marks them all read), the accounts at the foot and the
-// fetch and outbox signs by the title. Apart from shell.qml, which places it first in the window's row.
+// The folders, with each one's unread count (✓ under the pointer marks them all read, and in Spam and Trash a bin beside
+// it empties them), the accounts at the foot and the fetch and outbox signs by the title. Apart from shell.qml, which
+// places it first in the window's row.
 //
 // The title's line and the search's are as high (headerHeight) and as far from the top, so the first
 // folder and the first message line up.
@@ -40,11 +41,25 @@ AppSidebar {
             countColor: c.dim
             active: panes.at === "folders"     // Tab's (Panes.qml)
             onClicked: win.pickFolder(index)
-            // Under the pointer, the unread count gives way to ✓: mark all read
+            // Under the pointer, the unread count gives way to ✓: mark all read. In Spam and Trash the bin beside it
+            // empties the folder (it asks first), so the two lie side by side, the bin outermost.
+            AppIconButton {
+                id: emptyButton
+                readonly property string dir: folderRow.modelData.dir
+                visible: folderRow.hovered && (dir === "Spam" || dir === "Trash")
+                anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
+                c: win.look
+                glyph: "trash-2"
+                hoverColor: c.sel       // as ✓ beside it: the confirm panel is the warning
+                tip: "Empty " + dir; keys: "⌘⇧⌫"; tipSide: "right"
+                onClicked: ops.emptyDir(dir)
+            }
             AppIconButton {
                 id: readButton
                 visible: folderRow.hovered && win.unreadCounts[folderRow.index] > 0
-                anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
+                anchors.right: emptyButton.visible ? emptyButton.left : parent.right
+                anchors.rightMargin: emptyButton.visible ? 2 : 6
+                anchors.verticalCenter: parent.verticalCenter
                 c: win.look
                 glyph: "check-check"
                 hoverColor: c.sel
