@@ -53,7 +53,7 @@ QtObject {
         // r answers everyone, ⇧R only the sender; ⌘⇧C (Ctrl+Shift+C) has Claude write the reply.
         else if (k === Qt.Key_R && !alt) win.compose(e.modifiers & Qt.ShiftModifier ? "reply" : "all")
         else if (k === Qt.Key_A || k === Qt.Key_E) ops.archive()
-        else if ((k === Qt.Key_Backspace || k === Qt.Key_Delete) && shift && (ctrl || e.modifiers & Qt.MetaModifier)) ops.emptyTrash()
+        else if ((k === Qt.Key_Backspace || k === Qt.Key_Delete) && shift && (ctrl || e.modifiers & Qt.MetaModifier)) ops.emptyFolder()
         else if (k === Qt.Key_D || k === Qt.Key_NumberSign || k === Qt.Key_Backspace || k === Qt.Key_Delete) ops.trash()
         else if (k === Qt.Key_Exclam) ops.spam()
         else if (k === Qt.Key_U && shift) ops.markAllRead(win.folder)

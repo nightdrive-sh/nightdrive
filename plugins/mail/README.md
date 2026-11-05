@@ -21,7 +21,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | `a` `d` `!` | Archive, Trash, spam (in Spam: not spam) |
 | ⌘Z | Undo |
 | ⇧↑ ⇧↓ ⌘A | Select several threads (Ctrl-click adds one) |
-| ⌘⇧⌫ | In Trash: empty it (`d` there deletes one for good) |
+| ⌘⇧⌫ | Empty Trash, or in Spam empty Spam: asks first, and can't be undone (`d` in Trash deletes one for good) |
 
 - The next sync makes every move on the server too, so your phone sees it.
 - In a narrow window the list and the thread take turns: `Enter` or → opens the thread, `Esc` or ← goes back. Moving in the list marks nothing read.
@@ -185,12 +185,13 @@ SyncState *
 | `nightmail sync` | Fetches new mail now and shows it |
 | `nightmail show ID`, `reply ID`, `claude ID` | A message by its notmuch id, as the notifications use them |
 | `nightmail archive ID…`, `unarchive ID…`, `delete ID…` | From the inbox to Archive (and back) or Trash, as `a` and `d` do; an ID is one message's id or a thread (`thread:…`), exactly, never a query |
+| `nightmail empty Spam` (or `Trash`) `[--account ID]` | Everything in Spam or Trash deleted for good, as ⌘⇧⌫ does, without asking; `--card` shows what it would delete |
 | `nightmail unread`, `search QUERY [LIMIT]`, `thread ID`, `accounts` | Mail as JSON, without the window: unread threads, a notmuch search, a thread's messages as text |
 | `nightmail invitation ID` | A message's calendar invitation as JSON, by Calendar (`calendar invite`); `--add CALENDAR` puts it in a calendar or updates it there, `--remove` takes a cancelled one out |
 | `nightmail draft`, `draft-show ID`, `discard ID`, `send ID` | Drafts without the window: `draft` saves one from JSON on stdin (`{to, cc, subject, body, account}`, or a reply: `{reply_to, reply_all, body}`), with the signature and quote; `send` sends one |
 | `nightmail enable`, `disable` | Mail among the apps, its notifications and the sync, on or off (your mail and settings stay). Run `enable` again after changing `isyncrc`. |
 | `nightmail restart`, `quit`, `log` | After a change to Mail, and its QML errors |
 
-Claude Code uses these too, with Nightdrive's tools for Claude (Settings › Claude › Access › Mail): it reads and searches your mail and the invitations in it, writes drafts and archives, which you can undo, and sends or deletes only after you allow it on Nightdrive's card, which shows exactly what goes out: a message Claude reads can't send or delete anything. Access › Mail › *Mail Claude never gets* keeps senders, domains and tags from it whole (`maija@example.com`, `bank.fi`, `tag:health`): that mail, and mail you sent them, isn't in its unread, searches or threads, nor its notifications in the latest notifications. Empty at first. These commands in a terminal give everything.
+Claude Code uses these too, with Nightdrive's tools for Claude (Settings › Claude › Access › Mail): it reads and searches your mail and the invitations in it, writes drafts and archives, which you can undo, and sends, deletes or empties Spam only after you allow it on Nightdrive's card, which shows exactly what goes out: a message Claude reads can't send or delete anything. Access › Mail › *Mail Claude never gets* keeps senders, domains and tags from it whole (`maija@example.com`, `bank.fi`, `tag:health`): that mail, and mail you sent them, isn't in its unread, searches or threads, nor its notifications in the latest notifications. Empty at first. These commands in a terminal give everything.
 
 Needs: notmuch, isync (mbsync), an IMAP account; Claude Code for Claude's replies

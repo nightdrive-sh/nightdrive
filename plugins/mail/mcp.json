@@ -335,6 +335,44 @@
       "class": "act",
       "area": "mail",
       "deletes": true
+    },
+    {
+      "name": "mail_empty_spam",
+      "title": "Empty Spam",
+      "description": "Delete every message in the user's Spam folder for good, as Mail's Empty Spam does: in every account, or only in one (its id or address from mail_accounts). It can't be undone, and the next sync deletes them on the server too. The user allows it on Nightdrive's card, which shows how many threads go. Empty Spam only when the user asked to; an empty Spam is an error that says so.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string",
+            "title": "Account",
+            "description": "Only this account's Spam: its id or address (default: every account's)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "command": [
+        "nightmail",
+        "empty",
+        "Spam",
+        [
+          "--account",
+          "{account}"
+        ]
+      ],
+      "card": [
+        "nightmail",
+        "empty",
+        "Spam",
+        "--card",
+        [
+          "--account",
+          "{account}"
+        ]
+      ],
+      "class": "act",
+      "area": "mail",
+      "deletes": true
     }
   ]
 }

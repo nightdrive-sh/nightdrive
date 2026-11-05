@@ -2,8 +2,8 @@ import QtQuick
 import QtQuick.Layouts
 import qs.kit
 
-// The thread list's column: the search, the list (ThreadRow.qml, its keys in ListKeys.qml), Empty Trash and the quiet
-// line for what just happened. Apart from shell.qml, which places it between the folders and the open thread.
+// The thread list's column: the search, the list (ThreadRow.qml, its keys in ListKeys.qml), Empty Trash (or Spam) and
+// the quiet line for what just happened. Apart from shell.qml, which places it between the folders and the open thread.
 //
 // In one pane it fills the window, and while the thread shows it is there at no width: it keeps the keyboard, so j k
 // and the rest go on working from the thread.
@@ -76,15 +76,16 @@ Rectangle {
                 text: "Nothing here"; color: c.faint; font.family: c.font; font.pixelSize: 12
             }
         }
-        // In Trash: emptying it, which asks first
+        // In Trash or Spam: emptying it, which asks first
         AppKeyAction {
+            readonly property string dir: win.folders[win.folder].dir
             Layout.leftMargin: 28
             Layout.topMargin: 8
             Layout.bottomMargin: 24
-            visible: win.folders[win.folder].dir === "Trash" && win.threads.length > 0
+            visible: (dir === "Trash" || dir === "Spam") && win.threads.length > 0
             c: win.look
-            keys: "⌘⇧⌫"; label: "Empty Trash"; hoverColor: c.danger
-            onClicked: ops.emptyTrash()
+            keys: "⌘⇧⌫"; label: "Empty " + dir; hoverColor: c.danger
+            onClicked: ops.emptyFolder()
         }
     }
     Rectangle { visible: !win.onePane; anchors.right: parent.right; width: 1; height: parent.height; color: c.divider }

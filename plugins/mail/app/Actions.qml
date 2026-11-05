@@ -38,14 +38,15 @@ QtObject {
     // d: to Trash, and in Trash deleted for good (after asking)
     function trash() { if (folders[win.folder].dir === "Trash") eraseThreads(); else moveThread("Trash", "Moved to Trash") }
 
-    // Deleting for good, in Trash: the files go, and the next sync deletes them on the server. There is no ⌘Z, so it
-    // asks first (the confirm panel: Enter deletes, Esc doesn't).
-    function erase(query, n) {
-        nm.erase(query, win.sources(folders.findIndex(f => f.dir === "Trash")), r => {
+    // Deleting for good, in Trash (or Spam, emptied): the files go, and the next sync deletes them on the server. There
+    // is no ⌘Z, so it asks first (the confirm panel: Enter deletes, Esc doesn't).
+    function erase(query, n, dir) {
+        const d = dir || "Trash"
+        nm.erase(query, win.sources(folders.findIndex(f => f.dir === d)), r => {
             if (r.error) { win.say(r.error); return }
             win.say(r.erased ? "Deleted for good: " + n + (n === 1 ? " thread" : " threads") : "Nothing deleted")
             win.reload(false, win.current)
-        })
+        }, d)
     }
     function eraseThreads() {
         const ts = win.targets()
@@ -56,14 +57,16 @@ QtObject {
                     detail: (n === 1 ? "It is" : "They are") + " deleted here and, at the next sync, on the server. This can't be undone.",
                     action: "Delete", run: () => erase(q, n) }
     }
-    function emptyTrash() {
-        const t = folders.findIndex(f => f.dir === "Trash"), q = win.folderQuery(t)
+    // ⌘⇧⌫: in Spam it empties Spam, anywhere else Trash. Both ask first, with the count.
+    function emptyFolder() { emptyDir(folders[win.folder].dir === "Spam" ? "Spam" : "Trash") }
+    function emptyDir(dir) {
+        const t = folders.findIndex(f => f.dir === dir), q = win.folderQuery(t)
         nm.run(["count", "--output=threads", "--exclude=false", q], out => {
             const n = parseInt(out) || 0
-            if (!n) { win.say("Trash is empty"); return }
-            win.confirm = { title: "Empty Trash?", detail: (n === 1 ? "The thread" : "All " + n + " threads") + " in Trash (" + win.account.address
+            if (!n) { win.say(dir + " is empty"); return }
+            win.confirm = { title: "Empty " + dir + "?", detail: (n === 1 ? "The thread" : "All " + n + " threads") + " in " + dir + " (" + win.account.address
                             + (n === 1 ? ") is" : ") are") + " deleted here and, at the next sync, on the server. This can't be undone.",
-                        action: "Empty Trash", run: () => erase(q, n) }
+                        action: "Empty " + dir, run: () => erase(q, n, dir) }
         })
     }
     // u: read threads (or a mix) become unread, and unread ones read

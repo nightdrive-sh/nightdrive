@@ -102,10 +102,10 @@ QtObject {
         } })
     }
 
-    // Deletes a query's messages in Trash for good (lib/erase.py); done gets { erased } or { error }.
+    // Deletes a query's messages in Trash (or folder: "Spam") for good (lib/erase.py); done gets { erased } or { error }.
     readonly property string eraser: composer.replace(/compose\.py$/, "erase.py")
-    function erase(query, from, done) {
-        proc.createObject(nm, { command: ["python3", eraser, query].concat(from), done: t => {
+    function erase(query, from, done, folder) {
+        proc.createObject(nm, { command: ["python3", eraser, "--folder", folder || "Trash", query].concat(from), done: t => {
             let r
             try { r = JSON.parse(t) } catch (e) { r = { error: t.trim() || "No answer from erase.py" } }
             done(r)
