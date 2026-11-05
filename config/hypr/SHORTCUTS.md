@@ -51,6 +51,7 @@
   ⌘ ⌥ ← / →         Previous / next tab (any app: sends Ctrl+PageUp/PageDown)
   ⌃ ⌘ ← / →         Back / forward (browsers, web apps, Nautilus)
   ⌥ ← / →           Move by word (⇧ selects)
+  ⌥ ↓ / ⌥ ↑          Files: open the selected folder / go to the parent folder
 
 ## Workspaces (like macOS Spaces)
   ⌘ 1 … ⌘ 0          Go to workspace (⌘ 0: the laptop's own screen, with an external display)

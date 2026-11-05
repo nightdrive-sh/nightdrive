@@ -263,6 +263,22 @@ for _, key in ipairs({ "left", "right" }) do
     end)
 end
 
+-- Files (Nautilus): ⌥↓ opens the selection (Nautilus's own Alt+Down only goes back down the path it came up): Enter, or
+-- ⌘O with the Mac Keyboard Shortcuts plugin, whose Nautilus extension makes Enter rename. ⌥↑ goes to the parent folder
+-- (Alt+Up). With a Mac layout ⌥ is often the third level (Mod5) that types characters, not
+-- Alt, so Nautilus never sees Alt: these send what it needs. Other apps get the keys as they were pressed. The raw
+-- bind: each modifier is bound here, and passed on as itself
+local FILES_OPTION_KEYS = { up = { mods = "ALT", key = "up" }, down = plugins.keyd and { mods = "SUPER", key = "o" } or { mods = "", key = "Return" } }
+for key, files_key in pairs(FILES_OPTION_KEYS) do
+    for _, m in ipairs({ "ALT", "MOD5" }) do
+        bind(m .. " + " .. key, function ()
+            local w = hl.get_active_window()
+            local files = w and (w.class == "org.gnome.Nautilus" or w.class == "nautilus")
+            hl.dispatch(hl.dsp.send_shortcut(files and files_key or { mods = m, key = key }))
+        end)
+    end
+end
+
 -- Next/previous tab ⌘⌥← / ⌘⌥→ in every app (Firefox, Chromium, Nautilus, Thunderbird: Ctrl+PageUp/PageDown)
 hl.bind(mod .. " + ALT + left",  hl.dsp.send_shortcut({ mods = "CTRL", key = "Prior" }))
 hl.bind(mod .. " + ALT + right", hl.dsp.send_shortcut({ mods = "CTRL", key = "Next" }))
