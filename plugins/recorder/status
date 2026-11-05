@@ -1,0 +1,15 @@
+#!/bin/bash
+# Recorder's top bar module (module.jsonc): the microphone and the time while a recording is being made (pulse) or paused
+# (off), hidden otherwise. It runs every second, so it reads lib/capture.py's runtime state with jq rather than starting
+# Python: {state, pid, since, done} (capture.py's docstring), the time = done + the running piece's seconds.
+. ~/.config/topbar/scripts/emit
+f="${XDG_RUNTIME_DIR:-/run/user/$UID}/recorder/state.json"
+[[ -f $f ]] || { emit "" ""; exit; }
+read -r state pid secs < <(jq -r '[.state, (.pid // 0),
+  ((.done // 0) + (if .state == "recording" then (now - .since) else 0 end) | floor)] | @tsv' "$f" 2>/dev/null)
+[[ $state == recording || $state == paused ]] || { emit "" ""; exit; }
+# A pw-record that died by itself is a pause (capture.py's current() says so at its next command)
+[[ $state == recording && ! -d /proc/$pid ]] && state=paused
+if ((secs >= 3600)); then t=$(printf '%d:%02d:%02d' $((secs / 3600)) $((secs / 60 % 60)) $((secs % 60)))
+else t=$(printf '%d:%02d' $((secs / 60)) $((secs % 60))); fi
+if [[ $state == recording ]]; then emit mic "$t" pulse; else emit mic "$t" off; fi

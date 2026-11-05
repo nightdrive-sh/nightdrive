@@ -20,7 +20,7 @@ import glob, json, os, shlex, shutil, sys
 
 OUT = os.path.expanduser("~/.local/state/nightdrive/plugins.d")
 OLD = os.path.expanduser("~/.cache/nightdrive/plugins.d")    # before #1950
-COMMANDS = ("status", "right", "middle", "drop")   # module.jsonc keys holding shell commands
+COMMANDS = ("status", "click", "right", "middle", "drop")   # module.jsonc keys holding shell commands
 
 
 def jsonc(path):

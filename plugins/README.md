@@ -114,7 +114,8 @@ explains every key), with a few differences:
 - `size`: its icon size in px.
 - `label` (required) and `glyph` (a Lucide name): its row in Launcher › Settings › Top bar › Items, where it can be
   hidden.
-- Its commands (`status`, `right`, `middle`, `drop`) run in the plugin's folder with bash, so `bin/<command>` finds
+- `click`: a command for a left click, in place of a menu (with `"menu": ""`): Recorder's icon pauses and goes on.
+- Its commands (`status`, `click`, `right`, `middle`, `drop`) run in the plugin's folder with bash, so `bin/<command>` finds
   the plugin's own command (Ferry's is installed elsewhere: `~/.local/bin/ferry add`).
 
 ```jsonc

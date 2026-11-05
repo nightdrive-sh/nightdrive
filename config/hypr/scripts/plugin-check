@@ -27,8 +27,8 @@ CONF_KEYS = ("name", "icon", "description", "default", "install", "installed", "
 CONF_NEEDED = ("name", "icon", "description", "installed", "version", "author")   # without installed it never counts
                                                              # as installed; version and author go in bug reports
 GROUPS = ("app", "recommended", "webapp", "plugin")
-MODULE_KEYS = {"name", "interval", "status", "menu", "right", "middle", "spacing", "drop", "after", "before", "size",
-               "label", "glyph"}                                           # modules.jsonc's header; needs is implied
+MODULE_KEYS = {"name", "interval", "status", "menu", "click", "right", "middle", "spacing", "drop", "after", "before",
+               "size", "label", "glyph"}                                           # modules.jsonc's header; needs is implied
 FACTS = ("Homepage", "Needs", "Keys")                             # in this order, the last lines of a README
 ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 HEX = re.compile(r"""["'`]#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})["'`]""")

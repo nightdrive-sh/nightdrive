@@ -7,6 +7,7 @@
 //   status    optional: another command printing the state (default ~/.config/topbar/scripts/status <name>)
 //   menu      optional: the menu to open on a left click, if not <Name>Menu.qml ("" = none)
 //   right, middle  optional: shell commands for a right / middle click (the module updates right after)
+//   click     optional: a shell command for a left click, in place of a menu (Recorder's pause and go on)
 //   spacing   optional: letter spacing of its text in px (- = tighter)
 //   needs     optional: an optional part's id (plugins.txt); without it installed the module isn't run or listed
 //             (a plugin folder's module, plugins/<id>/module.jsonc, has its own id as needs, and these keys too:

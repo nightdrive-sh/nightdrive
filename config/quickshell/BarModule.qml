@@ -172,7 +172,12 @@ Item {
         onReleased: if (moving) { moving = false; mod.moveEnded() }
         onCanceled: if (moving) { moving = false; mod.moveEnded() }
         onClicked: mouse => {
-            if (mouse.button === Qt.LeftButton) { if (mod.hasMenu && !cmd) mod.leftClicked(mod.mapToItem(null, mod.width / 2, 0).x) }
+            // "click": a command for the left click instead of a menu (Recorder's pause and go on)
+            if (mouse.button === Qt.LeftButton) {
+                if (cmd) return
+                if (mod.def.click) TopBar.run(mod.def.click, mod.name)
+                else if (mod.hasMenu) mod.leftClicked(mod.mapToItem(null, mod.width / 2, 0).x)
+            }
             else if (mouse.button === Qt.RightButton && mod.def.right) TopBar.run(mod.def.right, mod.name)
             else if (mouse.button === Qt.MiddleButton && mod.def.middle) TopBar.run(mod.def.middle, mod.name)
         }

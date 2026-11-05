@@ -1,7 +1,7 @@
 import QtQuick
 
 // The top bar's "…" (BarOverflow): the modules that didn't fit on this screen's bar, in the bar's order. A row opens the
-// module's menu in this one's place, below the "…"; one without a menu is only listed. TopBar.overflow is the list of the
+// module's menu in this one's place, below the "…" (or runs its "click"); one without either is only listed. TopBar.overflow is the list of the
 // bar whose "…" was clicked.
 Column {
     id: m
@@ -26,9 +26,13 @@ Column {
                 icon: TopBar.moduleGlyph(modelData.def)
                 label: TopBar.moduleLabel(modelData.def)
                 detail: st && st.text ? st.text : ""
-                interactive: modelData.menu !== ""
+                interactive: modelData.menu !== "" || !!modelData.def.click
                 padded: true
-                onClicked: m.openMenu(modelData.menu)
+                // A module whose left click is a command (modules.jsonc "click") runs it here too
+                onClicked: {
+                    if (modelData.def.click) { TopBar.run(modelData.def.click, modelData.def.name); m.close() }
+                    else m.openMenu(modelData.menu)
+                }
             }
         }
     }
