@@ -5,24 +5,15 @@
 # keyboard, with hyprlock and with the login screen alike. So a new lock is started and the old one closed.
 # The order matters: Hyprland shows its "lock died" screen at once when no lock client is left, but with
 # allow_session_lock_restore (hyprland.lua) a new lock takes the lock over while the old one is still up. So the new
-# one starts first, and the old one goes once it has loaded. Until it has drawn, the screen is black
-# (lockdead_screen_delay = 0 there: with a delay, Hyprland draws the desktop under it meanwhile).
+# one starts first (lock --replace), and it closes the old one once it is secure: a surface on every screen. Closing it
+# as soon as the new one had loaded left a screen on the "lock died" screen when the new one never drew there (#2342).
+# Until it has drawn, the screen is black (lockdead_screen_delay = 0 there: with a delay, Hyprland draws the desktop
+# under it meanwhile).
 # Steps go to the journal (journalctl -t relock).
 lock='[q]s -p .*/greeter/lock\.qml'
 mine=(--ns $$ --nslist pid -u "$UID")   # not a container's lock (nightdrive sandbox): same user, other PID namespace
 pgrep "${mine[@]}" -f "$lock" >/dev/null || exit 0
 sleep 1   # the keyboards come back a moment after the resume
-old=$(pgrep "${mine[@]}" -f "$lock") || { logger -t relock "unlocked meanwhile"; exit 0; }
+pgrep "${mine[@]}" -f "$lock" >/dev/null || { logger -t relock "unlocked meanwhile"; exit 0; }
 logger -t relock "starting a new lock"
 setsid -f "$HOME/.config/hypr/scripts/lock" --replace >/dev/null 2>&1
-# Loaded = it has asked for the lock; give it a moment more to draw. If it doesn't come up, the old one stays.
-for _ in $(seq 50); do
-  new=$(pgrep "${mine[@]}" -f "$lock" | grep -vxF "$old" | head -1)
-  [[ -n $new ]] && grep -q 'Configuration Loaded' "${XDG_RUNTIME_DIR:-/run/user/$UID}/quickshell/by-pid/$new/log.log" 2>/dev/null && break
-  new=
-  sleep 0.1
-done
-[[ -n $new ]] || { logger -t relock "the new lock didn't load, keeping the old one"; exit 0; }
-sleep 0.3
-kill -9 $old
-logger -t relock "new lock up, old one closed"
