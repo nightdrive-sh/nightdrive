@@ -4,7 +4,38 @@
 #   lid closed | open    applies one by hand (testing)
 # logind, not Hyprland's switch binds: Hyprland sent a "lid open" ~3 s after every close, with the lid still closed.
 # Each step goes to the journal (journalctl -t nightdrive-lid).
+# Not while the lock is being replaced (relock after sleep, ⌃⌥F3): a reload then left the new lock with no surface on
+# the built-in screen, Hyprland's "lockscreen app died" screen (#2342). A change waits until there is one lock and it
+# is secure (lock.qml logs it), at most SETTLE_WAIT seconds, and then applies logind's state at that time. Under a lock
+# that is up it still applies: opening the lid has to bring the built-in screen back to type the password on, as the
+# external display may not have woken (#2341).
+SETTLE_WAIT=15
 log() { logger -t nightdrive-lid "$*"; }
+LOCK='[q]s -p .*/greeter/lock\.qml'
+RUNTIME=${XDG_RUNTIME_DIR:-/run/user/$UID}
+# No lock, or one that is secure: not one starting or being replaced. Only this session's, not a sandbox's.
+settled() {
+  local locks
+  mapfile -t locks < <(pgrep --ns $$ --nslist pid -u "$UID" -f "$LOCK")
+  (( ${#locks[@]} == 0 )) && return 0
+  (( ${#locks[@]} == 1 )) && grep -q 'nightdrive-lock: secure' "$RUNTIME/quickshell/by-pid/${locks[0]}/log.log" 2>/dev/null
+}
+wait_settled() {
+  local i
+  settled && return
+  log "the lock is being replaced, waiting for it"
+  for (( i = 0; i < SETTLE_WAIT * 10; i++ )); do settled && return; sleep 0.1; done
+  log "the lock didn't settle in ${SETTLE_WAIT} s, applying anyway"
+}
+lid_now() {
+  busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager LidClosed \
+    | grep -q true && echo closed || echo open
+}
+# logind's state, if it isn't the one last applied
+apply_current() {
+  local now; now=$(lid_now)
+  [[ $(cat "$RUNTIME/nightdrive-lid" 2>/dev/null) == "$now" ]] || apply "$now"
+}
 
 apply() {
   local state=$1 ws
@@ -31,15 +62,13 @@ case $1 in
   watch)
     exec 9>"$XDG_RUNTIME_DIR/nightdrive-lid.lock"
     flock -n 9 || exit 0   # one watcher per session
-    now=open
-    busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager LidClosed \
-      | grep -q true && now=closed
-    # The state at the start (a file from an earlier session in this login may say otherwise)
-    [[ $(cat "$XDG_RUNTIME_DIR/nightdrive-lid" 2>/dev/null) == "$now" ]] || apply "$now"
+    wait_settled; apply_current   # the state at the start (a file from an earlier session in this login may say otherwise)
     gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 \
       | grep --line-buffered -oE "'LidClosed': <(true|false)>" \
-      | while read -r line; do
-          [[ $line == *true* ]] && apply closed || apply open
+      | while read -r _; do
+          # After the wait the lid may have changed again (its event is queued): logind's state then, once
+          wait_settled
+          apply_current
         done ;;
   *) echo "usage: lid watch | closed | open" >&2; exit 1 ;;
 esac
