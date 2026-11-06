@@ -180,9 +180,10 @@ hl.bind(mod .. " + ESCAPE",      hl.dsp.exec_cmd("qs ipc call menu toggle notifi
 hl.bind(mod .. " + CTRL + L",    hl.dsp.exec_cmd("loginctl lock-session"))
 -- ⌃⌥F3 brings back a lock that died (Hyprland's "lockscreen app died" screen, still locked): that screen says to switch to
 -- a text console with Ctrl+Alt+F3, but a Mac keyboard's F3 is Mission Control without Fn, so this key starts the lock
--- again instead (scripts/lock does nothing while one is up; unlocked, it locks). Where F3 is F3, Hyprland switches to
--- the console first.
-hl.bind("CTRL + ALT + XF86LaunchA", hl.dsp.exec_cmd(scripts .. "/lock"), { locked = true })
+-- again instead. --replace: the lock that broke may still be running (alive, but with no surface on a screen), and plain
+-- scripts/lock does nothing while one is up; the new one takes over and closes it once it is secure (#2342). Unlocked,
+-- it locks. Where F3 is F3, Hyprland switches to the console first.
+hl.bind("CTRL + ALT + XF86LaunchA", hl.dsp.exec_cmd(scripts .. "/lock --replace"), { locked = true })
 hl.bind(mod .. " + SHIFT + S",   hl.dsp.exec_cmd(scripts .. "/screenshot clip"))   -- region screenshot to clipboard
 hl.bind(mod .. " + ALT + S",     hl.dsp.exec_cmd(scripts .. "/screenshot winclip"))   -- window screenshot to clipboard
 hl.bind(mod .. " + ALT + SHIFT + S", hl.dsp.exec_cmd(scripts .. "/screenshot fullclip"))   -- whole screen to clipboard

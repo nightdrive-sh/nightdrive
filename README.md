@@ -216,7 +216,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   start hidden. Only 1Password (if installed) is on by default, as its SSH agent and the Passwords level need it.
 - **Login screen**: a password-only login screen in the theme's colours, for the user who installed Nightdrive. It is the
   lock screen too. Another user logs in from the text console (Ctrl+Alt+F3, with Fn on a Mac keyboard). If the lock
-  screen ever dies, it comes back by itself, still locked; if it doesn't, ⌃⌥F3 starts it again.
+  screen ever dies, it comes back by itself, still locked; if it doesn't, or a screen stays blank or on Hyprland's
+  "lockscreen app died" screen, ⌃⌥F3 replaces it with a new one.
 
 ## What's included
 

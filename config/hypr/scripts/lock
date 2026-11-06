@@ -3,7 +3,11 @@
 # before sleep, ⌃⌘L through loginctl lock-session), so the lock looks like the login screen. After sleep relock starts it
 # again (the keyboard doesn't come back to the old one on some machines). hyprland.lua starts it at an autologin boot
 # (--boot: with the login screen's intro).
-# A lock already up stays (idle and sleep both ask for one), unless --replace (relock: it closes the old one itself).
+# A lock already up stays (idle and sleep both ask for one), unless --replace (relock after sleep, ⌃⌥F3): then the locks
+# up now are closed once the new one is secure, i.e. Hyprland has had a surface from it on every screen. Not as soon as it
+# has loaded: one that loaded but never drew on a screen left that screen on the "lock died" screen (#2342). Hyprland
+# never unlocks when a lock client goes, so closing one can't open the session. If the new one never gets secure, the
+# old ones stay until its unlock: one left over would make every later lock here think it is already up.
 # Only this session's: a container's (nightdrive sandbox) runs as the same user, and a locked one kept this from locking.
 #
 # If the lock dies while locked, it is started again: Hyprland keeps the session locked but shows only its "lockscreen
@@ -20,18 +24,47 @@ WINDOW=60
 lock='[q]s -p .*/greeter/lock\.qml'
 mine=(--ns $$ --nslist pid -u "$UID")
 [[ $1 == --replace ]] || ! pgrep "${mine[@]}" -f "$lock" >/dev/null || exit 0
+runtime=${XDG_RUNTIME_DIR:-/run/user/$UID}
+replaced=()
+[[ $1 == --replace ]] && mapfile -t replaced < <(pgrep "${mine[@]}" -f "$lock")
+# Locks up now that this one isn't replacing (another --replace started after it)
+others() { pgrep "${mine[@]}" -f "$lock" | grep -vxF -f <(printf '%s\n' "${replaced[@]}"); }
+# Their scripts first, or they would start them again
+close_replaced() {
+  local p parent
+  for p in "${replaced[@]}"; do
+    pgrep "${mine[@]}" -f "$lock" | grep -qxF "$p" || continue   # gone already, or the pid is another process's now
+    parent=$(ps -o ppid= -p "$p" | tr -d ' ')
+    [[ $(ps -o args= -p "$parent") == *hypr/scripts/lock* ]] && kill "$parent" 2>/dev/null
+    kill -9 "$p" 2>/dev/null
+  done
+}
+# In the background: waits for this script's lock to log that it is secure (lock.qml), then closes the replaced ones
+close_once_secure() {
+  local p waited=0
+  while kill -0 $$ 2>/dev/null; do
+    p=$(pgrep -P $$ -f "$lock" | head -1)
+    if [[ -n $p ]] && grep -q 'nightdrive-lock: secure' "$runtime/quickshell/by-pid/$p/log.log" 2>/dev/null; then
+      close_replaced; logger -t lock "the new lock is secure, the old one closed"; return
+    fi
+    (( ++waited == 100 )) && logger -t lock "the new lock isn't secure after 10 s, the old one stays until it is"
+    sleep 0.1
+  done
+}
+(( ${#replaced[@]} )) && close_once_secure &
 pam=login; [[ -e /etc/pam.d/nightdrive-lock ]] && pam=nightdrive-lock   # it also opens the keyring (switch.sh autologin)
 quick=1; [[ $1 == --boot ]] && quick=
 saving=0
 [[ -z $1 ]] && pgrep "${mine[@]}" -f '^(python3 -I|qs -p) .*/screensaver/(nightdrive-saver|nightdrive-rain|clock)$' >/dev/null && saving=1
 starts=()
-[[ -z $1 ]] && { "$HOME/.config/hypr/scripts/sounds" event lock >/dev/null 2>&1 & }
+[[ -z $1 || ( $1 == --replace && ${#replaced[@]} -eq 0 ) ]] && { "$HOME/.config/hypr/scripts/sounds" event lock >/dev/null 2>&1 & }
 while :; do
   NIGHTDRIVE_LOCK_PAM=$pam NIGHTDRIVE_LOCK_QUICK=$quick NIGHTDRIVE_LOCK_SAVING=$saving qs -p "$HOME/.config/greeter/lock.qml"
   status=$?
   saving=0
-  (( status == 0 )) && exit 0                                    # unlocked: lock.qml quits once the compositor has it
-  pgrep "${mine[@]}" -f "$lock" >/dev/null && exit 0             # another lock took over (relock killed this one)
+  (( status == 0 )) && { close_replaced; exit 0; }               # unlocked: lock.qml quits once the compositor has it
+  # Another lock took over (a --replace closed this one). Not one this replaces: it has lost the lock to this one.
+  others >/dev/null && exit 0
   hyprctl -j version >/dev/null 2>&1 || exit 0                   # Hyprland is gone (logout)
   now=$(date +%s); starts=("${starts[@]}" "$now")
   starts=($(for t in "${starts[@]}"; do (( now - t < WINDOW )) && echo "$t"; done))

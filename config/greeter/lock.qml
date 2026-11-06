@@ -114,6 +114,9 @@ ShellRoot {
         locked: !root.preview
         // NightdriveLocked starts the session once, at boot; a later lock only hides the corners
         onSecureChanged: if (secure) {
+            // hypr/scripts/lock --replace waits for this line (in this process's log) before it closes the lock it
+            // replaces: secure means Hyprland has a surface from this one on every screen
+            console.info("nightdrive-lock: secure")
             Quickshell.execDetached([root.saverStop])
             pointerAgain.start()
             Quickshell.execDetached(["hyprctl", "eval", "NightdriveCornersHidden(true)"])
