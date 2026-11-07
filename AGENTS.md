@@ -19,6 +19,8 @@ open anything.
 Don't press Enter over IPC on rows that act on real things (Home Assistant devices, Power).
 On a machine without Hyprland, or to leave the user's desktop alone, use the headless container: `nightdrive sandbox
 check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` for the rest (docs/sandbox.md; no agent-warn there).
+Each checkout has its own sandbox; a session that needs one apart from others in the same checkout adds `--name ID` to every
+command, and ends with `--name ID down`. `nightdrive sandbox list` shows them all: remove only your own.
 
 **Pitfalls**
 - Menu icons are invisible private-use glyphs in strings. Don't retype those lines, and compare the glyph counts with HEAD.
@@ -52,7 +54,7 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
 - A big piece of work that shouldn't hold up or swell the next release (a new app: Calendar, Contacts) gets a branch of
   its own off `dev`, in a worktree beside the live one: `git worktree add ~/dotfiles-<name> -b <name> dev`. `~/dotfiles`
   stays on `dev`, so the desktop doesn't change; an app runs from the worktree (`qs -p ~/dotfiles-<name>/plugins/<name>/app`)
-  or in the sandbox (the worktree's own `bin/nightdrive sandbox` mounts it: `sandbox down` first if one runs). A request about what users already have (Mail, Deck, the desktop) goes to `~/dotfiles`, the new
+  or in the sandbox (the worktree's own `bin/nightdrive sandbox` runs a container of its own for it, once the branch has `dev`'s sandbox script). A request about what users already have (Mail, Deck, the desktop) goes to `~/dotfiles`, the new
   thing's to its worktree. The apps' kit (`config/quickshell/kit`) changes only in `dev`, merged into the branch from
   there (`git merge dev`, often). The branch is merged into `dev` once it is usable, and reaches users in the release after.
 - A part of an app that works without Nightdrive (Deck's player and CLI) has a repo of its own in `~/Projects`; the

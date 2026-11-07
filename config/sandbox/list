@@ -1,0 +1,61 @@
+#!/bin/bash
+# nightdrive sandbox list / prune (config/sandbox/sandbox runs it): every sandbox container, whichever checkout started
+# it, so stale ones from removed worktrees or ended sessions can be found and removed; and the images, one per
+# Containerfile version, that prune removes once no container uses them. docs/sandbox.md › One per checkout.
+#   list [--json]   name, state, checkout (gone: the folder no longer exists), VNC port, memory, age; then the images
+#   --prune HASH    removes the sandbox images no container uses, except the one tagged HASH (the current inputs)
+set -uo pipefail
+IMAGE=nightdrive-sandbox
+
+mounted() { podman container inspect -f '{{range .Mounts}}{{if eq .Destination "/home/nd/nightdrive"}}{{.Source}}{{end}}{{end}}' "$1" 2>/dev/null; }
+# JSON string: the values are container names, paths and podman's own words, so quotes and backslashes are enough
+js() { local s=${1//\\/\\\\}; printf '"%s"' "${s//\"/\\\"}"; }
+
+prune() {
+  local keep=$1 used id ref n=0
+  used=$(podman ps -a --format '{{.ImageID}}' 2>/dev/null)
+  while read -r id ref; do
+    [[ -z $id || $ref == "$IMAGE:$keep" ]] && continue
+    grep -qx "$id" <<<"$used" && continue
+    podman rmi "$ref" >/dev/null 2>&1 && { echo "Removed $ref"; n=$((n + 1)); }
+  done < <(podman images --filter "reference=$IMAGE" --format '{{.ID}} {{.Repository}}:{{.Tag}}' 2>/dev/null)
+  (( n )) || echo "No unused sandbox images"
+}
+
+list() {
+  local json=$1 name st ports age repo where port mem first=1 mems
+  mems=$(podman stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' 2>/dev/null)
+  [[ $json ]] && printf '{"containers":[' || printf '%-28s %-8s %-6s %-10s %-14s %s\n' NAME STATE VNC MEMORY AGE CHECKOUT
+  while IFS=$'\t' read -r name st ports age; do
+    [[ -z $name ]] && continue
+    repo=$(mounted "$name"); where=$repo; [[ -d $repo ]] || where="$repo (gone)"
+    port=$(grep -oE ':[0-9]+->5900' <<<"$ports" | sed -E 's/^:([0-9]+).*/\1/')
+    mem=$(awk -F'\t' -v n="$name" '$1 == n {split($2, m, " / "); print m[1]}' <<<"$mems")
+    if [[ $json ]]; then
+      (( first )) || printf ','; first=0
+      printf '{"name":%s,"state":%s,"repo":%s,"repoExists":%s,"vncPort":%s,"memory":%s,"age":%s}' \
+        "$(js "$name")" "$(js "$st")" "$(js "$repo")" "$([[ -d $repo ]] && echo true || echo false)" \
+        "${port:-null}" "$(js "$mem")" "$(js "$age")"
+    else
+      printf '%-28s %-8s %-6s %-10s %-14s %s\n' "$name" "$st" "${port:--}" "${mem:--}" "$age" "$where"
+    fi
+  done < <(podman ps -a --filter "name=^$IMAGE" --format '{{.Names}}\t{{.State}}\t{{.Ports}}\t{{.RunningFor}}' 2>/dev/null)
+  if [[ $json ]]; then
+    printf '],"images":['; first=1
+    while read -r id ref size; do
+      [[ -z $id ]] && continue
+      (( first )) || printf ','; first=0
+      printf '{"id":%s,"tag":%s,"size":%s}' "$(js "$id")" "$(js "$ref")" "$(js "$size")"
+    done < <(podman images --filter "reference=$IMAGE" --format '{{.ID}} {{.Repository}}:{{.Tag}} {{.Size}}' 2>/dev/null)
+    printf ']}\n'
+  else
+    echo; podman images --filter "reference=$IMAGE" --format 'table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.Created}}'
+  fi
+}
+
+case ${1:-} in
+  --prune) prune "${2:?}" ;;
+  --json) list 1 ;;
+  "") list "" ;;
+  *) echo "usage: nightdrive sandbox list [--json] | prune" >&2; exit 1 ;;
+esac
