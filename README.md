@@ -134,6 +134,8 @@ Click an icon and a small menu opens under it:
   gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
   session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a border, the ones it opened
   joined to it by a line; the groups and the other sessions go in the order of their workspaces, a dot between each.
+  Each chip ends with how long its turn has run or it has waited for you; a turn past 10 minutes, likely stuck, shows
+  its time in orange.
   **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar.
 
 ⌘⇧Space walks through the menus with the arrow keys, and ⌘+drag moves an icon. On a narrow screen the icons that don't

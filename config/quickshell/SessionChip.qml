@@ -5,6 +5,8 @@ import QtQuick
 // another window: the bell with a dot, as in the Claude menu; working: the spinner. iconOnly on a crowded, narrow bar.
 // No border: a fill of its own. A lead (a session that opened others, SessionGroups.js) has a quiet border, its name in
 // bold and the bot for its icon, which breathes while it works; a chip it opened is linked: a line to the one before.
+// At the right edge, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
+// past stuckAfter is in the warning colour, as it's likely stuck. The bar hides it when crowded, before the name.
 Rectangle {
     id: chip
     property var session: ({})
@@ -16,6 +18,9 @@ Rectangle {
     property bool linked: false          // a line across the gap to the chip before it (its group's)
     property int linkWidth: 8
     property color lineColor: Theme.border
+    property string time: ""             // "" = none
+    property bool showTime: true
+    property bool stuck: false
     readonly property bool hovered: area.containsMouse
     signal clicked()
 
@@ -65,8 +70,17 @@ Rectangle {
         }
     }
     Text {
+        id: tm
+        visible: chip.showTime && !chip.iconOnly && chip.time !== ""
+        anchors { right: parent.right; rightMargin: chip.padding; verticalCenter: parent.verticalCenter }
+        text: chip.time
+        color: chip.stuck ? Theme.warning : Theme.dim
+        font { family: Theme.font; pixelSize: 10; bold: chip.stuck }   // SessionsBar.timeW measures this font
+    }
+    Text {
         visible: !chip.iconOnly
-        anchors { left: ic.right; leftMargin: 6; right: parent.right; rightMargin: chip.padding
+        anchors { left: ic.right; leftMargin: 6; right: tm.visible ? tm.left : parent.right
+                  rightMargin: tm.visible ? 6 : chip.padding
                   verticalCenter: parent.verticalCenter }
         text: chip.text
         elide: Text.ElideRight

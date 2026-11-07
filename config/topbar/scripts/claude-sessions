@@ -1,10 +1,11 @@
 #!/bin/bash
 # The Claude Code sessions running in a terminal window on this desktop, for the Claude menu (Claude.qml):
-# [{address, pid, dir, started, name, status, waitingFor, last}], address = the window (hyprctl clients), started = epoch
-# seconds. The window's title tells the rest live (Claude Code sets it: ✳ when it waits for you, a spinner while it works).
+# [{address, pid, dir, started, name, status, waitingFor, last, since}], address = the window (hyprctl clients), started
+# = epoch seconds. The window's title tells the rest live (Claude Code sets it: ✳ when it waits for you, a spinner while it works).
 # From Claude Code's own record of the session (~/.claude/sessions/PID.json, missing in an old version: then empty):
 # name (the session's name, /rename), status (busy, idle, waiting: it asks you something) and waitingFor (what), and
-# last, the last line of its last reply (its transcript), for the sessions bar's hover (SessionsBar.qml).
+# last, the last line of its last reply (its transcript), for the sessions bar's hover (SessionsBar.qml); since, when its
+# status last changed (epoch seconds, 0 if unknown): the bar's time, how long a turn has run or it has waited for you.
 # openerPid and openerName: the session that opened it with `nightdrive ask` (terminal-or-claude puts them in its
 # environment), 0 and "" for one you opened; the bar groups a session's openings beside it (SessionGroups.js).
 # A session in tmux or over ssh has no window of its own and isn't listed.
@@ -25,8 +26,9 @@ for pid in $(pgrep -x claude); do
   dir=$(readlink "/proc/$pid/cwd" 2>/dev/null) || continue
   age=$(ps -o etimes= -p "$pid" | tr -d ' ')
   rec="$HOME/.claude/sessions/$pid.json"
-  [[ -r $rec ]] && info=$(jq -c '{name: (.name // ""), status: (.status // ""), waitingFor: (.waitingFor // ""), sid: (.sessionId // "")}' "$rec" 2>/dev/null) || info=
-  [[ -n $info ]] || info='{"name":"","status":"","waitingFor":"","sid":""}'
+  [[ -r $rec ]] && info=$(jq -c '{name: (.name // ""), status: (.status // ""), waitingFor: (.waitingFor // ""), sid: (.sessionId // ""),
+                                    since: ((.statusUpdatedAt // 0) / 1000 | floor)}' "$rec" 2>/dev/null) || info=
+  [[ -n $info ]] || info='{"name":"","status":"","waitingFor":"","sid":"","since":0}'
   # The last reply's last line: the transcript is ~/.claude/projects/<the dir, mangled>/<sessionId>.jsonl, found by its
   # id rather than by mangling the dir as Claude Code does
   last='""' sid=$(jq -r .sid <<<"$info")
