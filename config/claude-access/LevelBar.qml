@@ -61,8 +61,8 @@ Column {
     }
     Text {
         width: root.width
-        text: "What Claude reads goes to Anthropic, Claude's maker, to answer you. These choices cover only "
-            + "Nightdrive's tools: what Claude Code may do with its own (commands, files) is set in Claude Code."
+        text: "What Claude reads goes to Anthropic, Claude's maker, to answer you. These choices cover Nightdrive's "
+            + "tools, and the web for Ask Claude: what Claude Code may do with its own (commands, files) is set in Claude Code."
         wrapMode: Text.Wrap
         color: root.c.dim
         font { family: root.c.font; pixelSize: 12 }

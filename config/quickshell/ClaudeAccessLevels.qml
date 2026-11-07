@@ -143,7 +143,7 @@ Item {
                                         + (changed === 1 ? " choice" : " choices") + " of your own" }] : [])
             const open = { kind: "cawindow", name: "Areas: what Claude may read, modify and delete…", glyph: "app-window",
                            sub: "Each area Allow, Ask or No, in plain words, in a window of its own" }
-            const only = { kind: "note", name: "These cover only Nightdrive's tools: what Claude Code may do with its own (commands, files) is set in Claude Code" }
+            const only = { kind: "note", name: "These cover Nightdrive's tools, and the web for Ask Claude: what Claude Code may do with its own (commands, files) is set in Claude Code" }
             return [about].concat(top, [{ kind: "header", name: "Level" }], presetRows, [{ kind: "header", name: "Areas" }], [open],
                               now.problem ? [{ kind: "note", name: now.problem }] : [], [only])
         }

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Ask Claude's background run (#1886): `python3 config/mcp/ask_claude_test.py`. The script runs against stand-ins for
 claude, notify-send and the rest, in a home of its own: every notification's texts come after --, so an answer or a
-request that begins with --app-name= or --icon= is shown as text instead of changing the notification, and the
-background session skips the user's settings files (hooks, plugins) but keeps the model they chose."""
+request that begins with --app-name= or --icon= is shown as text instead of changing the notification, the
+background session skips the user's settings files (hooks, plugins) but keeps the model they chose, and it gets
+Claude Code's WebSearch and WebFetch only when Access › Web's Read is Allow (#2241)."""
 
 import json
 import os
@@ -53,6 +54,19 @@ class AskClaude(unittest.TestCase):
     def settings(self, value):
         (self.home / ".claude/settings.json").write_text(json.dumps(value))
 
+    def access(self, text):
+        """Settings › Claude › Access's file in this home, as access.py reads it"""
+        path = self.home / ".config/nightdrive/claude-access.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def web(self, args):
+        """The built-in tools the session gets, and whether WebSearch and WebFetch are allowed or denied"""
+        allowed = args[args.index("--allowedTools") + 1:args.index("--disallowedTools")]
+        denied = args[args.index("--disallowedTools") + 1:args.index("--append-system-prompt")]
+        return args[args.index("--tools") + 1], [t for t in allowed if t.startswith("Web")], \
+            [t for t in denied if t.startswith("Web")]
+
     def ask(self, prompt, answer):
         env = {"HOME": str(self.home), "PATH": f"{self.bin}:{os.environ['PATH']}", "LOG": str(self.log),
                "ANSWER": answer, "XDG_RUNTIME_DIR": str(self.tmp / "run")}
@@ -82,6 +96,7 @@ class AskClaude(unittest.TestCase):
         self.assertEqual(self.texts(notes[-1]), ["Claude couldn't answer", "No answer to: -u critical"])
 
     def test_background_session_skips_the_settings_files(self):
+        self.access('{"version": 2, "level": "strict"}')
         claude, _ = self.ask("hello", "Hi.")
         args = claude[0]
         self.assertIn("--restricted", args)
@@ -95,6 +110,31 @@ class AskClaude(unittest.TestCase):
         claude, _ = self.ask("hello", "Hi.")
         self.assertNotIn("--model", claude[0])
         self.assertIn("--restricted", claude[0])
+
+    def test_web_on_normal(self):
+        # Normal allows the web (log 4035): no file before any install is Normal
+        claude, _ = self.ask("find an engine sound", "Here.")
+        self.assertEqual(self.web(claude[0]), ("WebSearch,WebFetch", ["WebSearch", "WebFetch"], []))
+        system = claude[0][claude[0].index("--append-system-prompt") + 1]
+        self.assertIn("web search and reading web pages", system)
+        self.assertNotIn("no web pages", system)
+
+    def test_no_web_on_strict_or_when_set_no(self):
+        for text in ('{"version": 2, "level": "strict"}',
+                     '{"version": 2, "level": "open", "areas": {"web": {"read": "no"}}}'):
+            self.access(text)
+            self.log.unlink(missing_ok=True)
+            claude, _ = self.ask("find an engine sound", "I can't.")
+            self.assertEqual(self.web(claude[0]), ("", [], ["WebFetch", "WebSearch"]))
+            self.assertIn("no web pages", claude[0][claude[0].index("--append-system-prompt") + 1])
+
+    def test_no_web_when_access_is_broken_or_asks(self):
+        # A file that can't be read is Strict; Ask, which nothing could answer here, is No
+        for text in ("{ not json", '{"version": 2, "level": "normal", "areas": {"web": {"read": "ask"}}}'):
+            self.access(text)
+            self.log.unlink(missing_ok=True)
+            claude, _ = self.ask("find an engine sound", "I can't.")
+            self.assertEqual(self.web(claude[0])[0], "")
 
     def test_unreadable_settings_leave_the_model_out(self):
         (self.home / ".claude/settings.json").write_text("{ not json")

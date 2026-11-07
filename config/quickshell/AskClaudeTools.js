@@ -2,7 +2,8 @@
 
 // Ask Claude's steps in words (AskClaudeSession.qml): a Nightdrive tool's name (mcp__nightdrive__mail_search) as a
 // glyph and what it does ("Searching mail"), with the argument that says on what ("Mikko palaveri"). A tool not named
-// here gets its area's glyph and its name in words, so a new tool still reads sensibly.
+// here gets its area's glyph and its name in words, so a new tool still reads sensibly. Claude Code's own WebSearch and
+// WebFetch come by their bare names, when Access › Web allows them (#2241).
 
 // The glyph for the thinking row: a robot's head while Claude thinks between steps
 var THINKING = "bot"
@@ -13,7 +14,7 @@ var AREAS = {
     appearance: "palette", display: "monitor", sound: "volume-2", network: "wifi", bluetooth: "bluetooth",
     battery: "battery-medium", software: "package", files: "folder", apps: "app-window", windows: "app-window",
     notifications: "bell", docs: "book-open", shortcuts: "keyboard", undo: "undo-2", open: "globe", home_assistant: "house",
-    ferry: "send", recent: "history", nightdrive: "info"
+    ferry: "send", recent: "history", nightdrive: "info", WebSearch: "globe", WebFetch: "globe"
 }
 
 var LABELS = {
@@ -33,7 +34,7 @@ var LABELS = {
     notifications_dnd_on: "Turning Do Not Disturb on", notifications_dnd_off: "Turning Do Not Disturb off",
     notifications_recent: "Reading notifications", network_off: "Turning the network off",
     display_scale: "Changing the display's scale", display_resolution: "Changing the resolution", undo_change: "Undoing a change",
-    nightdrive_status: "Checking Nightdrive"
+    nightdrive_status: "Checking Nightdrive", WebSearch: "Searching the web", WebFetch: "Reading a page"
 }
 
 // The argument worth showing beside the step, in this order

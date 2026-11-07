@@ -201,6 +201,16 @@ AREAS = {
                       "off": "Claude installs only Nightdrive's own plugins: another repository's are yours to "
                              "install."},
                  ]},
+    # The web for Ask Claude (#2225, logs 4033-4035): its Read is Claude Code's own WebSearch and WebFetch, not a tool
+    # of ours, so `builtin` names them for the window and ask-claude turns them on (`access.py value web read`). Only
+    # Allow or No: in the background Claude Code can't ask about its own tools, and our card doesn't see them. In a
+    # terminal Claude Code's own settings decide, as for its commands and files. Modify is web_download's (#2242)
+    "web": {"name": "Web", "glyph": "globe",
+            "read": "searches the web and reads pages in Ask Claude (in a terminal, Claude Code's settings decide)",
+            "modify": "downloads files into a folder of its own, which it doesn't read back",
+            "builtin": {"read": [{"name": "WebSearch", "title": "Search the web"},
+                                 {"name": "WebFetch", "title": "Read a web page"}]},
+            "choices": {"read": ["allow", "no"]}},
 }
 
 
@@ -221,3 +231,13 @@ def words(area, right):
 def options(area):
     """The area's own choices: [{id, name, on, off}], and list: True for a list."""
     return AREAS.get(area, {}).get("options", [])
+
+
+def builtin(area, right):
+    """Claude Code's own tools a right turns on, not Nightdrive's (the web's WebSearch): [{name, title}]."""
+    return AREAS.get(area, {}).get("builtin", {}).get(right, [])
+
+
+def choices(area, right):
+    """The values a right may have: Allow, Ask and No unless the area says fewer (the web's Read can't ask)."""
+    return AREAS.get(area, {}).get("choices", {}).get(right, ["allow", "ask", "no"])
