@@ -18,6 +18,22 @@ DIR=$HOME/dotfiles
 # GitHub's main behind the release's back isn't what runs. Empty in the repo: run from a clone, nothing is pinned.
 PINNED=""
 
+# Whether an existing ~/dotfiles is Nightdrive's own clone: its origin must be exactly one of the project's addresses,
+# https or ssh, with or without .git. A substring match let any URL that merely contains the name pass
+# (github.com/someone/nightdrive-sh/nightdrive-fork, evil.example/nightdrive-sh/nightdrive), and install.sh would
+# then run that repo's code. A clone made before the repo moved to the nightdrive-sh organisation still has the old
+# address (jarilehtinen/nightdrive), which GitHub redirects.
+is_nightdrive_origin() {
+  local url=${1%.git} owner
+  for owner in nightdrive-sh jarilehtinen; do
+    case $url in
+      "https://github.com/$owner/nightdrive" | "git@github.com:$owner/nightdrive" | \
+        "ssh://git@github.com/$owner/nightdrive") return 0 ;;
+    esac
+  done
+  return 1
+}
+
 # An existing clone is put on the asked channel's branch (--dev or not), as `nightdrive channel` would: without this a
 # --dev run over a stable clone went on silently with main. Never over uncommitted changes: it stops and says so.
 use_clone() {
@@ -73,9 +89,8 @@ main() {
   if { : </dev/tty; } 2>/dev/null; then exec </dev/tty; fi
 
   if [[ -e $DIR ]]; then
-    # A clone made before the repo moved to the nightdrive-sh organisation still has the old address.
     local origin; origin=$(git -C "$DIR" remote get-url origin 2>/dev/null || true)
-    if [[ $origin == *nightdrive-sh/nightdrive* || $origin == *jarilehtinen/nightdrive* ]]; then
+    if is_nightdrive_origin "$origin"; then
       use_clone "$branch"
     else
       echo "$DIR is already there and isn't a Nightdrive clone: move it aside and run this again." >&2
