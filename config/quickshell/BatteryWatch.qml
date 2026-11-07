@@ -29,7 +29,8 @@ Scope {
 
     function check() {
         if (!present) return
-        if (!draining) { if (given.level) { given.level = 0; clear(); session("drop") } return }
+        // Not draining: the notification goes at once, but the warnings re-arm only through `rearm` below.
+        if (!draining) { if (given.level) clear(); return }
         const level = pct <= lastAt ? lastAt : pct <= warnAt ? warnAt : 0
         if (level === 0) { if (pct > warnAt + 2) given.level = 0; return }   // a little margin: no flapping around 10 %
         if (given.level !== 0 && given.level <= level) return
@@ -88,6 +89,18 @@ Scope {
             "Battery", "0", "lucide:battery-warning", summary, body, "[]",
             "{'urgency': <byte 2>, 'x-dunst-stack-tag': <'" + tag + "'>, 'value': <int32 " + pct + ">, 'suppress-sound': <true>}",
             "int32 -1"])
+    }
+
+    // Re-arms the warnings (and drops the kept windows) once the charger has held for `rearmMs`. On a Mac at low charge
+    // UPower flips Charging ↔ Discharging every few seconds for about a minute after the plug goes in (the power
+    // controller negotiating), and re-arming on each flip warned again at 6 %, 7 %... while charging (#2414).
+    // A flip back to Discharging stops the timer, so only a steady charge counts.
+    readonly property int rearmMs: 120000
+    Timer {
+        id: rearm
+        interval: w.rearmMs
+        running: w.present && !w.draining && given.level !== 0
+        onTriggered: { given.level = 0; w.session("drop") }
     }
 
     Timer {
