@@ -1,7 +1,8 @@
 name: CI
 
-# The checks in .github/ci/check.py: bash -n and ast.parse on every script, shellcheck against its baseline, and a
-# secret scan of the whole history with gitleaks. Run them locally the same way: .github/ci/check.py --secrets.
+# The checks in .github/ci/check.py: bash -n and ast.parse on every script, shellcheck against its baseline, a
+# secret scan of the whole history with gitleaks, and the unit tests (every *_test.py, .github/ci/tests.py). Run
+# them locally the same way: .github/ci/check.py --secrets.
 on:
   push:
     branches: [dev, main]
@@ -24,8 +25,15 @@ jobs:
     # weeks, and this job holds no secret and can write nothing.
     container: registry.fedoraproject.org/fedora:44
     steps:
+      # The tests' own needs besides: the Python libraries the plugins import, and the commands the scripts under
+      # test run (jq, lua for Hyprland's config, gio with the MIME database, xdg-user-dir, notmuch, khal), as a
+      # Nightdrive desktop has them. Quickshell and Chromium aren't in Fedora's repos or are too big: the tests
+      # that need them skip themselves, and the log names each skip's reason.
       - name: Install the tools
-        run: dnf -y -q install git-core python3 ShellCheck gitleaks
+        run: >-
+          dnf -y -q install git-core python3 ShellCheck gitleaks
+          tzdata jq lua glib2 shared-mime-info xdg-user-dirs notmuch khal
+          python3-icalendar python3-dateutil python3-vobject python3-cryptography
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # gitleaks reads every commit

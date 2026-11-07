@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """The repo's CI checks, the same locally and in .github/workflows/ci.yml.
 
-  check.py                    syntax (bash -n, ast.parse) and shellcheck
+  check.py                    syntax (bash -n, ast.parse), shellcheck and the unit tests (every *_test.py)
   check.py --secrets          gitleaks over the whole history as well
+  check.py --no-tests         without the unit tests
+  check.py --tests-only       only the unit tests (tests.py says how they run)
   check.py --update-baseline  write the shellcheck findings there are now as the baseline
 
 Shellcheck runs at severity warning against a baseline (shellcheck-baseline.txt): the findings that were there when
@@ -18,6 +20,9 @@ import os
 import shutil
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # tests.py beside it, also under python3 -I
+import tests  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shellcheck-baseline.txt")
@@ -108,7 +113,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--secrets", action="store_true", help="also scan the history for secrets with gitleaks")
     ap.add_argument("--update-baseline", action="store_true", help="accept the shellcheck findings there are now")
+    ap.add_argument("--no-tests", action="store_true", help="leave out the unit tests")
+    ap.add_argument("--tests-only", action="store_true", help="run only the unit tests")
     args = ap.parse_args()
+    if args.tests_only:
+        return 1 if tests.run(ROOT) else 0
     if not shutil.which("shellcheck"):
         sys.exit("shellcheck is not installed (sudo dnf install ShellCheck)")
 
@@ -136,6 +145,8 @@ def main():
 
     if args.secrets:
         bad += secrets()
+    if not args.no_tests:
+        bad += tests.run(ROOT)
     print(f"{len(sh)} shell and {len(py)} Python scripts: " + ("ok" if not bad else f"{bad} problems"))
     return 1 if bad else 0
 

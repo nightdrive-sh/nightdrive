@@ -38,7 +38,9 @@ FONT_STATE = f"{HOME}/.local/state/nightdrive/font"              # the UI font's
 # The fonts on trial for the UI (#1839), JetBrains Mono (the default) first. Others work too with `theme font FAMILY`.
 FONTS = ["JetBrains Mono", "Inter Variable", "Geist", "Atkinson Hyperlegible Next", "DM Sans", "Rubik", "Mulish",
          "Figtree", "Work Sans", "Plus Jakarta Sans", "Source Sans 3"]
-OWN_THEMES = f"{HOME}/.config/hypr/themes"                       # Nightdrive's: the repo's config/hypr/themes
+# Nightdrive's: the repo's config/hypr/themes, found from this script (linked to ~/.config/hypr/themes too), so a
+# checkout that link.sh hasn't linked (CI, a worktree) reads its own
+OWN_THEMES = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "themes")
 MY_THEMES = f"{HOME}/.config/nightdrive/themes"                  # yours, saved from Theme Editor
 OUT = f"{HOME}/.cache/nightdrive"
 APOSTROPHE = f"{HOME}/.var/app/org.gnome.gitlab.somas.Apostrophe/config/gtk-4.0"   # a Flatpak: can't read ~/.cache

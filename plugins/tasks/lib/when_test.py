@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """when.py's readings of a due, as the command, Claude and the window's fields give them: python3 when_test.py"""
 
+import sys
 import unittest
 from datetime import date, datetime
+from pathlib import Path
 from unittest import mock
 
-import when
+# CI runs the tests with python3 -I, which leaves the script's own folder off the path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import when  # noqa: E402
 
 NOW = datetime(2026, 11, 2, 14, 20)   # a Monday afternoon
 # Entries of the kit's regions.json, the parts the readings and labels use

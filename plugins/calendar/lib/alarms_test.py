@@ -2,11 +2,16 @@
 """alarms.py: which VALARMs ring and when, and the editor's reminder written and read back."""
 
 import datetime as dt
+import sys
 import unittest
+from pathlib import Path
 
 import icalendar
 
-import alarms
+# CI runs the tests with python3 -I, which leaves the script's own folder off the path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import alarms  # noqa: E402
 
 EVENT = """BEGIN:VEVENT
 UID:x

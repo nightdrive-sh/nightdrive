@@ -5,6 +5,7 @@
 import sys
 import tempfile
 import unittest
+import zoneinfo
 from pathlib import Path
 
 import icalendar
@@ -73,8 +74,11 @@ class InviteTest(unittest.TestCase):
             self.cals.append({"id": cid, "name": cid.split("/")[1].title(), "read_only": ro, "shared": False,
                               "path": str(folder), "color": "#fff", "source": cid.split("/")[0], "events": 0})
         self.synced = []
-        self.saved = [(calendars, "calendars", calendars.calendars), (write, "sync", write.sync)]
+        self.saved = [(calendars, "calendars", calendars.calendars), (write, "sync", write.sync),
+                      (write, "local_zone", write.local_zone)]
         calendars.calendars = lambda: self.cals
+        # Local time is Helsinki's, whatever the machine's zone (CI's container is in UTC)
+        write.local_zone = lambda: zoneinfo.ZoneInfo("Europe/Helsinki")
         write.sync = lambda cal: self.synced.append(cal["id"]) or True
 
     def tearDown(self):
