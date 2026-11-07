@@ -35,7 +35,7 @@ var LABELS = {
     notifications_recent: "Reading notifications", network_off: "Turning the network off",
     display_scale: "Changing the display's scale", display_resolution: "Changing the resolution", undo_change: "Undoing a change",
     nightdrive_status: "Checking Nightdrive", WebSearch: "Searching the web", WebFetch: "Reading a page",
-    web_download: "Downloading a file"
+    web_download: "Downloading a file", results_add: "Adding a result"
 }
 
 // The argument worth showing beside the step, in this order
