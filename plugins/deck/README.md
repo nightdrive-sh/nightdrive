@@ -40,7 +40,7 @@ A fast, clean Spotify player for whole albums. Keep the ones you love on a shelf
 
 ## Setting up
 
-Deck comes as the `deck` package from Nightdrive's COPR (aarch64 and x86_64), and `nightdrive update` updates it; where there is no package, it is built from source. It needs the Client ID of your own free Spotify developer app: Deck's README shows how.
+Deck comes as the `deck` package from Nightdrive's COPR (aarch64 and x86_64), and `nightdrive update` updates it; where there is no package (another architecture, the COPR unreachable), the Deck release pinned in `install.sh` is built from source, after a warning. It needs the Client ID of your own free Spotify developer app: Deck's README shows how.
 
 Curated needs that Spotify app too, and something to go on: your Last.fm listening history (an account that records your Spotify listening, and its API key in Deck's config), or a few lines about your taste in `~/.config/deck/taste.md` (Deck's README › Setting up Curated).
 
