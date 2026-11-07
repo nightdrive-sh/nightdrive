@@ -22,7 +22,7 @@ Rectangle {
     readonly property bool asking: !!session.asking
     readonly property bool done: !!session.done
     readonly property bool working: session.state === "working"
-    readonly property string icon: asking ? "message-circle-question" : lead ? "bot" : done ? "check"
+    readonly property string icon: asking ? "message-circle-question" : lead ? "bot" : done ? "circle-check-big"
                                  : session.wants ? "bell-dot" : working ? "loader" : "terminal"
     readonly property color iconColor: asking || lead || (session.wants && !done) ? Theme.accent : done ? Theme.ok
                                      : working ? Theme.text : Theme.dim
