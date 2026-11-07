@@ -138,7 +138,8 @@ Click an icon and a small menu opens under it:
   equally only when they don't fit. After the name, how long its turn has run or it has waited for you; a turn past
   10 minutes, likely stuck, shows its time in orange.
   **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar, and **Hyper ↑** /
-  **Hyper ↓** to the previous / next lead.
+  **Hyper ↓** to the previous / next lead. The bar follows Settings › Top bar opacity, its focused session the active
+  workspace's colour.
 
 ⌘⇧Space walks through the menus with the arrow keys, and ⌘+drag moves an icon. On a narrow screen the icons that don't
 fit go into a **…** menu, the ones farthest from the clock first. If that's still not enough, the logo and then the empty

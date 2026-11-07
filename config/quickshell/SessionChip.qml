@@ -36,9 +36,11 @@ Rectangle {
 
     height: 24
     radius: 6
-    // The focused session's chip under the mouse a step lighter than its own fill (Theme.sel is lighter than hover)
-    color: hovered && active ? Qt.tint(Theme.sel, Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08))
-         : hovered ? Theme.hover : active ? Theme.sel : "transparent"
+    // The focused session's chip: the top bar's active workspace colour (see-through, so it matches over any bar
+    // opacity); under the mouse a step stronger, as plain hover is darker than it
+    readonly property color activeBg: TopBar.c("wsBg")
+    color: hovered && active ? Qt.rgba(activeBg.r, activeBg.g, activeBg.b, Math.min(1, activeBg.a * 1.4))
+         : hovered ? Theme.hover : active ? activeBg : "transparent"
 
     Text {
         id: ic

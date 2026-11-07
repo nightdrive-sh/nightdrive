@@ -12,6 +12,7 @@ import "SessionGroups.js" as Groups
 // in bold (no lines between them: the bar reads quieter). Groups and lone sessions follow each other, a dot between
 // each (SessionGroups.js); a chip is as wide as its name, and the chips share the bar equally only when they don't
 // fit (layout below).
+// Its background is the top bar's (TopBar.c("bg")), so it follows Settings › Top bar opacity.
 // Each chip but a lead's ends with how long it has worked or waited (Claude.sessions' since), ticking once a second;
 // crowded, the times go first, then the names (the leads keep theirs).
 PanelWindow {
