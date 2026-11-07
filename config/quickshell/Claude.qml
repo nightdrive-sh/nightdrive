@@ -21,7 +21,7 @@ Singleton {
     property var lastState: ({})       // address → "working" | "waiting", to see the change
     property var changedAt: ({})       // address → epoch seconds its title's state last changed, as seen here
     // Leads (sessions that opened others, SessionGroups.js) stay leads once their openings close, so a project manager
-    // keeps its group and its section in the bar while nothing of its runs: by window while it lives, and by name (if
+    // keeps its group and its place in the bar while nothing of its runs: by window while it lives, and by name (if
     // it has one) in leadsFile, so also after the shell or the session restarts. The last maxLeads names are kept.
     property var leadAddrs: ({})       // address → true
     property var leadNames: []

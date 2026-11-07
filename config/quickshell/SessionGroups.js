@@ -17,7 +17,7 @@ function openerOf(s, all) {
 }
 
 // Whether s led a group before, though its openings have all closed: kept = { addrs: { address: true }, names: [name…] }
-// (Claude.qml remembers them), so a project manager keeps its own section of the bar while it has no sessions running
+// (Claude.qml remembers them), so a project manager stays a lead (its bot, its place, Hyper ↑/↓) while it has no sessions running
 function wasLead(s, kept) {
     return !!kept && (!!(kept.addrs || {})[s.address] || (!!s.name && (kept.names || []).indexOf(s.name) >= 0))
 }
@@ -59,8 +59,7 @@ function opens(a, b, all) {
 
 // The bar's row: { kind: "chip", session, lead, linked } (linked: joined to the chip before it) and { kind: "dot" }.
 // Its units, a group or a lone session, go by workspace (a group by its lead's; ws: Claude.qml), so the bar reads like
-// the workspaces; on one workspace the groups first, each by age. unit: the chip's group (its lead's address) or "" for a
-// lone session, for the bar's sections (SessionsBar.layout).
+// the workspaces; on one workspace the groups first, each by age
 function row(sessions, kept) {
     const a = arrange(sessions, kept)
     const units = a.groups.map((g, i) => ({ s: g.lead, g: g, i: i }))
@@ -69,10 +68,8 @@ function row(sessions, kept) {
     const out = []
     for (const u of units) {
         if (out.length) out.push({ kind: "dot" })
-        const unit = u.g ? u.s.address : ""
-        out.push({ kind: "chip", session: u.s, lead: !!u.g, linked: false, unit: unit })
-        if (u.g) for (const m of u.g.members)
-            out.push({ kind: "chip", session: m, lead: a.leads.has(m), linked: true, unit: unit })
+        out.push({ kind: "chip", session: u.s, lead: !!u.g, linked: false })
+        if (u.g) for (const m of u.g.members) out.push({ kind: "chip", session: m, lead: a.leads.has(m), linked: true })
     }
     return out
 }

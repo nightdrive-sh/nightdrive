@@ -9,9 +9,8 @@ import "SessionGroups.js" as Groups
 // Sessions bar (Claude.barOn), off by default; hidden while there are no sessions, and then the room goes back.
 // A chip (SessionChip.qml) per session; a click goes to its window, the mouse over one shows more (SessionTip.qml).
 // A session that opened others (nightdrive ask from it: a project manager) leads a group of them, first and joined to
-// them by a line. Each group has an equal section of the bar, the lone sessions one more together (layout below); a
-// chip is as wide as its name, and a section's sessions share it equally only when they don't fit. A dot between
-// groups and lone sessions (SessionGroups.js).
+// them by a line. Groups and lone sessions follow each other, a dot between each (SessionGroups.js); a chip is as wide
+// as its name, and the chips share the bar equally only when they don't fit (layout below).
 // Each chip but a lead's ends with how long it has worked or waited (Claude.sessions' since), ticking once a second;
 // crowded, the times go first, then the names (the leads keep theirs).
 PanelWindow {
@@ -69,7 +68,7 @@ PanelWindow {
     FontMetrics { id: fm; font { family: Theme.font; pixelSize: 12; bold: true } }
     FontMetrics { id: nfm; font { family: Theme.font; pixelSize: 12 } }   // the others' names
     FontMetrics { id: tfm; font { family: Theme.font; pixelSize: 10; bold: true } }
-    // A typical time's room, for when shared chips are too narrow to show theirs (a chip of its own fits its time as is)
+    // A typical time's room, for when shared chips are too narrow to show theirs (an unshared chip fits its time as is)
     readonly property int timeW: Math.ceil(tfm.advanceWidth("59 min")) + 6
 
     // Now, in epoch seconds, once a second while the bar shows: only the chips' times read it, so a tick rebuilds nothing
@@ -85,16 +84,14 @@ PanelWindow {
         return Math.floor(t / 3600) + " h" + (m ? " " + m + " min" : "")
     }
 
-    // The row in sections of equal width: one for each group (its lead and the sessions it opened; a lead whose
-    // openings have all closed keeps its section, Claude.keptLeads), one more for all the lone sessions together, so
-    // with two project managers each has half the bar. In a section the lead's chip is always as wide as its (bold)
-    // name, with no time; every other chip as wide as its name and time, and only when they don't all fit do they share
-    // what is left equally: then their times go first, and narrower still they show only their icons. The dots and
-    // their gaps come off the bar first. { widths, chips, times }: each item's cell (a section's last one takes the rest
-    // of it, so the sections stay put), its chip's width in that, and whether it shows its time.
+    // The row: groups and lone sessions one after another, with no shares of their own (#2410), the room
+    // after the last chip left empty. A lead's chip is always as wide as its (bold) name, with no time; every other chip
+    // as wide as its name and time, and only when they don't all fit do they share what the leads, dots and gaps leave
+    // equally: then their times go first, and narrower still they show only their icons. { widths, times }: each item's
+    // width and whether it shows its time.
     readonly property var layout: {
         const n = items.length
-        if (n === 0) return { widths: [], chips: [], times: [] }
+        if (n === 0) return { widths: [], times: [] }
         const leadW = it => Math.min(maxLead, Math.ceil(2 * chipPad + iconW + 6 + fm.advanceWidth(label(it))))
         // The time as it reads now: it grows a step at 10 s, 1 min, 10 min, 1 h (the font's digits are one width)
         const ownW = it => {
@@ -102,37 +99,18 @@ PanelWindow {
             return Math.min(maxChip, Math.ceil(2 * chipPad + iconW + 6 + nfm.advanceWidth(label(it))
                                                + (t ? timeGap + tfm.advanceWidth(t) : 0)))
         }
-        const sections = {}, order = []
-        let dots = 0
-        items.forEach((it, i) => {
-            if (it.kind === "dot") { dots++; return }
-            if (!(it.unit in sections)) { sections[it.unit] = []; order.push(it.unit) }
-            sections[it.unit].push(i)
-        })
-        const each = Math.floor((width - 2 * pad - dots * (dotW + 2 * gap)) / order.length)
-        const widths = items.map(() => dotW), chips = items.map(() => dotW), times = items.map(() => false)
-        for (const u of order) {
-            const idx = sections[u]
-            // The lone sessions stand apart (a dot between each, already off), a group's are joined across gaps
-            const lead = u === "" ? -1 : idx[0]
-            const rest = u === "" ? idx : idx.slice(1)
-            let room = each - (u === "" ? 0 : gap * rest.length)
-            if (lead >= 0) {
-                chips[lead] = widths[lead] = Math.max(minChip, Math.min(leadW(items[lead]), room))
-                room -= chips[lead]
-            }
-            const own = rest.map(i => ownW(items[i]))
-            const fits = own.reduce((a, b) => a + b, 0) <= room
-            const share = rest.length ? Math.max(minChip, Math.floor(room / rest.length)) : 0
-            rest.forEach((i, k) => {
-                chips[i] = widths[i] = fits ? own[k] : share
-                times[i] = !items[i].lead && (fits || share >= textMin + timeW)
-            })
-            // What is left of the section: in its last cell, after its chip
-            const used = idx.reduce((a, i) => a + widths[i], 0) + (u === "" ? 0 : gap * rest.length)
-            widths[idx[idx.length - 1]] += Math.max(0, each - used)
+        const widths = items.map(it => it.kind === "dot" ? dotW : it.lead ? leadW(it) : ownW(it))
+        const others = items.map((it, i) => i).filter(i => items[i].kind === "chip" && !items[i].lead)
+        let room = width - 2 * pad - gap * (n - 1)
+        items.forEach((it, i) => { if (it.kind === "dot" || it.lead) room -= widths[i] })
+        const fits = others.reduce((a, i) => a + widths[i], 0) <= room
+        const share = others.length ? Math.max(minChip, Math.floor(room / others.length)) : 0
+        const times = items.map(() => false)
+        for (const i of others) {
+            if (!fits) widths[i] = share
+            times[i] = fits || share >= textMin + timeW
         }
-        return { widths: widths, chips: chips, times: times }
+        return { widths: widths, times: times }
     }
     readonly property var widths: layout.widths
 
@@ -161,8 +139,7 @@ PanelWindow {
                 SessionChip {
                     id: chip
                     visible: cell.it.kind === "chip"
-                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                    width: sb.layout.chips[cell.index] || parent.width
+                    anchors.fill: parent
                     session: cell.it.session || ({})
                     lead: !!cell.it.lead
                     linked: !!cell.it.linked
