@@ -198,7 +198,8 @@ Usage: nightmail [command]
   thread ID      a thread's messages as JSON text (ID: thread:… or a message id)
   unsubscribe MSGID…  the messages' unsubscribe links as JSON (List-Unsubscribe, else the body's)
   invitation ID  a message's calendar invitation, by Calendar, as JSON; --add CALENDAR puts its event in one (or
-                 updates it there), --remove takes a cancelled one out
+                 updates it there), --remove takes a cancelled one out; --reply accept|maybe|decline [--calendar ID]
+                 sends the answer to its organiser (--card: only what would go)
   accounts       the accounts, as JSON
   draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body})
   draft-show ID  a draft as it would be sent, as JSON

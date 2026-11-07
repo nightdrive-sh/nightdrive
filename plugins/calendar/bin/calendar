@@ -128,21 +128,25 @@ Usage: calendar [command]
   calendars      the calendars on this computer (--json)
   events FROM TO the events from FROM up to TO (YYYY-MM-DD; TO not included), recurring ones as each time
                  (--json; --calendar ID, --search TEXT)
-  add            a new event (--calendar ID --title T --start S [--end E] [--location L] [--notes N], or JSON on
-                 stdin): S and E are YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day (--json)
+  add            a new event (--calendar ID --title T --start S [--end E] [--location L] [--notes N] [--repeat R],
+                 or JSON on stdin): S and E are YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day; R daily, weekdays,
+                 weekly, biweekly, monthly or yearly (--json)
   edit CALENDAR UID
-                 change an event (not a recurring one): JSON on stdin of what changes (title, start, end, location,
-                 notes, move_to: another calendar); prints the id restore takes (--json)
+                 change an event: JSON on stdin of what changes (title, start, end, location, notes, move_to:
+                 another calendar, reminder, repeat); a recurring one's scope: this (with occurrence, its start) or
+                 all; prints the id restore takes (--json)
   restore UNDO   put an edited event back as it was
   invite [FILE|-]
                  an invitation's .ics (a mail's; stdin without FILE): what it is, and whether its event is in a
                  calendar already (--json); --add CALENDAR puts it in one, or updates the copy there; --remove takes
-                 a cancelled one out
+                 a cancelled one out. --as ADDRESS says whether it can be answered; --reply accept|maybe|decline --as
+                 ADDRESS prints the REPLY for the organiser (Mail sends it), --answered ANSWER --as ADDRESS [--add
+                 CALENDAR] keeps the answer in the event once sent
   color [ID [COLOR|reset]]
                  the calendars' colours, or set one's here (a name from the list, or #RRGGBB) over its server's;
                  reset gives the server's back (--json)
-  delete CALENDAR UID
-                 delete an event (not a recurring one) here and on the server
+  delete [--scope this|all] [--occurrence START] CALENDAR UID
+                 delete an event here and on the server: a recurring one's every time, or the one at START
   reminders [--days N]
                  whether reminders are on, and those of the next N days (1) (--json)
   reminders on|off
@@ -183,8 +187,8 @@ case ${1:-open} in
   calendars) python3 "$LIB/calendars.py" "${@:2}" ;;
   invite)
     python3 "$LIB/invite.py" "${@:2}"; status=$?
-    # --add and --remove change an event the window may show
-    [[ " ${*:2} " =~ \ --(add|remove)\  ]] && ((status == 0)) && running && ipc refresh >/dev/null 2>&1
+    # --add, --remove and --answered change an event the window may show
+    [[ " ${*:2} " =~ \ --(add|remove|answered)\  ]] && ((status == 0)) && running && ipc refresh >/dev/null 2>&1
     exit $status ;;
   events)    python3 "$LIB/events.py" "${@:2}" ;;
   shared)    exec python3 "$LIB/write.py" "$@" ;;   # Claude's calendar_add: whether it asks first

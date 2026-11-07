@@ -12,7 +12,7 @@
 
 reply, forward and resume say which account the message came to ("account": the one whose folder under ~/Mail it is
 in), and send and draft use the account the JSON names. JSON holds account, to, cc, subject, body, attachments (file
-paths) and, for a reply, in_reply_to and references; draft_id is
+paths) and, for a reply, in_reply_to and references (calendar: an invitation's answer, an iTIP REPLY); draft_id is
 the copy saved in Drafts before, which a new save or sending removes. A forward's or a draft's attachments are copied
 out of the message into ~/.cache/nightmail/parts/ first, so a message is always built from files. Every command prints one JSON object;
 failures are {"error": "..."}, so the window can show them.
@@ -243,6 +243,9 @@ def build(acc, f):
         msg["References"] = f.get("references") or f["in_reply_to"]
     msg["User-Agent"] = "Nightdrive Mail"
     msg.set_content(f.get("body", ""))
+    if f.get("calendar"):
+        # An invitation's answer (invitation_reply.py): the iTIP REPLY beside the text, as calendars look for it
+        msg.add_alternative(f["calendar"], subtype="calendar", params={"method": "REPLY"})
     for path in f.get("attachments") or []:
         kind = mimetypes.guess_type(path)[0] or "application/octet-stream"
         with open(path, "rb") as fh:

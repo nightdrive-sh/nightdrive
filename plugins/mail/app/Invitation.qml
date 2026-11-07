@@ -8,7 +8,8 @@ import qs.kit
 // the calendar. A new one goes in with Add to calendar into the calendar picked; one already there opens in Calendar,
 // an update (a newer version, METHOD:REQUEST) waits for Update, a cancellation (METHOD:CANCEL) for Remove: nothing
 // changes in a calendar without a press. Reading and writing are `nightmail invitation` (lib/invitation.py), by
-// `calendar invite`, which reads the stranger's file as data; its texts show here as plain text.
+// `calendar invite`, which reads the stranger's file as data; its texts show here as plain text. Answering the
+// organiser is InviteAnswer.qml's.
 Rectangle {
     id: root
     required property QtObject c
@@ -51,7 +52,8 @@ Rectangle {
     Component.onCompleted: load()
     onMsgChanged: { info = null; failed = ""; load() }
 
-    function act(args, doing) {
+    // done(r): the caller's look at the answer (InviteAnswer keeps the one sent), before the card reads it again
+    function act(args, doing, done) {
         busy = true
         app.say(doing)
         app.mailer.nightmail(["invitation", msg.id].concat(args), t => {
@@ -60,6 +62,7 @@ Rectangle {
             try { r = JSON.parse(t) } catch (e) { r = { error: "No answer from Calendar" } }
             app.say(r.error || r.said + (r.note ? ". " + r.note : ""))
             if (r.error) failed = r.error
+            if (done) done(r)
             load()
         })
     }
@@ -191,5 +194,8 @@ Rectangle {
                 onClicked: root.openInCalendar()
             }
         }
+        // Accept, Maybe, Decline: a mail to the organiser, on a press (#2130)
+        Item { width: 1; height: 6; visible: answer.visible }
+        InviteAnswer { id: answer; width: parent.width; c: root.c; card: root }
     }
 }

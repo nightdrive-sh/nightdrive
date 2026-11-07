@@ -5,6 +5,9 @@ Claude's mail_invitation).
     invitation.py MSGID                    what it is: Calendar's `calendar invite --json` of it, as JSON
     invitation.py MSGID --add CALENDAR     its event into that calendar, or the copy already in one brought up to date
     invitation.py MSGID --remove           a cancelled one's event out of the calendar it is in
+    invitation.py MSGID --reply accept|maybe|decline [--calendar ID] [--card]
+                                           the answer to its organiser, sent from the account it came to
+                                           (invitation_reply.py); --card only shows what would go
 
 The invitation is the message's text/calendar part (an invitation's own), else an application/ics part or an .ics
 attachment: the first, at most MAX_BYTES. It goes to Calendar on stdin, never as a file here, and Calendar reads it as
@@ -47,7 +50,8 @@ def main(argv):
     if not argv or argv[0].startswith("--"):
         sys.exit(__doc__)
     msgid, rest = argv[0], argv[1:]
-    if rest not in ([], ["--remove"]) and not (len(rest) == 2 and rest[0] == "--add"):
+    replying = bool(rest) and rest[0] == "--reply"
+    if rest not in ([], ["--remove"]) and not (len(rest) == 2 and rest[0] == "--add") and not replying:
         sys.exit(__doc__)
     if not CALENDAR.exists():
         return {"error": "Nightdrive Calendar isn't installed (Settings › Plugins).", "calendar": False}
@@ -59,8 +63,28 @@ def main(argv):
         return {"error": str(e).strip() or "notmuch couldn't read the message"}
     if data is None:
         return {"error": "This message has no calendar invitation.", "invitation": False}
+    if replying:
+        import invitation_reply   # sends mail: only when asked to
+        return invitation_reply.run(msgid, data, rest[1:], ask)
+    if not rest:
+        address = answering_address(msgid)
+        rest = ["--as", address] if address else []   # whether, and how, the card can answer it (#2130)
+    return ask(data, rest)
+
+
+def answering_address(msgid):
+    """The address of the account the message came to, the one that answers; None when there is no account"""
+    import compose
     try:
-        done = subprocess.run([str(CALENDAR), "invite", "-", "--json", *rest], input=data, capture_output=True,
+        return compose.account(compose.account_id(msgid))["address"]
+    except (SystemExit, KeyError, subprocess.CalledProcessError, OSError):
+        return None
+
+
+def ask(data, args):
+    """`calendar invite - --json ARGS` on the invitation's bytes, as a dict ({"error": …} when it fails)"""
+    try:
+        done = subprocess.run([str(CALENDAR), "invite", "-", "--json", *args], input=data, capture_output=True,
                               timeout=TIMEOUT)
     except subprocess.TimeoutExpired:
         return {"error": "Calendar took too long; try again in a while."}
@@ -73,4 +97,10 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    print(json.dumps(main(sys.argv[1:]), ensure_ascii=False))
+    result = main(sys.argv[1:])
+    print(json.dumps(result, ensure_ascii=False))
+    # An answer that didn't go fails the command too, so Claude's card stops (and says why) rather than showing it;
+    # the window reads the JSON either way
+    if "--reply" in sys.argv[2:] and result.get("error"):
+        print(result["error"], file=sys.stderr)
+        sys.exit(1)
