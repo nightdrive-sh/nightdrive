@@ -23,7 +23,7 @@ case $kind in
     # config/hypr/scripts/net-watch notifies): the icon in orange, Wi-Fi's with a "!". Not a check of its own: NM's
     # last result, which net-watch refreshes the bar on
     cls=; case $(nmcli networking connectivity 2>/dev/null) in limited|none|portal) cls=warning ;; esac
-    wifi=wifi; [[ -n $cls ]] && wifi=wifi-alert
+    wifi=wifi; [[ -n $cls ]] && wifi="wifi-alert"
     # The traffic goes over a cable (NetworkManager prefers it to Wi-Fi, which stays connected as a standby): a cable,
     # whether Wi-Fi is on or not
     if [[ $(~/.config/hypr/scripts/net-primary | jq -r '.type // ""') == ethernet ]]; then emit cable "" "$cls"; exit; fi

@@ -38,7 +38,6 @@
 2 plugins/deck/bin/deck-window SC2034
 2 plugins/garage/bin/garage SC2034
 1 plugins/garage/bin/garage-ctl SC2010
-5 plugins/garage/lib/arch.sh SC2034
 1 plugins/garage/lib/firstboot.sh SC2155
 1 plugins/garage/lib/qemu.sh SC2034
 2 plugins/garage/lib/qemu.sh SC2054

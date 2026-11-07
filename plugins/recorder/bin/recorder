@@ -9,7 +9,9 @@ QS_DIR=$APP_DIR/app                                     # Recorder's own Quicksh
 LIB=$APP_DIR/lib
 
 # The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+# shellcheck disable=SC2034  # read by kit/app.sh, sourced below
 APP_TITLE=Recorder
+# shellcheck disable=SC2034  # read by kit/app.sh
 APP_IPC=recorder
 . "$QS_DIR/kit/app.sh"
 
