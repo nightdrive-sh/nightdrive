@@ -5,7 +5,7 @@ import QtQuick
 // another window: the bell with a dot, as in the Claude menu; working: the spinner. iconOnly on a crowded, narrow bar.
 // No border: a fill of its own. A lead (a session that opened others, SessionGroups.js) has a quiet border, its name in
 // bold and the bot for its icon, which breathes while it works; a chip it opened is linked: a line to the one before.
-// At the right edge, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
+// After its name, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
 // past stuckAfter is in the warning colour, as it's likely stuck. The bar hides it when crowded, before the name.
 Rectangle {
     id: chip
@@ -21,6 +21,7 @@ Rectangle {
     property string time: ""             // "" = none
     property bool showTime: true
     property bool stuck: false
+    property int timeGap: 10             // between the name and the time
     readonly property bool hovered: area.containsMouse
     signal clicked()
 
@@ -69,23 +70,24 @@ Rectangle {
             onRunningChanged: if (!running) ic.opacity = 1
         }
     }
+    // The time follows the name (the bar sizes a chip to fit both; shared, the name is shortened before the time)
     Text {
-        id: tm
-        visible: chip.showTime && !chip.iconOnly && chip.time !== ""
-        anchors { right: parent.right; rightMargin: chip.padding; verticalCenter: parent.verticalCenter }
-        text: chip.time
-        color: chip.stuck ? Theme.warning : Theme.dim
-        font { family: Theme.font; pixelSize: 10; bold: chip.stuck }   // SessionsBar.timeW measures this font
-    }
-    Text {
+        id: nm
         visible: !chip.iconOnly
-        anchors { left: ic.right; leftMargin: 6; right: tm.visible ? tm.left : parent.right
-                  rightMargin: tm.visible ? 6 : chip.padding
-                  verticalCenter: parent.verticalCenter }
+        anchors { left: ic.right; leftMargin: 6; verticalCenter: parent.verticalCenter }
+        width: Math.min(implicitWidth, chip.width - x - chip.padding - (tm.visible ? tm.implicitWidth + chip.timeGap : 0))
         text: chip.text
         elide: Text.ElideRight
         color: chip.asking || chip.active ? Theme.accent : chip.lead ? Theme.title : Theme.text
-        font { family: Theme.font; pixelSize: 12; bold: chip.lead }   // SessionsBar.widths measures a lead's bold
+        font { family: Theme.font; pixelSize: 12; bold: chip.lead }   // SessionsBar.layout measures these fonts
+    }
+    Text {
+        id: tm
+        visible: chip.showTime && !chip.iconOnly && chip.time !== ""
+        anchors { left: nm.right; leftMargin: chip.timeGap; verticalCenter: parent.verticalCenter }
+        text: chip.time
+        color: chip.stuck ? Theme.warning : Theme.dim
+        font { family: Theme.font; pixelSize: 10; bold: chip.stuck }   // SessionsBar.timeW measures this font
     }
     MouseArea {
         id: area

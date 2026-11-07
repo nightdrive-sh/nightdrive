@@ -16,9 +16,15 @@ function openerOf(s, all) {
     return null
 }
 
-// [{ lead: session, members: [session…] }] for the groups, then [session…] for the rest; each by age, oldest first,
-// so chips keep their places as sessions come and go
-function arrange(sessions) {
+// Whether s led a group before, though its openings have all closed: kept = { addrs: { address: true }, names: [name…] }
+// (Claude.qml remembers them), so a project manager keeps its own section of the bar while it has no sessions running
+function wasLead(s, kept) {
+    return !!kept && (!!(kept.addrs || {})[s.address] || (!!s.name && (kept.names || []).indexOf(s.name) >= 0))
+}
+
+// [{ lead: session, members: [session…] }] for the groups (a lead kept from before with none), then [session…] for the
+// rest; each by age, oldest first, so chips keep their places as sessions come and go
+function arrange(sessions, kept) {
     const byAge = sessions.slice().sort((a, b) => a.started - b.started || (a.address < b.address ? -1 : 1))
     const kids = new Map()      // opener → [sessions it opened]
     const roots = []
@@ -38,10 +44,10 @@ function arrange(sessions) {
     }
     const groups = [], rest = []
     for (const r of roots) {
-        if (kids.has(r)) groups.push({ lead: r, members: below(r) })
+        if (kids.has(r) || wasLead(r, kept)) groups.push({ lead: r, members: below(r) })
         else rest.push(r)
     }
-    return { groups: groups, rest: rest, leads: new Set(kids.keys()) }
+    return { groups: groups, rest: rest, leads: new Set(kids.keys()) }   // leads: the ones with openings now
 }
 
 // Whether a opened b, however far down (so making b a's opener would close a loop)
@@ -53,17 +59,20 @@ function opens(a, b, all) {
 
 // The bar's row: { kind: "chip", session, lead, linked } (linked: joined to the chip before it) and { kind: "dot" }.
 // Its units, a group or a lone session, go by workspace (a group by its lead's; ws: Claude.qml), so the bar reads like
-// the workspaces; on one workspace the groups first, each by age
-function row(sessions) {
-    const a = arrange(sessions)
+// the workspaces; on one workspace the groups first, each by age. unit: the chip's group (its lead's address) or "" for a
+// lone session, for the bar's sections (SessionsBar.layout).
+function row(sessions, kept) {
+    const a = arrange(sessions, kept)
     const units = a.groups.map((g, i) => ({ s: g.lead, g: g, i: i }))
                    .concat(a.rest.map((s, i) => ({ s: s, g: null, i: a.groups.length + i })))
     units.sort((x, y) => (x.s.ws || 0) - (y.s.ws || 0) || x.i - y.i)
     const out = []
     for (const u of units) {
         if (out.length) out.push({ kind: "dot" })
-        out.push({ kind: "chip", session: u.s, lead: !!u.g, linked: false })
-        if (u.g) for (const m of u.g.members) out.push({ kind: "chip", session: m, lead: a.leads.has(m), linked: true })
+        const unit = u.g ? u.s.address : ""
+        out.push({ kind: "chip", session: u.s, lead: !!u.g, linked: false, unit: unit })
+        if (u.g) for (const m of u.g.members)
+            out.push({ kind: "chip", session: m, lead: a.leads.has(m), linked: true, unit: unit })
     }
     return out
 }

@@ -20,6 +20,35 @@ Singleton {
     property var wants: ({})           // address → true: finished while you were elsewhere
     property var lastState: ({})       // address → "working" | "waiting", to see the change
     property var changedAt: ({})       // address → epoch seconds its title's state last changed, as seen here
+    // Leads (sessions that opened others, SessionGroups.js) stay leads once their openings close, so a project manager
+    // keeps its group and its section in the bar while nothing of its runs: by window while it lives, and by name (if
+    // it has one) in leadsFile, so also after the shell or the session restarts. The last maxLeads names are kept.
+    property var leadAddrs: ({})       // address → true
+    property var leadNames: []
+    property bool leadsRead: false     // not before: a write then would drop the names in the file
+    readonly property var keptLeads: ({ addrs: leadAddrs, names: leadNames })
+    readonly property int maxLeads: 20
+    readonly property string leadsFile: Quickshell.env("HOME") + "/.local/state/nightdrive/claude-leads"
+    FileView {
+        path: c.leadsFile; printErrors: false
+        onLoaded: { c.leadNames = text().split("\n").map(l => l.trim()).filter(l => l); c.leadsRead = true }
+        onLoadFailed: c.leadsRead = true
+    }
+    function rememberLeads() {
+        const now = Groups.arrange(seen, null).leads
+        const a = {}, names = leadNames.slice()
+        for (const s of seen) if (leadAddrs[s.address]) a[s.address] = true   // closed windows drop out
+        let named = false
+        now.forEach(s => {
+            a[s.address] = true
+            if (s.name && names.indexOf(s.name) < 0) { names.push(s.name); named = true }
+        })
+        if (JSON.stringify(a) !== JSON.stringify(leadAddrs)) leadAddrs = a
+        if (!named || !leadsRead) return
+        leadNames = names.slice(-maxLeads)
+        Quickshell.execDetached(["bash", "-c", 'mkdir -p "${1%/*}" && printf "%s\\n" "${@:2}" > "$1"', "_", leadsFile]
+                                .concat(leadNames))
+    }
 
     // The sessions bar at the bottom of the main screen: off unless the file says "on" (a new user has none)
     readonly property string barFile: Quickshell.env("HOME") + "/.local/state/nightdrive/claude-sessions-bar"
@@ -91,6 +120,7 @@ Singleton {
         lastState = st
         if (JSON.stringify(at) !== JSON.stringify(changedAt)) changedAt = at
         if (changed) wants = w
+        rememberLeads()
     }
     onActiveAddrChanged: if (wants[activeAddr]) { const w = Object.assign({}, wants); delete w[activeAddr]; wants = w }
 
@@ -116,7 +146,7 @@ Singleton {
     // start; from a window that isn't a session, to the first (or with n < 0 the last). The same order whether the bar
     // is on or not, so the key works without it; the bar shows the new one as focused (SessionChip.active).
     function step(n) {
-        const order = Groups.row(sessions).filter(it => it.kind === "chip").map(it => it.session)
+        const order = Groups.row(sessions, keptLeads).filter(it => it.kind === "chip").map(it => it.session)
         if (!order.length) return
         const i = order.findIndex(s => s.address === activeAddr)
         const k = i < 0 ? (n > 0 ? 0 : order.length - 1) : ((i + n) % order.length + order.length) % order.length
@@ -126,7 +156,7 @@ Singleton {
     // Focus goes to the next (n > 0) or previous lead after the focused session in the same order, round the end; from a
     // window that isn't a session, to the first (or last) lead. No leads: nothing; the only one, focused: it stays.
     function stepLead(n) {
-        const chips = Groups.row(sessions).filter(it => it.kind === "chip")
+        const chips = Groups.row(sessions, keptLeads).filter(it => it.kind === "chip")
         if (!chips.some(it => it.lead)) return
         const i = chips.findIndex(it => it.session.address === activeAddr)
         const len = chips.length
