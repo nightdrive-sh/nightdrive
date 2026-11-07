@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """When a task is due, as the command takes it and as it is shown.
 
-    parse(text, now) -> date | datetime     [DAY] [TIME]: today, tomorrow, fri, +3d, 5.11., 2026-11-05 and 9:30,
-                                            930, 14 (a time alone: the next such time), or +30m, +2h
-    at(day, time, now) -> … | None          the window's two fields, either may be empty
+    parse(text, now, r) -> date | datetime  [DAY] [TIME]: today, tomorrow, fri, +3d, 2026-11-05, a day the region's
+                                            way (5.11., 11/5 in the US) and 9:30, 930, 14 (a time alone: the next
+                                            such time), or +30m, +2h
+    at(day, time, now, r) -> … | None       the window's two fields, either may be empty
     later(due, now) -> date | datetime      what the notification's Later moves a task to
     due_at(due) -> datetime                 when a due task is notified: a date at MORNING
     label(due, now, r) -> str               "Today 14:00", "Tomorrow", "Fri 6.11.", "3.11.2027": the region's way
@@ -28,12 +29,13 @@ LATER = timedelta(hours=1)   # Later on a task with a time; one with only a date
 
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 WEEKDAYS_FULL = {d[:3]: d for d in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")}
-HELP = ("give a day (today, tomorrow, fri, 5.11., 5.11.2027, 2026-11-05, +3d), a time (9:30, 930, 14, 3pm) or both "
+HELP = ("give a day (today, tomorrow, fri, 2026-11-05, +3d, or the date as Settings › Region writes it: 5.11.2027 or "
+        "11/5/2027, 5.11. or 11/5), a time (9:30, 930, 14, 3pm) or both "
         "(tomorrow 10, fri 930, fri 3:30 pm), or +30m, +2h")
 TIME_HELP = "9:30, 930, 14 or 3pm."
 
 
-def parse(text, now=None):
+def parse(text, now=None, r=None):
     """One text, as --due and Claude give it: [DAY] [TIME], or +30m / +2h / +3d. A time alone is the next such time"""
     now = now or datetime.now()
     t = " ".join(text.strip().lower().split())
@@ -56,11 +58,11 @@ def parse(text, now=None):
             raise ValueError(f"Can't read the time {text!r}: " + HELP)
         x = datetime.combine(now.date(), at_)
         return x if x > now else x + timedelta(days=1)
-    day = day_of(" ".join(words), now)
+    day = day_of(" ".join(words), now, r)
     return datetime.combine(day, at_) if at_ is not None else day
 
 
-def at(day_text, time_text, now=None):
+def at(day_text, time_text, now=None, r=None):
     """The window's two fields, a day and a time, either may be empty: None when both are. A time without a day is the
     next such time, as in parse()"""
     now = now or datetime.now()
@@ -70,8 +72,8 @@ def at(day_text, time_text, now=None):
     if t and clk is None:
         raise ValueError(f"Can't read the time {time_text.strip()!r}: " + TIME_HELP)
     if not d:
-        return parse(t, now) if t else None
-    day = day_of(d, now)
+        return parse(t, now, r) if t else None
+    day = day_of(d, now, r)
     return datetime.combine(day, clk) if clk is not None else day
 
 
@@ -89,9 +91,11 @@ def clock_of(word):
     return time(h, mi) if h < 24 and mi < 60 else None
 
 
-def day_of(text, now):
-    """today, tomorrow, mon … sun (or monday: the next one, not today), +3d, 2026-11-05, 5.11., 5.11, 5.11.2027 (a day
-    without a year is this year's)"""
+def day_of(text, now, r=None):
+    """today, tomorrow, mon … sun (or monday: the next one, not today), +3d, 2026-11-05 (always), and a date read by
+    the region r (region.py) as the kit's Dates.parse reads the window's day field, so the two agree: 5.11.2027, 5/11/27
+    in a day-first region, 11/5/2027 in the US; . / - or a space between. Without the year (5.11., 11/5) it is this
+    year's, read in the order of the region's own day (ISO's MM-dd is month first, Sweden's d/M not)"""
     t = text.strip().lower()
     if t in ("today", "tomorrow"):
         return now.date() + timedelta(days=1 if t == "tomorrow" else 0)
@@ -101,11 +105,15 @@ def day_of(text, now):
     m = re.fullmatch(r"\+(\d+)\s*d", t)
     if m:
         return now.date() + timedelta(days=int(m.group(1)))
-    m = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", t)
+    m = re.fullmatch(r"(\d{4})[-./ ](\d{1,2})[-./ ](\d{1,2})", t)
     ymd = m.groups() if m else None
-    m = re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.?(\d{4})?", t)
+    m = re.fullmatch(r"(\d{1,2})[-./ ](\d{1,2})(?:[-./ ](\d{2}|\d{4}))?\.?", t)
     if m:
-        ymd = (m.group(3) or str(now.year), m.group(2), m.group(1))
+        r = r or region.current()
+        month_first = r.get("order") == "mdy" if m.group(3) else r.get("day", "").startswith("M")
+        mo, d = (m.group(1), m.group(2)) if month_first else (m.group(2), m.group(1))
+        y = m.group(3) or str(now.year)
+        ymd = (str(2000 + int(y)) if len(y) == 2 else y, mo, d)
     if ymd is None:
         raise ValueError(f"Can't read the day {text!r}: " + HELP)
     try:

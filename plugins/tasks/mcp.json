@@ -26,7 +26,7 @@
         "type": "object",
         "properties": {
           "title": {"type": "string", "title": "Task", "description": "What to do, short", "minLength": 1},
-          "due": {"type": "string", "title": "Due", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD or D.M. (5.11.), +3d; TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h. Leave it out for a task without a date"},
+          "due": {"type": "string", "title": "Due", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD, +3d (a date the user's way, 5.11. or 11/5, is read by their Settings › Region; YYYY-MM-DD always as such); TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h. Leave it out for a task without a date"},
           "list": {"type": "string", "title": "List", "description": "The list's name (default Tasks)"},
           "note": {"type": "string", "title": "Note", "description": "More about it, as plain text"},
           "priority": {"type": "string", "enum": ["high", "normal", "low"], "title": "Priority"}
@@ -86,7 +86,7 @@
         "type": "object",
         "properties": {
           "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"},
-          "until": {"type": "string", "title": "Until", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD or D.M. (5.11.), +3d; TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h"}
+          "until": {"type": "string", "title": "Until", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD, +3d (a date the user's way, 5.11. or 11/5, is read by their Settings › Region; YYYY-MM-DD always as such); TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h"}
         },
         "required": ["id"],
         "additionalProperties": false
@@ -107,7 +107,7 @@
         "properties": {
           "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"},
           "title": {"type": "string", "title": "Title", "description": "Its new title", "minLength": 1},
-          "due": {"type": "string", "title": "Due", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD or D.M. (5.11.), +3d; TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h"},
+          "due": {"type": "string", "title": "Due", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD, +3d (a date the user's way, 5.11. or 11/5, is read by their Settings › Region; YYYY-MM-DD always as such); TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h"},
           "clear_due": {"type": "boolean", "title": "No due", "description": "true takes the task's date and time away"},
           "note": {"type": "string", "title": "Note", "description": "The whole new note, as plain text"},
           "list": {"type": "string", "title": "List", "description": "The list's name to move it to"},

@@ -34,7 +34,7 @@ Claude › Access › Tasks).
 `tasks help` lists the commands: `tasks add "Buy milk" --due today --list Shopping`, `tasks list --view upcoming`, `tasks list --query milk`, `tasks
 edit ID --due fri --list Home` (`--no-due` takes the date away), `tasks done ID` (`tasks undone ID` opens it again), `tasks snooze ID --until "tomorrow 9:00"`, `tasks trash ID`, `tasks list-new
 Shopping`, `tasks list-rename Shopping Groceries`, `tasks list-remove Groceries` (`--with-tasks` for one that has tasks). A due is `[DAY] [TIME]`: the day `today`, `tomorrow`,
-`mon` … `sun` (the next one), `5.11.`, `2026-11-05` or `+3d`, the time `9:30`, `930`, `14` or `3pm` (alone: the next such time);
+`mon` … `sun` (the next one), `2026-11-05`, `+3d` or a date the way Settings › Region writes it (`5.11.`, `11/5/2027`), the time `9:30`, `930`, `14` or `3pm` (alone: the next such time);
 or `+30m`, `+2h`. `tasks when "fri 930"` shows how one reads. `--json` gives what Claude reads.
 
 ## Where they are

@@ -3,10 +3,24 @@
 
 import unittest
 from datetime import date, datetime
+from unittest import mock
 
 import when
 
 NOW = datetime(2026, 11, 2, 14, 20)   # a Monday afternoon
+# Entries of the kit's regions.json, the parts the readings and labels use
+FI = {"order": "dmy", "day": "d.M.", "short": "d.M.yyyy", "time": "H:mm"}
+UK = {"order": "dmy", "day": "d/M", "short": "dd/MM/yyyy", "time": "HH:mm"}
+US = {"order": "mdy", "day": "M/d", "short": "M/d/yyyy", "time": "h:mm AP"}
+SE = {"order": "ymd", "day": "d/M", "short": "yyyy-MM-dd", "time": "HH:mm"}
+ISO = {"order": "ymd", "day": "MM-dd", "short": "yyyy-MM-dd", "time": "HH:mm"}
+
+
+def setUpModule():
+    # Finland's unless a test gives its region, not the region of the machine the tests run on
+    patch = mock.patch.object(when.region, "current", lambda: FI)
+    patch.start()
+    unittest.addModuleCleanup(patch.stop)
 
 
 class Parse(unittest.TestCase):
@@ -70,10 +84,40 @@ class TwelveHour(unittest.TestCase):
             when.at("today", "14 pm", NOW)
 
 
+class RegionDays(unittest.TestCase):
+    """A date typed the region's way (#2058), as the window's day field reads it (the kit's Dates.parse)"""
+    def test_us(self):
+        self.assertEqual(when.parse("11/5", NOW, US), date(2026, 11, 5))
+        self.assertEqual(when.parse("11/5/2027", NOW, US), date(2027, 11, 5))
+        self.assertEqual(when.parse("11/5/27", NOW, US), date(2027, 11, 5))
+        self.assertEqual(when.parse("11/5 3pm", NOW, US), datetime(2026, 11, 5, 15, 0))
+        self.assertEqual(when.at("11/5", "9:30 AM", NOW, US), datetime(2026, 11, 5, 9, 30))
+        with self.assertRaises(ValueError):
+            when.parse("13/5", NOW, US)   # no 13th month
+
+    def test_day_first(self):
+        self.assertEqual(when.parse("5/11", NOW, UK), date(2026, 11, 5))
+        self.assertEqual(when.parse("05/11/2027", NOW, UK), date(2027, 11, 5))
+        self.assertEqual(when.parse("5-11-27", NOW, FI), date(2027, 11, 5))
+        self.assertEqual(when.at("5 11", "", NOW, FI), date(2026, 11, 5))   # a space in the day field
+
+    def test_without_the_year_the_regions_own_day(self):
+        self.assertEqual(when.parse("5/11", NOW, SE), date(2026, 11, 5))     # Sweden's day is d/M
+        self.assertEqual(when.parse("11-05", NOW, ISO), date(2026, 11, 5))   # ISO's is MM-dd
+
+    def test_iso_in_every_region(self):
+        for r in (FI, US, SE, ISO):
+            self.assertEqual(when.parse("2026-11-05", NOW, r), date(2026, 11, 5))
+        self.assertEqual(when.parse("2026/11/05", NOW, US), date(2026, 11, 5))
+
+    def test_the_machines_region(self):
+        with mock.patch.object(when.region, "current", lambda: US):
+            self.assertEqual(when.parse("11/5", NOW), date(2026, 11, 5))
+
+
 class Label(unittest.TestCase):
     """The region's way (Settings › Region), with its entry given rather than read from the user's locale.conf"""
-    FI = {"day": "d.M.", "short": "d.M.yyyy", "time": "H:mm"}
-    US = {"day": "M/d", "short": "M/d/yyyy", "time": "h:mm AP"}
+    FI, US = FI, US
 
     def test_finland(self):
         self.assertEqual(when.label(datetime(2026, 11, 2, 15, 0), NOW, self.FI), "Today 15:00")
