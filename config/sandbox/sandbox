@@ -8,8 +8,12 @@
 #   nightdrive sandbox ipc ARGS…   qs ipc call ARGS… (or `ipc show`)
 #   nightdrive sandbox exec CMD…   a command in the session (hyprctl, qs, …); `shell` for an interactive one
 #   nightdrive sandbox vnc [stop]  wayvnc on the tailnet address only, prints it and the password; the display drops to the VNC size
-#   nightdrive sandbox down        removes the container
+#   nightdrive sandbox down        removes this checkout's container
+#   nightdrive sandbox list [--json]  every sandbox container: its checkout, state, VNC port, memory; and the images
+#   nightdrive sandbox prune       removes the images no container uses (older Containerfiles)
 #   nightdrive sandbox build       rebuilds the image (up does it when the Containerfile or the package lists change)
+#   nightdrive sandbox --name ID … a container of its own (nightdrive-sandbox-ID), e.g. one per session
+# Each checkout gets its own container: the main one nightdrive-sandbox, a worktree ~/dotfiles-ask nightdrive-sandbox-ask.
 # check, shot, ipc and exec start the sandbox first if it isn't up. The repo is mounted read-only: an edit in it reloads
 # in the sandbox right away, as on the desktop.
 set -uo pipefail
@@ -18,26 +22,80 @@ set -uo pipefail
 # size with a quarter of the pixels, which a viewer over the tailnet keeps up with.
 SHOT_MODE=3024x1964 SHOT_SCALE=2
 VNC_MODE=1512x982 VNC_SCALE=1
-VNC_PORT=5901   # on the host's tailnet address (tailscale ip -4)
+VNC_PORT=5901    # on the host's tailnet address (tailscale ip -4); further sandboxes take the next free one
+VNC_PORTS=50     # how far up from VNC_PORT to look for a free one
+MIN_FREE_MB=3000 # up warns below this much available memory: a sandbox takes ~1 GB
 IMAGE=nightdrive-sandbox
-NAME=nightdrive-sandbox
 
 here=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 repo=$(cd "$here/../.." && pwd)
-state=${XDG_CACHE_HOME:-$HOME/.cache}/nightdrive/sandbox
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/nightdrive
 inside=/home/nd/nightdrive/config/sandbox/inside   # the same file as $here/inside, through the container's mount
-usage() { sed -n '4,14p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '4,20p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "nightdrive sandbox: $*" >&2; exit 2; }
-running() { [[ $(podman container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null) == true ]]; }
+
+# Which container is this checkout's. The main checkout keeps the names it always had; a linked worktree is named after
+# its folder without the dotfiles- prefix, so parallel sessions in ~/dotfiles and ~/dotfiles-ask don't take over each
+# other's container. --name (or NIGHTDRIVE_SANDBOX) picks one by hand, for two sessions in one checkout.
+checkout_id() {
+  local gd cd b
+  gd=$(git -C "$repo" rev-parse --absolute-git-dir 2>/dev/null)
+  cd=$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+  [[ -z $gd || $gd == "$cd" ]] && return   # the main checkout, or no git at all
+  b=${repo##*/}; b=${b#dotfiles-}; b=${b,,}; echo "${b//[^a-z0-9_.-]/-}"
+}
+named=${NIGHTDRIVE_SANDBOX:-}
+[[ ${1:-} == --name ]] && { named=${2:-}; shift 2 || die "--name needs an ID"; }
+[[ -z $named || $named =~ ^[a-z0-9][a-z0-9_.-]*$ ]] || die "a sandbox ID is lower-case letters, digits, . _ and - (got: $named)"
+id=${named:-$(checkout_id)}
+NAME=$IMAGE${id:+-$id}
+state=$cache/sandbox${id:+-$id}   # local.lua, screenshots and logs, one folder per container
+
+# The checkout a container mounts (empty if there's no such container)
+mounted() { podman container inspect -f '{{range .Mounts}}{{if eq .Destination "/home/nd/nightdrive"}}{{.Source}}{{end}}{{end}}' "$1" 2>/dev/null; }
+# Up and showing this checkout: a container of the same name over another one (an old shared one) doesn't count
+running() { [[ $(podman container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null) == true && $(mounted "$NAME") == "$repo" ]]; }
 in_box() { podman exec "$NAME" "$inside" "$@"; }
 
-# The image is labelled with a hash of what goes into it, so up rebuilds it only when one of them changed
+# The image is tagged with a hash of what goes into it, so up rebuilds it only when one of them changed, and checkouts
+# with different Containerfiles (a branch that adds a package) each keep theirs instead of rebuilding over each other
 inputs() { cat "$here/Containerfile" "$repo/packages.txt" "$repo/packages-hyprland.txt" "$repo/setup-hyprland-repo.sh" | sha256sum | cut -c1-16; }
 build() {
   mkdir -p "$state"
-  echo "Building the image $IMAGE (from scratch ~10 min and ~4.5 GB, KWin brings much of KDE): log in $state/build.log"
-  podman build --label "nightdrive.inputs=$(inputs)" -t "$IMAGE" -f "$here/Containerfile" "$repo" >"$state/build.log" 2>&1 \
+  echo "Building the image $IMAGE:$(inputs) (from scratch ~10 min and ~4.5 GB, KWin brings much of KDE): log in $state/build.log"
+  podman build --label "nightdrive.inputs=$(inputs)" -t "$IMAGE:$(inputs)" -f "$here/Containerfile" "$repo" >"$state/build.log" 2>&1 \
     || { tail -30 "$state/build.log"; die "the build failed (log: $state/build.log)"; }
+}
+# An image built from the same inputs under another tag (the old :latest) is tagged, not built again
+image() {
+  local h old; h=$(inputs)
+  podman image exists "$IMAGE:$h" && return
+  old=$(podman images -q --filter "label=nightdrive.inputs=$h" 2>/dev/null | head -1)
+  [[ -n $old ]] && podman tag "$old" "$IMAGE:$h" && return
+  build
+}
+
+# The first VNC port from VNC_PORT up that no container publishes and nothing on the host listens on
+free_port() {
+  local p used; used=$(podman ps -a --format '{{.Ports}}' 2>/dev/null; ss -Htln 2>/dev/null | awk '{print $4}')
+  for (( p = VNC_PORT; p < VNC_PORT + VNC_PORTS; p++ )); do
+    grep -Eq ":$p(->|\$|[[:space:]])" <<<"$used" || { echo "$p"; return; }
+  done
+}
+
+# Each sandbox is a KWin, a Hyprland and a Quickshell (~1 GB, a few dozen inotify instances): say so before the host runs
+# short, as a Hyprland without inotify instances starts with no output and the error is far from the cause
+resources() {
+  local n avail limit used
+  n=$(podman ps --filter "name=^$IMAGE" --format '{{.Names}}' 2>/dev/null | grep -cvx "$NAME")
+  (( n > 0 )) && echo "($n other sandbox(es) running: nightdrive sandbox list)" >&2
+  avail=$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo)
+  (( avail < MIN_FREE_MB )) && echo "Warning: only $avail MB of memory available; a sandbox takes ~1 GB" >&2
+  limit=$(sysctl -n fs.inotify.max_user_instances 2>/dev/null) || return 0
+  used=$(find /proc/[0-9]*/fd -lname 'anon_inode:inotify' 2>/dev/null | wc -l)
+  (( used * 10 > limit * 8 )) && echo "Warning: $used of $limit inotify instances in use; a new Hyprland may start with no output.
+Remove sandboxes you don't need (nightdrive sandbox list), or raise it: sudo sysctl fs.inotify.max_user_instances=1024" >&2
+  return 0
 }
 
 # local.lua for the container (the repo's own, if any, stays under it). Written in place: the container's bind mount
@@ -58,8 +116,14 @@ up() {
   # Hyprland renders through a GPU render node: without one it crashes at start (no software fallback)
   for f in /dev/dri/renderD*; do [[ -e $f ]] && opts+=(--device "$f"); done
   (( ${#opts[@]} )) || die "needs a GPU render node (/dev/dri/renderD*): Hyprland crashes without one"
+  # A container of this name over another checkout is another session's (or one from before names were per checkout):
+  # not ours to remove, unless its checkout is gone
+  local other; other=$(mounted "$NAME")
+  [[ -n $other && $other != "$repo" && -d $other ]] && die "$NAME runs $other, not this checkout.
+Remove it from there (nightdrive sandbox down), or use one of your own: nightdrive sandbox --name ID up"
   mkdir -p "$state/shots"
-  [[ $(podman image inspect -f '{{index .Config.Labels "nightdrive.inputs"}}' "$IMAGE" 2>/dev/null) == "$(inputs)" ]] || build
+  image || exit
+  resources
   write_local "$SHOT_MODE" "$SHOT_SCALE"
   # The same content link.sh writes into the repo, so its comparison matches and it doesn't try to write (read-only)
   printf 'screencopy {\n    custom_picker_binary = /home/nd/.config/hypr/scripts/share-picker\n}\n' > "$state/xdph.conf"
@@ -80,36 +144,44 @@ up() {
   for m in "$SHOT_MODE" "$VNC_MODE"; do
     w=${m%x*} h=${m#*x}; (( w > ${kw:-0} )) && kw=$w; (( h > ${kh:-0} )) && kh=$h
   done
-  local addr; addr=$(tailscale ip -4 2>/dev/null | head -1)
-  [[ -n $addr ]] && opts+=(-p "$addr:$VNC_PORT:5900")   # VNC only on the tailnet address (nightdrive sandbox vnc)
-
-  podman rm -f -t 0 "$NAME" >/dev/null 2>&1
+  podman rm -f -t 0 "$NAME" >/dev/null 2>&1   # after it, so its own VNC port counts as free again
+  local addr port; addr=$(tailscale ip -4 2>/dev/null | head -1)
+  if [[ -n $addr ]]; then   # VNC only on the tailnet address (nightdrive sandbox vnc), a port of its own per sandbox
+    port=$(free_port)
+    [[ -n $port ]] && opts+=(-p "$addr:$port:5900") || echo "(no free VNC port from $VNC_PORT up: no VNC)" >&2
+  fi
+  echo "$repo" > "$state/repo"   # which checkout down cleans the placeholders of
   # --init: `sleep infinity` as PID 1 doesn't reap, and the top bar's scripts would pile up as zombies.
   # label=disable instead of :Z, which would relabel the repo on the host.
   podman run -d --init --name "$NAME" --hostname nightdrive \
+    --label "nightdrive.repo=$repo" --label "nightdrive.sandbox=${id:-main}" \
     --userns=keep-id:uid=1000,gid=1000 --security-opt label=disable --tz=local "${opts[@]}" \
     -v "$repo":/home/nd/nightdrive:ro \
     -v "$state/local.lua":/home/nd/nightdrive/config/hypr/local.lua:ro \
     -v "$state/xdph.conf":/home/nd/nightdrive/config/hypr/xdph.conf:ro \
     -v "$state/shots":/home/nd/shots \
-    "$IMAGE" sleep infinity >/dev/null || die "podman run failed"
+    "$IMAGE:$(inputs)" sleep infinity >/dev/null || die "podman run failed"
   podman exec "$NAME" /home/nd/nightdrive/link.sh >"$state/link.log" 2>&1 \
     || { tail -20 "$state/link.log"; die "link.sh failed in the container (log: $state/link.log)"; }
   in_box start "$kw" "$kh" || die "the session didn't start (logs in the container: /tmp/kwin.log, /tmp/hyprland.log)"
-  echo "Sandbox up: $SHOT_MODE at scale $SHOT_SCALE, repo $repo (read-only)"
+  echo "Sandbox $NAME up: $SHOT_MODE at scale $SHOT_SCALE, repo $repo (read-only)"
 }
 need_up() { running || { echo "(sandbox not up, starting it)" >&2; up >&2 || exit; }; }
 
 down() {
+  # Only this checkout's container, or the one --name gives: another checkout's is another session's
+  local other; other=$(mounted "$NAME")
+  [[ -z $named && -n $other && $other != "$repo" && -d $other ]] && die "$NAME runs $other, not this checkout: \
+nightdrive sandbox down there, or nightdrive sandbox --name ${id:-main} down to remove it anyway"
   podman rm -f -t 0 "$NAME" >/dev/null 2>&1
-  local f p
+  local f p r; r=$(cat "$state/repo" 2>/dev/null); [[ -d $r ]] || r=$repo
   while read -r f; do
     [[ $f == */* ]] || f=config/hypr/$f   # a list written before paths were repo-relative
-    p=$repo/$f
+    p=$r/$f
     [[ -f $p && ! -L $p && ! -s $p ]] && rm -f "$p"   # only if still the empty placeholder
   done < <(cat "$state/placeholders" 2>/dev/null)
-  rm -f "$state/placeholders"
-  echo "Sandbox down"
+  rm -f "$state/placeholders" "$state/repo"
+  echo "Sandbox $NAME down"
 }
 
 shot() {
@@ -126,7 +198,7 @@ vnc() {
     in_box vnc stop; set_mode "$SHOT_MODE" "$SHOT_SCALE"
     echo "VNC stopped, display back at $SHOT_MODE (scale $SHOT_SCALE)"; return
   fi
-  local addr; addr=$(podman port "$NAME" 5900/tcp 2>/dev/null | head -1)
+  local addr port; addr=$(podman port "$NAME" 5900/tcp 2>/dev/null | head -1); port=${addr##*:}
   [[ -n $addr ]] || die "VNC is published only on the tailnet address, and there was none when the sandbox started
 (tailscale ip -4). Bring Tailscale up, then nightdrive sandbox up again."
   set_mode "$VNC_MODE" "$VNC_SCALE"
@@ -134,8 +206,8 @@ vnc() {
   local zone; zone=$(firewall-cmd --get-zone-of-interface=tailscale0 2>/dev/null)
   echo "VNC: $addr ($VNC_MODE), user nd, ${auth:-password: see ~/.config/wayvnc/config in the container}. Stop: nightdrive sandbox vnc stop"
   echo "The password needs a viewer with RSA-AES (TigerVNC 1.13 or later)."
-  echo "If a viewer can't connect, the host's firewall must let $VNC_PORT/tcp in from the tailnet, e.g. (firewalld):"
-  echo "  sudo firewall-cmd --permanent --zone=${zone:-<the zone of tailscale0>} --add-port=$VNC_PORT/tcp && sudo firewall-cmd --reload"
+  echo "If a viewer can't connect, the host's firewall must let $port/tcp in from the tailnet, e.g. (firewalld):"
+  echo "  sudo firewall-cmd --permanent --zone=${zone:-<the zone of tailscale0>} --add-port=$port/tcp && sudo firewall-cmd --reload"
   echo "The size is fixed: a viewer's \"SetDesktopSize failed\" is harmless (TigerVNC: turn off \"Resize remote session\")."
 }
 
@@ -154,6 +226,8 @@ case ${1:-} in
   exec) need_up; in_box exec "${@:2}" ;;
   shell) need_up; exec podman exec -it "$NAME" "$inside" exec bash ;;
   vnc) vnc "${2:-}" ;;
+  list) exec "$here/list" "${2:-}" ;;
+  prune) exec "$here/list" --prune "$(inputs)" ;;
   ""|help|-h|--help) usage ;;
   *) usage >&2; exit 1 ;;
 esac

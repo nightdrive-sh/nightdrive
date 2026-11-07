@@ -19,6 +19,8 @@ open anything.
 Don't press Enter over IPC on rows that act on real things (Home Assistant devices, Power).
 On a machine without Hyprland, or to leave the user's desktop alone, use the headless container: `nightdrive sandbox
 check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` for the rest (docs/sandbox.md; no agent-warn there).
+Each checkout has its own sandbox; a session that needs one apart from others in the same checkout adds `--name ID` to every
+command, and ends with `--name ID down`. `nightdrive sandbox list` shows them all: remove only your own.
 
 **Pitfalls**
 - Menu icons are invisible private-use glyphs in strings. Don't retype those lines, and compare the glyph counts with HEAD.
@@ -39,9 +41,10 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
   cherry-picks, so `main` is always an earlier point of `dev` and a release has nothing to conflict with.
 - A release, and pushing, are the user's decisions: don't do either unasked. `nightdrive release [patch|minor|major]`
   makes one from `dev`: the plugins' versions (`plugins bump`, plugins/README.md › Versions), the notes as a new section
-  of `CHANGELOG.md`, the website's docs check, then the commit, the tag `vX.Y.Z`, `main` moved to it, the push, the
-  GitHub release and, once the website has rebuilt, its publishing (its `tools/publish.sh`). `--dry-run` shows what it
-  would do.
+  of `CHANGELOG.md`, the website's docs check, a warning when Deck or Ferry has a newer release than the one pinned
+  (`DECK_REF` in `plugins/deck/install.sh`, `plugins/ferry/pin`; `config/hypr/scripts/release-pins`), then the commit,
+  the tag `vX.Y.Z`, `main` moved to it, the push, the GitHub release and, once the website has rebuilt, its publishing
+  (its `tools/publish.sh`). `--dry-run` shows what it would do.
 - Release notes are for users, in plain words: what they can now do, what works better, what they need to do. Never
   the commit messages as such. Write them from the commits (`--dry-run` lists them), let the user read them, also as
   the website's Changelog page (`nightdrive release … --notes FILE --preview`, or with `--dry-run`: built in throwaway
@@ -51,7 +54,7 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
 - A big piece of work that shouldn't hold up or swell the next release (a new app: Calendar, Contacts) gets a branch of
   its own off `dev`, in a worktree beside the live one: `git worktree add ~/dotfiles-<name> -b <name> dev`. `~/dotfiles`
   stays on `dev`, so the desktop doesn't change; an app runs from the worktree (`qs -p ~/dotfiles-<name>/plugins/<name>/app`)
-  or in the sandbox (the worktree's own `bin/nightdrive sandbox` mounts it: `sandbox down` first if one runs). A request about what users already have (Mail, Deck, the desktop) goes to `~/dotfiles`, the new
+  or in the sandbox (the worktree's own `bin/nightdrive sandbox` runs a container of its own for it, once the branch has `dev`'s sandbox script). A request about what users already have (Mail, Deck, the desktop) goes to `~/dotfiles`, the new
   thing's to its worktree. The apps' kit (`config/quickshell/kit`) changes only in `dev`, merged into the branch from
   there (`git merge dev`, often). The branch is merged into `dev` once it is usable, and reaches users in the release after.
 - A part of an app that works without Nightdrive (Deck's player and CLI) has a repo of its own in `~/Projects`; the
@@ -65,9 +68,10 @@ check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` 
 - Code is written only by Claude, so files stay small for the context: one file does one thing, ~200–400 lines. Past ~600,
   split off what stands on its own (a component, a library, a level); past ~800 it must be split (generated files such as
   `Icons.qml` excepted). A new app or feature is planned in small files from the start.
-  `config/hypr/scripts/size-guard [REPO]` holds the line (here, Deck, Ferry, doubletake; `sandbox check` runs it): a file
-  over 800 may not grow and none may cross it. Opt-in as a commit hook: `size-guard --install [REPO]`. When growth is
-  justified, say why with a `Size-guard: <reason>` line in the commit message; exceptions are its `EXEMPT` list.
+  `config/hypr/scripts/size-guard [REPO]` holds the line (here, Deck, Ferry; `sandbox check` runs it): a file over 800
+  may not grow and none may cross it. Upstream code we only build (doubletake) isn't ours to split and isn't guarded.
+  Opt-in as a commit hook: `size-guard --install [REPO]`. When growth is justified, say why with a `Size-guard: <reason>`
+  line in the commit message; exceptions are its `EXEMPT` list.
 - Colours come from `Theme.*` in QML, and the bar's from `TopBar.c()` (bar-style; source: `THEMES` in `hypr/scripts/theme`).
 - Machine-specific values are named constants at the top of each file.
 - Nothing personal goes in the repo. Private additions use the git-ignored *local* slots (README › Make it yours).

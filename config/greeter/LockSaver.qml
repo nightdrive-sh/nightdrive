@@ -1,8 +1,9 @@
 import QtQuick
 import Quickshell
 
-// The screensaver under the lock (lock.qml shows it on every lock surface after the idle time): the clock screensaver's
-// face on black, over the login view. A screensaver window can't show there, as the session lock covers every window.
+// The screensaver under the lock (lock.qml shows it on every lock surface after the idle time): a screensaver's face
+// (screensaver/<style>/<Style>Face.qml, the same file the screensaver shows) on black, over the login view. A screensaver
+// window can't show there, as the session lock covers every window.
 // Any key, click, wheel or mouse movement wakes it (woke()). The key that does is eaten here, so it never goes into
 // the password; the login view is hidden meanwhile, so its field can't take keys either.
 // Opaque black whatever happens: if the face fails to load, the screen stays black and the lock is untouched (a Loader,
@@ -12,7 +13,14 @@ Rectangle {
     color: "#000000"
     signal woke()
 
-    readonly property string faceFile: Quickshell.shellDir + "/../screensaver/clock/ClockFace.qml"
+    // Which face: the style setting's names (hypr/scripts/idle style), saver being the synthwave; lock.qml picks one for
+    // random. "" is none yet (lock.qml hasn't read the setting); anything else is the clock.
+    property string style: "clock"
+    readonly property string folder: ({ saver: "synthwave", synthwave: "synthwave", rain: "rain" })[style] || "clock"
+    // A file:// URL: a bare path became one of Quickshell's own qs: URLs, under which a face's other files (RainState.qml
+    // beside RainFace.qml) weren't found
+    readonly property string faceFile: "file://" + Quickshell.shellDir + "/../screensaver/" + folder + "/"
+                                       + folder[0].toUpperCase() + folder.slice(1) + "Face.qml"
     readonly property int grace: 500    // ms after it shows when the pointer is ignored (the lock surface sends one on entry)
 
     property bool armed: false
@@ -31,10 +39,11 @@ Rectangle {
     Keys.onPressed: event => { event.accepted = true; saver.woke() }
     Keys.onReleased: event => { event.accepted = true }
 
-    // Loaded only while it shows: its timer stops, and nothing is drawn behind the login view
+    // Loaded only while it shows: its timer stops, and nothing is drawn behind the login view (and a style picked for
+    // the next time loads then)
     Loader {
         anchors.fill: parent
-        active: saver.visible
+        active: saver.visible && saver.style !== ""
         source: saver.faceFile
     }
 

@@ -26,5 +26,6 @@ case $scheme in
   msteams) app="Microsoft Teams" ;;
   *) app=${scheme^} ;;
 esac
+# shellcheck disable=SC1111  # typographic quotes inside the message, on purpose
 notify-send -a Links -i lucide:external-link "No $app app here" \
   "The page tried to open $app's desktop app. Use its link to the web version instead (for Slack: “use Slack in your browser”)."

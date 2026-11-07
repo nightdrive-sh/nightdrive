@@ -16,8 +16,8 @@
 # With allow_session_lock_restore (hyprland.lua) the new one takes the lock over. Steps go to the journal (journalctl -t lock).
 # A new lock plays system/lock.wav (hypr/scripts/sounds event); not at boot (the login screen has its own sound), nor
 # at a relock after sleep or a restart here.
-# A screensaver running as the lock comes (the idle lock, 20 min after the saver by default): the lock starts with its own
-# screensaver, the clock (NIGHTDRIVE_LOCK_SAVING), instead of the prompt flashing up before the screen goes off. Only a
+# A screensaver running as the lock comes (the idle lock, 20 min after the saver by default): the lock starts showing the
+# same one itself (NIGHTDRIVE_LOCK_SAVING=<style>), instead of the prompt flashing up before the screen goes off. Only a
 # first start: after a restart or a relock the prompt shows.
 RESTARTS=5        # at most this many restarts within WINDOW seconds; then the "lock died" screen stays (still locked)
 WINDOW=60
@@ -54,8 +54,12 @@ close_once_secure() {
 (( ${#replaced[@]} )) && close_once_secure &
 pam=login; [[ -e /etc/pam.d/nightdrive-lock ]] && pam=nightdrive-lock   # it also opens the keyring (switch.sh autologin)
 quick=1; [[ $1 == --boot ]] && quick=
+# A screensaver running as the lock comes (the idle lock): the lock goes on with the same one (lock.qml), by its style name
 saving=0
-[[ -z $1 ]] && pgrep "${mine[@]}" -f '^(python3 -I|qs -p) .*/screensaver/(nightdrive-saver|nightdrive-rain|clock)$' >/dev/null && saving=1
+if [[ -z $1 ]]; then
+  running=$(pgrep -a "${mine[@]}" -f '^qs -p .*/screensaver/(synthwave|rain|clock)$' | head -1)
+  case $running in */synthwave) saving=saver ;; */rain) saving=rain ;; */clock) saving=clock ;; esac
+fi
 starts=()
 [[ -z $1 || ( $1 == --replace && ${#replaced[@]} -eq 0 ) ]] && { "$HOME/.config/hypr/scripts/sounds" event lock >/dev/null 2>&1 & }
 while :; do

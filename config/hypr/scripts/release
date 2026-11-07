@@ -6,8 +6,9 @@
 # one question, commits, tags vX.Y.Z, moves main to it, pushes dev, main and the tag, and publishes the GitHub release
 # with the section as its notes. Last, the website's tools/publish.sh (if there is a checkout of it) waits for the
 # website's rebuild from the new main and publishes it on its server. --notes FILE takes the notes from a file instead of the editor, --yes answers the
-# question (both for an agent, with notes the maintainer has read). --dry-run only shows what it would do, reminds of
-# the security audit that comes before a release, and with --notes also opens the website's Changelog page with them
+# question (both for an agent, with notes the maintainer has read). --dry-run only shows what it would do, warns
+# when Deck or Ferry has a newer release than the one pinned (release-pins; the release warns too), reminds of the
+# security audit that comes before a release, and with --notes also opens the website's Changelog page with them
 # on it in the browser (release-preview); --preview only that.
 # --name gives the release its name beside the number (Afterglow): the heading "## 0.6.0 Afterglow – date" and the GitHub
 # release "Nightdrive 0.6 Afterglow". The name is for people; the tag, nightdrive update and version keep the number.
@@ -101,6 +102,14 @@ compose() {
       END { if (!done) { print ""; while ((getline l < f) > 0) print l } }' > "$tmp/changelog"
 }
 
+# The releases of Deck and Ferry that install.sh pins: a warning when one has a newer release (release-pins), as
+# moving a pin means trying that release first, which the maintainer decides, not this script
+pins() {
+  echo "==> Pins of Deck and Ferry"
+  "$repo/config/hypr/scripts/release-pins" "$repo" | sed 's/^/    /' && return 0
+  echo "    (a warning, the release goes on: move the pin first if that release should be in this one)"
+}
+
 preview_notes() {
   compose "$notes_from"
   echo "==> Preview: the website's Changelog page"
@@ -115,6 +124,7 @@ if (( dry )); then
   echo "==> Names"; echo "    CHANGELOG.md: $heading"; echo "    GitHub: $title"
   echo "==> Plugins"; "$repo/config/hypr/scripts/plugin-version" bump --dry-run | sed 's/^/    /'
   echo "==> Commits"; g log --no-merges --reverse --format='    %h %s' "$range" | tail -40
+  pins
   docs_check || echo "    fails: the release would stop here"
   if [[ -x $WEBSITE/tools/publish.sh ]]; then echo "==> Website: published after its rebuild ($WEBSITE/tools/publish.sh)"
   else echo "==> Website: not published from here (no $WEBSITE/tools/publish.sh)"; fi
@@ -126,6 +136,7 @@ if (( dry )); then
   exit 0
 fi
 docs_check || die "The website can't build its docs from dev (see above)"
+pins
 
 # The notes: drafted from the commits for the maintainer to edit into what users see, or taken from --notes
 if [[ -n $notes_from ]]; then

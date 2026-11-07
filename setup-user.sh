@@ -15,7 +15,7 @@ SIX_CAPS_SHA256=7b54a46671722fb670647c9c3951e6e618b6a9d876fc5d9ae34dfd311628ae5a
 BLESH_REF=d81fd54feb0d996fdff20dca27eaf0201f7015cc   # master of 8.9.2026, in use since 14.10.2026; contrib is pinned by it
 
 fetch() {   # URL SHA256 FILE
-  curl -fsSL -o "$3" "$1" && sha256sum -c --quiet - <<<"$2  $3" || { echo "    $1: not downloaded, or not the file expected (sha256 $2)" >&2; return 1; }
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$3" "$1" && sha256sum -c --quiet - <<<"$2  $3" || { echo "    $1: not downloaded, or not the file expected (sha256 $2)" >&2; return 1; }
 }
 
 echo "==> Nerd Fonts symbols (icons for the top bar and menus)"

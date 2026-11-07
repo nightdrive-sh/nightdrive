@@ -163,6 +163,15 @@ update() {
 
   offer_apps     # before the Deck rebuild: a Deck installed there was just built
 
+  # A Deck built from the pinned source (no package to be had, install.sh's DECK_REF): built again when the pin moves.
+  # Its clone is detached there, so the pull above doesn't. Not a packaged Deck (its link) nor a source of one's own.
+  local deck_src=$HOME/.local/src/deck deck_ref
+  deck_ref=$(sed -n 's/^DECK_REF=\([0-9a-f]\{40\}\).*/\1/p' "$repo/plugins/deck/install.sh")
+  if [[ -z ${DECK_SRC:-} && -d $deck_src/.git && ! -L $deck_src && -f $HOME/.local/bin/deck && ! -L $HOME/.local/bin/deck \
+        && -n $deck_ref && $(git -C "$deck_src" rev-parse HEAD 2>/dev/null) != "$deck_ref" ]]; then
+    deck=1
+  fi
+
   # Only while Deck is installed: its source stays when the app is removed, and a rebuild would bring it back
   # No DECK_SRC of its own: install.sh builds a DECK_SRC as one's own source, which would turn a packaged Deck into a build
   (( deck )) && [[ -x $HOME/.local/bin/deck ]] && { echo "==> Deck (rebuild)"; "$repo/plugins/deck/install.sh" \

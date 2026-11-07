@@ -4,14 +4,17 @@ import qs.kit
 
 // A message's attachments, as the last row of its header (Thread.qml), so they show as soon as the message opens
 // instead of below a long text: a click opens one, its save icon puts it in the downloads folder, and with two or more
-// "Save all" puts them all there. The chips wrap onto more lines in a narrow pane.
+// "Save all" puts them all there. A newsletter's Unsubscribe comes last (Unsubscribe.qml). The chips wrap onto more
+// lines in a narrow pane.
 Flow {
     id: root
     required property QtObject c
     required property var app
     required property var msg           // the message: { id, files: [{ part, name, size }] … }
+    property var unsubscribe: null      // its unsubscribe link (lib/unsubscribe.py), or null
+    property var openLink: null         // Thread.openLink, which the Unsubscribe button's link goes through
     spacing: 8
-    visible: msg.files.length > 0
+    visible: msg.files.length > 0 || unsub.visible
     Repeater {
         model: root.msg.files
         delegate: Rectangle {
@@ -76,4 +79,5 @@ Flow {
             Text { anchors.verticalCenter: parent.verticalCenter; text: "Save all"; font.family: c.font; font.pixelSize: 12; color: allHover.hovered ? c.accent : c.dim }
         }
     }
+    Unsubscribe { id: unsub; c: root.c; link: root.unsubscribe; open: root.openLink; narrow: root.width < 280 }
 }

@@ -29,6 +29,11 @@ RUN mkdir -p /usr/share/fonts/nerd /tmp/nf \
 # luac: nightdrive plugin check reads a plugin's bindings.lua with it (a layer of its own, so adding it rebuilt only this)
 RUN dnf -y install lua && dnf clean all
 
+# The apps' own packages, which their plugins' install.sh brings on a real desktop and the sandbox doesn't run:
+# Calendar's (icalendar for its lib, khal reads the events, vdirsyncer syncs) and Contacts' (vobject). Without them
+# the app opens with an error toast. Mail's notmuch/isync and VNC Display's cryptography aren't here: neither runs in it.
+RUN dnf -y install python3-icalendar khal vdirsyncer python3-vobject && dnf clean all
+
 # A regular user (Hyprland refuses to run as root); podman run --userns=keep-id maps it to the host user, so the
 # read-only repo is readable and the screenshots it writes belong to the host user
 RUN useradd -m -u 1000 nd && echo 'nd ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/nd

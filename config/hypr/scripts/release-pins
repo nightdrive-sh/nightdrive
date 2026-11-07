@@ -1,0 +1,45 @@
+#!/bin/bash
+# Are the releases Nightdrive pins of its own apps still their latest? A pin is moved by hand, so it falls behind
+# silently: `nightdrive release` (and --dry-run) runs this before a release and warns, without stopping it.
+#   Deck:  DECK_REF/DECK_TAG in plugins/deck/install.sh (the source build) against Deck's newest vX.Y.Z tag; Deck
+#          tags its releases without GitHub release pages. Also that DECK_REF is that tag's commit.
+#   Ferry: tag= in plugins/ferry/release.conf (written by plugins/ferry/pin) against Ferry's latest GitHub release,
+#          the one pin takes by default.
+# release-pins [REPO]: prints a line per pin; exit 1 when one is behind or wrong, 2 when GitHub couldn't be asked.
+set -euo pipefail
+
+DECK_REPO=https://github.com/nightdrive-sh/deck
+FERRY_REPO=https://github.com/nightdrive-sh/ferry
+
+repo=${1:-$(cd "$(dirname "$(readlink -f "$0")")/../../.." && pwd)}
+rc=0
+warn() { echo "!!  $*"; rc=1; }
+unknown() { echo "??  $*"; (( rc )) || rc=2; }
+https() { curl --proto '=https' --tlsv1.2 -fsS --max-time 15 "$@"; }
+
+# Deck: the newest release tag (pre-releases, v1.0.0-rc.1, left out) and its commit (an annotated tag's ^{} line)
+deck_ref=$(sed -nE 's/^DECK_REF=([0-9a-f]{40}).*/\1/p' "$repo/plugins/deck/install.sh")
+deck_tag=$(sed -nE 's/^DECK_TAG=(\S+).*/\1/p' "$repo/plugins/deck/install.sh")
+if ! tags=$(git ls-remote --tags "$DECK_REPO" 'v*' 2>/dev/null); then
+  unknown "Deck: couldn't list the tags of $DECK_REPO (pinned $deck_tag)"
+else
+  latest=$(awk '{ sub("refs/tags/", "", $2); sub(/\^\{\}$/, "", $2); print $2 }' <<<"$tags" |
+    grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -uV | tail -1)
+  commit() { awk -v t="refs/tags/$1" '$2 == t { l = $1 } $2 == t "^{}" { p = $1 } END { print p ? p : l }' <<<"$tags"; }
+  if [[ -z $latest ]]; then unknown "Deck: no release tags at $DECK_REPO"
+  elif [[ $(commit "$deck_tag") != "$deck_ref" ]]; then
+    warn "Deck: DECK_REF ${deck_ref:0:12} isn't the commit of $deck_tag ($(commit "$deck_tag" | cut -c1-12)) in plugins/deck/install.sh"
+  elif [[ $deck_tag != "$latest" ]]; then
+    warn "Deck: pinned $deck_tag, released $latest: move DECK_REF and DECK_TAG in plugins/deck/install.sh" \
+      "(git -C ~/Projects/deck rev-parse '$latest^{commit}')"
+  else echo "ok  Deck $deck_tag"; fi
+fi
+
+# Ferry: GitHub's latest release, as plugins/ferry/pin asks for it
+ferry_tag=$(sed -nE 's/^tag=//p' "$repo/plugins/ferry/release.conf")
+latest=$(https -I -o /dev/null -w '%{redirect_url}' "$FERRY_REPO/releases/latest" 2>/dev/null | sed -nE 's|.*/tag/||p') || true
+if [[ -z $latest ]]; then unknown "Ferry: couldn't ask GitHub for its latest release (pinned $ferry_tag)"
+elif [[ $ferry_tag != "$latest" ]]; then warn "Ferry: pinned $ferry_tag, released $latest: run plugins/ferry/pin, try it, commit release.conf"
+else echo "ok  Ferry $ferry_tag"; fi
+
+exit $rc

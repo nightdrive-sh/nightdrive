@@ -87,8 +87,10 @@ def raw(msgid, part=None):
     return subprocess.run(args, capture_output=True, check=True).stdout
 
 
-def page(msgid):
-    msg = email.message_from_bytes(raw(msgid), policy=email.policy.default)
+def cleaned(msg):
+    """A message's HTML with nothing in it that loads by itself or takes the page's head over, and the top it goes
+    under: (top, title, text), for page() and for Claude's PDF (save.py). top is the sender's doctype and the opening
+    of our own head, title one from the subject when the HTML has none."""
     body = msg.get_body(preferencelist=("html",))
     if body is None:
         raise ValueError("This message has no HTML version")
@@ -120,6 +122,12 @@ def page(msgid):
     doctype = re.search(r"<!doctype\b[^<>]*>", text, re.I)
     text = re.sub(r"<!doctype\b[^>]*>", "", text, flags=re.I)
     top = (doctype.group(0) if doctype else "") + "\n<html><head>\n"
+    return top, title, text
+
+
+def page(msgid):
+    msg = email.message_from_bytes(raw(msgid), policy=email.policy.default)
+    top, title, text = cleaned(msg)
     stem = hashlib.sha1(msgid.encode()).hexdigest()[:12]
     os.makedirs(PAGES, mode=0o700, exist_ok=True)
 

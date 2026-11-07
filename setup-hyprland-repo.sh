@@ -65,7 +65,7 @@ sudo=sudo; (( EUID == 0 )) && sudo=
 # The key first, before the repo exists: nothing from the COPR is trusted until it is the pinned one
 if ! key_ok "$KEY_FILE"; then
   key=$(mktemp); trap 'rm -f "$key"' EXIT
-  curl -fsSL -o "$key" "$KEY_URL"
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$key" "$KEY_URL"
   if ! key_ok "$key"; then
     echo "$COPR: its signing key ($KEY_URL) isn't $KEY_FPR, or expires within 30 days. Not set up." >&2
     exit 1

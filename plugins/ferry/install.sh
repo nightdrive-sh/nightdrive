@@ -33,7 +33,7 @@ trap 'rm -rf "$tmp"' EXIT
 args=()
 if [[ -z $from ]]; then
   for f in install.sh ferry-linux.tar.gz; do
-    curl -fsSL -o "$tmp/$f" "https://github.com/$repo/releases/download/$tag/$f" \
+    curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/$f" "https://github.com/$repo/releases/download/$tag/$f" \
       || { echo "Couldn't download $f of Ferry $tag from github.com/$repo" >&2; exit 1; }
   done
   # Neither runs unless both are what was pinned: the tarball too, since the script would otherwise fetch its own

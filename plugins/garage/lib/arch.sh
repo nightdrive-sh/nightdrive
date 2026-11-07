@@ -13,6 +13,7 @@
 
 ARCH=${GARAGE_ARCH:-$(uname -m)}
 
+# shellcheck disable=SC2034  # each variable is read by the files sourced after this one (above)
 case $ARCH in
   aarch64)
     QEMU=qemu-system-aarch64
@@ -22,6 +23,7 @@ case $ARCH in
     GPU=virtio-gpu-gl-pci
     # virtio-snd: Fedora's and Arch Linux ARM's kernels have its driver (CONFIG_SND_VIRTIO). Stream 0 is the output,
     # 1 the input: one stream, so no microphone
+    # shellcheck disable=SC2054  # the commas are qemu's, inside one argument
     SOUND=(-device virtio-sound-pci,audiodev=snd0,streams=1)
     # The M2 Max's performance cluster: a vCPU must not move to an E-core (another MIDR, and KVM stops it)
     PIN=4-11
@@ -41,6 +43,7 @@ case $ARCH in
     GPU=virtio-vga-gl
     # Intel HD Audio: every PC's guest has its driver, Windows' too (virtio-snd needs one added there). Output only,
     # so no microphone
+    # shellcheck disable=SC2054  # the commas are qemu's, inside one argument
     SOUND=(-device ich9-intel-hda -device hda-output,audiodev=snd0)
     # A hybrid Intel's P- and E-cores are the same architecture to KVM: a vCPU may run on any
     PIN=""

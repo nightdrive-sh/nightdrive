@@ -1,11 +1,13 @@
 #!/bin/bash
-# Launches the Nightdrive screensaver in a fullscreen kitty.
-# Usage: start [saver|rain|clock]  (without an argument: the choice in launcher › Settings › Screensaver › Style, random by default)
+# Launches the Nightdrive screensaver: a Quickshell window on every screen (qs -p STYLE-FOLDER; the faces are QML, which the
+# lock shows too, greeter/LockSaver.qml).
+# Usage: start [saver|rain|clock]  (without an argument: the choice in launcher › Settings › Screensaver › Style, random by
+# default; saver is the synthwave sunset, its folder synthwave/)
 # One running already: the savers themselves (as stop matches them), not a command that names one, and this session's
 # only: a container's (nightdrive sandbox) run as the same user in another PID namespace
-pgrep --ns $$ --nslist pid -f '^(python3 -I|qs -p) .*/screensaver/(nightdrive-saver|nightdrive-rain|clock)$' >/dev/null && exit 0
+pgrep --ns $$ --nslist pid -f '^qs -p .*/screensaver/(synthwave|rain|clock)$' >/dev/null && exit 0
 # Not under the lock (hypridle's timer runs on while locked): the lock covers it, and it would outlive the unlock. The lock
-# shows the clock itself after the same idle time (greeter/LockSaver.qml)
+# shows the same faces itself after the same idle time (greeter/LockSaver.qml)
 pgrep --ns $$ --nslist pid -u "$UID" -f '[q]s -p .*/greeter/lock\.qml' >/dev/null && exit 0
 dir=$(dirname "$(readlink -f "$0")")
 choice=${1:-$(awk '$1 == "style" { print $2 }' ~/.local/state/nightdrive/idle 2>/dev/null)}
@@ -13,13 +15,9 @@ case $choice in
   saver|rain|clock) name=$choice ;;
   *) name=$(shuf -n1 -e saver rain clock) ;;
 esac
-case $name in rain) size=18 ;; *) size=9 ;; esac   # rain: bigger glyphs
-# The cursor is hidden by Hyprland while the saver runs: kitty's own hiding (mouse_hide_wait) doesn't apply once the
-# program asks for mouse reports, which the savers do to exit on mouse movement
+[ "$name" = saver ] && name=synthwave
+# The cursor is hidden by Hyprland while the saver runs: Qt's blank cursor shape takes effect only once the pointer
+# moves, which ends the saver
 hyprctl eval 'hl.config({ cursor = { invisible = true } })' >/dev/null
 trap "hyprctl eval 'hl.config({ cursor = { invisible = false } })' >/dev/null" EXIT
-# clock: a Quickshell window (smooth animation), not a terminal
-if [ "$name" = clock ]; then qs -p "$dir/clock"; exit; fi   # not exec: the trap brings the cursor back
-kitty --class "nightdrive-$name" --start-as=fullscreen \
-  -o window_padding_width=0 -o background=#09021e -o font_size=$size -o confirm_os_window_close=0 \
-  python3 -I "$dir/nightdrive-$name"
+qs -p "$dir/$name"   # not exec: the trap brings the cursor back

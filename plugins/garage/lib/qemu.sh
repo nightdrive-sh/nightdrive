@@ -218,7 +218,7 @@ type_text() {
   done
   need "$name"; running "$name" || die "$name isn't running"
   [[ $(vm_state "$name") == paused* ]] && die "$name is paused: resume it first"
-  [[ $keymap == us || $keymap == fi ]] || die "Keymap: us or fi"
+  [[ $keymap == us || $keymap == "fi" ]] || die "Keymap: us or fi"
   if ((clip)); then
     local text; text=$(wl-paste -n -t text 2>/dev/null) && [[ -n $text ]] || die "Nothing to type: the clipboard has no text"
     printf '%s' "$text" | (cd "$(dir "$name")" && python3 -I "$TYPEKEYS" qmp.sock "$name" "$keymap")
