@@ -12,7 +12,7 @@ local MONITOR_SCALE = 2.0
 local KB_LAYOUT     = "fi"
 local KB_VARIANT    = "mac"
 local BUILTIN_DISPLAY = "eDP-1"   -- a laptop's own screen (a desktop has none)
-local BAR_HEIGHT    = 37      -- the top bar in logical px (Theme.barHeight in quickshell/Theme.qml): the top corners start under it
+local BAR_HEIGHT    = 36      -- the top bar in logical px (Theme.barHeight in quickshell/Theme.qml): the top corners start under it
 
 local HOME = os.getenv("HOME")
 require("region")   -- LC_TIME of Settings › Region for what starts here: region.lua

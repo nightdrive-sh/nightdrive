@@ -58,7 +58,7 @@ Item {
                               : TopBar.c("fg")
     function snap(v) { return Math.round(v * dpr) / dpr }
 
-    height: 27
+    height: Theme.pillHeight
     width: present ? Math.max(icon && !label ? 34 : 0, pad + (icon ? isz.size : 0) + (icon && label ? gap : 0) + (label ? txt.implicitWidth : 0) + pad) : 0
 
     Rectangle {

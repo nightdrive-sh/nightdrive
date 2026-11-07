@@ -95,7 +95,7 @@ Variants {
                     id: logoBox
                     readonly property bool wanted: TopBar.hidden.indexOf("logo") < 0
                     visible: wanted && win.squeeze < 1
-                    width: logo.width + 20; height: 27; radius: 8
+                    width: logo.width + 20; height: Theme.pillHeight; radius: 8
                     // Bright like the bar's text (a grey N looked disabled), highlighted while the launcher is open on this screen
                     readonly property bool open: bar.launcherOpen && win.focused
                     color: open ? TopBar.c("wsBg") : "transparent"
@@ -152,7 +152,7 @@ Variants {
                         // One with windows in the bar's text colour, an empty one in its faintest: "dim" between them was
                         // too close to "off" to tell which workspaces are in use (#2066)
                         readonly property color fg: active ? TopBar.c("hlFg") : windows ? TopBar.c("fg") : TopBar.c("off")
-                        width: (device ? icon.implicitWidth : 0) + gap + (num.visible ? num.implicitWidth : 0) + 20; height: 27; radius: 8
+                        width: (device ? icon.implicitWidth : 0) + gap + (num.visible ? num.implicitWidth : 0) + 20; height: Theme.pillHeight; radius: 8
                         color: active ? TopBar.c("wsBg") : "transparent"
                         // Half while the drawer is over it, and on a screen without the focus (with more than one screen):
                         // the bright one shows where the keyboard goes
@@ -196,7 +196,7 @@ Variants {
                             if (mon === win.modelData.name) drawer.open = ws === "special:drawer"
                         }
                     }
-                    width: dot.implicitWidth + 20; height: 27; radius: 8
+                    width: dot.implicitWidth + 20; height: Theme.pillHeight; radius: 8
                     color: open ? TopBar.c("wsBg") : "transparent"
                     BarText {
                         id: dot

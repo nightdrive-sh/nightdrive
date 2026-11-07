@@ -33,7 +33,8 @@ Singleton {
     readonly property color ok:      "#9ece6a"
     readonly property color launcherBg: c.launcherBg || "#f7171822"   // the terminals' background and opacity (`nightdrive theme set background`)
     readonly property string font:   c.font || "JetBrains Mono"  // `nightdrive theme font FAMILY` (theme.json)
-    readonly property int barHeight: 37                           // the top bar (Bar.qml)
+    readonly property int barHeight: 36                           // the top bar (Bar.qml)
+    readonly property int pillHeight: barHeight - 10              // a highlight in a bar: workspaces, modules, session chips
     // The launcher's card and Ask Claude's, which takes over from it, have their top edge here, as a fraction of the
     // screen's height: one place for both, so going from one to the other doesn't jump (#1895)
     readonly property real cardTop: 0.15

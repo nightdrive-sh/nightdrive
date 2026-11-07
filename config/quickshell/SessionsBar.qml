@@ -17,7 +17,8 @@ import "SessionGroups.js" as Groups
 // crowded, the times go first, then the names (the leads keep theirs).
 PanelWindow {
     id: sb
-    readonly property int barH: 32
+    readonly property int barH: Theme.barHeight   // as tall as the top bar
+    readonly property int chipH: Theme.pillHeight   // as the top bar's workspace highlight
     readonly property int pad: 8          // from the screen's edges
     readonly property int gap: 0          // between chips: their own padding keeps them apart
     readonly property int dotW: 8         // the dot between groups, with a gap on each side
@@ -133,7 +134,7 @@ PanelWindow {
                 required property int index
                 readonly property var it: sb.byKey[modelData] || ({ kind: "dot" })
                 width: sb.widths[index] || sb.minChip
-                height: 24
+                height: sb.chipH
                 Rectangle {
                     visible: cell.it.kind === "dot"
                     anchors.centerIn: parent

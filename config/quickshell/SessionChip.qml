@@ -34,7 +34,7 @@ Rectangle {
     readonly property color iconColor: asking ? Theme.danger : lead || (session.wants && !done) ? Theme.accent
                                      : done ? Theme.ok : working ? Theme.text : Theme.dim
 
-    height: 24
+    height: 27   // SessionsBar.chipH sets it (anchors.fill)
     radius: 6
     // The focused session's chip: the top bar's active workspace colour (see-through, so it matches over any bar
     // opacity); under the mouse a step stronger, as plain hover is darker than it
