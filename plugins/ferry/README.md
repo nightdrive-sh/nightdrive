@@ -47,7 +47,7 @@ ferry enable
 | `ferry rm <n>` | Takes an item out of the box, or cancels a send that waits |
 | `ferry qr` | The page's QR code, for adding a phone |
 
-A new Ferry release reaches Nightdrive once `plugins/ferry/pin` has written its tag and sha256 to `release.conf` and that is committed. `FERRY_FROM=<a Ferry checkout's linux/>` installs one that isn't pinned (`plugins/ferry/install.sh`).
+A new Ferry release reaches Nightdrive once `plugins/ferry/pin` has written its tag and sha256 to `release.conf` and that is committed; `nightdrive release` warns when the pin is behind Ferry's latest release. `FERRY_FROM=<a Ferry checkout's linux/>` installs one that isn't pinned (`plugins/ferry/install.sh`).
 
 ## Claude
 

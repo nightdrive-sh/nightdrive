@@ -14,7 +14,8 @@ src=${DECK_SRC:-$HOME/.local/src/deck}
 bin=$HOME/.local/bin/deck
 # The source build's release: a build runs Deck's code (build.rs too) as the user, so it is a tagged release's commit,
 # never whatever main is that day. Moved with Deck's releases (git -C ~/Projects/deck rev-parse 'vX.Y.Z^{commit}');
-# `nightdrive update` rebuilds a Deck built from it when this changes (update.sh reads the line).
+# `nightdrive update` rebuilds a Deck built from it when this changes (update.sh reads the line); `nightdrive release`
+# warns when Deck has a newer release (release-pins reads both lines).
 DECK_REF=4d17cd4dbef8e8cb3405151b713aa69f473887cc   # v0.1.2 of 29.10.2026
 DECK_TAG=v0.1.2
 DECK_REPO=https://github.com/nightdrive-sh/deck
