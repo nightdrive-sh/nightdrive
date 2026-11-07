@@ -12,14 +12,16 @@ the conversation: each step Claude takes, then its answer as it is written, and 
 text dragged over with the mouse is copied with ⌘C,
 and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again, in manual mode: what the
 tools read came along, so each tool asks first until you change the mode (⇧Tab). Esc, or a click beside the
-toast, closes it without stopping Claude: a small card says it is working, then for a moment that it answered (the
-row says so too), and a click on it, or ⌘⌥Space, opens the toast again (⌘⌥Space anywhere opens it to write in).
+toast, closes it without stopping Claude: a small card says it is working (its ✕ cancels), then for a moment that it
+answered (the row says so too), and a click on it, or ⌘⌥Space, opens the toast again (⌘⌥Space anywhere opens it to write
+in). When Claude finishes with the toast closed, a notification says so, and its Open brings the conversation back. A
+request runs on its own, so it carries on through a restart of the desktop, which picks it up again.
 Claude Code works with Nightdrive's tools and nothing else (no shell, files, hooks or plugins of its own; the web only
 when Access › Web allows it, as Normal does), so the card and Access below decide as always. On the web it searches,
 reads pages and downloads files: audio, pictures, PDF and zip of at most 25 MB (200 MB a conversation), from public
 servers only, into the conversation's own folder in `~/.local/state/nightdrive/ask/`, kept for 7 days after its last
 turn. It never opens or reads them back, so a file can't tell it what to do. A short card comes into
-the conversation (Enter allows, Esc denies), a long one on its own, and after 5 minutes a request is stopped. What the tools read (a mail, a note) comes along, so look at
+the conversation (Enter allows, Esc denies), a long one on its own, and after 15 minutes a request is stopped. What the tools read (a mail, a note) comes along, so look at
 what it asks then as in any session. Without the tools on, or without Claude Code, Ask Claude says so; ⌘⌃Enter opens a
 terminal.
 

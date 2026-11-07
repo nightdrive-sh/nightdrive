@@ -3,10 +3,14 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "AskClaudeTools.js" as Tools
+import "AskClaudeEvents.js" as Events
 
 // Ask Claude's conversation (Dashboard #1895): one at a time, kept here and shown by Ask Claude's toast
-// (AskClaudeToast.qml). Each request runs hypr/scripts/ask-claude --stream, which sets up Claude Code with Nightdrive's
-// tools only and passes its events on as they come; a request after the first goes on with the same session (--resume). The view reads `entries` and `live` (AskClaudeThread.qml).
+// (AskClaudeToast.qml). Each request runs hypr/scripts/ask-claude --start, which starts the turn as a systemd user unit
+// with Nightdrive's tools only (#2244) and returns; the turn's events come through the conversation's events.jsonl,
+// read here as it grows (AskClaudeEvents.js), so a turn goes on through Quickshell's restart and is picked up again
+// (ask-claude --current). A request after the first goes on with the same session (--resume). The view reads
+// `entries` and `live` (AskClaudeThread.qml).
 //   entries: [{ kind: "you", text }, { kind: "step", id, glyph, text, state: run | done | error | stop },
 //             { kind: "text", text }, { kind: "error", text }]
 Singleton {
@@ -40,26 +44,27 @@ Singleton {
     // A request: false while one runs or when there's nothing to send. A conversation idle for freshAfter starts anew
     function ask(text) {
         const q = text.trim()
-        if (q === "" || busy) return false
+        if (q === "" || busy || starter.running) return false
         if (sessionId !== "" && Date.now() - lastAt > freshAfter) reset()
         const first = sessionId === ""
         // The session's name (claude -n) is the request's start, to find it again in the Claude menu and /resume
         const line = q.split("\n")[0]
         const name = line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, "") + "…" : line
-        add({ kind: "you", text: q })
-        proc.command = [script, "--stream"].concat(first ? ["--name", name] : ["--resume", sessionId], ["--", q])
+        pending = q
+        starter.command = [script, "--start"].concat(first ? ["--name", name] : ["--resume", sessionId], ["--", q])
         busy = true
-        proc.running = true
+        starter.running = true
         return true
     }
+    // ⌃C, the small card's Cancel: the unit stops, and its end comes through the events (or now, when it never started)
     function stop() {
         if (!busy) return
-        proc.running = false
-        add({ kind: "error", text: "Stopped" })
+        Quickshell.execDetached([script, "--cancel"])
     }
     function reset() {
-        if (busy) proc.running = false
-        entries = []; live = ""; sessionId = ""; unseen = false
+        if (busy) stop()
+        tail.running = false
+        entries = []; live = ""; sessionId = ""; unseen = false; busy = false
     }
 
     function add(e) { entries = entries.concat([e]) }
@@ -67,41 +72,61 @@ Singleton {
         entries = entries.map(e => pred(e) ? Object.assign({}, e, change(e)) : e)
     }
     function flush() { if (live !== "") { add({ kind: "text", text: live.trim() }); live = "" } }
-
-    // One line of claude's stream-json, or the script's own nightdrive_error
-    function read(line) {
-        let ev
-        try { ev = JSON.parse(line) } catch (e) { return }
-        if (ev.type === "system" && ev.subtype === "init" && ev.session_id) sessionId = ev.session_id
-        else if (ev.type === "stream_event") {
-            const e = ev.event || {}
-            const b = e.content_block || {}
-            if (e.type === "content_block_start" && b.type === "tool_use")
-                add(Object.assign({ kind: "step", id: b.id, name: b.name, state: "run" }, Tools.step(b.name, null)))
-            else if (e.type === "content_block_delta" && e.delta && e.delta.type === "text_delta") live += e.delta.text
-            else if (e.type === "content_block_stop") flush()
-        } else if (ev.type === "assistant") {
-            // The whole message once it's done: a step's arguments are known now, to say what it is done on
-            for (const c of (ev.message && ev.message.content) || [])
-                if (c.type === "tool_use") update(e => e.kind === "step" && e.id === c.id, e => Tools.step(e.name, c.input))
-        } else if (ev.type === "user") {
-            for (const c of (ev.message && ev.message.content) || [])
-                if (c.type === "tool_result") update(e => e.kind === "step" && e.id === c.tool_use_id, e => ({ state: c.is_error ? "error" : "done" }))
-        } else if (ev.type === "result" && ev.is_error) add({ kind: "error", text: ev.result || "Claude couldn't answer" })
-        else if (ev.type === "nightdrive_error")
-            add({ kind: "error", text: ev.message === "notools" ? "Claude Code or Nightdrive's tools aren't set up here: Cmd+Enter opens a terminal"
-                                                                : ev.message })
+    // A turn's end (AskClaudeEvents.js): an earlier one read again after a restart isn't news
+    function ended(at) {
+        lastAt = at
+        if (at >= watchedFrom) answered()
     }
 
+    // Reads the conversation's events from its first line: what a restart lost comes back, and the file's later turns
+    // as they're written. -F waits for a file not there yet
+    property double watchedFrom: 0
+    function watch(id) {
+        if (sessionId === id && tail.running) return
+        tail.running = false
+        entries = []; live = ""
+        sessionId = id
+        watchedFrom = Date.now() - 2000   // a turn that ends as this starts still counts as news
+        tail.command = ["tail", "-n", "+1", "-F", stateDir + "/" + id + "/events.jsonl"]
+        tail.running = true
+    }
+
+    readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/nightdrive/ask"
+    property string pending: ""          // the request being started, shown with the error when it can't start
+
+    // --start: {"id"} once the turn runs, or {"error"}
     Process {
-        id: proc
-        stdout: SplitParser { onRead: line => s.read(line) }
-        onExited: {
-            s.flush()
-            s.update(e => e.kind === "step" && e.state === "run", e => ({ state: "stop" }))
-            s.busy = false
-            s.lastAt = Date.now()
-            s.answered()
+        id: starter
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let r = {}
+                try { r = JSON.parse(text) } catch (e) {}
+                if (r.id) { s.watch(r.id); return }
+                s.busy = false
+                s.add({ kind: "you", text: s.pending })
+                s.add({ kind: "error", text: r.error === "notools" ? Events.NOTOOLS
+                                           : r.error === "busy" ? "Claude is still working on another request"
+                                           : r.error || "Claude couldn't start" })
+                s.answered()
+            }
+        }
+    }
+    Process {
+        id: tail
+        stdout: SplitParser { onRead: line => Events.read(s, line) }
+    }
+    // After Quickshell's restart: the conversation that runs, or a recent one, comes back as it was
+    Process {
+        id: current
+        command: [s.script, "--current"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let r = {}
+                try { r = JSON.parse(text) } catch (e) {}
+                if (!r.id || s.sessionId !== "") return
+                if (r.running || Date.now() - r.last < s.freshAfter) { s.watch(r.id); s.lastAt = r.last }
+            }
         }
     }
 }
