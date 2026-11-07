@@ -109,8 +109,8 @@ AppPanel {
         if (m >= 0) duration = m
     }
     function entered(field) { if (field.input.activeFocus) field.input.selectAll() }
-    function toggleAllDay() {
-        allDay.on = !allDay.on
+    // All day has just turned (AppCheck)
+    function allDayToggled() {
         // A timed event's reminder means nothing to an all-day one, and back: none, unless it was the event's own
         reminder.picked = reminderWas !== "none" && reminder.options.some(o => o.id === reminderWas) ? reminderWas : "none"
         // All day keeps the days; back to times, an hour from the start's time
@@ -212,36 +212,12 @@ AppPanel {
     Connections { target: endDay.input; function onActiveFocusChanged() { root.entered(endDay) } function onEditingFinished() { root.endMoved() } }
     Connections { target: endTime.input; function onActiveFocusChanged() { root.entered(endTime) } function onEditingFinished() { root.endMoved() } }
     // All day: a box to tick, Space with the keys on it
-    Item {
+    AppCheck {
         id: allDay
-        property bool on: false
-        activeFocusOnTab: true
-        width: dayRow.implicitWidth; height: 22
-        Keys.onPressed: e => {
-            if (e.key === Qt.Key_Space) root.toggleAllDay()
-            else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) root.save()
-            else return
-            e.accepted = true
-        }
-        TapHandler { onTapped: { root.toggleAllDay(); allDay.forceActiveFocus() } }
-        HoverHandler { cursorShape: Qt.PointingHandCursor }
-        Row {
-            id: dayRow
-            spacing: 8
-            anchors.verticalCenter: parent.verticalCenter
-            Rectangle {
-                width: 16; height: 16; radius: 4
-                color: allDay.on ? root.c.sel : "transparent"
-                border.color: allDay.activeFocus ? root.c.primary : root.c.line
-                Text {
-                    anchors.centerIn: parent
-                    visible: allDay.on
-                    text: Icons.g("check"); font.family: Icons.family; font.pixelSize: 11
-                    color: root.c.title
-                }
-            }
-            Text { text: "All day"; color: root.c.text; font.family: root.c.font; font.pixelSize: 13 }
-        }
+        c: root.c
+        label: "All day"
+        onToggled: root.allDayToggled()
+        onAccepted: root.save()
     }
     // Its reminder, a notification that long before (lib/remind.py); the options follow All day
     AppChips {
@@ -253,11 +229,13 @@ AppPanel {
         onAccepted: root.save()
         onEscaped: root.close()
     }
-    CalendarPicker {
+    // The calendar it goes in: the writable ones as chips with their colour, all seen at once
+    AppChips {
         id: picker
         c: root.c
         width: parent.width
-        calendars: root.writable
+        label: "Calendar"
+        options: root.writable
         onAccepted: root.save()
         onEscaped: root.close()
     }
@@ -269,10 +247,11 @@ AppPanel {
         onAccepted: root.save()
         onEscaped: root.close()
     }
-    NotesField {
+    AppTextArea {
         id: notes
         c: root.c
         width: parent.width
+        label: "Notes"
         boxHeight: root.height < 700 ? 50 : 74     // a low window: the card must fit; the notes scroll with the cursor
         onSave: root.save()
         onEscaped: root.close()
