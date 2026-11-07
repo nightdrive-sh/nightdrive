@@ -413,8 +413,8 @@ ShellRoot {
             c: win.look
             app: win
             onClosed: win.refocus()
-            onEditRequested: ev => editor.edit(ev)
-            onDeleteRequested: ev => deleter.ask(ev)
+            onEditRequested: (ev, scope) => editor.edit(ev, scope)
+            onDeleteRequested: (ev, scope) => deleter.ask(ev, scope)
         }
         EventDelete {
             id: deleter
@@ -459,7 +459,7 @@ ShellRoot {
                                            ["t", "Today"], ["m  w  d  a", "Month, week, day, agenda"], ["⏎", "Open the day's first event"], ["n", "New event"], ["/", "Search"]] },
                 { title: "Agenda, search", keys: [["↑ ↓  j k", "Previous, next event"], ["⏎", "Open it"], ["/", "To the search's words"], ["Esc", "Leave the search"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next calendar"], ["1 – 9", "A calendar of the sidebar"], ["c", "The calendar's colour"], ["⌘R", "Sync now"], ["⌘B", "Hide or show the sidebar"], ["⌘,", "Settings: reminders"]] },
-                { title: "An event", keys: [["e", "Edit it"], ["Del  ⌫", "Delete it (asks first)"], ["Esc  ⏎", "Close it"]] },
+                { title: "An event", keys: [["e", "Edit it"], ["Del  ⌫", "Delete it (asks first)"], ["← →", "A recurring one: this time, every time"], ["Esc  ⏎", "Close it"]] },
                 { title: "New or edited event", keys: [["⏎  Ctrl ⏎", "Save it"], ["Tab", "The next field"], ["← →", "Another calendar"], ["Space", "All day, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }
             ]
         }

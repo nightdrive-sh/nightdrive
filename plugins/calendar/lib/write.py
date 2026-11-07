@@ -2,9 +2,12 @@
 """Adding and deleting events: `calendar add` and `calendar delete` (Claude's calendar_add and calendar_delete).
 
     write.py add [--json]                    the event on stdin as JSON, or as options (below)
-        --calendar ID --title T --start S [--end E] [--location L] [--notes N] [--reminder MINUTES]
-    write.py delete [--check] CALENDAR UID   --check: stdin's JSON must name the event (title, start), as Claude's
-                                             confirmation card showed it, or nothing is deleted
+        --calendar ID --title T --start S [--end E] [--location L] [--notes N] [--reminder MINUTES] [--repeat R]
+    write.py delete [--check] [--scope this|all] [--occurrence START] CALENDAR UID
+                                             --check: stdin's JSON must name the event (title, start), as Claude's
+                                             confirmation card showed it, or nothing is deleted. A recurring event
+                                             says which: --scope all, every time; this, the one time --occurrence
+                                             (or --check's start) names, as calendar_events gives its start
     write.py shared [--calendar ID] [--from ID]
                                              calendar_add's (and calendar_update's) asks_if: yes when add would put the event in a calendar
                                              others see (calendars.conf's `shared`), so the card asks every time;
@@ -13,12 +16,13 @@
 
 start and end are local times, "YYYY-MM-DDTHH:MM", or days, "YYYY-MM-DD", for an all-day event; an all-day event's
 end is its last day (not iCalendar's day after). Without end: an hour, or the one day. reminder: an alarm that many
-minutes before the start (alarms.py: 0 at the start, -540 9:00 on an all-day event's day), none without it.
+minutes before the start (alarms.py: 0 at the start, -540 9:00 on an all-day event's day), none without it. repeat:
+repeat.py's (weekly, or {"every": "week", "interval": 2, "until": "2027-06-01"}); the start is its first time.
 
 The event is a new .ics in the calendar's folder, then `calendar sync SOURCE/CALENDAR` takes it to the server (or the next
 round does, when it can't now). Only a calendar of a CalDAV account that isn't read-only takes one: the ICS ones are
-read from an address, and a read-only account's sync would take a new event away again. A recurring event isn't
-deleted (that is the phone's, for now); changing an event is change.py's.
+read from an address, and a read-only account's sync would take a new event away again. A repeat (repeat.py) makes
+it recurring; changing an event is change.py's.
 """
 
 import datetime as dt
@@ -33,6 +37,8 @@ import icalendar
 
 import alarms   # it imports this file too: each uses the other's functions only once loaded
 import calendars
+import repeat   # the same
+import series   # the same: it uses shown() and when()
 
 COMMAND = Path(__file__).resolve().parents[1] / "bin/calendar"
 PRODID = "-//Nightdrive//Calendar//EN"
@@ -138,6 +144,7 @@ def add(data):
         if (data.get(key) or "").strip():
             event.add(field, data[key].strip())
     alarms.set_reminder(event, alarms.minutes(data.get("reminder")))
+    repeat.set_rule(event, repeat.spec(data.get("repeat")))
     ics = icalendar.Calendar()
     ics.add("prodid", PRODID)
     ics.add("version", "2.0")
@@ -151,6 +158,7 @@ def add(data):
     last = end - dt.timedelta(days=1) if all_day else end
     return {"uid": uid, "calendar": cal["id"], "calendar_name": cal["name"], "title": title, "start": shown(start),
             "end": shown(last), "all_day": all_day, "when": span(start, last), "synced": synced,
+            **({"repeat": repeat.read(event)["text"]} if "rrule" in event else {}),
             **({} if synced else {"note": "Saved on this computer; the next sync takes it to the server."})}
 
 
@@ -172,9 +180,9 @@ def event_file(cal, uid):
     return None
 
 
-def one_event(cal, uid, doing):
-    """The file, its calendar and the VEVENT of a single event (not a recurring one, which `doing`, "delete" or
-    "change", isn't done to yet); exits with what to do instead"""
+def event_parts(cal, uid):
+    """The file, its calendar, the VEVENTs of uid (a recurring one's changed times too) and the event itself (else its
+    first changed time); exits with what to do instead"""
     path = event_file(cal, uid)
     if path is None:
         sys.exit(f"No event {uid} in {cal['name']}: calendar_events gives the uids.")
@@ -183,22 +191,37 @@ def one_event(cal, uid, doing):
     if not events:
         sys.exit(f"No event {uid} in {cal['name']}.")
     main = next((e for e in events if "recurrence-id" not in e), events[0])
-    if "rrule" in main or "rdate" in main or len(events) > 1:
-        sys.exit(f"That event repeats: Calendar doesn't {doing} a recurring event yet. The user can do it on "
-                 "their phone or at icloud.com.")
-    return path, ics, main
+    return path, ics, events, main
 
 
-def delete(calendar_id, uid, check):
+def delete(calendar_id, uid, check, scope=None, occurrence=None):
+    """The event, or of a recurring one (scope) every time or the one occurrence names (series.py). check: what the
+    card showed, the time's title and start, which must still be so (a recurring event's: one of its times)"""
     cal = writable(calendar_id)
-    path, _, main = one_event(cal, uid, "delete")
-    title, start = str(main.get("summary", "")), shown(main.decoded("dtstart"))
+    path, ics, events, main = event_parts(cal, uid)
+    if check is not None and not occurrence:
+        occurrence = check.get("start")
+    data = {"scope": scope, "occurrence": occurrence}
+    which = series.scope(events, data)
+    shown_event, start = main, shown(main.decoded("dtstart"))
+    if which is not None:
+        rid, found = series.locate(main if "recurrence-id" not in main else None, events, occurrence or start)
+        shown_event = found or main
+        start = shown(found.decoded("dtstart")) if found is not None else shown(series.aware(rid))
+    title = str(shown_event.get("summary", ""))
     if check is not None and (check.get("title", "").strip() != title.strip() or check.get("start") != start):
         sys.exit(f"Nothing deleted: the event is {title!r} at {start}, not what the card showed. Read it again with "
                  "calendar_events.")
-    path.unlink()
+    master = main if "recurrence-id" not in main else None
+    if which == "this" and series.drop(ics, master, events, occurrence):
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(ics.to_ical())
+        tmp.replace(path)
+    else:
+        path.unlink()
     synced = sync(cal)
-    return {"deleted": uid, "calendar": cal["id"], "title": title, "start": start, "synced": synced}
+    return {"deleted": uid, "calendar": cal["id"], "title": title, "start": start, "synced": synced,
+            **({"scope": which} if which else {})}
 
 
 def options(argv):
@@ -237,15 +260,24 @@ def main(argv):
     else:
         check = "--check" in args
         args = [a for a in args if a != "--check"]
+        opts = {}
+        for flag in ("--scope", "--occurrence"):
+            if flag in args:
+                i = args.index(flag)
+                if i + 1 >= len(args):
+                    sys.exit(f"{flag} takes a value")
+                opts[flag[2:]] = args[i + 1]
+                del args[i:i + 2]
         if len(args) != 2:
-            sys.exit("Usage: calendar delete [--check] CALENDAR UID")
-        result = delete(args[0], args[1], json.load(sys.stdin) if check else None)
+            sys.exit("Usage: calendar delete [--check] [--scope this|all] [--occurrence START] CALENDAR UID")
+        result = delete(args[0], args[1], json.load(sys.stdin) if check else None, **opts)
     if as_json:
         print(json.dumps(result, ensure_ascii=False))
     elif "deleted" in result:
         print(f"Deleted: {result['title']} ({result['start']})")
     else:
-        print(f"Added to {result['calendar_name']}: {result['title']} ({result['start']} – {result['end']})")
+        print(f"Added to {result['calendar_name']}: {result['title']} ({result['start']} – {result['end']})"
+              + (f", {result['repeat'].lower()}" if result.get("repeat") else ""))
     if not result["synced"]:
         print("Not synced yet: the next sync takes it to the server.", file=sys.stderr)
 

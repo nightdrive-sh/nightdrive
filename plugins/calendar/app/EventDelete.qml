@@ -2,33 +2,38 @@ import QtQuick
 import Quickshell.Io
 import qs.kit
 import "Dates.js" as Dates
+import "Repeat.js" as Repeat
 
 // Deleting an event, asked first: the kit's yes-or-no panel with what goes, then `calendar delete --check`, which
 // deletes it here and on the server only if the event is still the one asked about (its title and start, as the card
 // showed them): a sync in between may have changed it. The panel stays while that runs, so a server's refusal is said
-// on it; the window is told when it is gone (deleted), to reload and say so.
+// on it; the window is told when it is gone (deleted), to reload and say so. A recurring event's (#2009) scope says
+// which go: "this" time (its start, as the card showed it, names it) or "all" of them.
 AppConfirm {
     id: root
     required property var app           // the window: command
     property var event: null
+    property string scope: ""           // a recurring event's: "this" or "all"
     property bool busy: false
     property string error: ""
     signal deleted(var result)          // calendar delete's JSON: deleted (the uid), title, start, synced
     signal closed()
     visible: false
     action: busy ? "Deleting…" : "Delete"
-    question: event ? "Delete “" + event.title + "”?" : ""
+    question: !event ? "" : scope === "all" ? "Delete every “" + event.title + "”?"
+            : scope === "this" ? "Delete this time of “" + event.title + "”?" : "Delete “" + event.title + "”?"
     detail: error !== "" ? error
-          : event ? Dates.span(event, Regional) + " · " + event.calendar_name + ". It goes from the server and your other devices too."
-          : ""
+          : !event ? ""
+          : scope === "all" ? Repeat.text(event.repeat, Regional) + " · " + event.calendar_name + ". Every time goes, from the server and your other devices too."
+          : Dates.span(event, Regional) + " · " + event.calendar_name + (scope === "this" ? ". The other times stay." : ". It goes from the server and your other devices too.")
 
-    function ask(e) { event = e; error = ""; visible = true }
+    function ask(e, which) { event = e; scope = which || ""; error = ""; visible = true }
     function close() { if (!busy) { visible = false; closed() } }
     onAnswered: ok => {
         if (busy) return
         if (!ok) { close(); return }
         busy = true
-        deleter.command = [app.command, "delete", "--json", "--check", event.calendar, event.uid]
+        deleter.command = [app.command, "delete", "--json", "--check"].concat(scope ? ["--scope", scope] : [], [event.calendar, event.uid])
         deleter.input = JSON.stringify({ title: event.title, start: event.start })
         deleter.running = true
     }

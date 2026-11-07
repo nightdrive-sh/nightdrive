@@ -1,4 +1,5 @@
 .pragma library
+.import "Repeat.js" as Repeat
 // The event editor's fields, and what `calendar add` takes from them. Kept apart from the panel so the rules (what an
 // event needs) are in one place and the QML only shows them. Days are "YYYY-MM-DD" and times "HH:MM" as text, as
 // Dates.js has them: compared as text, no time zone in between. How a day or a time is typed and shown is the
@@ -44,6 +45,8 @@ function problem(f, day, time) {
     if (f.endDay < f.startDay) return "It ends before it starts."
     if (!f.allDay && between(f.startDay, f.startTime, f.endDay, f.endTime) <= 0) return "It ends before it starts."
     if (!f.calendar) return "Pick a calendar for it."
+    if (f.untilBad) return "The day it repeats until is written " + day + "."
+    if (f.until && f.repeat !== "none" && f.until < f.startDay) return "It repeats until a day before it starts."
     return ""
 }
 
@@ -55,21 +58,38 @@ function payload(f) {
     if (f.location.trim()) out.location = f.location.trim()
     if (f.notes.trim()) out.notes = f.notes.trim()
     if (f.reminder !== "none") out.reminder = reminderValue(f.reminder)
+    if (f.repeat && f.repeat !== "none" && f.repeat !== "own") out.repeat = Repeat.value(f.repeat, f.until)
     return out
 }
 
 // What `calendar edit` reads on stdin (lib/change.py): every field, so an emptied location or notes is cleared there
 // (payload leaves them out), and move_to only when the calendar was changed from the one the event was in. The
-// reminder only when it was changed (reminderWas, a chip's id): it replaces every alarm the event has (the phone may
-// have set two), so an edit of the title alone leaves them be
-function edits(f, was, reminderWas) {
+// reminder only when it was changed (was.reminder, a chip's id): it replaces every alarm the event has (the phone may
+// have set two), so an edit of the title alone leaves them be. The repeat, the same: only when it or its last day
+// changed. was: the event's calendar, reminder, repeat (a chip's id) and until as the editor opened it, and of a
+// recurring event its scope ("this" time or "all"), occurrence (the time's start, as calendar events gave it) and the
+// event as it was opened
+function edits(f, was) {
     const out = payload(f)
     delete out.calendar
     delete out.reminder
-    if (f.reminder !== reminderWas) out.reminder = reminderValue(f.reminder)
+    delete out.repeat
+    if (f.reminder !== was.reminder) out.reminder = reminderValue(f.reminder)
     out.location = f.location.trim()
     out.notes = f.notes.trim()
-    if (f.calendar !== was) out.move_to = f.calendar
+    if (f.calendar !== was.calendar) out.move_to = f.calendar
+    if (was.scope) { out.scope = was.scope; out.occurrence = was.occurrence }
+    // Every time: only the fields changed here. The editor shows the time that was opened, which may be one changed on
+    // its own ("Standup moved"): its title saved as it is would rename them all
+    if (was.scope === "all" && was.event) {
+        const e = was.event
+        if (out.title === e.title) delete out.title
+        if (out.location === (e.location || "")) delete out.location
+        if (out.notes === (e.notes || "")) delete out.notes
+        if (out.start === e.start && out.end === e.end) { delete out.start; delete out.end }
+    }
+    if (was.scope !== "this" && f.repeat !== "own" && (f.repeat !== was.repeat || (f.repeat !== "none" && f.until !== was.until)))
+        out.repeat = Repeat.value(f.repeat, f.until)
     return out
 }
 
