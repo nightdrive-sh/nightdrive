@@ -20,7 +20,13 @@ for r in "$@"; do
   [[ -n $fpr ]] || { echo "Usage: $0 free|nonfree..." >&2; exit 2; }
   rpm -q "rpmfusion-$r-release" >/dev/null 2>&1 && continue
   pkg=$tmp/rpmfusion-$r-release.rpm
-  curl -fsSL -o "$pkg" "https://mirrors.rpmfusion.org/$r/fedora/rpmfusion-$r-release-$fedora.noarch.rpm"
+  # https only, redirects too: mirrors.rpmfusion.org sends each request to a random mirror, and one that is http only
+  # fails it, so a few tries get another (the key and signature checks below are what make the RPM safe).
+  for try in 1 2 3; do
+    curl --proto '=https' --tlsv1.2 -fsSL -o "$pkg" \
+      "https://mirrors.rpmfusion.org/$r/fedora/rpmfusion-$r-release-$fedora.noarch.rpm" && break
+    (( try < 3 )) || { echo "RPM Fusion $r: its release RPM couldn't be downloaded over https." >&2; exit 1; }
+  done
   # The key the RPM would install for this Fedora (a link to the year's key), unpacked without installing anything
   mkdir "$tmp/$r"; rpm2archive - < "$pkg" | tar -xzf - -C "$tmp/$r"
   key=$tmp/$r/etc/pki/rpm-gpg/RPM-GPG-KEY-rpmfusion-$r-fedora-$fedora

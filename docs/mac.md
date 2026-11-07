@@ -8,7 +8,7 @@ next to macOS. It's used every day on a MacBook Pro 14″ with an M2 Max; other 
    and leaves macOS as it was.
 
 ```sh
-curl https://fedora-asahi-remix.org/install | sh
+curl --proto '=https' --tlsv1.2 https://fedora-asahi-remix.org/install | sh
 ```
 
 2. Boot into Fedora, finish its first-boot setup (your user) and log in on the text console.

@@ -276,7 +276,7 @@ On a fresh Fedora 44 (above), logged in as your user on its text console, with a
 
 ```sh
 nmcli device wifi connect "Network name" --ask   # on Wi-Fi; a cable needs nothing
-curl -fsSL https://nightdrive.sh/install | bash
+curl --proto '=https' --tlsv1.2 -fsSL https://nightdrive.sh/install | bash
 ```
 
 That runs [`bootstrap.sh`](bootstrap.sh): it installs git, clones Nightdrive into `~/dotfiles`, checks out the release

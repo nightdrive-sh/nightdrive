@@ -19,11 +19,11 @@ esac
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 export GNUPGHOME=$tmp/gnupg; mkdir -m 700 "$GNUPGHOME"   # a keyring of its own: the user's stays as it is
 
-version=$(curl -fsSL "$BASE/latest")
+version=$(curl --proto '=https' --tlsv1.2 -fsSL "$BASE/latest")
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Claude Code: no version from $BASE/latest" >&2; exit 1; }
-curl -fsSL -o "$tmp/key.asc" "$KEY_URL"
-curl -fsSL -o "$tmp/manifest.json" "$BASE/$version/manifest.json"
-curl -fsSL -o "$tmp/manifest.json.sig" "$BASE/$version/manifest.json.sig"
+curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/key.asc" "$KEY_URL"
+curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/manifest.json" "$BASE/$version/manifest.json"
+curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/manifest.json.sig" "$BASE/$version/manifest.json.sig"
 gpg -q --import "$tmp/key.asc" 2>/dev/null
 # VALIDSIG's last field is the signing key's primary fingerprint: any other key, even one in the same file, fails here
 status=$(gpg --status-fd 1 --verify "$tmp/manifest.json.sig" "$tmp/manifest.json" 2>/dev/null || true)
@@ -38,7 +38,7 @@ if m.get("version") == sys.argv[2]: print(m.get("platforms", {}).get(sys.argv[3]
   "$tmp/manifest.json" "$version" "$platform")
 [[ $sum =~ ^[0-9a-f]{64}$ ]] || { echo "Claude Code $version: no $platform build in its manifest" >&2; exit 1; }
 
-curl -fsSL -o "$tmp/claude" "$BASE/$version/$platform/claude"
+curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/claude" "$BASE/$version/$platform/claude"
 echo "$sum  $tmp/claude" | sha256sum -c --quiet - || { echo "Claude Code $version: the download doesn't match its manifest" >&2; exit 1; }
 chmod +x "$tmp/claude"
 "$tmp/claude" install

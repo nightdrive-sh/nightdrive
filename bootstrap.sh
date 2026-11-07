@@ -1,8 +1,8 @@
 #!/bin/bash
 # Installs Nightdrive in one line: the website serves this file at nightdrive.sh/install (its build copies it from main,
 # with PINNED filled in).
-#   curl -fsSL https://nightdrive.sh/install | bash
-#   curl -fsSL https://nightdrive.sh/install | bash -s -- --dev --with deck   # the options go on to install.sh
+#   curl --proto '=https' --tlsv1.2 -fsSL https://nightdrive.sh/install | bash
+#   curl --proto '=https' --tlsv1.2 -fsSL https://nightdrive.sh/install | bash -s -- --dev --with deck   # the options go on to install.sh
 # Clones the repo into ~/dotfiles (installing git first: a fresh Fedora lacks it) and runs ./install.sh there, which asks
 # on the terminal as it does when started by hand. --dev clones the dev branch, the dev channel (`nightdrive channel`).
 # A ~/dotfiles that is already a Nightdrive clone is used (a second run after a failed install), switched to the asked
