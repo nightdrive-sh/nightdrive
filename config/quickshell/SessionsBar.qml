@@ -20,7 +20,7 @@ PanelWindow {
     readonly property int barH: Theme.barHeight   // as tall as the top bar
     readonly property int chipH: Theme.pillHeight   // as the top bar's workspace highlight
     readonly property int pad: 8          // from the screen's edges
-    readonly property int gap: 0          // between chips: their own padding keeps them apart
+    readonly property int gap: 2          // between chips: a hair apart, so neighbouring boxes never touch
     readonly property int dotW: 8         // the dot between groups, with a gap on each side
     readonly property int dotPad: 10      // more room on the dot's left: a chip with no box ends close to it otherwise
     readonly property int dotPadR: 11     // and on its right, so it sits midway (the next icon has its padding too)
