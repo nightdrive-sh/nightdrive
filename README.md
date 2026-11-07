@@ -131,7 +131,9 @@ Click an icon and a small menu opens under it:
   elsewhere, and a click goes to its window. A right click changes what the icon shows (5-hour or weekly usage, or the
   number of sessions). Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
   (windows make room): one asking you something stands out in the theme colour, one whose last reply ends on a ✅ line
-  gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window.
+  gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
+  session that opened others with `nightdrive ask` (a project manager, say) comes first with a bot and a border, the
+  ones it opened joined to it by a line; a dot sets the groups and the other sessions apart.
 
 ⌘⇧Space walks through the menus with the arrow keys, and ⌘+drag moves an icon. On a narrow screen the icons that don't
 fit go into a **…** menu, the ones farthest from the clock first. If that's still not enough, the logo and then the empty
@@ -481,7 +483,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |
 | `nightdrive software search gimp` | Fedora's packages and Flathub's apps, as System › Install › Software finds them; `info dnf ID` (or `flatpak`, `plugin`), `installed` and `plugins` tell more (`--json`). `install dnf ID` or `install flatpak ID` installs one, `remove` removes it, `preview install …` shows first what would change; dnf asks for the password in the system's own dialog |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the Launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
-| `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌃Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS` |
+| `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌃Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS`. Run from a Claude Code session, the new one is grouped beside it in the sessions bar |
 | `nightdrive mcp access open` | Claude's access, the window of Launcher › Settings › Claude › *Access*: each area's Read, Modify and Delete, `Allow`, `Ask` or `No`. `level strict` (`normal`, `open`) sets them all, `set mail read allow` one, and `nightdrive mcp access` alone shows what applies. `nightdrive mcp install` gives Claude Code the tools, `remove` takes them away |
 | `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck, Ferry… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 

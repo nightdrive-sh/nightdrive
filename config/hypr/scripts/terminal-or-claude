@@ -31,10 +31,19 @@ done
 # the terminal would quietly fall back to ~ in a folder that doesn't exist
 [[ -d $dir ]] || { echo "No such folder: $dir" >&2; exit 1; }
 dir=$(cd "$dir" && pwd)   # relative to where it was called, before the terminal starts elsewhere
+# Called from a Claude Code session (its shell has CLAUDE_PID): the new session records it as its opener, with that
+# session's name for when the opener is restarted (a new PID). claude-sessions reads them from the new claude's
+# environment, and the sessions bar groups a session's openings beside it (SessionGroups.js).
+opener=()
+if [[ ${CLAUDE_PID:-} =~ ^[0-9]+$ ]]; then
+  opener=(env "NIGHTDRIVE_OPENER_PID=$CLAUDE_PID")
+  oname=$(jq -r '.name // empty' "$HOME/.claude/sessions/$CLAUDE_PID.json" 2>/dev/null)
+  [[ -n $oname ]] && opener+=("NIGHTDRIVE_OPENER_NAME=$oname")
+fi
 # clear inherited CLAUDE* variables so the new Claude doesn't think it's a child session
 for v in $(compgen -e | grep '^CLAUDE'); do unset "$v"; done
 term="$HOME/.config/hypr/scripts/terminal"   # the terminal chosen in Default apps
-claude=("$HOME/.local/bin/claude")
+claude=("${opener[@]}" "$HOME/.local/bin/claude")   # env execs into claude: its process keeps the name
 [[ -n $name ]] && claude+=(-n "$name")
 [[ -n $effort ]] && claude+=(--effort "$effort")
 (( $# )) && claude+=(-- "$*")

@@ -1,8 +1,10 @@
 import QtQuick
 import Quickshell
+import "SessionGroups.js" as Groups
 
 // The card above a chip of the sessions bar (SessionsBar.qml) while the mouse is on it: the session's name, Claude's
-// topic for it (the window title's), its folder, its state and the last line of its last reply. After a short wait, so
+// topic for it (the window title's), its folder, its state, who opened it or how many it opened (SessionGroups.js) and
+// the last line of its last reply. After a short wait, so
 // passing over the bar doesn't flash cards.
 PopupWindow {
     id: tip
@@ -24,6 +26,17 @@ PopupWindow {
     function home(p) {
         const h = Quickshell.env("HOME")
         return p && p.indexOf(h) === 0 ? "~" + p.slice(h.length) : (p || "")
+    }
+    // "Opened by …" or "Opened 3 sessions", or nothing
+    function family(x) {
+        if (!x.address) return ""
+        const all = Claude.sessions
+        const o = Groups.openerOf(x, all)
+        // by address: the card's copy may be from an earlier look than all's
+        const n = all.filter(k => { const ko = Groups.openerOf(k, all); return ko && ko.address === x.address }).length
+        const by = o ? "Opened by " + (o.name || o.topic || o.project) : ""
+        const of = n ? "Opened " + n + (n === 1 ? " session" : " sessions") : ""
+        return [by, of].filter(t => t).join(" · ")
     }
     function stateText(x) {
         if (x.asking) return "Asks you" + (x.waitingFor ? ": " + x.waitingFor : "")
@@ -82,6 +95,15 @@ PopupWindow {
             Text {
                 text: tip.stateText(tip.s)
                 color: tip.s.asking ? Theme.accent : tip.s.done ? Theme.ok : Theme.text
+                font { family: Theme.font; pixelSize: 12 }
+            }
+            Text {
+                readonly property string t: tip.family(tip.s)
+                visible: t !== ""
+                width: Math.min(implicitWidth, tip.maxW - 24)
+                text: t
+                elide: Text.ElideRight
+                color: Theme.dim
                 font { family: Theme.font; pixelSize: 12 }
             }
             Text {

@@ -15,7 +15,7 @@ import Quickshell.Io
 Singleton {
     id: c
 
-    property var found: []             // claude-sessions: [{ address, pid, dir, started }]
+    property var found: []             // claude-sessions: [{ address, pid, dir, started, openerPid, openerName, … }]
     property var wants: ({})           // address → true: finished while you were elsewhere
     property var lastState: ({})       // address → "working" | "waiting", to see the change
 
@@ -52,6 +52,7 @@ Singleton {
             out.push({ address: addr(f.address), dir: f.dir, project: f.dir.replace(/\/+$/, "").split("/").pop() || "/",
                        topic: m && !/[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? m[2] : title, state: state, started: f.started,
                        name: f.name || "", status: f.status || "", waitingFor: f.waitingFor || "", last: last,
+                       pid: f.pid || 0, openerPid: f.openerPid || 0, openerName: f.openerName || "",
                        asking: f.status === "waiting" && state !== "working",
                        done: state === "waiting" && f.status !== "waiting" && f.status !== "busy" && /^✅/.test(last) })
         }

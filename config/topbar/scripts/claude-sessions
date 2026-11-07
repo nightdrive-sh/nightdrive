@@ -5,6 +5,8 @@
 # From Claude Code's own record of the session (~/.claude/sessions/PID.json, missing in an old version: then empty):
 # name (the session's name, /rename), status (busy, idle, waiting: it asks you something) and waitingFor (what), and
 # last, the last line of its last reply (its transcript), for the sessions bar's hover (SessionsBar.qml).
+# openerPid and openerName: the session that opened it with `nightdrive ask` (terminal-or-claude puts them in its
+# environment), 0 and "" for one you opened; the bar groups a session's openings beside it (SessionGroups.js).
 # A session in tmux or over ssh has no window of its own and isn't listed.
 set -uo pipefail
 readonly TAIL=300    # transcript lines read from the end for the last reply: a long tool run has no text in between
@@ -38,8 +40,13 @@ for pid in $(pgrep -x claude); do
       break
     done
   fi
-  jq -nc --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" --argjson i "$info" \
+  # Its environment is readable as it's ours; NUL-separated
+  opener=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -E '^NIGHTDRIVE_OPENER_(PID|NAME)=')
+  opid=$(sed -n 's/^NIGHTDRIVE_OPENER_PID=//p' <<<"$opener"); [[ $opid =~ ^[0-9]+$ ]] || opid=0
+  oname=$(sed -n 's/^NIGHTDRIVE_OPENER_NAME=//p' <<<"$opener")
+  jq -nc --argjson op "$opid" --arg on "$oname" --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" --argjson i "$info" \
      --argjson l "$last" --argjson n "$LAST" \
      '{address: $a, pid: $pid, dir: $d, started: $s} + ($i | del(.sid))
+      + {openerPid: $op, openerName: $on}
       + {last: ($l | gsub("^\\s+|\\s+$"; "") | split("\n") | map(select(test("\\S"))) | last // "" | .[0:$n])}'
 done | jq -sc 'unique_by(.address)'
