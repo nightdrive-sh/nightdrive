@@ -348,6 +348,9 @@ end
 -- round from the end to the start. Hyper + a letter stays the apps'; the arrows aren't a letter, so they're free.
 hl.bind("MOD3 + left",  hl.dsp.exec_cmd("qs ipc call claude prev"))
 hl.bind("MOD3 + right", hl.dsp.exec_cmd("qs ipc call claude next"))
+-- Hyper ↑ / ↓: the previous / next lead in the same order (a session that opened others, a project manager, say)
+hl.bind("MOD3 + up",    hl.dsp.exec_cmd("qs ipc call claude prevLead"))
+hl.bind("MOD3 + down",  hl.dsp.exec_cmd("qs ipc call claude nextLead"))
 
 -- ⌥Tab / ⌥⇧Tab: the active app's next / previous window (same class), on any workspace (focus goes there), in the order
 -- they opened. Not the ones hidden in special:bg (⌘W on a background app): those were put away on purpose.

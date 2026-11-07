@@ -136,7 +136,8 @@ Click an icon and a small menu opens under it:
   joined to it by a line; the groups and the other sessions go in the order of their workspaces, a dot between each.
   Each chip ends with how long its turn has run or it has waited for you; a turn past 10 minutes, likely stuck, shows
   its time in orange.
-  **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar.
+  **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar, and **Hyper ↑** /
+  **Hyper ↓** to the previous / next lead.
 
 ⌘⇧Space walks through the menus with the arrow keys, and ⌘+drag moves an icon. On a narrow screen the icons that don't
 fit go into a **…** menu, the ones farthest from the clock first. If that's still not enough, the logo and then the empty

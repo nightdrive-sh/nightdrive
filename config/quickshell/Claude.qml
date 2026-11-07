@@ -107,6 +107,9 @@ Singleton {
         // (two functions: an argument "-1" would read as an option of qs ipc call)
         function next(): void { c.step(1) }
         function prev(): void { c.step(-1) }
+        // Hyper ↑ / ↓: the previous / next lead (a session with a bot and a border: it opened others)
+        function nextLead(): void { c.stepLead(1) }
+        function prevLead(): void { c.stepLead(-1) }
     }
 
     // Focus goes n sessions on in the sessions bar's order (SessionGroups.row: groups and all), round from the end to the
@@ -118,6 +121,19 @@ Singleton {
         const i = order.findIndex(s => s.address === activeAddr)
         const k = i < 0 ? (n > 0 ? 0 : order.length - 1) : ((i + n) % order.length + order.length) % order.length
         focus(order[k])
+    }
+
+    // Focus goes to the next (n > 0) or previous lead after the focused session in the same order, round the end; from a
+    // window that isn't a session, to the first (or last) lead. No leads: nothing; the only one, focused: it stays.
+    function stepLead(n) {
+        const chips = Groups.row(sessions).filter(it => it.kind === "chip")
+        if (!chips.some(it => it.lead)) return
+        const i = chips.findIndex(it => it.session.address === activeAddr)
+        const len = chips.length
+        for (let k = 1; k <= len; k++) {
+            const j = i < 0 ? (n > 0 ? k - 1 : len - k) : ((i + n * k) % len + len) % len
+            if (chips[j].lead) { if (j !== i) focus(chips[j].session); return }
+        }
     }
 
     function focus(s) {
