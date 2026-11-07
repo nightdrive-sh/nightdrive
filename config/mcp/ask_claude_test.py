@@ -3,7 +3,8 @@
 claude, notify-send and the rest, in a home of its own: every notification's texts come after --, so an answer or a
 request that begins with --app-name= or --icon= is shown as text instead of changing the notification, the
 background session skips the user's settings files (hooks, plugins) but keeps the model they chose, and it gets
-Claude Code's WebSearch and WebFetch only when Access › Web's Read is Allow (#2241)."""
+Claude Code's WebSearch and WebFetch only when Access › Web's Read is Allow (#2241), and web_download's folder
+(#2242)."""
 
 import json
 import os
@@ -23,6 +24,8 @@ with open(os.environ["LOG"], "a") as f:
     f.write(json.dumps([os.path.basename(sys.argv[0])] + sys.argv[1:]) + "\\n")
 name = os.path.basename(sys.argv[0])
 if name == "claude":
+    with open(os.environ["LOG"] + ".mcp", "w") as f:   # the server config, gone with the run's folder after
+        f.write(open(sys.argv[sys.argv.index("--mcp-config") + 1]).read())
     print(json.dumps({"is_error": False, "result": os.environ["ANSWER"]}))
 elif name == "notify-send" and "-p" in sys.argv:
     print(7)
@@ -135,6 +138,22 @@ class AskClaude(unittest.TestCase):
             self.log.unlink(missing_ok=True)
             claude, _ = self.ask("find an engine sound", "I can't.")
             self.assertEqual(self.web(claude[0])[0], "")
+
+    def test_downloads_folder_reaches_the_server(self):
+        # #2242: web_download's folder is the conversation's, given to the server on its command line; an old
+        # conversation's folder goes
+        old = self.home / ".local/state/nightdrive/ask/old-one"
+        (old / "files").mkdir(parents=True)
+        os.utime(old, (0, 0))
+        claude, _ = self.ask("find an engine sound", "Here.")
+        session = claude[0][claude[0].index("--session-id") + 1]
+        files = self.home / f".local/state/nightdrive/ask/{session}/files"
+        server = json.loads(Path(f"{self.log}.mcp").read_text())["mcpServers"]["nightdrive"]
+        self.assertEqual(server, {"type": "stdio", "command": "/usr/bin/env",
+                                  "args": [f"NIGHTDRIVE_ASK_FILES={files}", "/x/bin/nightdrive", "mcp"]})
+        self.assertTrue(files.is_dir())
+        self.assertEqual(files.stat().st_mode & 0o777, 0o700)
+        self.assertFalse(old.exists())
 
     def test_unreadable_settings_leave_the_model_out(self):
         (self.home / ".claude/settings.json").write_text("{ not json")

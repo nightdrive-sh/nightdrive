@@ -44,13 +44,23 @@ class Web(unittest.TestCase):
         self.assertEqual(got, {"strict": ("no", "no"), "normal": ("allow", "allow"), "open": ("allow", "allow")})
 
     def test_row_without_tools_of_ours(self):
-        # No Nightdrive tool reads the web, yet the row is there with Claude Code's own; Modify waits for its tool
+        # No Nightdrive tool reads the web, yet the row is there with Claude Code's own; Modify is web_download's
         read = self.row()["rights"]["read"]
         self.assertEqual([t["name"] for t in read["tools"]], ["WebSearch", "WebFetch"])
         self.assertEqual(read["choices"], ["allow", "no"])
         self.assertEqual((read["value"], read["own"]), ("allow", False))
         self.assertFalse(any(t["asks"] or t["undo"] for t in read["tools"]))
         self.assertNotIn("modify", self.row()["rights"])
+
+    def test_modify_is_web_download(self):
+        # #2242: its Modify can ask (the card works in Ask Claude's panel), unlike Read
+        rows = access.load(self.file).summary(access.installed_tools())["areas"]
+        modify = next(r for r in rows if r["id"] == "web")["rights"]["modify"]
+        self.assertEqual([t["name"] for t in modify["tools"]], ["web_download"])
+        self.assertEqual(modify["choices"], ["allow", "ask", "no"])
+        self.assertTrue(modify["tools"][0]["undo"])
+        access.set_value("web", "modify", "ask", path=self.file)
+        self.assertEqual(access.load(self.file).value("web", "modify"), "ask")
 
     def test_ask_is_refused(self):
         with self.assertRaises(ValueError):

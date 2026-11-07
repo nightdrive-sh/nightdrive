@@ -18,6 +18,7 @@
 readonly LIMIT=300        # seconds Claude gets for one request, cards included; then it is stopped
 readonly SHOWN=1500       # characters of the answer the notification gets; the rest is in the terminal
 readonly OPEN_WAIT=1800   # seconds the answer's buttons are waited on
+readonly KEEP_DAYS=7      # days a conversation's downloads are kept after its last turn (log 4039)
 readonly SERVER=nightdrive   # the server's name here, so its tools are mcp__nightdrive__* whatever it's registered as
 scripts=$(dirname "$(readlink -f "$0")")
 access="$scripts/../../mcp/access.py"   # Settings › Claude › Access (config/mcp)
@@ -64,7 +65,15 @@ id=${resume:-$(cat /proc/sys/kernel/random/uuid)}
 run="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/ask-claude/$id-$$"   # a resumed turn's own, beside a running one's
 mkdir -p -m 700 "$run" || exit 1
 trap 'rm -rf "$run"' EXIT
-jq -n --arg s "$SERVER" --argjson v "$srv" '{ mcpServers: { ($s): $v } }' >"$run/mcp.json"
+# The conversation's own folder for web_download (#2242, config/mcp/web/download.py), kept after the run for its
+# result cards, a resumed turn's the same; the server gets it through env on its command line, which holds however
+# Claude Code passes environments on. Conversations older than KEEP_DAYS go (log 4039)
+ask_state="${XDG_STATE_HOME:-$HOME/.local/state}/nightdrive/ask"
+files="$ask_state/$id/files"
+mkdir -p -m 700 "$ask_state" "$ask_state/$id" "$files" && touch "$ask_state/$id" || exit 1
+find "$ask_state" -mindepth 1 -maxdepth 1 -type d -mtime +"$KEEP_DAYS" -exec rm -rf {} + 2>/dev/null
+jq -n --arg s "$SERVER" --argjson v "$srv" --arg f "NIGHTDRIVE_ASK_FILES=$files" \
+  '{ mcpServers: { ($s): ($v | .args = [$f, .command] + (.args // []) | .command = "/usr/bin/env") } }' >"$run/mcp.json"
 icon=lucide:bot
 for f in "$HOME"/.config/nightdrive/agent-icon.{svg,png}; do [[ -f $f ]] && { icon=$f; break; }; done
 short=${prompt%%$'\n'*}; (( ${#short} > 120 )) && short="${short:0:120}…"
