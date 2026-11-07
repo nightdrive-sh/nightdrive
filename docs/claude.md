@@ -175,11 +175,11 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   its own tools.
   The rows are home's own folders and those at its top, Space ticks one; type a deeper one (`~/Work/Invoices`) in the
   field. A refusal names the folders and this place. Notes, Mail, Calendar, Tasks and the wallpapers keep their own,
-  and Claude Code's own commands aren't limited by it. Ferry and the wallpaper keep to it even when Apps and files is
-  *No*. A new wallpaper must be a picture by its content too, not just its name. `nightdrive mcp access option
-  apps-files folders add ~/Projects`. A list that can't be read gives Claude no folder. A file is checked just before
-  it is opened or sent, so a program of yours that swaps it in that moment could get past the check; Claude's tools
-  can't.
+  and Claude Code's own commands aren't limited by it. Ferry, the wallpaper and Mail's saved attachments and PDFs keep
+  to it even when Apps and files is *No*. A new wallpaper must be a picture by its content too, not just its name.
+  `nightdrive mcp access option apps-files folders add ~/Projects`. A list that can't be read gives Claude no folder.
+  A file is checked just before it is opened or sent, so a program of yours that swaps it in that moment could get
+  past the check; Claude's tools can't.
 
   Software has three. What they leave out you install or remove yourself: the Launcher's Install and Remove are as
   they were.
@@ -238,7 +238,7 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Area | Read | Modify | Delete |
 | --- | --- | --- | --- |
 | Docs and status | the docs and keys of this version, the version, plugins, displays | undo Claude's own changes | |
-| Mail | **unread, search, threads, accounts** (without the senders, domains and tags you block) | a new draft, archive; send a draft † | **to Trash †** |
+| Mail | **unread, search, threads, accounts** (without the senders, domains and tags you block) | a new draft, archive, save attachments or a mail as PDF (in the folders it can use); send a draft † | **to Trash †** |
 | Contacts | **search, a card** (company, title, emails, numbers; addresses, birthday, web addresses, note: choices) | | |
 | Calendar | **calendars, events** | add an event (the first one to each calendar asks; to a calendar marked shared: †) | **an event †** |
 | Tasks | lists and tasks | add, done, later | **to the trash** |

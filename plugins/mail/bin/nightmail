@@ -202,6 +202,10 @@ Usage: nightmail [command]
   draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body})
   draft-show ID  a draft as it would be sent, as JSON
   discard ID     throw a draft away
+  save-attachments [--into FOLDER] -- ID [NAME …]
+                 copy a message's attachments (or those named) into FOLDER (default Downloads), as JSON
+  save-pdf [--into FOLDER] -- ID
+                 the message as a PDF there; nothing remote is loaded (lib/save.py, pdf.py)
   send ID        send a draft, through the account's SMTP server
   notify         notify of new mail (notmuch's post-new hook runs it)
   blocked-notifications  which of Mail's notifications (JSON on stdin) are of mail Access › Mail keeps from Claude
@@ -260,6 +264,10 @@ case ${1:-open} in
     running && ipc refresh
     exit $status
     ;;
+  save-attachments|save-pdf|unsave)
+    # Claude's mail_save_attachments and mail_save_pdf, and unsave their undo (lib/save.py): copies, the mail stays
+    sub=${1#save-}; [[ $1 == unsave ]] && sub=unsave
+    python3 "$APP_DIR/lib/save.py" "$sub" "${@:2}" ;;
   draft-show)
     python3 "$APP_DIR/lib/drafts.py" show "${@:2}" ;;
   draft-card)   # mail_send's card: what goes out that Claude saw hidden

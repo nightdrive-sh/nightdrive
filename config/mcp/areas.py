@@ -48,7 +48,8 @@ AREAS = {
                    "modify": "undoes its own changes"},
     "mail": {"name": "Mail", "glyph": "mail", "app": True,
              "read": "searches and reads your mail: unread, whole threads, your accounts",
-             "modify": "writes new drafts and archives; sends a draft",
+             "modify": "writes new drafts and archives; saves attachments, or a mail as PDF, in your folders; "
+                       "sends a draft",
              "delete": "moves mail to Trash",
              "options": [
                  SECRETS,
@@ -176,7 +177,8 @@ AREAS = {
                         "words": "Claude opens, finds, moves, trashes and sends files (Ferry, a new wallpaper) only in "
                                  "these folders and those inside them, wherever a link points; hidden files never. "
                                  "~/Projects isn't on Normal's: code and its keys. Notes and Mail keep their own. "
-                                 "Ferry and the wallpaper keep to it also when Apps and files is No.",
+                                 "Ferry, the wallpaper and Mail's saved attachments keep to it also when Apps and "
+                                 "files is No.",
                         "on": "Claude may use the files in it.",
                         "off": "Claude can't use its files."},
                    ]},
