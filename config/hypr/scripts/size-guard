@@ -10,7 +10,8 @@ files not yet split don't block every commit.
   size-guard --commit REV [REPO]  commit REV against its parent
   size-guard --all [REPO]         every file over 600 lines, changed or not (a report; never fails)
   size-guard --install [REPO]     opt-in: link this script as REPO's commit-msg hook
-REPO defaults to the repository the current directory is in: the same script serves Deck, Ferry and doubletake.
+REPO defaults to the repository the current directory is in: the same script serves Deck and Ferry (code Claude
+writes; upstream code such as doubletake isn't guarded).
 
 As a commit-msg hook it checks the staged files. A justified exception passes with a trailer in the commit message,
 so the reason stays in the history:  Size-guard: <why this file has to grow now>
