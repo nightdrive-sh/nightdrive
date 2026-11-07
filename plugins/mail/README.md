@@ -28,6 +28,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 - In a long thread, the read messages fold to one line each, and a quote that is all in an earlier message hides behind `•••`.
 - Remote images stay off, and so does the sender's tracking. In the browser (⇧H), Load images brings them, still without scripts.
 - With Nightdrive Contacts, a button beside the sender opens their card, or adds them.
+- A newsletter has an Unsubscribe button at the end of its header, beside the attachments: its List-Unsubscribe header's link, else the body's own unsubscribe link. A web link opens in the browser, an email one as a new message for you to send; nothing goes out without you.
 - With Nightdrive Calendar, an invitation (an `.ics` in the message: a meeting, a train ticket) shows as a card under the header: what, when, where and from whom. Add to calendar puts it in the calendar picked. When it is in one already, an updated invitation offers Update and a cancelled one Remove: nothing changes in your calendar until you press it. Replying to the organiser isn't there yet.
 
 ## Writing
@@ -189,6 +190,7 @@ SyncState *
 | `nightmail unread`, `search QUERY [LIMIT]`, `thread ID`, `accounts` | Mail as JSON, without the window: unread threads, a notmuch search, a thread's messages as text |
 | `nightmail invitation ID` | A message's calendar invitation as JSON, by Calendar (`calendar invite`); `--add CALENDAR` puts it in a calendar or updates it there, `--remove` takes a cancelled one out |
 | `nightmail draft`, `draft-show ID`, `discard ID`, `send ID` | Drafts without the window: `draft` saves one from JSON on stdin (`{to, cc, subject, body, account}`, or a reply: `{reply_to, reply_all, body}`), with the signature and quote; `send` sends one |
+| `nightmail unsubscribe MSGID…` | The messages' unsubscribe links as JSON (`links`: url, kind web or mail, from header or body); only reads |
 | `nightmail save-attachments [--into FOLDER] -- ID [NAME…]`, `save-pdf [--into FOLDER] -- ID` | Copies a message's attachments (all, or those named), or the message as a PDF, into a folder (Downloads by default), never over a file that is there; the PDF loads no remote images or anything else from the network |
 | `nightmail enable`, `disable` | Mail among the apps, its notifications and the sync, on or off (your mail and settings stay). Run `enable` again after changing `isyncrc`. |
 | `nightmail restart`, `quit`, `log` | After a change to Mail, and its QML errors |

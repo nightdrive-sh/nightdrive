@@ -196,6 +196,7 @@ Usage: nightmail [command]
   search QUERY [LIMIT]  threads a notmuch query finds, as JSON (newest first, 20 by default)
   unread [LIMIT] the unread threads in the inboxes, as JSON
   thread ID      a thread's messages as JSON text (ID: thread:… or a message id)
+  unsubscribe MSGID…  the messages' unsubscribe links as JSON (List-Unsubscribe, else the body's)
   invitation ID  a message's calendar invitation, by Calendar, as JSON; --add CALENDAR puts its event in one (or
                  updates it there), --remove takes a cancelled one out
   accounts       the accounts, as JSON
@@ -258,6 +259,7 @@ case ${1:-open} in
   accounts)
     python3 "$APP_DIR/lib/compose.py" accounts ;;
   invitation) python3 "$APP_DIR/lib/invitation.py" "${@:2}" ;;
+  unsubscribe) python3 "$APP_DIR/lib/unsubscribe.py" "${@:2}" ;;
   draft|discard|send)
     # The window shows a new draft, and a draft gone, at once
     python3 "$APP_DIR/lib/drafts.py" "$@"; status=$?

@@ -47,7 +47,21 @@ Flickable {
     readonly property int foldFrom: 3
     property var unfolded: ({})         // message ids opened by a click
     property var quotesShown: ({})      // message ids whose quote "…" shows
-    onMessagesChanged: { unfolded = ({}); quotesShown = ({}) }
+    onMessagesChanged: { unfolded = ({}); quotesShown = ({}); loadUnsubscribes() }
+    // A newsletter's unsubscribe link, by message id (lib/unsubscribe.py, #2393): read for the whole thread in one go
+    // when it opens, as notmuch's JSON hasn't the List-Unsubscribe header. A late answer for an earlier thread only
+    // adds ids this one hasn't.
+    property var unsubscribes: ({})
+    function loadUnsubscribes() {
+        unsubscribes = ({})
+        const ids = messages.filter(m => !m.draft).map(m => m.id)
+        if (!ids.length) return
+        nm.nightmail(["unsubscribe"].concat(ids), t => {
+            let r
+            try { r = JSON.parse(t) } catch (e) { return }
+            if (r.links) unsubscribes = Object.assign({}, unsubscribes, r.links)
+        })
+    }
     function folded(m, i) {
         return messages.length >= foldFrom && i < messages.length - 1 && !m.draft && m.tags.indexOf("unread") < 0 && !unfolded[m.id]
     }
@@ -331,7 +345,10 @@ Flickable {
                         // The attachments last in the header, in sight as the message opens, a little apart from
                         // the address above them
                         Item { visible: attachments.visible; width: 1; height: 8 }
-                        Attachments { id: attachments; width: parent.width; c: root.c; app: root.app; msg: modelData }
+                        Attachments {
+                            id: attachments; width: parent.width; c: root.c; app: root.app; msg: modelData
+                            unsubscribe: root.unsubscribes[modelData.id] || null; openLink: root.openLink
+                        }
                         // A calendar invitation in it, with Nightdrive Calendar: what, when, and Add to calendar
                         Item { visible: invitation.visible; width: 1; height: 8 }
                         Invitation { id: invitation; width: parent.width; c: root.c; app: root.app; msg: modelData }

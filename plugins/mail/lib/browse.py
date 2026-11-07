@@ -23,6 +23,7 @@ from datetime import datetime
 import blocked
 import compose
 import ids
+import unsubscribe
 
 LIMIT = 20            # threads when no limit is given
 LIMIT_MAX = 200
@@ -126,6 +127,10 @@ def thread(ident):
         rows.append({"id": m["id"], "date": when(m["timestamp"]), "from": h.get("From", ""), "to": h.get("To", ""),
                      "cc": h.get("Cc", ""), "subject": h.get("Subject", ""), "tags": m.get("tags", []),
                      "text": compose.plain_text(m.get("body", [])).strip(), "attachments": files(m.get("body", []), [])})
+        # A newsletter's unsubscribe link (lib/unsubscribe.py), for "unsubscribe me" to open: the user's click
+        link = unsubscribe.of(m["id"])
+        if link:
+            rows[-1]["unsubscribe"] = link["url"]
     budget = THREAD_MAX
     for row in reversed(rows):
         cap = max(0, min(TEXT_MAX, budget))
