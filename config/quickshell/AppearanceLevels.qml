@@ -45,10 +45,10 @@ Item {
         idlestyle: ["idle", "style", "idleStyle"]
     })
 
-    // The lock shows only the clock (greeter/LockSaver.qml): the other styles are windows, which the lock covers
+    // The lock shows the same screensaver itself (greeter/LockSaver.qml), as no window shows over it
     function footer(level, query) {
         if (level === "baritems") return "Enter: show / hide  ·  Ctrl+Up+Down: reorder"
-        if (level === "screensaver" || level === "saverstyle") return "While locked: the clock, after the same time"
+        if (level === "screensaver" || level === "saverstyle") return "Shows on the lock too, after the same time"
         return ""
     }
     function opened() {}

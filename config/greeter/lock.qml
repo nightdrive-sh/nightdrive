@@ -12,8 +12,8 @@ import Quickshell.Services.Pam
 // (NightdriveUnlocked: they may ask the keyring, which the password opens). Both run once per login.
 // If this process dies while locked, Hyprland keeps the session locked (the "lockdead" screen) and hypr/scripts/lock,
 // which runs it, starts it again: it quits with 0 only after the unlock.
-// After the screensaver's idle time (Settings › Screensaver) the lock shows the clock screensaver over the login view
-// (LockSaver.qml); a key or the mouse brings the prompt back.
+// After the screensaver's idle time (Settings › Screensaver) the lock shows the screensaver of the style chosen there over
+// the login view (LockSaver.qml); a key or the mouse brings the prompt back.
 // Preview without locking: `nightdrive preview login` (checks the password, Esc closes).
 ShellRoot {
     id: root
@@ -28,27 +28,44 @@ ShellRoot {
     // unlock for one that started in between (screensaver/start also won't start under the lock)
     readonly property string saverStop: Quickshell.env("HOME") + "/.config/screensaver/stop"
 
-    // The screensaver under the lock: the clock on every screen once nothing has been typed or moved for the screensaver's
-    // time (hypr/scripts/idle saver: minutes, 0 = never). hypr/scripts/lock passes NIGHTDRIVE_LOCK_SAVING=1 when a
-    // screensaver was running as the lock came (the idle lock), so the clock goes on without the prompt flashing up.
+    // The screensaver under the lock: a face on every screen once nothing has been typed or moved for the screensaver's
+    // time (hypr/scripts/idle saver: minutes, 0 = never), of the style chosen (idle style: saver, rain, clock or random,
+    // picked anew each time). hypr/scripts/lock passes NIGHTDRIVE_LOCK_SAVING=<style> when a screensaver was running as
+    // the lock came (the idle lock), so the same one goes on without the prompt flashing up.
     // Inhibitors don't keep it away: a video playing behind the lock is nothing to look at.
     property int saverMinutes: 10
     property bool saverRead: false
+    property string saverChoice: "random"
+    readonly property var saverStyles: ["saver", "rain", "clock"]
+    readonly property string savingEnv: Quickshell.env("NIGHTDRIVE_LOCK_SAVING") || ""
+    // "" until the setting is read: nothing shows rather than a style that is then replaced
+    property string saverStyle: saverStyles.includes(savingEnv) ? savingEnv : ""
+    function settingRead() {
+        // A lock that starts saving with no saver to go on from (nightdrive preview lock-saver): the chosen style
+        if (!saverStyles.includes(savingEnv)) pickStyle()
+        saverRead = true
+    }
+    function pickStyle() {
+        saverStyle = saverStyles.includes(saverChoice) ? saverChoice
+                   : saverStyles[Math.floor(Math.random() * saverStyles.length)]
+    }
     FileView {
         path: Quickshell.env("HOME") + "/.local/state/nightdrive/idle"
         printErrors: false                      // none until the times are first changed
         onLoaded: {
             const m = text().match(/^saver (\d+)$/m)
             if (m) root.saverMinutes = parseInt(m[1])
-            root.saverRead = true
+            const st = text().match(/^style (\w+)$/m)
+            if (st) root.saverChoice = st[1]
+            root.settingRead()
         }
-        onLoadFailed: root.saverRead = true     // none yet: the default
+        onLoadFailed: root.settingRead()        // none yet: the defaults
     }
-    property bool saving: Quickshell.env("NIGHTDRIVE_LOCK_SAVING") === "1"
+    property bool saving: savingEnv !== "" && savingEnv !== "0"
     // Not while the password is being checked: the prompt would vanish under its own answer
-    function sleep() { if (!busy && saverMinutes > 0) saving = true }
+    function sleep() { if (!busy && saverMinutes > 0 && !saving) { pickStyle(); saving = true } }
     function wake() { saving = false }
-    // The pointer goes while the clock shows, as over the screensaver (screensaver/start). Qt's blank cursor shape didn't
+    // The pointer goes while the saver shows, as over the screensaver (screensaver/start). Qt's blank cursor shape didn't
     // hide it on the lock surface until the pointer moved, which wakes it. Set again once the lock is up (after the
     // screensaver it ended has brought the pointer back), and at the start, for a lock restarted while it was hidden.
     function pointer(hidden) { Quickshell.execDetached(["hyprctl", "eval", `hl.config({ cursor = { invisible = ${hidden} } })`]) }
@@ -137,7 +154,7 @@ ShellRoot {
                 onTyping: root.message = ""
                 onSubmitted: password => root.submit(password)
             }
-            LockSaver { anchors.fill: parent; visible: root.saving; onWoke: root.wake() }
+            LockSaver { anchors.fill: parent; visible: root.saving; style: root.saverStyle; onWoke: root.wake() }
         }
     }
 
@@ -169,7 +186,7 @@ ShellRoot {
                 onSubmitted: password => root.submit(password)
                 onEscapePressed: root.endPreview()
             }
-            LockSaver { anchors.fill: parent; visible: root.saving; onWoke: root.wake() }
+            LockSaver { anchors.fill: parent; visible: root.saving; style: root.saverStyle; onWoke: root.wake() }
         }
     }
 }

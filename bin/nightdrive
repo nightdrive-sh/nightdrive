@@ -77,7 +77,7 @@ usage() {
   row "plugin check [NAME]"       "Check plugins against the rules (plugins/README.md): file:line findings, exit 1"
   section "Preview"
   row "preview login"            "The login screen, without locking (Esc closes)"
-  row "preview lock-saver"       "The lock's screensaver (the clock), without locking: a key brings the login screen"
+  row "preview lock-saver [STYLE]" "The lock's screensaver (saver, rain or clock; else the chosen style), without locking"
   section "For developers"
   row "platform [WHAT]"          "What this runs on: arch, name, machine, gpu, keyboard, pagesize"
   row "sandbox COMMAND"          "Nightdrive in a headless container: up, check, shot, ipc, vnc, down"
@@ -122,7 +122,8 @@ case ${1:-} in
   # The login screen (config/greeter/lock.qml) without locking: it checks the password, then just closes
   preview) case ${2:-} in
              login) NIGHTDRIVE_LOCK_PREVIEW=1 exec qs -p "$repo/config/greeter/lock.qml" >/dev/null 2>&1 ;;
-             lock-saver) NIGHTDRIVE_LOCK_PREVIEW=1 NIGHTDRIVE_LOCK_SAVING=1 exec qs -p "$repo/config/greeter/lock.qml" >/dev/null 2>&1 ;;
+             # A style name goes on as that one (as from a running saver); 1 is the chosen style
+             lock-saver) NIGHTDRIVE_LOCK_PREVIEW=1 NIGHTDRIVE_LOCK_SAVING=${3:-1} exec qs -p "$repo/config/greeter/lock.qml" >/dev/null 2>&1 ;;
              *) usage >&2; exit 1 ;;
            esac ;;
   agent-warn) exec "$scripts/agent-warn" "${@:2}" ;;                  # AGENTS.md

@@ -1,6 +1,6 @@
 // The clock screensaver's face: a big theme-coloured HH:MM:SS. On a change the old digit slides up and out while the new
 // one comes up from below in step with it, with a small spring at the end. Transparent: the caller draws the black.
-// Used by the screensaver (shell.qml here, one per screen) and by the lock (greeter/LockSaver.qml loads this file).
+// Used by the screensaver (../SaverShell.qml, one per screen) and by the lock (greeter/LockSaver.qml loads this file).
 // It redraws only while a digit slides, ~0.6 s a second.
 import QtQuick
 import Quickshell
