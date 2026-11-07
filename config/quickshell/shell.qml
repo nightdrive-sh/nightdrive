@@ -203,6 +203,8 @@ ShellRoot {
         onMenuClicked: (name, x, screen) => root.clickMenu(name, x, screen)
         onMoveStarted: root.current = ""
     }
+    // Every Claude session in a row at the bottom of the main screen, while it's on (Claude menu › Sessions bar)
+    SessionsBar {}
     // The "…" menu lists the modules that didn't fit on its screen's bar
     Binding { target: TopBar; property: "overflow"; value: bar.tuckedOf(root.menuScreen) }
 

@@ -1,9 +1,14 @@
 #!/bin/bash
 # The Claude Code sessions running in a terminal window on this desktop, for the Claude menu (Claude.qml):
-# [{address, pid, dir, started}], address = the window (hyprctl clients), started = epoch seconds.
-# The window's title tells the rest live (Claude Code sets it: ✳ when it waits for you, a spinner while it works).
+# [{address, pid, dir, started, name, status, waitingFor, last}], address = the window (hyprctl clients), started = epoch
+# seconds. The window's title tells the rest live (Claude Code sets it: ✳ when it waits for you, a spinner while it works).
+# From Claude Code's own record of the session (~/.claude/sessions/PID.json, missing in an old version: then empty):
+# name (the session's name, /rename), status (busy, idle, waiting: it asks you something) and waitingFor (what), and
+# last, the last line of its last reply (its transcript), for the sessions bar's hover (SessionsBar.qml).
 # A session in tmux or over ssh has no window of its own and isn't listed.
 set -uo pipefail
+readonly TAIL=300    # transcript lines read from the end for the last reply: a long tool run has no text in between
+readonly LAST=300    # characters of the last line kept
 clients=$(hyprctl -j clients 2>/dev/null) || { echo '[]'; exit 0; }
 now=$(date +%s)
 for pid in $(pgrep -x claude); do
@@ -17,5 +22,24 @@ for pid in $(pgrep -x claude); do
   [[ -n $addr ]] || continue
   dir=$(readlink "/proc/$pid/cwd" 2>/dev/null) || continue
   age=$(ps -o etimes= -p "$pid" | tr -d ' ')
-  jq -nc --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" '{address: $a, pid: $pid, dir: $d, started: $s}'
+  rec="$HOME/.claude/sessions/$pid.json"
+  [[ -r $rec ]] && info=$(jq -c '{name: (.name // ""), status: (.status // ""), waitingFor: (.waitingFor // ""), sid: (.sessionId // "")}' "$rec" 2>/dev/null) || info=
+  [[ -n $info ]] || info='{"name":"","status":"","waitingFor":"","sid":""}'
+  # The last reply's last line: the transcript is ~/.claude/projects/<the dir, mangled>/<sessionId>.jsonl, found by its
+  # id rather than by mangling the dir as Claude Code does
+  last='""' sid=$(jq -r .sid <<<"$info")
+  if [[ -n $sid ]]; then
+    for t in "$HOME"/.claude/projects/*/"$sid".jsonl; do
+      [[ -r $t ]] || continue
+      # As a JSON string, one line however many the reply has
+      last=$(tac "$t" | head -n "$TAIL" | jq -c 'select(.type == "assistant") | [.message.content[]? | select(.type == "text") | .text]
+               | join("\n") | select(test("\\S"))' 2>/dev/null | head -n 1)
+      [[ -n $last ]] || last='""'
+      break
+    done
+  fi
+  jq -nc --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" --argjson i "$info" \
+     --argjson l "$last" --argjson n "$LAST" \
+     '{address: $a, pid: $pid, dir: $d, started: $s} + ($i | del(.sid))
+      + {last: ($l | gsub("^\\s+|\\s+$"; "") | split("\n") | map(select(test("\\S"))) | last // "" | .[0:$n])}'
 done | jq -sc 'unique_by(.address)'

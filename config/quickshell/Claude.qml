@@ -9,12 +9,28 @@ import Quickshell.Io
 // which Claude Code sets: "✳ topic" when it waits for you, a spinner and the topic while it works.
 // A session that finishes (or stops to ask) while you're in another window wants you: a dot in the bar and in the menu,
 // gone once you go to its window.
+// claude-sessions also reads Claude Code's own record of each session: its name, whether it asks you something
+// (status "waiting") and its last reply's last line; one ending "✅ …" (the sign-off of a finished task) is done. The
+// sessions bar (SessionsBar.qml) shows them all, while barOn: Claude menu › Sessions bar, kept in barFile.
 Singleton {
     id: c
 
     property var found: []             // claude-sessions: [{ address, pid, dir, started }]
     property var wants: ({})           // address → true: finished while you were elsewhere
     property var lastState: ({})       // address → "working" | "waiting", to see the change
+
+    // The sessions bar at the bottom of the main screen: off unless the file says "on" (a new user has none)
+    readonly property string barFile: Quickshell.env("HOME") + "/.local/state/nightdrive/claude-sessions-bar"
+    property bool barOn: false
+    function setBar(on) {
+        barOn = on
+        Quickshell.execDetached(["bash", "-c", 'mkdir -p "${1%/*}" && echo "$2" > "$1"', "_", barFile, on ? "on" : "off"])
+    }
+    FileView {
+        path: c.barFile; watchChanges: true; onFileChanged: reload(); printErrors: false
+        onLoaded: c.barOn = text().trim() === "on"
+        onLoadFailed: c.barOn = false
+    }
 
     // Hyprland's addresses with or without 0x
     function addr(a) { return String(a).replace(/^0x/, "") }
@@ -32,8 +48,12 @@ Singleton {
             // ✳ = waiting; any other symbol before the topic = Claude's spinner
             const m = title.match(/^(\S)\s+(.*)$/)
             const state = !m || m[1] === "✳" || /[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? "waiting" : "working"
+            const last = f.last || ""
             out.push({ address: addr(f.address), dir: f.dir, project: f.dir.replace(/\/+$/, "").split("/").pop() || "/",
-                       topic: m && !/[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? m[2] : title, state: state, started: f.started })
+                       topic: m && !/[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? m[2] : title, state: state, started: f.started,
+                       name: f.name || "", status: f.status || "", waitingFor: f.waitingFor || "", last: last,
+                       asking: f.status === "waiting" && state !== "working",
+                       done: state === "waiting" && f.status !== "waiting" && f.status !== "busy" && /^✅/.test(last) })
         }
         return out
     }
@@ -62,6 +82,7 @@ Singleton {
         target: "claude"
         function want(address: string): void {
             const a = c.addr(address)
+            scan.running = true   // its status (asking) at once, not at the next look
             if (a === c.activeAddr || c.wants[a]) return
             const w = Object.assign({}, c.wants); w[a] = true; c.wants = w
         }
