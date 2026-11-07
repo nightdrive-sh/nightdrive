@@ -57,7 +57,7 @@ function opens(a, b, all) {
     return false
 }
 
-// The bar's row: { kind: "chip", session, lead, linked } (linked: joined to the chip before it) and { kind: "dot" }.
+// The bar's row: { kind: "chip", session, lead } and { kind: "dot" }.
 // Its units, a group or a lone session, go by workspace (a group by its lead's; ws: Claude.qml), so the bar reads like
 // the workspaces; on one workspace the groups first, each by age
 function row(sessions, kept) {
@@ -68,8 +68,8 @@ function row(sessions, kept) {
     const out = []
     for (const u of units) {
         if (out.length) out.push({ kind: "dot" })
-        out.push({ kind: "chip", session: u.s, lead: !!u.g, linked: false })
-        if (u.g) for (const m of u.g.members) out.push({ kind: "chip", session: m, lead: a.leads.has(m), linked: true })
+        out.push({ kind: "chip", session: u.s, lead: !!u.g })
+        if (u.g) for (const m of u.g.members) out.push({ kind: "chip", session: m, lead: a.leads.has(m) })
     }
     return out
 }

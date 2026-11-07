@@ -1,10 +1,13 @@
 import QtQuick
 
-// One session in the sessions bar (SessionsBar.qml): a low rounded box with its state's icon and its name. Asking you
-// something: the theme colour's box; done (its last reply signs off with ✅): a green check; finished while you were in
-// another window: the bell with a dot, as in the Claude menu; working: the spinner. iconOnly on a crowded, narrow bar.
-// No border: a fill of its own. A lead (a session that opened others, SessionGroups.js) has a quiet border, its name in
-// bold and the bot for its icon, which breathes while it works; a chip it opened is linked: a line to the one before.
+// One session in the sessions bar (SessionsBar.qml): its state's icon and its name, in a low rounded box only when its
+// window has the focus or the mouse is on it (boxes on every chip made the bar busy). Asking you something: the
+// question icon in red and its name in the theme colour (no coloured box: it was too loud); done (its last reply signs
+// off with ✅): a green check; finished while you were in another window: the bell with a dot, as in the Claude menu;
+// working: the spinner; waiting for you: a prompt (›; the terminal >_ read as noise). iconOnly on a crowded, narrow
+// bar.
+// A lead (a session that opened others, SessionGroups.js) has its name in bold and the bot for its icon, which
+// breathes while it works; the chips it opened follow it.
 // After its name, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
 // past stuckAfter is in the warning colour, as it's likely stuck. The bar hides it when crowded, before the name.
 Rectangle {
@@ -15,9 +18,6 @@ Rectangle {
     property bool iconOnly: false
     property int padding: 10
     property bool lead: false
-    property bool linked: false          // a line across the gap to the chip before it (its group's)
-    property int linkWidth: 8
-    property color lineColor: Theme.border
     property string time: ""             // "" = none
     property bool showTime: true
     property bool stuck: false
@@ -29,22 +29,16 @@ Rectangle {
     readonly property bool done: !!session.done
     readonly property bool working: session.state === "working"
     readonly property string icon: asking ? "message-circle-question" : lead ? "bot" : done ? "circle-check-big"
-                                 : session.wants ? "bell-dot" : working ? "loader" : "terminal"
-    readonly property color iconColor: asking || lead || (session.wants && !done) ? Theme.accent : done ? Theme.ok
-                                     : working ? Theme.text : Theme.dim
+                                 : session.wants ? "bell-dot" : working ? "loader" : "chevron-right"
+    // Asking: the question in the top bar's critical red (as the Dashboard's tasks there), so it stands out without a box
+    readonly property color iconColor: asking ? Theme.danger : lead || (session.wants && !done) ? Theme.accent
+                                     : done ? Theme.ok : working ? Theme.text : Theme.dim
 
     height: 24
     radius: 6
-    color: asking ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, hovered ? 0.4 : 0.28)
-         : hovered ? Theme.hover : active ? Theme.sel : Theme.card
-    border { width: lead ? 1 : 0; color: chip.lineColor }
-
-    Rectangle {
-        visible: chip.linked
-        x: -chip.linkWidth; width: chip.linkWidth; height: 2
-        anchors.verticalCenter: parent.verticalCenter
-        color: chip.lineColor
-    }
+    // The focused session's chip under the mouse a step lighter than its own fill (Theme.sel is lighter than hover)
+    color: hovered && active ? Qt.tint(Theme.sel, Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08))
+         : hovered ? Theme.hover : active ? Theme.sel : "transparent"
 
     Text {
         id: ic

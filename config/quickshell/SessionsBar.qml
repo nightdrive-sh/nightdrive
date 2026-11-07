@@ -8,17 +8,20 @@ import "SessionGroups.js" as Groups
 // screen, edge to edge like the top bar, with its exclusive zone so tiled windows make room. On from Claude menu ›
 // Sessions bar (Claude.barOn), off by default; hidden while there are no sessions, and then the room goes back.
 // A chip (SessionChip.qml) per session; a click goes to its window, the mouse over one shows more (SessionTip.qml).
-// A session that opened others (nightdrive ask from it: a project manager) leads a group of them, first and joined to
-// them by a line. Groups and lone sessions follow each other, a dot between each (SessionGroups.js); a chip is as wide
-// as its name, and the chips share the bar equally only when they don't fit (layout below).
+// A session that opened others (nightdrive ask from it: a project manager) leads a group of them, first and
+// in bold (no lines between them: the bar reads quieter). Groups and lone sessions follow each other, a dot between
+// each (SessionGroups.js); a chip is as wide as its name, and the chips share the bar equally only when they don't
+// fit (layout below).
 // Each chip but a lead's ends with how long it has worked or waited (Claude.sessions' since), ticking once a second;
 // crowded, the times go first, then the names (the leads keep theirs).
 PanelWindow {
     id: sb
     readonly property int barH: 32
     readonly property int pad: 8          // from the screen's edges
-    readonly property int gap: 8          // between chips: a group's line spans it
+    readonly property int gap: 0          // between chips: their own padding keeps them apart
     readonly property int dotW: 8         // the dot between groups, with a gap on each side
+    readonly property int dotPad: 10      // more room on the dot's left: a chip with no box ends close to it otherwise
+    readonly property int dotPadR: 11     // and on its right, so it sits midway (the next icon has its padding too)
     readonly property int maxLead: 220    // a lead's name, at most
     readonly property int maxChip: 320    // another chip's name and time, at most
     readonly property int timeGap: 10     // between a name and its time
@@ -27,8 +30,8 @@ PanelWindow {
     readonly property int chipPad: 10     // a chip's side padding
     readonly property int iconW: 16
     readonly property int stuckAfter: 600 // a turn running longer is probably stuck: its time in the warning colour
-    // A group's line, a lead's border and the dot: one quiet grey from the theme
-    readonly property color line: Qt.rgba(Theme.dim.r, Theme.dim.g, Theme.dim.b, 0.28)
+    // The dot between groups: a quiet grey from the theme
+    readonly property color line: Qt.rgba(Theme.dim.r, Theme.dim.g, Theme.dim.b, 0.38)
 
     // The main screen: the one with workspace 1 (where everything comes back to, virtual-display.lua), never a virtual
     // one (a tablet over VNC); else the first real screen
@@ -99,7 +102,7 @@ PanelWindow {
             return Math.min(maxChip, Math.ceil(2 * chipPad + iconW + 6 + nfm.advanceWidth(label(it))
                                                + (t ? timeGap + tfm.advanceWidth(t) : 0)))
         }
-        const widths = items.map(it => it.kind === "dot" ? dotW : it.lead ? leadW(it) : ownW(it))
+        const widths = items.map(it => it.kind === "dot" ? dotW + dotPad + dotPadR : it.lead ? leadW(it) : ownW(it))
         const others = items.map((it, i) => i).filter(i => items[i].kind === "chip" && !items[i].lead)
         let room = width - 2 * pad - gap * (n - 1)
         items.forEach((it, i) => { if (it.kind === "dot" || it.lead) room -= widths[i] })
@@ -133,6 +136,7 @@ PanelWindow {
                 Rectangle {
                     visible: cell.it.kind === "dot"
                     anchors.centerIn: parent
+                    anchors.horizontalCenterOffset: (sb.dotPad - sb.dotPadR) / 2
                     width: 4; height: 4; radius: 2
                     color: sb.line
                 }
@@ -142,9 +146,6 @@ PanelWindow {
                     anchors.fill: parent
                     session: cell.it.session || ({})
                     lead: !!cell.it.lead
-                    linked: !!cell.it.linked
-                    linkWidth: sb.gap
-                    lineColor: sb.line
                     text: visible ? sb.label(cell.it) : ""
                     iconOnly: width < sb.textMin
                     showTime: !!sb.layout.times[cell.index]
@@ -157,7 +158,8 @@ PanelWindow {
                         if (chip.hovered) sb.hovered = chip
                         else if (sb.hovered === chip) sb.hovered = null
                     }
-                    onClicked: Claude.focus(cell.it.session)
+                    // A click closes the card too; it comes back only when the mouse enters a chip again
+                    onClicked: { sb.hovered = null; Claude.focus(cell.it.session) }
                 }
             }
         }
