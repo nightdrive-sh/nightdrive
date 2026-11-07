@@ -132,8 +132,9 @@ Click an icon and a small menu opens under it:
   number of sessions). Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
   (windows make room): one asking you something stands out in the theme colour, one whose last reply ends on a ✅ line
   gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
-  session that opened others with `nightdrive ask` (a project manager, say) comes first with a bot and a border, the
-  ones it opened joined to it by a line; a dot sets the groups and the other sessions apart.
+  session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a border, the ones it opened
+  joined to it by a line; the groups and the other sessions go in the order of their workspaces, a dot between each.
+  **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar.
 
 ⌘⇧Space walks through the menus with the arrow keys, and ⌘+drag moves an icon. On a narrow screen the icons that don't
 fit go into a **…** menu, the ones farthest from the clock first. If that's still not enough, the logo and then the empty

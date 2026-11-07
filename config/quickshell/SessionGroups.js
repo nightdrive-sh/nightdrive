@@ -1,7 +1,7 @@
 .pragma library
 // The sessions bar's order (SessionsBar.qml): a session that opened others with `nightdrive ask` (a project manager,
-// say) leads a group of them, the ones it opened right after it, joined by a line; groups first, then the sessions
-// nobody here opened, with a dot between each group or lone session. Nothing is named: a lead is a session with
+// say) leads a group of them, the ones it opened right after it, joined by a line; the groups and the sessions
+// nobody here opened in the order of their workspaces, with a dot between each group or lone session. Nothing is named: a lead is a session with
 // openings, whatever it's called.
 // claude-sessions gives each session its opener's PID and name (terminal-or-claude records them); the PID finds it while
 // it runs, the name once it has been restarted (a new PID: claude --resume, a reboot).
@@ -51,17 +51,20 @@ function opens(a, b, all) {
     return false
 }
 
-// The bar's row: { kind: "chip", session, lead, linked } (linked: joined to the chip before it) and { kind: "dot" }
+// The bar's row: { kind: "chip", session, lead, linked } (linked: joined to the chip before it) and { kind: "dot" }.
+// Its units, a group or a lone session, go by workspace (a group by its lead's; ws: Claude.qml), so the bar reads like
+// the workspaces; on one workspace the groups first, each by age
 function row(sessions) {
     const a = arrange(sessions)
+    const units = a.groups.map((g, i) => ({ s: g.lead, g: g, i: i }))
+                   .concat(a.rest.map((s, i) => ({ s: s, g: null, i: a.groups.length + i })))
+    units.sort((x, y) => (x.s.ws || 0) - (y.s.ws || 0) || x.i - y.i)
     const out = []
-    const sep = () => { if (out.length) out.push({ kind: "dot" }) }
-    for (const g of a.groups) {
-        sep()
-        out.push({ kind: "chip", session: g.lead, lead: true, linked: false })
-        for (const m of g.members) out.push({ kind: "chip", session: m, lead: a.leads.has(m), linked: true })
+    for (const u of units) {
+        if (out.length) out.push({ kind: "dot" })
+        out.push({ kind: "chip", session: u.s, lead: !!u.g, linked: false })
+        if (u.g) for (const m of u.g.members) out.push({ kind: "chip", session: m, lead: a.leads.has(m), linked: true })
     }
-    for (const s of a.rest) { sep(); out.push({ kind: "chip", session: s, lead: false, linked: false }) }
     return out
 }
 

@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "SessionGroups.js" as Groups
 
 // The Claude Code sessions on this desktop, for the Claude menu and the bar's Claude icon. Which windows run Claude comes
 // from topbar/scripts/claude-sessions (every few seconds); what each one is doing comes live from its window's title,
@@ -49,10 +50,12 @@ Singleton {
             const m = title.match(/^(\S)\s+(.*)$/)
             const state = !m || m[1] === "✳" || /[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? "waiting" : "working"
             const last = f.last || ""
+            // Its workspace, for the bar's order of groups; a special one (negative id) counts after the numbered ones
+            const ws = t.workspace ? (t.workspace.id > 0 ? t.workspace.id : 1000 - t.workspace.id) : 0
             out.push({ address: addr(f.address), dir: f.dir, project: f.dir.replace(/\/+$/, "").split("/").pop() || "/",
                        topic: m && !/[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? m[2] : title, state: state, started: f.started,
                        name: f.name || "", status: f.status || "", waitingFor: f.waitingFor || "", last: last,
-                       pid: f.pid || 0, openerPid: f.openerPid || 0, openerName: f.openerName || "",
+                       ws: ws, pid: f.pid || 0, openerPid: f.openerPid || 0, openerName: f.openerName || "",
                        asking: f.status === "waiting" && state !== "working",
                        done: state === "waiting" && f.status !== "waiting" && f.status !== "busy" && /^✅/.test(last) })
         }
@@ -87,6 +90,21 @@ Singleton {
             if (a === c.activeAddr || c.wants[a]) return
             const w = Object.assign({}, c.wants); w[a] = true; c.wants = w
         }
+        // Hyper ← / → (bindings.lua): the previous / next session in the sessions bar's order
+        // (two functions: an argument "-1" would read as an option of qs ipc call)
+        function next(): void { c.step(1) }
+        function prev(): void { c.step(-1) }
+    }
+
+    // Focus goes n sessions on in the sessions bar's order (SessionGroups.row: groups and all), round from the end to the
+    // start; from a window that isn't a session, to the first (or with n < 0 the last). The same order whether the bar
+    // is on or not, so the key works without it; the bar shows the new one as focused (SessionChip.active).
+    function step(n) {
+        const order = Groups.row(sessions).filter(it => it.kind === "chip").map(it => it.session)
+        if (!order.length) return
+        const i = order.findIndex(s => s.address === activeAddr)
+        const k = i < 0 ? (n > 0 ? 0 : order.length - 1) : ((i + n) % order.length + order.length) % order.length
+        focus(order[k])
     }
 
     function focus(s) {

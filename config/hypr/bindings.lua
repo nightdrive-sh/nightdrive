@@ -344,6 +344,11 @@ for _, dir in ipairs({ "left", "right", "up", "down" }) do
     hl.bind(mod .. " + SHIFT + " .. dir,     function() NIGHTDRIVE_SWAP(dir) end)   -- slides (hyprland.lua)
 end
 
+-- Hyper ← / →: the previous / next Claude Code session in the sessions bar's order (Claude.qml), on any workspace,
+-- round from the end to the start. Hyper + a letter stays the apps'; the arrows aren't a letter, so they're free.
+hl.bind("MOD3 + left",  hl.dsp.exec_cmd("qs ipc call claude prev"))
+hl.bind("MOD3 + right", hl.dsp.exec_cmd("qs ipc call claude next"))
+
 -- ⌥Tab / ⌥⇧Tab: the active app's next / previous window (same class), on any workspace (focus goes there), in the order
 -- they opened. Not the ones hidden in special:bg (⌘W on a background app): those were put away on purpose.
 local function cycle_app_windows(step)

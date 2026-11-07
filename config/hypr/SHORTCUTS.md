@@ -44,6 +44,7 @@
   ⌘ ⇧ J              Toggle split direction (vertical/horizontal)
   ⌘ arrows           Move focus between windows
   ⌥ Tab / ⌥ ⇧ Tab    Next / previous window of the same app (on any workspace)
+  Hyper ← / →        Previous / next Claude Code session, in the sessions bar's order (on any workspace; the bar may be off)
   ⌘ ⇧ arrows         Move window
   ⌘ + mouse drag     Move window / right button: resize
   ⌘ + drag           A top bar icon: move it (the order is kept; also Launcher › Settings › Top bar › Items)
