@@ -35,6 +35,17 @@ PanelWindow {
     }
     readonly property var sessions: Claude.sessions
     readonly property var items: Groups.row(sessions)
+    // The Repeater's model is the items' keys, not the items: a new array on every claude-sessions poll would make it
+    // build every chip anew, and the one under the mouse would lose its hover and its card (#2404). ScriptModel keeps
+    // the delegate of a key that stays; each looks its item up by key. A chip's key is its window, a dot's the chip
+    // after it.
+    readonly property var keys: items.map((it, i) => it.kind === "dot" ? "dot " + items[i + 1].session.address
+                                                                        : it.session.address)
+    readonly property var byKey: {
+        const m = {}
+        items.forEach((it, i) => m[keys[i]] = it)
+        return m
+    }
 
     screen: mainScreen
     visible: Claude.barOn && sessions.length > 0 && mainScreen !== null
@@ -80,37 +91,38 @@ PanelWindow {
         anchors.verticalCenter: parent.verticalCenter
         spacing: sb.gap
         Repeater {
-            model: sb.items
+            model: ScriptModel { values: sb.keys }
             delegate: Item {
                 id: cell
-                required property var modelData
+                required property var modelData     // its key
                 required property int index
+                readonly property var it: sb.byKey[modelData] || ({ kind: "dot" })
                 width: sb.widths[index] || sb.minChip
                 height: 24
                 Rectangle {
-                    visible: cell.modelData.kind === "dot"
+                    visible: cell.it.kind === "dot"
                     anchors.centerIn: parent
                     width: 4; height: 4; radius: 2
                     color: sb.line
                 }
                 SessionChip {
                     id: chip
-                    visible: cell.modelData.kind === "chip"
+                    visible: cell.it.kind === "chip"
                     anchors.fill: parent
-                    session: cell.modelData.session || ({})
-                    lead: !!cell.modelData.lead
-                    linked: !!cell.modelData.linked
+                    session: cell.it.session || ({})
+                    lead: !!cell.it.lead
+                    linked: !!cell.it.linked
                     linkWidth: sb.gap
                     lineColor: sb.line
-                    text: visible ? sb.label(cell.modelData) : ""
+                    text: visible ? sb.label(cell.it) : ""
                     iconOnly: width < sb.textMin
                     padding: sb.chipPad
-                    active: !!cell.modelData.session && cell.modelData.session.address === Claude.activeAddr
+                    active: !!cell.it.session && cell.it.session.address === Claude.activeAddr
                     onHoveredChanged: {
                         if (chip.hovered) sb.hovered = chip
                         else if (sb.hovered === chip) sb.hovered = null
                     }
-                    onClicked: Claude.focus(cell.modelData.session)
+                    onClicked: Claude.focus(cell.it.session)
                 }
             }
         }
