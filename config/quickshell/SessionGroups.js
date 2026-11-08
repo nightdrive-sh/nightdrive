@@ -1,7 +1,7 @@
 .pragma library
 // The sessions bar's order (SessionsBar.qml): a session that opened others with `nightdrive ask` (a project manager,
 // say) leads a group of them, the ones it opened right after it, joined by a line; the groups and the sessions
-// nobody here opened in the order of their workspaces, with a dot between each group or lone session. Nothing is named: a lead is a session with
+// nobody here opened in the order of their workspaces and places there (place), with a dot between each group or lone session. Nothing is named: a lead is a session with
 // openings, whatever it's called.
 // claude-sessions gives each session its opener's PID and name (terminal-or-claude records them); the PID finds it while
 // it runs, the name once it has been restarted (a new PID: claude --resume, a reboot).
@@ -22,10 +22,18 @@ function wasLead(s, kept) {
     return !!kept && (!!(kept.addrs || {})[s.address] || (!!s.name && (kept.names || []).indexOf(s.name) >= 0))
 }
 
+// The bar's order of sessions: by workspace (ws: Claude.qml), then by the window's place there in columns, left to
+// right and top to bottom in each (a dwindle split reads so: the left half, then the right's top and bottom); the same
+// place by age, oldest first
+function place(a, b) {
+    return (a.ws || 0) - (b.ws || 0) || (a.x || 0) - (b.x || 0) || (a.y || 0) - (b.y || 0) || age(a, b)
+}
+function age(a, b) { return a.started - b.started || (a.address < b.address ? -1 : 1) }
+
 // [{ lead: session, members: [session…] }] for the groups (a lead kept from before with none), then [session…] for the
-// rest; each by age, oldest first, so chips keep their places as sessions come and go
+// rest; each by place, so the bar reads like the workspaces
 function arrange(sessions, kept) {
-    const byAge = sessions.slice().sort((a, b) => a.started - b.started || (a.address < b.address ? -1 : 1))
+    const byAge = sessions.slice().sort(age)   // by age for finding openers: a loop is broken the same way each time
     const kids = new Map()      // opener → [sessions it opened]
     const roots = []
     for (const s of byAge) {
@@ -39,11 +47,11 @@ function arrange(sessions, kept) {
     // (a loop, not flatMap: QML's JavaScript engine has none)
     const below = s => {
         let out = []
-        for (const k of kids.get(s) || []) out = out.concat([k], below(k))
+        for (const k of (kids.get(s) || []).slice().sort(place)) out = out.concat([k], below(k))
         return out
     }
     const groups = [], rest = []
-    for (const r of roots) {
+    for (const r of roots.slice().sort(place)) {
         if (kids.has(r) || wasLead(r, kept)) groups.push({ lead: r, members: below(r) })
         else rest.push(r)
     }
@@ -58,13 +66,11 @@ function opens(a, b, all) {
 }
 
 // The bar's row: { kind: "chip", session, lead } and { kind: "dot" }.
-// Its units, a group or a lone session, go by workspace (a group by its lead's; ws: Claude.qml), so the bar reads like
-// the workspaces; on one workspace the groups first, each by age
+// Its units, a group or a lone session, go by place (a group by its lead's), and so do a group's members
 function row(sessions, kept) {
     const a = arrange(sessions, kept)
-    const units = a.groups.map((g, i) => ({ s: g.lead, g: g, i: i }))
-                   .concat(a.rest.map((s, i) => ({ s: s, g: null, i: a.groups.length + i })))
-    units.sort((x, y) => (x.s.ws || 0) - (y.s.ws || 0) || x.i - y.i)
+    const units = a.groups.map(g => ({ s: g.lead, g: g })).concat(a.rest.map(s => ({ s: s, g: null })))
+    units.sort((x, y) => place(x.s, y.s))
     const out = []
     for (const u of units) {
         if (out.length) out.push({ kind: "dot" })

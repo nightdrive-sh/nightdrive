@@ -133,7 +133,8 @@ Click an icon and a small menu opens under it:
   (windows make room): one asking you something gets a red question mark, one whose last reply ends on a ✅ line
   gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
   session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a bold name, the ones it
-  opened following it; the groups and the other sessions go in the order of their workspaces, a dot between each.
+  opened following it; the groups, their sessions and the others go in the order of their workspaces, and on one
+  workspace by window, left to right and top to bottom, a dot between each group or lone session.
   A lead stays one when the sessions it opened have closed. Chips are as wide as their names, and share the bar
   equally only when they don't fit. After the name, once past 5 minutes, how long its turn has run or it has waited
   for you; a turn past 10 minutes, likely stuck, shows its time in orange. A session named `#N topic` (`nightdrive ask

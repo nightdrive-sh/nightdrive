@@ -82,10 +82,13 @@ Singleton {
             const last = f.last || ""
             // Its workspace, for the bar's order of groups; a special one (negative id) counts after the numbered ones
             const ws = t.workspace ? (t.workspace.id > 0 ? t.workspace.id : 1000 - t.workspace.id) : 0
+            // And its place there, for the order inside a workspace (SessionGroups.place): Hyprland gives no tiling
+            // order, only the position, which the Timer below keeps fresh (moves and swaps send no event)
+            const at = (t.lastIpcObject && t.lastIpcObject.at) || [0, 0]
             out.push({ address: addr(f.address), dir: f.dir, project: f.dir.replace(/\/+$/, "").split("/").pop() || "/",
                        topic: m && !/[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? m[2] : title, state: state, started: f.started,
                        name: f.name || "", status: f.status || "", waitingFor: f.waitingFor || "", last: last,
-                       ws: ws, since: f.since || 0, pid: f.pid || 0, openerPid: f.openerPid || 0, openerName: f.openerName || "",
+                       ws: ws, x: at[0], y: at[1], since: f.since || 0, pid: f.pid || 0, openerPid: f.openerPid || 0, openerName: f.openerName || "",
                        asking: f.status === "waiting" && state !== "working",
                        done: state === "waiting" && f.status !== "waiting" && f.status !== "busy" && /^✅/.test(last) })
         }
@@ -184,7 +187,9 @@ Singleton {
     // A new window or a closed one: look again at once; otherwise every few seconds (a claude started in an open terminal)
     Connections {
         target: Hyprland
-        function onRawEvent(e) { if (e.name === "openwindow" || e.name === "closewindow") scan.running = true }
+        function onRawEvent(e) { if (e.name === "openwindow" || e.name === "closewindow") look() }
     }
-    Timer { interval: 4000; repeat: true; running: true; triggeredOnStart: true; onTriggered: scan.running = true }
+    Timer { interval: 4000; repeat: true; running: true; triggeredOnStart: true; onTriggered: look() }
+    // The windows' positions too (lastIpcObject.at), which only a refresh brings
+    function look() { scan.running = true; Hyprland.refreshToplevels() }
 }
