@@ -4,7 +4,7 @@ import "SessionGroups.js" as Groups
 
 // The card above a chip of the sessions bar (SessionsBar.qml) while the mouse is on it: the session's name, Claude's
 // topic for it (the window title's), its folder, its state, who opened it or how many it opened (SessionGroups.js) and
-// the last line of its last reply. After a short wait, so
+// the last line of its last reply, and its key (Hyper 1…9, its place in the bar). After a short wait, so
 // passing over the bar doesn't flash cards.
 PopupWindow {
     id: tip
@@ -44,6 +44,11 @@ PopupWindow {
         if (x.done) return "Done"
         if (x.wants) return "Finished while you were away"
         return "Waiting for you"
+    }
+    // "Hyper 3" for the third chip (Claude.nth), or "" past the ninth
+    function key(x) {
+        const i = x.address ? Claude.order().findIndex(k => k.address === x.address) : -1
+        return i >= 0 && i < Claude.maxDigit ? "Hyper " + (i + 1) : ""
     }
 
     anchor.window: bar
@@ -117,6 +122,14 @@ PopupWindow {
                 lineHeight: 1.15
                 color: Theme.muted
                 font { family: Theme.font; pixelSize: 12 }
+            }
+            Text {
+                readonly property string t: tip.key(tip.s)
+                visible: t !== ""
+                topPadding: 4
+                text: t
+                color: Theme.dim
+                font { family: Theme.font; pixelSize: 11 }
             }
         }
     }

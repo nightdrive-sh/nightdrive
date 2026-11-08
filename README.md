@@ -140,7 +140,8 @@ Click an icon and a small menu opens under it:
   for you; a turn past 10 minutes, likely stuck, shows its time in orange. A session named `#N topic` (`nightdrive ask
   --name`) shows the task number small there, not in its name.
   **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar, and **Hyper ↑** /
-  **Hyper ↓** to the previous / next lead. The bar follows Settings › Top bar opacity, its focused session the active
+  **Hyper ↓** to the previous / next lead, and **Hyper 1** … **Hyper 9** to the first … ninth (a session's card
+  shows its key; a digit you gave an app in App shortcuts stays the app's). The bar follows Settings › Top bar opacity, its focused session the active
   workspace's colour.
 
 ⌘⇧Space walks through the menus with the arrow keys, and ⌘+drag moves an icon. On a narrow screen the icons that don't

@@ -143,13 +143,19 @@ Singleton {
         // Hyper ↑ / ↓: the previous / next lead (a session with a bot and a border: it opened others)
         function nextLead(): void { c.stepLead(1) }
         function prevLead(): void { c.stepLead(-1) }
+        // Hyper 1…9: the nth session in the same order (1 = the first chip); past the end, nothing
+        function nth(n: int): void { const o = c.order(); if (n >= 1 && n <= o.length) c.focus(o[n - 1]) }
     }
 
-    // Focus goes n sessions on in the sessions bar's order (SessionGroups.row: groups and all), round from the end to the
-    // start; from a window that isn't a session, to the first (or with n < 0 the last). The same order whether the bar
-    // is on or not, so the key works without it; the bar shows the new one as focused (SessionChip.active).
+    // The sessions in the sessions bar's order (SessionGroups.row: groups and all), its chips without the dots. The same
+    // order whether the bar is on or not, so the keys work without it; SessionTip shows a chip's Hyper digit from it.
+    function order() { return Groups.row(sessions, keptLeads).filter(it => it.kind === "chip").map(it => it.session) }
+    readonly property int maxDigit: 9   // Hyper 1…9 (bindings.lua)
+
+    // Focus goes n sessions on in that order, round from the end to the start; from a window that isn't a session, to
+    // the first (or with n < 0 the last). The bar shows the new one as focused (SessionChip.active).
     function step(n) {
-        const order = Groups.row(sessions, keptLeads).filter(it => it.kind === "chip").map(it => it.session)
+        const order = c.order()
         if (!order.length) return
         const i = order.findIndex(s => s.address === activeAddr)
         const k = i < 0 ? (n > 0 ? 0 : order.length - 1) : ((i + n) % order.length + order.length) % order.length

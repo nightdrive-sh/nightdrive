@@ -351,6 +351,11 @@ hl.bind("MOD3 + right", hl.dsp.exec_cmd("qs ipc call claude next"))
 -- Hyper ↑ / ↓: the previous / next lead in the same order (a session that opened others, a project manager, say)
 hl.bind("MOD3 + up",    hl.dsp.exec_cmd("qs ipc call claude prevLead"))
 hl.bind("MOD3 + down",  hl.dsp.exec_cmd("qs ipc call claude nextLead"))
+-- Hyper 1…9: the nth session in that order (its card in the bar says which). A digit chosen in App shortcuts wins (the
+-- hl.bind wrapper above leaves this one out then).
+for i = 1, 9 do
+    hl.bind("MOD3 + " .. i, hl.dsp.exec_cmd("qs ipc call claude nth " .. i))
+end
 
 -- ⌥Tab / ⌥⇧Tab: the active app's next / previous window (same class), on any workspace (focus goes there), in the order
 -- they opened. Not the ones hidden in special:bg (⌘W on a background app): those were put away on purpose.
