@@ -13,8 +13,10 @@ import "SessionGroups.js" as Groups
 // each (SessionGroups.js); a chip is as wide as its name, and the chips share the bar equally only when they don't
 // fit (layout below).
 // Its background is the top bar's (TopBar.c("bg")), so it follows Settings › Top bar opacity.
-// Each chip but a lead's ends with how long it has worked or waited (Claude.sessions' since), ticking once a second;
-// crowded, the times go first, then the names (the leads keep theirs).
+// Each chip but a lead's ends with how long it has worked or waited (Claude.sessions' since), once past timeAfter;
+// crowded, the times go first, then the names (the leads keep theirs). A session named "#N topic" (the PM's) shows the
+// number small before its time instead of in its name, which starts with a capital (#2427), and the time in brackets
+// ("#2427 8 min" read as one number); hidden with the time.
 PanelWindow {
     id: sb
     readonly property int barH: Theme.barHeight   // as tall as the top bar
@@ -26,11 +28,13 @@ PanelWindow {
     readonly property int dotPadR: 11     // and on its right, so it sits midway (the next icon has its padding too)
     readonly property int maxLead: 220    // a lead's name, at most
     readonly property int maxChip: 320    // another chip's name and time, at most
-    readonly property int timeGap: 10     // between a name and its time
+    readonly property int timeGap: 10     // between a name and its time (or its tag)
+    readonly property int tagGap: 5       // between a tag and its time
     readonly property int minChip: 34     // the icon alone
     readonly property int textMin: 72     // narrower than this, a name shows too little ("#…"): the icon alone instead
     readonly property int chipPad: 10     // a chip's side padding
     readonly property int iconW: 16
+    readonly property int timeAfter: 300  // a shorter turn shows no time: seconds and a minute or two say nothing
     readonly property int stuckAfter: 600 // a turn running longer is probably stuck: its time in the warning colour
     // The dot between groups: a quiet grey from the theme
     readonly property color line: Qt.rgba(Theme.dim.r, Theme.dim.g, Theme.dim.b, 0.38)
@@ -80,23 +84,39 @@ PanelWindow {
 
     function label(it) {
         const s = it.session
-        return it.lead && s.name ? Groups.shortName(s.name) : s.name || s.topic || s.project
+        const name = untagged(s.name || "")
+        return it.lead && name ? Groups.shortName(name) : name || s.topic || s.project
+    }
+    // "#2427 topic": the task number, shown apart (the tip and the Claude menu keep the full name)
+    function tag(it) {
+        const m = /^(#\d+)\s+\S/.exec(it.session && it.session.name || "")
+        return m ? m[1] : ""
+    }
+    function untagged(name) {
+        const m = /^#\d+\s+(\S.*)$/.exec(name)
+        return m ? m[1].charAt(0).toUpperCase() + m[1].slice(1) : name
     }
 
     FontMetrics { id: fm; font { family: Theme.font; pixelSize: 12; bold: true } }
     FontMetrics { id: nfm; font { family: Theme.font; pixelSize: 12 } }   // the others' names
     FontMetrics { id: tfm; font { family: Theme.font; pixelSize: 10; bold: true } }
+    FontMetrics { id: gfm; font { family: Theme.font; pixelSize: 10 } }   // the tags
+    // A tag's room after the name: the gap before it and the tag (the gap before the time is counted with the time)
+    function tagW(it) {
+        const g = tag(it)
+        return g ? Math.ceil(timeGap + gfm.advanceWidth(g)) : 0
+    }
     // A typical time's room, for when shared chips are too narrow to show theirs (an unshared chip fits its time as is)
     readonly property int timeW: Math.ceil(tfm.advanceWidth("59 min")) + 6
 
     // Now, in epoch seconds, once a second while the bar shows: only the chips' times read it, so a tick rebuilds nothing
     property real now: Date.now() / 1000
     Timer { interval: 1000; repeat: true; running: sb.visible; onTriggered: sb.now = Date.now() / 1000 }
-    // 42 s, 7 min, 1 h 5 min; "" when unknown (an old Claude Code without its record)
+    // 7 min, 1 h 5 min; "" before timeAfter and when unknown (an old Claude Code without its record)
     function age(since) {
         if (!since) return ""
         const t = Math.max(0, Math.floor(now - since))
-        if (t < 60) return t + " s"
+        if (t < timeAfter) return ""
         if (t < 3600) return Math.floor(t / 60) + " min"
         const m = Math.floor(t / 60) % 60
         return Math.floor(t / 3600) + " h" + (m ? " " + m + " min" : "")
@@ -110,12 +130,14 @@ PanelWindow {
     readonly property var layout: {
         const n = items.length
         if (n === 0) return { widths: [], times: [] }
-        const leadW = it => Math.min(maxLead, Math.ceil(2 * chipPad + iconW + 6 + fm.advanceWidth(label(it))))
+        const leadW = it => Math.min(maxLead, Math.ceil(2 * chipPad + iconW + 6 + fm.advanceWidth(label(it)) + tagW(it)))
         // The time as it reads now: it grows a step at 10 s, 1 min, 10 min, 1 h (the font's digits are one width)
         const ownW = it => {
             const t = age(it.session.since)
-            return Math.min(maxChip, Math.ceil(2 * chipPad + iconW + 6 + nfm.advanceWidth(label(it))
-                                               + (t ? timeGap + tfm.advanceWidth(t) : 0)))
+            const g = tagW(it)
+            return Math.min(maxChip, Math.ceil(2 * chipPad + iconW + 6 + nfm.advanceWidth(label(it)) + g
+                                               + (t ? (g ? tagGap + tfm.advanceWidth("(" + t + ")")
+                                                         : timeGap + tfm.advanceWidth(t)) : 0)))
         }
         const widths = items.map(it => it.kind === "dot" ? dotW + dotPad + dotPadR : it.lead ? leadW(it) : ownW(it))
         const others = items.map((it, i) => i).filter(i => items[i].kind === "chip" && !items[i].lead)
@@ -126,7 +148,8 @@ PanelWindow {
         const times = items.map(() => false)
         for (const i of others) {
             if (!fits) widths[i] = share
-            times[i] = fits || share >= textMin + timeW
+            const g = tagW(items[i])
+            times[i] = fits || share >= textMin + timeW + (g ? g + Math.ceil(tfm.advanceWidth("()")) : 0)
         }
         return { widths: widths, times: times }
     }
@@ -164,6 +187,9 @@ PanelWindow {
                     text: visible ? sb.label(cell.it) : ""
                     iconOnly: width < sb.textMin
                     showTime: !!sb.layout.times[cell.index]
+                    tag: visible ? sb.tag(cell.it) : ""
+                    showTag: chip.lead || chip.showTime   // a lead has no time, and keeps its name too
+                    tagGap: sb.tagGap
                     time: visible ? sb.age(chip.session.since) : ""
                     stuck: chip.working && !chip.asking && chip.session.since > 0 && sb.now - chip.session.since >= sb.stuckAfter
                     padding: sb.chipPad

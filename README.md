@@ -135,8 +135,9 @@ Click an icon and a small menu opens under it:
   session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a bold name, the ones it
   opened following it; the groups and the other sessions go in the order of their workspaces, a dot between each.
   A lead stays one when the sessions it opened have closed. Chips are as wide as their names, and share the bar
-  equally only when they don't fit. After the name, how long its turn has run or it has waited for you; a turn past
-  10 minutes, likely stuck, shows its time in orange.
+  equally only when they don't fit. After the name, once past 5 minutes, how long its turn has run or it has waited
+  for you; a turn past 10 minutes, likely stuck, shows its time in orange. A session named `#N topic` (`nightdrive ask
+  --name`) shows the task number small there, not in its name.
   **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar, and **Hyper ↑** /
   **Hyper ↓** to the previous / next lead. The bar follows Settings › Top bar opacity, its focused session the active
   workspace's colour.

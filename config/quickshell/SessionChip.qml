@@ -9,7 +9,9 @@ import QtQuick
 // A lead (a session that opened others, SessionGroups.js) has its name in bold and the bot for its icon, which
 // breathes while it works; the chips it opened follow it.
 // After its name, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
-// past stuckAfter is in the warning colour, as it's likely stuck. The bar hides it when crowded, before the name.
+// past stuckAfter is in the warning colour, as it's likely stuck. Before the time, as small and grey: the task number
+// of a session named "#N topic" (SessionsBar.tag; #2427), left out of its name. The bar hides both when crowded, before
+// the name (a lead, which has no time, keeps its number).
 Rectangle {
     id: chip
     property var session: ({})
@@ -20,8 +22,11 @@ Rectangle {
     property bool lead: false
     property string time: ""             // "" = none
     property bool showTime: true
+    property string tag: ""              // "#2427", or ""
+    property bool showTag: true
     property bool stuck: false
-    property int timeGap: 10             // between the name and the time
+    property int timeGap: 10             // between the name and the time (or the tag)
+    property int tagGap: 5               // between the tag and the time
     readonly property bool hovered: area.containsMouse
     signal clicked()
 
@@ -71,17 +76,28 @@ Rectangle {
         id: nm
         visible: !chip.iconOnly
         anchors { left: ic.right; leftMargin: 6; verticalCenter: parent.verticalCenter }
-        width: Math.min(implicitWidth, chip.width - x - chip.padding - (tm.visible ? tm.implicitWidth + chip.timeGap : 0))
+        width: Math.min(implicitWidth, chip.width - x - chip.padding
+                        - (tg.visible ? tg.implicitWidth + chip.timeGap : 0)
+                        - (tm.visible ? tm.implicitWidth + (tg.visible ? chip.tagGap : chip.timeGap) : 0))
         text: chip.text
         elide: Text.ElideRight
         color: chip.asking || chip.active ? Theme.accent : chip.lead ? Theme.title : Theme.text
         font { family: Theme.font; pixelSize: 12; bold: chip.lead }   // SessionsBar.layout measures these fonts
     }
     Text {
+        id: tg
+        visible: chip.showTag && !chip.iconOnly && chip.tag !== ""
+        anchors { left: nm.right; leftMargin: chip.timeGap; verticalCenter: parent.verticalCenter }
+        text: chip.tag
+        color: Theme.dim
+        font { family: Theme.font; pixelSize: 10 }   // SessionsBar.tagW measures this font
+    }
+    Text {
         id: tm
         visible: chip.showTime && !chip.iconOnly && chip.time !== ""
-        anchors { left: nm.right; leftMargin: chip.timeGap; verticalCenter: parent.verticalCenter }
-        text: chip.time
+        anchors { left: tg.visible ? tg.right : nm.right; leftMargin: tg.visible ? chip.tagGap : chip.timeGap
+                  verticalCenter: parent.verticalCenter }
+        text: tg.visible ? "(" + chip.time + ")" : chip.time   // "#2427 (8 min)"
         color: chip.stuck ? Theme.warning : Theme.dim
         font { family: Theme.font; pixelSize: 10; bold: chip.stuck }   // SessionsBar.timeW measures this font
     }
