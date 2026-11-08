@@ -57,8 +57,21 @@ PanelWindow {
         return m
     }
 
+    // The drawer (⌘D, Drawer.qml) open on the bar's screen hides the bar (#2426): a Top-layer surface is drawn over
+    // every window, and its exclusive zone would keep the drawer's windows and the empty-drawer panel above it. Hidden,
+    // its room goes back, so both reach the screen's bottom; the windows behind reflow under the dimmed drawer.
+    property bool drawerOpen: false
+    Connections {
+        target: Hyprland
+        function onRawEvent(e) {
+            if (e.name !== "activespecial") return
+            const [ws, mon] = e.data.split(",")
+            if (sb.mainScreen && mon === sb.mainScreen.name) sb.drawerOpen = ws === "special:drawer"
+        }
+    }
+
     screen: mainScreen
-    visible: Claude.barOn && sessions.length > 0 && mainScreen !== null
+    visible: Claude.barOn && sessions.length > 0 && mainScreen !== null && !drawerOpen
     anchors { bottom: true; left: true; right: true }
     implicitHeight: barH
     color: TopBar.c("bg")
