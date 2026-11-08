@@ -150,10 +150,13 @@ Singleton {
         if (a === "") return null
         const dotted = a.replace(/\s+/g, ".")
         const first = a.split(/\s+/)[0]
+        // An entry named after the app plus a suffix, only when it is the one such entry: "Webapp" would otherwise
+        // borrow the first webapp-*.desktop's icon (webapp-youtube), and any generic name an unrelated app's
+        const prefixed = all.filter(e => id(e).startsWith(a + "-"))
         return all.find(e => id(e) === a || id(e).split(".").pop() === a || (e.name || "").toLowerCase() === a
                              || (e.startupClass || "").toLowerCase() === a)
-            || all.find(e => id(e).endsWith("." + dotted) || (e.name || "").toLowerCase() === first || id(e).startsWith(a + "-"))   // blueman → blueman-manager
-            || null
+            || all.find(e => id(e).endsWith("." + dotted) || (e.name || "").toLowerCase() === first)
+            || (prefixed.length === 1 ? prefixed[0] : null)   // blueman → blueman-manager
     }
 
     function remove(uid) {
