@@ -12,10 +12,12 @@ Item {
     property var node: null                    // the PwNode to listen to (null: nothing)
     property bool active: true                 // listening at all (the window shown)
     property bool live: false                  // recording: the bars in the accent colour
-    // -40: a humming room (a fan, ventilation: peaks near -37 dBFS, measured 9.11.) stays all but empty, while speech
-    // (peaks -4 … -20) still fills most of it; at -50 the hum alone filled half
-    readonly property int floorDb: -40
-    readonly property int topDb: -6
+    // -34 … 0 dBFS: a humming room heard by a MacBook's mic (a fan, ventilation) stays empty, at -50 it filled half and
+    // at -40 a fifth; speech (peaks -4 … -20) fills a half to most of it. The top is 0, where it clips, so typing beside
+    // the mic (clicks near -10) no longer reads as clipping: only the last tenth, above -3.4 dBFS, is red (redFrom).
+    readonly property int floorDb: -34
+    readonly property int topDb: 0
+    readonly property real redFrom: 0.9
     readonly property int bars: Math.max(8, Math.floor(width / 6))
     property real level: 0
     property real hold: 0                      // the highest peak since the last step
@@ -53,7 +55,7 @@ Item {
                 anchors.bottom: parent.bottom
                 radius: 1.5
                 // The loudest end warns: there it clips
-                color: lit || held ? (at > 0.88 ? m.c.danger : m.live ? m.c.accent : m.c.dim) : m.c.line
+                color: lit || held ? (at > m.redFrom ? m.c.danger : m.live ? m.c.accent : m.c.dim) : m.c.line
                 opacity: lit || held ? 1 : 0.6
             }
         }
