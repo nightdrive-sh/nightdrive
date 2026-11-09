@@ -35,6 +35,10 @@ sed "s/@USER@/${SUDO_USER:-$USER}/" "$here/shell.qml" | sudo install -m 0644 /de
 sudo install -m 0644 "$here/../hypr/vm-display.lua" "$here/../hypr/scripts/vm-display" /etc/greetd/
 sudo install -m 0644 "$here/LoginView.qml" "$here/NightdriveLogo.qml" "$here/background.jpg" /etc/greetd/greeter/
 sudo install -m 0644 -D -t /etc/greetd/greeter/sounds "$here"/sounds/*.wav
+# greetd waits at boot for the graphics driver (NVIDIA's may load after it starts: wait-gpu.sh)
+sudo install -m 0644 "$here/wait-gpu.sh" /etc/greetd/
+sudo install -D -m 0644 "$here/greetd-wait-gpu.conf" /etc/systemd/system/greetd.service.d/nightdrive-gpu.conf
+sudo systemctl daemon-reload
 # Last, once greeter.sh it runs is there
 (( text )) || sudo install -m 0644 "$here/config.toml" /etc/greetd/config.toml
 # What these files were installed from (the git tree of this directory, and the two of hypr's): `nightdrive update`
