@@ -120,12 +120,25 @@ def split(path, points, folder):
     return list(zip([0.0] + points, pieces))
 
 
+def parakeet_config(folder):
+    """A config of Recorder's own for Parakeet, in folder (the pieces' throwaway one). voxtype-onnx 1.1 checks --model
+    against Whisper's names whatever the engine ("Unknown model 'parakeet-…', using default model 'large-v3-turbo'")
+    and Parakeet then loads the user's config.toml [parakeet] model: the full one writes short Finnish words in
+    Cyrillic, and without the section it fails (#2456). Only -c picks the model; the user's own config is left alone."""
+    path = Path(folder) / "recorder-parakeet.toml"
+    model = ENGINES["parakeet"]["model"]
+    path.write_text(f'engine = "parakeet"\n\n[parakeet]\nmodel = "{model}"\nmodel_type = "tdt"\n')
+    return path
+
+
 def recognize(piece, model, language="auto"):
     """One piece's text, as the model hears it ("" for silence)."""
     e = ENGINES[model]
-    cmd = [program(e["program"]) or e["program"], "-q", "--engine", e["engine"], "--model", e["model"]]
-    if e["engine"] == "whisper":
-        cmd += ["--language", language]
+    cmd = [program(e["program"]) or e["program"], "-q"]
+    if e["engine"] == "parakeet":
+        cmd += ["-c", str(parakeet_config(Path(piece).parent)), "--engine", "parakeet"]
+    else:
+        cmd += ["--engine", e["engine"], "--model", e["model"], "--language", language]
     try:
         done = subprocess.run(cmd + ["transcribe", str(piece)], capture_output=True, text=True,
                               timeout=PIECE_TIMEOUT)

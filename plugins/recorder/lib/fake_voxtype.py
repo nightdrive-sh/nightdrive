@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""A stand-in for voxtype and voxtype-onnx in transcribe_test.py: `-q --engine E --model M [--language L] transcribe
-FILE` prints what the real one does around the text (its progress lines and a warning), and as the text the piece's
-length and what it was asked, so a test can see which piece went where. FAKE_VOXTYPE_LOG gets each call's arguments;
-FAKE_VOXTYPE_FAIL makes it fail, FAKE_VOXTYPE_SLEEP slow (seconds a piece), and a piece shorter than a second is
-"silence" (no text)."""
+"""A stand-in for voxtype and voxtype-onnx in transcribe_test.py: `-q [-c CONFIG] --engine E [--model M --language L]
+transcribe FILE` prints what the real one does around the text (its progress lines and a warning), and as the text
+the piece's length and what it was asked, so a test can see which piece went where. FAKE_VOXTYPE_LOG gets each call's
+arguments; FAKE_VOXTYPE_FAIL makes it fail, FAKE_VOXTYPE_SLEEP slow (seconds a piece), and a piece shorter than a
+second is "silence" (no text)."""
 
 import os
 import sys
@@ -13,7 +13,11 @@ import wave
 args = sys.argv[1:]
 if os.environ.get("FAKE_VOXTYPE_LOG"):
     with open(os.environ["FAKE_VOXTYPE_LOG"], "a") as log:
-        log.write(" ".join([os.path.basename(sys.argv[0])] + args) + "\n")
+        # A -c config's model goes in the log too: Recorder picks Parakeet's model there (voxtype.parakeet_config)
+        conf = open(args[args.index("-c") + 1]).read() if "-c" in args else ""
+        model = [ln.split("=")[1].strip(' "') for ln in conf.splitlines() if ln.startswith("model =")]
+        line = [os.path.basename(sys.argv[0])] + args + [f"config-model={m}" for m in model]
+        log.write(" ".join(line) + "\n")
 if os.environ.get("FAKE_VOXTYPE_FAIL"):
     print("error: the model is broken", file=sys.stderr)
     sys.exit(1)

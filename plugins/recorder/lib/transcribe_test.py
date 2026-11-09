@@ -99,7 +99,10 @@ class Transcribe(unittest.TestCase):
                                "[01:50] Parakeet - 16000 39s\n")
         calls = self.log.read_text().splitlines()
         self.assertEqual(len(calls), 3)
-        self.assertTrue(calls[0].startswith("voxtype-onnx -q --engine parakeet --model parakeet-tdt-0.6b-v3-int8"))
+        # Parakeet's model goes in a config of Recorder's own: voxtype-onnx ignores --model for it (#2456)
+        self.assertRegex(calls[0], r"^voxtype-onnx -q -c \S+/recorder-parakeet\.toml --engine parakeet transcribe ")
+        self.assertNotIn("--model", calls[0])
+        self.assertTrue(calls[0].endswith(" config-model=parakeet-tdt-0.6b-v3-int8"))
         self.assertEqual(self.status(), [])
         self.assertFalse(list(self.rec.glob(".*")))           # no half-written file left
 
