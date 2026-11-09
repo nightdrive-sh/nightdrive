@@ -136,12 +136,16 @@ PanelWindow {
         if (n === 0) return { widths: [], times: [] }
         const leadW = it => Math.min(maxLead, Math.ceil(2 * chipPad + iconW + 6 + fm.advanceWidth(label(it)) + tagW(it)))
         // The time as it reads now: it grows a step at 10 s, 1 min, 10 min, 1 h (the font's digits are one width)
+        // Past maxChip the chip drops its tag (SessionChip.tagShown), so it is sized without one: sized with it and then
+        // capped, the tag's room stayed empty after the time (#2467)
         const ownW = it => {
             const t = chipTime(it.session)
             const g = tagW(it)
-            return Math.min(maxChip, Math.ceil(2 * chipPad + iconW + 6 + nfm.advanceWidth(label(it)) + g
-                                               + (t ? (g ? tagGap + tfm.advanceWidth("(" + t + ")")
-                                                         : timeGap + tfm.advanceWidth(t)) : 0)))
+            const base = 2 * chipPad + iconW + 6 + nfm.advanceWidth(label(it))
+            const tagged = Math.ceil(base + g + (t ? (g ? tagGap + tfm.advanceWidth("(" + t + ")")
+                                                        : timeGap + tfm.advanceWidth(t)) : 0))
+            if (!g || tagged <= maxChip) return Math.min(maxChip, tagged)
+            return Math.min(maxChip, Math.ceil(base + (t ? timeGap + tfm.advanceWidth(t) : 0)))
         }
         const widths = items.map(it => it.kind === "dot" ? dotW + dotPad + dotPadR : it.lead ? leadW(it) : ownW(it))
         const others = items.map((it, i) => i).filter(i => items[i].kind === "chip" && !items[i].lead)
