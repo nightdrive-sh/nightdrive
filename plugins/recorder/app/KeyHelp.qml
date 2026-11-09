@@ -15,6 +15,14 @@ QtObject {
             ["Home  End", "The newest, the oldest"],
             ["⏎", "Not recording: open it (narrow window: its own page)"],
             ["Esc", "Narrow window: back to the list"]] },
+        { title: "The picked recording", keys: [
+            ["p", "Play, pause"],
+            ["← →", "Back, on five seconds"],
+            ["F2", "Rename"],
+            ["e", "Export: MP3, M4A, FLAC, Opus"],
+            ["o", "Show in Files"],
+            ["⌘⌫  Del", "To the trash"],
+            ["⌘Z", "Undo a rename or the trash"]] },
         { title: "Window", keys: [
             ["?", "These keys"],
             ["⌘Q", "Quit (a recording goes on: the top bar's icon)"]] }

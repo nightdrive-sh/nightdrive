@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """A stand-in for pw-record in capture_test.py: writes silence to the WAV file it is given at the real rate, with a
 header that says 0 bytes until SIGINT, as pw-record's does until it is stopped, and then the true size. With
-FAKE_PW_FAIL set it exits at once, as pw-record does when it can't connect."""
+FAKE_PW_FAIL set it exits at once, as pw-record does when it can't connect; FAKE_PW_ARGS names a file its arguments
+are added to, a line each run (which --target it was given)."""
 
 import os
 import signal
@@ -16,6 +17,9 @@ if os.environ.get("FAKE_PW_FAIL"):
     sys.exit(1)
 
 args = sys.argv[1:]
+if os.environ.get("FAKE_PW_ARGS"):
+    with open(os.environ["FAKE_PW_ARGS"], "a") as log:
+        log.write(" ".join(args) + "\n")
 rate = int(args[args.index("--rate") + 1])
 channels = int(args[args.index("--channels") + 1])
 path = args[-1]

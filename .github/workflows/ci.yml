@@ -32,7 +32,7 @@ jobs:
       - name: Install the tools
         run: >-
           dnf -y -q install git-core python3 ShellCheck gitleaks
-          tzdata jq lua glib2 shared-mime-info xdg-user-dirs notmuch khal
+          tzdata jq lua glib2 shared-mime-info xdg-user-dirs notmuch khal ffmpeg-free
           python3-icalendar python3-dateutil python3-vobject python3-cryptography
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

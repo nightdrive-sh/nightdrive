@@ -17,6 +17,8 @@ Where things are kept:
   crash or a power cut loses nothing;
 - what is going on now (pw-record's pid, when the piece began, the seconds of the pieces before it), in
   $XDG_RUNTIME_DIR/recorder/state.json, which a reboot or a logout clears.
+A Bluetooth headset (bluetooth.py) is recorded from by its card: the first piece switches it to its headset profile,
+and meta.json keeps the profile it was in ("bt"), which save, a mic picked instead, or recover put back.
 Pieces on disk without that state are a recording that was cut off: the next command joins them into
 "NAME (recovered).wav" (recover). --json prints the state after the command: {state: idle|recording|paused, name,
 mic, elapsed (seconds), started (ISO), saved: the recording save wrote, recovered: the one recover wrote}.
@@ -34,6 +36,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
+import bluetooth
 import recordings
 import settings
 import wav
@@ -109,6 +112,7 @@ def recover():
     if read_json(STATE) or not SESSION.exists():
         return None
     meta = read_json(SESSION / "meta.json") or {}
+    give_back(meta)
     saved = None
     if pieces():
         name = recordings.clean_name(f"{meta.get('name') or 'Recording'} (recovered)")
@@ -118,6 +122,33 @@ def recover():
             saved = None
     shutil.rmtree(SESSION, ignore_errors=True)
     return saved
+
+
+# --- the microphone -------------------------------------------------------------------------------------------------
+
+def target_of(mic, meta):
+    """pw-record's --target for the mic: a Bluetooth card switched to its headset profile and its source, else the mic
+    itself. meta (the session's, written back) keeps the profile to put back, from the first switch only."""
+    if not bluetooth.is_card(mic):
+        return mic
+    try:
+        source, previous = bluetooth.use(mic)
+    except bluetooth.BluetoothError as e:
+        raise CaptureError(str(e)) from None
+    if previous and not meta.get("bt"):
+        meta["bt"] = {"card": mic, "profile": previous}
+        write_json(SESSION / "meta.json", meta)
+    return source
+
+
+def give_back(meta, keep=None):
+    """The headset back in the profile it was in (A2DP), unless it is still the mic (keep)."""
+    bt = meta.get("bt")
+    if bt and bt.get("card") != keep:
+        bluetooth.restore(bt.get("card"), bt.get("profile"))
+        meta.pop("bt", None)
+        if (SESSION / "meta.json").exists():
+            write_json(SESSION / "meta.json", meta)
 
 
 # --- pw-record --------------------------------------------------------------------------------------------------------
@@ -181,17 +212,22 @@ def record(mic=None, name=None):
     if state:   # paused: go on, from another mic if one is given
         meta = read_json(SESSION / "meta.json")
         if mic is not None and mic != meta.get("mic"):
-            write_json(SESSION / "meta.json", dict(meta, mic=mic))
-        return start_piece(mic if mic is not None else meta.get("mic", ""), state.get("done", 0))
+            meta["mic"] = mic
+            write_json(SESSION / "meta.json", meta)
+        mic = meta.get("mic", "")
+        give_back(meta, keep=mic)   # a headset left for another mic plays music well again
+        return start_piece(target_of(mic, meta), state.get("done", 0))
     mic = settings.get()["mic"] if mic is None else mic
     now = datetime.now().astimezone()
     shutil.rmtree(SESSION, ignore_errors=True)
     SESSION.mkdir(parents=True)
-    write_json(SESSION / "meta.json", {"name": recordings.clean_name(name or now.strftime(NAME_FORMAT)), "mic": mic,
-                                       "started": now.isoformat(timespec="seconds")})
+    meta = {"name": recordings.clean_name(name or now.strftime(NAME_FORMAT)), "mic": mic,
+            "started": now.isoformat(timespec="seconds")}
+    write_json(SESSION / "meta.json", meta)
     try:
-        return start_piece(mic, 0)
+        return start_piece(target_of(mic, meta), 0)
     except CaptureError:
+        give_back(meta)
         shutil.rmtree(SESSION, ignore_errors=True)
         raise
 
@@ -223,6 +259,7 @@ def save(name=None):
     if state["state"] == "recording":
         stop_piece(state)
     meta = read_json(SESSION / "meta.json") or {}
+    give_back(meta)
     try:
         saved = write_recording(recordings.clean_name(name or meta.get("name") or "Recording"))
     except wav.WavError:

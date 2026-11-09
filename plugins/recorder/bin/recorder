@@ -47,6 +47,28 @@ uninstall_app() {
   echo "Recorder is out of your apps; your recordings stay in $(python3 "$LIB/settings.py" get --json | jq -r .path)."
 }
 
+# Trash's undo: back from the trash (files restore takes no --json; the window's asks for it all the same)
+restore() {
+  local names=() json=false a
+  for a in "$@"; do if [[ $a == --json ]]; then json=true; else names+=("$a"); fi; done
+  "$APP_DIR/../../bin/nightdrive" files restore "${names[@]}" >/dev/null || return 1
+  changed
+  if $json; then printf '%s\n' "${names[@]}" | jq -R . | jq -sc '{restored: .}'; else echo "Restored ${#names[@]}."; fi
+}
+
+# The recording's WAV picked in the file manager (FileManager1's ShowItems: Nautilus, Dolphin…); without one, its
+# folder opened
+show() {
+  local path
+  path=$(python3 "$LIB/recordings.py" info --json -- "${1:-}" | jq -r .path) || return 1
+  gdbus call --session --dest org.freedesktop.FileManager1 --object-path /org/freedesktop/FileManager1 \
+    --method org.freedesktop.FileManager1.ShowItems "['file://$(jq -rn --arg p "$path" '$p | @uri' | sed 's|%2F|/|g')']" "" \
+    >/dev/null 2>&1 || xdg-open "$(dirname "$path")" >/dev/null 2>&1 &
+  disown 2>/dev/null
+  [[ ${2:-} == --json ]] && jq -nc --arg p "$path" '{shown: $p}'
+  return 0
+}
+
 usage() {
   cat <<USAGE
 Usage: recorder [command]
@@ -64,6 +86,9 @@ Usage: recorder [command]
   rename NAME NEW  a new name for the recording, its transcript and exports (--json)
   trash NAME       the recording and its files to the trash, where Files puts them back (--json)
   restore NAME…    back from the trash (the names trash --json gives)
+  export NAME FMT  a copy beside it as mp3, m4a, flac or opus (--json); export formats: the four
+  show NAME        the recording in Files, picked
+  headsets         the Bluetooth headsets to record from (--json): --mic takes their card
   config           the settings (--json); config KEY VALUE changes one: folder, mic, model (parakeet|whisper),
                    language (auto|fi|en), transcribe_on_save (on|off)
   install          Recorder among the desktop's apps (the installer), and ~/Recordings
@@ -82,7 +107,10 @@ case ${1:-open} in
   status)    python3 "$LIB/capture.py" "$@" ;;
   list|info) python3 "$LIB/recordings.py" "$@" ;;
   rename|trash) python3 "$LIB/recordings.py" "$@"; changed ;;
-  restore)   "$APP_DIR/../../bin/nightdrive" files restore "${@:2}"; changed ;;   # trash's undo: back from the trash
+  restore)   restore "${@:2}" ;;
+  export)    python3 "$LIB/export.py" "${@:2}"; changed ;;
+  show)      show "${@:2}" ;;
+  headsets)  python3 "$LIB/bluetooth.py" list "${@:2}" ;;
   config)
     if (($# > 2)) || { (($# == 2)) && [[ $2 != --json ]]; }; then
       python3 "$LIB/settings.py" set "${@:2}"; changed

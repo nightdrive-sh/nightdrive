@@ -86,15 +86,19 @@ Item {
         stdout: StdioCollector { onStreamFinished: { try { store.mic = JSON.parse(text).mic || "" } catch (e) {} } }
     }
 
-    // --- Changing: one command at a time, the state after it applied; failed gets the command's own words ---
+    // --- Changing: one command at a time, the state after it applied; failed gets the command's own words. act's
+    // then gets the command's answer (rename, trash: RecordingActions) ---
     signal failed(string text)
     signal saved(string name)                  // a recording was saved (Save, New): the window picks it
     property var queue: []
+    property var reply: null                   // the running command's then
     readonly property bool busy: runner.running
-    function run(args) { queue = queue.concat([args]); next() }
+    function run(args) { act(args, null) }
+    function act(args, then) { queue = queue.concat([{ args: args, then: then }]); next() }
     function next() {
         if (runner.running || !queue.length) return
-        runner.command = [store.command].concat(queue[0]).concat(["--json"])
+        runner.command = [store.command].concat(queue[0].args).concat(["--json"])
+        reply = queue[0].then
         queue = queue.slice(1)
         runner.running = true
     }
@@ -117,6 +121,7 @@ Item {
             else {
                 try {
                     const st = JSON.parse(out.text)
+                    if (store.reply) store.reply(st)
                     if (st.state) store.applyStatus(st)
                     // saved: the recording save wrote ({ name, … }), null when nothing was heard
                     if (st.saved) { store.picked = st.saved.name; store.saved(st.saved.name) }
