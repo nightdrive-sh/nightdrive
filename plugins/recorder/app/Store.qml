@@ -52,15 +52,38 @@ Item {
     }
     function pickAt(i) { if (i >= 0 && i < recordings.length) picked = recordings[i].name }
 
-    // --- The microphone picked: Settings' mic, which a new recording takes ---
-    property string mic: ""
+    // --- Settings (`recorder config --json`: folder, mic, model, language, transcribe_on_save) and what each
+    // transcription model still needs (`recorder models --json`: {parakeet: {label, about, ready, missing}, whisper}) ---
+    property var config: ({})
+    property var models: ({})
+    property string mic: ""                    // the microphone picked: Settings' mic, which a new recording takes
+    readonly property string modelMissing: config.model && models[config.model] ? (models[config.model].missing || "") : ""
+    function setConfig(key, value) {
+        config = Object.assign({}, config, { [key]: value })
+        act(["config", key, String(value === true ? "on" : value === false ? "off" : value)], c => {
+            config = c
+            if (key === "folder") refresh()
+        })
+    }
+    function readSettings() { settings.running = true; modelReader.again() }
+
+    // --- Transcriptions under way (`recorder transcriptions --json`: {name, state: queued|running|failed, done,
+    // total, error}), read every second while there are any; one gone has written its transcript, so the list is
+    // read again. A failure is told once ---
+    property var jobs: []
+    property var toldFailed: ({})
+    property bool jobsRead: false              // one that failed before the window opened shows in its view only
+    function job(name) { return jobs.find(j => j.name === name) || null }
+    function transcribe(name) { act(["transcribe", name], () => transcriber.again()) }
+    function cancelTranscript(name) { act(["transcribe", "--cancel", name], () => transcriber.again()) }
 
     // --- Reading ---
-    function refresh() { status.again(); lister.again() }
+    function refresh() { status.again(); lister.again(); readSettings() }   // `recorder config` from elsewhere too
     // Quickshell has no folder watcher: the list is read again every few seconds too (Files, a sync, a terminal)
     Timer { interval: store.idle ? 5000 : 2000; repeat: true; running: true; onTriggered: status.again() }
     Timer { interval: 5000; repeat: true; running: true; onTriggered: lister.again() }
-    Component.onCompleted: { refresh(); settings.running = true }
+    Timer { interval: store.jobs.some(j => j.state !== "failed") ? 1000 : 5000; repeat: true; running: true; onTriggered: transcriber.again() }
+    Component.onCompleted: { refresh(); readSettings(); transcriber.again() }
 
     Reader {
         id: status
@@ -83,7 +106,28 @@ Item {
     Process {
         id: settings
         command: [store.command, "config", "--json"]
-        stdout: StdioCollector { onStreamFinished: { try { store.mic = JSON.parse(text).mic || "" } catch (e) {} } }
+        stdout: StdioCollector { onStreamFinished: { try { store.config = JSON.parse(text); store.mic = store.config.mic || "" } catch (e) {} } }
+    }
+    Reader {
+        id: modelReader
+        command: [store.command, "models", "--json"]
+        onRead: data => store.models = data
+    }
+    Reader {
+        id: transcriber
+        command: [store.command, "transcriptions", "--json"]
+        onRead: data => {
+            const now = data.jobs || []
+            if (store.jobs.some(j => j.state !== "failed" && !now.some(n => n.name === j.name))) lister.again()
+            const told = Object.assign({}, store.toldFailed)
+            for (const j of now) if (j.state === "failed" && !told[j.name + j.started]) {
+                told[j.name + j.started] = true
+                if (store.jobsRead) store.failed("Transcribing " + j.name + " failed: " + j.error)
+            }
+            store.toldFailed = told
+            store.jobs = now
+            store.jobsRead = true
+        }
     }
 
     // --- Changing: one command at a time, the state after it applied; failed gets the command's own words. act's
@@ -125,6 +169,7 @@ Item {
                     if (st.state) store.applyStatus(st)
                     // saved: the recording save wrote ({ name, … }), null when nothing was heard
                     if (st.saved) { store.picked = st.saved.name; store.saved(st.saved.name) }
+                    if (st.transcribing) transcriber.again()
                     else if ("saved" in st) store.failed("Nothing was heard, so nothing was saved.")
                 } catch (e) {}
                 lister.again()

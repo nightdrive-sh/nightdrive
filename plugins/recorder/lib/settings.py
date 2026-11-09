@@ -10,8 +10,8 @@ file.
 
 folder: where recordings go (~/Recordings; RECORDINGS_DIR overrides it, for a test or a script). mic: the PipeWire
 source's node name to record from, "" for the default input. model: "parakeet" (Parakeet int8 through voxtype-onnx,
-fast, finds the language itself) or "whisper" (Whisper large-v3-turbo through voxtype: slower, more exact). language:
-Whisper's, "fi", "en" or "auto". transcribe_on_save: a saved recording is transcribed at once (Jari 5.11.: on).
+fast, finds the language itself), "medium" (Whisper medium through voxtype: between the two) or "whisper" (Whisper
+large-v3-turbo through voxtype: slower, more exact). language: Whisper's, "fi", "en" or "auto". transcribe_on_save: a saved recording is transcribed at once (Jari 5.11.: on).
 """
 
 import json
@@ -23,7 +23,7 @@ CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") 
 FILE = CONFIG_DIR / "settings.json"
 DEFAULT_FOLDER = "~/Recordings"
 DEFAULTS = {"folder": DEFAULT_FOLDER, "mic": "", "model": "parakeet", "language": "auto", "transcribe_on_save": True}
-CHOICES = {"model": ("parakeet", "whisper"), "language": ("auto", "fi", "en")}
+CHOICES = {"model": ("parakeet", "medium", "whisper"), "language": ("auto", "fi", "en")}
 SWITCHES = ("transcribe_on_save",)
 
 

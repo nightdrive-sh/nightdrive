@@ -5,8 +5,8 @@ import qs.kit
 
 // The picked recording: its name, when it was made, its length and size, the player (Transport: Play, the place in
 // it), and what can be done to it (RecordingActions: Rename, Export, Show in Files, Trash), with the exports made so far
-// under them. The transcript comes here next (Dashboard #2251). In a narrow window it is a page of its own, with Back
-// (Esc) to the list; below compactMax the buttons are their glyphs alone.
+// under them, and its transcript in the rest of the height (TranscriptView). In a narrow window it is a page of its own,
+// with Back (Esc) to the list; below compactMax the buttons are their glyphs alone.
 Item {
     id: v
     required property QtObject c
@@ -17,6 +17,8 @@ Item {
     readonly property var rec: store.current
     readonly property bool compact: width < 400   // the two-pane view of a 720 px window (419) keeps its words
     signal back()
+    signal openSettings()
+    function transcribe() { transcript.toggle() }      // t
 
     function mb(bytes) { return bytes >= 1e6 ? (bytes / 1e6).toFixed(1) + " MB" : Math.max(1, Math.round(bytes / 1e3)) + " kB" }
     function home(path) { return path.replace(/^\/home\/[^/]+/, "~") }
@@ -38,6 +40,7 @@ Item {
         anchors.left: parent.left; anchors.leftMargin: v.compact ? 16 : 24
         anchors.right: parent.right; anchors.rightMargin: v.compact ? 16 : 24
         anchors.top: parent.top; anchors.topMargin: v.onePane ? 44 : 14
+        anchors.bottom: parent.bottom; anchors.bottomMargin: 8
         spacing: 8
 
         Text {
@@ -56,7 +59,9 @@ Item {
             color: v.c.dim
         }
 
+        // z: a later sibling draws over an earlier one, so the rows whose tips hang down over the rest come first in z
         Transport {
+            z: 3
             Layout.fillWidth: true
             Layout.topMargin: 10
             c: v.c
@@ -67,6 +72,7 @@ Item {
 
         // What can be done to it: frameless, as Notes' bar over a note; the glyphs alone when narrow
         Flow {
+            z: 2
             Layout.fillWidth: true
             Layout.topMargin: 6
             Layout.leftMargin: -10                    // the first glyph lines up with the text above
@@ -92,6 +98,18 @@ Item {
             text: v.rec ? "Exported: " + v.rec.exports.map(e => ({ mp3: "MP3", m4a: "M4A", flac: "FLAC", opus: "Opus" })[e.split(".").pop()] || e).join(", ") : ""
             font.family: v.c.font; font.pixelSize: 11
             color: v.c.faint
+        }
+
+        TranscriptView {
+            id: transcript
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.topMargin: 12
+            c: v.c
+            store: v.store
+            player: v.player
+            compact: v.compact
+            onOpenSettings: v.openSettings()
         }
     }
 

@@ -30,8 +30,10 @@ class Env(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.rec = root / "Recordings"
-        self.env = dict(os.environ, XDG_STATE_HOME=str(root / "state"), XDG_CONFIG_HOME=str(root / "config"),
-                        XDG_RUNTIME_DIR=str(root / "run"), RECORDINGS_DIR=str(self.rec), HOME=str(root),
+        # XDG_DATA_HOME: no Voxtype model, so a save isn't transcribed (transcribe_test's part)
+        self.env = dict(os.environ, XDG_DATA_HOME=str(root / "data"), XDG_STATE_HOME=str(root / "state"),
+                        XDG_CONFIG_HOME=str(root / "config"), XDG_RUNTIME_DIR=str(root / "run"),
+                        RECORDINGS_DIR=str(self.rec), HOME=str(root),
                         RECORDER_PW_RECORD=str(HERE / "fake_pw_record.py"))
         (root / "run").mkdir()
 

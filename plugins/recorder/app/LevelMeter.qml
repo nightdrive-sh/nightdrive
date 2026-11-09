@@ -12,7 +12,9 @@ Item {
     property var node: null                    // the PwNode to listen to (null: nothing)
     property bool active: true                 // listening at all (the window shown)
     property bool live: false                  // recording: the bars in the accent colour
-    readonly property int floorDb: -50
+    // -40: a humming room (a fan, ventilation: peaks near -37 dBFS, measured 9.11.) stays all but empty, while speech
+    // (peaks -4 … -20) still fills most of it; at -50 the hum alone filled half
+    readonly property int floorDb: -40
     readonly property int topDb: -6
     readonly property int bars: Math.max(8, Math.floor(width / 6))
     property real level: 0

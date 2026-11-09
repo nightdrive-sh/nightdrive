@@ -13,8 +13,12 @@ QtObject {
     required property var exporter            // ExportPanel
     readonly property var rec: store.current
 
+    // A transcription under way writes to the name it began with: rename waits for it, trash stops it
+    function busyTranscribing() { const j = rec ? store.job(rec.name) : null; return !!j && j.state !== "failed" }
+
     function rename() {
         if (!rec) return
+        if (busyTranscribing()) { toast.show("It is being transcribed: rename it once that is done, or cancel it (t)."); return }
         const was = rec.name
         prompt.ask("New name", was, name => {
             if (!name || name === was) return
@@ -31,6 +35,7 @@ QtObject {
         const name = rec.name
         const i = store.index
         player.stop()
+        if (store.job(name)) store.cancelTranscript(name)
         store.act(["trash", name], r => {
             // The one below it is picked, as Notes does; the last one gives way to the one above
             const rest = store.recordings.filter(x => x.name !== name)

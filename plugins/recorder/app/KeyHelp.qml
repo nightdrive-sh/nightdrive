@@ -21,9 +21,11 @@ QtObject {
             ["F2", "Rename"],
             ["e", "Export: MP3, M4A, FLAC, Opus"],
             ["o", "Show in Files"],
+            ["t", "Transcribe, or stop transcribing"],
             ["⌘⌫  Del", "To the trash"],
             ["⌘Z", "Undo a rename or the trash"]] },
         { title: "Window", keys: [
+            ["⌘,", "Settings: folder, transcription model and language"],
             ["?", "These keys"],
             ["⌘Q", "Quit (a recording goes on: the top bar's icon)"]] }
     ]

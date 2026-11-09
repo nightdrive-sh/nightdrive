@@ -56,6 +56,23 @@ restore() {
   if $json; then printf '%s\n' "${names[@]}" | jq -R . | jq -sc '{restored: .}'; else echo "Restored ${#names[@]}."; fi
 }
 
+# transcribe NAME [--wait] [--json], transcribe --cancel NAME: lib/transcribe.py's start (in the background, the
+# default), run (here, with its progress) and cancel
+transcribe() {
+  local args=() wait=false cancel=false a
+  for a in "$@"; do
+    case $a in
+      --wait) wait=true ;;
+      --cancel) cancel=true ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  if $cancel; then python3 "$LIB/transcribe.py" cancel "${args[@]}"
+  elif $wait; then python3 "$LIB/transcribe.py" run "${args[@]}"
+  else python3 "$LIB/transcribe.py" start "${args[@]}"
+  fi
+}
+
 # The recording's WAV picked in the file manager (FileManager1's ShowItems: Nautilus, Dolphin…); without one, its
 # folder opened
 show() {
@@ -88,8 +105,12 @@ Usage: recorder [command]
   restore NAME…    back from the trash (the names trash --json gives)
   export NAME FMT  a copy beside it as mp3, m4a, flac or opus (--json); export formats: the four
   show NAME        the recording in Files, picked
+  transcribe NAME  NAME.txt beside it, a paragraph a minute with its time, in the background (--json; --wait: here,
+                   with its progress; --cancel NAME: stop it, the transcript before it stays)
+  transcriptions   those under way and those that failed (--json: {jobs: [{name, state, done, total, error}]})
+  models           the transcription models, and what each still needs (--json)
   headsets         the Bluetooth headsets to record from (--json): --mic takes their card
-  config           the settings (--json); config KEY VALUE changes one: folder, mic, model (parakeet|whisper),
+  config           the settings (--json); config KEY VALUE changes one: folder, mic, model (parakeet|medium|whisper),
                    language (auto|fi|en), transcribe_on_save (on|off)
   install          Recorder among the desktop's apps (the installer), and ~/Recordings
   uninstall        take it out again (your recordings stay)
@@ -110,6 +131,9 @@ case ${1:-open} in
   restore)   restore "${@:2}" ;;
   export)    python3 "$LIB/export.py" "${@:2}"; changed ;;
   show)      show "${@:2}" ;;
+  transcribe) transcribe "${@:2}"; changed ;;
+  transcriptions) python3 "$LIB/transcribe.py" status "${@:2}" ;;
+  models)    python3 "$LIB/voxtype.py" check "${@:2}" ;;
   headsets)  python3 "$LIB/bluetooth.py" list "${@:2}" ;;
   config)
     if (($# > 2)) || { (($# == 2)) && [[ $2 != --json ]]; }; then

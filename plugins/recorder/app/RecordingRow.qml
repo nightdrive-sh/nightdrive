@@ -3,7 +3,7 @@ import qs
 import qs.kit
 
 // A recording in the list: its name, and a line with when it was made (the list's "when": Regional.relative), its length
-// and whether it has been turned into text yet.
+// and whether it has been turned into text yet, or how far that is.
 AppRow {
     id: row
     required property var modelData
@@ -11,6 +11,11 @@ AppRow {
     required property var app                 // the window: the list's focus, open()
     required property var store
     readonly property var rec: modelData
+    // A transcription under way shows how far it is ("Text 3/12"), one that failed says so
+    readonly property var job: store.job(rec.name)
+    readonly property string textState: !job ? (rec.transcript ? "Text" : "")
+        : job.state === "failed" ? "Text failed" : job.state === "queued" ? "Text waits"
+        : "Text " + job.done + "/" + (job.total || "…")
 
     implicitHeight: 52
     selected: rec.name === store.picked
@@ -43,7 +48,7 @@ AppRow {
             width: parent.width
             elide: Text.ElideRight; textFormat: Text.PlainText
             text: [Regional.relative(row.rec.modified), row.store.clock(row.rec.duration),
-                   row.rec.transcript ? "Text" : ""].filter(s => s).join("  ·  ")
+                   row.textState].filter(s => s).join("  ·  ")
             font.family: row.c.font; font.pixelSize: 11
             color: row.c.dim
         }

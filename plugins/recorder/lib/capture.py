@@ -39,6 +39,8 @@ from pathlib import Path
 import bluetooth
 import recordings
 import settings
+import transcribe
+import voxtype
 import wav
 
 STATE_HOME = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
@@ -269,6 +271,20 @@ def save(name=None):
     return saved
 
 
+def transcribe_saved(out):
+    """Settings' "Transcribe when saved" (on unless turned off): the saved recording goes to transcribe.py at once, when
+    Voxtype and the model are there; out["transcribing"] is its job. Without them the recording is saved all the same,
+    and the window's Settings says what to install."""
+    saved = out.get("saved")
+    conf = settings.get()
+    if not saved or not conf["transcribe_on_save"] or voxtype.missing(conf["model"]):
+        return
+    try:
+        out["transcribing"] = transcribe.start(saved["name"])
+    except (transcribe.TranscribeError, recordings.RecordingError, OSError):
+        pass   # the recording is saved: Transcribe in the window tries again, and says why
+
+
 # --- the command line -------------------------------------------------------------------------------------------------
 
 def option(args, flag):
@@ -316,6 +332,7 @@ def main(argv):
                 print(__doc__.split("\n\n")[1], file=sys.stderr)
                 return 2
             out = dict(status(), **out)
+        transcribe_saved(out)
     except (CaptureError, recordings.RecordingError) as e:
         print(e, file=sys.stderr)
         return 1

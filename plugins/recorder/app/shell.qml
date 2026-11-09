@@ -10,7 +10,7 @@ import qs.kit
 // strip (RecordPane: the time, the level, the mic, Pause / Save / New); otherwise it is taller, with the recordings
 // under the strip (RecordingList) and the picked one beside them (RecordingView), or in a narrow window on a page of its
 // own. Record makes it the strip, Save tall again (WindowSize). The picked recording plays in Player, and
-// RecordingActions renames, exports, shows and trashes it. This file holds the window together: the layout, the keys
+// RecordingActions renames, exports, shows and trashes it; TranscriptView, in the view, transcribes it. This file holds the window together: the layout, the keys
 // (their sheet: KeyHelp.qml) and the IPC the recorder command calls when something changed elsewhere.
 ShellRoot {
     FloatingWindow {
@@ -71,10 +71,12 @@ ShellRoot {
             function pick(name: string): void { store.picked = name; store.refresh() }
             // Picked, and in a narrow window its page opened (as ⏎)
             function open(name: string): void { store.picked = name; win.open() }
+            function openSettings(): void { settingsPanel.open() }   // the kit's `recorder settings`
         }
 
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
         Shortcut { sequence: "Ctrl+Z"; onActivated: toast.act() }    // the toast's Undo: a rename, a trash
+        Shortcut { sequence: "Ctrl+,"; onActivated: settingsPanel.open() }
 
         ColumnLayout {
             id: content
@@ -102,6 +104,7 @@ ShellRoot {
                 else if (k === Qt.Key_F2) actions.rename()
                 else if (e.text === "e") actions.exportIt()
                 else if (e.text === "o") actions.show()
+                else if (e.text === "t") view.transcribe()
                 else if (k === Qt.Key_Delete || (k === Qt.Key_Backspace && (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier))))
                     actions.trash()
                 else if (k === Qt.Key_Home) store.pickAt(0)
@@ -113,6 +116,7 @@ ShellRoot {
             }
 
             RecordPane {
+                z: 1                               // its buttons' tips over the recordings below it
                 Layout.fillWidth: true
                 Layout.preferredHeight: implicitHeight
                 c: win.look
@@ -144,6 +148,7 @@ ShellRoot {
                 }
                 Rectangle { visible: !win.onePane; Layout.fillHeight: true; implicitWidth: 1; color: win.look.divider }
                 RecordingView {
+                    id: view
                     visible: !win.onePane || win.viewOpen
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -153,6 +158,7 @@ ShellRoot {
                     actions: actions
                     onePane: win.onePane
                     onBack: win.viewOpen = false
+                    onOpenSettings: settingsPanel.open()
                 }
             }
         }
@@ -180,6 +186,13 @@ ShellRoot {
             onExported: r => toast.show("Exported " + r.export.split("/").pop(), { action: "Show", run: () => store.run(["show", r.name]) })
             onFailed: text => toast.show(text, { danger: true })
             onVisibleChanged: if (!visible) content.forceActiveFocus()
+        }
+        SettingsPanel {
+            id: settingsPanel
+            behind: content
+            c: win.look
+            store: store
+            onClosed: content.forceActiveFocus()
         }
         KeySheet { id: sheet; c: win.look; groups: keyHelp.groups }
         AppToast { id: toast; c: win.look }
