@@ -291,50 +291,7 @@ hl.bind(mod .. " + SHIFT + U",   hl.dsp.exec_cmd(scripts .. "/reopen"))   -- ope
 -- The window's own keys are ⌘⇧: fullscreen, floating, split direction and the arrows that move it. ⌘F / ⌘T / ⌘J are the
 -- apps' (find, new tab, downloads: the list below the copy keys)
 hl.bind(mod .. " + SHIFT + F",   hl.dsp.window.fullscreen(), { dont_inhibit = true })   -- also over a VM window (dont_inhibit: see Workspaces)
--- ⌘⇧T: toggle floating. For Deck: tiled -> floating at its default size, centred; floating but moved/resized ->
--- back to default size, centred; floating already at default position -> tiled. (Size: DECK_SIZE, which the Deck plugin's
--- hyprland.lua sets after this file has run, so it's read at the key press)
-local function xy(t) return t.x or t[1], t.y or t[2] end
-local function deck_reset(w)
-    hl.dispatch(hl.dsp.window.resize({ x = DECK_SIZE.w, y = DECK_SIZE.h, exact = true, window = "address:" .. w.address }))
-    hl.dispatch(hl.dsp.window.center({ window = "address:" .. w.address }))
-end
-local function deck_at_default(w)
-    local sw, sh = xy(w.size)
-    local x, y = xy(w.at)
-    local m = w.monitor
-    local cx, cy = (m.width / m.scale - DECK_SIZE.w) / 2, (m.height / m.scale - DECK_SIZE.h) / 2
-    return sw == DECK_SIZE.w and sh == DECK_SIZE.h and math.abs(x - cx) <= 3 and math.abs(y - cy) <= 30   -- y: the bar shifts the centre a little
-end
--- A window floated with ⌘⇧T is always centred. A screen-sized one (e.g. a lone window: geometry stays screen-sized and
--- the border disappears off the left/top) is first shrunk to 70 % x 75 %
-local function tame_float(w)
-    if not (w and w.floating) then return end
-    local m = w.monitor
-    local mw, mh = m.width / m.scale, m.height / m.scale
-    local sw, sh = xy(w.size)
-    if sw >= mw * 0.95 and sh >= mh * 0.9 then
-        hl.dispatch(hl.dsp.window.resize({ x = math.floor(mw * 0.7), y = math.floor(mh * 0.75), exact = true, window = "address:" .. w.address }))
-    end
-    hl.dispatch(hl.dsp.window.center({ window = "address:" .. w.address }))
-end
-local function deck_toggle_float()
-    local w = hl.get_active_window()
-    if w and w.class:gsub("^sh%.nightdrive%.", "") == "deck" and DECK_SIZE then
-        if not w.floating then
-            hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
-            deck_reset(w)
-        elseif deck_at_default(w) then
-            hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
-        else
-            deck_reset(w)
-        end
-    else
-        hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
-        tame_float(hl.get_active_window())
-    end
-end
-hl.bind(mod .. " + SHIFT + T",   deck_toggle_float)
+require("float-toggle")   -- ⌘⇧T: toggle floating, at a size the window fits
 
 hl.bind(mod .. " + SHIFT + J",   hl.dsp.layout("togglesplit"))
 
