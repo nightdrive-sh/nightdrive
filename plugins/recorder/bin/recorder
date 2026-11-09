@@ -100,6 +100,7 @@ Usage: recorder [command]
                    elapsed, started})
   list             the recordings, newest first (--json; --limit N)
   info NAME        one recording: its length, transcript and exports (--json)
+  transcript NAME  its transcript's text (--json: {name, duration, transcript (its path), text})
   rename NAME NEW  a new name for the recording, its transcript and exports (--json)
   trash NAME       the recording and its files to the trash, where Files puts them back (--json)
   restore NAME…    back from the trash (the names trash --json gives)
@@ -126,7 +127,7 @@ USAGE
 case ${1:-open} in
   record|pause|toggle|save|new) python3 "$LIB/capture.py" "$@"; changed ;;
   status)    python3 "$LIB/capture.py" "$@" ;;
-  list|info) python3 "$LIB/recordings.py" "$@" ;;
+  list|info|transcript) python3 "$LIB/recordings.py" "$@" ;;
   rename|trash) python3 "$LIB/recordings.py" "$@"; changed ;;
   restore)   restore "${@:2}" ;;
   export)    python3 "$LIB/export.py" "${@:2}"; changed ;;

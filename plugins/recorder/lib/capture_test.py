@@ -199,6 +199,15 @@ class Recordings(Env):
         self.assertEqual(sorted(p.name for p in self.rec.iterdir()),
                          ["Level 3 notes.mp3", "Level 3 notes.txt", "Level 3 notes.wav"])
 
+    def test_transcript(self):
+        self.make("Talk", transcript=True)
+        out = self.recs("transcript", "Talk")
+        self.assertEqual((out["name"], out["text"]), ("Talk", "[00:00] hello"))
+        self.make("Silent")
+        done = self.recs("transcript", "Silent", ok=False)
+        self.assertEqual((done.returncode, done.stderr.strip()),
+                         (1, "Silent has no transcript yet: recorder transcribe makes one."))
+
     def test_rename_onto_another(self):
         self.make("A")
         self.make("B")

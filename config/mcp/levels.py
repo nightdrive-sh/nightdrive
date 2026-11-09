@@ -19,8 +19,8 @@ from areas import RIGHTS
 VALUES = ("allow", "ask", "no")
 
 # Read Ask on Normal: what a stranger may have written (mail, invitations, notifications: prompt injection) or what is
-# other people's or private (contacts, notes), and the picture of a window, which could show anything
-PRIVATE = ("mail", "contacts", "calendar", "notes", "notifications", "screen")
+# other people's or private (contacts, notes, what was said in a recording), and the picture of a window, which could show anything
+PRIVATE = ("mail", "contacts", "calendar", "notes", "recorder", "notifications", "screen")
 
 LEVELS = {
     "strict": {"default": {"read": "no", "modify": "no", "delete": "no"},
@@ -60,7 +60,7 @@ OPTIONS = {
     # Masking (logs 3300, 3301, 3304, 3306): codes, login links and card numbers are what an injection wants most and
     # what Claude doesn't need, so they stay hidden on Open too; the user may show them area by area
     **{area: {"secrets": {"strict": False, "normal": False, "open": False}}
-       for area in ("mail", "calendar", "notes", "ferry", "tasks")},
+       for area in ("mail", "calendar", "notes", "recorder", "ferry", "tasks")},
     # The apps whose notifications are a code or a vault's (#1884), as claude-write's BLOCKED_CLASSES are the windows
     # nothing is sent from: by the name a notification shows, on every level, the user may take one off
     "notifications": {

@@ -1,0 +1,82 @@
+{
+  "tools": [
+    {
+      "name": "recorder_list",
+      "title": "List recordings",
+      "description": "The user's recordings in Nightdrive Recorder (WAV files in ~/Recordings, or the folder Settings gives), newest first: each one's name (what the other recorder tools take), path, duration in seconds, size, when it was saved, its transcript's path (null when it has none) and its exports (MP3, M4A, FLAC, Opus copies). total is how many there are, limit of them returned (default all). Read a transcript with recorder_transcript.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {"type": "integer", "title": "At most", "description": "How many recordings to return, newest first (default all)", "minimum": 1}
+        },
+        "additionalProperties": false
+      },
+      "command": ["recorder", "list", "--json", ["--limit", "{limit}"]],
+      "class": "read",
+      "area": "recorder"
+    },
+    {
+      "name": "recorder_transcript",
+      "title": "Read a transcript",
+      "description": "A recording's transcript whole, as Recorder wrote it beside the WAV: a paragraph for each minute or so, each starting with its time in the recording ([mm:ss]). It is speech recognition, so expect misheard words. An error says when the recording has none yet (recorder_transcribe makes one).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recording": {"type": "string", "title": "Recording", "description": "The recording's name from recorder_list", "minLength": 1}
+        },
+        "required": ["recording"],
+        "additionalProperties": false
+      },
+      "command": ["recorder", "transcript", "--json", "--", "{recording}"],
+      "mask": ["text"],
+      "class": "read",
+      "area": "recorder"
+    },
+    {
+      "name": "recorder_transcribe",
+      "title": "Transcribe a recording",
+      "description": "Starts making a recording into text, offline with the model Recorder's Settings picked, in the background: an hour takes a few minutes with the fast model, about as long as the recording with the exact one. One runs at a time, the others wait. The transcript replaces the one before only once it is done. Check its progress with recorder_transcriptions, then read it with recorder_transcript. Recordings are transcribed when saved by default, so look at recorder_list first: one that has a transcript needs this only to make it again.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recording": {"type": "string", "title": "Recording", "description": "The recording's name from recorder_list", "minLength": 1}
+        },
+        "required": ["recording"],
+        "additionalProperties": false
+      },
+      "command": ["recorder", "transcribe", "--json", "--", "{recording}"],
+      "undo": ["recorder", "transcribe", "--cancel", "--json", "--", "{name}"],
+      "notice": "Transcribing {name}",
+      "class": "change",
+      "area": "recorder"
+    },
+    {
+      "name": "recorder_transcriptions",
+      "title": "Transcriptions under way",
+      "description": "The transcriptions under way and those that failed: each one's recording name, state (queued, running, failed), done and total pieces (about a minute each), model and error. A recording no longer listed here is done: its transcript is in recorder_list.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["recorder", "transcriptions", "--json"],
+      "class": "read",
+      "area": "recorder"
+    },
+    {
+      "name": "recorder_rename",
+      "title": "Rename a recording",
+      "description": "Gives a recording a new name: its WAV, transcript and exports are renamed together in the same folder. A name already taken is refused. Characters a file name can't have become spaces. Returns the recording under its new name. The user is told and can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recording": {"type": "string", "title": "Recording", "description": "The recording's name from recorder_list", "minLength": 1},
+          "new_name": {"type": "string", "title": "New name", "description": "Its new name, without .wav", "minLength": 1, "maxLength": 120}
+        },
+        "required": ["recording", "new_name"],
+        "additionalProperties": false
+      },
+      "command": ["recorder", "rename", "--json", "--", "{recording}", "{new_name}"],
+      "undo": ["recorder", "rename", "--json", "--", "{name}", "{was}"],
+      "notice": "Renamed the recording {was} to {name}",
+      "class": "change",
+      "area": "recorder"
+    }
+  ]
+}

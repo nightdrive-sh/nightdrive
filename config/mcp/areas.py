@@ -107,6 +107,10 @@ AREAS = {
               "modify": "writes new notes and adds to the end of one",
               "delete": "moves notes to the trash",
               "options": [SECRETS]},
+    "recorder": {"name": "Recorder", "glyph": "mic", "app": True,
+                 "read": "lists your recordings in ~/Recordings and reads their transcripts",
+                 "modify": "transcribes recordings and renames them",
+                 "options": [SECRETS]},   # what was said aloud: a code read out is in the transcript
     "deck": {"name": "Deck", "glyph": "disc-3", "app": True,
              "read": "sees what plays, searches music and albums (the search words go to Spotify)",
              "modify": "plays, queues, pauses and skips, likes songs"},

@@ -191,6 +191,8 @@ def run(name, progress=None):
 def main(argv):
     as_json = "--json" in argv
     args = [a for a in argv if a != "--json"]
+    if args[1:2] == ["--"]:      # a name after it may begin with - (Claude's tools put one there)
+        del args[1]
     cmd, rest = (args[0], args[1:]) if args else ("", [])
     try:
         if cmd == "status" and not rest:

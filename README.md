@@ -30,8 +30,8 @@ Nightdrive puts all of that together into one opinionated desktop.
   dictation, and sleep is tuned for Asahi.
 - **Everything is a keystroke away.** One launcher handles apps, passwords, clipboard history, emoji, screenshots, settings,
   installing packages and power. You rarely need a terminal for everyday things.
-- **Apps of its own.** Mail, Contacts, Calendar, Tasks, Notes, Deck, Garage and Ferry come with it, made for the keyboard
-  and in the desktop's colours.
+- **Apps of its own.** Mail, Contacts, Calendar, Tasks, Notes, Recorder, Deck, Garage and Ferry come with it, made for the
+  keyboard and in the desktop's colours.
 - **Simple and readable.** Plain config files, a few small scripts, and comments that explain *why*.
 
 ## Highlights
@@ -608,7 +608,8 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   `nightdrive mcp install`), any Claude Code session can use your desktop as far as Access allows. Each area (Mail,
   Appearance…) has Read, Modify and Delete, each *Allow*, *Ask* (Nightdrive's own card asks you each time) or *No* (not
   there for Claude at all). *Strict* gives only Nightdrive's docs and status; *Normal* asks before reading what is
-  private (mail, contacts, calendar, notes, notifications, the screen) and before deleting; *Open* allows the rest.
+  private (mail, contacts, calendar, notes, recordings, notifications, the screen) and before deleting; *Open* allows the
+  rest.
   Sending, installing and devices always ask; passwords are never there. What each area gives, and how to turn it off:
   [docs/claude.md](docs/claude.md).
 - **No credentials are stored in this repo.** Tokens stay with each app (Deck, Claude Code) or in 1Password.

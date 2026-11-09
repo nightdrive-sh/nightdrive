@@ -2,9 +2,11 @@
 
 Record from a microphone into `~/Recordings`: pause and go on as often as you like, and the pieces are saved as one WAV (48 kHz mono). The recording goes on with the window closed. Each one can be transcribed into text beside it, offline with Voxtype.
 
+![Recorder: the microphone's level and Record, the recordings, and one with its transcript](recorder.jpg)
+
 ## The window
 
-Hyper R opens it: the recordings, newest first, under the microphone's level and Record. While it records, the window is a low strip (the time, the level, Pause, Save, New) and grows back once saved; `l` shows the recordings meanwhile.
+Hyper R opens it: the recordings, newest first, under the microphone's level and Record. While it records, the window is a low strip (the time, the level, the microphone, Pause, Save, New) and grows back once saved; `l` shows the recordings meanwhile.
 
 | Key | What it does |
 | --- | --- |
@@ -41,6 +43,10 @@ models: `voxtype setup --download --model medium` (or `large-v3-turbo`).
 
 While a recording is made or paused, the top bar shows a microphone and the time: a click pauses or goes on, a right click saves, a middle click opens the window.
 
+## With Claude
+
+In Settings › Claude › Access, the Recorder row lets Claude list your recordings and read their transcripts (on the Normal level it asks each time, as for notes), and transcribe one or rename it, with Undo in the notification. Claude doesn't record, play or delete.
+
 ## In a terminal
 
 | Command | What it does |
@@ -52,6 +58,7 @@ While a recording is made or paused, the top bar shows a microphone and the time
 | `recorder new` | Save, and start the next recording at once |
 | `recorder status` | What is being recorded and for how long |
 | `recorder list`, `recorder info NAME` | The recordings, newest first; one recording |
+| `recorder transcript NAME` | Its transcript's text |
 | `recorder rename NAME NEW` | A new name for the recording, its transcript and exports |
 | `recorder trash NAME` | The recording and its files to the trash, where Files puts them back |
 | `recorder export NAME FORMAT` | A copy beside it as `mp3`, `m4a`, `flac` or `opus`; made again if there is one |

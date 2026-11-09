@@ -46,8 +46,8 @@ private asks each time), and turn it all off with its switch ([Turning it off](#
 | **Actions with consequences** | sending mail, a Home Assistant device, installing software, a screen's resolution, Do Not Disturb on | only after you allow it on Nightdrive's card |
 
 Any read, change or delete can ask on the card too: that is your choice in Access, area by area (below). On the
-Normal level, reading what is private (mail, contacts, calendar, notes, notifications, a window on screen) and every
-delete do.
+Normal level, reading what is private (mail, contacts, calendar, notes, recordings, notifications, a window on screen)
+and every delete do.
 
 **The card** shows exactly what will be done: the recipients and the text, the device and its new state, every package
 dnf would install, every path a trash takes (a folder with how many files are in it), the app and title of the window
@@ -84,8 +84,8 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
 - **On or off** at the top: whether Claude Code has Nightdrive's tools at all.
 - **The level** sets every area at once:
   - *Strict*: only Nightdrive's docs and status, so Claude can explain how things work.
-  - *Normal*, the default: reading your mail, contacts, calendar, notes, notifications or a window on screen asks you
-    each time; the rest is allowed. Changes run at once with Undo; deleting asks.
+  - *Normal*, the default: reading your mail, contacts, calendar, notes, recordings, notifications or a window on screen
+    asks you each time; the rest is allowed. Changes run at once with Undo; deleting asks.
   - *Open*: everything allowed.
 
   Once you change any choice below, the level shows as *Custom* (from the level you changed).
@@ -127,11 +127,11 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   search needs a word of two characters or more (a number three digits) and gives at most 25 people, and searches and
   cards give it at most 100 different people an hour, so the address book isn't read a letter or two at a time.
 
-  Mail, Calendar, Notes, Tasks, Ferry and Notifications have *Codes, card numbers and passwords*, off on every level:
-  what Claude reads there comes with them hidden, before it leaves your computer. One-time codes and meeting passcodes
-  (`[code hidden]`), login and password reset links (`[login link hidden]`), card numbers with their expiry and CVV
-  (`•••• 4242`), IBANs (`FI •••• 0785`), Finnish identity codes, passwords and API keys; a Ferry text that is a code or
-  a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. Invisible
+  Mail, Calendar, Notes, Recorder, Tasks, Ferry and Notifications have *Codes, card numbers and passwords*, off on
+  every level: what Claude reads there comes with them hidden, before it leaves your computer. One-time codes and
+  meeting passcodes (`[code hidden]`), login and password reset links (`[login link hidden]`), card numbers with their
+  expiry and CVV (`•••• 4242`), IBANs (`FI •••• 0785`), Finnish identity codes, passwords and API keys; a Ferry text
+  that is a code or a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. Invisible
   characters are taken out first and digits of other forms (`４`, `⁴`) read as 0–9, so a code split by them or spaced
   out (`4 8 2 9 1 3`, `4.8.2.9.1.3`, a thin space) is hidden too, as is a number to sign in with ("Use 482913 to log
   in"). A reply Claude drafts comes back with its quote hidden the same way: the card that
@@ -243,6 +243,7 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Calendar | **calendars, events** | add an event (the first one to each calendar asks; to a calendar marked shared: †) | **an event †** |
 | Tasks | lists and tasks | add, done, later | **to the trash** |
 | Notes | **list, search, read (`~/Notes`)** | a new note, add to the end of one | **to the trash** |
+| Recorder | **recordings, transcripts (`~/Recordings`)**, transcriptions under way | transcribe, rename | |
 | Deck | what plays, search, albums | play, queue, pause and skip, like, Pick for me | |
 | Ferry | whether it's on, devices, the box | send files or a text to a device † | |
 | Home Assistant | devices and sensors (presence and location: a choice) | switch a device, dim a light (with Undo), lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
