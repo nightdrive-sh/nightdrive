@@ -23,7 +23,7 @@ import "NotifGroups.js" as Groups
 // The history keeps what still matters (stale rows are noise that buries the rest):
 // - Replaced: a notification with the same stack tag as an earlier one from its app (hints x-dunst-stack-tag or
 //   x-canonical-private-synchronous: `notify-send -h string:x-dunst-stack-tag:NAME`) takes its place without a sound,
-//   and one with the same text as an earlier one moves that row to the top instead of adding a second.
+//   and one with the same text (and picture) as an earlier one moves that row to the top instead of adding a second.
 // - Withdrawn: a notification stays open after its popup goes, so its app can still close it (a chat read on the phone,
 //   a reminder whose meeting began), and then its row goes too. Not when the app has no window left: apps close their
 //   notifications when they quit, and those rows stay.
@@ -330,9 +330,11 @@ Singleton {
             row.group = Groups.key(row.app, String(hints["x-nightdrive-group"] || ""))
             const stack = hints["x-dunst-stack-tag"] || hints["x-canonical-private-synchronous"] || ""
             if (stack) row.tag = row.app + "\n" + stack
-            // The earlier one this replaces: the same stack tag, or else the same text (in the history, or a transient popup)
+            // The earlier one this replaces: the same stack tag, or else the same text and picture (in the history, or a
+            // transient popup). The picture counts: each screenshot says the same words but is a different picture of its own.
             const twin = s.history.concat(s.popups.map(p => p.entry)).find(h => h.uid !== row.uid && h.app === row.app
-                && (row.tag ? h.tag === row.tag : h.summary === row.summary && h.body === row.body))
+                && (row.tag ? h.tag === row.tag
+                            : h.summary === row.summary && h.body === row.body && (h.image || "") === row.image))
             const others = s.history.filter(h => h.uid !== row.uid && (!twin || h.uid !== twin.uid))
             // (twin's notification closes as its row goes: onHistoryChanged)
             s.history = n.transient ? others : [row].concat(others).slice(0, s.maxHistory)
