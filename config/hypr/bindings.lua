@@ -379,6 +379,7 @@ hl.bind(mod .. " + SHIFT + TAB", hl.dsp.focus({ workspace = "e-1" }))
 -- A window remembers where it came from (until Hyprland reloads its config): ⌘⇧D in the drawer takes it back to that
 -- workspace, a floating one to its old place and size, a tiled one next to the window now at its old place
 local drawerOrigin = {}   -- window address -> { ws, floating, x, y, w, h }
+local function xy(t) return t.x or t[1], t.y or t[2] end   -- Hyprland gives positions and sizes as {x, y} or {1, 2}
 -- ⌘⇧D throws the window down off the screen before it goes into the drawer: it floats at its own place, slides down
 -- (only this move is animated, windows otherwise switch instantly) and is tiled again in the drawer
 hl.curve("throw", { type = "bezier", points = { {0.5, 0}, {0.75, 0} } })   -- ease in: speeds up as it falls
