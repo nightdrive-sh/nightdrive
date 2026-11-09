@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import qs
 import qs.kit
 
-// The recording: its time, the microphone's level, the mic it records from, and Record / Pause / Resume (Space), Save (⏎)
+// The recording: its time, the microphone's level, the mic it records from (left of the buttons), and Record / Pause / Resume (Space), Save (⏎)
 // and New (n: save and go straight on with the next). It is the whole window while a recording is made (a low strip,
 // shell.qml), and the top of the tall one otherwise. Below compactMax the buttons are glyphs alone; in the strip their
 // tips stay off, as there is no room under them (the key sheet, ?, has the keys).
@@ -54,48 +54,50 @@ Item {
             TextMetrics { id: timeMetrics; font.family: pane.c.font; font.pixelSize: 26; text: pane.store.elapsed >= 3600 ? "0:00:00" : "00:00" }
         }
 
-        ColumnLayout {
+        // The meter alone sets the row's middle, so the time, the meter and Record line up; the recording's name hangs
+        // under it without moving it
+        Item {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
-            spacing: 6
+            implicitHeight: meter.implicitHeight
             LevelMeter {
-                Layout.fillWidth: true
-                Layout.maximumWidth: 560          // a wide window: not a bar from edge to edge
+                id: meter
+                anchors.left: parent.left
+                width: Math.min(parent.width, 560)        // a wide window: not a bar from edge to edge
+                anchors.verticalCenter: parent.verticalCenter
                 c: pane.c
                 node: pane.mics.nodeOf(pane.micShown)
                 live: pane.store.recording
             }
-            // The mic (a click picks another, but not in the middle of a piece: pause first) and the recording's name
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-                // Its own width, its label cut short rather than the button squeezed (its row doesn't elide), and its
-                // glyph lined up with the meter's left end
-                AppBarButton {
-                    Layout.preferredWidth: implicitWidth
-                    Layout.leftMargin: -10
-                    c: pane.c
-                    glyph: "mic"
-                    label: pane.short(pane.mics.nameOf(pane.micShown), pane.compact ? 18 : 30)
-                    enabled: !pane.store.recording
-                    tip: pane.strip ? "" : "Microphone"
-                    keys: "m"
-                    onClicked: pane.pickMic()
-                }
-                Text {
-                    Layout.fillWidth: true
-                    visible: !pane.store.idle && !pane.compact
-                    elide: Text.ElideRight; textFormat: Text.PlainText
-                    text: pane.store.name
-                    font.family: pane.c.font; font.pixelSize: 12
-                    color: pane.c.faint
-                }
+            Text {
+                anchors.left: parent.left; anchors.right: meter.right
+                anchors.top: meter.bottom; anchors.topMargin: 6
+                visible: !pane.store.idle && !pane.compact
+                elide: Text.ElideRight; textFormat: Text.PlainText
+                text: (micButton.visible ? "" : pane.mics.nameOf(pane.micShown) + "  ·  ") + pane.store.name
+                font.family: pane.c.font; font.pixelSize: 12
+                color: pane.c.faint
             }
         }
 
         Row {
             Layout.alignment: Qt.AlignVCenter
             spacing: 8
+            // The mic, left of Record: a click picks another, but not in the middle of a piece (pause first). Its label
+            // cut short rather than the button squeezed. Not in the strip, where Pause, Save and New need the room:
+            // its name goes under the meter there, and m still picks another while paused.
+            AppBarButton {
+                id: micButton
+                visible: !pane.strip
+                anchors.verticalCenter: parent.verticalCenter
+                c: pane.c
+                glyph: "mic"
+                label: pane.compact ? "" : pane.short(pane.mics.nameOf(pane.micShown), 24)
+                enabled: !pane.store.recording
+                tip: pane.strip ? "" : "Microphone"
+                keys: "m"
+                onClicked: pane.pickMic()
+            }
             AppButton {
                 c: pane.c
                 glyph: pane.store.recording ? "pause" : "circle"

@@ -51,8 +51,10 @@ Item {
                 readonly property bool lit: at <= m.level
                 readonly property bool held: Math.abs(at - m.peak) < 0.5 / m.bars && m.peak > 0.05
                 width: (m.width - (m.bars - 1) * 2) / m.bars
-                height: m.height * (0.45 + 0.55 * index / m.bars)     // rising, as a volume wedge
-                anchors.bottom: parent.bottom
+                // Rising, as a volume wedge, about its middle line: the meter's middle is the row's, as the time's
+                // and Record's are (Jari, 9.11.2026)
+                height: m.height * (0.45 + 0.55 * index / m.bars)
+                anchors.verticalCenter: parent.verticalCenter
                 radius: 1.5
                 // The loudest end warns: there it clips
                 color: lit || held ? (at > m.redFrom ? m.c.danger : m.live ? m.c.accent : m.c.dim) : m.c.line
