@@ -14,9 +14,10 @@ import "SessionGroups.js" as Groups
 // fit (layout below).
 // Its background is the top bar's (TopBar.c("bg")), so it follows Settings › Top bar opacity.
 // Each chip but a lead's ends with how long it has worked or waited (Claude.sessions' since), once past timeAfter;
-// crowded, the times go first, then the names (the leads keep theirs). A session named "#N topic" (the PM's) shows the
+// crowded, the times go first, then the names (the leads keep theirs). A done session (the green check) shows no time:
+// how long ago it finished took the room from its name (#2443). A session named "#N topic" (the PM's) shows the
 // number small before its time instead of in its name, which starts with a capital (#2427), and the time in brackets
-// ("#2427 8 min" read as one number); hidden with the time.
+// ("#2427 8 min" read as one number); the number goes before the name is shortened (SessionChip.tagShown).
 PanelWindow {
     id: sb
     readonly property int barH: Theme.barHeight   // as tall as the top bar
@@ -122,6 +123,9 @@ PanelWindow {
         return Math.floor(t / 3600) + " h" + (m ? " " + m + " min" : "")
     }
 
+    // A chip's time: none on a done one (#2443), whose name matters more than how long ago it finished
+    function chipTime(s) { return s && !s.done ? age(s.since) : "" }
+
     // The row: groups and lone sessions one after another, with no shares of their own (#2410), the room
     // after the last chip left empty. A lead's chip is always as wide as its (bold) name, with no time; every other chip
     // as wide as its name and time, and only when they don't all fit do they share what the leads, dots and gaps leave
@@ -133,7 +137,7 @@ PanelWindow {
         const leadW = it => Math.min(maxLead, Math.ceil(2 * chipPad + iconW + 6 + fm.advanceWidth(label(it)) + tagW(it)))
         // The time as it reads now: it grows a step at 10 s, 1 min, 10 min, 1 h (the font's digits are one width)
         const ownW = it => {
-            const t = age(it.session.since)
+            const t = chipTime(it.session)
             const g = tagW(it)
             return Math.min(maxChip, Math.ceil(2 * chipPad + iconW + 6 + nfm.advanceWidth(label(it)) + g
                                                + (t ? (g ? tagGap + tfm.advanceWidth("(" + t + ")")
@@ -146,10 +150,10 @@ PanelWindow {
         const fits = others.reduce((a, i) => a + widths[i], 0) <= room
         const share = others.length ? Math.max(minChip, Math.floor(room / others.length)) : 0
         const times = items.map(() => false)
+        // A tag isn't counted: the chip drops it on its own before shortening the name (SessionChip.tagShown)
         for (const i of others) {
             if (!fits) widths[i] = share
-            const g = tagW(items[i])
-            times[i] = fits || share >= textMin + timeW + (g ? g + Math.ceil(tfm.advanceWidth("()")) : 0)
+            times[i] = fits || share >= textMin + timeW
         }
         return { widths: widths, times: times }
     }
@@ -188,9 +192,9 @@ PanelWindow {
                     iconOnly: width < sb.textMin
                     showTime: !!sb.layout.times[cell.index]
                     tag: visible ? sb.tag(cell.it) : ""
-                    showTag: chip.lead || chip.showTime   // a lead has no time, and keeps its name too
+                    showTag: true   // the chip shows it only while its name fits beside it
                     tagGap: sb.tagGap
-                    time: visible ? sb.age(chip.session.since) : ""
+                    time: visible ? sb.chipTime(chip.session) : ""
                     stuck: chip.working && !chip.asking && chip.session.since > 0 && sb.now - chip.session.since >= sb.stuckAfter
                     padding: sb.chipPad
                     timeGap: sb.timeGap

@@ -137,8 +137,8 @@ Click an icon and a small menu opens under it:
   workspace by window, left to right and top to bottom, a dot between each group or lone session.
   A lead stays one when the sessions it opened have closed. Chips are as wide as their names, and share the bar
   equally only when they don't fit. After the name, once past 5 minutes, how long its turn has run or it has waited
-  for you; a turn past 10 minutes, likely stuck, shows its time in orange. A session named `#N topic` (`nightdrive ask
-  --name`) shows the task number small there, not in its name.
+  for you (not on a finished one); a turn past 10 minutes, likely stuck, shows its time in orange. A session named
+  `#N topic` (`nightdrive ask --name`) shows the task number small there, not in its name, while the name fits.
   **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar, and **Hyper ↑** /
   **Hyper ↓** to the previous / next lead, and **Hyper 1** … **Hyper 9** to the first … ninth (a session's card
   shows its key; a digit you gave an app in App shortcuts stays the app's). The bar follows Settings › Top bar opacity, its focused session the active

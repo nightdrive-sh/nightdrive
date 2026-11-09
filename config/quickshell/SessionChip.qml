@@ -10,8 +10,9 @@ import QtQuick
 // breathes while it works; the chips it opened follow it.
 // After its name, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
 // past stuckAfter is in the warning colour, as it's likely stuck. Before the time, as small and grey: the task number
-// of a session named "#N topic" (SessionsBar.tag; #2427), left out of its name. The bar hides both when crowded, before
-// the name (a lead, which has no time, keeps its number).
+// of a session named "#N topic" (SessionsBar.tag; #2427), left out of its name. The bar hides the time when crowded;
+// the number shows only while the name fits whole beside it, so the name wins the room (#2443). A done session has
+// no time (SessionsBar.chipTime).
 Rectangle {
     id: chip
     property var session: ({})
@@ -28,6 +29,14 @@ Rectangle {
     property int timeGap: 10             // between the name and the time (or the tag)
     property int tagGap: 5               // between the tag and the time
     readonly property bool hovered: area.containsMouse
+    // The tag only while the whole name fits beside it (and the time, when that shows): crowded, the number goes and
+    // the name keeps its room (#2443). Measured on implicit widths, so it doesn't loop through nm's width.
+    readonly property bool tagShown: showTag && !iconOnly && tag !== ""
+        && nm.implicitWidth + timeGap + tg.implicitWidth + (tm.visible ? tagGap + bracketed.width : 0)
+           <= width - nm.x - padding
+    // What follows the name; the name's width takes the same measures as tagShown, or a name that just fits is elided
+    readonly property real afterName: tagShown ? timeGap + tg.implicitWidth + (tm.visible ? tagGap + bracketed.width : 0)
+                                     : tm.visible ? timeGap + tm.implicitWidth : 0
     signal clicked()
 
     readonly property bool asking: !!session.asking
@@ -76,9 +85,7 @@ Rectangle {
         id: nm
         visible: !chip.iconOnly
         anchors { left: ic.right; leftMargin: 6; verticalCenter: parent.verticalCenter }
-        width: Math.min(implicitWidth, chip.width - x - chip.padding
-                        - (tg.visible ? tg.implicitWidth + chip.timeGap : 0)
-                        - (tm.visible ? tm.implicitWidth + (tg.visible ? chip.tagGap : chip.timeGap) : 0))
+        width: Math.min(implicitWidth, chip.width - x - chip.padding - chip.afterName)
         text: chip.text
         elide: Text.ElideRight
         color: chip.asking || chip.active ? Theme.accent : chip.lead ? Theme.title : Theme.text
@@ -86,7 +93,7 @@ Rectangle {
     }
     Text {
         id: tg
-        visible: chip.showTag && !chip.iconOnly && chip.tag !== ""
+        visible: chip.tagShown
         anchors { left: nm.right; leftMargin: chip.timeGap; verticalCenter: parent.verticalCenter }
         text: chip.tag
         color: Theme.dim
@@ -101,6 +108,8 @@ Rectangle {
         color: chip.stuck ? Theme.warning : Theme.dim
         font { family: Theme.font; pixelSize: 10; bold: chip.stuck }   // SessionsBar.timeW measures this font
     }
+    // The time as it reads after a tag, for tagShown (tm's own width changes with the tag: a loop)
+    TextMetrics { id: bracketed; font: tm.font; text: "(" + chip.time + ")" }
     MouseArea {
         id: area
         anchors.fill: parent
