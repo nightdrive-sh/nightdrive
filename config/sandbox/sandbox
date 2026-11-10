@@ -92,7 +92,8 @@ resources() {
   avail=$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo)
   (( avail < MIN_FREE_MB )) && echo "Warning: only $avail MB of memory available; a sandbox takes ~1 GB" >&2
   limit=$(sysctl -n fs.inotify.max_user_instances 2>/dev/null) || return 0
-  used=$(find /proc/[0-9]*/fd -lname 'anon_inode:inotify' 2>/dev/null | wc -l)
+  # stat, not find: find aborts with a core dump when a process exits while it walks /proc/<pid>/fd
+  used=$(QUOTING_STYLE=literal stat -c '%N' /proc/[0-9]*/fd/* 2>/dev/null | grep -c ' -> anon_inode:inotify$')
   (( used * 10 > limit * 8 )) && echo "Warning: $used of $limit inotify instances in use; a new Hyprland may start with no output.
 Remove sandboxes you don't need (nightdrive sandbox list), or raise it: sudo sysctl fs.inotify.max_user_instances=1024" >&2
   return 0
