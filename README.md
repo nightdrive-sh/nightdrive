@@ -194,7 +194,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   be answered right there (Allow, Deny). Allow is offered only when the notification shows all it allows: a long
   command, one run outside the sandbox, a file edit or an MCP tool is answered in its session.
 - **Closed by mistake?** ⌘⇧U opens the window you closed with ⌘W again, in the same place. A terminal comes back in the
-  same folder, with Claude Code in the same conversation. Press again for the one before it.
+  same folder, with Claude Code in the same conversation. Press again for the one before it. A fullscreen window (a
+  game) isn't closed by a stray key: ⌘W or ⌘Q asks you to press it again within 2 s.
 - **No internet?** When Wi-Fi or a cable is connected but the internet doesn't answer for 10 s, a notification says
   so, and **Back online** when it comes back; meanwhile the network icon is orange, Wi-Fi's with a "!". A hotel's or
   café's sign-in page gets a notification of its own: click it to sign in. None when you turn Wi-Fi off or right after

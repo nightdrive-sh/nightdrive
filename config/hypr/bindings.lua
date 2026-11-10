@@ -285,8 +285,9 @@ hl.bind(mod .. " + ALT + left",  hl.dsp.send_shortcut({ mods = "CTRL", key = "Pr
 hl.bind(mod .. " + ALT + right", hl.dsp.send_shortcut({ mods = "CTRL", key = "Next" }))
 
 -- Windows
-hl.bind(mod .. " + W",          hl.dsp.exec_cmd(scripts .. "/close-or-hide"))   -- closes; background apps (hypr/background-apps) are hidden in the background instead
-hl.bind(mod .. " + Q",           hl.dsp.exec_cmd(scripts .. "/quit-app"))   -- quits the app for real, background apps too (Deck, WhatsApp…); ⌘W hides them
+-- ⌘W and ⌘Q go through scripts/close-guard: a fullscreen window (a game) asks for a second press within 2 s (#2555)
+hl.bind(mod .. " + W",          hl.dsp.exec_cmd(scripts .. "/close-guard ⌘W " .. scripts .. "/close-or-hide"))   -- closes; background apps (hypr/background-apps) are hidden in the background instead
+hl.bind(mod .. " + Q",           hl.dsp.exec_cmd(scripts .. "/close-guard ⌘Q " .. scripts .. "/quit-app"))   -- quits the app for real, background apps too (Deck, WhatsApp…); ⌘W hides them
 hl.bind(mod .. " + SHIFT + U",   hl.dsp.exec_cmd(scripts .. "/reopen"))   -- opens the window last closed with ⌘W again, where it was; again: the one before it
 -- The window's own keys are ⌘⇧: fullscreen, floating, split direction and the arrows that move it. ⌘F / ⌘T / ⌘J are the
 -- apps' (find, new tab, downloads: the list below the copy keys)

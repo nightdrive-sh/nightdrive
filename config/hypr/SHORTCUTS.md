@@ -36,7 +36,7 @@
   ⌘ ⌃ C              Send to Claude: the selected text or files, or the clipboard's picture, to a Claude Code session's prompt, not sent (a preview and the sessions first; a new one too)
 
 ## Windows
-  ⌘ W                Close window; background apps (Deck, WhatsApp, Slack, 1Password…) are only hidden and keep running, with a green dot in the Launcher (their shortcut brings them back)
+  ⌘ W                Close window; background apps (Deck, WhatsApp, Slack, 1Password…) are only hidden and keep running, with a green dot in the Launcher (their shortcut brings them back). A fullscreen window (a game) closes only with a second ⌘W within 2 s; the same for ⌘Q
   ⌘ Q                Quit the app for real: closes all its windows, and an app left running in the tray is asked to quit too (also the background apps; in Deck `q` does the same)
   ⌘ ⇧ U              Reopen the window closed with ⌘W, where it was; again: the one before it (up to 10). A terminal opens in the same folder, Claude Code in the same conversation, editors start again (hypr/reopen-commands)
   ⌘ ⇧ F              Fullscreen
