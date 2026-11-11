@@ -175,6 +175,8 @@ Expunge Near
 SyncState *
 ```
 
+An iCloud account (with an app-specific password) is `imap.mail.me.com` and `smtp.mail.me.com:587`, with a channel per folder: `INBOX`, `Drafts` and `Archive` as they are, and `Sent Messages`, `Junk` and `Deleted Messages` as `Sent`, `Spam` and `Trash`. Mail sends with TLS from the start on port 465 and with STARTTLS on any other port, such as 587.
+
 ## In a terminal
 
 | Command | What it does |
