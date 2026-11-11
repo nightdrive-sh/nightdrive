@@ -52,7 +52,7 @@ usage() {
   row "snippets [COMMAND]"       "Text snippets: list, set, remove, status, enable, disable"
   row "defaults [set KIND APP]"  "Default apps (browser, email, files…), e.g. nightdrive defaults set pdf org.gnome.Papers"
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
-  row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --model MODEL, --effort LEVEL, --background, --workspace WS)"
+  row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --model MODEL (opus), --effort LEVEL (medium), --background, --workspace WS)"
   row "mcp"                      "Nightdrive's MCP server for Claude (stdio: Claude Code starts it)"
   row "mcp install|remove"       "Register it in Claude Code and allow its tools, or take that away (asks first; --dry-run shows)"
   row "mcp status"               "Whether Claude Code has it, and its tools are allowed (--json)"
@@ -147,7 +147,10 @@ case ${1:-} in
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
   ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }
-       exec "$scripts/terminal-or-claude" "${@:2}" ;;                   # what the launcher's ⌘⌥Enter runs
+       # Opus at medium unless asked: a session another one opens shouldn't take the user's default model (which may
+       # be a costlier one with its own limit). Later options win, so --model / --effort override these.
+       # The launcher's keys and dictation call terminal-or-claude directly and keep the user's model.
+       exec "$scripts/terminal-or-claude" --model opus --effort medium "${@:2}" ;;
   mcp) case ${2:-} in
         "") exec python3 "$repo/config/mcp/server.py" ;;               # Dashboard #1761; Claude Code runs it
         install|remove|status) exec python3 "$repo/config/mcp/register.py" "${@:2}" ;;
