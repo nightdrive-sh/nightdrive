@@ -51,7 +51,9 @@ Nightdrive puts all of that together into one opinionated desktop.
 Type a request and press ⌘Enter, or Enter on the **Ask Claude** row: Claude does it with [Nightdrive's
 tools](docs/claude.md) in a toast in the Launcher's place, showing each step and its answer, and you can write back (⌘⌃Enter sends
 it to Claude Code in a terminal instead). The tools are experimental: what Claude reads with them (a mail, a file) goes to
-Anthropic as part of the conversation ([What reaches Anthropic](docs/claude.md#what-reaches-anthropic)). Search "Rename current space" to name the workspace
+Anthropic as part of the conversation ([What reaches Anthropic](docs/claude.md#what-reaches-anthropic)). When nothing
+matches, **Open in Browser** under it opens what you typed in the default browser: an address as it is, anything else
+as a search with the browser's own search engine. Search "Rename current space" to name the workspace
 you're on in the bar. Settings › Launcher › *Light launcher* shows only the search field (and the player) until you
 type or press ↓; ↑ from the top row hides the rows again.
 

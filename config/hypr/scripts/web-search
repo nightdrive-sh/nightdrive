@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Open text in the default browser: an address as it is, anything else as a search with the browser's own default
+search engine (the launcher's "Open in Browser" row, WebSearchLevels.qml; Dashboard #2836).
+
+  web-search TEXT          open it
+  web-search --url TEXT    print the URL it would open (the browser's search, or the address), open nothing
+
+xdg-open with search words opens nothing useful (it reads them as a file name), and the browsers have no common way to
+search from the command line, so the engine is found per browser:
+- Firefox and its kin take --search, which uses the engine chosen in their settings.
+- A Chromium browser (Brave, Chrome, Chromium, Vivaldi, Edge) keeps the chosen engine's URL template in its profile's
+  Preferences (default_search_provider_data); it's filled in here and opened like any link, so it opens as links from
+  other apps do (in a new window: hypr/scripts/default-apps).
+- Anything else, or a profile without a choice saved: FALLBACK_SEARCH.
+"""
+import json, os, re, subprocess, sys
+from urllib.parse import quote
+
+HOME = os.path.expanduser("~")
+CONFIG = os.environ.get("XDG_CONFIG_HOME", HOME + "/.config")
+FIREFOX = re.compile(r"firefox|librewolf|waterfox|floorp|zen", re.I)
+# A Chromium browser's engine when its profile saved none: what that browser starts with
+FALLBACK_BY_PROG = [(re.compile(r"brave", re.I), "https://search.brave.com/search?q={searchTerms}")]
+FALLBACK_SEARCH = "https://www.google.com/search?q={searchTerms}"
+# An address: a scheme ("https://…", "mailto:" is left to search), or a host with a dot and letters at the end
+# ("nightdrive.sh", "example.com/path"), localhost or an IPv4 address, with an optional port and path. No spaces.
+SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*://\S+$", re.I)
+HOST = re.compile(r"^(localhost|\d{1,3}(\.\d{1,3}){3}|([a-z0-9-]+\.)+[a-z][a-z0-9-]{1,62})(:\d{1,5})?([/?#]\S*)?$", re.I)
+
+
+def address(text):
+    """The URL when the text is an address, else "". A bare host gets https://, localhost and an IP http://."""
+    if SCHEME.match(text): return text
+    m = HOST.match(text)
+    if not m: return ""
+    local = m.group(1).lower() == "localhost" or re.match(r"^\d", m.group(1))
+    return ("http://" if local else "https://") + text
+
+
+def browser():
+    """The default browser's desktop entry: (id, its Exec program's name)."""
+    try:
+        out = subprocess.run(["gio", "mime", "x-scheme-handler/https"], capture_output=True, text=True, timeout=5,
+                             env=dict(os.environ, LC_ALL="C")).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return "", ""
+    m = re.match(r"Default application for .*?: (\S+\.desktop)", out)
+    if not m: return "", ""
+    app_id = m.group(1)
+    data_home = os.environ.get("XDG_DATA_HOME", HOME + "/.local/share")
+    dirs = [data_home] + os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":")
+    # The wrapper's Exec is the browser's own plus --new-window: its program names the browser just as well
+    for d in dirs:
+        try:
+            with open(f"{d}/applications/{app_id}", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    if line.startswith("Exec="):
+                        words = line[5:].split()
+                        return app_id, os.path.basename(words[0]) if words else ""
+        except OSError:
+            continue
+    return app_id, ""
+
+
+def chromium_dir(prog):
+    """The browser's config folder by its program: brave-origin-stable → BraveSoftware/Brave-Origin,
+    google-chrome-stable → google-chrome, chromium-browser → chromium."""
+    name = re.sub(r"-stable$", "", prog)
+    if name.startswith("brave"):
+        return CONFIG + "/BraveSoftware/" + "-".join(p.capitalize() for p in name.split("-"))
+    if name == "chromium-browser": name = "chromium"
+    return CONFIG + "/" + name
+
+
+def chromium_template(prog):
+    """The URL template of the engine chosen in the browser's last used profile, or the browser's own fallback."""
+    folder = chromium_dir(prog)
+    profile = "Default"
+    try:
+        with open(folder + "/Local State", encoding="utf-8") as f:
+            profile = json.load(f).get("profile", {}).get("last_used") or profile
+    except (OSError, ValueError):
+        pass
+    try:
+        with open(f"{folder}/{profile}/Preferences", encoding="utf-8") as f:
+            data = json.load(f).get("default_search_provider_data", {})
+        for key in ("template_url_data", "mirrored_template_url_data"):
+            url = (data.get(key) or {}).get("url", "")
+            if "{searchTerms}" in url: return url
+    except (OSError, ValueError, AttributeError):
+        pass
+    return next((url for pat, url in FALLBACK_BY_PROG if pat.search(prog)), FALLBACK_SEARCH)
+
+
+def fill(template, text):
+    """Chromium's template with the words in: {google:baseURL} is Google's, its other {…} parameters are left out."""
+    url = template.replace("{searchTerms}", quote(text, safe="")).replace("{google:baseURL}", "https://www.google.com/")
+    url = re.sub(r"\{[^}]*\}", "", url)
+    return re.sub(r"&&+", "&", url).rstrip("&?")
+
+
+def main(args):
+    only_url = args[:1] == ["--url"]
+    text = " ".join(args[1:] if only_url else args).strip()
+    if not text:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    url = address(text)
+    if not url:
+        app_id, prog = browser()
+        if FIREFOX.search(prog) or FIREFOX.search(app_id):
+            if only_url:
+                print(f"{prog} --search {text}")
+                return 0
+            # "--" isn't taken by Firefox here: the words go as --search's value, so a leading "-" stays a word
+            subprocess.Popen([prog, "--search", text], start_new_session=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return 0
+        url = fill(chromium_template(prog) if prog else FALLBACK_SEARCH, text)
+    if only_url:
+        print(url)
+        return 0
+    subprocess.Popen(["xdg-open", url], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
