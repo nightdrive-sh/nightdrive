@@ -4,6 +4,7 @@
     sources.py write             write VDIRSYNCER_CONFIG, print its pairs: the CalDAV sources (one a line)
     sources.py names [KIND]      print the sources' names (KIND: caldav or ics)
     sources.py list              the sources as JSON: name, kind, read_only
+    sources.py any               exit 0 if there is a source to sync, 1 if none (the sync timer's condition)
 
 The CalDAV accounts are Contacts' (~/.config/contacts/accounts.conf, read by Contacts' own lib/config.py): one account
 and one app password in the keyring for both apps. Calendar's own calendars.conf adds to them:
@@ -172,8 +173,19 @@ def write():
     return caldav
 
 
+def any_source():
+    """0 if there is something to sync, 1 if not: the timer then skips its round instead of failing every 15 minutes
+    (#2527). A broken calendars.conf is 0 too, so the sync runs and reports it where it is seen (the unit's failure)."""
+    try:
+        return 0 if sources() else 1
+    except SystemExit:
+        return 0
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "names"
+    if what == "any":
+        sys.exit(any_source())
     if what == "write":
         found = write()
     elif what in ("names", "list"):

@@ -164,6 +164,7 @@ Usage: calendar [command]
   quit           close Calendar
   log            follow the app's log (QML errors show up here)
   keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
+  has-sources    exit 0 if there is a calendar to sync (with none, the sync skips its round)
   vdirsyncer …   vdirsyncer with Calendar's config, for a closer look
   khal …         khal with Calendar's config
   help           this text
@@ -209,6 +210,7 @@ case ${1:-open} in
   disable)   disable ;;
   # The same check as Contacts' (its lib/keyring.py says why it isn't a bare busctl)
   keyring-locked) python3 "$APP_DIR/../contacts/lib/keyring.py" ;;
+  has-sources) exec python3 "$LIB/sources.py" any ;;
   vdirsyncer) python3 "$LIB/sources.py" write >/dev/null && vds "${@:2}" ;;
   khal)      khal -c "$(python3 "$LIB/events.py" --config)" "${@:2}" ;;
   help|-h|--help) usage ;;
