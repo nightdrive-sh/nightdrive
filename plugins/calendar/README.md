@@ -1,6 +1,8 @@
 # Calendar
 
-Your iCloud calendars, and Google calendars by their private address, on your computer: the month, the week, the day or the days ahead in a window of its own, searchable, kept in sync every 15 minutes, with the events' reminders as notifications. A first version: you add, change and delete events in the window, with the `calendar` command, or by Claude when you ask it to.
+Your iCloud calendars, and Google calendars by their private address, on your computer: the month, the week, the day or the days ahead in a window of its own, searchable, kept in sync every 15 minutes, with the events' reminders as notifications. You add, change and delete events in the window, repeating ones too, with the `calendar` command, or by asking Claude.
+
+![Calendar's week, with the sidebar of calendars](calendar.jpg)
 
 ## Using it
 
@@ -27,6 +29,7 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 - A new or edited event: `Tab` moves between its fields, `Enter` or Ctrl+Enter saves it, `Esc` leaves it. Days and times are shown and typed the way Launcher › Settings › Region writes them (5.11.2026 and 9:30, or 11/5/2026 and 9:30 AM); 2026-11-05 and 930 are read too, and a day without its year (5.11.) is this year's. A click into a day's field, or `↓` there, opens the month to pick from: the arrows move a day or a week, `PgUp`/`PgDn` a month, `Enter` picks, `Esc` closes it. The end moves with the start. Weeks start on the region's day (Sunday in the US). It goes in a calendar that isn't read only (below), the one you used last.
 - **Reminders**: an event's reminder (its alarm, set here or on the phone) comes as a notification at its time, also with the window closed: Open shows the event, Snooze brings it back in 5 minutes. One missed while the computer slept or was off comes when it wakes, if the event hasn't ended yet; more than three at once come as one notification. A new or edited event's Reminder picks one (an all-day event's: 9:00 on the day or the day before); changing it replaces the alarms the event had, even two the phone set. Settings (⌘,) turns them off, or gives a timed event without one a reminder before it (none by default).
 - The top bar's clock menu lists today's events under the month; a click opens one in Calendar.
+- The Launcher's search (⌘Space) finds the next 30 days' events by title or place, and `Enter` opens one here; its New event row starts one. Settings › Launcher › Include calendar events leaves the events out.
 - **Invitations** in Mail (an `.ics` in a message) show as a card there, with Add to calendar; an update to one you added offers Update, a cancellation Remove (Mail's README › Reading). Only the event's own fields are kept: not the sender's alarms (your reminder, or the default in Settings, applies), attachments or links. An update keeps the reminder you gave the event, and the calendar it is in. Accept, Maybe and Decline on the card answer the organiser, and the event keeps your answer.
 - The day view (`d`) is the week's hours for one day, wide enough for each event's time and place beside its title.
 - The agenda (`a`) lists the 30 days from the day picked that have events, under Today, Tomorrow and the days' names.

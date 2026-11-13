@@ -75,9 +75,10 @@ sidebar steps aside; narrower still, the list and the message take turns.
 - **[Ferry](plugins/ferry/README.md)**: a mailbox over Tailscale between your computers and your phone
 - **[Notes](plugins/notes/README.md)**: your Markdown notes in `~/Notes`, written in its window, in folders and with
   #tags, found as you type there and in the Launcher; Apostrophe still opens them, if you like it better
-- **[Tasks](plugins/tasks/README.md)** and **[Calendar](plugins/calendar/README.md)**: new, and simple for now. Their
-  windows show your tasks (a notification when one comes due) and your iCloud and Google calendars, and you add and
-  change things with their commands or by asking Claude ([Claude and your desktop](docs/claude.md))
+- **[Calendar](plugins/calendar/README.md)**: your iCloud, Google and CalDAV calendars by month, week, day or agenda,
+  with reminders as notifications, invitations from Mail and repeating events; the Launcher finds what's coming
+- **[Tasks](plugins/tasks/README.md)**: new, and simple for now. Its window shows your tasks (a notification when one
+  comes due), and you add and change them with its command or by asking Claude ([Claude and your desktop](docs/claude.md))
 
 ![Mail four ways: folders, list and message; list and message; and in a narrow window the list, then the message](docs/releases/0.6.0-mail-sizes.jpg)
 
@@ -246,6 +247,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Browser | Firefox | themed, tabs below the address bar, no tab bar with one tab, starts with an empty window (Launcher › Settings › Apps › Firefox) |
 | Mail | [Mail](plugins/mail/README.md) (Nightdrive's own) | quiet reading, notifications you can answer from, replies Claude writes for you to read first |
 | Contacts | [Contacts](plugins/contacts/README.md) (Nightdrive's own) | iCloud, Google and CardDAV, in sync both ways; Mail and the Launcher find them too |
+| Calendar | [Calendar](plugins/calendar/README.md) (Nightdrive's own, vdirsyncer and khal) | iCloud, Google and CalDAV; reminders as notifications, today's events in the clock menu, invitations from Mail |
 | Music | [Deck](plugins/deck/README.md) (Nightdrive's own Spotify player, needs Premium) | bar icon, music menu, player row in the Launcher, media keys |
 | Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own) | a mailbox both ways with your phone and other computers, over Tailscale |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |

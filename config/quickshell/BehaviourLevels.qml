@@ -250,6 +250,8 @@ Item {
                       sub: "People by name, company, address or number; Enter shows their numbers and addresses", switchOn: launcher.prefs.contacts }] : [])
                 .concat(Plugins.has("notes") ? [{ kind: "lpref", key: "notes", name: "Include notes", glyph: "notebook-pen",
                       sub: "Notes by title, folder or #tag; Enter opens one in Notes", switchOn: launcher.prefs.notes }] : [])
+                .concat(Plugins.has("calendar") ? [{ kind: "lpref", key: "calendar", name: "Include calendar events", glyph: "calendar",
+                      sub: "The next 30 days’ events by title or place; Enter opens one in Calendar", switchOn: launcher.prefs.calendar }] : [])
         }
         if (level === "mousescroll") {
             const cur = Number(mouseScroll)
