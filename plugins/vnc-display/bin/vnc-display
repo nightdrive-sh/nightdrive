@@ -279,7 +279,7 @@ cmd_list() {
   if ((json)); then echo ']'; elif ((first)); then echo "No devices: vnc-display add ipad"; fi
 }
 
-# Hyprland reloads with the state file and moves the workspaces as when a screen comes (hyprland.lua's monitor.added)
+# Hyprland reloads with the state file and moves the workspaces as when a screen comes (display.lua's monitor.added)
 rearrange() {
   hyprctl reload >/dev/null && hyprctl eval 'NightdriveArrangeWorkspaces(); NightdriveArrangeVirtual()' >/dev/null || true
 }

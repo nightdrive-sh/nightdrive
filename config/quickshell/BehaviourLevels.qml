@@ -104,7 +104,7 @@ Item {
         const o = Object.assign({}, firefox); o[key] = value; firefox = o
         Quickshell.execDetached([scripts + "/firefox-prefs", key, value])
     }
-    // Settings › Mouse: the wheel's scroll speed, a multiplier in a state file that hyprland.lua reads when it loads (input
+    // Settings › Mouse: the wheel's scroll speed, a multiplier in a state file that input.lua reads when it loads (input
     // scroll_factor; the trackpad has its own). "" = not read yet
     readonly property string mouseScrollFile: Quickshell.env("HOME") + "/.local/state/nightdrive/mouse-scroll"
     readonly property var mouseScrolls: [0.5, 0.75, 1, 1.5, 2, 3]

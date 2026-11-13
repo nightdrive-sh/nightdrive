@@ -13,7 +13,7 @@
 # If the lock dies while locked, it is started again: Hyprland keeps the session locked but shows only its "lockscreen
 # app died" screen, whose way out (a text console) a Mac keyboard doesn't reach without Fn. It died at boot when a screen
 # went away as it was starting (Quickshell asked for a lock surface on the gone screen: a Wayland protocol error).
-# With allow_session_lock_restore (hyprland.lua) the new one takes the lock over. Steps go to the journal (journalctl -t lock).
+# With allow_session_lock_restore (appearance.lua) the new one takes the lock over. Steps go to the journal (journalctl -t lock).
 # A new lock plays system/lock.wav (hypr/scripts/sounds event); not at boot (the login screen has its own sound), nor
 # at a relock after sleep or a restart here.
 # A screensaver running as the lock comes (the idle lock, 20 min after the saver by default): the lock starts showing the

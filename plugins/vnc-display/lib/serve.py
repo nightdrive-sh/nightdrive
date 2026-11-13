@@ -138,7 +138,7 @@ def current(output):
 
 def make_output(output):
     """The output, once Hyprland has settled it: a new output reloads the config and moves the workspaces
-    (hyprland.lua's monitor.added), and wayvnc capturing then, as the client moves its pointer, dies ("Fatal error while
+    (display.lua's monitor.added), and wayvnc capturing then, as the client moves its pointer, dies ("Fatal error while
     capturing", #1801). A headless output also comes at a size of its own, the device's only after the reload. So
     wayvnc waits for the output to have its size, scale and workspace, and SETTLE more; the device waits on the socket
     meanwhile."""

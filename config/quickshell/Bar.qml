@@ -54,9 +54,9 @@ Variants {
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "nightdrive-bar"
         readonly property real dpr: modelData.devicePixelRatio || 1
-        readonly property int laptopWorkspace: 10   // hyprland.lua: LAPTOP_WORKSPACE
+        readonly property int laptopWorkspace: 10   // hypr/display.lua: LAPTOP_WORKSPACE
         // A virtual screen (HEADLESS-*: a tablet or a phone over VNC, hypr/virtual-display.lua) isn't a display at the
-        // desk: it doesn't dock the laptop (hyprland.lua's isVirtual), and its workspace is the device's icon, not a number
+        // desk: it doesn't dock the laptop (hypr/display.lua's isVirtual), and its workspace is the device's icon, not a number
         readonly property bool isVirtual: modelData.name.startsWith("HEADLESS-")
         readonly property int phoneMaxWidth: 600   // logical px: a phone is narrower (an iPhone 440), a tablet not (an iPad mini 744)
         // Workspace id -> the icon of the virtual screen it is on (2–9: virtual-display.lua never gives one 1)
@@ -75,7 +75,7 @@ Variants {
         function modules() { const out = []; for (let i = 0; i < rep.count; i++) out.push(rep.itemAt(i)); return out }
 
         // Workspaces 1–5 always, others while they exist; the screen's active one highlighted, empty ones dimmed.
-        // The laptop's own workspace (hyprland.lua: LAPTOP_WORKSPACE, ⌘0) is a laptop icon after them, there while an
+        // The laptop's own workspace (hypr/display.lua: LAPTOP_WORKSPACE, ⌘0) is a laptop icon after them, there while an
         // external display is connected or while it exists; the laptop's screen then shows only it. Number size: the `workspaces` row in adjust.conf.
         // What exists is read from the windows and the screens, not Hyprland.workspaces: a workspace given a new id
         // (⌘⌥1–0, hypr/bindings.lua) stays there under its old id with its windows, as Hyprland sends no event for it.

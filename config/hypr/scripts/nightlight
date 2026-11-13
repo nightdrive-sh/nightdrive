@@ -1,6 +1,6 @@
 #!/bin/bash
 # Night light (launcher › Settings › Display, the top bar's display menu): a warm tint through Hyprland's screen shader
-# (hyprland.lua, hypr/shaders/rounded-corners.frag). Asahi's display driver has no gamma tables, so gammastep and the like
+# (corners.lua, hypr/shaders/rounded-corners.frag). Asahi's display driver has no gamma tables, so gammastep and the like
 # can't do it. The choice is kept in ~/.local/state/nightdrive/nightlight and applied with a Hyprland reload.
 #   nightlight status [--json]       on | off ({"state": …})
 #   nightlight on|off|toggle [--json]

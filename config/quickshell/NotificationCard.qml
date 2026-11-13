@@ -57,7 +57,7 @@ Rectangle {
 
     width: 300
     height: body.implicitHeight + 28
-    radius: 4                                  // the same as the windows' corners (decoration.rounding in hyprland.lua)
+    radius: 4                                  // the same as the windows' corners (decoration.rounding in hypr/appearance.lua)
     opacity: appear * (1 - swipeFade)
     transform: Translate { x: card.enterX + card.swipeX }
 

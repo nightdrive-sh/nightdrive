@@ -1,5 +1,5 @@
 #!/bin/bash
-# The lid with an external display (hyprland.lua turns the built-in screen off while it's closed and docked).
+# The lid with an external display (display.lua turns the built-in screen off while it's closed and docked).
 #   lid watch            follows logind's LidClosed (started with the session); applies each change
 #   lid closed | open    applies one by hand (testing)
 # logind, not Hyprland's switch binds: Hyprland sent a "lid open" ~3 s after every close, with the lid still closed.
@@ -49,7 +49,7 @@ apply() {
   hyprctl reload >/dev/null
   sleep 1
   [[ $state == closed && $ws =~ ^[0-9]+$ ]] && hyprctl dispatch "hl.dsp.focus({ workspace = $ws })" >/dev/null
-  # Back on: the laptop's workspace to its screen, 1–9 to the external one (hyprland.lua)
+  # Back on: the laptop's workspace to its screen, 1–9 to the external one (display.lua)
   [[ $state == open ]] && hyprctl eval 'NightdriveArrangeWorkspaces()' >/dev/null
   log "monitors: $(hyprctl monitors all | grep -E '^Monitor|disabled' | tr -d '\t' | tr '\n' ' ')"
   # The external display moves and Hyprland redraws only part of it (its default background, the desktop shifted

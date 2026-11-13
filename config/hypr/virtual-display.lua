@@ -1,12 +1,12 @@
 -- Virtual screens: a tablet or a phone showing a headless output over VNC (hyprctl output create headless NAME, wayvnc
 -- -o NAME). Each is a screen of its own with one workspace of its own, like the laptop's screen beside an external display.
 -- The state is a file, as Settings › Display's is, because a rule set with hyprctl eval is gone at the next reload, and a
--- screen that comes or goes reloads the config (hyprland.lua: monitor.added). One line per screen:
+-- screen that comes or goes reloads the config (display.lua: monitor.added). One line per screen:
 --
 --     <name> <width>x<height>@<hz> <scale> <place> [<workspace>]
 --     HEADLESS-IPAD 2752x2064@60 2 beside 9
 --
--- The name starts with HEADLESS- (hyprland.lua's isVirtual: not an external display). <place> is the side of the desk's
+-- The name starts with HEADLESS- (display.lua's isVirtual: not an external display). <place> is the side of the desk's
 -- screens it is on, so the pointer slides over that edge as with Sidecar (a tablet): "right" (or "beside", the same),
 -- "left", "above" or "below"; or "away": far off, so it never strays there (a phone, used away from the desk). Lines
 -- starting with # are skipped.
@@ -21,7 +21,7 @@ local FAR_X, FAR_STEP = -10000, -5000
 -- Hyprland's own placing for a side, only when there are no desk screens to count from (a headless sandbox)
 local SIDES = { beside = "auto-right", right = "auto-right", left = "auto-left", above = "auto-up", below = "auto-down" }
 
--- The desk's screens' bounds in logical px, which the sides are counted from: where hyprland.lua has just put them
+-- The desk's screens' bounds in logical px, which the sides are counted from: where display.lua has just put them
 -- (deskPlaces: output -> { pos = "XxY" }), not where they were, as the same reload may move them
 local function deskBounds(monitors, deskPlaces, scales)
     local b
@@ -127,7 +127,7 @@ function NightdriveArrangeVirtual()
     end
 end
 
--- Run at each load, after hyprland.lua's workspace rules: a later rule for the same workspace wins, so 9 and 8 leave the
+-- Run at each load, after display.lua's workspace rules: a later rule for the same workspace wins, so 9 and 8 leave the
 -- external display for the virtual screens. A workspace rule only for a screen that is there: once it is gone, its
 -- workspace goes back to the desk's main screen, and is no longer kept there once empty.
 return function(deskPlaces, scales)

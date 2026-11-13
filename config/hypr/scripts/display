@@ -1,6 +1,6 @@
 #!/bin/bash
 # Display scale, refresh rate and arrangement (launcher Settings › Display). Chosen: ~/.local/state/nightdrive/display
-# ("<output> <scale>" per line, "mode <output> <width>x<height>@<hz>" and "builtin <side>"), which hyprland.lua reads on
+# ("<output> <scale>" per line, "mode <output> <width>x<height>@<hz>" and "builtin <side>"), which display.lua reads on
 # every (re)load, so a choice survives a reboot and wins over MONITOR_SCALE and local.lua.
 #   display list              one line per output: name, description, current scale, then "scale:width×height" for every scale
 #                             that divides the panel evenly (Hyprland adjusts any other value, which blurs text); a VM's
@@ -20,14 +20,14 @@
 #                             preferred) for that output, saved like a scale
 # scale and mode take --keep last: then Nightdrive's card asks whether to keep it, and it goes back unless the user
 # does (config/mcp/keep.py), so a screen left unreadable comes back by itself. Until they keep it, the new value is on
-# trial in the runtime dir (hyprland.lua reads it over the saved one), which a restart empties: a hard restart on a
+# trial in the runtime dir (display.lua reads it over the saved one), which a restart empties: a hard restart on a
 # black screen comes back with the value saved before (#1887). Keep saves it.
 set -euo pipefail
 state="$HOME/.local/state/nightdrive/display"
 trial="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/display-trial"
 # The Hyprland config that reads the trial: one from an older checkout (this one's tools on a desktop that runs
 # another's config) doesn't, and then the value is saved at once, as before
-grep -qs display-trial "$HOME/.config/hypr/hyprland.lua" && trying=1 || trying=0
+grep -qs display-trial "$HOME/.config/hypr/display.lua" "$HOME/.config/hypr/hyprland.lua" && trying=1 || trying=0
 here=$(dirname "$(readlink -f "$0")")
 
 saved() {   # saved <scale|mode> <out>: the value on trial, else the saved one, or auto

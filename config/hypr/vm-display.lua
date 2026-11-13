@@ -2,7 +2,7 @@
 -- mode, the window's size in pixels, each time the window changes size. Hyprland reads an output's modes only when it is
 -- plugged in (aquamarine), so "preferred" stays the size the VM booted with and the window stretches that picture. The
 -- kernel has the new one, the first line of the connector's modes in sysfs, and an output takes a mode outside its list.
--- Run at each load (hyprland.lua: a reload mustn't go back to the old size) and by scripts/vm-display, which watches the
+-- Run at each load (display.lua: a reload mustn't go back to the old size) and by scripts/vm-display, which watches the
 -- GPU's hotplug events. A mode picked in Settings › Display (the state's "mode" line) stays as it is.
 --
 -- The window's size is any number of pixels (on a host screen at 1.5 a window 1261 wide is 1891), and Hyprland takes a

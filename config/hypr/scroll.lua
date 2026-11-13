@@ -1,7 +1,7 @@
 -----------------------
 ---- SCROLLING ----
 -----------------------
--- Every app's scroll speed in one place. The touchpad's scroll_factor is 1.0 (hyprland.lua), so an app gets libinput's
+-- Every app's scroll speed in one place. The touchpad's scroll_factor is 1.0 (input.lua), so an app gets libinput's
 -- own distance: GTK moves the content about as far as the fingers, like macOS. Apps that turn it into a different
 -- distance get a multiplier here (window rule: touchpad, mouse wheel). 1.0 = as libinput sends it.
 -- Not windows, set in their own config: Quickshell (TouchScroll.qml, NotificationCard.qml: touchScale 0.8).

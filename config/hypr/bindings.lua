@@ -119,7 +119,7 @@ hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-down"), { locked = tru
 hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true, ignore_mods = true })
 hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-down"), { locked = true })                       -- Fn when keyd (Mac Keyboard Shortcuts) runs: keyd sends F19 for it
 hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true, ignore_mods = true })
--- Apps open with Hyper (Caps Lock, Mod3: hyprland.lua's kb_options) + a letter: the browser, Files, Email, and the optional
+-- Apps open with Hyper (Caps Lock, Mod3: input.lua's kb_options) + a letter: the browser, Files, Email, and the optional
 -- parts' apps below and in the plugins' bindings.lua (Deck M, 1Password P). ⌘ stays for the desktop and the apps' own keys.
 -- These are defaults: your own keys (appKeys, above) replace them.
 hl.bind("MOD3 + B",              hl.dsp.exec_cmd(browser))
@@ -300,7 +300,7 @@ hl.bind(mod .. " + SHIFT + J",   hl.dsp.layout("togglesplit"))
 -- Focus with arrows, move window with Shift+arrows
 for _, dir in ipairs({ "left", "right", "up", "down" }) do
     hl.bind(mod .. " + " .. dir,             hl.dsp.focus({ direction = dir }))
-    hl.bind(mod .. " + SHIFT + " .. dir,     function() NIGHTDRIVE_SWAP(dir) end)   -- slides (hyprland.lua)
+    hl.bind(mod .. " + SHIFT + " .. dir,     function() NIGHTDRIVE_SWAP(dir) end)   -- slides (appearance.lua)
 end
 
 -- Hyper ← / →: the previous / next Claude Code session in the sessions bar's order (Claude.qml), on any workspace,
@@ -376,7 +376,7 @@ end
 hl.bind(mod .. " + TAB",         hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mod .. " + SHIFT + TAB", hl.dsp.focus({ workspace = "e-1" }))
 
--- Drawer: a special workspace that slides up over the windows (look in hyprland.lua)
+-- Drawer: a special workspace that slides up over the windows (look in appearance.lua)
 -- ⌘⇧D puts the active window in the drawer, or takes it back out; ⌘D shows/hides the drawer (⌘S is Save, above)
 -- A window remembers where it came from (until Hyprland reloads its config): ⌘⇧D in the drawer takes it back to that
 -- workspace, a floating one to its old place and size, a tiled one next to the window now at its old place

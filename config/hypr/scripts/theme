@@ -334,7 +334,7 @@ def apply_look(lk):
     inactive = rgba(lk["inactive-border-color"], lk["inactive-border-opacity"]) if lk["inactive-border"] == "on" \
         else "rgba(00000000)"
     inactive_shadow = shadow if lk["inactive-shadow"] == "on" else "rgba(00000000)"
-    write(f"{OUT}/look.lua", "-- written by theme: hyprland.lua runs it after its own look, `theme set` over IPC\n"
+    write(f"{OUT}/look.lua", "-- written by theme: appearance.lua runs it after its own look, `theme set` over IPC\n"
           "hl.config({\n"
           f'    general = {{ col = {{ active_border = "{rgba(lk["border-color"], lk["border-opacity"])}", '
           f'inactive_border = "{inactive}" }} }},\n'
