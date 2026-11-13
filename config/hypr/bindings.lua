@@ -1,6 +1,7 @@
 -- All Hyprland keybindings (⌘ = SUPER).
 -- Edit this file; Hyprland reloads changes automatically.
 -- App-specific keys live in each app's own config (e.g. ~/.config/kitty/kitty.conf).
+require("compat")   -- NIGHTDRIVE_STABLE_ID (window order) for the keys here and the plugins' (keyd)
 
 ---------------------
 ---- PROGRAMS ----
@@ -327,7 +328,7 @@ local function cycle_app_windows(step)
         end
     end
     if #list < 2 then return end
-    table.sort(list, function (a, b) return a.stable_id < b.stable_id end)
+    table.sort(list, function (a, b) return NIGHTDRIVE_STABLE_ID(a) < NIGHTDRIVE_STABLE_ID(b) end)   -- compat.lua
     for i, o in ipairs(list) do
         if o.address == w.address then
             local target = list[(i - 1 + step) % #list + 1]
