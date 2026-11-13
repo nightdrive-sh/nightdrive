@@ -292,6 +292,7 @@ function NightdriveLocked()
     hl.exec_cmd("sh -c 'systemctl --user reset-failed hyprpolkitagent; systemctl --user restart hyprpolkitagent'")
     hl.exec_cmd("nm-applet --indicator")
     hl.exec_cmd("blueman-applet")
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/bt-notify")   -- Connected / Disconnected with a Disconnect button, in place of Blueman's
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     for _, cmd in ipairs(plugin_starts) do hl.exec_cmd(cmd) end

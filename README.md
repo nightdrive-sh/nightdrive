@@ -110,7 +110,8 @@ code or a card number stays hidden until you choose it.
 
 Click an icon and a small menu opens under it:
 
-- **Wi-Fi** (and Ethernet with your wired profiles) and **Bluetooth**
+- **Wi-Fi** (and Ethernet with your wired profiles) and **Bluetooth**. A device connecting shows a notification with
+  **Disconnect**, for headphones that join every computer they know: it disconnects them from this one and keeps them paired
 - **Display**: brightness, night light, each screen's scale and refresh rate. **Other displays**: mirroring to a TV
   (Screen Mirroring plugin), an iPad or iPhone as a display of its own (VNC Display plugin)
 - **Battery**: time left, the battery's health and **Low Power Mode** (tuned's power-saver profile; the icon turns
