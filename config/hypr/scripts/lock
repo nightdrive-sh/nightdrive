@@ -16,6 +16,10 @@
 # With allow_session_lock_restore (appearance.lua) the new one takes the lock over. Steps go to the journal (journalctl -t lock).
 # A new lock plays system/lock.wav (hypr/scripts/sounds event); not at boot (the login screen has its own sound), nor
 # at a relock after sleep or a restart here.
+# If it keeps dying (RESTARTS within WINDOW), hyprlock takes the lock over (the same allow_session_lock_restore), rather
+# than leave the session on that screen: Quickshell's Hyprland IPC crashed every lock under Hyprland 0.57 (#2899). Its
+# unlock does what lock.qml's does (the login apps at an autologin start, the corners, the pointer). While it is up, a
+# new lock request leaves it be.
 # A screensaver running as the lock comes (the idle lock, 20 min after the saver by default): the lock starts showing the
 # same one itself (NIGHTDRIVE_LOCK_SAVING=<style>), instead of the prompt flashing up before the screen goes off. Only a
 # first start: after a restart or a relock the prompt shows.
@@ -23,6 +27,7 @@ RESTARTS=5        # at most this many restarts within WINDOW seconds; then the "
 WINDOW=60
 lock='[q]s -p .*/greeter/lock\.qml'
 mine=(--ns $$ --nslist pid -u "$UID")
+pgrep "${mine[@]}" -x hyprlock >/dev/null && exit 0                # the fallback is up (below)
 [[ $1 == --replace ]] || ! pgrep "${mine[@]}" -f "$lock" >/dev/null || exit 0
 runtime=${XDG_RUNTIME_DIR:-/run/user/$UID}
 replaced=()
@@ -60,6 +65,21 @@ if [[ -z $1 ]]; then
   running=$(pgrep -a "${mine[@]}" -f '^qs -p .*/screensaver/(synthwave|rain|clock)$' | head -1)
   case $running in */synthwave) saving=saver ;; */rain) saving=rain ;; */clock) saving=clock ;; esac
 fi
+# hyprlock over a lock that keeps dying; on its unlock, the steps lock.qml takes at its own. NightdriveLocked first: it
+# does nothing once it has run, and at an autologin start whose lock was never secure the session hasn't started (that
+# start exits to the login screen after 20 s anyway: autostart.lua).
+fallback() {
+  logger -t lock "the lock keeps dying (exit $1), hyprlock takes over"
+  close_replaced
+  hyprlock --grace 0 --immediate-render --no-fade-in   # no grace: a moved pointer must not unlock
+  local st=$?
+  (( st == 0 )) || { logger -t lock "hyprlock failed too (exit $st): ⌃⌥F3 starts the lock again"; exit 1; }
+  "$HOME/.config/screensaver/stop" >/dev/null 2>&1
+  hyprctl eval 'hl.config({ cursor = { invisible = false } })' >/dev/null
+  hyprctl eval 'NightdriveCornersHidden(false)' >/dev/null
+  hyprctl eval 'NightdriveLocked(); NightdriveUnlocked()' >/dev/null
+  exit 0
+}
 starts=()
 [[ -z $1 || ( $1 == --replace && ${#replaced[@]} -eq 0 ) ]] && { "$HOME/.config/hypr/scripts/sounds" event lock >/dev/null 2>&1 & }
 while :; do
@@ -72,7 +92,7 @@ while :; do
   hyprctl -j version >/dev/null 2>&1 || exit 0                   # Hyprland is gone (logout)
   now=$(date +%s); starts=("${starts[@]}" "$now")
   starts=($(for t in "${starts[@]}"; do (( now - t < WINDOW )) && echo "$t"; done))
-  (( ${#starts[@]} > RESTARTS )) && { logger -t lock "the lock keeps dying (exit $status), giving up: ⌃⌥F3 starts it again"; exit 1; }
+  (( ${#starts[@]} > RESTARTS )) && fallback "$status"
   logger -t lock "the lock died (exit $status), starting it again"
   quick=1
   sleep 0.5

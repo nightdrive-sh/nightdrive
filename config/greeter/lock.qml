@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Pam
 
@@ -86,9 +85,11 @@ ShellRoot {
 
     // The screen with the prompt: the focused monitor, where the keyboard goes; the first screen before Hyprland's state has
     // arrived or if it names none of them, so there's always one. By name: monitorFor() gave another object than
-    // focusedMonitor, and no screen had the prompt.
+    // focusedMonitor, and no screen had the prompt. Not through Quickshell.Hyprland, whose IPC client crashed the lock
+    // under Hyprland 0.57 (FocusedScreen.qml).
+    FocusedScreen { id: focused }
     readonly property string promptScreen: {
-        const f = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : ""
+        const f = focused.name
         if (Quickshell.screens.some(s => s.name === f)) return f
         return Quickshell.screens.length > 0 ? Quickshell.screens[0].name : ""
     }
