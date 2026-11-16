@@ -36,14 +36,14 @@ Item {
     // The rows only change when their shape does (how many temperatures, processes, usage windows); the values, and the
     // processes' names, are live (liveText), so the list doesn't jump every two seconds
     property var sysData: null       // { cpu, cores, freq, load, memUsed, memTotal, swapUsed, swapTotal, temps: [{ label, c }], top: [{ name, cpu, rss }] }
-    property var usage: null         // { plan, windows: [{ key, percent, resetsAt, model }], error }
+    property var usage: []           // claude-usage --all: [{ account, plan, windows: [{ key, percent, resetsAt, model }], error }]
     property bool usageLoaded: false
     property string statusShape: ""
-    property var statusSnap: ({ d: null, u: null })   // the data the rows were built from (statusRows reads only this)
+    property var statusSnap: ({ d: null, u: [] })   // the data the rows were built from (statusRows reads only this)
     function updateShape() {
         const d = sysData, u = usage
         const shape = JSON.stringify([d ? d.temps.map(t => t.label) : null, d ? d.top.length : 0,
-                                      u && u.windows ? u.windows.map(w => w.key + w.model) : null, u ? u.error || "" : "", u ? u.plan || "" : "", usageLoaded])
+                                      u.map(a => [a.account, a.plan || "", a.error || "", (a.windows || []).map(w => w.key + w.model)]), usageLoaded])
         if (shape !== statusShape) { sel(); statusShape = shape; statusSnap = { d: d, u: u } }
     }
     function gb(b) { return (b / 1073741824).toFixed(1) }
@@ -65,7 +65,10 @@ Item {
         if (k === "temp") return d && d.temps[i] ? d.temps[i].c + " °C" : ""
         if (k === "procname") return d && d.top[i] ? d.top[i].name : ""
         if (k === "proc") return d && d.top[i] ? d.top[i].cpu.toFixed(1) + "%  ·  " + mb(d.top[i].rss) : ""
-        if (k === "usage") { const w = usage && usage.windows ? usage.windows[i] : null; return w ? w.percent + "%  ·  " + resets(w.resetsAt) : "" }
+        if (k === "usage") {   // usage:ACCOUNT_INDEX:WINDOW_INDEX
+            const a = usage[i], w = a && a.windows ? a.windows[key.split(":")[2]] : null
+            return w ? w.percent + "%  ·  " + resets(w.resetsAt) : ""
+        }
         return undefined   // not one of ours: Launcher.qml asks the next file
     }
     function statusRows() {
@@ -80,10 +83,16 @@ Item {
             if (d.top.length > 0) r.push({ kind: "header", name: "Top processes (CPU, 1 core = 100 %)" })
             d.top.forEach((p, i) => r.push({ kind: "stat", name: p.name, liveName: "procname:" + i, glyph: "activity", live: "proc:" + i, extra: "process" }))
         }
-        r.push({ kind: "header", name: "Claude usage" + (u && u.plan ? " · " + u.plan : "") })
-        if (usageLoaded && (!u || !u.windows || u.windows.length === 0 || u.error))
-            r.push({ kind: "hint", name: u && u.error ? u.error : "No usage data. Sign in to Claude Code (run claude) first." })
-        if (u && u.windows) u.windows.forEach((w, i) => r.push({ kind: "stat", name: usageLabel(w), glyph: "gauge", live: "usage:" + i, extra: "claude usage limit" }))
+        // Each Claude Code account's (claude-accounts), named after it when there are more than one, as the Claude menu
+        if (usageLoaded && u.length === 0) r.push({ kind: "header", name: "Claude usage" })
+        u.forEach((a, ai) => {
+            r.push({ kind: "header", name: "Claude usage" + (u.length > 1 ? " · " + a.account : "") + (a.plan ? " · " + a.plan : "") })
+            if (usageLoaded && (!a.windows || a.windows.length === 0 || a.error))
+                r.push({ kind: "hint", name: a.error ? a.error : "No usage data. Sign in to Claude Code (run claude) first." })
+            if (a.windows) a.windows.forEach((w, i) => r.push({ kind: "stat", name: usageLabel(w), glyph: "gauge", live: "usage:" + ai + ":" + i,
+                                                               extra: "claude usage limit " + a.account }))
+        })
+        if (usageLoaded && u.length === 0) r.push({ kind: "hint", name: "No usage data. Sign in to Claude Code (run claude) first." })
         r.push({ kind: "header", name: "More" },
                { kind: "action", name: "Open Claude usage page", glyph: "external-link", cmd: ["xdg-open", "https://claude.ai/settings/usage"], extra: "claude" })
         return r
@@ -97,9 +106,9 @@ Item {
     }
     Sh {
         id: claudeProc
-        command: [Quickshell.env("HOME") + "/.config/topbar/scripts/claude-usage"]
+        command: [Quickshell.env("HOME") + "/.config/topbar/scripts/claude-usage", "--all"]
         onResult: text => {
-            try { s.usage = JSON.parse(text) } catch (e) { s.usage = null }
+            try { s.usage = JSON.parse(text) || [] } catch (e) { s.usage = [] }
             s.usageLoaded = true
             s.updateShape()
         }

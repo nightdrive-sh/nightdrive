@@ -1,17 +1,19 @@
 #!/bin/bash
 # ⌘⌃Enter: if the launcher is open with text typed in it, send that to Claude Code; otherwise open an empty Claude.
 # (⌘⌥Enter asks in the background: ask-claude, which comes here without the text, or when it can't.)
-# terminal-or-claude [--dir DIR] [--name NAME] [--model MODEL] [--effort LEVEL] [--background] [--workspace WS] [--] [PROMPT…]:
+# terminal-or-claude [--dir DIR] [--name NAME] [--model MODEL] [--effort LEVEL] [--account NAME] [--background] [--workspace WS] [--] [PROMPT…]:
 # start Claude Code with that prompt, in DIR (~/Projects unless given), the session named NAME (claude -n, as /rename),
 # on MODEL (claude --model: an alias such as opus, or a full model id) at effort LEVEL (claude --effort). --background opens its window without the keyboard, so typing elsewhere isn't cut off (a session
 # another session starts, e.g. the project manager's): its class has a no_initial_focus rule in hyprland.lua, and a
 # notification says it opened, a click on it going to the window. It opens on the workspace of the window it was called
 # from (found up the process chain: the project manager's terminal), even if the user has moved to another one since;
 # called from no window, on the active one. --workspace WS (a number or special:NAME) names the workspace instead.
+# --account NAME: on that Claude Code account (topbar/scripts/claude-accounts; the Claude menu's New session · NAME).
+# Without it, on the caller's (its CLAUDE_CONFIG_DIR: a session on another account opens its own there), else the default.
 # The launcher's askClaude, ask-claude, crash reports and `nightdrive ask` call this.
 readonly BG_CLASS=claude-background   # hyprland.lua's rule, and TERMINAL_CLASSES in bindings.lua
 readonly BG_WAIT=15                   # seconds to wait for the window before giving up on the notification
-dir="$HOME/Projects"; name=; model=; effort=; bg=0; ws=; bare=$(( $# == 0 ))
+dir="$HOME/Projects"; name=; model=; effort=; bg=0; ws=; bare=$(( $# == 0 )); conf=${CLAUDE_CONFIG_DIR:-}
 while (( $# )); do
   case $1 in
     --dir) [[ -n ${2:-} ]] || { echo "--dir needs a folder" >&2; exit 1; }; dir=$2; shift 2 ;;
@@ -23,12 +25,13 @@ while (( $# )); do
     # checked here: a wrong level would only show as an error in the new terminal
     --effort) [[ ${2:-} =~ ^(low|medium|high|xhigh|max)$ ]] || { echo "--effort needs low, medium, high, xhigh or max" >&2; exit 1; }
               effort=$2; shift 2 ;;
+    --account) conf=$("$HOME/.config/topbar/scripts/claude-accounts" dir "${2:-}") || exit 1; shift 2 ;;
     --background) bg=1; shift ;;
     # it goes into a Lua string in hyprctl dispatch: no quotes or spaces
     --workspace) [[ ${2:-} =~ ^(-?[0-9]+|special(:[A-Za-z0-9_-]+)?)$ ]] || { echo "--workspace needs a number or special:NAME" >&2; exit 1; }
                  ws=$2; shift 2 ;;
     --) shift; break ;;
-    -*) echo "Unknown option: $1 (usage: nightdrive ask [--dir DIR] [--name NAME] [--model MODEL] [--effort LEVEL] [--background] [--workspace WS] MESSAGE)" >&2; exit 1 ;;
+    -*) echo "Unknown option: $1 (usage: nightdrive ask [--dir DIR] [--name NAME] [--model MODEL] [--effort LEVEL] [--account NAME] [--background] [--workspace WS] MESSAGE)" >&2; exit 1 ;;
     *) break ;;
   esac
 done
@@ -41,11 +44,14 @@ dir=$(cd "$dir" && pwd)   # relative to where it was called, before the terminal
 opener=()
 if [[ ${CLAUDE_PID:-} =~ ^[0-9]+$ ]]; then
   opener=(env "NIGHTDRIVE_OPENER_PID=$CLAUDE_PID")
-  oname=$(jq -r '.name // empty' "$HOME/.claude/sessions/$CLAUDE_PID.json" 2>/dev/null)
+  oname=$(jq -r '.name // empty' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions/$CLAUDE_PID.json" 2>/dev/null)
   [[ -n $oname ]] && opener+=("NIGHTDRIVE_OPENER_NAME=$oname")
 fi
 # clear inherited CLAUDE* variables so the new Claude doesn't think it's a child session
 for v in $(compgen -e | grep '^CLAUDE'); do unset "$v"; done
+# ...but its account: none (or ~/.claude's own) is the default, as claude itself reads it
+conf=${conf%/}
+if [[ -n $conf && $conf != "$HOME/.claude" ]]; then (( ${#opener[@]} )) || opener=(env); opener+=("CLAUDE_CONFIG_DIR=$conf"); fi
 term="$HOME/.config/hypr/scripts/terminal"   # the terminal chosen in Default apps
 claude=("${opener[@]}" "$HOME/.local/bin/claude")   # env execs into claude: its process keeps the name
 [[ -n $name ]] && claude+=(-n "$name")

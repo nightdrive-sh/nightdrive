@@ -1,0 +1,72 @@
+#!/bin/bash
+# The Claude Code accounts on this computer: each is a config dir of its own (Claude Code's CLAUDE_CONFIG_DIR), with its
+# own sign-in, sessions and usage limits. The Claude menu shows each one's usage, the bar a gauge each, the sessions
+# bar which account a session runs on, and New session opens one on any of them.
+#   claude-accounts [--json]   the accounts, the default first: NAME<TAB>DIR per line, or
+#                              [{name, dir, default, signedIn, plan}] (plan: Claude Code's subscriptionType: pro, max, team)
+#   claude-accounts dir NAME   the account's config dir (exit 1 when there's none of that name)
+#   claude-accounts name DIR   the name of the account whose config dir DIR is ("" = not one of them: exit 1)
+# Found by themselves: ~/.claude (the default, used without CLAUDE_CONFIG_DIR: always first, signed in or not) and every
+# ~/.claude-* that has a sign-in in it. ACCOUNTS names them or adds a dir elsewhere, a line each: DIR [NAME] (~ is your
+# home; # starts a comment). Without a name, a dir's is its own: ~/.claude-work → work, ~/.claude → default.
+# Names are kept to letters, digits, - and _, as they go in file names (claude-usage's cache) and on the bar's chips.
+set -uo pipefail
+readonly ACCOUNTS="$HOME/.config/nightdrive/claude-accounts"
+readonly DEFAULT_DIR="$HOME/.claude"
+
+# The dir as written (~ expanded, no trailing /), so the same dir always compares the same
+norm() { local d=${1/#\~/$HOME}; d=${d%/}; [[ -n $d ]] && printf '%s\n' "$d"; }
+own_name() {
+  [[ $1 == "$DEFAULT_DIR" ]] && { echo default; return; }
+  local b=${1##*/}; b=${b#.}; b=${b#claude-}; printf '%s\n' "$b"
+}
+clean() { local n; n=$(tr -c 'A-Za-z0-9_\n-' '-' <<<"$1"); printf '%s\n' "${n:-account}"; }
+
+# dirs[i] and names[i], in order: the default, then the file's, then the ones found
+dirs=() names=()
+add() {
+  local d=$1 n=$2 i
+  for i in "${!dirs[@]}"; do
+    [[ ${dirs[i]} == "$d" ]] || continue
+    [[ -n $n ]] && names[i]=$(clean "$n")   # the file names one already found (the default)
+    return
+  done
+  n=$(clean "${n:-$(own_name "$d")}")
+  # two of the same name: the later one gets a number, so a name still picks one account
+  local base=$n k=2
+  while printf '%s\n' "${names[@]}" | grep -qxF -- "$n"; do n="$base-$k"; (( k++ )); done
+  dirs+=("$d"); names+=("$n")
+}
+add "$DEFAULT_DIR" ""
+if [[ -r $ACCOUNTS ]]; then
+  while read -r d n; do
+    [[ -z $d || $d == \#* ]] && continue
+    n=${n%%#*}; n=${n%"${n##*[![:space:]]}"}
+    d=$(norm "$d") && add "$d" "$n"
+  done < "$ACCOUNTS"
+fi
+for d in "$HOME"/.claude-*/; do
+  d=${d%/}
+  [[ -s $d/.credentials.json ]] && add "$d" ""
+done
+
+case ${1:-} in
+  dir)
+    for i in "${!names[@]}"; do [[ ${names[i]} == "${2:-}" ]] && { echo "${dirs[i]}"; exit 0; }; done
+    echo "No Claude account named ${2:-}" >&2; exit 1 ;;
+  name)
+    want=$(norm "${2:-}") || exit 1
+    for i in "${!dirs[@]}"; do [[ ${dirs[i]} == "$want" ]] && { echo "${names[i]}"; exit 0; }; done
+    exit 1 ;;
+  --json)
+    for i in "${!dirs[@]}"; do
+      creds="${dirs[i]}/.credentials.json"
+      plan=$(jq -r '.claudeAiOauth.subscriptionType // ""' "$creds" 2>/dev/null)
+      jq -nc --arg n "${names[i]}" --arg d "${dirs[i]}" --argjson def "$(( i == 0 ))" \
+             --argjson in "$([[ -s $creds ]] && echo true || echo false)" --arg p "$plan" \
+             '{name: $n, dir: $d, default: ($def == 1), signedIn: $in, plan: $p}'
+    done | jq -sc . ;;
+  "")
+    for i in "${!dirs[@]}"; do printf '%s\t%s\n' "${names[i]}" "${dirs[i]}"; done ;;
+  *) echo "usage: claude-accounts [--json] | dir NAME | name DIR" >&2; exit 2 ;;
+esac

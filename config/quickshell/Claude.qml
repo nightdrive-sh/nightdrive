@@ -89,6 +89,7 @@ Singleton {
                        topic: m && !/[A-Za-z0-9\u00C0-\u024F]/.test(m[1]) ? m[2] : title, state: state, started: f.started,
                        name: f.name || "", status: f.status || "", waitingFor: f.waitingFor || "", last: last,
                        ws: ws, x: at[0], y: at[1], since: f.since || 0, pid: f.pid || 0, openerPid: f.openerPid || 0, openerName: f.openerName || "",
+                       account: f.account || "", accountDefault: f.accountDefault !== false,
                        asking: f.status === "waiting" && state !== "working",
                        done: state === "waiting" && f.status !== "waiting" && f.status !== "busy" && /^✅/.test(last) })
         }
@@ -178,8 +179,27 @@ Singleton {
     function focus(s) {
         Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.focus({ window = "address:0x' + s.address + '" })'])
     }
-    // A new session in ~/Projects, in the terminal chosen in Default apps (hypr/scripts/terminal-or-claude)
-    function newSession() { Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/terminal-or-claude"]) }
+    // A new session in ~/Projects, in the terminal chosen in Default apps (hypr/scripts/terminal-or-claude); on the
+    // account of that name, or without one the default
+    function newSession(account) {
+        const cmd = [Quickshell.env("HOME") + "/.config/hypr/scripts/terminal-or-claude"]
+        Quickshell.execDetached(account ? cmd.concat(["--account", account]) : cmd)
+    }
+
+    // The Claude Code accounts (topbar/scripts/claude-accounts: [{ name, dir, default, signedIn, plan }], the default
+    // first): the Claude menu's New session for each. Read now and then, and when the menu opens (refreshAccounts).
+    property var accounts: []
+    function refreshAccounts() { accountsProc.running = true }
+    Sh {
+        id: accountsProc
+        command: [Quickshell.env("HOME") + "/.config/topbar/scripts/claude-accounts", "--json"]
+        onResult: text => {
+            let v = []
+            try { v = JSON.parse(text) || [] } catch (e) { return }
+            if (JSON.stringify(v) !== JSON.stringify(c.accounts)) c.accounts = v
+        }
+    }
+    Timer { interval: 60000; repeat: true; running: true; triggeredOnStart: true; onTriggered: c.refreshAccounts() }
 
     Sh {
         id: scan

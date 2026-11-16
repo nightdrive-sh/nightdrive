@@ -2,7 +2,9 @@
 # The Claude Code sessions running in a terminal window on this desktop, for the Claude menu (Claude.qml):
 # [{address, pid, dir, started, name, status, waitingFor, last, since}], address = the window (hyprctl clients), started
 # = epoch seconds. The window's title tells the rest live (Claude Code sets it: ✳ when it waits for you, a spinner while it works).
-# From Claude Code's own record of the session (~/.claude/sessions/PID.json, missing in an old version: then empty):
+# account: the Claude Code account it runs on (claude-accounts: its CLAUDE_CONFIG_DIR, ~/.claude without one), and
+# accountDefault, true for ~/.claude's: the sessions bar tags the others with the account's name.
+# From Claude Code's own record of the session (<its config dir>/sessions/PID.json, missing in an old version: then empty):
 # name (the session's name, /rename), status (busy, idle, waiting: it asks you something) and waitingFor (what), and
 # last, the last line of its last reply (its transcript), for the sessions bar's hover (SessionsBar.qml); since, when its
 # status last changed (epoch seconds, 0 if unknown): the bar's time, how long a turn has run or it has waited for you.
@@ -14,6 +16,12 @@ readonly TAIL=300    # transcript lines read from the end for the last reply: a 
 readonly LAST=300    # characters of the last line kept
 clients=$(hyprctl -j clients 2>/dev/null) || { echo '[]'; exit 0; }
 now=$(date +%s)
+# The accounts' names by config dir; the first is the default's
+declare -A accounts=()
+default_dir=
+while IFS=$'\t' read -r aname adir; do
+  accounts[$adir]=$aname; [[ -n $default_dir ]] || default_dir=$adir
+done < <("$(dirname "$0")/claude-accounts")
 for pid in $(pgrep -x claude); do
   # Up the parents to the terminal's window
   p=$pid addr=
@@ -25,15 +33,20 @@ for pid in $(pgrep -x claude); do
   [[ -n $addr ]] || continue
   dir=$(readlink "/proc/$pid/cwd" 2>/dev/null) || continue
   age=$(ps -o etimes= -p "$pid" | tr -d ' ')
-  rec="$HOME/.claude/sessions/$pid.json"
+  # Its environment is readable as it's ours; NUL-separated: its account, and who opened it
+  env=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -E '^(NIGHTDRIVE_OPENER_(PID|NAME)|CLAUDE_CONFIG_DIR)=')
+  conf=$(sed -n 's/^CLAUDE_CONFIG_DIR=//p' <<<"$env"); conf=${conf%/}; conf=${conf:-$default_dir}
+  # A dir no account lists (a one-off CLAUDE_CONFIG_DIR) goes by its own name, as claude-accounts would name it
+  account=${accounts[$conf]:-$(b=${conf##*/}; b=${b#.}; echo "${b#claude-}")}
+  rec="$conf/sessions/$pid.json"
   [[ -r $rec ]] && info=$(jq -c '{name: (.name // ""), status: (.status // ""), waitingFor: (.waitingFor // ""), sid: (.sessionId // ""),
                                     since: ((.statusUpdatedAt // 0) / 1000 | floor)}' "$rec" 2>/dev/null) || info=
   [[ -n $info ]] || info='{"name":"","status":"","waitingFor":"","sid":"","since":0}'
-  # The last reply's last line: the transcript is ~/.claude/projects/<the dir, mangled>/<sessionId>.jsonl, found by its
-  # id rather than by mangling the dir as Claude Code does
+  # The last reply's last line: the transcript is <its config dir>/projects/<the dir, mangled>/<sessionId>.jsonl, found
+  # by its id rather than by mangling the dir as Claude Code does
   last='""' sid=$(jq -r .sid <<<"$info")
   if [[ -n $sid ]]; then
-    for t in "$HOME"/.claude/projects/*/"$sid".jsonl; do
+    for t in "$conf"/projects/*/"$sid".jsonl; do
       [[ -r $t ]] || continue
       # As a JSON string, one line however many the reply has
       last=$(tac "$t" | head -n "$TAIL" | jq -c 'select(.type == "assistant") | [.message.content[]? | select(.type == "text") | .text]
@@ -42,13 +55,12 @@ for pid in $(pgrep -x claude); do
       break
     done
   fi
-  # Its environment is readable as it's ours; NUL-separated
-  opener=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -E '^NIGHTDRIVE_OPENER_(PID|NAME)=')
-  opid=$(sed -n 's/^NIGHTDRIVE_OPENER_PID=//p' <<<"$opener"); [[ $opid =~ ^[0-9]+$ ]] || opid=0
-  oname=$(sed -n 's/^NIGHTDRIVE_OPENER_NAME=//p' <<<"$opener")
-  jq -nc --argjson op "$opid" --arg on "$oname" --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" --argjson i "$info" \
+  opid=$(sed -n 's/^NIGHTDRIVE_OPENER_PID=//p' <<<"$env"); [[ $opid =~ ^[0-9]+$ ]] || opid=0
+  oname=$(sed -n 's/^NIGHTDRIVE_OPENER_NAME=//p' <<<"$env")
+  jq -nc --arg acc "$account" --argjson accdef "$([[ $conf == "$default_dir" ]] && echo true || echo false)" \
+     --argjson op "$opid" --arg on "$oname" --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" --argjson i "$info" \
      --argjson l "$last" --argjson n "$LAST" \
      '{address: $a, pid: $pid, dir: $d, started: $s} + ($i | del(.sid))
-      + {openerPid: $op, openerName: $on}
+      + {openerPid: $op, openerName: $on, account: $acc, accountDefault: $accdef}
       + {last: ($l | gsub("^\\s+|\\s+$"; "") | split("\n") | map(select(test("\\S"))) | last // "" | .[0:$n])}'
 done | jq -sc 'unique_by(.address)'

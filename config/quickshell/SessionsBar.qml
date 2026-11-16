@@ -88,10 +88,13 @@ PanelWindow {
         const name = untagged(s.name || "")
         return it.lead && name ? Groups.shortName(name) : name || s.topic || s.project
     }
-    // "#2427 topic": the task number, shown apart (the tip and the Claude menu keep the full name)
+    // "#2427 topic": the task number, shown apart (the tip and the Claude menu keep the full name). Before it, a session
+    // on another Claude Code account than the default has the account's name (claude-accounts; #3035)
     function tag(it) {
-        const m = /^(#\d+)\s+\S/.exec(it.session && it.session.name || "")
-        return m ? m[1] : ""
+        const s = it.session || {}
+        const m = /^(#\d+)\s+\S/.exec(s.name || "")
+        const acc = s.accountDefault === false && s.account ? s.account : ""
+        return [acc, m ? m[1] : ""].filter(t => t).join(" ")
     }
     function untagged(name) {
         const m = /^#\d+\s+(\S.*)$/.exec(name)

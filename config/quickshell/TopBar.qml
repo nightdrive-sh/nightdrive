@@ -217,6 +217,13 @@ Singleton {
                            hlFg: "#ffffff", actBg: "#40c071eb", wsBg: "#4db17bcb" }[k]
     }
 
+    // A module's colour by its class (BarModule, and each of its "more" parts: BarModulePart); lit = its menu is open
+    // or it is active, which wins
+    function fg(cls, lit) {
+        return lit ? c("hlFg") : cls === "off" ? c("off") : cls === "warning" ? Theme.warning
+             : cls === "critical" ? Theme.danger : c("fg")
+    }
+
     // --- Icons: SVG text by name ("" = not found); fetched once, then cached ---
     // A missing one is asked again after 5 s and 30 s: a branch switch removes a plugin's icon links for a moment
     // (link.sh puts them back), and the bar reloading in between would otherwise keep the icon blank.

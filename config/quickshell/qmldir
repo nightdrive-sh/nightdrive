@@ -59,6 +59,7 @@ NotificationCard 1.0 NotificationCard.qml
 NotificationStack 1.0 NotificationStack.qml
 Bar 1.0 Bar.qml
 BarModule 1.0 BarModule.qml
+BarModulePart 1.0 BarModulePart.qml
 BarText 1.0 BarText.qml
 BarOverflow 1.0 BarOverflow.qml
 MenuSection 1.0 MenuSection.qml
@@ -83,6 +84,9 @@ singleton Home 1.0 Home.qml
 singleton Plugins 1.0 Plugins.qml
 SharePicker 1.0 SharePicker.qml
 ClaudeWrite 1.0 ClaudeWrite.qml
+ClaudeUsage 1.0 ClaudeUsage.qml
+ClaudeAccountColumn 1.0 ClaudeAccountColumn.qml
+ClaudeBarToggle 1.0 ClaudeBarToggle.qml
 ClaudeWriteButton 1.0 ClaudeWriteButton.qml
 ClaudeWritePlace 1.0 ClaudeWritePlace.qml
 LevelRing 1.0 LevelRing.qml

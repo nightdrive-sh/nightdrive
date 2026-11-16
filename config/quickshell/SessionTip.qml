@@ -97,6 +97,12 @@ PopupWindow {
                 color: Theme.dim
                 font { family: Theme.font; pixelSize: 12 }
             }
+            Text {   // another Claude Code account than the default (claude-accounts; #3035)
+                visible: tip.s.accountDefault === false && !!tip.s.account
+                text: "On the " + (tip.s.account || "") + " account"
+                color: Theme.dim
+                font { family: Theme.font; pixelSize: 12 }
+            }
             Text {
                 text: tip.stateText(tip.s)
                 color: tip.s.asking ? Theme.accent : tip.s.done ? Theme.ok : Theme.text

@@ -1,33 +1,59 @@
 #!/bin/bash
 # Claude plan usage (5 h session, week, per-model week) straight from Anthropic, using Claude Code's own sign-in.
-# Prints {plan, windows: [{key, percent, resetsAt, model}], fetchedAt, error} and caches it for two minutes,
-# so the bar and the Claude menu can both call this freely.
+#   claude-usage                  the default account's (~/.claude; claude-accounts)
+#   claude-usage --account NAME   that account's
+#   claude-usage --all            every account's, as an array in claude-accounts' order (the menu, the bar's gauges)
+# Each is {account, plan, windows: [{key, percent, resetsAt, model}], fetchedAt, error}, cached for two minutes per
+# account, so the bar and the Claude menu can both call this freely.
 # The token is only read: Claude Code refreshes it whenever it runs. If it has expired, the last data is shown with an error.
 set -uo pipefail
-creds="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
+here=$(dirname "$0")
 dir="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive"
-cache="$dir/claude-usage.json"
 mkdir -p "$dir"
+
+case ${1:-} in
+  --all)
+    # The accounts side by side (a request may take seconds), each into its own file, then joined in order
+    tmp=$(mktemp -d) || exit 1
+    trap 'rm -rf "$tmp"' EXIT
+    i=0
+    while IFS=$'\t' read -r name _; do
+      "$0" --account "$name" > "$tmp/$(printf '%03d' $i)" & (( i++ ))
+    done < <("$here/claude-accounts")
+    wait
+    cat "$tmp"/* 2>/dev/null | jq -sc .
+    exit 0 ;;
+  --account) account=${2:-} ;;
+  "") account=default ;;
+  *) echo "usage: claude-usage [--account NAME | --all]" >&2; exit 2 ;;
+esac
+# The default's name may be another (claude-accounts' file names it): it is the first line
+[[ -z ${1:-} ]] && account=$("$here/claude-accounts" | head -n1 | cut -f1)
+conf=$("$here/claude-accounts" dir "$account" 2>/dev/null) || { jq -nc --arg a "$account" '{account: $a, error: "No such Claude account"}'; exit 0; }
+creds="$conf/.credentials.json"
+cache="$dir/claude-usage-$account.json"
 
 fresh() { [[ -s $cache ]] && (( $(date +%s) - $(stat -c %Y "$cache") < 120 )); }
 fail() {   # keep the last good numbers, attach the reason
   local old='{}'; [[ -s $cache ]] && old=$(<"$cache")
-  jq -c --arg e "$1" '. + {error: $e}' <<<"$old" | tee "$cache.tmp"; mv "$cache.tmp" "$cache"; exit 0
+  jq -c --arg a "$account" --arg e "$1" '. + {account: $a, error: $e}' <<<"$old" | tee "$cache.tmp"; mv "$cache.tmp" "$cache"; exit 0
 }
 
-exec 9>"$dir/claude-usage.lock"
+exec 9>"$cache.lock"
 flock 9
 fresh && { cat "$cache"; exit 0; }
 
 [[ -s $creds ]] || fail "Not signed in to Claude Code"
-read -r token expires plan < <(jq -r '.claudeAiOauth | [.accessToken // "", (.expiresAt // 0), (.subscriptionType // "")] | @tsv' "$creds")
+# A line each: on one line, read would take an empty token's tab for nothing and the expiry for the token
+{ read -r token; read -r expires; read -r plan; } < <(jq -r '.claudeAiOauth | .accessToken // "", (.expiresAt // 0), (.subscriptionType // "")' "$creds")
 [[ -n $token ]] || fail "Not signed in to Claude Code"
 (( expires / 1000 > $(date +%s) )) || fail "Sign-in expired: run claude once to refresh it"
 
 # The token goes to curl on stdin (-H @-), not on its command line: any user can read a process's argv in /proc
 r=$(curl -sf --max-time 15 https://api.anthropic.com/api/oauth/usage -H @- \
   -H "anthropic-beta: oauth-2025-04-20" -H "User-Agent: nightdrive" <<<"Authorization: Bearer $token") || fail "Usage request failed"
-jq -c --arg plan "$plan" '{
+jq -c --arg a "$account" --arg plan "$plan" '{
+  account: $a,
   plan: $plan,
   windows: [.limits[]? | {
     key: ({session: "session", weekly_all: "weekly"}[.kind] // "model"),

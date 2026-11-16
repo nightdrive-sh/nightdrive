@@ -2,6 +2,8 @@
 # The bar's Claude module (scripts/status runs it). Right click cycles what it shows, remembered across restarts:
 #   0  gauge + 5-hour usage %    1  gauge + weekly usage %    2  gauge, 5-hour    3  gauge, weekly
 #   4  spark + number of Claude Code sessions                 5  spark alone
+# With more than one Claude Code account (claude-accounts), a gauge each, in their order: the first as the module's own
+# icon and text, the others as its "more" parts (BarModule.qml); each warns in its own colour.
 # The spark (icons/spark.svg) is our own, not Anthropic's logo: Nightdrive is a third-party project.
 # Usage: claude-bar [status|next]
 state=${XDG_STATE_HOME:-$HOME/.local/state}/nightdrive
@@ -18,10 +20,13 @@ case ${1:-status} in
       emit spark "$text"; exit
     fi
     key=$( (( mode % 2 )) && echo weekly || echo session )
-    pct=$("$dir/claude-usage" | jq -r --arg k "$key" '(.windows // [] | map(select(.key == $k)) | first // {}).percent // -1')
-    if (( pct < 0 )); then emit gauge "" off; exit; fi
-    # gauge@N: the needle points at the usage (TopBar.qml draws it); the colour follows the window shown
-    if (( pct > 95 )); then cls=critical; elif (( pct > 90 )); then cls=warning; else cls=; fi
-    text=; (( mode < 2 )) && text="$pct%"
-    emit "gauge@$pct" "$text" "$cls" ;;
+    # A part per account: gauge@N (the needle points at the usage: TopBar.qml draws it), the colour by the window shown;
+    # an account without numbers (signed out) is a dimmed gauge. Over 95 % critical, over 90 % warning.
+    "$dir/claude-usage" --all | jq -c --arg k "$key" --argjson withText "$(( mode < 2 ))" '
+      [.[] | ((.windows // []) | map(select(.key == $k)) | first // {}).percent // -1
+           | if . < 0 then {icon: "gauge", text: "", class: "off"}
+             else {icon: "gauge@\(.)", text: (if $withText == 1 then "\(.)%" else "" end),
+                   class: (if . > 95 then "critical" elif . > 90 then "warning" else "" end)} end]
+      | if length == 0 then {icon: "gauge", text: "", class: "off"}
+        else .[0] + (if length > 1 then {more: .[1:]} else {} end) end' ;;
 esac

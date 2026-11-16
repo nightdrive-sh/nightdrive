@@ -10,7 +10,8 @@ import QtQuick
 // breathes while it works; the chips it opened follow it.
 // After its name, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
 // past stuckAfter is in the warning colour, as it's likely stuck. Before the time, as small and grey: the task number
-// of a session named "#N topic" (SessionsBar.tag; #2427), left out of its name. The bar hides the time when crowded;
+// of a session named "#N topic" (SessionsBar.tag; #2427), left out of its name, after the account's name when it runs
+// on another Claude Code account than the default (#3035). The bar hides the time when crowded;
 // the number shows only while the name fits whole beside it, so the name wins the room (#2443). A done session has
 // no time (SessionsBar.chipTime).
 Rectangle {
@@ -23,7 +24,7 @@ Rectangle {
     property bool lead: false
     property string time: ""             // "" = none
     property bool showTime: true
-    property string tag: ""              // "#2427", or ""
+    property string tag: ""              // "#2427", "work #2427", "work", or ""
     property bool showTag: true
     property bool stuck: false
     property int timeGap: 10             // between the name and the time (or the tag)
