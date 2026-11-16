@@ -1,13 +1,15 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.kit
 
-// Contacts' settings (⌘, or launcher › Settings › Apps › Contacts): the accounts with how many contacts each has here,
-// when the sync last ran, and the two things to do about them: sync now, and add an account (with Claude, as the first
-// start does). The accounts themselves are the user's accounts.conf (README.md › Setting up an account).
+// Contacts' settings (⌘, or launcher › Settings › Apps › Contacts): the list's order (first or last name, F and L), the
+// accounts with how many contacts each has here, when the sync last ran, and the two things to do about them: sync now,
+// and add an account (with Claude, as the first start does). The accounts themselves are the user's accounts.conf
+// (README.md › Setting up an account); the order is lib/settings.py's, which cards.py sorts by.
 AppPanel {
     id: root
-    required property var app           // the window: accounts, command, startSetup(), say()
+    required property var app           // the window: accounts, sortBy, command, load(), startSetup(), say()
     signal closed()
     visible: false
     cardWidth: 520
@@ -24,6 +26,13 @@ AppPanel {
         syncer.running = true
     }
     function addAccount() { close(); app.startSetup() }
+    // The switch moves at once; the list follows once cards.py has read the cards again in the new order
+    function sortBy(by) {
+        if (by === app.sortBy || sorter.running) return
+        app.sortBy = by
+        sorter.command = ["python3", Quickshell.shellDir + "/../lib/settings.py", "sort", by]
+        sorter.running = true
+    }
 
     onOutsideTapped: close()
     Keys.onPressed: e => {
@@ -31,6 +40,8 @@ AppPanel {
         if (k === Qt.Key_Escape || ((k === Qt.Key_Comma) && (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)))) close()
         else if (k === Qt.Key_S) syncNow()
         else if (k === Qt.Key_A) addAccount()
+        else if (k === Qt.Key_F) sortBy("first")
+        else if (k === Qt.Key_L) sortBy("last")
         e.accepted = true
     }
 
@@ -48,6 +59,14 @@ AppPanel {
         }
     }
     Process {
+        id: sorter
+        stderr: StdioCollector { id: sortErr }
+        onExited: code => {
+            if (code !== 0) root.app.say(sortErr.text.trim() || "Couldn't change the order.")
+            root.app.load()     // also after a failure: the switch goes back to what the file says
+        }
+    }
+    Process {
         id: syncer
         command: [root.app.command, "sync"]
         onExited: code => {
@@ -61,6 +80,22 @@ AppPanel {
         width: parent.width
         Text { anchors.verticalCenter: parent.verticalCenter; width: parent.width - escHint.width; text: "Settings"; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium }
         KeyCap { id: escHint; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc" }
+    }
+
+    Item {
+        width: parent.width
+        implicitHeight: order.implicitHeight
+        Text { anchors.verticalCenter: parent.verticalCenter; text: "Sort by"; color: c.text; font.family: c.font; font.pixelSize: 13 }
+        AppSegments {
+            id: order
+            anchors.right: parent.right
+            c: root.c
+            tipAlign: "right"
+            options: [{ label: "First name", tip: "Anna Virtanen under A", keys: "F" },
+                      { label: "Last name", tip: "Anna Virtanen under V", keys: "L" }]
+            current: root.app.sortBy === "last" ? 1 : 0
+            onPicked: i => root.sortBy(i === 1 ? "last" : "first")
+        }
     }
 
     Column {
