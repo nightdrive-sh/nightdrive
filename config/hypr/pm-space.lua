@@ -6,8 +6,9 @@
 -- Only the sessions' names say which window is a PM, and Quickshell has them (claude-sessions): Claude.qml calls
 -- NightdrivePmSpaces with the PMs it sees, and the rest happens here. The PM's workspace gets the master layout by a
 -- workspace rule (the PM the master, orientation left), and Hyprland's events keep it so: a background session opened
--- or moved there joins the group, a PM whose sessions all closed keeps its width (a gap on the right), and a workspace
--- that is gone takes its rule with it, so its number is an ordinary workspace again.
+-- or moved there joins the group, a PM whose sessions all closed fills the width (keeping its column made it jump back
+-- a moment after master stretched it), and a workspace that is gone takes its rule with it, so its number is an
+-- ordinary workspace again.
 -- A PM seen for the first time on a workspace with other windows moves to the first empty workspace (focus follows
 -- when it had it). One restarted (a new window, the same name) goes back to its space, where its sessions are. A PM the
 -- user moves to another workspace makes that one its space, in place, and the old one is ordinary again.
@@ -41,18 +42,16 @@ local function save()
     f:close()
 end
 
--- A space's workspace rule: its layout and every outer gap, `right` wider while the PM is alone. Made anew on each
--- change, never toggled: disabling a rule turns its workspace back to the default layout even with another rule for
--- it enabled, and the gaps it set stay, so each rule says all. (The disabled ones stay in Hyprland until a reload: a
--- space changes a few times a day.)
-local function set_rule(s, layout, right)
-    local key = layout .. ":" .. tostring(right)
-    if s.ruleKey == key then return end
+-- A space's workspace rule: its layout and every outer gap. Made anew on each change, never toggled: disabling a
+-- rule turns its workspace back to the default layout even with another rule for it enabled, and the gaps it set
+-- stay, so each rule says all. (The disabled ones stay in Hyprland until a reload: a space changes a few times a day.)
+local function set_rule(s, layout)
+    if s.ruleKey == layout then return end
     if s.rule then s.rule:set_enabled(false) end
     local go = hl.get_config("general.gaps_out") or {}
     s.rule = hl.workspace_rule({ workspace = tostring(s.ws), layout = layout, gaps_out = {
-        top = go.top or 10, right = right or go.right or 10, bottom = go.bottom or 10, left = go.left or 10 } })
-    s.ruleKey = key
+        top = go.top or 10, right = go.right or 10, bottom = go.bottom or 10, left = go.left or 10 } })
+    s.ruleKey = layout
 end
 
 local function open_space(id, pm, sid, name)
@@ -68,19 +67,7 @@ local function close_space(s)
     spaces[s.ws] = nil
 end
 
--- The right gap that keeps a PM alone as wide as beside its sessions: the screen's width less its left gap and that
--- column (master gives the master mfact of the room inside the outer gaps, less an inner gap)
-local function alone_gap(mon)
-    local go = hl.get_config("general.gaps_out") or {}
-    local gi = hl.get_config("general.gaps_in") or {}
-    local left = go.left or 10
-    local res = mon.reserved or {}
-    local width = mon.width / mon.scale - (res.left or 0) - (res.right or 0)
-    return math.floor(width - left - ((width - left - (go.right or 10)) * PM_WIDTH - (gi.right or 5)))
-end
-
--- Puts a space in order: the PM out of any group and the master, the background sessions in one group, the gap
--- while the PM is alone
+-- Puts a space in order: the PM out of any group and the master, the background sessions in one group
 local function arrange(s)
     local pm = pm_of(s)
     local wins = hl.get_workspace_windows(s.ws) or {}
@@ -113,8 +100,6 @@ local function arrange(s)
             end
         end
     end
-    -- (and again when the screen's width differs: the space moved to another screen)
-    set_rule(s, "master", here and others == 0 and pm.monitor and alone_gap(pm.monitor) or nil)
 end
 
 -- Every space: one whose PM the user moved to another workspace follows it there, one whose workspace is gone
