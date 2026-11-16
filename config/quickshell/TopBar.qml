@@ -57,13 +57,21 @@ Singleton {
         }
         return out
     }
-    // In your order (Items: Ctrl+arrows, or ⌘+drag in the bar), then modules not in it in the files' order (a new one goes
-    // to the right end).
+    // In your order (Items: Ctrl+arrows, or ⌘+drag in the bar). A module not in it (a new one) goes right of the one
+    // before it in the files that is (claude2 beside claude, #3038), or else to the right end in the files' order.
     // A module whose optional part isn't installed ("needs") isn't listed at all. One with "first" stays at the left end
     // whatever the order: it comes and goes (the microphone and camera in use), and there it doesn't shift the others.
     readonly property var allModules: {
         const def = localModules.concat(withPlugins(publicModules)).filter(m => !m.needs || Plugins.has(m.needs))
-        const key = m => { const i = items.order.indexOf(m.name); return (m.first ? -1e6 : 0) + (i >= 0 ? i : items.order.length + def.indexOf(m)) }
+        const key = m => {
+            const base = m.first ? -1e6 : 0, at = def.indexOf(m), i = items.order.indexOf(m.name)
+            if (i >= 0) return base + i
+            for (let j = at - 1; j >= 0; j--) {
+                const k = items.order.indexOf(def[j].name)
+                if (k >= 0) return base + k + 0.5 + at / 1e4   // several new ones after the same keep the files' order
+            }
+            return base + items.order.length + at
+        }
         return def.slice().sort((a, b) => key(a) - key(b))
     }
     // The ones shown: a module turned off isn't run at all
@@ -108,7 +116,7 @@ Singleton {
         if (names.join() !== allModules.map(m => m.name).join()) saveItems({ hidden: items.hidden, order: names })
     }
     // Names and glyphs for the launcher's list; a module can give its own "label" and "glyph" in modules.jsonc
-    readonly property var moduleLabels: ({ claude: ["Claude", "gauge"], system: ["CPU and memory", "cpu"],
+    readonly property var moduleLabels: ({ claude: ["Claude", "gauge"], claude2: ["Claude, second account", "gauge"], system: ["CPU and memory", "cpu"],
                                            bluetooth: ["Bluetooth", "bluetooth"], wifi: ["Wi-Fi", "wifi"],
                                            volume: ["Volume", "volume-2"], headphones: ["Headphones", "headphones"], display: ["Display", "monitor"], battery: ["Battery", "battery-medium"],
                                            calendar: ["Date and time", "clock"], notifications: ["Notifications", "menu"],
@@ -215,13 +223,6 @@ Singleton {
     function c(k) {
         return col[k] || { bg: "#ff000000", fg: "#d9ffffff", dim: "#8cffffff", off: "#57ffffff", hlBg: "#4db17bcb",
                            hlFg: "#ffffff", actBg: "#40c071eb", wsBg: "#4db17bcb" }[k]
-    }
-
-    // A module's colour by its class (BarModule, and each of its "more" parts: BarModulePart); lit = its menu is open
-    // or it is active, which wins
-    function fg(cls, lit) {
-        return lit ? c("hlFg") : cls === "off" ? c("off") : cls === "warning" ? Theme.warning
-             : cls === "critical" ? Theme.danger : c("fg")
     }
 
     // --- Icons: SVG text by name ("" = not found); fetched once, then cached ---

@@ -2,7 +2,7 @@ import QtQuick
 import qs.kit
 
 // One Claude Code account's plan usage in the Claude menu (ClaudeMenu.qml): its section, then a meter for each window
-// (5-hour session, week, per-model week) with when it resets, in its column (ClaudeAccountColumn.qml). usage is one of
+// (5-hour session, week, per-model week) with when it resets. usage is one of
 // topbar/scripts/claude-usage --all's: { account, plan, windows: [{ key, percent, resetsAt, model }], error }.
 Column {
     id: u

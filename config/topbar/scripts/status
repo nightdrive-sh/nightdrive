@@ -81,6 +81,8 @@ case $kind in
     emit "$icon" "$pct%" "$cls" ;;
   claude)
     exec ~/.config/topbar/scripts/claude-bar status ;;   # its right click cycles what it shows
+  claude2)
+    exec ~/.config/topbar/scripts/claude-bar status 2 ;; # the second Claude Code account's; hidden without one
   system)
     IFS=$'\t' read -r _ _ cls < <(~/.config/topbar/scripts/sysinfo bar)
     [[ $cls == high ]] && cls=critical

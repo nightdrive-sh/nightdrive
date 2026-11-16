@@ -27,9 +27,6 @@ Item {
     Timer { running: mod.frames.length > 1; interval: 350; repeat: true; onTriggered: mod.frame++ }
     Timer { running: mod.frames.length > 1 || mod.pulsing; interval: 1000; repeat: true; onTriggered: TopBar.refresh(mod.name) }
     readonly property string label: st && st.text ? st.text : ""
-    // "more": [{icon, text, class}], further icons and texts after its own, each in its class's colour (Claude's gauge
-    // for each account: claude-bar)
-    readonly property var more: st && Array.isArray(st.more) ? st.more : []
     readonly property string cls: st && st.class ? st.class : ""
     // "pulse" is active whose icon fades in and out, smoothly (a VM booting in Garage): asked for every second meanwhile too
     readonly property bool pulsing: cls === "pulse"
@@ -49,18 +46,22 @@ Item {
     visible: present && !tucked
 
     readonly property bool isMic: name === "microphone" && icon !== ""
+    // claude → 0, claude2 → 1: the Claude Code account it shows (topbar/scripts/claude-bar); -1 for the others
+    readonly property int claudeAccount: name === "claude" ? 0 : name === "claude2" ? 1 : -1
     MicLevel { id: micLevel; active: mod.isMic; steps: Math.round(mod.isz.size * mod.dpr) }
 
     readonly property var isz: TopBar.size(name)
     readonly property int pad: 8
     readonly property int gap: 5
-    readonly property int partGap: 8     // before each of the "more" parts
-    readonly property color fg: TopBar.fg(cls, open || active)
+    readonly property color fg: open || active ? TopBar.c("hlFg")
+                              : cls === "off" ? TopBar.c("off")
+                              : cls === "warning" ? Theme.warning
+                              : cls === "critical" ? Theme.danger
+                              : TopBar.c("fg")
     function snap(v) { return Math.round(v * dpr) / dpr }
 
     height: Theme.pillHeight
-    width: present ? Math.max(icon && !label && !more.length ? 34 : 0, pad + (icon ? isz.size : 0) + (icon && label ? gap : 0)
-                              + (label ? txt.implicitWidth : 0) + (more.length ? partGap + moreRow.width : 0) + pad) : 0
+    width: present ? Math.max(icon && !label ? 34 : 0, pad + (icon ? isz.size : 0) + (icon && label ? gap : 0) + (label ? txt.implicitWidth : 0) + pad) : 0
 
     Rectangle {
         anchors.fill: parent
@@ -76,7 +77,7 @@ Item {
             id: img
             visible: mod.icon !== ""
             width: mod.isz.size; height: mod.isz.size
-            x: mod.snap(mod.label || mod.more.length ? mod.pad : (mod.width - width) / 2)
+            x: mod.snap(mod.label ? mod.pad : (mod.width - width) / 2)
             y: mod.snap((mod.height - height) / 2)
             sourceSize: Qt.size(Math.ceil(width * mod.dpr), Math.ceil(height * mod.dpr))
             source: TopBar.iconUrl(mod.shownIcon, mod.fg)
@@ -104,9 +105,9 @@ Item {
         }
 
         // A red dot on the icon: the status asks for it ("dot": true), or for Claude while a session that finished in the
-        // background waits for you (Claude.qml)
+        // background waits for you (Claude.qml): on the icon of the session's account (claude, claude2)
         Rectangle {
-            visible: mod.icon !== "" && (!!(mod.st && mod.st.dot) || (mod.name === "claude" && Claude.wanting > 0))
+            visible: mod.icon !== "" && (!!(mod.st && mod.st.dot) || (mod.claudeAccount >= 0 && Claude.wantingIn(mod.claudeAccount) > 0))
             width: 7; height: 7; radius: 3.5
             x: mod.snap(img.x + img.width - 7); y: mod.snap(img.y + 1)
             color: Theme.danger   // red like a critical module (the Dashboard's tasks); no ring around it: the bar's background can be see-through
@@ -120,28 +121,6 @@ Item {
             dpr: mod.dpr
             font.letterSpacing: mod.def.spacing || 0   // modules.jsonc "spacing"
             x: mod.snap(mod.icon ? img.x + img.width + mod.gap : (mod.width - implicitWidth) / 2)
-        }
-
-        Row {
-            id: moreRow
-            visible: mod.more.length > 0
-            spacing: mod.partGap
-            height: mod.height
-            x: mod.snap((mod.label ? txt.x + txt.implicitWidth : img.x + img.width) + mod.partGap)
-            Repeater {
-                model: mod.more
-                delegate: BarModulePart {
-                    required property var modelData
-                    icon: modelData.icon || ""
-                    label: modelData.text || ""
-                    cls: modelData.class || ""
-                    lit: mod.open || mod.active
-                    dpr: mod.dpr
-                    size: mod.isz.size
-                    gap: mod.gap
-                    opacity: mod.pulse
-                }
-            }
         }
     }
 

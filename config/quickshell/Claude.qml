@@ -105,6 +105,13 @@ Singleton {
     readonly property var sessions: seen.map(s => Object.assign({ wants: !!wants[s.address] }, s, { since: since(s) }))
                                         .sort((a, b) => (b.wants - a.wants) || (b.started - a.started))
     readonly property int wanting: sessions.filter(s => s.wants).length
+    // Which account's a session is: its place in accounts (claude-accounts' order); 0, the default's, also for one on a
+    // config dir no account lists. The bar's claude / claude2 icons and their menus go by it.
+    function accountIndex(s) {
+        const i = s.accountDefault ? 0 : accounts.findIndex(a => a.name === s.account)
+        return i < 0 ? 0 : i
+    }
+    function wantingIn(i) { return sessions.filter(s => s.wants && accountIndex(s) === i).length }
 
     // working → waiting while another window is focused: it wants you
     onSeenChanged: {
@@ -187,7 +194,7 @@ Singleton {
     }
 
     // The Claude Code accounts (topbar/scripts/claude-accounts: [{ name, dir, default, signedIn, plan }], the default
-    // first): the Claude menu's New session for each. Read now and then, and when the menu opens (refreshAccounts).
+    // first): the bar's claude and claude2 icons and their menus. Read now and then, and when a menu opens.
     property var accounts: []
     function refreshAccounts() { accountsProc.running = true }
     Sh {

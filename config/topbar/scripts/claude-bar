@@ -1,32 +1,37 @@
 #!/bin/bash
-# The bar's Claude module (scripts/status runs it). Right click cycles what it shows, remembered across restarts:
+# The bar's Claude modules (scripts/status runs it): `claude` for the first Claude Code account (claude-accounts: the
+# default, ~/.claude) and `claude2` for the second, hidden while there is none. Each opens its account's menu
+# (ClaudeMenu.qml, Claude2Menu.qml). Right click cycles what one shows, each remembered on its own across restarts:
 #   0  gauge + 5-hour usage %    1  gauge + weekly usage %    2  gauge, 5-hour    3  gauge, weekly
-#   4  spark + number of Claude Code sessions                 5  spark alone
-# With more than one Claude Code account (claude-accounts), a gauge each, in their order: the first as the module's own
-# icon and text, the others as its "more" parts (BarModule.qml); each warns in its own colour.
+#   4  spark + number of its account's Claude Code sessions    5  spark alone
 # The spark (icons/spark.svg) is our own, not Anthropic's logo: Nightdrive is a third-party project.
-# Usage: claude-bar [status|next]
+# Usage: claude-bar [status|next] [N]   N: the account's place in claude-accounts' list, 1 (default) or 2
 state=${XDG_STATE_HOME:-$HOME/.local/state}/nightdrive
-mode=$(cat "$state/claude-bar-mode" 2>/dev/null); [[ $mode =~ ^[0-5]$ ]] || mode=0
+n=${2:-1}; [[ $n =~ ^[1-9]$ ]] || n=1
+modefile="$state/claude-bar-mode"; (( n > 1 )) && modefile+="-$n"   # the first keeps the file it always had
+mode=$(cat "$modefile" 2>/dev/null); [[ $mode =~ ^[0-5]$ ]] || mode=0
 dir=$(dirname "$0")
 
 case ${1:-status} in
   next)
-    mkdir -p "$state" && echo $(( (mode + 1) % 6 )) > "$state/claude-bar-mode" ;;
+    mkdir -p "$state" && echo $(( (mode + 1) % 6 )) > "$modefile" ;;
   status)
     . "$dir/emit"
+    IFS=$'\t' read -r account _ < <("$dir/claude-accounts" | sed -n "${n}p")
+    [[ -n $account ]] || { emit "" ""; exit; }   # no such account: hidden
     if (( mode >= 4 )); then
-      text=; (( mode == 4 )) && text=$("$dir/claude-sessions" | jq length)
+      text=
+      if (( mode == 4 )); then   # its account's sessions; the first's has those on a dir no account lists too
+        text=$("$dir/claude-sessions" | jq --arg a "$account" --argjson first "$(( n == 1 ))" \
+                 '[.[] | select(.account == $a or ($first == 1 and .accountDefault))] | length')
+      fi
       emit spark "$text"; exit
     fi
     key=$( (( mode % 2 )) && echo weekly || echo session )
-    # A part per account: gauge@N (the needle points at the usage: TopBar.qml draws it), the colour by the window shown;
-    # an account without numbers (signed out) is a dimmed gauge. Over 95 % critical, over 90 % warning.
-    "$dir/claude-usage" --all | jq -c --arg k "$key" --argjson withText "$(( mode < 2 ))" '
-      [.[] | ((.windows // []) | map(select(.key == $k)) | first // {}).percent // -1
-           | if . < 0 then {icon: "gauge", text: "", class: "off"}
-             else {icon: "gauge@\(.)", text: (if $withText == 1 then "\(.)%" else "" end),
-                   class: (if . > 95 then "critical" elif . > 90 then "warning" else "" end)} end]
-      | if length == 0 then {icon: "gauge", text: "", class: "off"}
-        else .[0] + (if length > 1 then {more: .[1:]} else {} end) end' ;;
+    pct=$("$dir/claude-usage" --account "$account" | jq -r --arg k "$key" '(.windows // [] | map(select(.key == $k)) | first // {}).percent // -1')
+    if (( pct < 0 )); then emit gauge "" off; exit; fi
+    # gauge@N: the needle points at the usage (TopBar.qml draws it); the colour follows the window shown
+    if (( pct > 95 )); then cls=critical; elif (( pct > 90 )); then cls=warning; else cls=; fi
+    text=; (( mode < 2 )) && text="$pct%"
+    emit "gauge@$pct" "$text" "$cls" ;;
 esac

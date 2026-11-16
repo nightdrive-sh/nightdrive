@@ -148,9 +148,9 @@ Click an icon and a small menu opens under it:
   shows its key; a digit you gave an app in App shortcuts stays the app's). The bar follows Settings › Top bar opacity, its focused session the active
   workspace's colour.
   **Two Claude accounts** (a Claude Code config dir each, `CLAUDE_CONFIG_DIR`): `~/.claude` and every `~/.claude-*`
-  you have signed in to are found by themselves. The menu then has a column per account (its sessions, **New
-  session** on it and its usage), the icon a gauge each, and a session on another account than `~/.claude` has the
-  account's name small beside its name in the sessions bar. To name them, or add a config dir kept elsewhere, list them in
+  you have signed in to are found by themselves. The second account then gets a Claude icon of its own beside the
+  first, each with its own menu (its sessions, **New session** on it and its usage), right-click setting and dot,
+  and a session on another account than `~/.claude` has the account's name small beside its name in the sessions bar. To name them, or add a config dir kept elsewhere, list them in
   `~/.config/nightdrive/claude-accounts`, a line each: `~/.claude-work work` (the dir, then the name; without one, a
   dir's name is its own: `~/.claude-work` is *work*). `nightdrive claude accounts` shows what it found.
 
