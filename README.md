@@ -229,6 +229,9 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   stop working for 15 s, with a countdown, and come back by themselves (also if you close the lid). A mouse still works:
   click the countdown to end it sooner.
 - **Mouse**: the wheel's scroll speed, from 0.5× to 3×, in Launcher › Settings › Mouse. The trackpad keeps its own.
+- **Game Mode**: the CPU at full speed for a game, in Launcher › Settings › Game Mode (or `nightdrive game-mode on`).
+  Without it the CPU slows down between frames to save power, and a game stutters (a long frame every second); off goes
+  back to the profile from before. It is power-profiles-daemon's performance profile (tuned's throughput-performance).
 - **Region**: how dates and times are written, apart from the language: Finland 3.11.2026, the US 11/3/2026 and 2:30 PM
   with weeks from Sunday, ISO 2026-11-03 and a few more, in Launcher › Settings › Region (or `nightdrive region set fi`).
   Nightdrive's apps follow at once; it is `LC_TIME` in `~/.config/locale.conf`, so other programs started after follow
@@ -490,6 +493,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive network` | Wi-Fi and the network as JSON, with whether the internet answers; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |
 | `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
 | `nightdrive low-power on` | Low Power Mode on a laptop, `off` or `toggle`; `status` (`--json`). `suggest off` stops the 10 % warning offering it |
+| `nightdrive game-mode on` | Game Mode: the CPU at full speed for games, `off` (back to the profile from before) or `toggle`; `status` (`--json`) |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
 | `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |

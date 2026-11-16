@@ -2,7 +2,8 @@ import QtQuick
 import Quickshell
 
 // The launcher's Settings › Display (brightness, night light, Screen Mirroring's rows from MirroringLevels.qml, where the
-// laptop's screen is next to an external one, the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, Low Power Mode, then the details, as in the top bar's battery menu).
+// laptop's screen is next to an external one, the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, Low Power Mode, then the details, as in the top bar's battery menu), and Game Mode's
+// switch on Settings' own page (LauncherSettings.qml), beside Battery: the power profile's other end.
 // The brightness rows (screen, keyboard: the row's key) are sliders that Launcher.qml draws (bright, keys, setBright) and
 // ←/→ steps (stepBright), also in the root search; Launcher.qml's displayItems() puts them there.
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered).
@@ -22,6 +23,7 @@ Item {
     property var battDetail: null             // and its details (topbar/scripts/sysinfo battery), null on a desktop
     property bool hasBattery: false           // the machine has its own battery: Settings lists Battery only then
     property var low: null                    // Low Power Mode (hypr/scripts/low-power status --json), null until read
+    property var game: null                   // Game Mode (hypr/scripts/game-mode status --json), null until read
     readonly property int brightStep: 5       // ←/→ on the brightness row, the same step as the brightness keys (hypr/scripts/brightness)
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
@@ -47,7 +49,8 @@ Item {
     // The brightness and night light rows' footers are Launcher.qml's: the root search has them too
     function footer(level, query) { return "" }
     // On every open: the root search has the brightness and night light rows too
-    function opened() { brightProc.running = true; keysProc.running = true; nightProc.running = true }
+    // and Game Mode's row (Settings, the root search), which Low Power Mode may have turned off since
+    function opened() { brightProc.running = true; keysProc.running = true; nightProc.running = true; gameProc.running = true }
     function entered(level) {
         if (level === "display") { displayProc.running = true; ratesProc.running = true; sideProc.running = true; brightProc.running = true; keysProc.running = true; nightProc.running = true }
         if (level === "battery") { battProc.running = true; battDetailProc.running = true; lowProc.running = true }
@@ -152,6 +155,13 @@ Item {
             low = Object.assign({}, low, it.kind === "lowpower" ? { state: on ? "on" : "off" } : { suggest: on })
             Quickshell.execDetached(it.kind === "lowpower" ? [scripts + "/low-power", on ? "on" : "off"]
                                                            : [scripts + "/low-power", "suggest", on ? "on" : "off"])
+            return true
+        }
+        if (it.kind === "gamemode") {     // Settings › Hardware, beside Battery
+            l.keepSelection()
+            const on = game.state !== "on"
+            game = Object.assign({}, game, { state: on ? "on" : "off" })
+            Quickshell.execDetached([scripts + "/game-mode", on ? "on" : "off"])
             return true
         }
         if (it.kind === "side") {         // stays open like the scale rows; Hyprland reloads with the new arrangement
@@ -298,6 +308,11 @@ Item {
         id: lowProc
         script: '"$HOME/.config/hypr/scripts/low-power" status --json'
         onResult: text => { try { p.low = JSON.parse(text) } catch (e) { p.low = null } }
+    }
+    Sh {
+        id: gameProc
+        script: '"$HOME/.config/hypr/scripts/game-mode" status --json'
+        onResult: text => { try { p.game = JSON.parse(text) } catch (e) { p.game = null } }
     }
     Timer { interval: 5000; repeat: true; running: p.launcher !== null && p.launcher.open && p.launcher.level === "battery"; onTriggered: { battProc.running = true; battDetailProc.running = true; lowProc.running = true } }
 }

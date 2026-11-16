@@ -27,7 +27,10 @@ Item {
             { kind: "nav", name: "Display", glyph: "monitor", target: "display" }
         ], lv.disp.hasOthers() ? [{ kind: "nav", name: "Other displays", glyph: "monitor-smartphone", target: "otherdisplays", summary: lv.disp.othersSummary() }] : [], [
             { kind: "nav", name: "Mouse", glyph: "mouse", target: "mousescroll", summary: lv.behave.mouseScroll ? lv.behave.mouseScroll + "× scroll" : undefined }
-        ], lv.disp.hasBattery ? [{ kind: "nav", name: "Battery", glyph: "battery-medium", target: "battery" }] : [], [
+        ], lv.disp.hasBattery ? [{ kind: "nav", name: "Battery", glyph: "battery-medium", target: "battery" }] : [],
+           // Low Power Mode's opposite, on every machine with power-profiles-daemon (DisplayLevels.qml, hypr/scripts/game-mode)
+           lv.disp.game && lv.disp.game.available ? [{ kind: "gamemode", name: "Game Mode", glyph: "gamepad-2", switchOn: lv.disp.game.state === "on",
+                                                       footer: "Enter: on/off  ·  the CPU at full speed, no stutter in games" }] : [], [
             { kind: "header", name: "Appearance" },
             { kind: "nav", name: "Theme", glyph: "palette", target: "theme" },
             { kind: "nav", name: "Top bar", glyph: "panel-top", target: "topbar" },   // its look and what it shows
@@ -64,7 +67,7 @@ Item {
                                               "Other displays": "ipad iphone tablet phone android second screen extra extend sidecar vnc airplay apple tv mirror cast",
                                               "Notifications": "notification sounds alert chime beep ping tone urgent critical popup timeout seconds duration",
                                               "Crash reports": "crash crashes bug report claude app quit coredump",
-                                              "Tailscale": "vpn", "Mouse": "scroll scrolling wheel speed fast slow",
+                                              "Tailscale": "vpn", "Game Mode": "games gaming performance fps stutter cpu speed power profile tuned", "Mouse": "scroll scrolling wheel speed fast slow",
                                               "Claude writes": "ai write rewrite polish text draft reply tone instructions prompt model",
                                               "Default apps": "browser email mail files folders text editor terminal images photos video music player pdf calendar open with",
                                               "App shortcuts": "keyboard shortcuts hyper caps lock keys keybindings hotkeys open app", "Theme": "appearance style look colors",

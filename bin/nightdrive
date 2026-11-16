@@ -38,6 +38,7 @@ usage() {
   row "network [COMMAND]"        "Wi-Fi and network state as JSON; wifi|all on|off [--keep]"
   row "bluetooth|battery"        "Bluetooth devices or the battery as JSON"
   row "low-power [on|off|toggle]" "Low Power Mode on a laptop: status (--json); suggest on|off at 10 %"
+  row "game-mode [on|off|toggle]" "Game Mode: the CPU at full speed for games; status (--json)"
   row "bar-style COMMAND"        "The top bar's look: opacity, icons, highlight, icon-opacity"
   row "nightlight [on|off]"      "Night light's warm tint: status, on, off, toggle (--json)"
   row "appearance"               "Wallpaper, theme, night light and the top bar's look now, as JSON"
@@ -145,6 +146,7 @@ case ${1:-} in
   brightness) exec "$scripts/brightness" screen "${@:2}" ;;
   bluetooth|battery) exec "$scripts/devices" "$1" ;;
   low-power) exec "$scripts/low-power" "${@:2}" ;;                    # Settings › Battery, the battery menu
+  game-mode) exec "$scripts/game-mode" "${@:2}" ;;                    # Settings › Hardware
   software) exec "$scripts/software" "${@:2}" ;;                       # Install/Remove › Software without the launcher
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there

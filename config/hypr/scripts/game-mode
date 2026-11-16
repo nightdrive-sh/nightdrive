@@ -1,0 +1,58 @@
+#!/bin/bash
+# Game Mode (launcher › Settings › Hardware): the performance profile of power-profiles-daemon, which tuned-ppd
+# provides as TuneD's throughput-performance (/etc/tuned/ppd.conf). Low Power Mode's opposite (low-power): off goes
+# back to the profile from before.
+# Why: under balanced, intel_pstate clocks the CPU down to its floor (800 MHz on nightdrive-pc) while a game sleeps
+# between frames, and the frame after pays for it: a long frame every second (#3029: 61 fps with a 55 ms hitch, against
+# 104 fps and none). throughput-performance sets the same floor as latency-performance (governor performance,
+# min_perf_pct=100, boost on); latency-performance only adds a cap on the C-states (force_latency), whose wake-ups are
+# micro- to a millisecond, not the hitch's tens. So ppd's profile is enough, and it needs no password: polkit lets the
+# active session switch it, as Settings and low-power do.
+#   game-mode status [--json]           on | off  ({state, available, profile})
+#   game-mode on|off|toggle [--json]
+set -uo pipefail
+state="$HOME/.local/state/nightdrive"
+before="$state/game-mode-before"   # the profile to go back to (balanced, power-saver)
+
+ppd=(org.freedesktop.UPower.PowerProfiles /org/freedesktop/UPower/PowerProfiles org.freedesktop.UPower.PowerProfiles)
+# "unknown" when TuneD was set by hand to a profile ppd doesn't map (sudo tuned-adm profile latency-performance)
+profile() { busctl --system get-property "${ppd[@]}" ActiveProfile 2>/dev/null | sed -E 's/^s "(.*)"$/\1/'; }
+set_profile() { busctl --system set-property "${ppd[@]}" ActiveProfile s "$1"; }
+
+available() { busctl --system get-property "${ppd[@]}" Profiles 2>/dev/null | grep -q '"performance"'; }
+status() { [[ $(profile) == performance ]] && echo on || echo off; }
+json() {
+  printf '{"state": "%s", "available": %s, "profile": "%s"}\n' "$(status)" "$(available && echo true || echo false)" \
+    "$(profile)"
+}
+need() {
+  available && return
+  echo "power-profiles-daemon (tuned-ppd) isn't running, so Game Mode can't be set." >&2
+  exit 1
+}
+
+turn_on() {
+  [[ $(status) == on ]] && return
+  mkdir -p "$state"
+  profile > "$before"
+  set_profile performance || exit 1
+}
+turn_off() {
+  [[ $(status) == off ]] && return
+  # Back to what it was; a profile set by hand (unknown) can't be set again without root, so balanced
+  local to; to=$(cat "$before" 2>/dev/null)
+  [[ $to == balanced || $to == power-saver ]] || to=balanced
+  set_profile "$to" || exit 1
+  rm -f "$before"
+}
+
+case ${1:-} in
+  status) ;;
+  on) need; turn_on ;;
+  off) need; turn_off ;;
+  toggle) need; if [[ $(status) == on ]]; then turn_off; else turn_on; fi ;;
+  *) sed -n '11,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
+# status prints the state; the others only with --json (Claude's tool: config/mcp/tools/sound-display.json)
+if [[ ${2:-} == --json ]]; then json
+elif [[ $1 == status ]]; then status; fi

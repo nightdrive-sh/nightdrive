@@ -175,6 +175,25 @@
       "notice": "Turned Low Power Mode {state}",
       "class": "change",
       "area": "sound-display"
+    },
+    {
+      "name": "game_mode",
+      "title": "Game Mode",
+      "description": "Turn Game Mode on or off (Settings › Game Mode): the CPU at full speed, so a game doesn't stutter as the CPU slows down between frames (power-profiles-daemon's performance profile). Off goes back to the profile from before. Answers with state, available and the power profile now.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {"type": "string", "enum": ["on", "off"]}
+        },
+        "required": ["state"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "game-mode", "{state}", "--json"],
+      "before": ["nightdrive", "game-mode", "status", "--json"],
+      "undo": ["nightdrive", "game-mode", "{state}"],
+      "notice": "Turned Game Mode {state}",
+      "class": "change",
+      "area": "sound-display"
     }
   ]
 }
