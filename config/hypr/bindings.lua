@@ -304,6 +304,7 @@ for _, dir in ipairs({ "left", "right", "up", "down" }) do
     hl.bind(mod .. " + " .. dir,             hl.dsp.focus({ direction = dir }))
     hl.bind(mod .. " + SHIFT + " .. dir,     function() NIGHTDRIVE_SWAP(dir) end)   -- slides (appearance.lua)
 end
+require("window-groups")   -- ⌘⇧G: a group of tabs or none; ⌘⌥⇧ arrows: into the group that way, or out of its own
 
 -- Hyper ← / →: the previous / next Claude Code session in the sessions bar's order (Claude.qml), on any workspace,
 -- round from the end to the start. Hyper + a letter stays the apps'; the arrows aren't a letter, so they're free.
