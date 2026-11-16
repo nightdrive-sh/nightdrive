@@ -50,7 +50,7 @@ Variants {
         screen: modelData
         anchors { top: true; left: true; right: true }
         implicitHeight: Theme.barHeight
-        color: TopBar.c("bg")
+        color: TopBar.windowBg   // never quite opaque: TopBar.windowBg says why
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "nightdrive-bar"
         readonly property real dpr: modelData.devicePixelRatio || 1

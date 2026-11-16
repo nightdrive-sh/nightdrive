@@ -224,6 +224,14 @@ Singleton {
         return col[k] || { bg: "#ff000000", fg: "#d9ffffff", dim: "#8cffffff", off: "#57ffffff", hlBg: "#4db17bcb",
                            hlFg: "#ffffff", actBg: "#40c071eb", wsBg: "#4db17bcb" }[k]
     }
+    // The bars' window colour (Bar, SessionsBar): bg, never quite opaque. Quickshell gives a window whose colour is opaque
+    // when it is made an opaque region and keeps it when the colour turns translucent, so Hyprland stops drawing what is
+    // below and the bar stays black whatever its opacity (#3046). The colour is opaque then before bar.json is read, and
+    // at 100 %. Alpha 254/255 looks the same.
+    readonly property color windowBg: {
+        const k = Qt.color(c("bg"))
+        return Qt.rgba(k.r, k.g, k.b, Math.min(k.a, 254 / 255))
+    }
 
     // --- Icons: SVG text by name ("" = not found); fetched once, then cached ---
     // A missing one is asked again after 5 s and 30 s: a branch switch removes a plugin's icon links for a moment

@@ -12,7 +12,7 @@ import "SessionGroups.js" as Groups
 // in bold (no lines between them: the bar reads quieter). Groups and lone sessions follow each other, a dot between
 // each (SessionGroups.js); a chip is as wide as its name, and the chips share the bar equally only when they don't
 // fit (layout below).
-// Its background is the top bar's (TopBar.c("bg")), so it follows Settings › Top bar opacity.
+// Its background is the top bar's (TopBar.windowBg), so it follows Settings › Top bar opacity.
 // Each chip but a lead's ends with how long it has worked or waited (Claude.sessions' since), once past timeAfter;
 // crowded, the times go first, then the names (the leads keep theirs). A done session (the green check) shows no time:
 // how long ago it finished took the room from its name (#2443). A session named "#N topic" (the PM's) shows the
@@ -83,7 +83,7 @@ PanelWindow {
     visible: Claude.barOn && sessions.length > 0 && mainScreen !== null && !drawerOpen
     anchors { bottom: true; left: true; right: true }
     implicitHeight: barH
-    color: TopBar.c("bg")
+    color: TopBar.windowBg
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "nightdrive-sessions"
 
