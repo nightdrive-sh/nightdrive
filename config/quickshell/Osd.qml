@@ -19,7 +19,9 @@ Toast {
     property string micLabel: ""
     property string noteIcon: ""
     property string noteText: ""
-    readonly property bool textMode: mode === "dnd" || mode === "mic" || mode === "note"
+    readonly property bool volumeMuted: mode === "volume" && muted
+    // Muted, the level means nothing: the card is text like the mic's ("Mic off"), no grey bar (#3048)
+    readonly property bool textMode: mode === "dnd" || mode === "mic" || mode === "note" || volumeMuted
     readonly property real level: mode === "volume" ? volume : brightness
     // Longer texts ("Unable to listen", a note) need a wider card
     cardWidth: mode === "note" ? 340 : mode === "mic" && micLabel !== "" ? 350 : 280
@@ -73,7 +75,7 @@ Toast {
         anchors { left: parent.left; leftMargin: 16; verticalCenter: parent.verticalCenter }
         text: Icons.g(osd.mode === "note" ? osd.noteIcon : osd.mode === "mic" ? (osd.micMuted ? "mic-off" : "mic") : osd.mode === "dnd" ? (osd.dnd ? "bell-off" : "bell") : osd.mode === "brightness" ? "sun" : osd.mode === "kbd" ? "keyboard" : osd.muted || osd.volume <= 0 ? "volume-x" : osd.volume < 0.34 ? "volume" : osd.volume < 0.67 ? "volume-1" : "volume-2")
         font { family: Icons.family; pixelSize: 18 }
-        color: osd.mode === "volume" && osd.muted ? Theme.dim : Theme.accent
+        color: osd.volumeMuted ? Theme.dim : Theme.accent
     }
     Rectangle {
         id: track
@@ -84,13 +86,13 @@ Toast {
         Rectangle {
             width: parent.width * Math.min(1, osd.level)
             height: parent.height; radius: 3
-            color: osd.mode === "volume" && osd.muted ? Theme.off : Theme.primary
+            color: Theme.primary
         }
     }
     Text {
         anchors { horizontalCenter: parent.horizontalCenter; verticalCenter: parent.verticalCenter }
         visible: osd.textMode
-        text: (osd.mode === "note" ? osd.noteText : osd.mode === "mic" ? (osd.micLabel !== "" ? osd.micLabel : (osd.micMuted ? "Mic off" : "Mic on"))
+        text: (osd.volumeMuted ? "Muted" : osd.mode === "note" ? osd.noteText : osd.mode === "mic" ? (osd.micLabel !== "" ? osd.micLabel : (osd.micMuted ? "Mic off" : "Mic on"))
                                   : (osd.dnd ? "Do not disturb on" : "Notifications on")).toUpperCase()
         color: Theme.primary
         font { family: Theme.font; pixelSize: 12; letterSpacing: 0.6 }
@@ -99,10 +101,9 @@ Toast {
         id: pct
         visible: !osd.textMode
         anchors { right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter }
-        readonly property bool isMuted: osd.mode === "volume" && osd.muted
-        width: isMuted ? 52 : 38; horizontalAlignment: Text.AlignRight
-        text: isMuted ? "MUTED" : Math.round(osd.level * 100) + "%"
-        color: isMuted ? Theme.primary : Theme.text
-        font { family: Theme.font; pixelSize: 12; letterSpacing: isMuted ? 0.6 : 0 }
+        width: 38; horizontalAlignment: Text.AlignRight
+        text: Math.round(osd.level * 100) + "%"
+        color: Theme.text
+        font { family: Theme.font; pixelSize: 12 }
     }
 }
