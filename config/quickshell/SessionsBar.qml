@@ -17,7 +17,8 @@ import "SessionGroups.js" as Groups
 // crowded, the times go first, then the names (the leads keep theirs). A done session (the green check) shows no time:
 // how long ago it finished took the room from its name (#2443). A session named "#N topic" (the PM's) shows the
 // number small before its time instead of in its name, which starts with a capital (#2427), and the time in brackets
-// ("#2427 8 min" read as one number); the number goes before the name is shortened (SessionChip.tagShown).
+// ("#2427 8 min" read as one number); the number goes before the name is shortened (SessionChip.tagShown). The number
+// is hidden for now (showTaskTag; #3043).
 PanelWindow {
     id: sb
     readonly property int barH: Theme.barHeight   // as tall as the top bar
@@ -37,6 +38,9 @@ PanelWindow {
     readonly property int iconW: 16
     readonly property int timeAfter: 300  // a shorter turn shows no time: seconds and a minute or two say nothing
     readonly property int stuckAfter: 600 // a turn running longer is probably stuck: its time in the warning colour
+    // The task number of a "#N topic" session on its chip: hidden for now (#3043), its room goes to the name; the tip
+    // and the Claude menu keep the full name. Kept as a switch, as it may come back or become a setting
+    readonly property bool showTaskTag: false
     // The dot between groups: a quiet grey from the theme
     readonly property color line: Qt.rgba(Theme.dim.r, Theme.dim.g, Theme.dim.b, 0.38)
 
@@ -88,13 +92,12 @@ PanelWindow {
         const name = untagged(s.name || "")
         return it.lead && name ? Groups.shortName(name) : name || s.topic || s.project
     }
-    // "#2427 topic": the task number, shown apart (the tip and the Claude menu keep the full name). Before it, a session
-    // on another Claude Code account than the default has the account's name (claude-accounts; #3035)
+    // "#2427 topic": the task number, shown apart (the tip and the Claude menu keep the full name). A session on another
+    // Claude Code account shows its account only in the tip (SessionTip): on the chip it took room for little (#3043)
     function tag(it) {
-        const s = it.session || {}
-        const m = /^(#\d+)\s+\S/.exec(s.name || "")
-        const acc = s.accountDefault === false && s.account ? s.account : ""
-        return [acc, m ? m[1] : ""].filter(t => t).join(" ")
+        if (!showTaskTag) return ""
+        const m = /^(#\d+)\s+\S/.exec(it.session && it.session.name || "")
+        return m ? m[1] : ""
     }
     function untagged(name) {
         const m = /^#\d+\s+(\S.*)$/.exec(name)
