@@ -148,7 +148,7 @@ Click an icon and a small menu opens under it:
   shows its key; a digit you gave an app in App shortcuts stays the app's). The bar follows Settings › Top bar opacity, its focused session the active
   workspace's colour.
   **A project manager's space**: a session named *… Project Manager* or *… PM* (`claude -n`) gets a workspace of its
-  own, as the left column, full height and 40 % of the width; started on a workspace with other windows, it moves to
+  own, as the left column, full height and half the width; started on a workspace with other windows, it moves to
   the first empty one. The sessions it opens with `nightdrive ask --background` open there on the right, as one group
   of tabs: one shows, its tab strip lists them, and a click, **⌘ ←** / **⌘ →** or the Hyper keys above switch between
   them. It keeps its width when its sessions have all closed, and goes back to its space when restarted (by its name).

@@ -13,7 +13,7 @@
 -- user moves to another workspace makes that one its space, in place, and the old one is ordinary again.
 -- A reload starts Lua afresh and drops the rules (groups survive): the spaces are kept in STATE and made again.
 
-local PM_WIDTH = 0.40   -- the PM's column, a share of the width (1/3 was too narrow, #3042)
+local PM_WIDTH = 0.50   -- the PM's column, a share of the width (1/3, then 40 %, too narrow, #3042)
 local SESSION_CLASS = "claude-background"   -- terminal-or-claude's --background sessions (Ghostty prefixes sh.nightdrive.)
 local STATE = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/nightdrive-pm-spaces"   -- "ws<TAB>address<TAB>name" lines
 local SETTLE_MS = 120   -- events come in bursts (a window opens, joins a group, moves): arrange once they settle
