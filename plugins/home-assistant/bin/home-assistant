@@ -26,11 +26,18 @@
   home-assistant fav ID [on|off]   pins a device to the top bar's Home menu (no on/off: flips it)
   home-assistant bar               the top bar module's state line (modules.jsonc format)
   home-assistant open              opens the Home Assistant webapp (focuses it if already open)
-  home-assistant test URL < TOKEN  checks an address and a token, read from stdin to keep it out of argv (install.sh)
+  home-assistant test URL < TOKEN  checks an address and a token, read from stdin to keep it out of argv (install.sh);
+                                   exit 5 for a plain http address off a home network (it isn't sent there)
+  home-assistant home [list]       the networks answered for, and this one, as JSON {current: {uuid, mac, name,
+                                   answer} or null, networks: [{answer, uuid, mac, name}]}
+  home-assistant home add|not      this network is a home network (plain http addresses get the token here) | isn't
+  home-assistant home forget [UUID]  forgets this network's answer (or every network of that connection)
+  home-assistant ask-home          the notification "Is this your home network?" (lib/client.py runs it)
 
 Config: ~/.config/nightdrive/home-assistant (KEY=value, mode 600):
   HA_URLS="http://homeassistant.local:8123 http://ha:8123 https://xxxx.ui.nabu.casa"   tried in order, like the
-          official apps' internal / external URL: the first that answers is used and remembered for a while
+          official apps' internal / external URL: the first that answers is used and remembered for a while. A plain
+          http address only on a home network: ~/.config/nightdrive/home-assistant-networks (lib/network.py, #1748)
   HA_TOKEN=…               a long-lived access token (HA › Profile › Security), or
   HA_TOKEN_CMD="op read op://Private/Home Assistant/token"   a command that prints it
 Pinned devices: ~/.local/state/nightdrive/home-favorites, one entity id per line.
@@ -42,23 +49,19 @@ sensors, the input_booleans that say whether anyone is home, read or set, and a 
 app). One that isn't there is off. The launcher and the bar don't set it, so the user's own controls are as they
 were.
 """
-import json, os, re, shlex, subprocess, sys, time, urllib.error, urllib.request
+import json, os, re, sys, urllib.error
 
 # The checks beside this command's folder (it is linked to ~/.local/bin): what running a scene, a script or an
 # automation would open or unlock (#1923)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"))
 import opens  # noqa: E402
 from opens import ENTITY  # noqa: E402
+# The config, the token and the address it may go to on this network (#1748)
+import client, network  # noqa: E402,E401
+from client import Client, die, load_config, request  # noqa: E402
 
 HOME = os.environ["HOME"]
-CONFIG = f"{HOME}/.config/nightdrive/home-assistant"
 FAVS = f"{HOME}/.local/state/nightdrive/home-favorites"
-CACHE = f"{HOME}/.cache/nightdrive/home-assistant-url"
-# HA_TOKEN_CMD's answer, until logout. Never in /tmp: a file another user made there first would get the token.
-TOKEN_CACHE = f"{os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'}/nightdrive-ha-token"
-PROBE_TIMEOUT = 1.5      # s per address while looking for one that answers
-TIMEOUT = 8              # s for a request to the chosen address
-RECHECK = 300            # s: a fallback address is used this long before the preferred ones are tried again
 WEBAPP = "home-assistant"   # webapp-add's slug: ~/.local/share/applications/webapp-home-assistant.desktop
 
 # What the launcher can control, in this order (its sections). Sensors and the like are left out: nothing to press.
@@ -144,115 +147,6 @@ def opening(eid, attrs):
     """Whether its id or name says it may open or unlock something (a door, a gate, the garage)"""
     return any(w in OPENING_WORDS or w.startswith(OPENING_START) or w.endswith(OPENING_END)
                for w in words_of(eid, attrs))
-
-
-def die(msg, code=1):
-    print(msg, file=sys.stderr)
-    sys.exit(code)
-
-
-def load_config():
-    cfg = {}
-    try:
-        for line in open(CONFIG):
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            v = v.strip()
-            cfg[k.strip()] = " ".join(shlex.split(v)) if v else ""
-    except FileNotFoundError:
-        pass
-    return cfg
-
-
-def token(cfg):
-    if cfg.get("HA_TOKEN"):
-        return cfg["HA_TOKEN"]
-    if not cfg.get("HA_TOKEN_CMD"):
-        return ""
-    # Asking 1Password every few seconds would be slow (and may prompt): keep the answer in the runtime dir
-    try:
-        return open(TOKEN_CACHE).read().strip()
-    except FileNotFoundError:
-        pass
-    t = subprocess.run(["bash", "-c", cfg["HA_TOKEN_CMD"]], capture_output=True, text=True).stdout.strip()
-    if t:
-        try:
-            fd = os.open(TOKEN_CACHE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            os.write(fd, t.encode())
-            os.close(fd)
-        except OSError:   # no runtime dir (outside a login session): asked again next time
-            pass
-    return t
-
-
-def request(base, tok, method, path, body=None, timeout=TIMEOUT):
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(base.rstrip("/") + path, data=data, method=method,
-                                 headers={"Authorization": "Bearer " + tok, "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        raw = r.read().decode()
-    return json.loads(raw) if raw.strip().startswith(("{", "[")) else raw
-
-
-def reachable(base, tok):
-    try:
-        request(base, tok, "GET", "/api/", timeout=PROBE_TIMEOUT)
-        return True
-    except urllib.error.HTTPError as e:
-        if e.code == 401:
-            die("Home Assistant refused the token (401): make a new one in HA › Profile › Security")
-        return False
-    except Exception:
-        return False
-
-
-class Client:
-    """The first address in HA_URLS that answers. The choice is remembered; a fallback (say Tailscale while away) is
-    re-checked after RECHECK seconds, so the local address comes back when you're home."""
-
-    def __init__(self):
-        cfg = load_config()
-        self.urls = cfg.get("HA_URLS", "").split()
-        self.tok = token(cfg)
-        if not self.urls or not self.tok:
-            die("Home Assistant isn't set up: nightdrive plugins install home-assistant", 3)
-        self.base = None
-
-    def pick(self):
-        try:
-            cached = open(CACHE).read().strip()
-            age = time.time() - os.path.getmtime(CACHE)
-        except FileNotFoundError:
-            cached, age = "", 0
-        if cached in self.urls and (cached == self.urls[0] or age < RECHECK):
-            return cached
-        for u in self.urls:
-            if reachable(u, self.tok):
-                os.makedirs(os.path.dirname(CACHE), exist_ok=True)
-                with open(CACHE, "w") as f:
-                    f.write(u)
-                return u
-        die("Home Assistant doesn't answer at " + ", ".join(self.urls), 4)
-
-    def call(self, method, path, body=None):
-        self.base = self.base or self.pick()
-        try:
-            return request(self.base, self.tok, method, path, body)
-        except urllib.error.HTTPError as e:
-            # The config API wants an admin's token: its 401 says the token's user isn't one, not that it's wrong
-            if e.code == 401 and not path.startswith("/api/config/"):
-                die("Home Assistant refused the token (401): make a new one in HA › Profile › Security")
-            raise
-        except (urllib.error.URLError, TimeoutError, OSError):
-            # The remembered address stopped answering (left home, Wi-Fi changed): look again once
-            try:
-                os.remove(CACHE)
-            except FileNotFoundError:
-                pass
-            self.base = self.pick()
-            return request(self.base, self.tok, method, path, body)
 
 
 def favorites():
@@ -530,6 +424,31 @@ def open_webapp():
     os.execv(f"{HOME}/.config/hypr/scripts/launch-or-focus", ["launch-or-focus", "^" + wmclass + "$", "gtk-launch", f"webapp-{WEBAPP}"])
 
 
+def home(args):
+    """The home networks: a plain http address gets the token only on one of them (#1748)"""
+    sub = args[0] if args else "list"
+    net = network.current()
+    if sub == "list" and len(args) <= 1:
+        known = [{"answer": ans, "uuid": n.uuid, "mac": n.mac, "name": n.name} for ans, n in network.answers().values()]
+        cur = {"uuid": net.uuid, "mac": net.mac, "name": net.name, "answer": network.answer(net)} if net else None
+        print(json.dumps({"current": cur, "networks": known}, ensure_ascii=False))
+        return
+    if sub == "forget" and len(args) == 2:
+        gone = [n for _, n in network.answers().values() if n.uuid == args[1]]
+        for n in gone:
+            network.remember(n, None)
+        client.forget_choice()
+        print(f"forgot {len(gone)}")
+        return
+    if sub not in ("add", "not", "forget") or len(args) != 1:
+        die(__doc__.split("\n\n")[1], 2)
+    if not net:
+        die("Not on a Wi-Fi or wired network whose router answers", 1)
+    network.remember(net, {"add": "home", "not": "not", "forget": None}[sub])
+    client.forget_choice()   # chosen again with the new answer
+    print({"add": f"home: {net.name}", "not": f"not home: {net.name}", "forget": f"forgot {net.name}"}[sub])
+
+
 def main():
     a = sys.argv[1:]
     cmd = a[0] if a else ""
@@ -569,13 +488,20 @@ def main():
     elif cmd == "test" and len(a) == 2:
         # The token comes on stdin: as an argument any user could read it in /proc
         tok = sys.stdin.readline().strip()
+        route = network.route(a[1], network.current())
+        if not route:
+            die(f"{a[1]}: plain http, used only on your home network (not tested here)", 5)
         try:
-            r = request(a[1], tok, "GET", "/api/config", timeout=5)
+            r = request(route[0], tok, "GET", "/api/config", timeout=5, host=route[1])
             print(r.get("location_name", "Home Assistant"), r.get("version", ""))
         except urllib.error.HTTPError as e:
             die(f"{a[1]}: HTTP {e.code}" + (" (the token was refused)" if e.code == 401 else ""))
         except Exception as e:
             die(f"{a[1]}: no answer ({getattr(e, 'reason', e)})")
+    elif cmd == "home" and len(a) <= 3:
+        home(a[1:])
+    elif cmd == "ask-home" and len(a) == 1:
+        client.ask_home()
     else:
         die(__doc__.split("\n\n")[1], 2)
 
