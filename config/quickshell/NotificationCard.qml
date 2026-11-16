@@ -42,8 +42,8 @@ Rectangle {
     readonly property var buttons: (temporary ? [{ text: "Save", done: "Saved", save: true }] : [])
         .concat(filePath ? [{ text: "Copy image", copy: "image" }, { text: "Copy path", copy: "path" }] : [])
         .concat(actions.map(a => ({ text: a.text, action: a })))
-    readonly property bool hovered: hover.hovered || shotDrag.active   // a drag of the preview keeps a popup up too
-    readonly property bool dragging: shot.Drag.active   // the preview is being dragged out (the menu lets the drop through)
+    readonly property bool hovered: hover.hovered || shotDrag.active || dragging   // a drag of the preview keeps a popup up too
+    readonly property bool dragging: DragOut.active && DragOut.from(shot)   // the preview is being dragged out (the menu lets the drop through)
     signal activated()                         // click: open
     signal dropped()                           // the dragged preview landed somewhere
     signal viewed()                            // the preview was opened in the image viewer (double click)
@@ -291,12 +291,18 @@ Rectangle {
             height: visible ? Math.min(card.previewHeight, width * ar) : 0
             // Draggable as a file (text/uri-list): dropped on a terminal it's the file's path (Claude Code attaches
             // it as a picture), on a file manager or a browser the file. A click still opens the notification.
-            Drag.dragType: Drag.Automatic
-            Drag.supportedActions: Qt.CopyAction
-            Drag.mimeData: ({ "text/uri-list": card.fileUri, "text/plain": card.filePath })
-            Drag.active: shotDrag.active
-            Drag.onDragFinished: action => { if (action !== Qt.IgnoreAction) card.dropped() }
-            DragHandler { id: shotDrag; target: null; enabled: card.fileUri !== "" }
+            // The drag runs from DragOut.qml, which outlives this card (#3020).
+            property var icon: null   // the picture under the pointer (grabIcon's result, kept so its url stays valid)
+            DragHandler {
+                id: shotDrag; target: null; enabled: card.fileUri !== ""
+                onActiveChanged: active
+                    ? DragOut.start(shot, { "text/uri-list": card.fileUri, "text/plain": card.filePath }, shot.icon ? shot.icon.url : "")
+                    : DragOut.release(shot)
+            }
+            Connections {
+                target: DragOut
+                function onFinished(action) { if (DragOut.from(shot) && action !== Qt.IgnoreAction) card.dropped() }
+            }
             // A double click opens the file in the image viewer (xdg-open: Loupe). The press doesn't reach the card's
             // MouseArea here, so a single click opens the notification from here, once the double click's time is over.
             TapHandler {
@@ -314,7 +320,7 @@ Rectangle {
             function grabIcon() {
                 if (shotImg.status !== Image.Ready || shotClip.width <= 0) return
                 const sc = Math.min(1, 160 / shotClip.width)
-                shotClip.grabToImage(r => shot.Drag.imageSource = r.url, Qt.size(shotClip.width * sc, shotClip.height * sc))
+                shotClip.grabToImage(r => shot.icon = r, Qt.size(shotClip.width * sc, shotClip.height * sc))
             }
             ClippingRectangle {
                 id: shotClip

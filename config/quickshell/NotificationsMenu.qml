@@ -35,7 +35,8 @@ Column {
         return m
     }
     readonly property bool anyPinned: units.length > 0 && units[0].pinned
-    property int dragging: 0                    // previews being dragged out: shell.qml lets the drop through to the windows below
+    // A preview being dragged out: shell.qml lets the drop through to the windows below (DragOut.qml)
+    readonly property int dragging: DragOut.active && DragOut.from(m) ? 1 : 0
 
     // Clear: the cards in view go one after another from the top, the history empties when the last is gone
     property bool clearing: false
@@ -161,8 +162,6 @@ Column {
                         enabled: !m.clearing
                         color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, m.bgOpacity)
                         onSwept: m.sweptOne()
-                        property int counted: 0        // its drags already in m.dragging
-                        onDragsChanged: { m.dragging += drags - counted; counted = drags }
                         onDropped: m.close()
                         onViewed: m.close()
                         onActivated: row => { Notifs.openApp(row); m.close() }

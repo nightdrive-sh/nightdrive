@@ -31,7 +31,8 @@ Item {
     readonly property bool open: expanded && stacked
     readonly property var shown: open ? rows : rows.slice(0, 1)
     readonly property int behind: open ? 0 : Math.min(peek, rows.length - 1)
-    property int drags: 0                      // previews being dragged out of its cards
+    // A preview dragged out of its cards (DragOut.qml: still so when the card goes mid-drag)
+    readonly property int drags: DragOut.active && DragOut.from(st) ? 1 : 0
     readonly property bool hovered: hover.hovered || drags > 0
 
     signal activated(var row)                  // a card's click
@@ -134,7 +135,6 @@ Item {
                 onActivated: st.activated(modelData)
                 onViewed: st.viewed(modelData)
                 onDropped: st.dropped()
-                onDraggingChanged: st.drags += dragging ? 1 : -1
                 onDismissed: st.open ? st.dismissed(modelData) : st.dismissedAll()
 
                 footer: Rectangle {
