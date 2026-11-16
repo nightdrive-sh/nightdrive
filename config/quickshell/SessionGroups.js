@@ -80,8 +80,13 @@ function row(sessions, kept) {
     return out
 }
 
+// A session named "… Project Manager" or "… PM" (ndpm, cspm): a project manager, with a workspace of its own
+// (Claude.qml tells hypr/pm-space.lua)
+const PM_NAME = /\s+(project\s+manager|pm)\s*$/i
+function isPm(name) { return PM_NAME.test(String(name || "")) }
+
 // A lead's chip leaves out a trailing "Project Manager" or "PM": the bot icon and the border already say it (the
 // hover card keeps the whole name)
 function shortName(name) {
-    return String(name || "").replace(/\s+(project\s+manager|pm)\s*$/i, "") || name
+    return String(name || "").replace(PM_NAME, "") || name
 }

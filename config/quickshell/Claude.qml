@@ -63,6 +63,19 @@ Singleton {
         onLoadFailed: c.barOn = false
     }
 
+    // Project managers (SessionGroups.isPm) get a workspace of their own, their sessions as tabs beside them: Hyprland
+    // does it (hypr/pm-space.lua), told here which windows are PMs, as only the sessions' records have their names. Sent
+    // when the PMs change, and after a config reload, which starts its Lua afresh.
+    readonly property string pmKey: found.filter(f => Groups.isPm(f.name))
+        .map(f => "0x" + addr(f.address) + "\t" + String(f.name).replace(/[\x00-\x1f]/g, "")).sort().join("\n")
+    onPmKeyChanged: sendPms()
+    function sendPms() {
+        if (!pmKey) return
+        const str = t => '"' + t.replace(/[\\"]/g, "\\$&") + '"'   // a Lua string
+        const list = pmKey.split("\n").map(l => l.split("\t")).map(p => "{ a = " + str(p[0]) + ", n = " + str(p[1]) + " }")
+        Quickshell.execDetached(["hyprctl", "eval", "if NightdrivePmSpaces then NightdrivePmSpaces({ " + list.join(", ") + " }) end"])
+    }
+
     // Hyprland's addresses with or without 0x
     function addr(a) { return String(a).replace(/^0x/, "") }
     readonly property string activeAddr: Hyprland.activeToplevel ? addr(Hyprland.activeToplevel.address) : ""
@@ -220,7 +233,10 @@ Singleton {
     // A new window or a closed one: look again at once; otherwise every few seconds (a claude started in an open terminal)
     Connections {
         target: Hyprland
-        function onRawEvent(e) { if (e.name === "openwindow" || e.name === "closewindow") look() }
+        function onRawEvent(e) {
+            if (e.name === "openwindow" || e.name === "closewindow") look()
+            else if (e.name === "configreloaded") c.sendPms()
+        }
     }
     Timer { interval: 4000; repeat: true; running: true; triggeredOnStart: true; onTriggered: look() }
     // The windows' positions too (lastIpcObject.at), which only a refresh brings

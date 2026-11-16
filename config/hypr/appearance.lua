@@ -58,6 +58,14 @@ local mon = hl.get_monitors()[1]
 if mon then drawerTop = math.floor(mon.height / mon.scale * 0.05) end
 hl.workspace_rule({ workspace = "special:drawer", gaps_out = { top = drawerTop, right = 10, bottom = 10, left = 10 } })   -- the same 10 px gaps as other windows
 
+-- Window groups (tabs; a project manager's sessions, pm-space.lua): the tab strip, filled tabs. Their colours and
+-- font, the UI's, come from the theme (look.lua above); ⌘←/→ goes through the tabs first (bindings.lua)
+hl.config({
+    group = {
+        groupbar = { font_size = 11, height = 18, gradients = true, rounding = 4, gradient_rounding = 4 },
+    },
+})
+
 hl.config({
     dwindle = {
         preserve_split = true,

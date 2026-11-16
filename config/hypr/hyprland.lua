@@ -68,6 +68,7 @@ require("scroll")
 require("float-link")   -- ⌃⌘ + click on a link: the window it opens floats
 require("last-key")     -- when the last key was pressed: Claude doesn't move the focus while you type
 require("layer-keys")   -- the window under a layer that holds the keyboard looks inactive
+require("pm-space")     -- a project manager's own workspace, its sessions as tabs beside it: pm-space.lua
 
 -----------------------
 ---- WINDOW RULES ----

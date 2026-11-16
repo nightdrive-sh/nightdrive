@@ -334,13 +334,23 @@ def apply_look(lk):
     inactive = rgba(lk["inactive-border-color"], lk["inactive-border-opacity"]) if lk["inactive-border"] == "on" \
         else "rgba(00000000)"
     inactive_shadow = shadow if lk["inactive-shadow"] == "on" else "rgba(00000000)"
+    # Window groups' tabs (a project manager's sessions, pm-space.lua): the shown one in the border's colour, the
+    # others in the inactive border's (its own colour even when inactive borders are off), the text in the UI font
+    border = rgba(lk["border-color"], lk["border-opacity"])
+    tab_off = rgba(lk["inactive-border-color"], lk["inactive-border-opacity"])
+    text = palette(current())["text"]
     write(f"{OUT}/look.lua", "-- written by theme: appearance.lua runs it after its own look, `theme set` over IPC\n"
           "hl.config({\n"
-          f'    general = {{ col = {{ active_border = "{rgba(lk["border-color"], lk["border-opacity"])}", '
+          f'    general = {{ col = {{ active_border = "{border}", '
           f'inactive_border = "{inactive}" }} }},\n'
           f'    decoration = {{ shadow = {{ enabled = {"true" if lk["shadow"] == "on" else "false"}, '
           f'range = {lk["shadow-size"]}, color = "{shadow}", '
           f'color_inactive = "{inactive_shadow}" }} }},\n'
+          f'    group = {{ col = {{ border_active = "{border}", border_inactive = "{inactive}" }},\n'
+          f'              groupbar = {{ font_family = "{font() or FONTS[0]}", col = {{ active = "{border}", '
+          f'inactive = "{tab_off}" }},\n'
+          f'                           text_color = "{rgba(lk["background"], "100")}", '
+          f'text_color_inactive = "{rgba(text, "100")}" }} }},\n'
           "})\n"
           # layer-keys.lua: while a layer holds the keyboard the active window wears these inactive colours
           "if NightdriveLayerKeys then NightdriveLayerKeys(true) end\n")
