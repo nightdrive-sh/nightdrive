@@ -58,11 +58,18 @@ local mon = hl.get_monitors()[1]
 if mon then drawerTop = math.floor(mon.height / mon.scale * 0.05) end
 hl.workspace_rule({ workspace = "special:drawer", gaps_out = { top = drawerTop, right = 10, bottom = 10, left = 10 } })   -- the same 10 px gaps as other windows
 
--- Window groups (tabs; a project manager's sessions, pm-space.lua): the tab strip, filled tabs. Their colours and
--- font, the UI's, come from the theme (look.lua above); ⌘←/→ goes through the tabs first (bindings.lua)
+-- Window groups (tabs; a project manager's sessions, pm-space.lua): filled tabs with no line under them (its rounding
+-- left a notch at the corners; the fill tells the shown tab), each rounded as the windows look (their rounding 4 plus
+-- the border's 2: the border's outer edge is what shows), 1 px below the windows' top and 6 px above their own window.
+-- Hyprland's gap above the tabs is the one below them (gaps_out, with keep_upper_gap), so 1 px there and the other 5
+-- from the hidden line's gap (indicator_gap); 6 px between tabs. The window keeps its rounded corners: Hyprland
+-- rounds all four or none, and square ones at the bottom looked out of place. Colours and font, the UI's, come from
+-- the theme (look.lua above); ⌘←/→ goes through the tabs first (bindings.lua)
 hl.config({
     group = {
-        groupbar = { font_size = 11, height = 18, gradients = true, rounding = 4, gradient_rounding = 4 },
+        groupbar = { font_size = 12, height = 32, gradients = true, rounding = 0, gradient_rounding = 6,
+                     gradient_round_only_edges = false, indicator_height = 0, gaps_out = 1,
+                     keep_upper_gap = true, indicator_gap = 5, gaps_in = 6 },
     },
 })
 
