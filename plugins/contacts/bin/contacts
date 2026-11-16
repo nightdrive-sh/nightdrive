@@ -142,7 +142,7 @@ case ${1:-open} in
   setup)     setup ;;
   enable)    enable ;;
   disable)   disable ;;
-  keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
+  keyring-locked) python3 "$APP_DIR/app/kit/keyring.py" ;;
   vdirsyncer) python3 "$APP_DIR/lib/config.py" write >/dev/null && vds "${@:2}" ;;
   help|-h|--help) usage ;;
   *)

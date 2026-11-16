@@ -208,8 +208,8 @@ case ${1:-open} in
   subscribe) subscribe "${@:2}" ;;
   enable)    enable ;;
   disable)   disable ;;
-  # The same check as Contacts' (its lib/keyring.py says why it isn't a bare busctl)
-  keyring-locked) python3 "$APP_DIR/../contacts/lib/keyring.py" ;;
+  # The kit's check, as Mail's and Contacts' (kit/keyring.py says why it isn't a bare busctl)
+  keyring-locked) python3 "$APP_DIR/app/kit/keyring.py" ;;
   has-sources) exec python3 "$LIB/sources.py" any ;;
   vdirsyncer) python3 "$LIB/sources.py" write >/dev/null && vds "${@:2}" ;;
   khal)      khal -c "$(python3 "$LIB/events.py" --config)" "${@:2}" ;;

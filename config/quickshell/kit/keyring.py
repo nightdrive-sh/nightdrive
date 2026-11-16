@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Whether the login keyring is locked, for the sync's ExecCondition (`contacts keyring-locked`). The same as Mail's
-lib/keyring.py: a plugin can't count on another one being installed.
+"""Whether the login keyring is locked, for the apps' syncs (`nightmail keyring-locked`, `contacts …`, `calendar …` in
+their ExecCondition) and Mail's push.py. In the kit, as each app reaches it through its own `app/kit` link and none can
+count on another being installed.
 
     keyring.py    exit 0 if the login collection is locked, 1 if it is open or there is no keyring to ask
 

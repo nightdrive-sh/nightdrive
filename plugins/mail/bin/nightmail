@@ -279,7 +279,7 @@ case ${1:-open} in
   blocked-notifications) python3 "$APP_DIR/lib/blocked.py" notifications ;;   # `nightdrive notifications` for Claude
   fetch)     fetch "${@:2}" ;;
   fetching)  running && ipc fetching ;;     # fetch()'s, for Mail's spinner
-  keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
+  keyring-locked) python3 "$APP_DIR/app/kit/keyring.py" ;;
   push)      exec python3 "$APP_DIR/lib/push.py" ;;
   ask-claude)    ask_claude "$2" "$3" ;;   # Mail's ⌘⇧C (the commands below are the card's)
   claude-draft)  claude_draft "$2" ;;

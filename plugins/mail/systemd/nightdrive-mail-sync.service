@@ -10,7 +10,7 @@ ConditionPathExists=%h/.config/isyncrc
 Type=oneshot
 # Skip the round while the login keyring is locked (an autologin start before the lock's password): a PassCmd's
 # secret-tool would otherwise pop up gnome-keyring's own password prompt. Without a keyring the round runs. Not a bare
-# `busctl get-property`: a read as a connection's first message can abort gnome-keyring (lib/keyring.py says why).
+# `busctl get-property`: a read as a connection's first message can abort gnome-keyring (the kit's keyring.py says why).
 ExecCondition=/bin/sh -c '! %h/.local/bin/nightmail keyring-locked'
 # mbsync -a, then notmuch new, taking turns with the push's inbox fetches (nightmail fetch)
 ExecStart=%h/.local/bin/nightmail fetch
