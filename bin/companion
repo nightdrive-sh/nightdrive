@@ -45,16 +45,29 @@ def tailnet_url(st):
     return f"https://{name}:{HTTPS_PORT}" if name and st.get("BackendState") == "Running" else None
 
 
+def served(sock):
+    """Whether tailscale serve already puts this socket on :HTTPS_PORT (it keeps it through restarts): then on has
+    nothing to ask Tailscale, which refuses setting the same again."""
+    try:
+        text = subprocess.run(["tailscale", "serve", "status", "--json"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return f":{HTTPS_PORT}" in text and f"unix:{sock}" in text
+
+
 def serve_on_tailnet(on):
     import access
+    if on and served(access.SOCKET):
+        return
     argv = ["tailscale", "serve", "--bg", f"--https={HTTPS_PORT}", f"unix:{access.SOCKET}"] if on else \
         ["tailscale", "serve", f"--https={HTTPS_PORT}", "off"]
     r = subprocess.run(argv, capture_output=True, text=True)
     if r.returncode != 0 and on:
-        why = (r.stderr.strip() or r.stdout.strip()).splitlines()[-1:] or [""]
-        if "denied" in why[0] or "operator" in why[0]:
+        # Tailscale's own words; the operator line only when it is about that (a user not let to change its settings)
+        why = " ".join((r.stderr.strip() or r.stdout.strip()).split())[:300]
+        if "operator" in why.lower():
             sys.exit("companion: Tailscale didn't allow it. Run once: sudo tailscale set --operator=$USER")
-        sys.exit(f"companion: tailscale serve didn't start: {why[0]}")
+        sys.exit(f"companion: tailscale serve didn't start: {why}")
 
 
 def on():
