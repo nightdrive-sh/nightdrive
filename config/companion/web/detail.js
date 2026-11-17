@@ -1,10 +1,12 @@
 // A session's own view, over the whole screen: what it said and did lately (GET /api/sessions/ID/log: your prompts,
 // Claude's texts, its tool calls), read again every REFRESH_MS while it is open, and the session's buttons below it.
 // A tap on a tile opens it; × or Esc closes it. It stays at the end as new lines come, unless you scrolled up to read.
+// A question with choices shows whole above the buttons, to answer there (question.js).
 import { esc, get, since, store, subscribe } from "./api.js";
 import { icon } from "./icons.js";
 import { act, ASKS } from "./act.js";
 import { markdown } from "./markdown.js";
+import { questionClick, questionHTML } from "./question.js";
 
 const REFRESH_MS = 2000;
 const AT_END_PX = 40;      // this close to the bottom still counts as following along
@@ -20,6 +22,7 @@ export function openDetail(id) {
   view = { id, el, timer: setInterval(load, REFRESH_MS), logSig: "", frameSig: "" };
   el.addEventListener("click", e => {
     if (e.target.closest(".close")) return close();
+    if (questionClick(e)) return;
     const b = e.target.closest("button[data-act]");
     if (b) act(view.id, b.dataset.act, b).then(ok => { if (ok && b.dataset.act === "close") close(); });
   });
@@ -61,6 +64,7 @@ async function load() {
 function label(s) {
   if (s.state === "permission") return ["Permission", "var(--caution)"];
   if (s.state === "working") return [`Working · ${since(s.started)}`, "var(--dim)"];
+  if (s.question) return ["Question", "var(--primary)"];
   if (s.wants && !s.done) return ["Your turn", "var(--primary)"];
   return s.done ? ["Done", "var(--ok)"] : ["Waiting", "var(--dim)"];
 }
@@ -75,6 +79,7 @@ function buttons(s) {
       <button class="pill" data-act="deny">Deny</button>
       ${p.allow ? `<button class="pill main" data-act="allow">${icon("check", 16, 2.2)}Allow</button>` : ""}`;
   }
+  if (s.question) return `${questionHTML(s)}${CLOSE}`;    // its own answers in place of Answer: the terminal waits on it
   if (s.state === "working") {
     return `${CLOSE}<span class="spacer"></span>
       <button class="pill quiet" data-act="stop">${icon("square", 14, 2.2)}Stop</button>`;

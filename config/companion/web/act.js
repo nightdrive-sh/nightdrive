@@ -3,7 +3,8 @@
 import { ask, post, store } from "./api.js";
 import { compose } from "./compose.js";
 
-// A question with choices (AskUserQuestion) shows only in the terminal: Claude Code writes it nowhere until answered
+// A question with choices (AskUserQuestion) that Companion can't answer (the hook stopped waiting, or you were in its
+// window): only the terminal shows it, as Claude Code writes it nowhere until answered. Otherwise question.js has it.
 export const ASKS = "It asks you something in its terminal.";
 
 export async function act(id, what, button = null) {

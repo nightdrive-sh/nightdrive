@@ -264,6 +264,10 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("This one is answered in its terminal: it doesn't show all it allows")
                 ses.answer(sid, what, perm["request"])
                 ses.seen(sid)
+            case ["sessions", sid, "reply"]:
+                # a question with choices: the answers for the request the page showed (sessions.check_answers)
+                ses.reply(ses.window(sid), body.get("request"), body.get("answers"))
+                ses.seen(sid)
             case ["sessions", sid, "send"]:
                 ses.seen(ses.window(sid))
                 demo or control.type_text(sid, body.get("text", ""), bool(body.get("submit")))

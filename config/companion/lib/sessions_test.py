@@ -1,4 +1,5 @@
-"""Companion's view of the sessions (sessions.py): which windows it may type into, and a permission request's id.
+"""Companion's view of the sessions (sessions.py): which windows it may type into, a permission request's id, and a
+question's answers.
 
     python3 config/companion/lib/sessions_test.py
 """
@@ -67,6 +68,53 @@ class PermissionTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 sessions.Sessions().answer("0xa1", "deny", bad)
         self.assertFalse(os.path.exists(os.path.join(self.state, "0xa1.answer")))
+
+
+
+ASK = {"request": "Qx7", "questions": [
+    {"question": "Which fruit?", "header": "Fruit", "multiSelect": False,
+     "options": [{"label": "Apple", "description": "Red"}, {"label": "Pear", "description": ""}]},
+    {"question": "Which colours?", "header": "Colours", "multiSelect": True, "options": [{"label": "Red"}]}]}
+
+
+class QuestionTest(unittest.TestCase):
+    def setUp(self):
+        self.state = tempfile.mkdtemp()
+        patcher = mock.patch.object(sessions, "STATE", self.state)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        with open(os.path.join(self.state, "0xa1.ask"), "w") as f:
+            json.dump(ASK, f)
+
+    def test_read_whole(self):
+        q = sessions._question("0xa1")
+        self.assertEqual(q["request"], "Qx7")
+        self.assertEqual([x["header"] for x in q["questions"]], ["Fruit", "Colours"])
+        self.assertTrue(q["questions"][1]["multiSelect"])
+        self.assertEqual(q["questions"][1]["options"], [{"label": "Red", "description": ""}])
+
+    def test_reply_names_its_request(self):
+        sessions.Sessions().reply("0xa1", "Qx7", {"Which fruit?": "Pear", "Which colours?": "Red, my own\nwords"})
+        with open(os.path.join(self.state, "0xa1.answer")) as f:
+            line = f.read()
+        self.assertEqual(line.count("\n"), 1)                 # one line: the hook reads it with read -r
+        verdict, req, answers = line.split(" ", 2)
+        self.assertEqual((verdict, req), ("answer", "Qx7"))
+        self.assertEqual(json.loads(answers), {"Which fruit?": "Pear", "Which colours?": "Red, my own words"})
+
+    def test_reply_refused(self):
+        for req, answers in (("other", {"Which fruit?": "Pear", "Which colours?": "Red"}),   # a newer question
+                             ("Qx7", {"Which fruit?": "Pear"}),                              # one left unanswered
+                             ("Qx7", {"Which fruit?": "Pear", "Which colours?": "  "}),
+                             ("Qx7", ["Pear"])):
+            with self.assertRaises(ValueError):
+                sessions.Sessions().reply("0xa1", req, answers)
+        self.assertFalse(os.path.exists(os.path.join(self.state, "0xa1.answer")))
+
+    def test_no_question(self):
+        os.remove(os.path.join(self.state, "0xa1.ask"))
+        with self.assertRaises(ValueError):
+            sessions.Sessions().reply("0xa1", "Qx7", {})
 
 
 if __name__ == "__main__":

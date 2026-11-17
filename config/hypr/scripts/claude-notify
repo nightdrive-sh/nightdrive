@@ -9,6 +9,8 @@
 #   (x-nightdrive-pin, quickshell/Notifs.qml): it stays on screen until answered and gets through do not disturb. The hook waits
 #   for the answer (Claude Code asks in the terminal at the same time): Allow or Deny answers for you; going to the
 #   window, Show session, closing the notification or the terminal's own answer leave it to the terminal.
+#   A question with choices (AskUserQuestion) comes the same way, as a permission request: its notification says what it
+#   asks, and Companion shows it whole and answers it (below).
 # Reads the hook's JSON on stdin: {hook_event_name, cwd, message | tool_name, tool_input, ...}.
 set -uo pipefail
 readonly WAIT=590   # seconds a permission notification waits; Claude Code gives a hook 600
@@ -40,7 +42,7 @@ active() { [[ -n $addr && $(hyprctl -j activewindow 2>/dev/null | jq -r '.addres
 active && exit 0
 # A permission notification of this session is up (below): Claude Code's own "needs your permission" comes six seconds
 # later and would replace it with one without the buttons
-[[ $event == Notification && -n $addr && -e $state/$addr.perm ]] && exit 0
+[[ $event == Notification && -n $addr && ( -e $state/$addr.perm || -e $state/$addr.ask ) ]] && exit 0
 [[ -n $addr ]] && qs ipc call claude want "$addr" >/dev/null 2>&1
 
 # Claude Code's title: a status glyph (✳, a spinner), then the topic
@@ -66,6 +68,9 @@ if [[ $event == PermissionRequest ]]; then
   what=${full:0:SHOWN}
   what=${what/#$HOME/\~}
   body="$tool${what:+: $what}${project:+ · $project}"
+  # A question: what it asks, and no Deny (it would turn the question down, not answer it)
+  ask= deny=(-A deny=Deny)
+  [[ $tool == AskUserQuestion ]] && { ask=1 deny=(); body="$(jq -r '.tool_input.questions[0].question // "A question"' <<<"$in")${project:+ · $project}"; }
   # Allow answers for the whole tool_input, so it's offered only when you can read all of it: for a tool whose input the
   # text above is (SHOWN_KEYS; an edit's or an MCP tool's is not), with nothing else set (a command outside the
   # sandbox), not cut and without characters that don't show (bidi overrides, zero-width, escapes). The card takes it
@@ -83,27 +88,41 @@ if [[ $event == PermissionRequest ]]; then
   req=${out##*/perm.}
   ans="$state/$addr.answer"
   rm -f "$ans"
-  jq -nc --arg tool "$tool" --arg what "$what" --arg project "$project" --arg req "$req" \
-    --argjson allow "$(( ${#allow[@]} > 0 ))" \
-    '{tool: $tool, what: $what, project: $project, request: $req, allow: ($allow == 1)}' > "$state/$addr.perm"
-  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" -A deny=Deny \
+  # A question goes to Companion whole instead (<addr>.ask: its questions, their choices and what each means), and is
+  # answered with "answer REQUEST {question: answer, ...}": a choice's label, labels joined with ", " (multiSelect), or
+  # words of your own, as the terminal gives them
+  if [[ -n $ask ]]; then
+    jq -c --arg req "$req" '{request: $req, questions: [.tool_input.questions[]? | {question, header, multiSelect: (.multiSelect == true),
+      options: [.options[]? | {label, description}]}]}' <<<"$in" > "$state/$addr.ask"
+  else
+    jq -nc --arg tool "$tool" --arg what "$what" --arg project "$project" --arg req "$req" \
+      --argjson allow "$(( ${#allow[@]} > 0 ))" \
+      '{tool: $tool, what: $what, project: $project, request: $req, allow: ($allow == 1)}' > "$state/$addr.perm"
+  fi
+  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" "${deny[@]}" \
     -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
   ns=$!
-  # The terminal's answer ends this hook early (Claude Code stops it): the notification goes with it
-  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm" "$ans"; }
+  # The terminal's answer may not end this hook (Claude Code let it run on after a question answered there): you answer
+  # there in the window, which ends it within a second (active, below), and the notification goes with it
+  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm" "$state/$addr.ask" "$ans"; }
   trap cleanup EXIT
   trap 'exit 0' TERM INT HUP
+  # The answers for the questions it asked, and no others; the terminal's question closes as if answered there
+  answered() { jq -c --argjson a "$1" '.tool_input as $t | {hookSpecificOutput: {hookEventName: "PermissionRequest",
+               decision: {behavior: "allow", updatedInput: ($t + {answers: ($a | with_entries(select((.value | type) == "string"
+               and (.key as $k | any($t.questions[]?; .question == $k)))))})}}}' <<<"$in"; }
   decide() { jq -nc --arg b "$1" --arg from "${2:-the desktop notification}" '{hookSpecificOutput: {hookEventName: "PermissionRequest",
              decision: ({behavior: $b} + (if $b == "deny" then {message: "Denied from \($from)"} else {} end))}}'; }
   for (( i = 0; i < WAIT * 4; i++ )); do
     sleep 0.25
     sed -n 1p "$out" > "$idf" 2>/dev/null
     if [[ -s $ans ]]; then                  # answered on Companion: Allow only when the notification offers it too
-      read -r verdict rid < "$ans"
+      read -r verdict rid answers < "$ans"
       if [[ $rid == "$req" ]]; then
         case $verdict in
           allow) (( ${#allow[@]} )) && { decide allow; exit 0; } ;;
-          deny) decide deny Companion; exit 0 ;;
+          deny) [[ -z $ask ]] && { decide deny Companion; exit 0; } ;;
+          answer) [[ -n $ask ]] && answered "$answers" && exit 0 ;;
         esac
       fi
       rm -f "$ans"

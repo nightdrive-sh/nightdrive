@@ -4,7 +4,8 @@ Which windows run Claude comes from topbar/scripts/claude-sessions, the same as 
 each one is doing from its window's title, which Claude Code sets (✳ when it waits for you, a spinner while it works).
 A permission request waiting in hypr/scripts/claude-notify leaves <address>.perm in its state folder, with what it asks
 and the request's id as JSON, and the hook takes <address>.answer as the answer ("allow ID" or "deny ID"): an answer
-for another request of the session is thrown away.
+for another request of the session is thrown away. A question with choices (AskUserQuestion) comes to the same hook as
+a permission request: it leaves <address>.ask instead, the questions whole, and takes "answer ID {question: answer}".
 """
 import json
 import os
@@ -23,6 +24,7 @@ STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}
 WAITING_GLYPH = "✳"
 LETTER = re.compile(r"[A-Za-z0-9À-ɏ]")
 REQUEST = re.compile(r"[A-Za-z0-9]{1,32}")      # mktemp's random part, in claude-notify
+MAX_ANSWER = 4000                               # characters of one answer (words of your own)
 
 
 def _run_json(argv, default):
@@ -58,6 +60,44 @@ def _permission(address):
             "allow": bool(p.get("allow")) and bool(REQUEST.fullmatch(req))}
 
 
+def _question(address):
+    """The question the session asks with choices (claude-notify's <address>.ask), or None:
+    {request, questions: [{question, header, multiSelect, options: [{label, description}]}]}."""
+    try:
+        with open(os.path.join(STATE, f"{address}.ask")) as f:
+            q = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(q, dict) or not REQUEST.fullmatch(str(q.get("request", ""))):
+        return None
+    out = []
+    for x in q.get("questions") or []:
+        if isinstance(x, dict) and x.get("question"):
+            out.append({"question": str(x["question"]), "header": str(x.get("header") or ""),
+                        "multiSelect": x.get("multiSelect") is True,
+                        "options": [{"label": str(o.get("label", "")), "description": str(o.get("description") or "")}
+                                    for o in x.get("options") or [] if isinstance(o, dict) and o.get("label")]})
+    return {"request": q["request"], "questions": out} if out else None
+
+
+def check_answers(question, request, answers):
+    """The answers to send, {question: text}, or ValueError: every question it asks answered, for the request shown."""
+    if not question:
+        raise ValueError("It no longer asks")
+    if request != question["request"]:
+        raise ValueError("It asks something else now: read it again")
+    if not isinstance(answers, dict):
+        raise ValueError("No answers")
+    out = {}
+    for q in question["questions"]:
+        a = answers.get(q["question"])
+        a = re.sub(r"[\x00-\x1f\x7f]+", " ", a).strip() if isinstance(a, str) else ""
+        if not a:
+            raise ValueError(f"Answer “{q['header'] or q['question']}” too")
+        out[q["question"]] = a[:MAX_ANSWER]
+    return out
+
+
 class Sessions:
     """Keeps what changed between looks: a session that went from working to waiting while its window wasn't the
     active one wants you, until it works again or you go to it (here or on the desktop)."""
@@ -83,10 +123,13 @@ class Sessions:
             perm = _permission(addr)
             if perm:
                 state = "permission"
+            question = None if perm else _question(addr)
             busy = "working" if state == "working" else "waiting"
             if self.last_state.get(addr) == "working" and busy == "waiting" and addr != active:
                 self.wants.add(addr)
-            if busy == "working" or addr == active:
+            if question:
+                self.wants.add(addr)
+            elif busy == "working" or addr == active:
                 self.wants.discard(addr)
             seen[addr] = busy
             d = f.get("dir", "")
@@ -106,6 +149,8 @@ class Sessions:
                 # waiting for you in the terminal (AskUserQuestion: "input needed"), whose question only shows there
                 "asks": f.get("waitingFor", "") if f.get("status") == "waiting" and state != "permission" else "",
                 **({"permission": perm} if perm else {}),
+                # the question whole, with its choices, while claude-notify waits for Companion's answer
+                **({"question": question} if question else {}),
             })
         self.last_state = seen
         self.listed = listed
@@ -142,6 +187,17 @@ class Sessions:
         tmp = os.path.join(STATE, f".{addr}.answer")
         with open(tmp, "w") as f:
             f.write(f"{decision} {request}\n")
+        os.replace(tmp, os.path.join(STATE, f"{addr}.answer"))
+
+    def question(self, addr):
+        return _question(addr)
+
+    def reply(self, addr, request, answers):
+        """Answers its question (check_answers): the hook gives them to Claude Code as the terminal would."""
+        answers = check_answers(_question(addr), request, answers)
+        tmp = os.path.join(STATE, f".{addr}.answer")
+        with open(tmp, "w") as f:
+            f.write(f"answer {request} {json.dumps(answers, ensure_ascii=False)}\n")
         os.replace(tmp, os.path.join(STATE, f"{addr}.answer"))
 
 
@@ -203,7 +259,8 @@ class Demo:
              "state": "working", "started": now - 180, "last": "Edit: data/docs.json"},
             {"id": "demo-mail", "project": "mail", "dir": "~/dotfiles", "topic": "Thread sort order",
              "state": "waiting", "started": now - 3600,
-             "last": "Threads sort by the newest reply again. Tests pass, nothing committed."},
+             "last": "Threads sort by the newest reply again. Tests pass, nothing committed.",
+             **({} if "demo-mail" in self.answered else {"asks": "input needed", "question": DEMO_QUESTION})},
         ]
         for s in out:
             s["wants"] = s["id"] in self.wants or s["state"] == "permission"
@@ -232,3 +289,20 @@ class Demo:
 
     def answer(self, addr, decision, request):
         self.answered[addr] = decision
+
+    def question(self, addr):
+        return next((s.get("question") for s in self.look() if s["id"] == addr), None)
+
+    def reply(self, addr, request, answers):
+        self.answered[addr] = check_answers(self.question(addr), request, answers)
+
+
+DEMO_QUESTION = {"request": "demoask", "questions": [
+    {"question": "Which order should threads sort in?", "header": "Order", "multiSelect": False, "options": [
+        {"label": "Newest reply", "description": "A thread moves up when someone answers in it, as in most mail apps."},
+        {"label": "First message", "description": "Threads keep the place of the mail that started them."}]},
+    {"question": "Where should the order be set?", "header": "Setting", "multiSelect": True, "options": [
+        {"label": "Settings", "description": "Settings › Mail, for every account."},
+        {"label": "Per folder", "description": "From the folder's menu, remembered for each folder."},
+        {"label": "Nowhere", "description": "One order for all; no setting."}]},
+]}

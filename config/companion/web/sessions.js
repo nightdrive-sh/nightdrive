@@ -1,5 +1,6 @@
 // The session tiles: one per Claude Code session, each in its place (the server orders them as they started), and a tile
-// for a new one. A permission request is answered here; a question with Answer (dictation into that session). A tap
+// for a new one. A permission request is answered here; a question with choices with Question (its box, question.js),
+// anything else with Answer (dictation into that session). A tap
 // on a tile, off its buttons, brings its window up on the desktop; Show opens the session's own view (detail.js). The
 // buttons' requests are act.js's.
 import { esc, subscribe } from "./api.js";
@@ -9,6 +10,7 @@ import { act, ASKS } from "./act.js";
 import { holdToTalk, Recognition } from "./speech.js";
 import { send } from "./compose.js";
 import { openDetail } from "./detail.js";
+import { openQuestion } from "./question.js";
 
 const grid = document.querySelector(".sessions");
 
@@ -52,7 +54,21 @@ function permission(s) {
     </div></article>`;
 }
 
+// What it asks with choices: the first question (and how many more), Question opens them with their buttons
+function question(s) {
+  const qs = s.question.questions;
+  return `<article class="tile ask" data-act="focus" data-id="${esc(s.id)}">
+    ${head(s)}
+    <div class="say">${esc(qs[0].question)}${qs.length > 1 ? ` <span class="more-q">+${qs.length - 1} more</span>` : ""}</div>
+    <div class="fill"></div>
+    <div class="row">
+      <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
+      <button class="pill main" data-act="question" data-id="${esc(s.id)}">${icon("message-circle-question", 16)}Question</button>
+    </div></article>`;
+}
+
 function waiting(s) {
+  if (s.question) return question(s);
   const asks = s.wants && !s.done;
   return `<article class="tile ${asks ? "ask" : s.done && !s.pm ? "done" : ""}" data-act="focus" data-id="${esc(s.id)}">
     ${head(s)}
@@ -135,6 +151,7 @@ grid.addEventListener("click", e => {
   const { act: what, id } = b.dataset;
   if (what === "new") return compose("new");
   if (what === "open") return openDetail(id);
+  if (what === "question") return openQuestion(id);
   if (what === "answer" && Recognition) return;    // held or tapped: answers() has it
   if (b.tagName === "ARTICLE") flash(b);
   act(id, what, b);

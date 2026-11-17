@@ -43,7 +43,12 @@ when it hears nothing for 40 s (iOS can leave a dropped connection silent).
     "started": 1794868000,       // epoch seconds
     "since": 1794869200,         // when its status last changed: how long it has worked on this turn, or waited
     "last": "Bash: npm test",    // its last tool call, or the start of its last text (the question it asks)
-    "asks": "input needed",      // it waits for you in its terminal (AskUserQuestion), whose choices show only there; else ""
+    "asks": "input needed",      // it waits for you in its terminal (AskUserQuestion); else ""
+    "question": {                // only while Companion can answer that question (claude-notify waits for it)
+      "request": "Qa81Qz",
+      "questions": [{ "question": "Which order?", "header": "Order", "multiSelect": false,
+                      "options": [{ "label": "Newest reply", "description": "A thread moves up when…" }] }]
+    },
     "permission": {              // only while state is permission
       "tool": "Bash", "what": "nightdrive sandbox check", "request": "Xa81Qz", "allow": true
     }
@@ -59,6 +64,13 @@ hook (which gets `allow|deny REQUEST` in `<window>.answer`) ignores one for anot
 whole. `allow` is false when the request doesn't show all it allows (a long command, an edit, an MCP tool): then only Deny, and
 the rest is answered in the terminal. The same rule as the desktop notification's (`hypr/scripts/claude-notify`).
 
+A question with choices (AskUserQuestion) reaches the same hook as a permission request, which leaves `<window>.ask`
+(the `question` above) and waits for `answer REQUEST {"question": "answer", …}` in `<window>.answer`; it hands that to
+Claude Code as the terminal would, and the terminal's question closes. An answer is a choice's `label`, several joined
+with `", "` (`multiSelect`), or words of your own (the terminal's *Type something*), after them. The hook waits as long as
+for a permission request (590 s) and stops when its window gets the keyboard: then `question` goes and `asks` stays,
+answered in the terminal.
+
 ## Sessions
 
 `GET /api/sessions/ID/log` → what the session said and did lately, oldest first, from its transcript (the page's view
@@ -69,6 +81,7 @@ of one session): `[{ "role": "user" | "assistant", "kind": "text" | "tool", "tex
 | --- | --- | --- |
 | `POST /api/sessions/ID/allow` | `{ "request": "…" }` | Answers its permission request Allow (refused when `allow` is false) |
 | `POST /api/sessions/ID/deny` | `{ "request": "…" }` | Answers it Deny |
+| `POST /api/sessions/ID/reply` | `{ "request": "…", "answers": { "Which order?": "Newest reply" } }` | Answers its `question`: every question, by its text |
 | `POST /api/sessions/ID/send` | `{ "text": "…", "submit": true }` | Types the text in its prompt; `submit` presses Enter |
 | `POST /api/sessions/ID/stop` | | Esc in its window: stops what it does |
 | `POST /api/sessions/ID/focus` | | Brings its window up on the desktop |

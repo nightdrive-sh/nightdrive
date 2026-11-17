@@ -1,6 +1,8 @@
 // The box for a session's Answer and for a new session: its title says where the words go (the one it was opened for,
 // no menu), the big button to hold and talk (let go and it is sent, as the panel's), and Write for the keyboard
 // instead. Enter as the panel's: into a session as its prompt, into the window only when that window is a session's.
+// With words, the box gives them to it instead of sending (a question's Own answer, question.js): it returns true
+// when they went, and the box closes.
 import { esc, post, sheet, store, toast } from "./api.js";
 import { icon } from "./icons.js";
 import { holdToTalk, Recognition } from "./speech.js";
@@ -29,9 +31,10 @@ export async function send(t, words) {
   return ok;
 }
 
-export function compose(target = "window") {
+export function compose(target = "window", { title: own, words: give } = {}) {
   const t = target === "window" || target === "new" || session(target) ? target : "window";
-  const title = t === "new" ? "New session" : t === "window" ? `Send to ${nameOf(t)}` : `Answer ${nameOf(t)}`;
+  const title = own || (t === "new" ? "New session" : t === "window" ? `Send to ${nameOf(t)}` : `Answer ${nameOf(t)}`);
+  const deliver = give || (w => send(t, w));
   const s = sheet(`
     <div class="row"><span class="sec">${esc(title)}</span><span class="spacer"></span>
       <button class="close" aria-label="Close">${icon("x", 18)}</button></div>
@@ -55,7 +58,7 @@ export function compose(target = "window") {
   s.el.querySelector(".go").onclick = async () => {
     const words = area.value.trim();
     if (!words) return area.focus();
-    if (await send(t, words)) s.close();
+    if (await deliver(words)) s.close();
   };
   const mic = s.el.querySelector(".mic");
   if (!Recognition) {     // no speech recognition here: the keyboard's own microphone key dictates into the box
@@ -67,7 +70,7 @@ export function compose(target = "window") {
     heard: words => { said.textContent = `“${words}”`; },
     done: async words => {
       said.textContent = words ? `“${words}”` : "";
-      if (words && await send(t, words)) s.close();
+      if (words && await deliver(words)) s.close();
     },
   });
 }

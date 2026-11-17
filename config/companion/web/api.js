@@ -2,7 +2,11 @@
 
 export const store = { state: null, online: false, listeners: [] };
 
-export function subscribe(fn) { store.listeners.push(fn); }
+// Returns its undo: a box that follows the state (question.js) stops when it closes
+export function subscribe(fn) {
+  store.listeners.push(fn);
+  return () => { store.listeners = store.listeners.filter(f => f !== fn); };
+}
 function changed() { for (const fn of store.listeners) fn(store.state); }
 
 // The state over Server-Sent Events. EventSource reconnects by itself only sometimes: it gives up for good when a
