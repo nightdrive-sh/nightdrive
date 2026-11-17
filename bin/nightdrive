@@ -56,6 +56,7 @@ usage() {
   row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --model MODEL (opus), --effort LEVEL (medium), --account NAME, --background, --workspace WS)"
   row "claude accounts"          "Your Claude Code accounts, NAME and config dir (--json); ~/.config/nightdrive/claude-accounts names them"
   row "claude usage"             "The default account's plan limits as JSON, as the Claude menu shows them (--account NAME, --all)"
+  row "companion [on|off|url]"   "Companion: your Claude sessions and dictation on an iPad over Tailscale; status (--json)"
   row "mcp"                      "Nightdrive's MCP server for Claude (stdio: Claude Code starts it)"
   row "mcp install|remove"       "Register it in Claude Code and allow its tools, or take that away (asks first; --dry-run shows)"
   row "mcp status"               "Whether Claude Code has it, and its tools are allowed (--json)"
@@ -147,6 +148,7 @@ case ${1:-} in
   bluetooth|battery) exec "$scripts/devices" "$1" ;;
   low-power) exec "$scripts/low-power" "${@:2}" ;;                    # Settings › Battery, the battery menu
   game-mode) exec "$scripts/game-mode" "${@:2}" ;;                    # Settings › Hardware
+  companion) exec "$repo/bin/companion" "${@:2}" ;;                   # Settings › Companion (docs/companion.md)
   software) exec "$scripts/software" "${@:2}" ;;                       # Install/Remove › Software without the launcher
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there

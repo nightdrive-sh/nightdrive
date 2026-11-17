@@ -1,6 +1,6 @@
 """Companion's view of the sessions (sessions.py): which windows it may type into, and a permission request's id.
 
-    python3 plugins/companion/lib/sessions_test.py
+    python3 config/companion/lib/sessions_test.py
 """
 import json
 import os

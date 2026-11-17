@@ -1,4 +1,5 @@
-# Companion's server (plugins/companion, bin/companion). Off until turned on (companion enable, its installer).
+# Companion's server (config/companion, bin/companion; docs/companion.md). Linked only, started when turned on:
+# Settings › Companion, or nightdrive companion on.
 [Unit]
 Description=Nightdrive Companion
 PartOf=nightdrive-session.target

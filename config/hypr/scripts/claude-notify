@@ -78,7 +78,7 @@ if [[ $event == PermissionRequest ]]; then
     allow=(-A allow=Allow)
   fi
   out=$(mktemp "$state/perm.XXXXXX")
-  # What it asks, for Companion (plugins/companion), which answers by writing "allow|deny REQUEST" to $addr.answer. The
+  # What it asks, for Companion (config/companion), which answers by writing "allow|deny REQUEST" to $addr.answer. The
   # request's id (out's random part) ties the answer to what its page showed, not to a newer request of the session.
   req=${out##*/perm.}
   ans="$state/$addr.answer"

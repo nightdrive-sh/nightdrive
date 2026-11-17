@@ -11,7 +11,7 @@
 # openerPid and openerName: the session that opened it with `nightdrive ask` (terminal-or-claude puts them in its
 # environment), 0 and "" for one you opened; the bar groups a session's openings beside it (SessionGroups.js).
 # transcript: the path of its conversation (<its config dir>/projects/<dir>/<sessionId>.jsonl), "" when not found; Companion
-# reads it (plugins/companion/lib/transcript.py), as a folder may hold several sessions' transcripts on several accounts.
+# reads it (config/companion/lib/transcript.py), as a folder may hold several sessions' transcripts on several accounts.
 # A session in tmux or over ssh has no window of its own and isn't listed.
 set -uo pipefail
 readonly TAIL=300    # transcript lines read from the end for the last reply: a long tool run has no text in between

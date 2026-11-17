@@ -1,6 +1,6 @@
 """Who gets into Companion's server (access.py): only tailscaled on the socket, only the owner's login through it.
 
-    python3 plugins/companion/lib/access_test.py
+    python3 config/companion/lib/access_test.py
 """
 import os
 import socket
