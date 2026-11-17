@@ -2,7 +2,8 @@
 -- left column of a workspace of its own, full height, PM_WIDTH of the width, and the sessions it opens with `nightdrive
 -- ask --background` (terminal-or-claude puts them on its workspace) are a grid on the right, all in sight, up to
 -- MAX_GRID of them (#3060); past that they are one window group there, tabs, one shown, and a grid again once they are
--- MAX_GRID or fewer. Every other workspace keeps dwindle, and a session no PM opened opens as before.
+-- MAX_GRID or fewer. A display too small for that many usable terminals (pm-grid.lua works it out) lowers the limit:
+-- on a MacBook's own, two stack and a third makes the tabs (#3066). Every other workspace keeps dwindle, and a session no PM opened opens as before.
 --
 -- Only the sessions' names say which window is a PM, and Quickshell has them (claude-sessions): Claude.qml calls
 -- NightdrivePmSpaces with the PMs it sees, and the rest happens here. The PM's workspace gets a layout of its own by a
@@ -18,10 +19,12 @@ local PM_WIDTH = 0.50   -- the PM's column, a share of the width (1/3, then 40 %
 local SESSION_CLASS = "claude-background"   -- terminal-or-claude's --background sessions (Ghostty prefixes sh.nightdrive.)
 local STATE = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/nightdrive-pm-spaces"   -- "ws<TAB>address<TAB>name" lines
 local SETTLE_MS = 120   -- events come in bursts (a window opens, joins a group, moves): arrange once they settle
-local MAX_GRID = 4      -- sessions in the grid, each in sight; more are one group of tabs (#3060)
+local MAX_GRID = 4      -- sessions in the grid, each in sight; more are one group of tabs (#3060), fewer on a small display
 local LAYOUT = "pmgrid" -- pm-grid.lua; a workspace rule names it "lua:pmgrid"
 
 local spaces = {}   -- workspace id → { ws, pm = address, sid = its stable_id, name, rule, ruleKey }
+local fits = {}     -- workspace id → how many sessions its display fits in the grid (pm-grid.lua), MAX_GRID until told
+local settle        -- below: arranges the spaces once events settle
 
 local function is_session(w)
     return (w.class or ""):gsub("^sh%.nightdrive%.", "") == SESSION_CLASS
@@ -37,6 +40,9 @@ end
 require("pm-grid").register(LAYOUT, PM_WIDTH, function(ws)
     local w = spaces[ws] and pm_of(spaces[ws])
     return w and w.address
+end, function(ws, n)
+    fits[ws] = n
+    if spaces[ws] and settle then settle() end
 end)
 
 local function save()
@@ -83,7 +89,7 @@ local function arrange(s)
     for _, w in ipairs(hl.get_workspace_windows(s.ws) or {}) do
         if tiled(w) and is_session(w) and w.address ~= (pm and pm.address) then sessions[#sessions + 1] = w end
     end
-    if #sessions <= MAX_GRID then
+    if #sessions <= math.min(MAX_GRID, fits[s.ws] or MAX_GRID) then
         -- Back to the grid: toggling a grouped window disbands its whole group (fetched anew, as it changes)
         for _, w in ipairs(sessions) do
             local now = window(w.address)
@@ -124,7 +130,7 @@ local function arrange_all()
 end
 
 local pending = nil
-local function settle()
+function settle()
     if pending then return end
     pending = hl.timer(function() pending = nil; arrange_all() end, { timeout = SETTLE_MS, type = "oneshot" })
 end
