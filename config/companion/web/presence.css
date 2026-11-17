@@ -1,0 +1,8 @@
+/* The top bar's switch between at the computer and away (presence.js): quiet while you're there, the caution colour
+   when away, as a tap on a tile then does something else */
+.presence { height: 32px; border-radius: 8px; padding: 0 12px; display: flex; align-items: center; gap: 8px;
+            font-size: 12px; color: var(--muted); border: 1px solid var(--line); }
+.presence i { width: 8px; height: 8px; border-radius: 4px; background: var(--dim); }
+.presence.away { color: var(--caution); border-color: var(--caution); }
+.presence.away i { background: var(--caution); }
+.presence:active { filter: brightness(1.4); }

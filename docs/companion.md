@@ -6,6 +6,7 @@ Nightdrive on an iPad or a phone: your Claude Code sessions, a big dictation but
 - **Dictate:** hold the button and talk, let go and it is sent into the window that has the keyboard on the computer, which the panel names; into a Claude session with Enter, as its prompt. Hold a session's *Answer* to talk into that session the same way. A tap on it, or *New session*, opens a box with the same button, and *Write* to type instead.
 - **Actions:** tap an empty slot to pick what it does (Lock, Mute mic, Do not disturb, music, a new Claude session) or write a command of your own. Hold a slot to change it.
 - **Usage:** the gauge in the top right corner: every Claude account's 5-hour and week limits.
+- **Away:** when the computer is locked or has had no input for 5 minutes, the top bar says *Away* and a tap on a tile opens the session here instead of bringing its window up there. Tap *Away* / *At the computer* to say it yourself: that holds until the computer sees you lock it, leave it or come back.
 - The colours follow your theme.
 
 ## Turning it on

@@ -1,5 +1,5 @@
-// The page: the bar at the top (the computer, what needs you, a new version to reload, the usage's icon) and the
-// theme's colours.
+// The page: the bar at the top (the computer, at it or away, what needs you, a new version to reload, the usage's
+// icon) and the theme's colours.
 // The tiles, dictation and actions are their own files; each listens to the state.
 import { connect, esc, store, subscribe } from "./api.js";
 import "./sessions.js";
@@ -7,12 +7,15 @@ import "./dictate.js";
 import "./actions.js";
 import { icon } from "./icons.js";
 import { openUsage } from "./usage.js";
+import { presenceSwitch, togglePresence } from "./presence.js";
 
 const top = document.querySelector(".top");
 let loadedWeb = null;     // the page files' stamp (server.web_version) this page was loaded with
 top.addEventListener("click", e => {
   if (e.target.closest(".update")) location.reload();
   if (e.target.closest(".usage-btn")) openUsage();
+  const p = e.target.closest(".presence");
+  if (p) togglePresence(p);
 });
 const ROLES = ["primary", "accent", "sel", "hover", "card", "border", "text", "muted", "dim", "soft"];
 
@@ -48,6 +51,7 @@ function render(state) {
     <div class="brand"><img src="/logo.svg" height="18" alt="Nightdrive"><span>${esc(state?.host || "Nightdrive")}</span><i class="link ${store.online ? "" : "off"}"
       title="${store.online ? "Connected" : "No connection"}"></i></div>
     ${state?.demo ? '<span class="demo">Demo</span>' : ""}
+    ${presenceSwitch(state)}
     <div class="summary">${need ? `<i></i><span>${need} need${need === 1 ? "s" : ""} you</span>` : ""}
       ${work ? `<span>${need ? "· " : ""}${work} working</span>` : ""}</div>
     <span class="spacer"></span>

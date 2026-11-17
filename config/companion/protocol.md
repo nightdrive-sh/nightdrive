@@ -54,6 +54,7 @@ when it hears nothing for 40 s (iOS can leave a dropped connection silent).
     }
   }],
   "active": { "session": "0x5d1f2a40", "name": "nightdrive", "detail": "Companion proto" },  // the window with the keyboard
+  "presence": { "away": false, "why": "", "set": false },  // below
   "actions": [null, { "label": "Lock", "icon": "lock", "preset": "lock" }, null, null, null, null],
   "web": "3fa2c91d"              // a stamp of web/'s files: when it changes, the page offers to reload
 }
@@ -70,6 +71,11 @@ Claude Code as the terminal would, and the terminal's question closes. An answer
 with `", "` (`multiSelect`), or words of your own (the terminal's *Type something*), after them. The hook waits as long as
 for a permission request (590 s) and stops when its window gets the keyboard: then `question` goes and `asks` stays,
 answered in the terminal.
+
+`presence` says whether you are at the computer: away (`why`) when it is `locked`, `idle` (no input for 5 minutes,
+from logind's idle hint, which hypridle sets) or you `set` it. Away, a tap on a tile opens the session's view on the
+page instead of bringing its window up. `POST /api/presence` `{ "away": true }` sets it (`set` is true): it holds until
+the computer's own view changes (locked, idle, in use again), then that counts again (`lib/presence.py`).
 
 ## Sessions
 

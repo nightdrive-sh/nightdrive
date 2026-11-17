@@ -1,8 +1,8 @@
 // The session tiles: one per Claude Code session, each in its place (the server orders them as they started), and a tile
 // for a new one. A permission request is answered here; a question with choices with Question (its box, question.js),
 // anything else with Answer (dictation into that session). A tap
-// on a tile, off its buttons, brings its window up on the desktop; Show opens the session's own view (detail.js). The
-// buttons' requests are act.js's.
+// on a tile, off its buttons, brings its window up on the desktop; Show opens the session's own view (detail.js), and so
+// does the tap while you're away from the computer (presence.js). The buttons' requests are act.js's.
 import { esc, subscribe } from "./api.js";
 import { icon } from "./icons.js";
 import { compose } from "./compose.js";
@@ -11,6 +11,7 @@ import { holdToTalk, Recognition } from "./speech.js";
 import { send } from "./compose.js";
 import { openDetail } from "./detail.js";
 import { openQuestion } from "./question.js";
+import { away } from "./presence.js";
 
 const grid = document.querySelector(".sessions");
 
@@ -153,6 +154,7 @@ grid.addEventListener("click", e => {
   if (what === "open") return openDetail(id);
   if (what === "question") return openQuestion(id);
   if (what === "answer" && Recognition) return;    // held or tapped: answers() has it
+  if (what === "focus" && away()) return openDetail(id);   // nobody at the computer to see the window come up
   if (b.tagName === "ARTICLE") flash(b);
   act(id, what, b);
 });

@@ -15,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import access
 import control
+import presence
 import sessions
 
 POLL = 1.5          # seconds between looks at the desktop
@@ -67,6 +68,7 @@ class State:
     def __init__(self, demo):
         self.demo = demo
         self.sessions = sessions.Demo() if demo else sessions.Sessions()
+        self.presence = presence.Demo() if demo else presence.Presence()
         self.actions = control.DEMO_CONFIG if demo else control.CONFIG
         self.cond = threading.Condition()
         self.json = "{}"
@@ -99,6 +101,8 @@ class State:
     def build(self):
         return {"host": socket.gethostname().split(".")[0], "demo": self.demo, "theme": self._theme(),
                 "usage": self._usage(), "sessions": self.sessions.look(), "active": self.sessions.active,
+                # away from the computer (locked, idle, or as set on the page): a tile's tap opens its view there
+                "presence": self.presence.look(),
                 "actions": control.public_actions(self.actions), "web": web_version()}
 
     def loop(self):
@@ -282,6 +286,8 @@ class Handler(BaseHTTPRequestHandler):
                 # "session": Enter only when the window that has the keyboard is a session's (the dictation button)
                 submit = ses.active_is_session() if body.get("submit") == "session" else bool(body.get("submit"))
                 demo or control.type_text(None, body.get("text", ""), submit)
+            case ["presence"]:
+                self.state.presence.set(body.get("away"))
             case ["actions", n, "run"]:
                 demo or control.run_action(int(n), self.state.actions)
             case ["actions", n]:
