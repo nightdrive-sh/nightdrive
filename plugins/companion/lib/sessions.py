@@ -62,6 +62,7 @@ class Sessions:
     def __init__(self):
         self.last_state = {}
         self.wants = set()
+        self.listed = frozenset()      # the windows the last look found running Claude Code
 
     def look(self):
         found = _run_json([SESSIONS], [])
@@ -91,8 +92,15 @@ class Sessions:
                 **({"permission": perm} if perm else {}),
             })
         self.last_state = seen
+        self.listed = frozenset(seen)
         self.wants &= set(seen)
         return _ordered(out)
+
+    def window(self, addr):
+        """addr, when it is a session's window: the page sends and stops only there, never into another window."""
+        if addr not in self.listed:
+            raise ValueError("No such session (it may have ended)")
+        return addr
 
     def seen(self, addr):
         """You looked at it here: it no longer wants you."""
@@ -151,6 +159,11 @@ class Demo:
 
     def seen(self, addr):
         self.wants.discard(addr)
+
+    def window(self, addr):
+        if not any(s["id"] == addr for s in self.look()):
+            raise ValueError("No such session (it may have ended)")
+        return addr
 
     def permission(self, addr):
         return next((s.get("permission") for s in self.look() if s["id"] == addr), None)

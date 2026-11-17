@@ -63,7 +63,8 @@ the rest is answered in the terminal. The same rule as the desktop notification'
 | `POST /api/sessions/new` | `{ "text": "…" }` | A new session in ~/Projects, the text as its first prompt |
 | `POST /api/send` | `{ "text": "…", "submit": false }` | Types the text in the window that has the keyboard |
 
-Sending and stopping go through the desktop: its window comes to the front, as with ⌘⌃C (Send to Claude).
+`ID` must be a session's window from the state: no other window is typed into. Sending and stopping go through the
+desktop: its window comes to the front, as with ⌘⌃C (Send to Claude), and nothing is typed until it has the keyboard.
 
 ## Actions
 

@@ -212,7 +212,7 @@ class Handler(BaseHTTPRequestHandler):
             case ["sessions", "new"]:
                 demo or control.new_session(body.get("text", ""))
             case ["sessions", sid, ("allow" | "deny") as what]:
-                perm = ses.permission(sid)
+                perm = ses.permission(ses.window(sid))
                 if not perm:
                     raise ValueError("It no longer asks")
                 # the request the page showed: the state is up to POLL old, and a newer one may be waiting
@@ -223,12 +223,12 @@ class Handler(BaseHTTPRequestHandler):
                 ses.answer(sid, what, perm["request"])
                 ses.seen(sid)
             case ["sessions", sid, "send"]:
-                ses.seen(sid)
+                ses.seen(ses.window(sid))
                 demo or control.type_text(sid, body.get("text", ""), bool(body.get("submit")))
             case ["sessions", sid, "stop"]:
-                demo or control.stop(sid)
+                demo or control.stop(ses.window(sid))
             case ["sessions", sid, "focus"]:
-                ses.seen(sid)
+                ses.seen(ses.window(sid))
                 demo or control.focus(sid)
             case ["send"]:
                 demo or control.type_text(None, body.get("text", ""), bool(body.get("submit")))

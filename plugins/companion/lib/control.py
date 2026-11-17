@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 
 HOME = os.path.expanduser("~")
@@ -18,8 +19,11 @@ DEMO_CONFIG = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.
                            "companion-demo.json")
 SLOTS = 5
 FOCUS_WAIT = 0.25       # seconds for a window brought up to get the keyboard
+FOCUS_TRIES = 6         # FOCUS_WAITs before giving up: the keys would go to another window
 RESTORE_DELAY = 0.8     # seconds before the clipboard gets its old text back: the terminal reads it when it pastes
 MAX_TEXT = 8000         # characters a send takes
+# One at a time: two sends at once would swap the clipboard and the window under each other
+_typing = threading.Lock()
 
 # The actions a slot can be without writing a command: id → (label, icon, argv)
 PRESETS = {
@@ -51,6 +55,21 @@ def focus(addr):
     _hypr(f'hl.dsp.focus({{ window = "address:{addr}" }})')
 
 
+def bring_up(addr):
+    """Its window has the keyboard, or ValueError: what follows (a paste, Esc) must not reach another window."""
+    focus(addr)
+    for _ in range(FOCUS_TRIES):
+        time.sleep(FOCUS_WAIT)
+        try:
+            active = json.loads(subprocess.run(["hyprctl", "-j", "activewindow"], capture_output=True,
+                                               timeout=5).stdout or "{}").get("address")
+        except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+            active = None
+        if active == addr:
+            return
+    raise ValueError("Its window didn't get the keyboard: nothing was sent")
+
+
 def clean(text):
     """No control codes (an escape could end the terminal's bracketed paste, a carriage return send the prompt), and
     dictation's line breaks as spaces: one prompt, sent only by submit."""
@@ -62,9 +81,13 @@ def type_text(addr, text, submit):
     text = clean(text)
     if not text:
         raise ValueError("Nothing to send")
+    with _typing:
+        _paste(addr, text, submit)
+
+
+def _paste(addr, text, submit):
     if addr:
-        focus(addr)
-        time.sleep(FOCUS_WAIT)
+        bring_up(addr)
     try:
         old = subprocess.run(["wl-paste", "--no-newline", "--type", "text"], capture_output=True, timeout=2)
         old = old.stdout if old.returncode == 0 else None
@@ -83,9 +106,9 @@ def type_text(addr, text, submit):
 
 
 def stop(addr):
-    focus(addr)
-    time.sleep(FOCUS_WAIT)
-    _key("Escape")
+    with _typing:
+        bring_up(addr)
+        _key("Escape")
 
 
 def new_session(text):
