@@ -78,19 +78,30 @@ if [[ $event == PermissionRequest ]]; then
     allow=(-A allow=Allow)
   fi
   out=$(mktemp "$state/perm.XXXXXX")
-  touch "$state/$addr.perm"
+  # What it asks, for Companion (plugins/companion), which answers by writing allow or deny to $addr.answer
+  ans="$state/$addr.answer"
+  rm -f "$ans"
+  jq -nc --arg tool "$tool" --arg what "$what" --arg project "$project" --argjson allow "$(( ${#allow[@]} > 0 ))" \
+    '{tool: $tool, what: $what, project: $project, allow: ($allow == 1)}' > "$state/$addr.perm"
   notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" -A deny=Deny \
     -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
   ns=$!
   # The terminal's answer ends this hook early (Claude Code stops it): the notification goes with it
-  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm"; }
+  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm" "$ans"; }
   trap cleanup EXIT
   trap 'exit 0' TERM INT HUP
-  decide() { jq -nc --arg b "$1" '{hookSpecificOutput: {hookEventName: "PermissionRequest",
-             decision: ({behavior: $b} + (if $b == "deny" then {message: "Denied from the desktop notification"} else {} end))}}'; }
+  decide() { jq -nc --arg b "$1" --arg from "${2:-the desktop notification}" '{hookSpecificOutput: {hookEventName: "PermissionRequest",
+             decision: ({behavior: $b} + (if $b == "deny" then {message: "Denied from \($from)"} else {} end))}}'; }
   for (( i = 0; i < WAIT * 4; i++ )); do
     sleep 0.25
     sed -n 1p "$out" > "$idf" 2>/dev/null
+    if [[ -s $ans ]]; then                  # answered on Companion: Allow only when the notification offers it too
+      case $(<"$ans") in
+        allow) (( ${#allow[@]} )) && { decide allow; exit 0; } ;;
+        deny) decide deny Companion; exit 0 ;;
+      esac
+      rm -f "$ans"
+    fi
     if ! kill -0 "$ns" 2>/dev/null; then    # answered, or closed without one
       case $(sed -n 2p "$out") in
         allow) decide allow ;;

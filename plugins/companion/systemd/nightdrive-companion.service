@@ -1,0 +1,13 @@
+# Companion's server (plugins/companion, bin/companion). Off until turned on (companion enable, its installer).
+[Unit]
+Description=Nightdrive Companion
+PartOf=nightdrive-session.target
+After=nightdrive-session.target
+
+[Service]
+ExecStart=%h/.local/bin/companion run
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=nightdrive-session.target

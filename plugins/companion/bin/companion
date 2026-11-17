@@ -1,0 +1,65 @@
+#!/usr/bin/python3
+"""Companion: Nightdrive on an iPad or a phone, as a web app over Tailscale (plugins/companion, protocol.md).
+
+    companion enable | disable   the server on/off (nightdrive-companion.service) and on the tailnet (tailscale serve)
+    companion url                the address to open on the iPad
+    companion run [--demo]       the server itself (the service); --demo: made-up sessions, nothing done on the desktop
+    companion demo               the demo on http://127.0.0.1:8746, to look at in a browser here
+
+On the tailnet it is https://<this computer>.<tailnet>.ts.net:8443. Port 443 is left to Ferry, which serves there.
+"""
+import json
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"))
+
+PORT = 8746           # the server's own, on 127.0.0.1
+HTTPS_PORT = 8443     # tailscale serve's, on the tailnet
+SERVICE = "nightdrive-companion.service"
+
+
+def tailnet_url():
+    try:
+        st = json.loads(subprocess.run(["tailscale", "status", "--json"], capture_output=True, timeout=5).stdout)
+        name = st["Self"]["DNSName"].rstrip(".")
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError):
+        return None
+    return f"https://{name}:{HTTPS_PORT}"
+
+
+def serve_on_tailnet(on):
+    argv = ["tailscale", "serve", "--bg", f"--https={HTTPS_PORT}", f"http://127.0.0.1:{PORT}"] if on else \
+        ["tailscale", "serve", f"--https={HTTPS_PORT}", "off"]
+    r = subprocess.run(argv, capture_output=True, text=True)
+    if r.returncode != 0 and on:
+        sys.exit(f"companion: tailscale serve didn't start: {r.stderr.strip() or r.stdout.strip()}")
+
+
+def main(args):
+    cmd = args[0] if args else "url"
+    if cmd == "run":
+        import server
+        server.serve(PORT, "--demo" in args)
+    elif cmd == "demo":
+        import server
+        server.serve(PORT, True)
+    elif cmd == "enable":
+        subprocess.run(["systemctl", "--user", "enable", "--now", SERVICE], check=True)
+        serve_on_tailnet(True)
+        print(tailnet_url() or "companion: on, but Tailscale isn't connected")
+    elif cmd == "disable":
+        serve_on_tailnet(False)
+        subprocess.run(["systemctl", "--user", "disable", "--now", SERVICE])
+    elif cmd == "url":
+        url = tailnet_url()
+        if not url:
+            sys.exit("companion: Tailscale isn't connected")
+        print(url)
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
