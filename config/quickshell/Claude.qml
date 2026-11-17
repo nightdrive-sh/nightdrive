@@ -63,7 +63,7 @@ Singleton {
         onLoadFailed: c.barOn = false
     }
 
-    // Project managers (SessionGroups.isPm) get a workspace of their own, their sessions as tabs beside them: Hyprland
+    // Project managers (SessionGroups.isPm) get a workspace of their own, their sessions in a grid beside them: Hyprland
     // does it (hypr/pm-space.lua), told here which windows are PMs, as only the sessions' records have their names. Sent
     // when the PMs change, and after a config reload, which starts its Lua afresh.
     readonly property string pmKey: found.filter(f => Groups.isPm(f.name))

@@ -58,7 +58,7 @@ local mon = hl.get_monitors()[1]
 if mon then drawerTop = math.floor(mon.height / mon.scale * 0.05) end
 hl.workspace_rule({ workspace = "special:drawer", gaps_out = { top = drawerTop, right = 10, bottom = 10, left = 10 } })   -- the same 10 px gaps as other windows
 
--- Window groups (tabs; a project manager's sessions, pm-space.lua): filled tabs with no line under them (its rounding
+-- Window groups (tabs; a project manager's sessions past four, pm-space.lua): filled tabs with no line under them (its rounding
 -- left a notch at the corners; the fill tells the shown tab), each rounded as the windows look (their rounding 4 plus
 -- the border's 2: the border's outer edge is what shows; gradient_rounding is in the screen's own pixels, unlike the
 -- rest, so 6 times its scale), with 12 px of room for the title at either end (text_padding: it began at the tab's edge),

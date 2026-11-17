@@ -149,9 +149,11 @@ Click an icon and a small menu opens under it:
   workspace's colour.
   **A project manager's space**: a session named *… Project Manager* or *… PM* (`claude -n`) gets a workspace of its
   own, as the left column, full height and half the width; started on a workspace with other windows, it moves to
-  the first empty one. The sessions it opens with `nightdrive ask --background` open there on the right, as one group
-  of tabs: one shows, its tab strip lists them, and a click, **⌘ ←** / **⌘ →** or the Hyper keys above switch between
-  them. Alone, once its sessions have all closed, it fills the width; restarted, it goes back to its space (by its name).
+  the first empty one. The sessions it opens with `nightdrive ask --background` open there on the right, all in sight:
+  one fills the right half, two are one above the other, three and four a 2×2 grid (with three, the first spans the
+  top). A fifth turns them into one group of tabs: one shows, its tab strip lists them, and a click, **⌘ ←** / **⌘ →**
+  or the Hyper keys above switch between them; at four again, they are a grid again. Alone, once its sessions have all
+  closed, it fills the width; restarted, it goes back to its space (by its name).
   Moved to another workspace, it makes that one its space. Other workspaces, and sessions no PM opened, are as before.
   **Two Claude accounts** (a Claude Code config dir each, `CLAUDE_CONFIG_DIR`): `~/.claude` and every `~/.claude-*`
   you have signed in to are found by themselves. The second account then gets a Claude icon of its own beside the

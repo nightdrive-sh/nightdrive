@@ -1,14 +1,14 @@
 -- A project manager's own space (#3042): a Claude Code session named "… Project Manager" or "… PM" (ndpm, cspm) is the
 -- left column of a workspace of its own, full height, PM_WIDTH of the width, and the sessions it opens with `nightdrive
--- ask --background` (terminal-or-claude puts them on its workspace) are one window group on the right: tabs, one shown.
--- Every other workspace keeps dwindle, and a session no PM opened opens as before.
+-- ask --background` (terminal-or-claude puts them on its workspace) are a grid on the right, all in sight, up to
+-- MAX_GRID of them (#3060); past that they are one window group there, tabs, one shown, and a grid again once they are
+-- MAX_GRID or fewer. Every other workspace keeps dwindle, and a session no PM opened opens as before.
 --
 -- Only the sessions' names say which window is a PM, and Quickshell has them (claude-sessions): Claude.qml calls
--- NightdrivePmSpaces with the PMs it sees, and the rest happens here. The PM's workspace gets the master layout by a
--- workspace rule (the PM the master, orientation left), and Hyprland's events keep it so: a background session opened
--- or moved there joins the group, a PM whose sessions all closed fills the width (keeping its column made it jump back
--- a moment after master stretched it), and a workspace that is gone takes its rule with it, so its number is an
--- ordinary workspace again.
+-- NightdrivePmSpaces with the PMs it sees, and the rest happens here. The PM's workspace gets a layout of its own by a
+-- workspace rule (pm-grid.lua: the PM left, the rest a grid, the PM alone the whole width), and Hyprland's events keep
+-- it so: the sessions group past MAX_GRID and ungroup at it, and a workspace that is gone takes its rule with it, so
+-- its number is an ordinary workspace again.
 -- A PM seen for the first time on a workspace with other windows moves to the first empty workspace (focus follows
 -- when it had it). One restarted (a new window, the same name) goes back to its space, where its sessions are. A PM the
 -- user moves to another workspace makes that one its space, in place, and the old one is ordinary again.
@@ -18,9 +18,8 @@ local PM_WIDTH = 0.50   -- the PM's column, a share of the width (1/3, then 40 %
 local SESSION_CLASS = "claude-background"   -- terminal-or-claude's --background sessions (Ghostty prefixes sh.nightdrive.)
 local STATE = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/nightdrive-pm-spaces"   -- "ws<TAB>address<TAB>name" lines
 local SETTLE_MS = 120   -- events come in bursts (a window opens, joins a group, moves): arrange once they settle
-
--- Master is used only by these spaces (every other workspace is dwindle), so its defaults are theirs
-hl.config({ master = { mfact = PM_WIDTH, orientation = "left", new_status = "slave", new_on_top = false } })
+local MAX_GRID = 4      -- sessions in the grid, each in sight; more are one group of tabs (#3060)
+local LAYOUT = "pmgrid" -- pm-grid.lua; a workspace rule names it "lua:pmgrid"
 
 local spaces = {}   -- workspace id → { ws, pm = address, sid = its stable_id, name, rule, ruleKey }
 
@@ -34,6 +33,11 @@ local function pm_of(s)
     local w = window(s.pm)
     return w and w.stable_id == s.sid and w or nil
 end
+
+require("pm-grid").register(LAYOUT, PM_WIDTH, function(ws)
+    local w = spaces[ws] and pm_of(spaces[ws])
+    return w and w.address
+end)
 
 local function save()
     local f = io.open(STATE, "w")
@@ -56,7 +60,7 @@ end
 
 local function open_space(id, pm, sid, name)
     local s = { ws = id, pm = pm, sid = sid, name = name }
-    set_rule(s, "master")
+    set_rule(s, "lua:" .. LAYOUT)
     spaces[id] = s
     return s
 end
@@ -67,39 +71,37 @@ local function close_space(s)
     spaces[s.ws] = nil
 end
 
--- Puts a space in order: the PM out of any group and the master, the background sessions in one group
+-- Puts a space in order: the PM out of any group, the background sessions loose in the grid up to MAX_GRID, past it
+-- in one group (the layout itself, pm-grid.lua, puts the PM left)
 local function arrange(s)
     local pm = pm_of(s)
-    local wins = hl.get_workspace_windows(s.ws) or {}
-    local others, group, loose = 0, nil, {}
-    for _, w in ipairs(wins) do
-        if tiled(w) and w.address ~= (pm and pm.address) then
-            others = others + 1
-            if is_session(w) then
-                if w.group then group = group or w.group else loose[#loose + 1] = w end
-            end
-        end
-    end
-    local here = pm and pm.workspace and pm.workspace.id == s.ws and tiled(pm)
     -- A restarted PM opened over the group's focused tab lands in the group (group.auto_group)
-    if here and pm.group then pm.group:remove(pm); pm = pm_of(s) end
-    if #loose > 0 then
-        if not group then
-            hl.dispatch(hl.dsp.group.toggle({ window = "address:" .. loose[1].address }))
-            group = (window(loose[1].address) or {}).group
-            table.remove(loose, 1)
-        end
-        if group then for _, w in ipairs(loose) do group:add(w) end end
+    if pm and pm.group and pm.workspace and pm.workspace.id == s.ws and tiled(pm) then
+        pm.group:remove(pm); pm = pm_of(s)
     end
-    -- The master is the leftmost tiled window: a PM further right swaps with it
-    if here and others > 0 then
-        for _, w in ipairs(hl.get_workspace_windows(s.ws) or {}) do
-            if tiled(w) and w.address ~= pm.address and w.at.x < pm.at.x then
-                hl.dispatch(hl.dsp.window.swap({ direction = "left", window = "address:" .. s.pm }))
-                break
-            end
-        end
+    local sessions = {}
+    for _, w in ipairs(hl.get_workspace_windows(s.ws) or {}) do
+        if tiled(w) and is_session(w) and w.address ~= (pm and pm.address) then sessions[#sessions + 1] = w end
     end
+    if #sessions <= MAX_GRID then
+        -- Back to the grid: toggling a grouped window disbands its whole group (fetched anew, as it changes)
+        for _, w in ipairs(sessions) do
+            local now = window(w.address)
+            if now and now.group then hl.dispatch(hl.dsp.group.toggle({ window = "address:" .. w.address })) end
+        end
+        return
+    end
+    local group, loose = nil, {}
+    for _, w in ipairs(sessions) do
+        if w.group then group = group or w.group else loose[#loose + 1] = w end
+    end
+    if #loose == 0 then return end
+    if not group then
+        hl.dispatch(hl.dsp.group.toggle({ window = "address:" .. loose[1].address }))
+        group = (window(loose[1].address) or {}).group
+        table.remove(loose, 1)
+    end
+    if group then for _, w in ipairs(loose) do group:add(w) end end
 end
 
 -- Every space: one whose PM the user moved to another workspace follows it there, one whose workspace is gone
