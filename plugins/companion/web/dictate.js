@@ -1,7 +1,8 @@
-// Dictation: hold the big button and talk, let go, read it, send. The words come from the browser's own speech
-// recognition (Safari's: Apple's, the same as the keyboard's dictation); where there is none, a tap opens the text box,
-// and the keyboard's microphone key dictates into it. Where the text goes: a session (into its prompt), the window that
-// has the keyboard on the desktop, or a new session. By itself: the session that asks you something, else the window.
+// Dictation: hold the big button and talk, let go and it is sent, with no sheet in between. The words come from the
+// browser's own speech recognition (Safari's: Apple's, the same as the keyboard's dictation); where there is none, a tap
+// opens the sheet (compose, also the tiles' Answer), and the keyboard's microphone key dictates into it. Where the text
+// goes: a session (into its prompt), the window that has the keyboard on the desktop, or a new session. By itself: the
+// session that asks you something, else the window.
 import { esc, post, sheet, store, subscribe, toast } from "./api.js";
 import { icon } from "./icons.js";
 
@@ -11,6 +12,8 @@ const mic = document.querySelector(".mic");
 const hint = document.querySelector(".dictate .hint");
 const clock = document.querySelector(".dictate .time");
 const chip = document.querySelector(".target");
+const IDLE = "Hold to talk, let go to send";
+const SHOWN_MS = 4000;     // how long the words sent stay under the button
 
 let chosen = "auto";     // "auto" | a session's id | "window" | "new"
 
@@ -77,9 +80,31 @@ function done() {
   clearInterval(ticker);
   clock.textContent = "";
   mic.classList.remove("on");
-  hint.textContent = "Hold to talk, let go to read it";
+  hint.textContent = IDLE;
   try { r?.stop(); } catch {}
-  if (heard) compose(chosen, heard);
+  const words = heard;
+  heard = "";            // sent once, however many ways the listening ends
+  if (words) sendNow(chosen, words);
+}
+
+// Where the words go, as a request
+function pathFor(t) {
+  return t === "window" ? "/api/send" : t === "new" ? "/api/sessions/new" : `/api/sessions/${encodeURIComponent(t)}/send`;
+}
+
+function sentTo(t) {
+  return t === "new" ? "A new session starts on the desktop" : `Sent to ${nameOf(t)[0]}`;
+}
+
+// Straight from the button: the words stay under it for a moment, so you see what went. Enter (send it as the prompt)
+// for a session, not for the window with the keyboard: the sheet's default too.
+let shownTimer;
+async function sendNow(target, words) {
+  const t = resolve(target);
+  hint.textContent = `“${words}”`;
+  clearTimeout(shownTimer);
+  shownTimer = setTimeout(() => { if (!rec) hint.textContent = IDLE; }, SHOWN_MS);
+  if (await post(pathFor(t), { text: words, submit: t !== "window" })) toast(sentTo(t));
 }
 
 if (Recognition) {
@@ -119,10 +144,9 @@ export function compose(target = chosen, text = "") {
   s.el.querySelector(".go").onclick = async () => {
     const words = area.value.trim();
     if (!words) return area.focus();
-    const path = t === "window" ? "/api/send" : t === "new" ? "/api/sessions/new" : `/api/sessions/${encodeURIComponent(t)}/send`;
-    if (await post(path, { text: words, submit: enter.checked })) {
+    if (await post(pathFor(t), { text: words, submit: enter.checked })) {
       s.close();
-      toast(t === "new" ? "A new session starts on the desktop" : `Sent to ${nameOf(t)[0]}`);
+      toast(sentTo(t));
     }
   };
   if (!text) area.focus();

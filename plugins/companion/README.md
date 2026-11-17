@@ -3,7 +3,7 @@
 Nightdrive on an iPad or a phone: your Claude Code sessions, a big dictation button and five buttons of your own, as a web app on the home screen. It reaches the computer over Tailscale, from anywhere.
 
 - **Sessions** are tiles, the ones that need you first. Answer a permission request (Allow, Deny), answer a question by dictating, stop a session (Esc) or bring its window up on the desktop. A tile shows what the session did last.
-- **Dictate:** hold the button and talk, let go, read and fix it, send. It goes into the session that asks you something, else into the window that has the keyboard; tap *Into* for another session or a new one. *Press Enter* sends it as the prompt.
+- **Dictate:** hold the button and talk, let go and it is sent. It goes into the session that asks you something (with Enter, as its prompt), else into the window that has the keyboard (without); tap *Into* for another session or a new one. A tile's *Answer* opens a box to write or fix the words first.
 - **Actions:** tap an empty slot to pick what it does (Lock, Mute mic, Do not disturb, music, a new Claude session) or write a command of your own. Hold a slot to change it.
 - The colours follow your theme.
 
