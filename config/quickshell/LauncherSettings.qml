@@ -22,6 +22,10 @@ Item {
             { kind: "nav", name: "Wi-Fi", glyph: "wifi", target: "wifi" },
             { kind: "nav", name: "Bluetooth", glyph: "bluetooth", target: "bluetooth" }
         ].concat(Plugins.has("tailscale") ? [{ kind: "nav", name: "Tailscale", glyph: "shield-check", target: "tailscale" }] : [], [
+            // Companion: the iPad's web app over Tailscale (CompanionLevels.qml)
+            { kind: "nav", name: "Companion", glyph: "tablet-smartphone", target: "companion", summary: lv.companion.state === "on" ? "on" : undefined,
+              extra: "ipad phone remote" }
+        ], [
             { kind: "header", name: "Hardware" },
             { kind: "nav", name: "Sound", glyph: "volume-2", target: "sound" },   // Headphones are a row there, while connected
             { kind: "nav", name: "Display", glyph: "monitor", target: "display" }

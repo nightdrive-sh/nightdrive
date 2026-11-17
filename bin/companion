@@ -1,0 +1,112 @@
+#!/usr/bin/python3
+"""Companion: Nightdrive on an iPad or a phone, as a web app over Tailscale (docs/companion.md; the server and the page
+in config/companion, their protocol in config/companion/protocol.md). Also `nightdrive companion`, and Settings ›
+Companion (quickshell/CompanionLevels.qml).
+
+    companion on | off           the server (nightdrive-companion.service) and its address on the tailnet (tailscale
+                                 serve), both kept so; off by default
+    companion status [--json]    on | off; --json: {state, running, url, tailscale}
+    companion url                the address to open on the iPad
+    companion run [--demo]       the server itself (the service); --demo: made-up sessions, nothing done on the desktop
+    companion demo               the demo on http://127.0.0.1:8746, to look at in a browser here
+
+On the tailnet it is https://<this computer>.<tailnet>.ts.net:8443. Port 443 is left to Ferry, which serves there.
+The server itself has no port: tailscale serve proxies to its Unix socket (lib/access.py: who gets in).
+No tool for Claude: Companion is the user's remote for the desktop, and Claude has its own ways to the sessions and
+to what the action slots run (#3051).
+"""
+import json
+import os
+import subprocess
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, os.path.join(REPO, "config", "companion", "lib"))
+
+PORT = 8746           # the demo's, on 127.0.0.1
+HTTPS_PORT = 8443     # tailscale serve's, on the tailnet
+UNIT = "nightdrive-companion.service"
+
+
+def systemctl(*args):
+    return subprocess.run(["systemctl", "--user", *args], capture_output=True, text=True)
+
+
+def tailscale():
+    """tailscale status --json, or {} without Tailscale."""
+    try:
+        return json.loads(subprocess.run(["tailscale", "status", "--json"], capture_output=True, timeout=5).stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return {}
+
+
+def tailnet_url(st):
+    name = (st.get("Self") or {}).get("DNSName", "").rstrip(".")
+    return f"https://{name}:{HTTPS_PORT}" if name and st.get("BackendState") == "Running" else None
+
+
+def serve_on_tailnet(on):
+    import access
+    argv = ["tailscale", "serve", "--bg", f"--https={HTTPS_PORT}", f"unix:{access.SOCKET}"] if on else \
+        ["tailscale", "serve", f"--https={HTTPS_PORT}", "off"]
+    r = subprocess.run(argv, capture_output=True, text=True)
+    if r.returncode != 0 and on:
+        why = (r.stderr.strip() or r.stdout.strip()).splitlines()[-1:] or [""]
+        if "denied" in why[0] or "operator" in why[0]:
+            sys.exit("companion: Tailscale didn't allow it. Run once: sudo tailscale set --operator=$USER")
+        sys.exit(f"companion: tailscale serve didn't start: {why[0]}")
+
+
+def on():
+    st = tailscale()
+    if not tailnet_url(st):
+        sys.exit("companion: Tailscale isn't connected: turn it on first (Settings › Tailscale)")
+    serve_on_tailnet(True)
+    # The repo's path, not the name: link.sh links the unit, and off (disable) removes that link, so by name the next
+    # on wouldn't find it. By path systemd links it again (as crash-report and snippets do).
+    r = systemctl("enable", "--now", os.path.join(REPO, "config", "systemd", "user", UNIT))
+    if r.returncode != 0:
+        sys.exit(f"companion: the server didn't start: {r.stderr.strip()}")
+    print(tailnet_url(st))
+
+
+def off():
+    serve_on_tailnet(False)
+    systemctl("disable", "--now", UNIT)
+
+
+def status(as_json):
+    state = "on" if systemctl("is-enabled", UNIT).stdout.strip() == "enabled" else "off"
+    if not as_json:
+        print(state)
+        return
+    st = tailscale()
+    print(json.dumps({"state": state, "running": systemctl("is-active", UNIT).stdout.strip() == "active",
+                      "url": tailnet_url(st) or "", "tailscale": st.get("BackendState") == "Running"}))
+
+
+def main(args):
+    cmd = args[0] if args else "status"
+    if cmd == "run":
+        import server
+        server.serve(PORT, "--demo" in args)
+    elif cmd == "demo":
+        import server
+        server.serve(PORT, True)
+    elif cmd == "on":
+        on()
+    elif cmd == "off":
+        off()
+    elif cmd == "status":
+        status("--json" in args)
+    elif cmd == "url":
+        url = tailnet_url(tailscale())
+        if not url:
+            sys.exit("companion: Tailscale isn't connected")
+        print(url)
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

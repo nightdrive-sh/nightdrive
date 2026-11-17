@@ -1,0 +1,15 @@
+{
+  "name": "Nightdrive",
+  "short_name": "Nightdrive",
+  "description": "Your Claude Code sessions, dictation and buttons of your own, on the computer running Nightdrive",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

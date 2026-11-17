@@ -10,6 +10,8 @@
 # status last changed (epoch seconds, 0 if unknown): the bar's time, how long a turn has run or it has waited for you.
 # openerPid and openerName: the session that opened it with `nightdrive ask` (terminal-or-claude puts them in its
 # environment), 0 and "" for one you opened; the bar groups a session's openings beside it (SessionGroups.js).
+# transcript: the path of its conversation (<its config dir>/projects/<dir>/<sessionId>.jsonl), "" when not found; Companion
+# reads it (config/companion/lib/transcript.py), as a folder may hold several sessions' transcripts on several accounts.
 # A session in tmux or over ssh has no window of its own and isn't listed.
 set -uo pipefail
 readonly TAIL=300    # transcript lines read from the end for the last reply: a long tool run has no text in between
@@ -44,10 +46,11 @@ for pid in $(pgrep -x claude); do
   [[ -n $info ]] || info='{"name":"","status":"","waitingFor":"","sid":"","since":0}'
   # The last reply's last line: the transcript is <its config dir>/projects/<the dir, mangled>/<sessionId>.jsonl, found
   # by its id rather than by mangling the dir as Claude Code does
-  last='""' sid=$(jq -r .sid <<<"$info")
+  last='""' tpath= sid=$(jq -r .sid <<<"$info")
   if [[ -n $sid ]]; then
     for t in "$conf"/projects/*/"$sid".jsonl; do
       [[ -r $t ]] || continue
+      tpath=$t
       # As a JSON string, one line however many the reply has
       last=$(tac "$t" | head -n "$TAIL" | jq -c 'select(.type == "assistant") | [.message.content[]? | select(.type == "text") | .text]
                | join("\n") | select(test("\\S"))' 2>/dev/null | head -n 1)
@@ -59,8 +62,8 @@ for pid in $(pgrep -x claude); do
   oname=$(sed -n 's/^NIGHTDRIVE_OPENER_NAME=//p' <<<"$env")
   jq -nc --arg acc "$account" --argjson accdef "$([[ $conf == "$default_dir" ]] && echo true || echo false)" \
      --argjson op "$opid" --arg on "$oname" --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" --argjson i "$info" \
-     --argjson l "$last" --argjson n "$LAST" \
+     --argjson l "$last" --argjson n "$LAST" --arg tp "$tpath" \
      '{address: $a, pid: $pid, dir: $d, started: $s} + ($i | del(.sid))
-      + {openerPid: $op, openerName: $on, account: $acc, accountDefault: $accdef}
+      + {openerPid: $op, openerName: $on, account: $acc, accountDefault: $accdef, transcript: $tp}
       + {last: ($l | gsub("^\\s+|\\s+$"; "") | split("\n") | map(select(test("\\S"))) | last // "" | .[0:$n])}'
 done | jq -sc 'unique_by(.address)'

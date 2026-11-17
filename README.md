@@ -265,6 +265,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Calendar | [Calendar](plugins/calendar/README.md) (Nightdrive's own, vdirsyncer and khal) | iCloud, Google and CalDAV; reminders as notifications, today's events in the clock menu, invitations from Mail |
 | Music | [Deck](plugins/deck/README.md) (Nightdrive's own Spotify player, needs Premium) | bar icon, music menu, player row in the Launcher, media keys |
 | Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own) | a mailbox both ways with your phone and other computers, over Tailscale |
+| iPad | [Companion](docs/companion.md) (Nightdrive's own) | your Claude Code sessions, dictation and six buttons of your own on an iPad or a phone, over Tailscale (Settings › Companion) |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
 | Passwords (optional) | [1Password](plugins/1password/README.md) and its `op` CLI | Passwords level in the Launcher, SSH agent |
 | AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘Enter asks from the Launcher, ⌘⌃Enter in a terminal, Claude writes (⌘⇧C), sessions and usage limits in the bar |

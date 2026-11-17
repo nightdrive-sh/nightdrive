@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0b0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nightdrive">
+<title>Nightdrive</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="top"></header>
+  <div class="board">
+    <section class="sessions" aria-label="Claude Code sessions"></section>
+    <aside class="side">
+      <div class="dictate">
+        <div class="head"><span class="sec">Dictate</span><span class="spacer"></span><span class="time"></span></div>
+        <div class="spacer" style="display:flex;align-items:center">
+          <button class="mic" aria-label="Hold to dictate">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+              stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+          </button>
+        </div>
+        <div class="hint" aria-live="polite"></div>
+        <div class="target"></div>
+      </div>
+      <div class="actions">
+        <div class="head"><span class="sec">Actions</span><span>hold to change</span></div>
+        <div class="slots"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
