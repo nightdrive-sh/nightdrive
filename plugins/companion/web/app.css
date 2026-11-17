@@ -52,6 +52,9 @@ svg { flex: none; }
 .tile .code { background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--accent);
               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile .code.quiet { color: var(--dim); }
+/* What a permission request asks, whole: Allow answers for all of it (scrolls when it is long, never cut) */
+.tile.permission .code { white-space: pre-wrap; overflow-wrap: anywhere; text-overflow: clip; max-height: 40vh;
+                         overflow-y: auto; -webkit-user-select: text; user-select: text; }
 .tile .fill { flex: 1; }
 .tile .row { display: flex; gap: 10px; align-items: center; }
 .tile .meta { font-size: 12px; color: var(--dim); }

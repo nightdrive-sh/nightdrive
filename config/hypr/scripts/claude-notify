@@ -78,11 +78,14 @@ if [[ $event == PermissionRequest ]]; then
     allow=(-A allow=Allow)
   fi
   out=$(mktemp "$state/perm.XXXXXX")
-  # What it asks, for Companion (plugins/companion), which answers by writing allow or deny to $addr.answer
+  # What it asks, for Companion (plugins/companion), which answers by writing "allow|deny REQUEST" to $addr.answer. The
+  # request's id (out's random part) ties the answer to what its page showed, not to a newer request of the session.
+  req=${out##*/perm.}
   ans="$state/$addr.answer"
   rm -f "$ans"
-  jq -nc --arg tool "$tool" --arg what "$what" --arg project "$project" --argjson allow "$(( ${#allow[@]} > 0 ))" \
-    '{tool: $tool, what: $what, project: $project, allow: ($allow == 1)}' > "$state/$addr.perm"
+  jq -nc --arg tool "$tool" --arg what "$what" --arg project "$project" --arg req "$req" \
+    --argjson allow "$(( ${#allow[@]} > 0 ))" \
+    '{tool: $tool, what: $what, project: $project, request: $req, allow: ($allow == 1)}' > "$state/$addr.perm"
   notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" -A deny=Deny \
     -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
   ns=$!
@@ -96,10 +99,13 @@ if [[ $event == PermissionRequest ]]; then
     sleep 0.25
     sed -n 1p "$out" > "$idf" 2>/dev/null
     if [[ -s $ans ]]; then                  # answered on Companion: Allow only when the notification offers it too
-      case $(<"$ans") in
-        allow) (( ${#allow[@]} )) && { decide allow; exit 0; } ;;
-        deny) decide deny Companion; exit 0 ;;
-      esac
+      read -r verdict rid < "$ans"
+      if [[ $rid == "$req" ]]; then
+        case $verdict in
+          allow) (( ${#allow[@]} )) && { decide allow; exit 0; } ;;
+          deny) decide deny Companion; exit 0 ;;
+        esac
+      fi
       rm -f "$ans"
     fi
     if ! kill -0 "$ns" 2>/dev/null; then    # answered, or closed without one

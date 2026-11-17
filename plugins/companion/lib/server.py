@@ -215,9 +215,12 @@ class Handler(BaseHTTPRequestHandler):
                 perm = ses.permission(sid)
                 if not perm:
                     raise ValueError("It no longer asks")
+                # the request the page showed: the state is up to POLL old, and a newer one may be waiting
+                if perm["request"] != body.get("request"):
+                    raise ValueError("It asks something else now: read it again")
                 if what == "allow" and not perm["allow"]:
                     raise ValueError("This one is answered in its terminal: it doesn't show all it allows")
-                ses.answer(sid, what)
+                ses.answer(sid, what, perm["request"])
                 ses.seen(sid)
             case ["sessions", sid, "send"]:
                 ses.seen(sid)

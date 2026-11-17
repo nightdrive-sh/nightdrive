@@ -39,22 +39,24 @@ state each time something changes (and a comment every 15 s to keep the connecti
     "started": 1794868000,       // epoch seconds
     "last": "Bash: npm test",    // its last tool call, or the start of its last text (the question it asks)
     "permission": {              // only while state is permission
-      "tool": "Bash", "what": "nightdrive sandbox check", "allow": true
+      "tool": "Bash", "what": "nightdrive sandbox check", "request": "Xa81Qz", "allow": true
     }
   }],
   "actions": [null, { "label": "Lock", "icon": "lock", "preset": "lock" }, null, null, null]
 }
 ```
 
-`allow` is false when the request doesn't show all it allows (a long command, an edit, an MCP tool): then only Deny, and
+An answer names the `request` it was shown: when the session asks something else by then, it is refused, and the
+hook (which gets `allow|deny REQUEST` in `<window>.answer`) ignores one for another request. The page shows `what`
+whole. `allow` is false when the request doesn't show all it allows (a long command, an edit, an MCP tool): then only Deny, and
 the rest is answered in the terminal. The same rule as the desktop notification's (`hypr/scripts/claude-notify`).
 
 ## Sessions
 
 | Request | Body | Does |
 | --- | --- | --- |
-| `POST /api/sessions/ID/allow` | | Answers its permission request Allow (refused when `allow` is false) |
-| `POST /api/sessions/ID/deny` | | Answers it Deny |
+| `POST /api/sessions/ID/allow` | `{ "request": "…" }` | Answers its permission request Allow (refused when `allow` is false) |
+| `POST /api/sessions/ID/deny` | `{ "request": "…" }` | Answers it Deny |
 | `POST /api/sessions/ID/send` | `{ "text": "…", "submit": true }` | Types the text in its prompt; `submit` presses Enter |
 | `POST /api/sessions/ID/stop` | | Esc in its window: stops what it does |
 | `POST /api/sessions/ID/focus` | | Brings its window up on the desktop |

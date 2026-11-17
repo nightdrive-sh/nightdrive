@@ -75,7 +75,9 @@ grid.addEventListener("click", async e => {
   if (act === "new") return compose("new");
   if (act === "stop" && !confirm(`Stop what ${s?.project || "the session"} is doing (Esc)?`)) return;
   b.disabled = true;
-  const ok = await post(`/api/sessions/${encodeURIComponent(id)}/${act}`);
+  // An answer names the request it was shown, so it can't answer a newer one (protocol.md › Sessions)
+  const body = act === "allow" || act === "deny" ? { request: s?.permission?.request } : undefined;
+  const ok = await post(`/api/sessions/${encodeURIComponent(id)}/${act}`, body);
   if (ok && act === "focus") toast(`${s?.project || "Its window"} is on the desktop now`);
   b.disabled = false;
 });

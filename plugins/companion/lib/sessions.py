@@ -3,7 +3,8 @@
 Which windows run Claude comes from topbar/scripts/claude-sessions, the same as the bar's (quickshell/Claude.qml); what
 each one is doing from its window's title, which Claude Code sets (✳ when it waits for you, a spinner while it works).
 A permission request waiting in hypr/scripts/claude-notify leaves <address>.perm in its state folder, with what it asks
-as JSON, and the hook takes <address>.answer as the answer (allow or deny).
+and the request's id as JSON, and the hook takes <address>.answer as the answer ("allow ID" or "deny ID"): an answer
+for another request of the session is thrown away.
 """
 import json
 import os
@@ -18,6 +19,7 @@ SESSIONS = f"{HOME}/.config/topbar/scripts/claude-sessions"
 STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"), "nightdrive", "claude-notify")
 WAITING_GLYPH = "✳"
 LETTER = re.compile(r"[A-Za-z0-9À-ɏ]")
+REQUEST = re.compile(r"[A-Za-z0-9]{1,32}")      # mktemp's random part, in claude-notify
 
 
 def _run_json(argv, default):
@@ -48,7 +50,9 @@ def _permission(address):
         p = json.loads(text) if text else {}
     except ValueError:
         p = {}
-    return {"tool": p.get("tool", "a tool"), "what": p.get("what", ""), "allow": bool(p.get("allow"))}
+    req = str(p.get("request", ""))
+    return {"tool": p.get("tool", "a tool"), "what": p.get("what", ""), "request": req,
+            "allow": bool(p.get("allow")) and bool(REQUEST.fullmatch(req))}
 
 
 class Sessions:
@@ -97,10 +101,12 @@ class Sessions:
     def permission(self, addr):
         return _permission(addr)
 
-    def answer(self, addr, decision):
+    def answer(self, addr, decision, request):
+        if not REQUEST.fullmatch(request):
+            raise ValueError("Answer it in its terminal")
         tmp = os.path.join(STATE, f".{addr}.answer")
         with open(tmp, "w") as f:
-            f.write(decision)
+            f.write(f"{decision} {request}\n")
         os.replace(tmp, os.path.join(STATE, f"{addr}.answer"))
 
 
@@ -121,7 +127,8 @@ class Demo:
     def look(self):
         now = time.time()
         k = int((now - self.t0) // 20) % 3
-        perm = None if "demo-nd" in self.answered else {"tool": "Bash", "what": "nightdrive sandbox check", "allow": True}
+        perm = None if "demo-nd" in self.answered else {"tool": "Bash", "what": "nightdrive sandbox check",
+                                                           "request": "demo", "allow": True}
         out = [
             {"id": "demo-nd", "project": "nightdrive", "dir": "~/dotfiles", "topic": "Companion proto",
              "state": "permission" if perm else "working", "started": now - 1500,
@@ -148,5 +155,5 @@ class Demo:
     def permission(self, addr):
         return next((s.get("permission") for s in self.look() if s["id"] == addr), None)
 
-    def answer(self, addr, decision):
+    def answer(self, addr, decision, request):
         self.answered[addr] = decision
