@@ -12,7 +12,7 @@ export async function act(id, what, button = null) {
   if (what === "answer") return compose(id);
   const name = s?.name || s?.project || "the session";
   if (what === "stop" && !await ask("Stop", `Stop what ${name} is doing? Esc in its window.`, "Stop")) return;
-  if (what === "close" && !await ask("Close session", `Close ${name}? Its window closes on the computer.`, "Close", true)) return;
+  if (what === "close" && !await ask("End", `End ${name}? Its window closes on the computer.`, "End", true)) return;
   if (button) button.disabled = true;
   // An answer names the request it was shown, so it can't answer a newer one
   const body = what === "allow" || what === "deny" ? { request: s?.permission?.request } : undefined;

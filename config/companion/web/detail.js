@@ -1,16 +1,19 @@
 // A session's own view, over the whole screen: what it said and did lately (GET /api/sessions/ID/log: your prompts,
 // Claude's texts, its tool calls), read again every REFRESH_MS while it is open, and the session's buttons below it.
 // A tap on a tile opens it; × or Esc closes it. It stays at the end as new lines come, unless you scrolled up to read.
-// A question with choices shows whole above the buttons, to answer there (question.js).
+// A question with choices shows whole above the buttons, to answer there (question.js). Answer is held to talk, as
+// on a tile (let go and it is sent; a tap opens its box), and Write beside it opens the box at its keyboard.
 import { esc, get, since, store, subscribe } from "./api.js";
 import { icon } from "./icons.js";
 import { act, ASKS } from "./act.js";
+import { compose, send } from "./compose.js";
+import { holdToTalk, Recognition } from "./speech.js";
 import { markdown } from "./markdown.js";
 import { questionClick, questionHTML } from "./question.js";
 
 const REFRESH_MS = 2000;
 const AT_END_PX = 40;      // this close to the bottom still counts as following along
-let view = null;           // { id, el, timer, logSig, frameSig }
+let view = null;           // { id, el, timer, logSig, headSig, footSig, holding }
 
 export function openDetail(id) {
   close();
@@ -19,11 +22,13 @@ export function openDetail(id) {
   el.setAttribute("role", "dialog");
   el.innerHTML = '<header class="dhead"></header><div class="log"></div><footer class="dfoot"></footer>';
   document.body.append(el);
-  view = { id, el, timer: setInterval(load, REFRESH_MS), logSig: "", frameSig: "" };
+  view = { id, el, timer: setInterval(load, REFRESH_MS), logSig: "", headSig: "", footSig: "", holding: false };
   el.addEventListener("click", e => {
     if (e.target.closest(".close")) return close();
     if (questionClick(e)) return;
     const b = e.target.closest("button[data-act]");
+    if (b?.dataset.act === "write") return compose(view.id, { write: true });
+    if (b?.dataset.act === "answer" && Recognition) return;    // held or tapped: talk() has it
     if (b) act(view.id, b.dataset.act, b).then(ok => { if (ok && b.dataset.act === "close") close(); });
   });
   frame(store.state);
@@ -69,8 +74,8 @@ function label(s) {
   return s.done ? ["Done", "var(--ok)"] : ["Waiting", "var(--dim)"];
 }
 
-// Close session first, apart from the rest: it ends the session
-const CLOSE = `<button class="pill quiet danger" data-act="close">${icon("x", 16)}Close session</button>`;
+// End first, apart from the rest: it ends the session (its request is close, protocol.md)
+const CLOSE = `<button class="pill quiet danger" data-act="close">${icon("x", 16)}End</button>`;
 
 function buttons(s) {
   if (s.state === "permission") {
@@ -85,6 +90,7 @@ function buttons(s) {
       <button class="pill quiet" data-act="stop">${icon("square", 14, 2.2)}Stop</button>`;
   }
   return `${CLOSE}${s.asks ? `<span class="meta">${ASKS} Answer it on the desktop.</span>` : ""}<span class="spacer"></span>
+    <button class="pill" data-act="write">${icon("keyboard", 16)}Write</button>
     <button class="pill main" data-act="answer">${icon("mic", 16)}Answer</button>`;
 }
 
@@ -97,11 +103,36 @@ function frame(state) {
     <span class="spacer"></span><span class="sec" style="color:${colour}">${esc(text)}</span>
     <button class="close" aria-label="Close">${icon("x", 20)}</button>`;
   const foot = s ? buttons(s) : "";
-  const sig = head + foot;
-  if (sig === view.frameSig) return;
-  view.frameSig = sig;
-  view.el.querySelector(".dhead").innerHTML = head;
+  if (head !== view.headSig) { view.headSig = head; view.el.querySelector(".dhead").innerHTML = head; }
+  // the buttons stay as they are under a held Answer (not taken from under the finger), and when nothing changed
+  if (view.holding || foot === view.footSig) return;
+  view.footSig = foot;
   view.el.querySelector(".dfoot").innerHTML = foot;
+  talk();
+}
+
+// Answer held: the words show above the buttons as they come, and go into the session when you let go
+function talk() {
+  const b = view.el.querySelector('.dfoot button[data-act="answer"]');
+  if (!b || !Recognition) return;
+  const id = view.id;
+  const heard = () => {
+    let el = view?.el.querySelector(".dfoot .heard");
+    if (view && !el) { el = document.createElement("div"); el.className = "heard"; view.el.querySelector(".dfoot").prepend(el); }
+    return el;
+  };
+  const end = () => {
+    if (!view) return;
+    view.holding = false;
+    view.el.querySelector(".dfoot .heard")?.remove();
+    frame(store.state);
+  };
+  holdToTalk(b, {
+    started: () => { view.holding = true; heard().textContent = "Listening…"; },
+    heard: w => { const el = heard(); if (el) el.textContent = `“${w}”`; },
+    tapped: () => { end(); compose(id); },
+    done: w => { end(); if (w) send(id, w); },
+  });
 }
 
 subscribe(frame);

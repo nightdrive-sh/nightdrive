@@ -2,7 +2,8 @@
 // no menu), the big button to hold and talk (let go and it is sent, as the panel's), and Write for the keyboard
 // instead. Enter as the panel's: into a session as its prompt, into the window only when that window is a session's.
 // With words, the box gives them to it instead of sending (a question's Own answer, question.js): it returns true
-// when they went, and the box closes.
+// when they went. write opens the box at its keyboard (the session view's Write), text already in it.
+// Sent, the box goes at once; when the words don't get there (post's toast says why), it opens again with them in it.
 import { esc, post, sheet, store, toast } from "./api.js";
 import { icon } from "./icons.js";
 import { holdToTalk, Recognition } from "./speech.js";
@@ -31,7 +32,7 @@ export async function send(t, words) {
   return ok;
 }
 
-export function compose(target = "window", { title: own, words: give } = {}) {
+export function compose(target = "window", { title: own, words: give, write: typing = false, text = "" } = {}) {
   const t = target === "window" || target === "new" || session(target) ? target : "window";
   const title = own || (t === "new" ? "New session" : t === "window" ? `Send to ${nameOf(t)}` : `Answer ${nameOf(t)}`);
   const deliver = give || (w => send(t, w));
@@ -53,24 +54,31 @@ export function compose(target = "window", { title: own, words: give } = {}) {
     s.el.querySelector(".write").parentElement.hidden = true;
     area.focus();
   };
+  // Again with the same deliver and title: the session may be gone by then, and its words mustn't go to the window
+  const go = async words => {
+    s.close();
+    if (!await deliver(words)) compose(t, { title, words: deliver, write: true, text: words });
+  };
+  area.value = text;
   s.el.querySelector(".close").onclick = s.close;
   s.el.querySelector(".write").onclick = write;
-  s.el.querySelector(".go").onclick = async () => {
+  s.el.querySelector(".go").onclick = () => {
     const words = area.value.trim();
     if (!words) return area.focus();
-    if (await deliver(words)) s.close();
+    go(words);
   };
   const mic = s.el.querySelector(".mic");
-  if (!Recognition) {     // no speech recognition here: the keyboard's own microphone key dictates into the box
+  // Write asked for, or no speech recognition here (the keyboard's own microphone key dictates into the box)
+  if (!Recognition || typing) {
     mic.hidden = true;
     return write();
   }
   holdToTalk(mic, {
     started: () => { said.textContent = "Listening…"; },
     heard: words => { said.textContent = `“${words}”`; },
-    done: async words => {
+    done: words => {
       said.textContent = words ? `“${words}”` : "";
-      if (words && await deliver(words)) s.close();
+      if (words) go(words);
     },
   });
 }
