@@ -13,6 +13,9 @@ import time
 HOME = os.path.expanduser("~")
 SCRIPTS = f"{HOME}/.config/hypr/scripts"
 CONFIG = f"{HOME}/.config/nightdrive/companion.json"
+# The demo's slots: never the real file, whose commands run (the demo is on a port a browser here can reach)
+DEMO_CONFIG = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "nightdrive",
+                           "companion-demo.json")
 SLOTS = 5
 FOCUS_WAIT = 0.25       # seconds for a window brought up to get the keyboard
 RESTORE_DELAY = 0.8     # seconds before the clipboard gets its old text back: the terminal reads it when it pastes
@@ -96,9 +99,9 @@ def presets():
     return [{"id": k, "label": v[0], "icon": v[1]} for k, v in PRESETS.items()]
 
 
-def load_actions():
+def load_actions(config):
     try:
-        with open(CONFIG) as f:
+        with open(config) as f:
             slots = json.load(f).get("actions", [])
     except (OSError, ValueError):
         slots = []
@@ -106,10 +109,10 @@ def load_actions():
     return slots + [None] * (SLOTS - len(slots))
 
 
-def public_actions():
+def public_actions(config):
     """The slots as the page shows them: a preset's label and icon filled in, a command not sent back."""
     out = []
-    for s in load_actions():
+    for s in load_actions(config):
         if s and s.get("preset") in PRESETS:
             label, icon, _ = PRESETS[s["preset"]]
             out.append({"label": label, "icon": icon, "preset": s["preset"]})
@@ -120,7 +123,7 @@ def public_actions():
     return out
 
 
-def set_action(n, slot):
+def set_action(n, slot, config):
     if not 0 <= n < SLOTS:
         raise ValueError("No such slot")
     if slot is not None:
@@ -133,23 +136,23 @@ def set_action(n, slot):
                     "command": str(slot["command"])}
         else:
             raise ValueError("A slot needs a preset or a command")
-    slots = load_actions()
+    slots = load_actions(config)
     slots[n] = slot
-    os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+    os.makedirs(os.path.dirname(config), exist_ok=True)
     try:
-        with open(CONFIG) as f:
+        with open(config) as f:
             data = json.load(f)
     except (OSError, ValueError):
         data = {}
     data["actions"] = slots
-    tmp = CONFIG + ".tmp"
+    tmp = config + ".tmp"
     with open(tmp, "w") as f:
         json.dump(data, f, indent=2)
-    os.replace(tmp, CONFIG)
+    os.replace(tmp, config)
 
 
-def run_action(n):
-    slot = load_actions()[n] if 0 <= n < SLOTS else None
+def run_action(n, config):
+    slot = load_actions(config)[n] if 0 <= n < SLOTS else None
     if not slot:
         raise ValueError("The slot is empty")
     if slot.get("preset") in PRESETS:

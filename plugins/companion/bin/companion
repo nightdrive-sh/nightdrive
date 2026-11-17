@@ -7,6 +7,7 @@
     companion demo               the demo on http://127.0.0.1:8746, to look at in a browser here
 
 On the tailnet it is https://<this computer>.<tailnet>.ts.net:8443. Port 443 is left to Ferry, which serves there.
+The server itself has no port: tailscale serve proxies to its Unix socket (lib/access.py: who gets in).
 """
 import json
 import os
@@ -15,7 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"))
 
-PORT = 8746           # the server's own, on 127.0.0.1
+PORT = 8746           # the demo's, on 127.0.0.1
 HTTPS_PORT = 8443     # tailscale serve's, on the tailnet
 SERVICE = "nightdrive-companion.service"
 
@@ -30,7 +31,8 @@ def tailnet_url():
 
 
 def serve_on_tailnet(on):
-    argv = ["tailscale", "serve", "--bg", f"--https={HTTPS_PORT}", f"http://127.0.0.1:{PORT}"] if on else \
+    import access
+    argv = ["tailscale", "serve", "--bg", f"--https={HTTPS_PORT}", f"unix:{access.SOCKET}"] if on else \
         ["tailscale", "serve", f"--https={HTTPS_PORT}", "off"]
     r = subprocess.run(argv, capture_output=True, text=True)
     if r.returncode != 0 and on:

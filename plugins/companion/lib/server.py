@@ -1,16 +1,18 @@
-"""The companion's server: the web app's files and its API (protocol.md), on 127.0.0.1 only; `tailscale serve` puts it on
-the tailnet over HTTPS. One thread looks at the desktop every POLL seconds and keeps the state; each page open holds a
+"""The companion's server: the web app's files and its API (protocol.md), on a Unix socket that only tailscaled may use;
+`tailscale serve` puts it on the tailnet over HTTPS (who gets in: access.py). One thread looks at the desktop every POLL seconds and keeps the state; each page open holds a
 Server-Sent Events stream that gets the whole state when it changes.
 """
 import json
 import mimetypes
 import os
 import socket
+import socketserver
 import subprocess
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import access
 import control
 import sessions
 
@@ -23,6 +25,16 @@ USAGE = os.path.expanduser("~/.config/topbar/scripts/claude-usage")
 # The menus' font, served to the iPad (which hasn't got it): name in the URL → fontconfig's style
 FONTS = {"regular": "Regular", "medium": "Medium", "bold": "Bold"}
 FONT_TYPES = {".otf": "font/otf", ".ttf": "font/ttf", ".woff2": "font/woff2", ".woff": "font/woff"}
+MAX_BODY = 64 * 1024  # bytes a request's body may have: a send is at most control.MAX_TEXT characters
+# The page's own files and nothing else: a text that got into the page as markup can't load or send anywhere, and no
+# other page can frame it to catch a tap
+SECURITY_HEADERS = {
+    "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                               "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+}
 DEMO_USAGE = {"windows": [{"key": "session", "percent": 62}, {"key": "weekly", "percent": 31}]}
 
 
@@ -35,19 +47,11 @@ def font_file(style):
     return path if "jetbrains" in path.lower() and os.path.splitext(path)[1] in FONT_TYPES else None
 
 
-def tailscale_owner():
-    """The login of this machine's Tailscale user: requests through tailscale serve must come from it."""
-    try:
-        st = json.loads(subprocess.run(["tailscale", "status", "--json"], capture_output=True, timeout=5).stdout)
-        return st["User"][str(st["Self"]["UserID"])]["LoginName"]
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
-        return None
-
-
 class State:
     def __init__(self, demo):
         self.demo = demo
         self.sessions = sessions.Demo() if demo else sessions.Sessions()
+        self.actions = control.DEMO_CONFIG if demo else control.CONFIG
         self.cond = threading.Condition()
         self.json = "{}"
         self.version = 0
@@ -74,7 +78,8 @@ class State:
 
     def build(self):
         return {"host": socket.gethostname().split(".")[0], "demo": self.demo, "theme": self._theme(),
-                "usage": self._usage(), "sessions": self.sessions.look(), "actions": control.public_actions()}
+                "usage": self._usage(), "sessions": self.sessions.look(),
+                "actions": control.public_actions(self.actions)}
 
     def loop(self):
         while True:
@@ -94,7 +99,8 @@ class State:
 class Handler(BaseHTTPRequestHandler):
     server_version = "NightdriveCompanion"
     state: State = None
-    owner = None
+    owner: access.Owner = None
+    port = 0                # the demo's, for its Host check
 
     def log_message(self, fmt, *args):
         pass
@@ -108,11 +114,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def end_headers(self):
+        for k, v in SECURITY_HEADERS.items():
+            self.send_header(k, v)
+        super().end_headers()
+
     def _allowed(self):
-        login = self.headers.get("Tailscale-User-Login")
-        if login is None:
-            return True     # from this computer: tailscale serve always sets it
-        return self.owner is not None and login == self.owner
+        if self.state.demo:
+            return access.allowed_demo(self.headers, self.port)
+        return access.allowed_tailnet(self.headers, self.owner)
 
     def do_GET(self):
         if not self._allowed():
@@ -180,6 +190,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(403, {"error": "Missing X-Companion header"})
         try:
             n = int(self.headers.get("Content-Length") or 0)
+            if not 0 <= n <= MAX_BODY:
+                return self._send(413, {"error": "Too long"})
             body = json.loads(self.rfile.read(n) or b"null") if n else None
         except ValueError:
             return self._send(400, {"error": "The body isn't JSON"})
@@ -218,19 +230,37 @@ class Handler(BaseHTTPRequestHandler):
             case ["send"]:
                 demo or control.type_text(None, body.get("text", ""), bool(body.get("submit")))
             case ["actions", n, "run"]:
-                demo or control.run_action(int(n))
+                demo or control.run_action(int(n), self.state.actions)
             case ["actions", n]:
-                control.set_action(int(n), body or None)
+                control.set_action(int(n), body or None, self.state.actions)
             case _:
                 raise ValueError("No such request")
+
+
+class TailscaleServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+    """HTTP on a Unix socket, for tailscaled alone (access.py)."""
+    daemon_threads = True
+
+    def verify_request(self, request, client_address):
+        return access.peer_uid(request) == access.TAILSCALED_UID
 
 
 def serve(port, demo):
     state = State(demo)
     Handler.state = state
-    Handler.owner = None if demo else tailscale_owner()
     threading.Thread(target=state.loop, daemon=True).start()
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    httpd.daemon_threads = True
-    print(f"companion: http://127.0.0.1:{port}{' (demo)' if demo else ''}", flush=True)
+    if demo:
+        Handler.port = port
+        httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        httpd.daemon_threads = True
+        print(f"companion: http://127.0.0.1:{port} (demo)", flush=True)
+    else:
+        Handler.owner = access.Owner()
+        access.make_socket_dir()
+        old = os.umask(0o177)       # the socket rw for its user alone; root (tailscaled) gets in regardless
+        try:
+            httpd = TailscaleServer(access.SOCKET, Handler)
+        finally:
+            os.umask(old)
+        print(f"companion: {access.SOCKET}, for tailscale serve", flush=True)
     httpd.serve_forever()

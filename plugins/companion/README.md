@@ -24,6 +24,6 @@ Open that on the iPad in Safari, then Share › *Add to Home Screen*. `companion
 - Allow is offered only when the request shows all it allows, as in the desktop notification. Otherwise answer in the terminal.
 - A permission request asked while you're in that session's window on the desktop isn't shown: Claude Code asks there.
 - Dictation uses the browser's speech recognition (Apple's). Where there is none, tap the button and use the keyboard's microphone key.
-- Only your own Tailscale user gets in. A command in a slot runs on the computer as you.
+- Only your own Tailscale user gets in, from their own devices (not a tagged one, not over Funnel); nothing else on the computer reaches the server. Anyone with that login's device in hand can type into your sessions, and a command in a slot runs on the computer as you: keep the iPad locked.
 
 Needs: the Tailscale plugin, logged in on the computer and the iPad or phone

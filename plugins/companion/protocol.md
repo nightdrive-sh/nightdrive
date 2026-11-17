@@ -3,10 +3,17 @@
 What the web app (`web/`) and the server (`bin/companion run`) say to each other. The apps that come later (Mail, Deck,
 a terminal) get their own sections here, over the same server.
 
-The server listens on `127.0.0.1:8746` only. `tailscale serve` puts it on the tailnet over HTTPS
-(`https://<machine>.<tailnet>.ts.net`), which adding it to the home screen needs. A request through Tailscale carries
-`Tailscale-User-Login`; the server answers only its owner's (the machine's own Tailscale user). A request without it
-comes from this computer.
+## Access
+
+The server has no port: it listens on a Unix socket, `$XDG_RUNTIME_DIR/nightdrive/companion.sock`, and lets only
+tailscaled (root) connect. `tailscale serve` puts it on the tailnet over HTTPS (`https://<machine>.<tailnet>.ts.net:8443`),
+which adding it to the home screen needs. tailscale serve drops a `Tailscale-User-Login` the device sent and sets its
+own; the server answers only the machine's own Tailscale user's. A request without one (a tagged device, Funnel) is
+refused. No other user of the computer, and no web page in a browser on it, reaches the API (`lib/access.py`).
+
+The demo (`companion demo`) is on `127.0.0.1:8746`, answers only that Host, and does nothing on the desktop.
+
+Pages carry a Content-Security-Policy of their own files only, and can't be framed.
 
 Every `POST` needs the header `X-Companion: 1`: a web page elsewhere can't send one without asking first (CORS), and the
 server never says yes, so a page open in a browser here can't press the buttons.
