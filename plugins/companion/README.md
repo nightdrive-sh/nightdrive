@@ -1,9 +1,9 @@
 # Companion
 
-Nightdrive on an iPad or a phone: your Claude Code sessions, a big dictation button and five buttons of your own, as a web app on the home screen. It reaches the computer over Tailscale, from anywhere.
+Nightdrive on an iPad or a phone: your Claude Code sessions, a big dictation button and six buttons of your own, as a web app on the home screen. It reaches the computer over Tailscale, from anywhere.
 
-- **Sessions** are tiles, the ones that need you first. Answer a permission request (Allow, Deny), answer a question by dictating, stop a session (Esc) or bring its window up on the desktop. A tile shows what the session did last.
-- **Dictate:** hold the button and talk, let go and it is sent. It goes into the session that asks you something (with Enter, as its prompt), else into the window that has the keyboard (without); tap *Into* for another session or a new one. A tile's *Answer* opens a box to write or fix the words first.
+- **Sessions** are tiles that keep their places: project managers' sessions (a name with *Project Manager* or *PM*) first, then in the order the sessions started; one that needs you shows it in its colour. Answer a permission request (Allow, Deny), answer a question by dictating, stop a session (Esc). A tap on a tile brings its window up on the desktop; *Show* opens the session on the whole screen: what it said and did lately, as it goes, with its buttons, and *Close session*, which closes its window on the computer. A tile shows what the session did last.
+- **Dictate:** hold the button and talk, let go and it is sent into the window that has the keyboard on the computer, which the panel names; into a Claude session with Enter, as its prompt. Hold a session's *Answer* to talk into that session the same way. A tap on it, or *New session*, opens a box with the same button, and *Write* to type instead.
 - **Actions:** tap an empty slot to pick what it does (Lock, Mute mic, Do not disturb, music, a new Claude session) or write a command of your own. Hold a slot to change it.
 - The colours follow your theme.
 

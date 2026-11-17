@@ -5,20 +5,40 @@ export const store = { state: null, online: false, listeners: [] };
 export function subscribe(fn) { store.listeners.push(fn); }
 function changed() { for (const fn of store.listeners) fn(store.state); }
 
-// The state over Server-Sent Events. EventSource reconnects by itself; iOS drops the connection while the app is in
-// the background, and it comes back on its own when the app does.
+// The state over Server-Sent Events. EventSource reconnects by itself only sometimes: it gives up for good when a
+// retry gets an error (the server restarting behind tailscale serve), and on iOS a connection dropped while the app
+// slept can stay open in name, silent, the tiles frozen as they were. So the server pings every 15 s, and a stream
+// closed or silent for STALE_MS is opened again: checked every few seconds and as soon as the app is back in front.
+const STALE_MS = 40000;
+const CHECK_MS = 5000;
+let es = null, heardAt = 0;
+
+function heard() {
+  heardAt = Date.now();
+  if (!store.online) { store.online = true; changed(); }
+}
+
 export function connect() {
-  const es = new EventSource("/api/events");
+  es?.close();
+  heardAt = Date.now();
+  es = new EventSource("/api/events");
   es.addEventListener("state", e => {
     try { store.state = JSON.parse(e.data); } catch { return; }
+    heardAt = Date.now();
     store.online = true;
     changed();
   });
+  es.addEventListener("ping", heard);
   es.onerror = () => { store.online = false; changed(); };
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && es.readyState === EventSource.CLOSED) connect();
-  });
 }
+
+function check() {
+  if (!es || es.readyState === EventSource.CLOSED || Date.now() - heardAt > STALE_MS) connect();
+}
+setInterval(check, CHECK_MS);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") check(); });
+window.addEventListener("pageshow", check);
+window.addEventListener("online", check);
 
 export async function post(path, body) {
   try {
@@ -52,15 +72,35 @@ export function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
-// A sheet over the page; returns it and a close function. A tap on the dark around it closes it.
-export function sheet(html) {
+// A sheet over the page; returns it and a close function. A tap on the dark around it closes it: on its click, both
+// ends on the dark, so the click doesn't fall through to the tile under it (closed on pointerdown, the New session
+// tile got the click and opened the box again), and a press that starts in the sheet (holding its mic) never does.
+// onClose runs however it closes; cls is the sheet's own class (small: a question's narrower box).
+export function sheet(html, { onClose = () => {}, cls = "" } = {}) {
   const scrim = document.createElement("div");
   scrim.className = "scrim";
-  scrim.innerHTML = `<div class="sheet" role="dialog">${html}</div>`;
-  const close = () => scrim.remove();
-  scrim.addEventListener("pointerdown", e => { if (e.target === scrim) close(); });
+  scrim.innerHTML = `<div class="sheet ${cls}" role="dialog">${html}</div>`;
+  const close = () => { if (scrim.isConnected) { scrim.remove(); onClose(); } };
+  let downOnScrim = false;
+  scrim.addEventListener("pointerdown", e => { downOnScrim = e.target === scrim; });
+  scrim.addEventListener("click", e => { if (downOnScrim && e.target === scrim) close(); });
   document.body.append(scrim);
   return { el: scrim.firstElementChild, close };
+}
+
+// A yes-or-no question in a sheet of the page's own, not the browser's confirm() (which looks like another app's and
+// names the web address): true for yes, false for Cancel or a tap outside. danger: the yes button in red.
+export function ask(title, text, yes, danger = false) {
+  return new Promise(resolve => {
+    let answer = false;
+    const s = sheet(`<div class="row"><span class="sec">${esc(title)}</span></div>
+      <div class="ask-text">${esc(text)}</div>
+      <div class="row"><span class="spacer"></span><button class="pill no">Cancel</button>
+        <button class="pill main yes${danger ? " danger" : ""}">${esc(yes)}</button></div>`,
+      { cls: "small", onClose: () => resolve(answer) });
+    s.el.querySelector(".no").onclick = s.close;
+    s.el.querySelector(".yes").onclick = () => { answer = true; s.close(); };
+  });
 }
 
 // "12 min", "2 h 5 min" since an epoch second

@@ -1,5 +1,5 @@
 """What the companion does on the desktop: types into a session or the window with the keyboard, stops a session, brings
-a window up, starts a new session, and runs the five action slots (protocol.md › Sessions, Actions).
+a window up, starts a new session, and runs the six action slots (protocol.md › Sessions, Actions).
 
 Typing goes the way Send to Claude pastes (hypr/scripts/claude-send-paste): the text on the clipboard, Shift+Insert in
 the window, and the clipboard's old text back after the terminal has read it.
@@ -17,7 +17,7 @@ CONFIG = f"{HOME}/.config/nightdrive/companion.json"
 # The demo's slots: never the real file, whose commands run (the demo is on a port a browser here can reach)
 DEMO_CONFIG = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "nightdrive",
                            "companion-demo.json")
-SLOTS = 5
+SLOTS = 6
 FOCUS_WAIT = 0.25       # seconds for a window brought up to get the keyboard
 FOCUS_TRIES = 6         # FOCUS_WAITs before giving up: the keys would go to another window
 RESTORE_DELAY = 0.8     # seconds before the clipboard gets its old text back: the terminal reads it when it pastes
@@ -68,6 +68,13 @@ def bring_up(addr):
         if active == addr:
             return
     raise ValueError("Its window didn't get the keyboard: nothing was sent")
+
+
+def close_window(addr):
+    """Closes a session's window, as ⌘W would: the terminal goes and Claude Code with it, its conversation kept."""
+    if not re.fullmatch(r"0x[0-9a-f]+", addr):
+        raise ValueError("Not a window")
+    _hypr(f'hl.dsp.window.close({{ window = "address:{addr}" }})')
 
 
 def clean(text):

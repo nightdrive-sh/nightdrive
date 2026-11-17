@@ -10,6 +10,7 @@ import socketserver
 import subprocess
 import threading
 import time
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import access
@@ -18,7 +19,8 @@ import sessions
 
 POLL = 1.5          # seconds between looks at the desktop
 USAGE_EVERY = 60    # seconds between asks for the plan's usage (claude-usage caches it for two minutes itself)
-KEEPALIVE = 15      # seconds between comments on a quiet event stream
+KEEPALIVE = 15      # seconds between pings on a quiet event stream: the page reconnects when they stop
+FRESH_WAIT = 5      # seconds a page opening the stream waits for a look made after it came, before the last one
 WEB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "web")
 THEME = os.path.expanduser("~/.cache/nightdrive/theme.json")
 USAGE = os.path.expanduser("~/.config/topbar/scripts/claude-usage")
@@ -35,7 +37,21 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
 }
-DEMO_USAGE = {"windows": [{"key": "session", "percent": 62}, {"key": "weekly", "percent": 31}]}
+DEMO_USAGE = [{"account": "default", "windows": [{"key": "session", "percent": 62}, {"key": "weekly", "percent": 31}]},
+              {"account": "work", "windows": [{"key": "session", "percent": 8}, {"key": "weekly", "percent": 74}]}]
+
+
+def web_version():
+    """A stamp of the page's files (names, sizes, times): it changes with any of them, and a page open with another
+    one offers to reload. A few stats a look, nothing read."""
+    parts = []
+    for name in sorted(os.listdir(WEB)):
+        try:
+            st = os.stat(os.path.join(WEB, name))
+        except OSError:
+            continue
+        parts.append(f"{name}:{st.st_size}:{st.st_mtime_ns}")
+    return format(zlib.crc32("|".join(parts).encode()), "08x")   # not hash(): it changes with each start
 
 
 def font_file(style):
@@ -55,9 +71,11 @@ class State:
         self.cond = threading.Condition()
         self.json = "{}"
         self.version = 0
-        self.usage = DEMO_USAGE if demo else {}
+        self.usage = DEMO_USAGE if demo else []
         self.usage_at = 0
         self.wake = threading.Event()
+        self.watchers = 0          # pages with the event stream open: with none, no looks at all
+        self.built = 0.0           # when the last look finished
 
     def _theme(self):
         try:
@@ -71,29 +89,41 @@ class State:
             return self.usage
         self.usage_at = time.time()
         try:
-            self.usage = json.loads(subprocess.run([USAGE], capture_output=True, timeout=20).stdout or "{}")
+            # every account's, as the Claude menu shows them: [{account, windows: [{key, percent, resetsAt}]}]
+            got = json.loads(subprocess.run([USAGE, "--all"], capture_output=True, timeout=20).stdout or "[]")
+            self.usage = got if isinstance(got, list) else [got]
         except (OSError, subprocess.SubprocessError, ValueError):
             pass
         return self.usage
 
     def build(self):
         return {"host": socket.gethostname().split(".")[0], "demo": self.demo, "theme": self._theme(),
-                "usage": self._usage(), "sessions": self.sessions.look(),
-                "actions": control.public_actions(self.actions)}
+                "usage": self._usage(), "sessions": self.sessions.look(), "active": self.sessions.active,
+                "actions": control.public_actions(self.actions), "web": web_version()}
 
     def loop(self):
         while True:
-            try:
-                text = json.dumps(self.build(), ensure_ascii=False)
-            except Exception as e:   # a look that failed keeps the last state; the next one tries again
-                print("companion: look failed:", e, flush=True)
-                text = self.json
-            if text != self.json:
+            if self.watchers:
+                try:
+                    text = json.dumps(self.build(), ensure_ascii=False)
+                except Exception as e:   # a look that failed keeps the last state; the next one tries again
+                    print("companion: look failed:", e, flush=True)
+                    text = self.json
                 with self.cond:
-                    self.json, self.version = text, self.version + 1
+                    if text != self.json:
+                        self.json, self.version = text, self.version + 1
+                    self.built = time.time()
                     self.cond.notify_all()
-            self.wake.wait(POLL)
+            # Nobody watching: no looks until a page opens the stream. A look runs claude-sessions, ~0.3 s of CPU:
+            # every POLL seconds all day, a fifth of a core on a laptop's battery for a page nobody had open.
+            self.wake.wait(POLL if self.watchers else None)
             self.wake.clear()
+
+    def watch(self, delta):
+        """A page opened (1) or closed (-1) the event stream; the loop wakes either way, a new page gets a look at once."""
+        with self.cond:
+            self.watchers += delta
+        self.wake.set()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -134,6 +164,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, control.presets())
         if path == "/api/events":
             return self._events()
+        parts = path.strip("/").split("/")
+        if len(parts) == 4 and parts[:2] == ["api", "sessions"] and parts[3] == "log":
+            try:
+                return self._send(200, self.state.sessions.log(parts[2]))
+            except ValueError as e:
+                return self._send(404, {"error": str(e)})
         if path.startswith("/fonts/"):
             return self._font(path.split("/")[-1])
         self._static(path)
@@ -168,7 +204,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
         seen = -1
+        came = time.time()
+        self.state.watch(1)
         try:
+            with self.state.cond:        # the desktop as it is now, not as it was when the last page went
+                self.state.cond.wait_for(lambda: self.state.built >= came, timeout=FRESH_WAIT)
             while True:
                 with self.state.cond:
                     if self.state.version == seen:
@@ -178,10 +218,12 @@ class Handler(BaseHTTPRequestHandler):
                     seen = version
                     self.wfile.write(f"event: state\ndata: {text}\n\n".encode())
                 else:
-                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.write(b"event: ping\ndata:\n\n")    # an event, not a comment: the page sees it
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
+        finally:
+            self.state.watch(-1)
 
     def do_POST(self):
         if not self._allowed():
@@ -227,11 +269,15 @@ class Handler(BaseHTTPRequestHandler):
                 demo or control.type_text(sid, body.get("text", ""), bool(body.get("submit")))
             case ["sessions", sid, "stop"]:
                 demo or control.stop(ses.window(sid))
+            case ["sessions", sid, "close"]:
+                demo or control.close_window(ses.window(sid))
             case ["sessions", sid, "focus"]:
                 ses.seen(ses.window(sid))
                 demo or control.focus(sid)
             case ["send"]:
-                demo or control.type_text(None, body.get("text", ""), bool(body.get("submit")))
+                # "session": Enter only when the window that has the keyboard is a session's (the dictation button)
+                submit = ses.active_is_session() if body.get("submit") == "session" else bool(body.get("submit"))
+                demo or control.type_text(None, body.get("text", ""), submit)
             case ["actions", n, "run"]:
                 demo or control.run_action(int(n), self.state.actions)
             case ["actions", n]:

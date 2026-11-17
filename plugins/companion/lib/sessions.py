@@ -15,7 +15,10 @@ import time
 import transcript
 
 HOME = os.path.expanduser("~")
-SESSIONS = f"{HOME}/.config/topbar/scripts/claude-sessions"
+# This checkout's own claude-sessions (it gives each session's transcript), else the desktop's
+_REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+SESSIONS = next((p for p in (f"{_REPO}/config/topbar/scripts/claude-sessions",
+                             f"{HOME}/.config/topbar/scripts/claude-sessions") if os.access(p, os.X_OK)), "")
 STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"), "nightdrive", "claude-notify")
 WAITING_GLYPH = "✳"
 LETTER = re.compile(r"[A-Za-z0-9À-ɏ]")
@@ -62,13 +65,15 @@ class Sessions:
     def __init__(self):
         self.last_state = {}
         self.wants = set()
-        self.listed = frozenset()      # the windows the last look found running Claude Code
+        self.listed = {}               # the windows the last look found running Claude Code → (transcript, dir, started)
+        self.active = {}               # the window that has the keyboard: where the dictation button types
 
     def look(self):
         found = _run_json([SESSIONS], [])
         clients = {c.get("address"): c for c in _run_json(["hyprctl", "-j", "clients"], [])}
-        active = _run_json(["hyprctl", "-j", "activewindow"], {}).get("address", "")
-        out, seen = [], {}
+        win = _run_json(["hyprctl", "-j", "activewindow"], {})
+        active = win.get("address", "") if isinstance(win, dict) else ""
+        out, seen, listed = [], {}, {}
         for f in found:
             addr = f.get("address", "")
             client = clients.get(addr)
@@ -85,14 +90,26 @@ class Sessions:
                 self.wants.discard(addr)
             seen[addr] = busy
             d = f.get("dir", "")
+            listed[addr] = (f.get("transcript"), d, f.get("started", 0))
             out.append({
                 "id": addr, "dir": d, "project": d.rstrip("/").split("/")[-1] or "/", "topic": topic,
+                # its own name (/rename; Claude Code's record, via claude-sessions), else the window title's topic
+                "name": f.get("name") or topic,
                 "state": state, "wants": addr in self.wants or state == "permission",
-                "started": f.get("started", 0), "last": transcript.last(d, f.get("started", 0)),
+                # when its status last changed (claude-sessions): how long this turn has worked, or it has waited
+                "since": f.get("since") or f.get("started", 0),
+                "started": f.get("started", 0), "last": transcript.last(f.get("transcript"), d, f.get("started", 0)),
+                # done as the sessions bar has it (Claude.qml): waiting, not asking or working, the last reply's last
+                # line signing off with ✅
+                "done": state == "waiting" and f.get("status") not in ("waiting", "busy")
+                        and str(f.get("last", "")).startswith("✅"),
+                # waiting for you in the terminal (AskUserQuestion: "input needed"), whose question only shows there
+                "asks": f.get("waitingFor", "") if f.get("status") == "waiting" and state != "permission" else "",
                 **({"permission": perm} if perm else {}),
             })
         self.last_state = seen
-        self.listed = frozenset(seen)
+        self.listed = listed
+        self.active = _active(win, out) if active else {}
         self.wants &= set(seen)
         return _ordered(out)
 
@@ -101,6 +118,16 @@ class Sessions:
         if addr not in self.listed:
             raise ValueError("No such session (it may have ended)")
         return addr
+
+    def active_is_session(self):
+        """Whether the window that has the keyboard now is a session's: the dictation button presses Enter there."""
+        win = _run_json(["hyprctl", "-j", "activewindow"], {})
+        return isinstance(win, dict) and win.get("address") in self.listed
+
+    def log(self, addr):
+        """What it said and did lately (transcript.recent), for its own view on the page."""
+        path, d, started = self.listed.get(self.window(addr), ("", "", 0))
+        return transcript.recent(path, d, started) if path or d else []
 
     def seen(self, addr):
         """You looked at it here: it no longer wants you."""
@@ -118,14 +145,39 @@ class Sessions:
         os.replace(tmp, os.path.join(STATE, f"{addr}.answer"))
 
 
+def _active(win, found):
+    """The active window as the dictation button shows it: a session by its name and project (and Enter sends the words
+    as its prompt), any other window by its class and title."""
+    s = next((s for s in found if s["id"] == win.get("address")), None)
+    if s:
+        return {"session": s["id"], "name": s["name"] or s["project"], "detail": s["project"] if s["name"] else ""}
+    return {"session": "", "name": win.get("class", "") or "a window", "detail": win.get("title", "")}
+
+
+PM = re.compile(r"project manager|\bpm\b", re.I)
+
+
+def _is_pm(s):
+    """A project manager's session (nightdrive-pm, "Cold Start Project Manager"): it runs the others, so it goes first."""
+    return bool(PM.search(s.get("name", "")) or PM.search(s.get("topic", ""))
+                or PM.search(s.get("project", "").replace("-", " ")))
+
+
 def _ordered(sessions):
-    """The ones that need you first (a permission request before a question), then the newest."""
-    rank = {"permission": 0, "waiting": 1, "working": 2}
-    return sorted(sessions, key=lambda s: (not s["wants"], rank[s["state"]], -s["started"]))
+    """The project managers first, marked pm (the robot, never done: as the sessions bar's leads), then the rest in the
+    order they were started, each tile keeping its place: sorted by what they need, they moved under your finger
+    whenever one changed. What needs you shows in the tile's colour."""
+    for s in sessions:
+        s.setdefault("name", s.get("topic", ""))
+        s.setdefault("since", s.get("started", 0))
+        s["pm"] = _is_pm(s)
+        s["done"] = s.get("done", False) and not s["pm"]
+    return sorted(sessions, key=lambda s: (not s["pm"], s["started"], s["id"]))
 
 
 class Demo:
     """Made-up sessions that change over time, for a machine without Hyprland (and the sandbox, a screenshot)."""
+    active = {"session": "demo-mail", "name": "Thread sort order", "detail": "mail"}
 
     def __init__(self):
         self.t0 = time.time()
@@ -142,7 +194,7 @@ class Demo:
              "state": "permission" if perm else "working", "started": now - 1500,
              "last": "Bash: nightdrive sandbox check", **({"permission": perm} if perm else {})},
             {"id": "demo-ferry", "project": "ferry", "dir": "~/Projects/ferry", "topic": "Relay port",
-             "state": "waiting", "started": now - 2400,
+             "state": "waiting", "started": now - 2400, "done": True,
              "last": "Keep the old relay port as a fallback, or drop it in this release?"},
             {"id": "demo-deck", "project": "deck-player", "dir": "~/Projects/deck", "topic": "Gapless playback",
              "state": "working", "started": now - 720,
@@ -160,10 +212,20 @@ class Demo:
     def seen(self, addr):
         self.wants.discard(addr)
 
+    def active_is_session(self):
+        return True
+
     def window(self, addr):
         if not any(s["id"] == addr for s in self.look()):
             raise ValueError("No such session (it may have ended)")
         return addr
+
+    def log(self, addr):
+        s = next(s for s in self.look() if s["id"] == self.window(addr))
+        return [{"role": "user", "kind": "text", "text": f"Let's work on {s['topic'].lower()} in {s['project']}."},
+                {"role": "assistant", "kind": "text", "text": "Looking at it now."},
+                {"role": "assistant", "kind": "tool", "text": "Read: src/main.rs"},
+                {"role": "assistant", "kind": "text", "text": s["last"]}]
 
     def permission(self, addr):
         return next((s.get("permission") for s in self.look() if s["id"] == addr), None)

@@ -1,153 +1,47 @@
-// Dictation: hold the big button and talk, let go and it is sent, with no sheet in between. The words come from the
-// browser's own speech recognition (Safari's: Apple's, the same as the keyboard's dictation); where there is none, a tap
-// opens the sheet (compose, also the tiles' Answer), and the keyboard's microphone key dictates into it. Where the text
-// goes: a session (into its prompt), the window that has the keyboard on the desktop, or a new session. By itself: the
-// session that asks you something, else the window.
-import { esc, post, sheet, store, subscribe, toast } from "./api.js";
+// The Dictate panel: hold the big button and talk, let go and it is sent, with no box in between (speech.js listens).
+// It types into the window that has the keyboard on the desktop, which the panel names under the button (the state's
+// active): a session's with Enter, as its prompt, any other without. A session of your choice has its own Answer
+// (compose.js). Where the browser has no speech recognition, a tap opens that box to write in.
+import { esc, subscribe } from "./api.js";
 import { icon } from "./icons.js";
+import { holdToTalk, Recognition } from "./speech.js";
+import { compose, send } from "./compose.js";
 
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const LANGS = [...new Set([navigator.language, "fi-FI", "en-US"])];
-const mic = document.querySelector(".mic");
+const mic = document.querySelector(".dictate .mic");
 const hint = document.querySelector(".dictate .hint");
 const clock = document.querySelector(".dictate .time");
-const chip = document.querySelector(".target");
-const IDLE = "Hold to talk, let go to send";
+const chip = document.querySelector(".dictate .target");
 const SHOWN_MS = 4000;     // how long the words sent stay under the button
 
-let chosen = "auto";     // "auto" | a session's id | "window" | "new"
-
-function lang() {
-  try { return localStorage.getItem("companion.lang") || LANGS[0]; } catch { return LANGS[0]; }
-}
-
-function resolve(t) {
-  const list = store.state?.sessions || [];
-  if (t === "auto") {
-    const asks = list.find(s => s.wants && s.state === "waiting");
-    return asks ? asks.id : "window";
-  }
-  return t === "window" || t === "new" || list.some(s => s.id === t) ? t : "window";
-}
-
-function nameOf(t) {
-  if (t === "window") return ["the window with the keyboard", ""];
-  if (t === "new") return ["a new session", ""];
-  const s = store.state?.sessions.find(x => x.id === t);
-  return [s?.project || "a session", s?.topic || ""];
-}
-
-function options(selected) {
-  const list = store.state?.sessions || [];
-  return [["auto", "Automatic"], ...list.map(s => [s.id, `${s.project}${s.topic ? " · " + s.topic : ""}`]),
-          ["window", "The window with the keyboard"], ["new", "A new session"]]
-    .map(([v, l]) => `<option value="${esc(v)}" ${v === selected ? "selected" : ""}>${esc(l)}</option>`).join("");
-}
-
-function renderChip() {
-  const [name, topic] = nameOf(resolve(chosen));
-  chip.innerHTML = `<em>Into</em><b>${esc(name)}</b>${topic ? `<em>· ${esc(topic)}</em>` : ""}
-    <span class="spacer"></span>${icon("chevron-down", 16)}<select aria-label="Where the text goes">${options(chosen)}</select>`;
-  chip.querySelector("select").onchange = e => { chosen = e.target.value; renderChip(); };
+// Which window the button types into: an arrow and its name (a session's own, else the window's program). No menu
+// here: redrawn with every state, a native one closed under your finger.
+function renderChip(state) {
+  const name = state?.active?.name || "the window with the keyboard";
+  chip.innerHTML = `${icon("arrow-right", 16)}<b>${esc(name)}</b>`;
 }
 subscribe(renderChip);
 
-// Listening, while the button is held
-let rec = null, heard = "", started = 0, ticker = null;
-
-function listen() {
-  heard = "";
-  rec = new Recognition();
-  rec.lang = lang();
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.onresult = e => {
-    heard = Array.from(e.results, r => r[0].transcript).join(" ").replace(/\s+/g, " ").trim();
-    hint.textContent = heard ? `“${heard}”` : "Listening…";
-  };
-  rec.onerror = e => { if (e.error !== "aborted" && e.error !== "no-speech") toast(`Dictation: ${e.error}`, true); };
-  rec.onend = () => { if (rec) done(); };
-  try { rec.start(); } catch { rec = null; return; }
-  mic.classList.add("on");
-  hint.textContent = "Listening…";
-  started = Date.now();
-  ticker = setInterval(() => { clock.textContent = `0:${String(Math.floor((Date.now() - started) / 1000)).padStart(2, "0")}`; }, 250);
-}
-
-function done() {
-  const r = rec;
-  rec = null;
+// The seconds while it listens, and the words under the button: as you talk, and for a moment after they went
+let ticker = null, shownTimer = null;
+function tick(on) {
   clearInterval(ticker);
   clock.textContent = "";
-  mic.classList.remove("on");
-  hint.textContent = IDLE;
-  try { r?.stop(); } catch {}
-  const words = heard;
-  heard = "";            // sent once, however many ways the listening ends
-  if (words) sendNow(chosen, words);
-}
-
-// Where the words go, as a request
-function pathFor(t) {
-  return t === "window" ? "/api/send" : t === "new" ? "/api/sessions/new" : `/api/sessions/${encodeURIComponent(t)}/send`;
-}
-
-function sentTo(t) {
-  return t === "new" ? "A new session starts on the desktop" : `Sent to ${nameOf(t)[0]}`;
-}
-
-// Straight from the button: the words stay under it for a moment, so you see what went. Enter (send it as the prompt)
-// for a session, not for the window with the keyboard: the sheet's default too.
-let shownTimer;
-async function sendNow(target, words) {
-  const t = resolve(target);
-  hint.textContent = `“${words}”`;
-  clearTimeout(shownTimer);
-  shownTimer = setTimeout(() => { if (!rec) hint.textContent = IDLE; }, SHOWN_MS);
-  if (await post(pathFor(t), { text: words, submit: t !== "window" })) toast(sentTo(t));
+  if (!on) return;
+  const t0 = Date.now();
+  ticker = setInterval(() => { clock.textContent = `0:${String(Math.floor((Date.now() - t0) / 1000)).padStart(2, "0")}`; }, 250);
 }
 
 if (Recognition) {
-  mic.addEventListener("pointerdown", e => { e.preventDefault(); if (!rec) listen(); });
-  mic.addEventListener("pointerup", () => { if (rec) setTimeout(() => rec && done(), 400); });   // the last words
-  mic.addEventListener("pointercancel", () => rec && done());
-  mic.addEventListener("contextmenu", e => e.preventDefault());
+  holdToTalk(mic, {
+    started: () => { clearTimeout(shownTimer); hint.textContent = "Listening…"; tick(true); },
+    heard: words => { hint.textContent = `“${words}”`; },
+    done: words => {
+      tick(false);
+      hint.textContent = words ? `“${words}”` : "";
+      shownTimer = setTimeout(() => { hint.textContent = ""; }, SHOWN_MS);
+      if (words) send("window", words);
+    },
+  });
 } else {
-  hint.textContent = "Tap, then the keyboard's microphone";
-  mic.addEventListener("click", () => compose(chosen));
-}
-
-// The sheet: the words to read and fix, where they go, and Send
-export function compose(target = chosen, text = "") {
-  let t = resolve(target);
-  const s = sheet(`
-    <div class="row"><span class="sec">Send</span><span class="spacer"></span>
-      <label>Language <select class="lang">${LANGS.map(l => `<option ${l === lang() ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>
-    <div class="target"></div>
-    <textarea placeholder="Say it or write it">${esc(text)}</textarea>
-    <label><input type="checkbox" class="enter"> Press Enter: send it as the prompt</label>
-    <div class="row"><button class="pill cancel">Cancel</button>
-      <button class="pill main go">${icon("send", 16)}Send</button></div>`);
-  const area = s.el.querySelector("textarea");
-  const enter = s.el.querySelector(".enter");
-  const box = s.el.querySelector(".target");
-  const draw = () => {
-    const [name, topic] = nameOf(t);
-    box.innerHTML = `<em>Into</em><b>${esc(name)}</b>${topic ? `<em>· ${esc(topic)}</em>` : ""}<span class="spacer"></span>
-      ${icon("chevron-down", 16)}<select aria-label="Where the text goes">${options(t)}</select>`;
-    box.querySelector("select").onchange = e => { t = resolve(e.target.value); enter.checked = t !== "window"; draw(); };
-  };
-  enter.checked = t !== "window";
-  draw();
-  s.el.querySelector(".lang").onchange = e => { try { localStorage.setItem("companion.lang", e.target.value); } catch {} };
-  s.el.querySelector(".cancel").onclick = s.close;
-  s.el.querySelector(".go").onclick = async () => {
-    const words = area.value.trim();
-    if (!words) return area.focus();
-    if (await post(pathFor(t), { text: words, submit: enter.checked })) {
-      s.close();
-      toast(sentTo(t));
-    }
-  };
-  if (!text) area.focus();
+  mic.addEventListener("click", () => compose("window"));
 }

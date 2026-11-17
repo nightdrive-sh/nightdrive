@@ -1,20 +1,22 @@
-// The five action slots: a tap runs one, holding one (or a tap on an empty one) chooses what it does: one of the
+// The six action slots, in two columns: a tap runs one, holding one (or a tap on an empty one) chooses what it does: one of the
 // server's presets, or a command of your own (it runs on the computer, as you).
 import { esc, get, post, press, sheet, store, subscribe, toast } from "./api.js";
 import { icon } from "./icons.js";
 
 const list = document.querySelector(".actions .slots");
+const SLOTS = 6;      // control.SLOTS: until the state comes
 let presets = null;
 
 function render(state) {
-  const slots = state?.actions || [null, null, null, null, null];
+  const slots = state?.actions || Array(SLOTS).fill(null);
   const sig = JSON.stringify(slots);
   if (list.dataset.sig === sig) return;
   list.dataset.sig = sig;
   list.innerHTML = slots.map((a, n) => a
     ? `<button class="slot set" data-n="${n}" aria-label="${esc(a.label)}"><span class="key">${n + 1}</span>
-         <span style="color:var(--accent)">${icon(a.icon, 20)}</span><span class="label">${esc(a.label)}</span></button>`
-    : `<button class="slot" data-n="${n}" aria-label="Add an action"><span class="key">${n + 1}</span>${icon("plus")}<span class="label">Add action</span></button>`
+         <span class="what"><span style="color:var(--accent)">${icon(a.icon, 20)}</span><span class="label">${esc(a.label)}</span></span></button>`
+    : `<button class="slot" data-n="${n}" aria-label="Add an action"><span class="key">${n + 1}</span>
+         <span class="what">${icon("plus")}<span class="label">Add action</span></span></button>`
   ).join("");
   for (const el of list.querySelectorAll(".slot")) {
     const n = Number(el.dataset.n);

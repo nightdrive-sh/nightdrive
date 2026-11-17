@@ -21,7 +21,8 @@ server never says yes, so a page open in a browser here can't press the buttons.
 ## State
 
 `GET /api/state` → the whole state; `GET /api/events` → the same as Server-Sent Events, an `event: state` with the whole
-state each time something changes (and a comment every 15 s to keep the connection up).
+state each time something changes, and an `event: ping` every 15 s while nothing does: the page opens the stream again
+when it hears nothing for 40 s (iOS can leave a dropped connection silent).
 
 ```json
 {
@@ -34,15 +35,22 @@ state each time something changes (and a comment every 15 s to keep the connecti
     "project": "nightdrive",     // its folder's name
     "dir": "/home/me/dotfiles",
     "topic": "Companion proto",  // from the window's title
+    "name": "Companion proto",   // its own name (/rename), else the topic: the tile's title, the project under it
     "state": "permission",       // permission | waiting | working
     "wants": true,               // finished or stopped to ask while you were elsewhere
+    "done": false,               // its last reply signs off with ✅, as the sessions bar's green check (never a PM's)
+    "pm": false,                 // a project manager's session ("Project Manager", "PM"): first, with the robot
     "started": 1794868000,       // epoch seconds
+    "since": 1794869200,         // when its status last changed: how long it has worked on this turn, or waited
     "last": "Bash: npm test",    // its last tool call, or the start of its last text (the question it asks)
+    "asks": "input needed",      // it waits for you in its terminal (AskUserQuestion), whose choices show only there; else ""
     "permission": {              // only while state is permission
       "tool": "Bash", "what": "nightdrive sandbox check", "request": "Xa81Qz", "allow": true
     }
   }],
-  "actions": [null, { "label": "Lock", "icon": "lock", "preset": "lock" }, null, null, null]
+  "active": { "session": "0x5d1f2a40", "name": "nightdrive", "detail": "Companion proto" },  // the window with the keyboard
+  "actions": [null, { "label": "Lock", "icon": "lock", "preset": "lock" }, null, null, null, null],
+  "web": "3fa2c91d"              // a stamp of web/'s files: when it changes, the page offers to reload
 }
 ```
 
@@ -53,6 +61,10 @@ the rest is answered in the terminal. The same rule as the desktop notification'
 
 ## Sessions
 
+`GET /api/sessions/ID/log` → what the session said and did lately, oldest first, from its transcript (the page's view
+of one session): `[{ "role": "user" | "assistant", "kind": "text" | "tool", "text": "…" }]`, at most 60, a text up to
+6000 characters. Tool results and thinking are left out.
+
 | Request | Body | Does |
 | --- | --- | --- |
 | `POST /api/sessions/ID/allow` | `{ "request": "…" }` | Answers its permission request Allow (refused when `allow` is false) |
@@ -60,19 +72,20 @@ the rest is answered in the terminal. The same rule as the desktop notification'
 | `POST /api/sessions/ID/send` | `{ "text": "…", "submit": true }` | Types the text in its prompt; `submit` presses Enter |
 | `POST /api/sessions/ID/stop` | | Esc in its window: stops what it does |
 | `POST /api/sessions/ID/focus` | | Brings its window up on the desktop |
+| `POST /api/sessions/ID/close` | | Closes its window (⌘W): the session ends, its conversation kept |
 | `POST /api/sessions/new` | `{ "text": "…" }` | A new session in ~/Projects, the text as its first prompt |
-| `POST /api/send` | `{ "text": "…", "submit": false }` | Types the text in the window that has the keyboard |
+| `POST /api/send` | `{ "text": "…", "submit": false }` | Types the text in the window that has the keyboard; `"submit": "session"` presses Enter only when that window is a session's |
 
 `ID` must be a session's window from the state: no other window is typed into. Sending and stopping go through the
 desktop: its window comes to the front, as with ⌘⌃C (Send to Claude), and nothing is typed until it has the keyboard.
 
 ## Actions
 
-Five slots. `GET /api/presets` → `[{ "id": "lock", "label": "Lock", "icon": "lock" }, …]`.
+Six slots. `GET /api/presets` → `[{ "id": "lock", "label": "Lock", "icon": "lock" }, …]`.
 
 | Request | Body | Does |
 | --- | --- | --- |
-| `POST /api/actions/N/run` | | Runs slot N (0–4) |
+| `POST /api/actions/N/run` | | Runs slot N (0–5) |
 | `POST /api/actions/N` | `{ "preset": "lock" }`, or `{ "label", "icon", "command" }`, or `null` | Sets slot N, `null` empties it |
 
 They're kept in `~/.config/nightdrive/companion.json`. A command runs with `bash -c`, detached, as you.
