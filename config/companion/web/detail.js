@@ -3,20 +3,25 @@
 // A tap on a tile opens it; × or Esc closes it. It stays at the end as new lines come, unless you scrolled up to read.
 // A question with choices shows whole above the buttons, to answer there (question.js). Answer is held to talk, as
 // on a tile (let go and it is sent; a tap opens its box), and Write beside it opens the box at its keyboard.
+// The view is a step in the browser's history, so Back (Android's, Safari's edge gesture in a tab) closes it; in the
+// app on the home screen a swipe from the left edge does (swipe.js).
 import { esc, get, since, store, subscribe } from "./api.js";
 import { icon } from "./icons.js";
 import { act, ASKS } from "./act.js";
 import { compose, send } from "./compose.js";
 import { holdToTalk, Recognition } from "./speech.js";
 import { markdown } from "./markdown.js";
-import { questionClick, questionHTML } from "./question.js";
+import { keepScroll, questionClick, questionHTML } from "./question.js";
+import { edgeSwipe } from "./swipe.js";
 
 const REFRESH_MS = 2000;
 const AT_END_PX = 40;      // this close to the bottom still counts as following along
 let view = null;           // { id, el, timer, logSig, headSig, footSig, holding }
 
 export function openDetail(id) {
-  close();
+  // one step in the history however many views open one after another (a tile's Show over another's)
+  if (history.state?.detail) history.replaceState({ detail: id }, ""); else history.pushState({ detail: id }, "");
+  shut();
   const el = document.createElement("div");
   el.className = "detail";
   el.setAttribute("role", "dialog");
@@ -31,11 +36,20 @@ export function openDetail(id) {
     if (b?.dataset.act === "answer" && Recognition) return;    // held or tapped: talk() has it
     if (b) act(view.id, b.dataset.act, b).then(ok => { if (ok && b.dataset.act === "close") close(); });
   });
+  edgeSwipe(el, close);
   frame(store.state);
   load();
 }
 
+// × , Esc, End and the swipe go back in the history; popstate then shuts the view, as it does for the browser's Back
 function close() {
+  if (history.state?.detail) history.back(); else shut();
+}
+addEventListener("popstate", () => { if (!history.state?.detail) shut(); });
+// a reload with the view's step in the history opens the list: the step is left as nothing to go back to
+if (history.state?.detail) history.replaceState(null, "");
+
+function shut() {
   if (!view) return;
   clearInterval(view.timer);
   view.el.remove();
@@ -115,7 +129,11 @@ function frame(state) {
   // the buttons stay as they are under a held Answer (not taken from under the finger), and when nothing changed
   if (view.holding || foot === view.footSig) return;
   view.footSig = foot;
+  // a question's panel stays where you scrolled it: a pick leaves footSig behind, so the next state redraws it (#3138)
+  const qs = view.el.querySelector(".dfoot .qs");
+  const was = qs && [qs.scrollTop, qs.dataset.request];
   view.el.querySelector(".dfoot").innerHTML = foot;
+  if (was) keepScroll(...was);
   talk();
 }
 

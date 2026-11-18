@@ -25,3 +25,6 @@
 .more-q { color: var(--dim); white-space: nowrap; }
 /* The box from a tile: wider than a yes-or-no's, its choices two to a row on an iPad */
 .sheet.question { width: min(720px, 100%); }
+/* Answers on their way (question.js pending): the button that sent them turns, the others rest */
+.qs.sending .opt:not(.busy) { opacity: .45; }
+.opt.busy { border-color: var(--primary); }
