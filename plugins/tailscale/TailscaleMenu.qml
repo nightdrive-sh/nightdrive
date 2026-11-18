@@ -21,6 +21,7 @@ Column {
     property var peers: []           // this user's own machines: [{ host, ip, online, os }]
     property var others: []          // other users' machines, by owner: [{ owner, peers: [...] }]
     property string openOwner: ""    // the other user whose machines are shown
+    property bool offlineOpen: false // the offline machines wait behind a closed row, as other users' do
     property string message: ""
     property string copied: ""
     signal close()
@@ -126,7 +127,7 @@ Column {
         onClicked: m.login()
     }
 
-    // The other machines: online ones first, then offline ones (dimmed) under their own title
+    // The other machines: online ones under their title, then offline ones (dimmed) behind a closed row
     Repeater {
         model: m.running ? [{ title: "Online", online: true }, { title: "Offline", online: false }] : []
         delegate: Column {
@@ -137,8 +138,17 @@ Column {
             width: m.width
             spacing: 2
             MenuSection { title: sec.modelData.title; bottomPadding: 4 }
+            MenuRow {
+                visible: !sec.modelData.online
+                width: parent.width
+                icon: "cloud-off"
+                label: sec.list.length + (sec.list.length === 1 ? " offline device" : " offline devices")
+                checkIcon: m.offlineOpen ? "chevron-down" : "chevron-right"
+                checkIconSize: 13
+                onClicked: m.offlineOpen = !m.offlineOpen
+            }
             Repeater {
-                model: sec.list
+                model: sec.modelData.online || m.offlineOpen ? sec.list : []
                 delegate: TailscalePeer { menu: m; width: sec.width }
             }
         }
