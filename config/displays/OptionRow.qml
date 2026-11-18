@@ -11,7 +11,10 @@ Rectangle {
     property string note: ""
     property bool current: false
     signal picked()
-    width: parent ? parent.width : 200
+    // Out past the column by its padding on both sides, so its words line up with the section titles above
+    readonly property int inset: 10
+    x: -inset
+    width: (parent ? parent.width : 200) + 2 * inset
     height: 30
     radius: 6
     color: current ? Qt.rgba(c.sel.r, c.sel.g, c.sel.b, 0.7) : hover.hovered ? c.hover : "transparent"
@@ -19,7 +22,7 @@ Rectangle {
     TapHandler { onTapped: if (!root.current) root.picked() }
 
     Text {
-        anchors { left: parent.left; leftMargin: 10; right: noteText.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
+        anchors { left: parent.left; leftMargin: root.inset; right: noteText.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
         elide: Text.ElideRight
         text: root.label
         color: root.current ? root.c.title : root.c.text; font.family: root.c.font; font.pixelSize: 12
@@ -32,7 +35,7 @@ Rectangle {
     }
     Text {
         id: check
-        anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
+        anchors { right: parent.right; rightMargin: root.inset; verticalCenter: parent.verticalCenter }
         visible: root.current
         text: root.current ? Icons.g("check") : ""       // empty: no width, so the note goes to the edge
         font.family: Icons.family; font.pixelSize: 12; color: root.c.accent

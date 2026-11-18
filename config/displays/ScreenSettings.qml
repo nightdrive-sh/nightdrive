@@ -27,9 +27,11 @@ Item {
         return bits.join("  ·  ")
     }
 
+    // As wide as the panel and the option rows' inset on both sides (OptionRow), so their fill isn't clipped
     Flickable {
         id: flick
         anchors.fill: parent
+        anchors.leftMargin: -10; anchors.rightMargin: -10
         contentHeight: col.height + 16
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -37,7 +39,8 @@ Item {
 
         Column {
             id: col
-            width: flick.width
+            x: 10
+            width: flick.width - 20
             spacing: 6
 
             Text {
