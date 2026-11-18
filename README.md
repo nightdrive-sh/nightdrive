@@ -54,8 +54,7 @@ it to Claude Code in a terminal instead). The tools are experimental: what Claud
 Anthropic as part of the conversation ([What reaches Anthropic](docs/claude.md#what-reaches-anthropic)). When nothing
 matches, **Open in Browser** under it opens what you typed in the default browser: an address as it is, anything else
 as a search with the browser's own search engine. Search "Rename current space" to name the workspace
-you're on in the bar. Settings › Launcher › *Light launcher* shows only the search field (and the player) until you
-type or press ↓; ↑ from the top row hides the rows again.
+you're on in the bar.
 
 It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and the answer is the first row; Enter
 copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal comma in results* answers `3,5`.
