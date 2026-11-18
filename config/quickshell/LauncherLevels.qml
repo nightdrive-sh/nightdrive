@@ -8,7 +8,7 @@ import Quickshell
 // WifiLevels, BluetoothLevels, SoundLevels (Sound, Headphones), TailscaleLevels, CompanionLevels, StatusLevels, MirroringLevels, HomeLevels
 // (Home Assistant), DefaultAppsLevels, AppKeyLevels (App shortcuts), BehaviourLevels (Mouse, Launcher, Firefox, Computer
 // name, Remote login, Notifications, Crash reports, Update channel), RegionLevels, InstallLevels, ToolsLevels (Clipboard, Emoji,
-// Snippets), AppearanceLevels (Top bar, Screensaver), DisplayLevels (Display, Battery), RemoveLevels, PasswordLevels (with
+// Snippets), SessionsLevels (Claude Code's), AppearanceLevels (Top bar, Screensaver), DisplayLevels (Display, Battery), RemoveLevels, PasswordLevels (with
 // 1Password), ThemeLevels (Theme, Background), ClaudeWriteLevels, ClaudeAccessLevels, SendClaudeLevels, AskClaudeLevels,
 // WebSearchLevels (Open in Browser), AboutLevels, the plugins' and the private extension.
 Item {
@@ -35,6 +35,7 @@ Item {
     property alias web: webLv
     property alias inst: instLv
     property alias tools: toolsLv
+    property alias sessions: sessionsLv
     property alias look: lookLv
     property alias disp: dispLv
     property alias rm: rmLv
@@ -48,7 +49,7 @@ Item {
     // Personal additions from a private overlay: local/LauncherExtension.qml (not in the repo, see README). It may add
     // root items and whole levels; shell.qml sets the launcher's extSource when the file exists
     readonly property var ext: extLoader.item
-    readonly property var exts: [wifiLv, btLv, soundLv, tsLv, compLv, statsLv, mirrorLv, homeLv, defsLv, akeysLv, behaveLv, regionLv, instLv, toolsLv, lookLv, dispLv, rmLv, pwLv, themesLv, cwriteLv, caccessLv, sendclaudeLv, askLv, webLv, aboutLv].concat(pluginExts, ext ? [ext] : [])
+    readonly property var exts: [wifiLv, btLv, soundLv, tsLv, compLv, statsLv, mirrorLv, homeLv, defsLv, akeysLv, behaveLv, regionLv, instLv, toolsLv, sessionsLv, lookLv, dispLv, rmLv, pwLv, themesLv, cwriteLv, caccessLv, sendclaudeLv, askLv, webLv, aboutLv].concat(pluginExts, ext ? [ext] : [])
     // A plugin's row above the search field (topRow; Deck's player): the first file that has one. ↑ from the list's first
     // row selects it, its keys then go to topKey(event), and Ctrl+Space anywhere to topPress()
     readonly property var topExt: exts.find(e => e.topRow) || null
@@ -75,6 +76,7 @@ Item {
     AskClaudeLevels { id: askLv; launcher: root.launcher; hint: askHintLv }
     InstallLevels { id: instLv; launcher: root.launcher }
     ToolsLevels { id: toolsLv; launcher: root.launcher }
+    SessionsLevels { id: sessionsLv; launcher: root.launcher }
     AppearanceLevels { id: lookLv; launcher: root.launcher }
     DisplayLevels { id: dispLv; launcher: root.launcher }
     RemoveLevels { id: rmLv; launcher: root.launcher }

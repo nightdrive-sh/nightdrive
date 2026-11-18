@@ -102,6 +102,7 @@ WebSearchLevels 1.0 WebSearchLevels.qml
 Calculator 1.0 Calculator.qml
 InstallLevels 1.0 InstallLevels.qml
 ToolsLevels 1.0 ToolsLevels.qml
+SessionsLevels 1.0 SessionsLevels.qml
 ClipPicker 1.0 ClipPicker.qml
 AppearanceLevels 1.0 AppearanceLevels.qml
 DisplayLevels 1.0 DisplayLevels.qml

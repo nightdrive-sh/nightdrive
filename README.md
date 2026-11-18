@@ -150,6 +150,9 @@ Click an icon and a small menu opens under it:
   **Hyper ↓** to the previous / next lead, and **Hyper 1** … **Hyper 9** to the first … ninth (a session's card
   shows its key; a digit you gave an app in App shortcuts stays the app's). The bar follows Settings › Top bar opacity, its focused session the active
   workspace's colour.
+  **Launcher › Sessions** lists them all, the closed ones too: the running first (Enter goes to the window), then the
+  rest, the newest first (Enter opens a terminal in its folder and goes on with the conversation, on its account).
+  Typing searches their names, folders and task numbers (`#3120` or `3120`).
   **A project manager's space**: a session named *… Project Manager* or *… PM* (`claude -n`) gets a workspace of its
   own, as the left column, full height and half the width; started on a workspace with other windows, it moves to
   the first empty one. The sessions it opens with `nightdrive ask --background` open there on the right, as one group
@@ -521,6 +524,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive software search gimp` | Fedora's packages and Flathub's apps, as System › Install › Software finds them; `info dnf ID` (or `flatpak`, `plugin`), `installed` and `plugins` tell more (`--json`). `install dnf ID` or `install flatpak ID` installs one, `remove` removes it, `preview install …` shows first what would change; dnf asks for the password in the system's own dialog |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the Launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
 | `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌃Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--model MODEL` (opus unless given), `--effort LEVEL` (medium unless given), `--background` (without taking the keyboard), `--workspace WS` and `--account NAME` (one of `nightdrive claude accounts`; without it, the account of the session it's run from). Run from a Claude Code session, the new one is grouped beside it in the sessions bar |
+| `nightdrive sessions` | Your Claude Code sessions, running and closed, the newest first, as Launcher › Sessions lists them (`--query TEXT`, `--limit N`, `--json`); `sessions resume ID` goes on with one: its window, or a terminal in its folder |
 | `nightdrive claude accounts` | Your Claude Code accounts, each a config dir (`--json`); `nightdrive claude usage` the usage limits as JSON (`--account NAME`, `--all`), as the Claude menu shows them |
 | `nightdrive mcp access open` | Claude's access, the window of Launcher › Settings › Claude › *Access*: each area's Read, Modify and Delete, `Allow`, `Ask` or `No`. `level strict` (`normal`, `open`) sets them all, `set mail read allow` one, and `nightdrive mcp access` alone shows what applies. `nightdrive mcp install` gives Claude Code the tools, `remove` takes them away |
 | `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck, Ferry… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |

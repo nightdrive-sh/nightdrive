@@ -1,0 +1,309 @@
+#!/usr/bin/env python3
+"""The Claude Code sessions on this computer, running and closed, the newest first (launcher › Sessions, #3120).
+
+  claude-history [--json] [--limit N] [--query TEXT] [--no-running]
+      Each session's id, name (its -n or /rename), dir (where it ran), account (claude-accounts), last (when its
+      transcript last changed, epoch seconds), task (the Dashboard number in its name, #3120, or null), prompt (its
+      last prompt, cut short) and transcript; running and address (its window) for one open in a terminal on this
+      desktop (claude-sessions). --query keeps those whose name, folder or task number has every word typed.
+      --no-running leaves claude-sessions out (the launcher has the running ones live: quickshell/Claude.qml).
+  claude-history resume ID
+      Goes on with that conversation: its window when it still runs, else a terminal in its folder on its account
+      (claude --resume ID: Claude Code finds a conversation by the folder it ran in).
+
+The source is Claude Code's own transcripts, <account>/projects/<folder>/<id>.jsonl, gigabytes of them in all: each
+is read only at its ends (the name and the last prompt are written again every turn, the folder on every message), and
+what was found is kept in CACHE by the file's size and time, so a list of hundreds reads only what changed.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+
+HOME = os.path.expanduser("~")
+SCRIPTS = os.path.dirname(os.path.realpath(__file__))
+HYPR_SCRIPTS = os.path.join(HOME, ".config/hypr/scripts")
+CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or HOME + "/.cache", "nightdrive", "claude-history.json")
+CACHE_VERSION = 3
+TAIL = 256 * 1024     # bytes read from a transcript's end: the latest name and prompt, the folder
+HEAD = 64 * 1024      # ...and from its start, when the end is one long tool result
+PROMPT_MAX = 200      # characters of the last prompt kept
+SID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+TASK = re.compile(r"#(\d+)")
+# Claude Code's own lines, at a line's start (key order as it writes them): text quoted inside a message has its
+# quotes escaped, so it never matches. The folder is in every message line, anywhere in it. Found with rfind, not a
+# regex over the whole chunk: the first listing reads half a gigabyte, and a regex scan took seconds.
+TITLE = (b'{"type":"custom-title","customTitle":', True)
+AGENT = (b'{"type":"agent-name","agentName":', True)
+PROMPT = (b'{"type":"last-prompt","lastPrompt":', True)
+OWNER = (b'{"type":"session-owner","accountUuid":', True)   # which account ran it: projects/ may be shared
+CWD = (b'"cwd":', False)
+JSTR = re.compile(rb'"(?:[^"\\]|\\.)*"')
+
+
+def _last(marker, *chunks):
+    """The string after the last marker in the last chunk that has one (chunks oldest first), decoded; "" for none."""
+    key, line_start = marker
+    for chunk in reversed(chunks):
+        end = len(chunk)
+        while True:
+            i = chunk.rfind(key, 0, end)
+            if i < 0:
+                break
+            end = i
+            if line_start and i > 0 and chunk[i - 1] != 0x0A:
+                continue
+            m = JSTR.match(chunk, i + len(key))
+            if not m:
+                continue   # cut at the chunk's edge
+            try:
+                return json.loads(m.group().decode("utf-8", "replace"))
+            except ValueError:
+                continue
+    return ""
+
+
+def _first(marker, chunk):
+    """The string after the first marker in chunk, decoded; "" for none."""
+    key, _ = marker
+    i = chunk.find(key)
+    m = JSTR.match(chunk, i + len(key)) if i >= 0 else None
+    try:
+        return json.loads(m.group().decode("utf-8", "replace")) if m else ""
+    except ValueError:
+        return ""
+
+
+def read_transcript(path, size):
+    """{name, dir, prompt, owner} from a transcript's two ends; dir "" when it has no message yet (an empty session)."""
+    with open(path, "rb") as f:
+        head = f.read(min(HEAD, size))
+        if size > HEAD:
+            f.seek(max(HEAD, size - TAIL))
+            tail = f.read()
+        else:
+            tail = b""
+    # dir: the folder it started in, not one it went to later: the conversation is filed under that one, and --resume
+    # finds it only there
+    return {"name": _last(TITLE, head, tail) or _last(AGENT, head, tail),
+            "dir": _first(CWD, head) or _last(CWD, head, tail),
+            "prompt": _last(PROMPT, head, tail)[:PROMPT_MAX], "owner": _last(OWNER, head, tail)}
+
+
+def _uuid(conf, default):
+    """The account's id (its sign-in), as a transcript's session-owner line names it; "" when not signed in."""
+    path = HOME + "/.claude.json" if default and conf == HOME + "/.claude" else os.path.join(conf, ".claude.json")
+    try:
+        with open(path) as f:
+            return (json.load(f).get("oauthAccount") or {}).get("accountUuid") or ""
+    except (OSError, ValueError, AttributeError):
+        return ""
+
+
+def accounts():
+    """[{name, dir, default, uuid}] as claude-accounts lists them, the default first."""
+    try:
+        out = subprocess.run([os.path.join(SCRIPTS, "claude-accounts")], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        out = ""
+    rows = [line.split("\t", 1) for line in out.splitlines() if "\t" in line] or [["default", HOME + "/.claude"]]
+    return [{"name": n, "dir": d, "default": i == 0, "uuid": _uuid(d, i == 0)} for i, (n, d) in enumerate(rows)]
+
+
+def load_cache():
+    try:
+        with open(CACHE) as f:
+            c = json.load(f)
+        return c.get("files", {}) if c.get("version") == CACHE_VERSION else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def save_cache(files):
+    try:
+        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(CACHE), prefix=".claude-history.")
+    except OSError:
+        return
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump({"version": CACHE_VERSION, "files": files}, f, separators=(",", ":"))
+        os.replace(tmp, CACHE)   # whole or not at all: two launchers reading at once never see half of it
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def transcripts(accts):
+    """(path, session id, the account whose projects/ it was found in) for each transcript, once: accounts may share
+    one projects/ folder through a link."""
+    seen = set()
+    for a in accts:
+        root = os.path.realpath(os.path.join(a["dir"], "projects"))
+        if root in seen:
+            continue
+        seen.add(root)
+        try:
+            folders = [f.path for f in os.scandir(root) if f.is_dir(follow_symlinks=False)]
+        except OSError:
+            continue
+        for folder in folders:
+            try:
+                names = os.listdir(folder)
+            except OSError:
+                continue
+            for name in names:
+                # <id>.jsonl only: a subagent's transcript is a level deeper, in <id>/subagents
+                if name.endswith(".jsonl") and SID.match(name[:-6]):
+                    yield os.path.join(folder, name), name[:-6], a
+
+
+def closed_and_open(accts=None):
+    """Every transcript's session, the newest first, from the cache where the file hasn't changed."""
+    accts = accts or accounts()
+    by_uuid = {a["uuid"]: a for a in accts if a["uuid"]}
+    cache, fresh, out = load_cache(), {}, []
+    for path, sid, found_in in transcripts(accts):
+        try:
+            st = os.stat(path)
+        except OSError:
+            continue
+        key = [st.st_mtime_ns, st.st_size]
+        hit = cache.get(path)
+        if hit and hit[:2] == key:
+            info = hit[2]
+        else:
+            try:
+                info = read_transcript(path, st.st_size)
+            except OSError:
+                continue
+        fresh[path] = key + [info]
+        if not info["dir"]:
+            continue
+        a = by_uuid.get(info.get("owner")) or found_in
+        m = TASK.search(info["name"])
+        out.append({"id": sid, "name": info["name"], "dir": info["dir"], "account": a["name"],
+                    "accountDefault": a["default"], "accountDir": a["dir"], "last": st.st_mtime_ns // 1_000_000_000,
+                    "task": int(m.group(1)) if m else None, "prompt": info["prompt"],
+                    "transcript": path, "running": False, "address": ""})
+    if fresh != cache:
+        save_cache(fresh)   # also forgets the files that are gone
+    out.sort(key=lambda s: s["last"], reverse=True)
+    return out
+
+
+def running():
+    """{session id: window address} of the sessions open in a terminal here (claude-sessions), by their transcript's
+    name: its path goes through the account's own config dir, which may be a link to another's projects/."""
+    try:
+        out = subprocess.run([os.path.join(SCRIPTS, "claude-sessions")], capture_output=True, text=True, timeout=10).stdout
+        return {os.path.basename(s["transcript"])[:-6]: s["address"]
+                for s in json.loads(out or "[]") if s.get("transcript", "").endswith(".jsonl")}
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError):
+        return {}
+
+
+def matches(s, words):
+    """Every word in its name, folder or task number (#3120 or 3120), case aside."""
+    hay = " ".join([s["name"], s["dir"], "#%d" % s["task"] if s["task"] else ""]).lower()
+    return all(w.lstrip("#") in hay if w.startswith("#") else w in hay for w in words)
+
+
+def listing(limit=0, query="", with_running=True):
+    sessions = closed_and_open()
+    if with_running:
+        live = running()
+        for s in sessions:
+            if s["id"] in live:
+                s["running"], s["address"] = True, live[s["id"]]
+        # running ones first, each part the newest first (the sort is stable)
+        sessions.sort(key=lambda s: not s["running"])
+    words = query.lower().split()
+    if words:
+        sessions = [s for s in sessions if matches(s, words)]
+    return sessions[:limit] if limit > 0 else sessions
+
+
+def ago(sec):
+    d = max(0, int(time.time()) - sec)
+    for n, unit in ((86400, "d"), (3600, "h"), (60, "min")):
+        if d >= n:
+            return "%d %s ago" % (d // n, unit)
+    return "now"
+
+
+def resume(sid):
+    if not SID.match(sid or ""):
+        print("resume needs a session id", file=sys.stderr)
+        return 2
+    s = next((s for s in closed_and_open() if s["id"] == sid), None)
+    if not s:
+        print("No Claude Code session %s" % sid, file=sys.stderr)
+        return 1
+    addr = running().get(sid)
+    if addr:
+        subprocess.run(["hyprctl", "dispatch", 'hl.dsp.focus({ window = "address:%s" })' % addr], capture_output=True)
+        return 0
+    if not os.path.isdir(s["dir"]):
+        print("Its folder is gone: %s" % s["dir"], file=sys.stderr)
+        return 1
+    claude = os.path.join(HOME, ".local/bin/claude")
+    # Its own account: the conversation is only in that config dir. The terminal doesn't pass CLAUDE* on otherwise.
+    cmd = [claude] if s["accountDefault"] else ["env", "CLAUDE_CONFIG_DIR=" + s["accountDir"], claude]
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE")}   # not a child of the caller's session
+    subprocess.Popen([os.path.join(HYPR_SCRIPTS, "terminal"), "--dir", s["dir"], "--"] + cmd + ["--resume", sid],
+                     env=env, start_new_session=True, stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return 0
+
+
+USAGE = "usage: claude-history [--json] [--limit N] [--query TEXT] [--no-running] | resume ID"
+
+
+def main(argv):
+    if argv[:1] == ["resume"]:
+        return resume(argv[1] if len(argv) > 1 else "")
+    as_json, limit, query, with_running = False, 0, "", True
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--json":
+            as_json = True
+        elif a == "--no-running":
+            with_running = False
+        elif a in ("--limit", "--query") and i + 1 < len(argv):
+            if a == "--limit":
+                if not argv[i + 1].isdigit():
+                    print("--limit needs a number", file=sys.stderr)
+                    return 2
+                limit = int(argv[i + 1])
+            else:
+                query = argv[i + 1]
+            i += 1
+        elif a in ("-h", "--help"):
+            print(USAGE)
+            return 0
+        else:
+            print(USAGE, file=sys.stderr)
+            return 2
+        i += 1
+    sessions = listing(limit, query, with_running)
+    if as_json:
+        json.dump(sessions, sys.stdout, ensure_ascii=False, separators=(",", ":"))
+        print()
+        return 0
+    for s in sessions:
+        where = s["dir"].replace(HOME, "~", 1) if s["dir"].startswith(HOME) else s["dir"]
+        acct = "" if s["accountDefault"] else " [%s]" % s["account"]
+        state = "running" if s["running"] else ago(s["last"])
+        print("%-12s %s  %s%s  %s" % (state, s["name"] or "(no name)", where, acct, s["id"]))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

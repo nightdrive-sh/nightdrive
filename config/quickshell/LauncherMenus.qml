@@ -19,6 +19,7 @@ Item {
         { kind: "nav", name: "Apps", glyph: "layout-grid", target: "apps" },
     ], Plugins.has("1password") ? [{ kind: "nav", name: "Passwords", glyph: "key-round", target: "passwords" }] : [], [
         { kind: "nav", name: "Clipboard", glyph: "clipboard-list", target: "clipboard" },
+        lv.sessions.rootRow,   // SessionsLevels.qml: Claude Code's sessions, running and closed
     ], ...launcher.pluginExts.map(e => e.rootItems || []), lv.home.rootItems, launcher.ext ? launcher.ext.rootItems : [], [
         { kind: "nav", name: "Tools", glyph: "wrench", target: "tools" },
         { kind: "nav", name: "Keybindings", glyph: "keyboard", target: "keys" },

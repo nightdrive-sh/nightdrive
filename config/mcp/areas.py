@@ -170,7 +170,7 @@ AREAS = {
                     "off": "Claude asks first."},
                ]},
     "apps-files": {"name": "Apps and files", "glyph": "folder",
-                   "read": "lists your open windows and the newest files in your folders",
+                   "read": "lists your open windows, your Claude Code sessions and the newest files in your folders",
                    "modify": "opens apps, files and web addresses, brings a window forward; makes folders, moves and "
                              "renames files (a folder, or many files, asks)",
                    "delete": "moves files to the trash",
