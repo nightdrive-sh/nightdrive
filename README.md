@@ -284,7 +284,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Files and images | Nautilus, Loupe | |
 | Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) | `.md` files open in it, themed |
 | Web apps | Chromium app windows | your own, or ready-made ones with a key: WhatsApp, Slack, Teams, YouTube |
-| External display | Hyprland | workspaces 1–9 on the display, one on the laptop's screen (⌘0); with the lid closed only the display is used; where the screens are and which is the main one in Launcher › Settings › Display › Arrange displays |
+| External display | Hyprland | workspaces 1–9 on the main display, one on the laptop's screen (⌘0) and one on a second display (⌘§, the key left of 1); with the lid closed only the displays are used; where the screens are and which is the main one in Launcher › Settings › Display › Arrange displays |
 | Lock and idle | the login screen as the lock, hypridle | a screensaver after 10 min (a synthwave sunset, a falling-characters rain or a big clock), lock after 30 min (Settings › Screensaver); while locked, the same screensaver after the same 10 min, and a key or the mouse brings the password back (`nightdrive preview lock-saver [saver\|rain\|clock]` shows it) |
 | Smart home (optional) | [Home Assistant](plugins/home-assistant/README.md) | rooms, devices and scenes in the Launcher, pinned devices in the bar |
 | Mail, alternative (optional) | Thunderbird | themed, with a minimal toolbar ([details](docs/thunderbird.md)) |

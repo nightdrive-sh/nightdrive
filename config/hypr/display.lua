@@ -155,28 +155,64 @@ return function(machine)
     -- laptop's screen has them all, from 1 (an HDMI display that dropped out for a moment at boot left the MacBook on 3).
     -- The rules follow the screens at each reload; NightdriveArrangeWorkspaces moves the workspaces that already exist.
     LAPTOP_WORKSPACE = 10
+    -- A second external display: the main one (the Displays window's, arrangement.lua) keeps 1–9, and the other has one
+    -- workspace of its own, SIDE_WORKSPACE, as the laptop's screen and a virtual one do: ⌘§, the key left of 1, as it is
+    -- usually left of the main one (bindings.lua; a monitor icon in the bar, Bar.qml). Without a rule Hyprland gave it
+    -- whatever number was free, 11 or 2, out of reach of the keys. A third one gets none: Hyprland's choice stands.
+    SIDE_WORKSPACE = 11
     local function screens()
-        local builtin, ext
+        local builtin, ext, others = nil, nil, {}
         local list = Arrangement.ordered(hl.get_monitors() or {})
         if #list == 0 then list = connectedScreens() end   -- none in a headless sandbox either: then no rules at all
         for _, m in ipairs(list) do
-            if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext and not isVirtual(m) then ext = m end
+            if m.name == BUILTIN_DISPLAY then builtin = m
+            elseif not isVirtual(m) then
+                if not ext then ext = m else others[#others + 1] = m.name end
+            end
         end
-        return builtin, ext
+        return builtin, ext, others
     end
     do
-        local builtin, ext = screens()
+        local builtin, ext, others = screens()
         if builtin and ext then
             hl.workspace_rule({ workspace = tostring(LAPTOP_WORKSPACE), monitor = BUILTIN_DISPLAY, default = true })
+        end
+        if ext and (builtin or others[1]) then
             for i = 1, 9 do hl.workspace_rule({ workspace = tostring(i), monitor = ext.name, default = i == 1 }) end
-        elseif builtin or ext then
+        end
+        if ext and others[1] then
+            -- Persistent: it is there as the screen comes, so the screen opens on it, not on a new empty one
+            hl.workspace_rule({ workspace = tostring(SIDE_WORKSPACE), monitor = others[1], default = true, persistent = true })
+        end
+        if not (ext and (builtin or others[1])) and (builtin or ext) then
             -- 1 on the one screen there is. Never on a screen that isn't there (a VM's or a desktop's built-in one): 1 was
             -- kept for it and the real screen opened on 2
             hl.workspace_rule({ workspace = "1", monitor = (builtin or ext).name, default = true })
         end
     end
+    -- The second external display's workspace on it and shown there, without the focus (set_workspace), as
+    -- NightdriveArrangeVirtual does for a virtual screen. 1–9 that are on it go to the main one, as from the laptop's.
+    local function arrangeSide(ext, side)
+        for _, w in ipairs(hl.get_workspaces()) do
+            if w.id and w.id >= 1 and w.id <= 9 and w.monitor and w.monitor.name == side then   -- a special one has no id
+                hl.dispatch(hl.dsp.workspace.move({ workspace = w.id, monitor = ext.name }))
+            end
+        end
+        local sw = hl.get_workspace(SIDE_WORKSPACE)
+        if sw and not (sw.monitor and sw.monitor.name == side) then
+            hl.dispatch(hl.dsp.workspace.move({ workspace = SIDE_WORKSPACE, monitor = side }))
+        end
+        -- Moving the workspace that had the focus takes it along: back to the screen under the pointer
+        local now, here = hl.get_active_monitor(), hl.get_monitor_at_cursor()
+        if now and here and now.name ~= here.name then hl.dispatch(hl.dsp.focus({ monitor = here.name })) end
+        local m = hl.get_monitor(side)
+        if m and not (m.active_workspace and m.active_workspace.id == SIDE_WORKSPACE) then
+            m:set_workspace({ workspace = SIDE_WORKSPACE })
+        end
+    end
     function NightdriveArrangeWorkspaces()
-        local builtin, ext = screens()
+        local builtin, ext, others = screens()
+        if ext and others[1] then arrangeSide(ext, others[1]) end
         if not (builtin and ext) then return end
         local was = hl.get_active_workspace()
         local shown = builtin.active_workspace and builtin.active_workspace.id
@@ -189,7 +225,7 @@ return function(machine)
             hl.dispatch(hl.dsp.focus({ workspace = LAPTOP_WORKSPACE }))
         end
         for _, w in ipairs(hl.get_workspaces()) do
-            if w.id >= 1 and w.id <= 9 and w.monitor and w.monitor.name == BUILTIN_DISPLAY then
+            if w.id and w.id >= 1 and w.id <= 9 and w.monitor and w.monitor.name == BUILTIN_DISPLAY then
                 hl.dispatch(hl.dsp.workspace.move({ workspace = w.id, monitor = ext.name }))
             end
         end

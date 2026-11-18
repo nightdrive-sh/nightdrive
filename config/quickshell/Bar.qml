@@ -55,6 +55,10 @@ Variants {
         WlrLayershell.namespace: "nightdrive-bar"
         readonly property real dpr: modelData.devicePixelRatio || 1
         readonly property int laptopWorkspace: 10   // hypr/display.lua: LAPTOP_WORKSPACE
+        // A second external display's own workspace (hypr/display.lua: SIDE_WORKSPACE, ⌘§): a monitor icon, first in the
+        // row as § is left of 1, and the only one on that display's own bar
+        readonly property int sideWorkspace: 11
+        readonly property string sideScreen: { const w = Hyprland.workspaces.values.find(w => w.id === sideWorkspace); return w && w.monitor && !w.monitor.name.startsWith("HEADLESS-") && !w.monitor.name.startsWith("eDP") ? w.monitor.name : "" }
         // A virtual screen (HEADLESS-*: a tablet or a phone over VNC, hypr/virtual-display.lua) isn't a display at the
         // desk: it doesn't dock the laptop (hypr/display.lua's isVirtual), and its workspace is the device's icon, not a number
         readonly property bool isVirtual: modelData.name.startsWith("HEADLESS-")
@@ -133,7 +137,9 @@ Variants {
                         // The laptop's screen then has only its own workspace: 1–9 are the external display's
                         if (docked && win.modelData.name.startsWith("eDP")) return [win.laptopWorkspace]
                         if (docked && ids.indexOf(win.laptopWorkspace) < 0) ids.push(win.laptopWorkspace)
-                        return ids.sort((a, b) => a - b)
+                        if (win.sideScreen === win.modelData.name) return [win.sideWorkspace]
+                        const first = w => win.sideScreen && w === win.sideWorkspace ? -1 : w
+                        return ids.sort((a, b) => first(a) - first(b))
                     }
                     Rectangle {
                         id: ws
@@ -141,7 +147,8 @@ Variants {
                         readonly property bool windows: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === modelData)
                         readonly property bool active: { const m = Hyprland.monitorFor(win.modelData); return !!m && !!m.activeWorkspace && m.activeWorkspace.id === modelData }
                         // A device's own workspace is its icon: the laptop's screen, a virtual screen's tablet or phone
-                        readonly property string device: modelData === win.laptopWorkspace ? "laptop" : win.virtualWorkspaces[modelData] || ""
+                        readonly property string device: modelData === win.laptopWorkspace ? "laptop"
+                            : win.sideScreen && modelData === win.sideWorkspace ? "monitor" : win.virtualWorkspaces[modelData] || ""
                         // Its name, once renamed (Launcher › Rename current space): a device's workspace then shows both
                         readonly property string label: { const w = Hyprland.workspaces.values.find(w => w.id === modelData); return w && w.name ? w.name : String(modelData) }
                         readonly property bool named: label !== String(modelData)

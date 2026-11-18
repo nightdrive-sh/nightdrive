@@ -347,12 +347,12 @@ hl.bind("ALT + SHIFT + TAB", function () cycle_app_windows(-1) end)
 
 -- ⌘⌥1–⌘⌥0: every window of the active workspace to workspace i (joining the ones there), and focus follows them.
 -- To an empty workspace the whole workspace is renumbered, which keeps its layout as it was: moved one by one, dwindle
--- splits them anew. Not the laptop's own workspace with an external display: the laptop screen would lose it.
+-- splits them anew. Not the laptop's own workspace with an external display, nor the second display's: the screen would lose it.
 -- Otherwise one at a time with follow = false, so the source stays active until the last one has gone.
 local function move_all_windows(i)
     local ws = hl.get_active_workspace()
     if not ws or ws.id == i then return end
-    if not hl.get_workspace(i) and (ws.id ~= LAPTOP_WORKSPACE or #hl.get_monitors() == 1) then
+    if not hl.get_workspace(i) and ((ws.id ~= LAPTOP_WORKSPACE and ws.id ~= SIDE_WORKSPACE) or #hl.get_monitors() == 1) then
         hl.dispatch(hl.dsp.workspace.change_id({ workspace = ws.id, id = i }))
         hl.dispatch(hl.dsp.exec_cmd("qs ipc call bar workspaces"))   -- no event for the new id: the bar would keep the old one
         return
@@ -368,6 +368,19 @@ end
 -- window, a remote desktop) too, so it can be left with them; the desktop inside a VM doesn't get them.
 for i = 1, 10 do
     local key = i % 10
+    hl.bind(mod .. " + " .. key, function()
+        local special = hl.get_active_special_workspace()
+        if special and special.name == "special:drawer" then hl.dispatch(hl.dsp.workspace.toggle_special("drawer")) end
+        hl.dispatch(hl.dsp.focus({ workspace = i }))
+    end, { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), { dont_inhibit = true })
+    hl.bind(mod .. " + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
+end
+-- ⌘§ / ⌘⇧§ / ⌘⌥§: the second external display's own workspace (display.lua: SIDE_WORKSPACE), the key left of 1 as the
+-- display is usually left of the main one. By the symbol, not the keycode: Apple's and Keychron's ISO boards swap the §
+-- and < keys' codes. grave is the same key on a US layout.
+for _, key in ipairs({ "section", "grave" }) do
+    local i = SIDE_WORKSPACE
     hl.bind(mod .. " + " .. key, function()
         local special = hl.get_active_special_workspace()
         if special and special.name == "special:drawer" then hl.dispatch(hl.dsp.workspace.toggle_special("drawer")) end
