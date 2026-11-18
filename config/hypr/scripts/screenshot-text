@@ -1,0 +1,45 @@
+#!/bin/bash
+# screenshot-text → pick a region; its text (OCR, tesseract) goes to the clipboard and stdout. No picture is kept.
+# Run as `screenshot text` (⌘⌃S, Launcher › Tools › Screenshot › Text) or `nightdrive screenshot text`.
+# Languages: tesseract's -l, e.g. eng+fin, from the first line of LANG_FILE (default eng). Each needs its
+# tesseract-langpack-<lang> package; packages.txt installs only English.
+set -o pipefail
+LANG_FILE=${XDG_CONFIG_HOME:-$HOME/.config}/nightdrive/ocr-languages
+DEFAULT_LANGS=eng
+MIN_SCALE=2   # tesseract reads small text badly: a scale 1 screen is captured at twice its pixels
+
+# "Screenshot" with the Text row's glyph; it doesn't chime, the shutter has played (as in screenshot)
+notify() { notify-send -a Screenshot -i lucide:scan-text -h boolean:suppress-sound:true "$@"; }
+
+if ! command -v tesseract >/dev/null; then
+  notify -u critical "Text recognition needs tesseract" "sudo dnf install tesseract tesseract-langpack-eng"
+  exit 1
+fi
+
+langs=$DEFAULT_LANGS
+[[ -r $LANG_FILE ]] && read -r l < "$LANG_FILE" && [[ -n ${l// } ]] && langs=${l// }
+have=$(tesseract --list-langs 2>/dev/null | tail -n +2)
+for l in ${langs//+/ }; do
+  grep -qx "$l" <<<"$have" || { notify -u critical "No tesseract language $l" "sudo dnf install tesseract-langpack-$l"; exit 1; }
+done
+
+geom=$(slurp) || exit 0
+
+# grim captures at the greatest output scale; on a lower one, capture at MIN_SCALE so small text is big enough
+scale=$(hyprctl -j monitors 2>/dev/null | jq '[.[].scale] | max // 1')
+scale=$(awk -v s="${scale:-1}" -v m="$MIN_SCALE" 'BEGIN { print (s < m ? m : s) }')
+
+tmp=$(mktemp --suffix=.png) || exit 1
+trap 'rm -f "$tmp"' EXIT
+grim -s "$scale" -g "$geom" "$tmp" || exit 1
+"$HOME/.config/hypr/scripts/sounds" event screenshot &
+
+# Trailing spaces, the form feed and leading blank lines off ($( ) drops the trailing ones); blank lines inside
+# stay (paragraphs)
+text=$(tesseract "$tmp" - -l "$langs" 2>/dev/null | tr -d '\f' | sed 's/[[:space:]]*$//' | sed '/./,$!d')
+if [[ -z ${text//[[:space:]]/} ]]; then notify "No text found"; exit 0; fi
+
+printf '%s' "$text" | wl-copy
+printf '%s\n' "$text"
+n=$(grep -c . <<<"$text")
+notify "$n line$([[ $n == 1 ]] || echo s) of text copied to clipboard" "$(head -c 200 <<<"$text")"

@@ -5,10 +5,12 @@
 # screenshot clip     → region to the clipboard only, no file (⌘⇧S)
 # screenshot winclip  → window to the clipboard only, no file (⌘⌥S)
 # screenshot fullclip → whole screen to the clipboard only, no file (⌘⌥⇧S)
+# screenshot text     → region's text to the clipboard (OCR), no picture (⌘⌃S, launcher; screenshot-text)
 mode=${1:-full}
 
 # A selection is already running (slurp open): a second press cancels it instead of starting a new capture
 if [[ $mode != full && $mode != fullclip ]] && pgrep -x slurp >/dev/null; then pkill -x slurp; exit 0; fi
+[[ $mode == text ]] && exec "$(dirname "$0")/screenshot-text"
 
 # Pick a window by clicking: the current workspace's window bounds go to slurp (-r: only these boxes are selectable)
 pick_window() {

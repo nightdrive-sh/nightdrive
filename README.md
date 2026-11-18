@@ -505,6 +505,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive displays` | The Displays window (Settings › Display › Arrange displays). `nightdrive arrange` lists where the screens are (`--json`); `arrange side DP-1 left HDMI-A-1` puts one beside another, `main DP-1` makes it the main display, `away HEADLESS-IPHONE` a phone out of reach, `reset` back to Hyprland's own places |
 | `nightdrive sound` | Volume and outputs as JSON; `sound volume 40` sets the volume (`--mute on`/`off`), `sound output NAME` the output |
 | `nightdrive brightness 60` | The screen's brightness in percent; without a number, prints it |
+| `nightdrive screenshot text` | Pick a region: its text goes to the clipboard and is printed (OCR, as ⌘⌃S); `region`, `window` and `full` save a screenshot too, `clip`, `winclip` and `fullclip` only copy it |
 | `nightdrive network` | Wi-Fi and the network as JSON, with whether the internet answers; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |
 | `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
 | `nightdrive low-power on` | Low Power Mode on a laptop, `off` or `toggle`; `status` (`--json`). `suggest off` stops the 10 % warning offering it |
@@ -560,6 +561,7 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | ⌘ ⌃ C | Send the selection, files or a picture to a Claude Code session ([Send to Claude](#send-to-claude)) |
 | ⌘ ⇧ S | Screenshot of a region, to the clipboard (Save in the notification keeps a copy) |
 | ⌘ ⌥ S / ⌘ ⌥ ⇧ S | Screenshot of a window / of the screen |
+| ⌘ ⌃ S | The text in a region to the clipboard (OCR, English; other languages: their `tesseract-langpack-<lang>`, and e.g. `eng+fin` in `~/.config/nightdrive/ocr-languages`) |
 | Hyper B / F / E / M / P | Browser / Files / Email / Music / 1Password |
 | ⌘ ⇧ Space | Walk through the top bar menus with the keyboard |
 | ⌘ Esc | Notifications |

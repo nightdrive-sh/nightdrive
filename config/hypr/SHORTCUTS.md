@@ -74,7 +74,8 @@
   ⌘ ⇧ S              Region to the clipboard
   ⌘ ⌥ S              Window to the clipboard (click the window)
   ⌘ ⌥ ⇧ S            Whole screen to the clipboard (Save in the notification keeps a copy in Downloads)
-  ⌘ Space → Tools › Screenshot   Region, window or whole screen (saved to a file and the clipboard)
+  ⌘ ⌃ S              Text in a region to the clipboard (OCR; no picture is kept)
+  ⌘ Space → Tools › Screenshot   Region, window or whole screen (saved to a file and the clipboard), or Text
 
 ## Other
   ⌘ ⌫ / Delete in Settings › Background   Delete the selected own background (press twice; moves it to the trash)

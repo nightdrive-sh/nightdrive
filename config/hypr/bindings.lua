@@ -188,6 +188,7 @@ hl.bind("CTRL + ALT + XF86LaunchA", hl.dsp.exec_cmd(scripts .. "/lock --replace"
 hl.bind(mod .. " + SHIFT + S",   hl.dsp.exec_cmd(scripts .. "/screenshot clip"))   -- region screenshot to clipboard
 hl.bind(mod .. " + ALT + S",     hl.dsp.exec_cmd(scripts .. "/screenshot winclip"))   -- window screenshot to clipboard
 hl.bind(mod .. " + ALT + SHIFT + S", hl.dsp.exec_cmd(scripts .. "/screenshot fullclip"))   -- whole screen to clipboard
+hl.bind(mod .. " + CTRL + S",    hl.dsp.exec_cmd(scripts .. "/screenshot text"))   -- a region's text to clipboard (OCR)
 hl.bind(mod .. " + SHIFT + SPACE", hl.dsp.exec_cmd("qs ipc call menu nav"))   -- top bar via keyboard: ←/→ menu, ↑/↓ row, Enter, Esc
 hl.bind(mod .. " + SHIFT + K",     hl.dsp.exec_cmd(scripts .. "/terminal --class floating-help -- sh -c '" .. scripts .. "/shortcuts | less'"))   -- SHORTCUTS.md for the installed parts
 

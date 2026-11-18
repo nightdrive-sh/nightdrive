@@ -37,6 +37,7 @@ usage() {
   row "arrange [COMMAND]"        "Where the screens are (--json): move, step, side ID SIDE [OF], away, main, reset"
   row "sound [COMMAND]"          "Volume and output as JSON: volume [PCT] [--mute on|off], output [NAME]"
   row "brightness [PCT]"         "Screen brightness in percent (JSON), set when given"
+  row "screenshot [MODE]"        "region, window, full: saved and copied; clip, winclip, fullclip: copied; text: a region's text (OCR)"
   row "network [COMMAND]"        "Wi-Fi and network state as JSON; wifi|all on|off [--keep]"
   row "bluetooth|battery"        "Bluetooth devices or the battery as JSON"
   row "low-power [on|off|toggle]" "Low Power Mode on a laptop: status (--json); suggest on|off at 10 %"
@@ -140,6 +141,7 @@ case ${1:-} in
   theme|display|wallpaper|bar-style|notifications|arrange) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
   windows|files) exec "$scripts/$1" "${@:2}" ;;                       # also Claude's apps and files tools
   nightlight|appearance) exec "$scripts/$1" "${@:2}" ;;                # Claude's appearance tools use them too
+  screenshot) exec "$scripts/screenshot" "${@:2}" ;;                  # launcher › Tools › Screenshot, ⌘⇧S…
   sound|network) exec "$scripts/$1" "${@:2}" ;;                      # also Claude's sound and display tools
   clean) case ${2:-} in                                               # README › Little things (cleaning mode)
            stop|status) exec "$scripts/clean-input" "${@:2}" ;;
