@@ -13,10 +13,12 @@ Rectangle {
     border.color: lit ? c.primary : c.line
     border.width: 1
 
+    // A section title as the settings panel's (RESOLUTION): small capitals in the theme's colour
     Text {
-        x: root.firstX; y: 7
-        text: "Away" + (root.empty ? "" : "  ·  out of the pointer's reach")
-        color: root.c.dim; font.family: root.c.font; font.pixelSize: 11; font.weight: Font.DemiBold
+        x: root.firstX; y: 11
+        text: "Away"
+        color: root.c.primary; font.family: root.c.font; font.pixelSize: 10; font.weight: Font.DemiBold
+        font.letterSpacing: 1.2; font.capitalization: Font.AllUppercase
     }
     Text {
         visible: root.empty

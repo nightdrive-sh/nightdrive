@@ -14,7 +14,8 @@ Item {
 
     readonly property int pad: 24
     readonly property bool hasVirtual: model.screens.some(s => s.kind === "virtual")
-    readonly property int shelfH: hasVirtual ? Math.min(110, Math.max(76, height * 0.2)) : 0
+    // 11 px above its title and below its tiles; the tiles as tall as before
+    readonly property int shelfH: hasVirtual ? Math.min(116, Math.max(82, height * 0.2 + 6)) : 0
     readonly property real deskH: height - shelfH - (hasVirtual ? 12 : 0)
 
     // The desk's bounds in layout px, and the scale that fits them in with room around to drag a screen to any side
@@ -29,11 +30,13 @@ Item {
     readonly property real oy: (deskH - bounds.h * fit) / 2
 
     // The shelf's tiles: as tall as it lets them be, side by side after its label
-    readonly property real shelfTileH: shelfH - 34
+    readonly property real shelfTileH: shelfH - 40
     // wide enough for its name, a phone's narrow shape too
     function shelfW(s) { return Math.max(96, s.w / s.h * shelfTileH) }
+    // Side by side, 10 px apart, the row centred on the shelf
     function shelfX(s) {
-        let x = shelf.firstX
+        const total = model.away.reduce((t, a) => t + shelfW(a), 0) + 10 * Math.max(0, model.away.length - 1)
+        let x = Math.max(shelf.firstX, (width - total) / 2)
         for (const a of model.away) { if (a.id === s.id) return x; x += shelfW(a) + 10 }
         return x
     }
@@ -76,7 +79,7 @@ Item {
             width: shelved ? root.shelfW(modelData) : modelData.w * root.fit - 3
             height: shelved ? root.shelfTileH : modelData.h * root.fit - 3
             x: held ? root.dragX : shelved ? root.shelfX(modelData) : root.ox + (modelData.x - root.bounds.x0) * root.fit
-            y: held ? root.dragY : shelved ? shelf.y + 26 : root.oy + (modelData.y - root.bounds.y0) * root.fit
+            y: held ? root.dragY : shelved ? shelf.y + 29 : root.oy + (modelData.y - root.bounds.y0) * root.fit
             Behavior on x { enabled: !tile.held; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             Behavior on y { enabled: !tile.held; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
