@@ -147,6 +147,8 @@ body.offline .sessions, body.offline .actions { opacity: .45; transition: opacit
 .detail { position: fixed; inset: 0; z-index: 9; background: var(--bg); display: flex; flex-direction: column; gap: 14px;
           padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
                    max(16px, calc(env(safe-area-inset-bottom) - 8px)) max(16px, env(safe-area-inset-left)); }
+/* Swiped from the left edge (swipe.js): its edge's shadow over the list it uncovers */
+.detail.swiping { box-shadow: -12px 0 32px rgba(0, 0, 0, .5); }
 .dhead { display: flex; align-items: center; gap: 14px; min-height: 44px; }
 .dhead .who { min-width: 0; display: flex; flex-direction: column; }
 .dhead .who b { font-size: 18px; font-weight: 500; color: var(--title); }
