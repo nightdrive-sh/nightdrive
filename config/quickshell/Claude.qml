@@ -166,6 +166,9 @@ Singleton {
         function prevLead(): void { c.stepLead(-1) }
         // Hyper 1…9: the nth session in the same order (1 = the first chip); past the end, nothing
         function nth(n: int): void { const o = c.order(); if (n >= 1 && n <= o.length) c.focus(o[n - 1]) }
+        // The same order as window addresses, one a line: Companion pins its project managers in it
+        // (companion/lib/sessions.py), so it doesn't keep an order of its own
+        function order(): string { return c.order().map(s => "0x" + s.address).join("\n") }
     }
 
     // The sessions in the sessions bar's order (SessionGroups.row: groups and all), its chips without the dots. The same

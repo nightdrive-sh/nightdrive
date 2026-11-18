@@ -37,6 +37,21 @@ class WindowTest(unittest.TestCase):
             s.window("0xa1")
 
 
+class OrderTest(unittest.TestCase):
+    def test_pms_first_in_the_bars_order(self):
+        def pm(addr, started):
+            return {"id": addr, "name": "Project Manager", "started": started}
+        found = [{"id": "0xc3", "name": "work", "started": 1}, pm("0xa1", 2), pm("0xb2", 3)]
+        ids = [s["id"] for s in sessions._ordered(found, ["0xc3", "0xb2", "0xa1"])]
+        self.assertEqual(ids, ["0xb2", "0xa1", "0xc3"])
+
+    def test_without_the_bar_as_started(self):
+        found = [{"id": "0xb2", "name": "B PM", "started": 3}, {"id": "0xa1", "name": "A PM", "started": 2}]
+        self.assertEqual([s["id"] for s in sessions._ordered(found, [])], ["0xa1", "0xb2"])
+        # one the bar doesn't list (it was just opened) after those it does
+        self.assertEqual([s["id"] for s in sessions._ordered(found, ["0xb2"])], ["0xb2", "0xa1"])
+
+
 class PermissionTest(unittest.TestCase):
     def setUp(self):
         self.state = tempfile.mkdtemp()

@@ -156,7 +156,8 @@ class Sessions:
         self.listed = listed
         self.active = _active(win, out) if active else {}
         self.wants &= set(seen)
-        return _ordered(out)
+        # The PMs' order among themselves is the sessions bar's: asked only when there are two to put in order
+        return _ordered(out, _bar_order() if sum(_is_pm(s) for s in out) > 1 else [])
 
     def window(self, addr):
         """addr, when it is a session's window: the page sends and stops only there, never into another window."""
@@ -219,16 +220,29 @@ def _is_pm(s):
                 or PM.search(s.get("project", "").replace("-", " ")))
 
 
-def _ordered(sessions):
-    """The project managers first, marked pm (the robot, never done: as the sessions bar's leads), then the rest in the
-    order they were started, each tile keeping its place: sorted by what they need, they moved under your finger
-    whenever one changed. What needs you shows in the tile's colour."""
+def _bar_order():
+    """The window addresses in the sessions bar's order (Claude.qml's order over IPC: by workspace, then the window's
+    place there, SessionGroups.place), or [] without the bar's Quickshell. Asked, not copied, so the two can't drift."""
+    try:
+        out = subprocess.run(["qs", "ipc", "call", "claude", "order"], capture_output=True, text=True, timeout=2)
+        return out.stdout.split() if out.returncode == 0 else []
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+
+def _ordered(sessions, bar=()):
+    """The project managers first, marked pm (the robot, never done: as the sessions bar's leads), in the bar's order
+    (bar: addresses, _bar_order; else as they were started), then the rest in the order they were started, each tile
+    keeping its place: sorted by what they need, they moved under your finger whenever one changed. What needs you shows
+    in the tile's colour."""
     for s in sessions:
         s.setdefault("name", s.get("topic", ""))
         s.setdefault("since", s.get("started", 0))
         s["pm"] = _is_pm(s)
         s["done"] = s.get("done", False) and not s["pm"]
-    return sorted(sessions, key=lambda s: (not s["pm"], s["started"], s["id"]))
+    rank = {a: i for i, a in enumerate(bar)}
+    return sorted(sessions, key=lambda s: (not s["pm"], rank.get(s["id"], len(rank)) if s["pm"] else 0,
+                                           s["started"], s["id"]))
 
 
 class Demo:
