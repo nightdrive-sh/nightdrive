@@ -49,6 +49,15 @@ keep() {
     -- "$here/display" "$1" "$2" "$4"
 }
 
+# Hyprland again with the saved values, then the arrangement fitted to the new sizes (a scale or resolution makes a
+# screen larger or smaller, which would leave it over its neighbour or apart from it): arrange fit, once the Displays
+# window has arranged them
+reload() {
+  hyprctl reload >/dev/null
+  [[ -f $HOME/.local/state/nightdrive/arrangement ]] && "$here/arrange" fit >/dev/null 2>&1
+  return 0
+}
+
 case ${1:-} in
   list)
     hyprctl -j monitors | jq -r '.[] | [.name, (.description | if . == "" then "-" else . end), .width, .height, .scale] | @tsv' |
@@ -80,12 +89,12 @@ case ${1:-} in
     if [[ ${4:-} == --keep && $old != "$s" ]]; then
       if (( trying )); then put "$trial" "$out " "$out $s"   # auto as it is: on trial it stands for the saved value too
       else put "$state" "$out " "$([[ $s == auto ]] || echo "$out $s")"; fi
-      hyprctl reload >/dev/null
+      reload
       keep scale "$out" "$s" "$old"
     fi
     put "$state" "$out " "$([[ $s == auto ]] || echo "$out $s")"
     put "$trial" "$out "
-    hyprctl reload >/dev/null ;;
+    reload ;;
   mode)
     out=${2:?output}; m=${3:?resolution}
     hyprctl -j monitors | jq -e --arg o "$out" 'any(.name == $o)' >/dev/null || { echo "no output: $out" >&2; exit 1; }
@@ -101,12 +110,12 @@ case ${1:-} in
     if [[ ${4:-} == --keep && $old != "$m" ]]; then
       if (( trying )); then put "$trial" "mode $out " "mode $out $m"
       else put "$state" "mode $out " "$([[ $m == auto ]] || echo "mode $out $m")"; fi
-      hyprctl reload >/dev/null
+      reload
       keep mode "$out" "$m" "$old"
     fi
     put "$state" "mode $out " "$([[ $m == auto ]] || echo "mode $out $m")"
     put "$trial" "mode $out "
-    hyprctl reload >/dev/null ;;
+    reload ;;
   json)
     "$0" list | while IFS=$'\t' read -r name _ _ opts; do
       printf '%s\t%s\t%s\t%s\n' "$name" "$(saved scale "$name")" "$(saved mode "$name")" "$opts"
@@ -132,7 +141,7 @@ case ${1:-} in
     [[ -n $size ]] || { echo "no output: $out" >&2; exit 1; }
     mkdir -p "${state%/*}"
     { grep -v "^mode $out " "$state" 2>/dev/null || true; [[ $hz == auto ]] || echo "mode $out $size@$hz"; } > "$state.tmp" && mv "$state.tmp" "$state"
-    hyprctl reload >/dev/null ;;
+    reload ;;
   side)
     if [[ -z ${2:-} ]]; then
       awk '$1 == "builtin" { s = $2 } END { print s ? s : "auto" }' "$state" 2>/dev/null || echo auto

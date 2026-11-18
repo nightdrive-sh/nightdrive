@@ -115,7 +115,8 @@ Click an icon and a small menu opens under it:
 - **Display**: brightness, night light, each screen's scale and refresh rate, and Arrange displays: the screens as tiles
   to drag where they stand on your desk (the laptop's too, with the lid closed), so the pointer crosses where they meet,
   the main display (workspaces 1–9: Make main, or `m`) and a phone dragged to Away, out of the pointer's reach. A drop
-  is applied at once. **Other displays**: mirroring to a TV
+  is applied at once. Beside the picture, the picked display's resolution, scale and refresh rate; a screen made larger
+  or smaller stays beside its neighbours. **Other displays**: mirroring to a TV
   (Screen Mirroring plugin), an iPad or iPhone as a display of its own (VNC Display plugin)
 - **Battery**: time left, the battery's health and **Low Power Mode** (tuned's power-saver profile; the icon turns
   yellow). The low battery warning at 10 % offers to turn it on, plugging in the charger turns it off; Launcher ›

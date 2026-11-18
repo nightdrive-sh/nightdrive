@@ -7,7 +7,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from arrange_layout import connected, move, overlaps, place_side, step, touches  # noqa: E402
+from arrange_layout import connected, move, overlaps, place_side, settle, step, touches  # noqa: E402
 
 
 def scr(sid, x, y, w, h):
@@ -89,6 +89,20 @@ class Virtual(unittest.TestCase):
     def test_drop_ignores_it(self):
         o = at(move(self.desk(), "DP", 440, 949))
         self.assertEqual(o["DP"][1], o["HDMI"][1])
+
+
+class Settle(unittest.TestCase):
+    def test_grown_display_stays_on_its_side(self):
+        # DP at 1.5 left of the main HDMI, then set to scale 1: 3840 wide, over HDMI's left part
+        out = at(settle([scr("DP", 0, 0, 3840, 2160), scr("HDMI", 2560, 0, 2560, 1440)], "HDMI"))
+        self.assertEqual(out, {"DP": (0, 0), "HDMI": (3840, 0)})
+
+    def test_shrunk_display_closes_the_gap(self):
+        out = at(settle([scr("HDMI", 0, 0, 1920, 1080), scr("DP", 2560, 0, 2560, 1440)], "HDMI"))
+        self.assertEqual(out["DP"], (1920, 0))
+
+    def test_unchanged_stays(self):
+        self.assertEqual(at(settle(DESK, "HDMI")), at(DESK))
 
 
 class Keys(unittest.TestCase):

@@ -54,7 +54,7 @@ hl.window_rule({
     name  = "float-displays",
     match = { class = "^org\\.quickshell$", title = "^Displays$" },
     float = true,
-    size  = "760 560",
+    size  = "980 620",
     center = true,
 })
 -- Welcome to Nightdrive (config/welcome): its window rules, and what it opens comes over it

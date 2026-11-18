@@ -36,10 +36,13 @@ Item {
     Process {
         id: proc
         property bool isChange: false
+        property string last: ""
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    root.screens = JSON.parse(text).screens
+                    // The same again (the 3 s poll): left alone, so nothing that follows the screens runs for nothing
+                    if (text !== proc.last) root.screens = JSON.parse(text).screens
+                    proc.last = text
                     root.loaded = true
                     if (proc.isChange) { root.error = ""; root.changed() }
                 } catch (e) {}

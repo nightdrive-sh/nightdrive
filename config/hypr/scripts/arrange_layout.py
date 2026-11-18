@@ -207,6 +207,43 @@ def step(screens, sid, side):
     return move(screens, sid, best[1], best[2])
 
 
+def _side_of(s, p):
+    """Which side of p screen s is on, by their centres, each axis counted against the two sizes."""
+    dx = (s["x"] + s["w"] / 2 - p["x"] - p["w"] / 2) / (s["w"] + p["w"])
+    dy = (s["y"] + s["h"] / 2 - p["y"] - p["h"] / 2) / (s["h"] + p["h"])
+    if abs(dx) >= abs(dy):
+        return "right" if dx > 0 else "left"
+    return "below" if dy > 0 else "above"
+
+
+def settle(screens, first=None):
+    """After sizes changed (a new scale or resolution, a display turned): the displays from first (the main one) out,
+    the nearest first, each kept where it is if that is still free and beside one placed, else put back on the same
+    side of its nearest neighbour, level as it was, so a display grown wider doesn't end up above the other. Then the
+    virtual screens give way, as after a move."""
+    out = [dict(s) for s in screens]
+    displays = [s for s in out if not s.get("soft")]
+    if not displays:
+        return normalize(out)
+    start = next((s for s in displays if s["id"] == first), displays[0])
+    placed, rest = [start], [s for s in displays if s is not start]
+
+    def centre_dist(a, b):
+        return abs(a["x"] + a["w"] / 2 - b["x"] - b["w"] / 2) + abs(a["y"] + a["h"] / 2 - b["y"] - b["h"] / 2)
+    while rest:
+        s = min(rest, key=lambda t: min(centre_dist(t, p) for p in placed))
+        rest.remove(s)
+        if not (any(touches(s, p) for p in placed) and _free(s, s["x"], s["y"], placed)):
+            p = min(placed, key=lambda q: centre_dist(s, q))
+            cx, cy = beside(s, p, _side_of(s, p), s["x"], s["y"])
+            at = (cx, cy) if _free(s, cx, cy, placed) else snap(s, s["x"], s["y"], placed)
+            if at:
+                s["x"], s["y"] = at
+        placed.append(s)
+    _settle_soft(out, placed)
+    return normalize(out)
+
+
 def normalize(screens):
     """Shifted so the desk's displays start at 0,0, as Hyprland lays screens out from there (a virtual screen left of or
     above them goes negative, so whether one is there doesn't move the displays)."""

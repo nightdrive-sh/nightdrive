@@ -2,8 +2,8 @@ import QtQuick
 import qs
 
 // One screen as a tile: its name, size and state, in proportion to the others (ArrangeCanvas sets its size). The main
-// display has a bar along its top, as macOS's arrangement shows the menu bar; one that is off (a closed lid, a device
-// not connected) is dimmed, and still moves. Pressed and dragged, it tells the canvas, which draws it where it goes.
+// display says so under its size, in the theme's colour; one that is off (a closed lid, a device not connected) is
+// dimmed, and still moves. Pressed and dragged, it tells the canvas, which draws it where it goes.
 Rectangle {
     id: root
     required property QtObject c
@@ -23,15 +23,6 @@ Rectangle {
     border.color: selected ? c.primary : c.line
     opacity: lifted ? 0.85 : screen.on ? 1 : 0.5
     z: lifted ? 10 : selected ? 2 : 1
-
-    // The main display's bar
-    Rectangle {
-        visible: root.screen.main
-        anchors { left: parent.left; right: parent.right; top: parent.top; margins: root.border.width }
-        height: Math.max(3, Math.min(8, root.height * 0.07))
-        radius: 2
-        color: root.c.primary
-    }
 
     Column {
         anchors.centerIn: parent
@@ -54,6 +45,22 @@ Rectangle {
             visible: root.height >= 54
             text: root.screen.note !== "" ? root.screen.note : root.screen.w + " × " + root.screen.h
             color: root.c.dim; font.family: root.c.font; font.pixelSize: 11
+        }
+        // The main display: workspaces 1–9 are on it. 6 px above it, with the column's spacing
+        Item { width: 1; height: 4; visible: mainBadge.visible }
+        Rectangle {
+            id: mainBadge
+            visible: root.screen.main && root.height >= 46
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: mainText.implicitWidth + 14; height: mainText.implicitHeight + 4
+            radius: 5
+            color: root.c.primary
+            Text {
+                id: mainText
+                anchors.centerIn: parent
+                text: "Main display"
+                color: root.c.solid; font.family: root.c.font; font.pixelSize: 10; font.weight: Font.DemiBold
+            }
         }
     }
 

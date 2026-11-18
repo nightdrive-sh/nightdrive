@@ -20,6 +20,8 @@ vnc-display place). The changes write the whole arrangement, as the screens are 
   arrange side ID SIDE [OF]  on that side of screen OF, or of the whole desk
   arrange away ID         a virtual screen out of reach; move or side brings it back
   arrange main ID         the main display (not a virtual screen)
+  arrange fit             after a new scale or resolution (display runs it): each screen back beside the others on
+                          its side, none over another; saved and reloaded only if something moved
   arrange reset           the file away: Hyprland's own places again
   arrange --state         the file as it is, as JSON ({ "state": "…" }, "" without one); restore STATE puts it back
                           (Claude's tool undoes a change with them)
@@ -246,6 +248,9 @@ def change(args, all_screens):
         s["away"] = True
         rest = [t for t in all_screens if not t["away"]]
         return relaid(all_screens, layout.normalize(rest))
+    if cmd == "fit" and len(args) == 1:
+        main = next((t["id"] for t in all_screens if t["main"]), None)
+        return relaid(all_screens, layout.settle([t for t in all_screens if not t["away"]], main))
     if cmd == "main" and s:
         if s["kind"] == "virtual":
             die("the main display is one of the desk's, not a virtual screen")
@@ -307,7 +312,11 @@ def main(argv):
     if not all_screens:
         die("no screens: is Hyprland running?")
     if args:
+        before = [(t["x"], t["y"]) for t in all_screens]
         all_screens = change(args, all_screens)
+        if args == ["fit"] and [(t["x"], t["y"]) for t in all_screens] == before:
+            show(all_screens, as_json)       # nothing moved: no reload, so display's own reload is the last
+            return
         save(all_screens, reload)
         if reload and args[0] == "main":
             settle_workspaces()

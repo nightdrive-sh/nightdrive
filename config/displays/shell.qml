@@ -7,14 +7,15 @@ import qs.kit
 
 // Displays (#1800): the screens as tiles to drag where they stand on the desk, as macOS's Arrangement: the laptop's own
 // (dimmed with the lid closed, still movable), the external displays and the virtual ones (VNC Display's iPads), the
-// main display with its bar (workspaces 1–9), and the shelf of virtual screens put away. A drop is saved and applied at
-// once (hypr/scripts/arrange). This file holds the window together: the picked screen, its buttons, the keys.
+// main display with its label (workspaces 1–9), and the shelf of virtual screens put away. A drop is saved and applied at
+// once (hypr/scripts/arrange). Beside it the picked screen's own settings (ScreenSettings: resolution, scale, refresh
+// rate). This file holds the window together: the picked screen, the layout from wide to narrow, the keys.
 ShellRoot {
     FloatingWindow {
         id: win
         title: "Displays"
-        implicitWidth: 760
-        implicitHeight: 560
+        implicitWidth: 980
+        implicitHeight: 620
         color: c.bg
         onClosed: Qt.quit()
 
@@ -25,7 +26,16 @@ ShellRoot {
             id: screens
             onChanged: toast.show("Arranged")
             onErrorChanged: if (error !== "") toast.show(error, { danger: true })
+            onScreensChanged: displayCtl.refresh()       // a reload or a display plugged in: its settings may be new too
         }
+        DisplayCtl {
+            id: displayCtl
+            onApplied: screens.refresh()          // a new scale or resolution resizes it, and display fits the arrangement
+            onErrorChanged: if (error !== "") toast.show(error, { danger: true })
+        }
+        // Wide enough for the picture and the panel side by side; narrower, the panel goes under the picture
+        readonly property int panelWidth: 300
+        readonly property bool wide: width >= 700
 
         // The picked screen: the first one's id until one is picked, and one that went (a device let go) gives its turn
         property string picked: ""
@@ -50,11 +60,13 @@ ShellRoot {
 
         Shortcut { sequences: ["Ctrl+Q", "Meta+Q"]; onActivated: Qt.quit() }
 
-        ColumnLayout {
+        // Wide: the title and the picture on the left, a line, the picked screen's panel on the right from the top down.
+        // Narrow: the three one under another, without the line.
+        GridLayout {
             id: content
             anchors.fill: parent
-            anchors.margins: 20
-            spacing: 12
+            columns: win.wide ? 3 : 1
+            columnSpacing: 0; rowSpacing: 0
             focus: true
             AppPointer { c: win.look }
 
@@ -77,30 +89,38 @@ ShellRoot {
                 e.accepted = true
             }
 
-            RowLayout {
+            ColumnLayout {
                 Layout.fillWidth: true
+                // Narrow, the picture takes its share and the panel the rest: both would fill, and the panel has no height of its own
+                Layout.fillHeight: win.wide
+                Layout.preferredHeight: win.wide ? -1 : Math.max(260, win.height * 0.5)
+                Layout.margins: 20
+                spacing: 12
                 AppTitle { c: win.look; text: "Displays"; pixelSize: 15 }
-                Item { Layout.fillWidth: true }
-                Text {
-                    text: "Drag the screens where they are on your desk"
-                    visible: win.width > 560
-                    color: c.dim; font.family: c.font; font.pixelSize: 12
+                ArrangeCanvas {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    c: win.look
+                    model: screens
+                    selected: win.current ? win.current.id : ""
+                    onPicked: id => { win.picked = id; content.forceActiveFocus() }
+                    onRefused: text => toast.show(text, { danger: true })
                 }
             }
-
-            ArrangeCanvas {
-                Layout.fillWidth: true
+            Rectangle {
+                visible: win.wide
                 Layout.fillHeight: true
-                c: win.look
-                model: screens
-                selected: win.current ? win.current.id : ""
-                onPicked: id => { win.picked = id; content.forceActiveFocus() }
-                onRefused: text => toast.show(text, { danger: true })
+                Layout.preferredWidth: 1
+                color: c.divider
             }
-
-            ScreenBar {
-                Layout.fillWidth: true
+            ScreenSettings {
+                Layout.fillHeight: true
+                Layout.fillWidth: !win.wide
+                Layout.preferredWidth: win.wide ? win.panelWidth : -1
+                Layout.margins: 20
+                Layout.topMargin: win.wide ? 20 : 0
                 c: win.look
+                ctl: displayCtl
                 screen: win.current
                 onMakeMain: screens.makeMain(win.current.id)
                 onToggleAway: win.toggleAway(win.current)
