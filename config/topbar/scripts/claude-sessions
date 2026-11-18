@@ -16,6 +16,22 @@
 set -uo pipefail
 readonly TAIL=300    # transcript lines read from the end for the last reply: a long tool run has no text in between
 readonly LAST=300    # characters of the last line kept
+readonly HOPS=20     # continued-in links followed at most, so a loop of them can't hang the bar
+
+# The transcript being written now. Claude Code may carry a conversation on in a new transcript (a new sessionId) and
+# end the old one with {"type":"continued-in","continuedInSessionId":…}, while the session's record keeps the first id:
+# without following that, the bar's last line and Companion's view stop where the old file ends (#3134).
+current() {
+  local t=$1 next hop
+  for (( hop = 0; hop < HOPS; hop++ )); do
+    next=$(grep -F '{"type":"continued-in"' "$t" 2>/dev/null \
+             | jq -r 'select(.type == "continued-in") | .continuedInSessionId // empty' 2>/dev/null | tail -n 1)
+    [[ $next =~ ^[A-Za-z0-9-]+$ && -r ${t%/*}/$next.jsonl ]] || break
+    t=${t%/*}/$next.jsonl
+  done
+  printf '%s\n' "$t"
+}
+
 clients=$(hyprctl -j clients 2>/dev/null) || { echo '[]'; exit 0; }
 now=$(date +%s)
 # The accounts' names by config dir; the first is the default's
@@ -46,10 +62,11 @@ for pid in $(pgrep -x claude); do
   [[ -n $info ]] || info='{"name":"","status":"","waitingFor":"","sid":"","since":0}'
   # The last reply's last line: the transcript is <its config dir>/projects/<the dir, mangled>/<sessionId>.jsonl, found
   # by its id rather than by mangling the dir as Claude Code does
-  last='""' tpath= sid=$(jq -r .sid <<<"$info")
+  last='""' tpath='' sid=$(jq -r .sid <<<"$info")
   if [[ -n $sid ]]; then
     for t in "$conf"/projects/*/"$sid".jsonl; do
       [[ -r $t ]] || continue
+      t=$(current "$t")
       tpath=$t
       # As a JSON string, one line however many the reply has
       last=$(tac "$t" | head -n "$TAIL" | jq -c 'select(.type == "assistant") | [.message.content[]? | select(.type == "text") | .text]
