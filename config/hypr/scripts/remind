@@ -1,0 +1,258 @@
+#!/usr/bin/python3 -I
+"""Quick reminders: a message on screen in N minutes (Dashboard #3118). `nightdrive remind …` runs it, the
+launcher's Tools › Remind (quickshell/RemindLevels.qml) and Claude's tools (config/mcp/tools/remind.json) use it.
+
+  remind WHEN [MESSAGE…] [--json]      WHEN is minutes (15, 90m, 2h, 1h30m, up to a week) or a time of day (22:45,
+                                       22.45: the next one, tomorrow's once today's has passed); @UNIX: that moment
+                                       (the undo of Claude's cancel). --json: the reminder, as list gives each
+  remind list [--json]                 the waiting ones, soonest first. --json: {reminders: [{id, at, at_unix,
+                                       minutes_left, clock, message}]}, at ISO 8601, clock HH:MM
+  remind show ID --json                one of them, as list gives it
+  remind cancel ID|all [--json]        takes one (or every one) away before it's due
+  remind restore                       at login (hypr/autostart.lua): sets the timers again, and tells the missed ones
+  remind fire ID                       the timer's own call: the banner (quickshell/RemindToast.qml), with a sound;
+                                       a notification instead where Quickshell can't show it
+
+Each one is a transient systemd user timer (nightdrive-remind-ID.timer) on the wall clock, so a suspend doesn't push it
+later: after waking, a due one comes at once. Such a timer goes with the user's systemd at logout (no lingering) and at
+a reboot, so the reminders are kept in a state file too, and `restore` arms them again at the next login; one that came
+due meanwhile is told then, as missed. A plain one-shot timer, not a task: it needs no Tasks app (Jari's call in #3118).
+"""
+import argparse, contextlib, datetime, fcntl, json, os, re, secrets, subprocess, sys, time
+
+STATE = os.path.expanduser("~/.local/state/nightdrive/reminders.json")
+UNIT = "nightdrive-remind-"         # + the id: the timer and its service
+MAX_MINUTES = 7 * 24 * 60           # a week: longer is a calendar event's or a task's job
+APP, ICON = "Remind", "lucide:alarm-clock"
+DEFAULT_MESSAGE = "Reminder"
+SELF = os.path.realpath(__file__)   # the timer runs this checkout's script (a worktree's or the sandbox's own)
+
+
+def die(msg, code=1):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def clock_time(text, now):
+    """22:45 or 22.45 (also 9:05) → the next such moment as Unix time: today's, or tomorrow's once it has passed.
+    None when it isn't one. Counted on the calendar, not as 24 h, so a daylight saving change keeps the clock time."""
+    m = re.fullmatch(r"([01]?\d|2[0-3])[:.]([0-5]\d)", str(text).strip())
+    if not m:
+        return None
+    today = datetime.datetime.fromtimestamp(now)
+    at = today.replace(hour=int(m.group(1)), minute=int(m.group(2)), second=0, microsecond=0)
+    if at.timestamp() <= now:
+        at = (today + datetime.timedelta(days=1)).replace(hour=at.hour, minute=at.minute, second=0, microsecond=0)
+    return int(at.timestamp())
+
+
+def when(text, now):
+    """WHEN as the command takes it (@UNIX, a time of day, minutes) → Unix time, or None."""
+    if re.fullmatch(r"@\d+", str(text)):
+        at = int(text[1:])
+        return at if now < at <= now + MAX_MINUTES * 60 else None
+    at = clock_time(text, now)
+    if at is not None:
+        return at
+    minutes = parse_minutes(text)
+    return None if minutes is None else now + minutes * 60
+
+
+def parse_minutes(text):
+    """15, 15m, 2h, 1h30m, 1h 30m → minutes; None when it isn't one or is out of range."""
+    t = re.sub(r"\s+", "", str(text).lower())
+    if re.fullmatch(r"\d+", t):
+        n = int(t)
+    else:
+        m = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m(?:in)?)?", t)
+        if not m or not (m.group(1) or m.group(2)):
+            return None
+        n = int(m.group(1) or 0) * 60 + int(m.group(2) or 0)
+    return n if 1 <= n <= MAX_MINUTES else None
+
+
+@contextlib.contextmanager
+def state():
+    """The reminders, read and written under a lock: a timer's `fire` may land while the launcher adds one."""
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    with open(STATE + ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            with open(STATE) as f:
+                rows = json.load(f).get("reminders", [])
+        except (OSError, ValueError, AttributeError):
+            rows = []
+        rows = [r for r in rows if isinstance(r, dict) and r.get("id") and isinstance(r.get("at"), (int, float))]
+        before = json.dumps(rows)
+        yield rows
+        if json.dumps(rows) != before:
+            tmp = STATE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump({"reminders": rows}, f, ensure_ascii=False, indent=1)
+            os.replace(tmp, STATE)
+
+
+def systemctl(*args):
+    return subprocess.run(["systemctl", "--user", *args], capture_output=True, text=True)
+
+
+def armed(rid):
+    return systemctl("is-active", "--quiet", UNIT + rid + ".timer").returncode == 0
+
+
+def arm(r):
+    """The timer for one reminder, on the wall clock in UTC (a time zone change doesn't move it)."""
+    when = datetime.datetime.fromtimestamp(r["at"], datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    p = subprocess.run(["systemd-run", "--user", "--quiet", "--collect", "--unit", UNIT + r["id"],
+                        "--on-calendar", when, "--timer-property=AccuracySec=1s", "--timer-property=Persistent=false",
+                        "--description", "Nightdrive reminder: " + r["message"][:60], "--", SELF, "fire", r["id"]],
+                       capture_output=True, text=True)
+    return p.returncode == 0, p.stderr.strip()
+
+
+def disarm(rid):
+    systemctl("stop", UNIT + rid + ".timer")
+
+
+def banner(rid, message, note, tries=1):
+    """The reminder as Quickshell's banner (quickshell/RemindToast.qml); False when it isn't there to show it. At login
+    Quickshell may still be starting: restore gives it a few tries."""
+    for i in range(tries):
+        try:
+            p = subprocess.run(["qs", "ipc", "call", "remind", "ring", rid, message, note],
+                               capture_output=True, text=True, timeout=10)
+            if p.stdout.strip() == "ok":
+                return True
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        if i + 1 < tries:
+            time.sleep(2)
+    return False
+
+
+def tell(rid, message, note, tries=1):
+    if not banner(rid, message, note, tries):
+        notify(message, note)
+
+
+def notify(summary, body=""):
+    # Without the banner: pinned (Notifs.qml's x-nightdrive-pin), so it stays until dismissed and gets through Do Not
+    # Disturb, as an alarm would
+    subprocess.run(["notify-send", "-a", APP, "-i", ICON, "-h", "boolean:x-nightdrive-pin:true",
+                    "-h", "string:x-dunst-stack-tag:remind", "--", summary, body], capture_output=True)
+
+
+def clock(ts):
+    return datetime.datetime.fromtimestamp(ts).strftime("%H:%M")
+
+
+def public(r, now=None):
+    now = time.time() if now is None else now
+    return {"id": r["id"], "at": datetime.datetime.fromtimestamp(r["at"]).astimezone().isoformat(timespec="seconds"),
+            "at_unix": int(r["at"]), "clock": clock(r["at"]), "minutes_left": max(0, int((r["at"] - now + 59) // 60)), "message": r["message"]}
+
+
+def cmd_add(a):
+    now = int(time.time())
+    at = when(a.when, now)
+    if at is None:
+        die("Minutes up to a week (15, 90m, 2h, 1h30m) or a time of day (22:45); "
+            "a moment (@UNIX) not past and within a week", 2)
+    message = " ".join(a.message).strip() or DEFAULT_MESSAGE
+    r = {"id": secrets.token_hex(4), "at": at, "message": message}
+    with state() as rows:
+        ok, err = arm(r)
+        if not ok:
+            die("The timer didn't start: " + (err or "systemd-run failed"))
+        rows.append(r)
+    out = public(r)
+    print(json.dumps(out, ensure_ascii=False) if a.json else f"At {clock(r['at'])}: {message}  ({r['id']})")
+
+
+def cmd_list(a):
+    with state() as rows:
+        rows.sort(key=lambda r: r["at"])
+        out = [public(r) for r in rows]
+    if a.json:
+        print(json.dumps({"reminders": out}, ensure_ascii=False))
+    elif not out:
+        print("No reminders waiting")
+    for r in [] if a.json else out:
+        print(f"{r['at'][11:16]}  in {r['minutes_left']} min  {r['message']}  ({r['id']})")
+
+
+def cmd_show(a):
+    with state() as rows:
+        r = next((r for r in rows if r["id"] == a.id), None)
+    if not r:
+        die(f"No reminder {a.id}: it came already, or was cancelled (remind list)")
+    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"{clock(r['at'])}  {r['message']}")
+
+
+def cmd_cancel(a):
+    with state() as rows:
+        gone = [r for r in rows if a.id in ("all", r["id"])]
+        if not gone and a.id != "all":
+            die(f"No reminder {a.id}: it came already, or was cancelled (remind list)")
+        for r in gone:
+            disarm(r["id"])
+            rows.remove(r)
+    if a.json:
+        print(json.dumps({"cancelled": [public(r) for r in gone]}, ensure_ascii=False))
+    else:
+        print("\n".join(f"Cancelled: {r['message']}" for r in gone) or "No reminders waiting")
+
+
+def cmd_fire(a):
+    with state() as rows:
+        r = next((r for r in rows if r["id"] == a.id), None)
+        if r:
+            rows.remove(r)
+    if r:   # one cancelled meanwhile has no row: nothing to say
+        tell(r["id"], r["message"], "")   # the message alone: it's due now, its time needs no saying
+
+
+def cmd_restore(a):
+    now = time.time()
+    missed = []
+    with state() as rows:
+        for r in list(rows):
+            if r["at"] <= now:
+                missed.append(r)
+                rows.remove(r)
+            elif not armed(r["id"]):
+                arm(r)
+    for r in missed:   # after the rows are saved: a notification that hangs doesn't keep the lock
+        tell(r["id"], r["message"], "Missed while you were away: due at " + clock(r["at"]), tries=10)
+
+
+def main():
+    p = argparse.ArgumentParser(prog="nightdrive remind", description=__doc__.split("\n\n")[0],
+                                formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n\n")[1])
+    sub = p.add_subparsers(dest="cmd")
+    add = sub.add_parser("add")
+    add.add_argument("when")
+    add.add_argument("message", nargs="*")
+    add.add_argument("--json", action="store_true")
+    ls = sub.add_parser("list")
+    ls.add_argument("--json", action="store_true")
+    show = sub.add_parser("show")
+    show.add_argument("id")
+    show.add_argument("--json", action="store_true")
+    cancel = sub.add_parser("cancel")
+    cancel.add_argument("id")
+    cancel.add_argument("--json", action="store_true")
+    fire = sub.add_parser("fire")
+    fire.add_argument("id")
+    sub.add_parser("restore")
+    argv = sys.argv[1:]
+    if not argv or argv[0].startswith("-") and argv[0] not in ("-h", "--help"):
+        argv = ["list", *argv]          # `remind` or `remind --json`: the list
+    elif argv[0] not in sub.choices and argv[0] not in ("-h", "--help"):
+        argv = ["add", *argv]           # `remind 15 Tea`
+    a = p.parse_args(argv)
+    {"add": cmd_add, "list": cmd_list, "show": cmd_show, "cancel": cmd_cancel, "fire": cmd_fire, "restore": cmd_restore}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    main()

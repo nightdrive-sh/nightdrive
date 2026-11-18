@@ -1,0 +1,53 @@
+{
+  "tools": [
+    {
+      "name": "remind_add",
+      "title": "Set a reminder",
+      "description": "A quick reminder: the message as a banner at the top of this desktop's screen, with a sound, in so many minutes (up to a week) or at a time of day, as the launcher's Tools › Remind sets one. It stays until dismissed, also under Do Not Disturb. It waits over a logout or a restart; one that came due meanwhile is told at the next login. For a thing to do with a date, a task is better, and for a time with others a calendar event.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "when": {"type": "string", "maxLength": 20, "pattern": "^[0-9hmin:. ]+$", "title": "When",
+                   "description": "Minutes from now (15, 90m, 1h30m; up to a week), or a time of day (22:45: the next one, tomorrow's once today's has passed)"},
+          "message": {"type": "string", "maxLength": 500, "title": "Message", "description": "What the notification says, short. Without it: Reminder"}
+        },
+        "required": ["when"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "remind", "add", "{when}", "--json", "--", ["{message}"]],
+      "class": "change",
+      "undo": ["nightdrive", "remind", "cancel", "{id}"],
+      "notice": "Reminder at {clock}: {message}",
+      "area": "notifications"
+    },
+    {
+      "name": "remind_list",
+      "title": "Reminders waiting",
+      "description": "The quick reminders still to come (remind_add's and the launcher's Tools › Remind), soonest first: id, at (ISO 8601), clock (HH:MM), minutes_left and message.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "remind", "list", "--json"],
+      "mask": ["reminders.message"],
+      "class": "read",
+      "area": "notifications"
+    },
+    {
+      "name": "remind_cancel",
+      "title": "Cancel a reminder",
+      "description": "Takes a waiting reminder away before it's due, by its id from remind_list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "maxLength": 32, "title": "Reminder", "description": "Its id from remind_list"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "remind", "cancel", "{id}", "--json"],
+      "before": ["nightdrive", "remind", "show", "{id}", "--json"],
+      "undo": ["nightdrive", "remind", "add", "@{at_unix}", "--json", "--", "{message}"],
+      "notice": "Cancelled the reminder at {clock}: {message}",
+      "class": "change",
+      "area": "notifications"
+    }
+  ]
+}

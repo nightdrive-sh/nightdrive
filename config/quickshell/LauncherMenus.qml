@@ -46,6 +46,7 @@ Item {
             { kind: "nav", name: "Screenshot", glyph: "camera", target: "screenshot" },
             { kind: "nav", name: "Emoji", glyph: "smile", target: "emoji" },
             { kind: "nav", name: "Snippets", glyph: "text-cursor-input", target: "snippets", extra: "text expansion replacement abbreviation autotext" },
+            lv.remind.toolRow,   // RemindLevels.qml: a reminder banner in N minutes
             { kind: "action", name: "Color Picker", glyph: "pipette", cmd: ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/color-picker\""] },
             // as ⌘⌃C, once the launcher is gone: the window under it is what's gathered, and its screenshot is without the launcher
             { kind: "action", name: "Send to Claude", glyph: "bot", keyHint: true, extra: "selection files picture screenshot prompt claude code",

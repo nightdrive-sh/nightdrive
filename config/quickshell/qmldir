@@ -102,6 +102,9 @@ WebSearchLevels 1.0 WebSearchLevels.qml
 Calculator 1.0 Calculator.qml
 InstallLevels 1.0 InstallLevels.qml
 ToolsLevels 1.0 ToolsLevels.qml
+RemindLevels 1.0 RemindLevels.qml
+RemindToast 1.0 RemindToast.qml
+SwipeOff 1.0 SwipeOff.qml
 SessionsLevels 1.0 SessionsLevels.qml
 ClipPicker 1.0 ClipPicker.qml
 AppearanceLevels 1.0 AppearanceLevels.qml

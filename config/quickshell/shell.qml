@@ -223,6 +223,7 @@ ShellRoot {
         }
         Osd {}
         CleanToast {}   // cleaning mode's countdown (hypr/scripts/clean-input)
+        RemindToast {}  // a quick reminder that came due (hypr/scripts/remind, launcher › Tools › Remind)
     }
 
     Timer { id: handOff; interval: 250; onTriggered: launcher.open = false }

@@ -140,8 +140,8 @@ AREAS = {
                                    "are: they tell whether anyone is home."},
                        ]},
     "notifications": {"name": "Notifications", "glyph": "bell-ring",
-                      "read": "reads the latest notifications of every app",
-                      "modify": "sends you a notification, turns Do Not Disturb on or off",
+                      "read": "reads the latest notifications of every app, and the reminders waiting",
+                      "modify": "sends you a notification or sets a reminder, turns Do Not Disturb on or off",
                       "options": [
                           SECRETS,
                           {"id": "apps", "name": "Apps whose notifications Claude doesn't see", "list": True,

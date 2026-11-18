@@ -48,6 +48,7 @@ usage() {
   row "notifications [COMMAND]"  "The latest notifications (--json), dnd [on|off], send SUMMARY [BODY], remove TAG"
   row "windows [COMMAND]"        "The open windows (--json); focus WINDOW, shot WINDOW, open APP|URL, close ADDRESS"
   row "files COMMAND"            "Newest in Downloads, Pictures, Documents: recent (--json); open PATH, trash PATH…, restore NAME…"
+  row "remind WHEN [MESSAGE]"    "A reminder banner in minutes (15, 1h30m) or at a time (22:45): list, cancel ID|all (--json)"
   row "clean [SECONDS]"          "Lock the keyboard and touchpad to clean them, 15 s or 5–60 (stop, status --json)"
   row "restart"                  "Restart the top bar, menus and notifications (Quickshell), e.g. after it crashed"
   row "topbar adjust"            "The top bar's icon and text sizes, live"
@@ -148,6 +149,7 @@ case ${1:-} in
            stop|status) exec "$scripts/clean-input" "${@:2}" ;;
            *) exec "$scripts/clean-input" start "${@:2}" ;;
          esac ;;
+  remind) exec "$scripts/remind" "${@:2}" ;;                          # launcher › Tools › Remind
   restart) exec "$scripts/desktop-shell" restart ;;                   # Quickshell, the supervised way (AGENTS.md)
   brightness) exec "$scripts/brightness" screen "${@:2}" ;;
   bluetooth|battery) exec "$scripts/devices" "$1" ;;

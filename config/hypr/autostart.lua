@@ -85,6 +85,7 @@ function NightdriveUnlocked()
     if not once(UNLOCKED_FLAG) then return end
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/autostart")   -- the user's login apps (launcher › Settings › Apps › Startup; 1Password by default)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/reopen session offer")   -- the battery ran out: open its windows again?
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/remind restore")   -- quick reminders: their timers again, the missed ones told
     hl.exec_cmd(HOME .. "/.config/welcome/welcome login")   -- a new install's first login: Welcome to Nightdrive (later ones: a reminder)
     session.unlocked()
 end

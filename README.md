@@ -203,6 +203,10 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Dictation**: hold F5 or Fn on a Mac, Insert on a PC, speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Snippets**: Launcher › Tools › Snippets; Enter pastes one. With auto-expand on, typing a trigger anywhere replaces it
   with the text. A snippet can have several lines (Shift+Enter), like an email signature.
+- **Remind**: Launcher › Tools › Remind, pick the minutes (or type them: 25, 1h30m, or a time: 22:45), type the
+  message, Enter. It comes as a banner at the top of the screen with a sound, apart from the notifications, and stays
+  until you dismiss it. The waiting ones are listed there too: Enter twice cancels one. They wait over a logout or a
+  restart; one that came due meanwhile shows at the next login.
 - **From your phone**: [Ferry](plugins/ferry/README.md), one of Nightdrive's apps, is a mailbox over Tailscale between your
   computers and your phone. Two experimental plugins: [LocalSend](plugins/localsend/README.md) receives files from a
   phone once you accept them, and [AirPlay Receiver](plugins/airplay-receiver/README.md) mirrors an iPhone, iPad or Mac
@@ -514,6 +518,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
 | `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |
 | `nightdrive notifications` | The latest notifications (`--limit N`, `--json`); `dnd on` / `off` turns Do Not Disturb on or off, `send "Title" "Text"` shows one (`--app NAME`) and `remove TAG` takes it away again |
+| `nightdrive remind 15 "Tea"` | A reminder in 15 minutes (`90m`, `1h30m`; up to a week) or at a time (`22:45`, the next one), as Launcher › Tools › Remind sets one; `remind list` shows the waiting ones (`--json`), `remind cancel ID` (or `all`) takes one away |
 | `nightdrive windows` | The open windows (`--json`); `focus WINDOW` brings one forward (an address or an app), `shot WINDOW` takes a picture of one on screen (never of one Send to Claude leaves out), `open firefox` opens an app or brings it forward, `open https://…` an address |
 | `nightdrive files recent` | The newest files in Downloads, Pictures and Documents (`--in downloads`, `--name TEXT`, `--json`); `open PATH` opens one in its default app, `trash PATH…` moves to the trash, `restore NAME…` puts back, `mkdir PATH` makes a folder, `move --into FOLDER PATH…` and `rename PATH NAME` move and rename (never over a file; `move-back` is their undo) and `check PATH…` lists what a send (Claude's Ferry tool) would take. Only in your home folder and nothing hidden; programs and scripts aren't opened. Claude's tools keep also to the folders in Access (docs/claude.md); `folders` lists those it offers |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
