@@ -5,7 +5,8 @@
 # start Claude Code with that prompt, in DIR (~/Projects unless given), the session named NAME (claude -n, as /rename),
 # on MODEL (claude --model: an alias such as opus, or a full model id) at effort LEVEL (claude --effort). --background opens its window without the keyboard, so typing elsewhere isn't cut off (a session
 # another session starts, e.g. the project manager's): its class has a no_initial_focus rule in hyprland.lua, and a
-# notification says it opened, a click on it going to the window. It opens on the workspace of the window it was called
+# notification says it opened, a click on it going to the window (none when you were in the window that called it: you
+# asked for it). It opens on the workspace of the window it was called
 # from (found up the process chain: the project manager's terminal), even if the user has moved to another one since;
 # called from no window, on the active one. --workspace WS (a number or special:NAME) names the workspace instead.
 # --account NAME: on that Claude Code account (topbar/scripts/claude-accounts; the Claude menu's New session · NAME).
@@ -65,20 +66,31 @@ fi
 bg_windows() {   # the addresses of the background sessions' windows (Ghostty's class has a prefix: scripts/terminal)
   hyprctl -j clients 2>/dev/null | jq -r --arg c "$BG_CLASS" '.[] | select(.class | sub("^sh\\.nightdrive\\."; "") == $c) | .address'
 }
-# The workspace of the first window up the process chain (own PID → parents), as hyprctl dispatch takes it; nothing when
-# none is a window's (the launcher, a script started by a key)
-caller_workspace() {
+# The first window up the process chain (own PID → parents): "ADDRESS WORKSPACE", the workspace as hyprctl dispatch
+# takes it (empty when it isn't one it can name); nothing when none is a window's (the launcher, a script started by a key)
+caller_window() {
   local pid=$$ clients w
   clients=$(hyprctl -j clients 2>/dev/null) || return
   while [[ $pid =~ ^[0-9]+$ ]] && (( pid > 1 )); do
-    w=$(jq -r --argjson p "$pid" 'first(.[] | select(.pid == $p) | .workspace
-          | if .id < 0 then .name else (.id | tostring) end) // empty' <<<"$clients")
-    [[ -n $w ]] && { [[ $w =~ ^(-?[0-9]+|special(:[A-Za-z0-9_-]+)?)$ ]] && echo "$w"; return; }
+    w=$(jq -r --argjson p "$pid" 'first(.[] | select(.pid == $p) | "\(.address) "
+          + (.workspace | if .id < 0 then .name else (.id | tostring) end)) // empty' <<<"$clients")
+    if [[ -n $w ]]; then
+      [[ ${w#* } =~ ^(-?[0-9]+|special(:[A-Za-z0-9_-]+)?)$ ]] || w=${w%% *}
+      echo "$w"; return
+    fi
     pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
   done
 }
 targs=(--dir "$dir")
-if (( bg )); then targs+=(--class "$BG_CLASS"); before=$(bg_windows); [[ -n $ws ]] || ws=$(caller_workspace); fi
+# asked: you were in the window that opened it (the project manager's, as you asked it to), so its opening needs no
+# notification (#3126). One opened while you were elsewhere, later on its own, still says so.
+asked=0
+if (( bg )); then
+  targs+=(--class "$BG_CLASS"); before=$(bg_windows)
+  read -r caddr cws < <(caller_window) || true
+  [[ -n $ws ]] || ws=${cws:-}
+  [[ -n ${caddr:-} && $(hyprctl -j activewindow 2>/dev/null | jq -r '.address // ""') == "$caddr" ]] && asked=1
+fi
 if [[ -n $ws ]]; then
   # Started by Hyprland with an exec rule, which puts the window there without switching the user's view (it matches the
   # terminal's PID: the launch script and scripts/terminal exec into it). The arguments go through a script that removes
@@ -100,7 +112,7 @@ icon=lucide:bot
 for f in "$HOME"/.config/nightdrive/agent-icon.{svg,png}; do [[ -f $f ]] && { icon=$f; break; }; done
 prompt=$*; prompt=${prompt%%$'\n'*}; (( ${#prompt} > 120 )) && prompt="${prompt:0:120}…"
 project=${dir/#$HOME/\~}
-export BG_CLASS BG_WAIT before icon ws
+export BG_CLASS BG_WAIT before icon ws asked
 export -f bg_windows
 setsid -f bash -c '
   for (( i = 0; i < BG_WAIT * 4; i++ )); do
@@ -114,6 +126,7 @@ setsid -f bash -c '
     [[ $ws =~ ^-?[0-9]+$ ]] && target=$ws || target="\"$ws\""
     [[ -n $at && $at != "$ws" ]] && hyprctl dispatch "hl.dsp.window.move({ workspace = $target, follow = false, window = \"address:$addr\" })" >/dev/null
   fi
+  (( asked )) && exit 0   # you asked for it: the window is all the answer it needs
   action=$(notify-send -a Claude -i "$icon" -h string:x-nightdrive-group:sessions -A default=Open -A show="Show session" -w -- "Claude session opened: $1" "$2")
   [[ $action == default || $action == show ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
 ' _ "${name:-${dir##*/}}" "${prompt:+$prompt · }$project" >/dev/null 2>&1 < /dev/null
