@@ -79,6 +79,10 @@ PanelWindow {
         }
     }
 
+    // Claude.barShown starts from these (and claude-notify asks it)
+    Binding { target: Claude; property: "barVisible"; value: sb.visible }
+    Binding { target: Claude; property: "barScreen"; value: sb.mainScreen ? sb.mainScreen.name : "" }
+
     screen: mainScreen
     visible: Claude.barOn && sessions.length > 0 && mainScreen !== null && !drawerOpen
     anchors { bottom: true; left: true; right: true }

@@ -63,6 +63,33 @@ Singleton {
         onLoadFailed: c.barOn = false
     }
 
+    // Whether the bar is there for you to see (#3126): on the main screen, not under its drawer (SessionsBar sets
+    // barVisible), nor under a fullscreen window there, and you at the computer: not locked, nor away (no input for
+    // awayAfter, logind's idle hint, as Companion's presence.py reads it). While it is, it carries a session's news:
+    // claude-notify sends no "done" or "waiting" notification (qs ipc call claude barShown). The lock and the idle time
+    // are looked at every few seconds, only while the bar shows.
+    property bool barVisible: false        // SessionsBar.visible
+    property string barScreen: ""          // its screen's name
+    property bool away: false
+    readonly property int awayAfter: 300   // seconds without input
+    readonly property bool barCovered: {
+        const m = Hyprland.monitors.values.find(m => m.name === barScreen)
+        return !!(m && m.activeWorkspace && m.activeWorkspace.hasFullscreen)
+    }
+    readonly property bool barShown: barVisible && !barCovered && !away && !Notifs.locked
+    Sh {
+        id: presence
+        // Only this session's lock (a sandbox container's runs as the same user): hypr/scripts/lock's own match.
+        // IdleSinceHint is when hypridle set the hint, a minute after the last input (hypridle.conf).
+        script: 'mine="pgrep --ns $PPID --nslist pid -u $(id -u)"
+                 if $mine -f "[q]s -p .*/greeter/lock\\.qml" >/dev/null || $mine -x hyprlock >/dev/null; then echo away; exit; fi
+                 sid=$(loginctl show-user "$(id -u)" -p Display --value 2>/dev/null) || exit 0
+                 eval "$(loginctl show-session "$sid" -p IdleHint -p IdleSinceHint 2>/dev/null | grep -E "^Idle(Hint|SinceHint)=[0-9a-z]*$")"
+                 [ "${IdleHint:-}" = yes ] && [ $(( $(date +%s) - ${IdleSinceHint:-0} / 1000000 + 60 )) -ge ' + c.awayAfter + ' ] && echo away'
+        onResult: text => c.away = text.trim() === "away"
+    }
+    Timer { interval: 5000; repeat: true; running: c.barVisible; triggeredOnStart: true; onTriggered: presence.running = true }
+
     // Project managers (SessionGroups.isPm) get a workspace of their own, their sessions as tabs beside them: Hyprland
     // does it (hypr/pm-space.lua), told here which windows are PMs, as only the sessions' records have their names. Sent
     // when the PMs change, and after a config reload, which starts its Lua afresh.
@@ -169,6 +196,8 @@ Singleton {
         // The same order as window addresses, one a line: Companion pins its project managers in it
         // (companion/lib/sessions.py), so it doesn't keep an order of its own
         function order(): string { return c.order().map(s => "0x" + s.address).join("\n") }
+        // "true" while the sessions bar is there for you to see (barShown): claude-notify stays quiet then
+        function barShown(): string { return c.barShown ? "true" : "false" }
     }
 
     // The sessions in the sessions bar's order (SessionGroups.row: groups and all), its chips without the dots. The same
