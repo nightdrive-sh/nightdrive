@@ -2,6 +2,7 @@
 // (protocol.md › Sessions), Answer opening the sheet to dictate into it.
 import { ask, post, store } from "./api.js";
 import { compose } from "./compose.js";
+import { openPermission } from "./permission.js";
 
 // A question with choices (AskUserQuestion) that Companion can't answer (the hook stopped waiting, or you were in its
 // window): only the terminal shows it, as Claude Code writes it nowhere until answered. Otherwise question.js has it.
@@ -10,6 +11,7 @@ export const ASKS = "It asks you something in its terminal.";
 export async function act(id, what, button = null) {
   const s = store.state?.sessions.find(x => x.id === id);
   if (what === "answer") return compose(id);
+  if (what === "review") return openPermission(id);      // the request whole, its Allow after it
   const name = s?.name || s?.project || "the session";
   if (what === "stop" && !await ask("Stop", `Stop what ${name} is doing? Esc in its window.`, "Stop")) return;
   if (what === "close" && !await ask("End", `End ${name}? Its window closes on the computer.`, "End", true)) return;

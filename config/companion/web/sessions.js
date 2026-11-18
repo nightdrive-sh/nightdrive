@@ -1,5 +1,6 @@
 // The session tiles: one per Claude Code session, each in its place (the server orders them as they started), and a tile
-// for a new one. A permission request is answered here; a question with choices with Question (its box, question.js),
+// for a new one. A permission request is answered here (an edit, a write, an MCP tool after Review shows it whole:
+// permission.js); a question with choices with Question (its box, question.js),
 // anything else with Answer (dictation into that session). A tap
 // on a tile, off its buttons, brings its window up on the desktop; Show opens the session's own view (detail.js), and so
 // does the tap while you're away from the computer (presence.js). The buttons' requests are act.js's.
@@ -46,12 +47,13 @@ function permission(s) {
   return `<article class="tile permission" data-act="focus" data-id="${esc(s.id)}">
     ${head(s)}
     ${p.allow ? `<div class="code">${esc(p.tool)}${p.what ? ": " + esc(p.what) : ""}</div>`
-              : '<div class="meta">Shows only part of what it allows: tap to answer in its terminal.</div>'}
+              : '<div class="meta">Too long to show here whole: tap to answer in its terminal.</div>'}
     <div class="fill"></div>
     <div class="row">
       <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
       <button class="pill" data-act="deny" data-id="${esc(s.id)}">Deny</button>
-      ${p.allow ? `<button class="pill main" data-act="allow" data-id="${esc(s.id)}">${icon("check", 16, 2.2)}Allow</button>` : ""}
+      ${p.review ? `<button class="pill main" data-act="review" data-id="${esc(s.id)}">${icon("shield", 16)}Review</button>`
+        : p.allow ? `<button class="pill main" data-act="allow" data-id="${esc(s.id)}">${icon("check", 16, 2.2)}Allow</button>` : ""}
     </div></article>`;
 }
 

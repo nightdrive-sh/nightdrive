@@ -5,7 +5,8 @@
 # Claude icon gets its dot (Claude.qml). Nothing while you're in that window, and no Notification while the sessions bar
 # shows (below). Claude Code's own terminal notification (kitty's, all alike) is turned off by link.sh.
 #   Notification: "Waiting for your input" and the like.
-#   PermissionRequest: what it wants to run or change, with Deny, and Allow when it shows all it allows. Pinned
+#   PermissionRequest: what it wants to run or change, with Deny, and Allow when it shows all it allows. Companion gets
+#   the request's whole input (<addr>.input) and offers Allow there after showing it (companion/lib/permission.py). Pinned
 #   (x-nightdrive-pin, quickshell/Notifs.qml): it stays on screen until answered and gets through do not disturb. The hook waits
 #   for the answer (Claude Code asks in the terminal at the same time): Allow or Deny answers for you; going to the
 #   window, Show session, closing the notification or the terminal's own answer leave it to the terminal.
@@ -15,6 +16,7 @@
 set -uo pipefail
 readonly WAIT=590   # seconds a permission notification waits; Claude Code gives a hook 600
 readonly SHOWN=300  # characters of the command or path the notification shows; a longer one gets no Allow
+readonly WHOLE=200000  # characters of the input Companion gets whole, to show before its Allow; a longer one: the terminal
 # The tools whose permission notification can offer Allow: the keys of their input that it shows, or that don't change
 # what they do. Any other key set, or any other tool (Edit, Write, MCP tools: their content doesn't show), gets none.
 declare -rA SHOWN_KEYS=(
@@ -32,7 +34,7 @@ state="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/claude-notify"; mkdir -p "$
 
 # The session's window: up the parents (claude, its shell, the terminal) to a pid Hyprland knows
 clients=$(hyprctl -j clients 2>/dev/null) || clients='[]'
-p=$PPID addr= title=
+p=$PPID addr='' title=''
 while (( p > 1 )); do
   read -r addr title < <(jq -r --argjson p "$p" 'first(.[] | select(.pid == $p) | "\(.address) \(.title)") // ""' <<<"$clients")
   [[ -n $addr ]] && break
@@ -73,7 +75,7 @@ if [[ $event == PermissionRequest ]]; then
   what=${what/#$HOME/\~}
   body="$tool${what:+: $what}${project:+ · $project}"
   # A question: what it asks, and no Deny (it would turn the question down, not answer it)
-  ask= deny=(-A deny=Deny)
+  ask='' deny=(-A deny=Deny)
   [[ $tool == AskUserQuestion ]] && { ask=1 deny=(); body="$(jq -r '.tool_input.questions[0].question // "A question"' <<<"$in")${project:+ · $project}"; }
   # Allow answers for the whole tool_input, so it's offered only when you can read all of it: for a tool whose input the
   # text above is (SHOWN_KEYS; an edit's or an MCP tool's is not), with nothing else set (a command outside the
@@ -95,20 +97,26 @@ if [[ $event == PermissionRequest ]]; then
   # A question goes to Companion whole instead (<addr>.ask: its questions, their choices and what each means), and is
   # answered with "answer REQUEST {question: answer, ...}": a choice's label, labels joined with ", " (multiSelect), or
   # words of your own, as the terminal gives them
+  # Anything else leaves its whole input too (<addr>.input, before .perm so it is there when the page looks): Companion
+  # shows every key of it in full and only then offers Allow, so an edit, a write or an MCP tool can be allowed from
+  # there (#3137); this notification can't show them, so its own Allow stays as above
+  whole=
   if [[ -n $ask ]]; then
     jq -c --arg req "$req" '{request: $req, questions: [.tool_input.questions[]? | {question, header, multiSelect: (.multiSelect == true),
       options: [.options[]? | {label, description}]}]}' <<<"$in" > "$state/$addr.ask"
   else
+    input=$(jq -c --arg req "$req" '{request: $req, input: .tool_input}' <<<"$in")
+    if (( ${#input} <= WHOLE )) && printf '%s\n' "$input" > "$state/$addr.input"; then whole=1; fi
     jq -nc --arg tool "$tool" --arg what "$what" --arg project "$project" --arg req "$req" \
-      --argjson allow "$(( ${#allow[@]} > 0 ))" \
-      '{tool: $tool, what: $what, project: $project, request: $req, allow: ($allow == 1)}' > "$state/$addr.perm"
+      --argjson allow "$(( ${#allow[@]} > 0 ))" --argjson whole "${whole:-0}" \
+      '{tool: $tool, what: $what, project: $project, request: $req, allow: ($allow == 1), whole: ($whole == 1)}' > "$state/$addr.perm"
   fi
   notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" "${deny[@]}" \
     -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
   ns=$!
   # The terminal's answer may not end this hook (Claude Code let it run on after a question answered there): you answer
   # there in the window, which ends it within a second (active, below), and the notification goes with it
-  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm" "$state/$addr.ask" "$ans"; }
+  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm" "$state/$addr.input" "$state/$addr.ask" "$ans"; }
   trap cleanup EXIT
   trap 'exit 0' TERM INT HUP
   # The answers for the questions it asked, and no others; the terminal's question closes as if answered there
@@ -120,11 +128,12 @@ if [[ $event == PermissionRequest ]]; then
   for (( i = 0; i < WAIT * 4; i++ )); do
     sleep 0.25
     sed -n 1p "$out" > "$idf" 2>/dev/null
-    if [[ -s $ans ]]; then                  # answered on Companion: Allow only when the notification offers it too
+    if [[ -s $ans ]]; then                  # answered on Companion: Allow when the notification offers it, or the input
+                                            # went to Companion whole (its Review showed all of it)
       read -r verdict rid answers < "$ans"
       if [[ $rid == "$req" ]]; then
         case $verdict in
-          allow) (( ${#allow[@]} )) && { decide allow; exit 0; } ;;
+          allow) if (( ${#allow[@]} )) || [[ -n $whole ]]; then decide allow; exit 0; fi ;;
           deny) [[ -z $ask ]] && { decide deny Companion; exit 0; } ;;
           answer) [[ -n $ask ]] && answered "$answers" && exit 0 ;;
         esac

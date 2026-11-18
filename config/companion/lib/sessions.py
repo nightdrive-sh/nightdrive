@@ -6,6 +6,7 @@ A permission request waiting in hypr/scripts/claude-notify leaves <address>.perm
 and the request's id as JSON, and the hook takes <address>.answer as the answer ("allow ID" or "deny ID"): an answer
 for another request of the session is thrown away. A question with choices (AskUserQuestion) comes to the same hook as
 a permission request: it leaves <address>.ask instead, the questions whole, and takes "answer ID {question: answer}".
+An edit, a write, an MCP tool or a long command is shown whole before its Allow (permission.py: review).
 """
 import json
 import os
@@ -13,6 +14,7 @@ import re
 import subprocess
 import time
 
+import permission
 import transcript
 
 HOME = os.path.expanduser("~")
@@ -56,8 +58,13 @@ def _permission(address):
     except ValueError:
         p = {}
     req = str(p.get("request", ""))
+    ok = bool(REQUEST.fullmatch(req))
+    # what: all it allows (the notification's rule), so Allow can sit beside it; otherwise Allow only after Review has
+    # shown the input whole (permission.py), when the hook left it
+    shown = bool(p.get("allow")) and ok
+    review = not shown and ok and bool(p.get("whole")) and permission.whole(STATE, address, req)
     return {"tool": p.get("tool", "a tool"), "what": p.get("what", ""), "request": req,
-            "allow": bool(p.get("allow")) and bool(REQUEST.fullmatch(req))}
+            "allow": shown or review, "review": review}
 
 
 def _question(address):
@@ -78,6 +85,17 @@ def _question(address):
                         "options": [{"label": str(o.get("label", "")), "description": str(o.get("description") or "")}
                                     for o in x.get("options") or [] if isinstance(o, dict) and o.get("label")]})
     return {"request": q["request"], "questions": out} if out else None
+
+
+def whole_request(perm, read):
+    """The permission request with its input whole ({..., fields}: permission.fields), for Review; ValueError when it
+    no longer asks or its input isn't there to show (too long: answered at the computer)."""
+    if not perm:
+        raise ValueError("It no longer asks")
+    got = read(perm["request"])
+    if got is None:
+        raise ValueError("Too long to show here whole: answer it at the computer")
+    return {**perm, "fields": got}
 
 
 def check_answers(question, request, answers):
@@ -182,6 +200,9 @@ class Sessions:
     def permission(self, addr):
         return _permission(addr)
 
+    def request(self, addr):
+        return whole_request(_permission(addr), lambda req: permission.read(STATE, addr, req))
+
     def answer(self, addr, decision, request):
         if not REQUEST.fullmatch(request):
             raise ValueError("Answer it in its terminal")
@@ -270,7 +291,8 @@ class Demo:
              "state": "working", "started": now - 720,
              "last": ["Bash: cargo test --workspace", "Edit: src/queue.rs", "Read: src/decoder.rs"][k]},
             {"id": "demo-web", "project": "website", "dir": "~/Projects/nightdrive-website", "topic": "Docs contents",
-             "state": "working", "started": now - 180, "last": "Edit: data/docs.json"},
+             "started": now - 180, "last": "Edit: data/docs.json",
+             **({"state": "working"} if "demo-web" in self.answered else {"state": "permission", "permission": DEMO_EDIT})},
             {"id": "demo-mail", "project": "mail", "dir": "~/dotfiles", "topic": "Thread sort order",
              "state": "waiting", "started": now - 3600,
              "last": "Threads sort by the newest reply again. Tests pass, nothing committed.",
@@ -301,6 +323,10 @@ class Demo:
     def permission(self, addr):
         return next((s.get("permission") for s in self.look() if s["id"] == addr), None)
 
+    def request(self, addr):
+        return whole_request(self.permission(addr),
+                             lambda req: permission.fields(DEMO_EDIT_INPUT) if req == DEMO_EDIT["request"] else None)
+
     def answer(self, addr, decision, request):
         self.answered[addr] = decision
 
@@ -310,6 +336,11 @@ class Demo:
     def reply(self, addr, request, answers):
         self.answered[addr] = check_answers(self.question(addr), request, answers)
 
+
+DEMO_EDIT_INPUT = {"file_path": "~/Projects/nightdrive-website/data/docs.json", "old_string": '  "companion": "Companion",',
+                   "new_string": '  "companion": "Companion",\n  "companion-permissions": "Permission requests",',
+                   "replace_all": False}
+DEMO_EDIT = {"tool": "Edit", "what": DEMO_EDIT_INPUT["file_path"], "request": "demoedit", "allow": True, "review": True}
 
 DEMO_QUESTION = {"request": "demoask", "questions": [
     {"question": "Which order should threads sort in?", "header": "Order", "multiSelect": False, "options": [

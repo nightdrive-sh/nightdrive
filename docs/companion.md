@@ -21,7 +21,7 @@ If Tailscale refuses (*Run once: sudo tailscale set --operator=$USER*), run that
 
 - Several computers: each has its own address, and a web app of its own on the iPad.
 - Sending text and Stop bring the session's window to the front on the computer, as Send to Claude does.
-- Allow is offered only when the request shows all it allows, as in the desktop notification. Otherwise answer in the terminal.
+- A permission request for an edit, a write, an MCP tool or a long command has *Review*: it shows what it would do whole (the file, the text taken out and put in, the tool's input), with Deny and Allow under it. A character that wouldn't show is written out as ⟨U+…⟩. One over 200,000 characters is answered in the terminal.
 - A question with choices can be answered here for about ten minutes, and not when it was asked while you were in that session's window on the computer, or once you go there or close its notification: then answer it in its terminal (the tile says so).
 - A permission request asked while you're in that session's window on the computer isn't shown: Claude Code asks there.
 - Dictation uses the browser's speech recognition (Apple's). Where there is none, a tap opens a box to write in.

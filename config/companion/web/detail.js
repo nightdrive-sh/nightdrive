@@ -80,9 +80,12 @@ const CLOSE = `<button class="pill quiet danger" data-act="close">${icon("x", 16
 function buttons(s) {
   if (s.state === "permission") {
     const p = s.permission;
-    return `<div class="code">${esc(p.tool)}${p.what ? ": " + esc(p.what) : ""}</div>${CLOSE}<span class="spacer"></span>
+    // Review: the request whole before its Allow (permission.js); none: too long to show here
+    return `<div class="code">${esc(p.tool)}${p.what ? ": " + esc(p.what) : ""}</div>${CLOSE}
+      ${p.allow ? "" : '<span class="meta">Too long to show here whole: answer it at the computer.</span>'}<span class="spacer"></span>
       <button class="pill" data-act="deny">Deny</button>
-      ${p.allow ? `<button class="pill main" data-act="allow">${icon("check", 16, 2.2)}Allow</button>` : ""}`;
+      ${p.review ? `<button class="pill main" data-act="review">${icon("shield", 16)}Review</button>`
+        : p.allow ? `<button class="pill main" data-act="allow">${icon("check", 16, 2.2)}Allow</button>` : ""}`;
   }
   if (s.question) return `${questionHTML(s)}${CLOSE}`;    // its own answers in place of Answer: the terminal waits on it
   if (s.state === "working") {

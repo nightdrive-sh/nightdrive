@@ -169,9 +169,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/events":
             return self._events()
         parts = path.strip("/").split("/")
-        if len(parts) == 4 and parts[:2] == ["api", "sessions"] and parts[3] == "log":
+        if len(parts) == 4 and parts[:2] == ["api", "sessions"] and parts[3] in ("log", "permission"):
+            ses = self.state.sessions
             try:
-                return self._send(200, self.state.sessions.log(parts[2]))
+                # permission: the request whole, for Review before its Allow (permission.py)
+                return self._send(200, ses.log(parts[2]) if parts[3] == "log" else ses.request(ses.window(parts[2])))
             except ValueError as e:
                 return self._send(404, {"error": str(e)})
         if path.startswith("/fonts/"):
