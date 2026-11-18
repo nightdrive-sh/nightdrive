@@ -84,15 +84,17 @@ function waiting(s) {
     </div></article>`;
 }
 
+// At work it still takes words, as its terminal does mid-turn (Claude Code reads them as soon as it can): Answer beside
+// Stop
 function working(s) {
   return `<article class="tile" data-act="focus" data-id="${esc(s.id)}">
     ${head(s)}
     ${s.last ? `<div class="code quiet">${esc(s.last)}</div>` : ""}
     <div class="fill"></div>
     <div class="row">
-      <span class="spacer"></span>
       <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
       <button class="pill quiet" data-act="stop" data-id="${esc(s.id)}">${icon("square", 14, 2.2)}Stop</button>
+      <button class="pill main" data-act="answer" data-id="${esc(s.id)}">${icon("mic", 16)}Answer</button>
     </div></article>`;
 }
 

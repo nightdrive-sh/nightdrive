@@ -88,14 +88,19 @@ function buttons(s) {
         : p.allow ? `<button class="pill main" data-act="allow">${icon("check", 16, 2.2)}Allow</button>` : ""}`;
   }
   if (s.question) return `${questionHTML(s)}${CLOSE}`;    // its own answers in place of Answer: the terminal waits on it
+  // At work it still takes words, as its terminal does mid-turn: Stop beside Write and Answer. Four on a phone's row:
+  // Stop and Write give up their words there (.squeeze, app.css)
   if (s.state === "working") {
     return `${CLOSE}<span class="spacer"></span>
-      <button class="pill quiet" data-act="stop">${icon("square", 14, 2.2)}Stop</button>`;
+      <button class="pill quiet squeeze" data-act="stop" aria-label="Stop">${icon("square", 14, 2.2)}<span>Stop</span></button>
+      ${TALK.replace('class="pill"', 'class="pill squeeze"')}`;
   }
   return `${CLOSE}${s.asks ? `<span class="meta">${ASKS} Answer it on the desktop.</span>` : ""}<span class="spacer"></span>
-    <button class="pill" data-act="write">${icon("keyboard", 16)}Write</button>
-    <button class="pill main" data-act="answer">${icon("mic", 16)}Answer</button>`;
+    ${TALK}`;
 }
+
+const TALK = `<button class="pill" data-act="write" aria-label="Write">${icon("keyboard", 16)}<span>Write</span></button>
+    <button class="pill main" data-act="answer">${icon("mic", 16)}Answer</button>`;
 
 // The head and the buttons follow the state; the log has its own timer
 function frame(state) {

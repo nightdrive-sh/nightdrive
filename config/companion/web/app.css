@@ -246,4 +246,7 @@ body.offline .sessions, body.offline .actions { opacity: .45; transition: opacit
   /* End, Write and Answer on one row: Answer from its own width, growing into what is left, instead of 220px */
   .dfoot .pill.main { flex: 1 1 auto; }
   .dfoot .pill { padding: 0 14px; }
+  /* End, Stop, Write and Answer (a session at work): Stop and Write as their icons alone */
+  .dfoot .pill.squeeze { padding: 0; width: 44px; flex: none; }
+  .dfoot .pill.squeeze span { display: none; }
 }
