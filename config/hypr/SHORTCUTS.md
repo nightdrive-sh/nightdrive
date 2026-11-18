@@ -51,6 +51,7 @@
   ⌘ ⇧ G             Make the window a group of tabs, or break its group up
   ⌘ ⌥ ⇧ arrows       Move the window into the group (or window) that way; with none there, out of its own group
   ⌘ + mouse drag     Move window / right button: resize
+  ⌘ ⌥ − / ⌘ ⌥ +      Window narrower / wider (5 % of the screen; held, it repeats). US keyboard: ⌘ ⌥ =; the keypad's − / + too
   ⌘ + drag           A top bar icon: move it (the order is kept; also Launcher › Settings › Top bar › Items)
   ⌃ ⌘ + click       A link: the window it opens floats in the centre (not a link that opens in a tab)
   ⌘ ⌥ ← / →         Previous / next tab (any app: sends Ctrl+PageUp/PageDown)

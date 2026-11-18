@@ -554,6 +554,7 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | ⌘ ⇧ U | Open the closed window again |
 | ⌘ ⇧ F | Fullscreen |
 | ⌘ ⇧ T | Tile or float the window |
+| ⌘ ⌥ − / ⌘ ⌥ + | The window narrower / wider (US keyboard: ⌘ ⌥ =) |
 | ⌘ ⇧ J | Split direction (⌘ ⇧ arrows move the window) |
 | ⌘ ⇧ G | Window tabs: make the window a group, or break it up (⌘ ⌥ ⇧ arrows: into the group that way, or out) |
 | ⌥ Tab / ⌥ ⇧ Tab | The app's next / previous window |

@@ -6,26 +6,49 @@
 
 local M = {}
 
+local MIN_SHARE, MAX_SHARE = 0.2, 0.8   -- how far ⌘⌥− / ⌘⌥+ move the PM's share (window-width.lua)
+
 -- name: the layout's name; width: the PM's share of the width; pm_of(ws): the PM's window address on workspace ws
 function M.register(name, width, pm_of)
-    hl.layout.register(name, { recalculate = function(ctx)
-        local pm, rest = nil, {}
+    -- A workspace's share once ⌘⌥− / ⌘⌥+ moved it (#3130): kept here, as the layout places the PM afresh each time.
+    -- Until a config reload, which starts Lua anew: the space is back at `width`.
+    local shares = {}   -- workspace id -> share
+    local function ws_of(ctx)
         for _, t in ipairs(ctx.targets) do
-            local w = t.window
-            local here = w and w.workspace and pm_of(w.workspace.id)
-            if here and w.address == here and not pm then pm = t else rest[#rest + 1] = t end
+            if t.window and t.window.workspace then return t.window.workspace.id end
         end
-        local right = ctx.area
-        if pm then
-            if #rest == 0 then pm:place(ctx.area); return end
-            pm:place(ctx:split(ctx.area, "left", width))
-            right = ctx:split(ctx.area, "right", 1 - width)
-        end
-        -- Normally one target (the group); a moment before a new session joins it, or windows no PM opened: even rows
-        for i, t in ipairs(rest) do
-            t:place({ x = right.x, y = right.y + right.h * (i - 1) / #rest, w = right.w, h = right.h / #rest })
-        end
-    end })
+    end
+    hl.layout.register(name, {
+        -- "width D": the active window D (a share, + wider) wider; on a session the PM's share moves the other way
+        layout_msg = function(ctx, msg)
+            local d = tonumber(msg:match("^width%s+([-+]?[%d.]+)$") or "")
+            local ws = ws_of(ctx)
+            if not d or not ws then return false end
+            local a = hl.get_active_window()
+            if a and a.address ~= pm_of(ws) then d = -d end
+            shares[ws] = math.max(MIN_SHARE, math.min(MAX_SHARE, (shares[ws] or width) + d))
+            return true
+        end,
+        recalculate = function(ctx)
+            local width = shares[ws_of(ctx)] or width
+            local pm, rest = nil, {}
+            for _, t in ipairs(ctx.targets) do
+                local w = t.window
+                local here = w and w.workspace and pm_of(w.workspace.id)
+                if here and w.address == here and not pm then pm = t else rest[#rest + 1] = t end
+            end
+            local right = ctx.area
+            if pm then
+                if #rest == 0 then pm:place(ctx.area); return end
+                pm:place(ctx:split(ctx.area, "left", width))
+                right = ctx:split(ctx.area, "right", 1 - width)
+            end
+            -- Normally one target (the group); a moment before a new session joins it, or windows no PM opened: even rows
+            for i, t in ipairs(rest) do
+                t:place({ x = right.x, y = right.y + right.h * (i - 1) / #rest, w = right.w, h = right.h / #rest })
+            end
+        end,
+    })
 end
 
 return M
