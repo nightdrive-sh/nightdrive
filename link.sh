@@ -34,7 +34,7 @@ for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,systemd/user/wireplumbe
   fi
 done
 
-for d in hypr hyprpolkitagent topbar fuzzel kitty ghostty alacritty foot quickshell screensaver greeter welcome; do   # hyprpolkitagent: the polkit password prompt's size; greeter: the lock at startup (greeter/lock.qml) and the preview; welcome: Welcome to Nightdrive
+for d in hypr hyprpolkitagent topbar fuzzel kitty ghostty alacritty foot quickshell screensaver greeter welcome displays; do   # hyprpolkitagent: the polkit password prompt's size; greeter: the lock at startup (greeter/lock.qml) and the preview; welcome: Welcome to Nightdrive; displays: the Displays window
   link "$repo/config/$d" "$HOME/.config/$d"
 done
 # foot's config includes your local.ini and won't start without one

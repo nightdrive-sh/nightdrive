@@ -67,7 +67,7 @@ Item {
     })
 
     readonly property var settingsAliases: ({ "Wi-Fi": "wifi wlan network internet", "Sound": "audio volume output speakers headphones airpods noise cancelling equalizer", "Battery": "power charge charging health cycles low power mode saver saving",
-                                              "Display": "brightness keyboard backlight night light warm scale scaling resolution monitor screen retina hidpi zoom size bigger smaller",
+                                              "Display": "brightness keyboard backlight night light warm scale scaling resolution monitor screen retina hidpi zoom size bigger smaller arrange arrangement position place side left right above below main primary order displays",
                                               "Other displays": "ipad iphone tablet phone android second screen extra extend sidecar vnc airplay apple tv mirror cast",
                                               "Notifications": "notification sounds alert chime beep ping tone urgent critical popup timeout seconds duration",
                                               "Crash reports": "crash crashes bug report claude app quit coredump",
@@ -96,6 +96,7 @@ Item {
                                               "Keyboard backlight": "keyboard light lit illumination brightness dim",
                                               "Night light": "night shift warm yellow blue light evening",
                                               "Scale": "scaling resolution monitor screen retina hidpi zoom size bigger smaller",
+                                              "Arrange displays": "arrangement position place side left right above below main primary order monitor screen away ipad iphone",
                                               "Screen Mirroring": "airplay cast mirror apple tv share screen" })
     // Settings › Theme: sub-items (Color with its current value)
     // Settings › Display for the root search: the brightness slider row itself (←/→ work there too), the night light toggle
@@ -104,7 +105,9 @@ Item {
         return (lv.disp.bright >= 0 ? [{ kind: "brightness", key: "screen", name: "Brightness", glyph: "sun" }] : [])
             .concat(lv.disp.keys >= 0 ? [{ kind: "brightness", key: "keys", name: "Keyboard backlight", glyph: "keyboard" }] : [])
             .concat([{ kind: "nightlight", name: "Night light", glyph: "moon" },
-                     { kind: "nav", name: "Scale", glyph: "monitor", target: "display" }],
+                     { kind: "nav", name: "Scale", glyph: "monitor", target: "display" },
+                     // Opens the Displays window (DisplayLevels' activate), straight from the search too
+                     { kind: "arrange", name: "Arrange displays", glyph: "move" }],
                     lv.mirror.mirrorAvail ? [{ kind: "nav", name: "Screen Mirroring", glyph: "screen-share", target: "otherdisplays" }] : [])
     }
 }

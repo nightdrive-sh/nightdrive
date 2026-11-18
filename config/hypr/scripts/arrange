@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+"""arrange [--json] | move ID X Y | step ID SIDE | side ID SIDE [OF] | away ID | main ID | reset
+
+Where the screens are next to each other (#1800): the laptop's own, the external displays and the virtual ones (VNC
+Display's iPads), as the Displays window (config/displays) shows and moves them. The arrangement is a file,
+~/.local/state/nightdrive/arrangement, which display.lua and virtual-display.lua read (arrangement.lua) at every load:
+
+    <x> <y> <screen>     its top left corner in layout pixels (after the scale)
+    away <screen>        a virtual screen out of the pointer's reach (a phone, used away from the desk)
+    main <screen>        the main display: workspaces 1–9 are on it
+
+A screen is an external display's description (desc:LG Electronics LG HDR 4K 0x0006756A), so its place follows it to
+another port, else its output (eDP-1, HEADLESS-IPAD). Without the file, Hyprland's places stand (display side,
+vnc-display place). The changes write the whole arrangement, as the screens are now, reload Hyprland and print it.
+
+  arrange                 the screens, one a line; --json for the window and Claude's tool: { screens: [{ id, key,
+                          name, kind (builtin | external | virtual), w, h, x, y, on, note, away, main }] }
+  arrange move ID X Y     dropped there: snapped beside the nearest screen (arrange_layout.py), the others rejoined
+  arrange step ID SIDE    a screen's width that way (left, right, above, below): the arrow keys
+  arrange side ID SIDE [OF]  on that side of screen OF, or of the whole desk
+  arrange away ID         a virtual screen out of reach; move or side brings it back
+  arrange main ID         the main display (not a virtual screen)
+  arrange reset           the file away: Hyprland's own places again
+  arrange --state         the file as it is, as JSON ({ "state": "…" }, "" without one); restore STATE puts it back
+                          (Claude's tool undoes a change with them)
+IDs are outputs (HDMI-A-1, eDP-1, HEADLESS-IPAD), or builtin (the laptop's own) and main. --no-reload leaves Hyprland
+alone (vnc-display place, which reloads after it, and a test).
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import arrange_layout as layout  # noqa: E402
+
+STATE = os.path.expanduser("~/.local/state/nightdrive/arrangement")
+VIRTUAL = os.path.expanduser("~/.local/state/nightdrive/virtual-displays")   # virtual-display.lua's, vnc-display's
+BUILTIN = re.compile(r"^(eDP|LVDS|DSI)-")                                   # a laptop's panel (display.lua's BUILTIN_DISPLAY)
+VIRT = re.compile(r"^HEADLESS-")
+NAMES = {"ipad": "iPad", "iphone": "iPhone", "macbook": "MacBook"}         # as VNC Display names its devices
+
+
+def hypr_monitors():
+    try:
+        return json.loads(subprocess.run(["hyprctl", "-j", "monitors", "all"], capture_output=True, text=True,
+                                         timeout=5).stdout or "[]")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return []
+
+
+def read_virtual():
+    """virtual-display.lua's lines: { output: (w, h, scale, place) }, the file's order kept."""
+    out = {}
+    try:
+        with open(VIRTUAL) as f:
+            for line in f:
+                m = re.match(r"^(HEADLESS-\S+)\s+(\d+)x(\d+)\S*\s+([\d.]+)\s+(\w+)", line)
+                if m:
+                    out[m[1]] = (int(m[2]), int(m[3]), float(m[4]), m[5])
+    except OSError:
+        pass
+    return out
+
+
+def read_state():
+    places, away, main = {}, set(), None
+    try:
+        with open(STATE) as f:
+            for line in f:
+                line = line.rstrip("\n")
+                if m := re.match(r"^(-?\d+) (-?\d+) (.+)$", line):
+                    places[m[3]] = (int(m[1]), int(m[2]))
+                elif line.startswith("away "):
+                    away.add(line[5:])
+                elif line.startswith("main "):
+                    main = line[5:]
+    except OSError:
+        pass
+    return places, away, main
+
+
+def key_of(mon):
+    if not BUILTIN.match(mon["name"]) and not VIRT.match(mon["name"]) and mon.get("description"):
+        return "desc:" + mon["description"]
+    return mon["name"]
+
+
+def virtual_name(output):
+    n = output[len("HEADLESS-"):].lower()
+    for k, v in NAMES.items():
+        if n.startswith(k):
+            return v + n[len(k):].replace("-", " ").upper()
+    return n.replace("-", " ").capitalize()
+
+
+def logical(w, h, scale, transform=0):
+    w, h = round(w / scale), round(h / scale)
+    return (h, w) if transform % 2 else (w, h)
+
+
+def screens():
+    """Every screen there is or may come: Hyprland's (a closed lid's too) and the virtual ones in their file."""
+    places, away, main = read_state()
+    virtual = read_virtual()
+    out = []
+    for m in hypr_monitors():
+        kind = "builtin" if BUILTIN.match(m["name"]) else "virtual" if VIRT.match(m["name"]) else "external"
+        w, h = logical(m["width"], m["height"], m["scale"] or 1, m.get("transform", 0))
+        name = "Built-in display" if kind == "builtin" else virtual_name(m["name"]) if kind == "virtual" else \
+            " ".join(x for x in (m.get("make"), m.get("model")) if x) or m["name"]
+        out.append({"id": m["name"], "key": key_of(m), "name": name, "kind": kind, "w": w, "h": h,
+                    "x": m["x"], "y": m["y"], "on": not m.get("disabled"),
+                    "note": "Lid closed" if m.get("disabled") and kind == "builtin" else "Off" if m.get("disabled") else ""})
+    seen = {s["id"] for s in out}
+    for output, (pw, ph, scale, place) in virtual.items():
+        if output in seen:
+            continue
+        w, h = logical(pw, ph, scale)
+        out.append({"id": output, "key": output, "name": virtual_name(output), "kind": "virtual", "w": w, "h": h,
+                    "x": 0, "y": 0, "on": False, "note": "Not connected", "place": place})
+    # Two of the same model: their outputs tell them apart
+    twins = [s for s in out if s["kind"] == "external" and sum(o["name"] == s["name"] for o in out) > 1]
+    for s in twins:
+        s["name"] += " · " + s["id"]
+    for s in out:
+        s["away"] = s["kind"] == "virtual" and (s["key"] in away or (s["key"] not in places and
+                                                                       virtual.get(s["id"], (0, 0, 0, ""))[3] == "away"))
+        if s["key"] in places:
+            s["x"], s["y"] = places[s["key"]]
+    # One not in the file and not there (a device that isn't connected): where its place would put it
+    desk = [s for s in out if not s["away"] and (s["key"] in places or s.get("place") is None)]
+    for s in out:
+        if s.get("place") and not s["away"] and s["key"] not in places:
+            side = {"beside": "right"}.get(s["place"], s["place"])
+            moved = layout.place_side(desk + [s], s["id"], side if side in layout.SIDES else "right", origin=False)
+            s["x"], s["y"] = next((t["x"], t["y"]) for t in moved if t["id"] == s["id"])
+            desk.append(s)
+    mains = [s for s in out if s["kind"] != "virtual"]
+    chosen = next((s for s in mains if s["key"] == main), None) or next((s for s in mains if s["kind"] == "external"), None) \
+        or (mains[0] if mains else None)
+    for s in out:
+        s["main"] = s is chosen
+        s.pop("place", None)
+        s["soft"] = s["kind"] == "virtual"      # gives way to the displays (arrange_layout.py)
+    return out
+
+
+def save(all_screens, reload=True):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    lines = ["# The screens' places (arrange, the Displays window); read by config/hypr/arrangement.lua"]
+    for s in all_screens:
+        lines.append(f"away {s['key']}" if s["away"] else f"{s['x']} {s['y']} {s['key']}")
+    main = next((s for s in all_screens if s["main"]), None)
+    if main:
+        lines.append(f"main {main['key']}")
+    tmp = STATE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, STATE)
+    if reload:
+        subprocess.run(["hyprctl", "reload"], capture_output=True, timeout=10)
+
+
+def hypr_json(*what):
+    try:
+        return json.loads(subprocess.run(["hyprctl", "-j", *what], capture_output=True, text=True, timeout=5).stdout or "[]")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return []
+
+
+def settle_workspaces():
+    """After a new main display: the workspaces that exist go where their rules now put them (1–9 to the new main
+    one), as a reload only places those made after it. One already on its screen stays, and so does the focus's screen."""
+    rules = {r["workspaceString"]: r["monitor"] for r in hypr_json("workspacerules") if r.get("monitor")}
+    for w in hypr_json("workspaces"):
+        want = rules.get(str(w["id"]))
+        if want and w["id"] > 0 and w["monitor"] != want:
+            subprocess.run(["hyprctl", "dispatch", f'hl.dsp.workspace.move({{ workspace = {w["id"]}, monitor = "{want}" }})'],
+                           capture_output=True, timeout=5)
+
+
+def sync_virtual(all_screens):
+    """VNC Display's line (its place) says away as the arrangement does, so its page and `vnc-display list` agree: away,
+    or back beside the desk (right; the arrangement has its exact place)."""
+    try:
+        with open(VIRTUAL) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return
+    away = {s["id"]: s["away"] for s in all_screens if s["kind"] == "virtual"}
+    out = []
+    for line in lines:
+        f = line.split()
+        if len(f) >= 4 and f[0] in away and (f[3] == "away") != away[f[0]]:
+            f[3] = "away" if away[f[0]] else "right"
+            line = " ".join(f)
+        out.append(line)
+    if out != lines:
+        with open(VIRTUAL + ".tmp", "w") as fh:
+            fh.write("\n".join(out) + "\n")
+        os.replace(VIRTUAL + ".tmp", VIRTUAL)
+
+
+def die(msg):
+    print("arrange: " + msg, file=sys.stderr)
+    sys.exit(1)
+
+
+def find(all_screens, sid):
+    if sid == "builtin":
+        sid = next((s["id"] for s in all_screens if s["kind"] == "builtin"), sid)
+    elif sid == "main":
+        sid = next((s["id"] for s in all_screens if s["main"]), sid)
+    s = next((s for s in all_screens if s["id"] == sid), None)
+    return s or die(f"no screen {sid}: " + ", ".join(s["id"] for s in all_screens))
+
+
+def relaid(all_screens, desk_after):
+    """The desk's new places over the full list (the away ones keep theirs)."""
+    pos = {s["id"]: (s["x"], s["y"]) for s in desk_after}
+    for s in all_screens:
+        if s["id"] in pos:
+            s["x"], s["y"] = pos[s["id"]]
+    return all_screens
+
+
+def change(args, all_screens):
+    cmd = args[0]
+    s = find(all_screens, args[1]) if len(args) > 1 else None
+    desk = lambda: [t for t in all_screens if not t["away"] or t is s]   # noqa: E731
+    if cmd == "move" and len(args) == 4:
+        s["away"] = False
+        return relaid(all_screens, layout.move(desk(), s["id"], int(float(args[2])), int(float(args[3]))))
+    if cmd == "step" and len(args) == 3 and args[2] in layout.SIDES:
+        return relaid(all_screens, layout.step(desk(), s["id"], args[2]))
+    if cmd == "side" and len(args) in (3, 4) and args[2] in layout.SIDES:
+        of = find(all_screens, args[3])["id"] if len(args) == 4 else None
+        s["away"] = False
+        return relaid(all_screens, layout.place_side(desk(), s["id"], args[2], of))
+    if cmd == "away" and s:
+        if s["kind"] != "virtual":
+            die(f"only a virtual screen goes away: {s['id']} is the desk's")
+        s["away"] = True
+        rest = [t for t in all_screens if not t["away"]]
+        return relaid(all_screens, layout.normalize(rest))
+    if cmd == "main" and s:
+        if s["kind"] == "virtual":
+            die("the main display is one of the desk's, not a virtual screen")
+        for t in all_screens:
+            t["main"] = t is s
+        return all_screens
+    die("usage: arrange [--json] | move ID X Y | step ID SIDE | side ID SIDE [OF] | away ID | main ID | reset")
+
+
+def show(all_screens, as_json):
+    if as_json:
+        print(json.dumps({"screens": all_screens}))
+        return
+    for s in all_screens:
+        where = "away" if s["away"] else f"{s['x']},{s['y']}"
+        flags = ", ".join(x for x in ("main" if s["main"] else "", s["note"]) if x)
+        print(f"{s['id']:<20} {where:<12} {s['w']}x{s['h']:<8} {s['name']}" + (f"  ({flags})" if flags else ""))
+
+
+def main(argv):
+    as_json = "--json" in argv
+    reload = "--no-reload" not in argv
+    args = [a for a in argv if a not in ("--json", "--no-reload")]
+    if args and args[0] in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return
+    if args == ["--state"]:
+        try:
+            with open(STATE) as f:
+                print(json.dumps({"state": f.read()}))
+        except OSError:
+            print(json.dumps({"state": ""}))
+        return
+    if len(args) == 2 and args[0] == "restore":
+        if args[1].strip():
+            os.makedirs(os.path.dirname(STATE), exist_ok=True)
+            with open(STATE + ".tmp", "w") as f:
+                f.write(args[1])
+            os.replace(STATE + ".tmp", STATE)
+            args = []
+        else:
+            args = ["reset"]
+        if args == []:
+            if reload:
+                subprocess.run(["hyprctl", "reload"], capture_output=True, timeout=10)
+                settle_workspaces()
+            show(screens(), as_json)
+            return
+    if args == ["reset"]:
+        try:
+            os.remove(STATE)
+        except FileNotFoundError:
+            pass
+        if reload:
+            subprocess.run(["hyprctl", "reload"], capture_output=True, timeout=10)
+        show(screens(), as_json)
+        return
+    all_screens = screens()
+    if not all_screens:
+        die("no screens: is Hyprland running?")
+    if args:
+        all_screens = change(args, all_screens)
+        save(all_screens, reload)
+        if reload and args[0] == "main":
+            settle_workspaces()
+        sync_virtual(all_screens)
+    show(all_screens, as_json)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

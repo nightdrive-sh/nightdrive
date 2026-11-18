@@ -33,6 +33,8 @@ usage() {
   row "theme COMMAND"            "The theme colour, e.g. nightdrive theme color teal"
   row "wallpaper COMMAND"        "The background: list, set, add, remove"
   row "display COMMAND"          "Screens: list, json, scale OUTPUT SCALE, mode OUTPUT WxH (--keep asks)"
+  row "displays"                 "The Displays window: drag the screens where they are, pick the main one"
+  row "arrange [COMMAND]"        "Where the screens are (--json): move, step, side ID SIDE [OF], away, main, reset"
   row "sound [COMMAND]"          "Volume and output as JSON: volume [PCT] [--mute on|off], output [NAME]"
   row "brightness [PCT]"         "Screen brightness in percent (JSON), set when given"
   row "network [COMMAND]"        "Wi-Fi and network state as JSON; wifi|all on|off [--keep]"
@@ -135,7 +137,7 @@ case ${1:-} in
   minimal) exec "$repo/config/minimal/minimal" "${@:2}" ;;             # README › Install (Installed on Fedora KDE?)
   # topbar adjust: config/topbar/adjust.conf; software-catalog: config/quickshell/data/software.json
   platform|software-catalog|snippets) exec "$scripts/$1" "${@:2}" ;;
-  theme|display|wallpaper|bar-style|notifications) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
+  theme|display|wallpaper|bar-style|notifications|arrange) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
   windows|files) exec "$scripts/$1" "${@:2}" ;;                       # also Claude's apps and files tools
   nightlight|appearance) exec "$scripts/$1" "${@:2}" ;;                # Claude's appearance tools use them too
   sound|network) exec "$scripts/$1" "${@:2}" ;;                      # also Claude's sound and display tools
@@ -170,6 +172,7 @@ case ${1:-} in
         *) usage >&2; exit 1 ;;
       esac ;;
   welcome) exec "$repo/config/welcome/welcome" "${@:2}" ;;             # Welcome to Nightdrive (launcher › System › Set up Nightdrive)
+  displays) exec "$repo/config/displays/displays" "${@:2}" ;;           # Displays (Settings › Display › Arrange displays)
   ""|help|-h|--help) usage ;;
   *) usage >&2; exit 1 ;;
 esac

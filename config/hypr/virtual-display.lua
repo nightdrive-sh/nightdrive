@@ -51,7 +51,9 @@ local function positions(list, bounds, present)
     for _, d in ipairs(list) do
         local side = d.place == "beside" and "right" or d.place
         local w, h = d.mode:match("^(%d+)x(%d+)")
-        if bounds and used[side] and w then
+        if d.at then
+            out[d.name] = d.at                     -- the Displays window's place (arrangement.lua)
+        elseif bounds and used[side] and w then
             w, h = math.floor(tonumber(w) / d.scale + 0.5), math.floor(tonumber(h) / d.scale + 0.5)
             local u = used[side]
             if side == "right" then out[d.name] = (bounds.x1 + u) .. "x" .. bounds.y0; u = u + w
@@ -80,7 +82,7 @@ local function readState()
         end
     end
     f:close()
-    return list
+    return require("arrangement").virtual(list)   -- the Displays window's places and away over the file's
 end
 
 -- A workspace given in the file is kept if it is one of 2–9 and not taken; the others get the highest free one, in the

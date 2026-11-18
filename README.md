@@ -112,7 +112,10 @@ Click an icon and a small menu opens under it:
 
 - **Wi-Fi** (and Ethernet with your wired profiles) and **Bluetooth**. A device connecting shows a notification with
   **Disconnect**, for headphones that join every computer they know: it disconnects them from this one and keeps them paired
-- **Display**: brightness, night light, each screen's scale and refresh rate. **Other displays**: mirroring to a TV
+- **Display**: brightness, night light, each screen's scale and refresh rate, and Arrange displays: the screens as tiles
+  to drag where they stand on your desk (the laptop's too, with the lid closed), so the pointer crosses where they meet,
+  the main display (workspaces 1–9: Make main, or `m`) and a phone dragged to Away, out of the pointer's reach. A drop
+  is applied at once. **Other displays**: mirroring to a TV
   (Screen Mirroring plugin), an iPad or iPhone as a display of its own (VNC Display plugin)
 - **Battery**: time left, the battery's health and **Low Power Mode** (tuned's power-saver profile; the icon turns
   yellow). The low battery warning at 10 % offers to turn it on, plugging in the charger turns it off; Launcher ›
@@ -280,7 +283,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Files and images | Nautilus, Loupe | |
 | Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) | `.md` files open in it, themed |
 | Web apps | Chromium app windows | your own, or ready-made ones with a key: WhatsApp, Slack, Teams, YouTube |
-| External display | Hyprland | workspaces 1–9 on the display, one on the laptop's screen (⌘0); with the lid closed only the display is used; where the laptop's screen is in Launcher › Settings › Display |
+| External display | Hyprland | workspaces 1–9 on the display, one on the laptop's screen (⌘0); with the lid closed only the display is used; where the screens are and which is the main one in Launcher › Settings › Display › Arrange displays |
 | Lock and idle | the login screen as the lock, hypridle | a screensaver after 10 min (a synthwave sunset, a falling-characters rain or a big clock), lock after 30 min (Settings › Screensaver); while locked, the same screensaver after the same 10 min, and a key or the mouse brings the password back (`nightdrive preview lock-saver [saver\|rain\|clock]` shows it) |
 | Smart home (optional) | [Home Assistant](plugins/home-assistant/README.md) | rooms, devices and scenes in the Launcher, pinned devices in the bar |
 | Mail, alternative (optional) | Thunderbird | themed, with a minimal toolbar ([details](docs/thunderbird.md)) |
@@ -498,6 +501,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive theme save "My theme"` | Saves the colour and the look as a theme of your own; `nightdrive theme themes` lists them, `use ID` switches, `delete ID` removes one, `reset` goes back to Default |
 | `nightdrive wallpaper set <image>` | Changes the wallpaper (an image from elsewhere, such as Downloads, is copied to your own backgrounds first); `nightdrive wallpaper current` prints it |
 | `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one, `mode eDP-1 2560x1440` the resolution (`auto` for either goes back to the default). With `--keep` last, a card asks whether to keep it and it goes back in 20 s unless you do. `display json` gives it all as JSON |
+| `nightdrive displays` | The Displays window (Settings › Display › Arrange displays). `nightdrive arrange` lists where the screens are (`--json`); `arrange side DP-1 left HDMI-A-1` puts one beside another, `main DP-1` makes it the main display, `away HEADLESS-IPHONE` a phone out of reach, `reset` back to Hyprland's own places |
 | `nightdrive sound` | Volume and outputs as JSON; `sound volume 40` sets the volume (`--mute on`/`off`), `sound output NAME` the output |
 | `nightdrive brightness 60` | The screen's brightness in percent; without a number, prints it |
 | `nightdrive network` | Wi-Fi and the network as JSON, with whether the internet answers; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |

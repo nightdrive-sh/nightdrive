@@ -4,7 +4,7 @@ import qs
 
 // VNC Display's part of the launcher (plugin-parts lists it while the plugin is on): its rows in Settings › Other displays
 // (displayRows: each device, on or off, and Add a display, whose pages are VncAddLevels.qml's), and a device's page (its
-// screen on or off, its workspace, place, size (VncAddLevels.qml's form) and name, how to connect, remove). bin/vnc-display does the work; this reads
+// screen on or off, its workspace, place (the Displays window, config/displays), size (VncAddLevels.qml's form) and name, how to connect, remove). bin/vnc-display does the work; this reads
 // `list --json` and `show NAME --json`.
 // The password stays out of the rows until asked for (Enter on its row, or the QR card: VncDisplayCard.qml), so a
 // screenshot of the launcher doesn't give it away.
@@ -22,19 +22,11 @@ Item {
     property string busy: ""                  // a command running: what it is doing, on the page's last row
     property string error: ""                 // the last command's complaint
 
-    readonly property var levels: ["vncdevice", "vncws", "vncplace"]
+    readonly property var levels: ["vncdevice", "vncws"]
     readonly property var inputs: ["vncdevice"]   // its Name field: ⌘⇧V pastes into it (ClipPicker)
-    // virtual-display.lua's places: a side of the desk's screens, or out of the pointer's reach
-    // "your display", or "displays" with more than one at the desk: the side is counted from all of them
-    readonly property string yours: Quickshell.screens.filter(s => !s.name.startsWith("HEADLESS-")).length > 1 ? "your displays" : "your display"
-    readonly property var places: [["right", "Right of " + yours, "arrow-right"], ["left", "Left of " + yours, "arrow-left"],
-                                   ["above", "Above " + yours, "arrow-up"], ["below", "Below " + yours, "arrow-down"],
-                                   ["away", "Away", "circle-off"]]
-    function placeName(p) { const f = places.find(x => x[0] === (p === "beside" ? "right" : p)); return f ? f[1] : p }
     readonly property var titles: ({ vncdevice: "Settings › Other displays › " + label(cur),
-                                     vncws: "Settings › Other displays › " + label(cur) + " › Workspace",
-                                     vncplace: "Settings › Other displays › " + label(cur) + " › Place" })
-    readonly property var parents: ({ vncdevice: "otherdisplays", vncws: "vncdevice", vncplace: "vncdevice" })
+                                     vncws: "Settings › Other displays › " + label(cur) + " › Workspace" })
+    readonly property var parents: ({ vncdevice: "otherdisplays", vncws: "vncdevice" })
 
     function label(n) {
         if (/^(ip(ad|hone)|macbook)/.test(n)) return n.replace(/^ipad/, "iPad").replace(/^iphone/, "iPhone").replace(/^macbook/, "MacBook")
@@ -84,7 +76,9 @@ Item {
             const i = info
             const rows = [{ kind: "vncswitch", name: "Display", glyph: phone(dev()) ? "smartphone" : "tablet", switchOn: i.on },   // the workspace is on its own row
                           { kind: "nav", name: "Workspace", glyph: "layout-grid", target: "vncws", summary: "⌘" + i.workspace },
-                          { kind: "nav", name: "Place", glyph: "move", target: "vncplace", summary: placeName(dev().place) },
+                          // Where it is beside the desk's screens, or away: the Displays window (config/displays), with it picked
+                          { kind: "vncarrange", name: "Place", glyph: "move", summary: dev().place === "away" ? "Away" : undefined,
+                            footer: "Enter: open Displays  ·  drag it beside your displays, or to Away" },
                           { kind: "vncsize", name: "Size", glyph: "scaling", summary: sizeName(dev()) },
                           // Typed into in place (FieldBox.qml), set with Enter or by leaving the row: rename
                           { kind: "vncname", key: "name", field: true, name: "Name", glyph: "tag", summary: cur },
@@ -124,14 +118,6 @@ Item {
             if (error !== "") rows.push({ kind: "note", name: error })
             return rows
         }
-        if (level === "vncplace") {
-            const mine = dev().place === "beside" ? "right" : dev().place
-            const rows = places.map(([p, name, glyph]) => ({ kind: "vncplace", place: p, name: name, glyph: p === mine ? "check" : glyph,
-                summary: p === mine ? "current" : p === "away" ? "out of the pointer's reach" : undefined }))
-            if (busy !== "") rows.push({ kind: "hint", name: busy })
-            if (error !== "") rows.push({ kind: "note", name: error })
-            return rows
-        }
         return []
     }
     function dev() { return devices.find(d => d.name === cur) || {} }
@@ -157,8 +143,9 @@ Item {
             run("Moving to workspace " + it.ws + "…", ["workspace", cur, String(it.ws)], () => { if (l.level === "vncws") l.back() })
             return true
         }
-        if (it.kind === "vncplace") {
-            run("Moving…", ["place", cur, it.place], () => { if (l.level === "vncplace") l.back() })
+        if (it.kind === "vncarrange") {
+            l.open = false
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.config/displays/displays", "select", dev().output])
             return true
         }
         if (it.kind === "vncsize") { if (adder()) adder().edit(dev()); return true }

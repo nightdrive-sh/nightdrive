@@ -1,8 +1,8 @@
 import QtQuick
 import Quickshell
 
-// The launcher's Settings › Display (brightness, night light, Screen Mirroring's rows from MirroringLevels.qml, where the
-// laptop's screen is next to an external one, the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, Low Power Mode, then the details, as in the top bar's battery menu), and Game Mode's
+// The launcher's Settings › Display (brightness, night light, Screen Mirroring's rows from MirroringLevels.qml, the
+// Arrangement row that opens the Displays window (config/displays: where the screens are, the main one), the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, Low Power Mode, then the details, as in the top bar's battery menu), and Game Mode's
 // switch on Settings' own page (LauncherSettings.qml), beside Battery: the power profile's other end.
 // The brightness rows (screen, keyboard: the row's key) are sliders that Launcher.qml draws (bright, keys, setBright) and
 // ←/→ steps (stepBright), also in the root search; Launcher.qml's displayItems() puts them there.
@@ -13,7 +13,6 @@ Item {
 
     property var displays: null               // [{ name, desc, scale, opts: [{ value, size }] }] (hypr/scripts/display list)
     property var rates: ({})                  // { output: { current, chosen: hz or "auto", hz: [...] } } (display rates)
-    property string side: ""                  // the laptop's screen: left | right | above | below | auto (display side)
     property real bright: -1                  // Brightness: 0..1 (brightnessctl), -1 = no backlight (a VM) or not read yet
     property real pendingBright: -1           // the slider's value waiting to be applied (throttled)
     property real keys: -1                    // Keyboard backlight: 0..1, -1 = none (a desktop) or not read yet
@@ -52,7 +51,7 @@ Item {
     // and Game Mode's row (Settings, the root search), which Low Power Mode may have turned off since
     function opened() { brightProc.running = true; keysProc.running = true; nightProc.running = true; gameProc.running = true }
     function entered(level) {
-        if (level === "display") { displayProc.running = true; ratesProc.running = true; sideProc.running = true; brightProc.running = true; keysProc.running = true; nightProc.running = true }
+        if (level === "display") { displayProc.running = true; ratesProc.running = true; brightProc.running = true; keysProc.running = true; nightProc.running = true }
         if (level === "battery") { battProc.running = true; battDetailProc.running = true; lowProc.running = true }
     }
     function shiftActivate(it) {}
@@ -68,19 +67,13 @@ Item {
             if (keys >= 0) out.push({ kind: "brightness", key: "keys", name: "Keyboard", glyph: "keyboard", summary: Math.round(keys * 100) + "%" })
             if (night !== "") out.push({ kind: "nightlight", name: "Night light", glyph: "moon", switchOn: night === "on" })
             if (out.length > 0) out.unshift({ kind: "header", name: "Brightness" })
+            // Where the screens are and which is the main one: the Displays window, a picture to drag them in. Always
+            // there, also with one screen on (a closed lid hid the laptop's old side rows, #1800), as a virtual screen or
+            // a display plugged in later is placed there too
+            out.push({ kind: "header", name: "Arrangement" },
+                     { kind: "arrange", name: "Arrange displays", glyph: "move", summary: desk.length > 1 ? desk.length + " displays" : undefined,
+                       footer: "Enter: open Displays  ·  drag the screens where they are on your desk" })
             // Scales the panel divides evenly, shown as the resulting desktop size ("looks like" in macOS); current one marked
-            // Where the laptop's own screen is, so the pointer crosses where the screens meet: only with both on.
-            // eDP is the connector of a laptop's panel (BUILTIN_DISPLAY in hyprland.lua)
-            if (side !== "" && desk.length > 1 && desk.some(d => /^eDP-/.test(d.name))) {
-                out.push({ kind: "header", name: "Laptop screen" })
-                for (const [v, label, glyph] of [["below", "Below the display", "arrow-down"], ["above", "Above the display", "arrow-up"],
-                                                 ["left", "Left of the display", "arrow-left"], ["right", "Right of the display", "arrow-right"],
-                                                 ["auto", "Automatic", "monitor"]]) {
-                    const cur = side === v
-                    out.push({ kind: "side", value: v, name: label, glyph: cur ? "check" : glyph,
-                               summary: cur ? "current" : v === "auto" ? "side by side" : undefined })
-                }
-            }
             for (const d of desk) {
                 out.push({ kind: "header", name: "Scale" + (desk.length > 1 ? " · " + d.name + (d.desc !== "-" ? "  " + d.desc : "") : "") })
                 for (const o of d.opts) {
@@ -164,10 +157,9 @@ Item {
             Quickshell.execDetached([scripts + "/game-mode", on ? "on" : "off"])
             return true
         }
-        if (it.kind === "side") {         // stays open like the scale rows; Hyprland reloads with the new arrangement
-            l.keepSelection()
-            side = it.value
-            Quickshell.execDetached([scripts + "/display", "side", it.value])
+        if (it.kind === "arrange") {      // the Displays window comes next
+            l.open = false
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.config/displays/displays"])
             return true
         }
         if (it.kind === "rate") {         // stays open like the scale rows; Hyprland reloads with the new mode
@@ -231,11 +223,6 @@ Item {
             p.launcher.keepSelection()
             p.rates = r
         }
-    }
-    Sh {
-        id: sideProc
-        script: '"$HOME/.config/hypr/scripts/display" side'
-        onResult: text => { p.launcher.keepSelection(); p.side = text.trim() }
     }
     // Brightness: read on entering and every 2 s while there (the brightness keys also work then),
     // not while the slider is held or a value is waiting to be applied

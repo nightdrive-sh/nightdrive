@@ -11,7 +11,8 @@
 #                             preferred mode, often 60 Hz on a TV that does 120), then every rate at its current resolution
 #   display rate <out> <hz>   saves that rate (at the current resolution) or auto for that output and reloads Hyprland
 #   display side [<side>]     where the laptop's own screen is next to the external one: left, right, above, below or
-#                             auto (Hyprland's choice: side by side); without one, prints the saved side
+#                             auto (Hyprland's choice: side by side); without one, prints the saved side. The Displays
+#                             window (arrange) places every screen and replaces it: once it has, this goes to arrange
 #   display json              every output as JSON (Claude's tools, config/mcp/tools/sound-display.json): name,
 #                             description, resolution, refresh, scale, scales (as list's), resolutions (WxH, each at its
 #                             highest rate), the saved_scale and saved_mode (null: the default), and a laptop
@@ -141,6 +142,11 @@ case ${1:-} in
     [[ $side =~ ^(left|right|above|below|auto)$ ]] || { echo "bad side: $side" >&2; exit 1; }
     mkdir -p "${state%/*}"
     { grep -v "^builtin " "$state" 2>/dev/null || true; [[ $side == auto ]] || echo "builtin $side"; } > "$state.tmp" && mv "$state.tmp" "$state"
+    # Once the Displays window has arranged the screens (arrange's file wins over the side), the side goes there:
+    # beside the main display, centred (auto: on its right, as Hyprland put it)
+    if [[ -f $HOME/.local/state/nightdrive/arrangement ]]; then
+      exec "$here/arrange" side builtin "${side/auto/right}" main >/dev/null
+    fi
     hyprctl reload >/dev/null ;;
   *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

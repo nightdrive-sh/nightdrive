@@ -3,6 +3,9 @@
 -- require("display")({ scale = MONITOR_SCALE, builtin = BUILTIN_DISPLAY }).
 
 local HOME = os.getenv("HOME")
+-- Where the screens are and which is the main one, as the Displays window saves it: the main display is the first
+-- external one below, with workspaces 1–9
+local Arrangement = require("arrangement")
 
 -- A virtual screen (hyprctl output create headless: a phone or a tablet showing it over VNC) is not an external display:
 -- it takes neither workspaces 1–9 from the laptop's own screen nor the place beside it
@@ -80,15 +83,21 @@ return function(machine)
         position = "auto",
         scale    = MONITOR_SCALE,
     })
-    -- The side: the external screen at 0,0 and the laptop's centred along its edge, in layout pixels (after the scale), so the
-    -- pointer crosses where the screens really meet. Without one, or alone, Hyprland places them itself (auto: side by side).
+    -- The arrangement from the Displays window (arrangement.lua, scripts/arrange) first: each desk screen it places is
+    -- where it says. Without it, the side: the external screen at 0,0 and the laptop's centred along its edge, in layout
+    -- pixels (after the scale), so the pointer crosses where the screens really meet. Without one, or alone, Hyprland
+    -- places them itself (auto: side by side).
     local positions = {}
+    for _, m in ipairs(hl.get_monitors()) do
+        local at = not isVirtual(m) and Arrangement.position(m)
+        if at then positions[m.name] = { m = m, pos = at } end
+    end
     do
         local builtin, ext
-        for _, m in ipairs(hl.get_monitors()) do
+        for _, m in ipairs(Arrangement.ordered(hl.get_monitors())) do
             if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext and not isVirtual(m) then ext = m end
         end
-        if builtinSide and builtin and ext then
+        if builtinSide and builtin and ext and next(positions) == nil then
             local function size(m)
                 local s = scales[m.name] or m.scale
                 local w, h = math.floor(m.width / s + 0.5), math.floor(m.height / s + 0.5)
@@ -148,7 +157,7 @@ return function(machine)
     LAPTOP_WORKSPACE = 10
     local function screens()
         local builtin, ext
-        local list = hl.get_monitors() or {}
+        local list = Arrangement.ordered(hl.get_monitors() or {})
         if #list == 0 then list = connectedScreens() end   -- none in a headless sandbox either: then no rules at all
         for _, m in ipairs(list) do
             if m.name == BUILTIN_DISPLAY then builtin = m elseif not ext and not isVirtual(m) then ext = m end

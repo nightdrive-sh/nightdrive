@@ -1,0 +1,21 @@
+#!/bin/bash
+# displays [open | select OUTPUT | restart | quit | log]: Displays, the window that shows the screens as tiles to drag
+# where they are on the desk (#1800): the laptop's own, the external displays and the virtual ones (VNC Display's), the
+# main display, and the virtual screens put away. hypr/scripts/arrange does the work and keeps the state; `select`
+# opens the window with that screen picked (VNC Display's Place). `nightdrive displays`, Settings › Display ›
+# Arrangement and Settings › Other displays › a device › Place open it.
+set -u
+
+QS_DIR=$(dirname "$(readlink -f "$0")")                 # this folder: the window's own Quickshell config
+
+# The window: started, brought forward and stopped by the apps' kit (kit/app.sh)
+APP_TITLE=Displays
+APP_IPC=displays
+. "$QS_DIR/kit/app.sh"
+
+case ${1:-open} in
+  select) [[ -n ${2:-} ]] || { echo "usage: displays select OUTPUT" >&2; exit 1; }
+          open_ready && ipc select "$2" ;;
+  help|-h|--help) sed -n '2,6s/^# \{0,1\}//p' "$0" ;;
+  *) app_command "$@"; rc=$?; ((rc == 2)) && { sed -n '2,6s/^# \{0,1\}//p' "$0" >&2; exit 1; }; exit $rc ;;
+esac

@@ -49,6 +49,14 @@ hl.window_rule({
     size  = "460 monitor_h-57",             -- the screen's height under the bar; it scrolls
     move  = "monitor_w-470 47",
 })
+-- Displays (config/displays): a settings card over the windows, as macOS's; ⌘⇧T tiles it
+hl.window_rule({
+    name  = "float-displays",
+    match = { class = "^org\\.quickshell$", title = "^Displays$" },
+    float = true,
+    size  = "760 560",
+    center = true,
+})
 -- Welcome to Nightdrive (config/welcome): its window rules, and what it opens comes over it
 require("welcome")
 hl.window_rule({
