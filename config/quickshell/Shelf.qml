@@ -8,11 +8,26 @@ import Quickshell.Wayland
 // Files can be dragged from the shelf into another app (a successful drop removes them from the shelf). The shelf closes by itself when the cursor leaves.
 // Files are not copied, the shelf only holds paths. State is in memory (reset when Quickshell restarts).
 // Keyboard: qs ipc call shelf toggle  (keeps the shelf open until you close it)  /  qs ipc call shelf clear
+// Settings › Shelf turns it off (launcher.json's shelf)
 Scope {
     id: shelf
     property var items: []             // file:// URLs
     property bool open: false
     property bool pinned: false        // a shelf opened via IPC doesn't close by itself
+    // Settings › Shelf (launcher.json's shelf, missing = on; the launcher writes it). Off: the trigger at the top edge is
+    // gone and IPC toggle does nothing, so neither a dragged file nor a lingering cursor opens it (#3128)
+    property bool enabled: true
+    FileView {
+        path: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
+        watchChanges: true; onFileChanged: reload(); printErrors: false
+        onLoaded: {
+            let v = {}
+            try { v = JSON.parse(text()) || {} } catch (e) {}
+            shelf.enabled = v.shelf !== false
+        }
+        onLoadFailed: shelf.enabled = true
+    }
+    onEnabledChanged: if (!enabled) { pinned = false; open = false }
     // An outgoing drag in progress (the shelf must not close mid-drag); it runs from DragOut.qml (#3020)
     readonly property int dragging: DragOut.active && DragOut.from(card) ? 1 : 0
     // 0 = hidden above the screen, 1 = fully down; the window stays mapped until the slide-up has finished
@@ -56,12 +71,13 @@ Scope {
 
     IpcHandler {
         target: "shelf"
-        function toggle(): void { shelf.pinned = !shelf.open || !shelf.pinned; shelf.open = shelf.pinned }
+        function toggle(): void { if (!shelf.enabled) return; shelf.pinned = !shelf.open || !shelf.pinned; shelf.open = shelf.pinned }
         function clear(): void { shelf.clear() }
     }
 
     // Invisible trigger at the top edge (center): a drag arriving here opens the shelf.
     PanelWindow {
+        visible: shelf.enabled
         anchors { top: true }
         // The trigger is the notch: hovering or dragging over it opens the shelf, and dropping works there already.
         // No wider: the bar's icons on either side must stay clickable.

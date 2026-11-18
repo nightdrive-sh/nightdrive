@@ -49,6 +49,9 @@ Item {
         ], lv.behave.crashReportItems, [
             { kind: "header", name: "System" },
             { kind: "nav", name: "Launcher", glyph: "text-search", target: "launcherprefs" },
+            // Shelf.qml: off, the top edge ignores a dragged file and `shelf toggle` does nothing (#3128)
+            { kind: "lpref", key: "shelf", name: "Shelf", glyph: "inbox", switchOn: launcher.prefs.shelf,
+              footer: "Enter: on/off  ·  drag a file to the top edge to park it there" },
             { kind: "nav", name: "Region", glyph: "calendar-clock", target: "region", summary: Regional.name },   // dates and times (RegionLevels)
             { kind: "nav", name: "Computer name", glyph: "laptop", target: "compname", summary: lv.behave.compName }   // what phones see
         ], lv.behave.remoteLoginItems, [
@@ -81,6 +84,7 @@ Item {
                                               "Top bar": "waybar panel menu bar",
                                               "Firefox": "browser tabs tab bar links new window",
                                               "Launcher": "search fuzzy typos shortcuts hints spotlight",
+                                              "Shelf": "drop files here drag park top edge dropover yoink",
                                               "Region": "date format time clock 24 hour 12 hour am pm week starts monday sunday locale lc_time country",
                                               "Computer name": "hostname rename device localsend airplay ferry phone",
                                               "Remote login": "ssh sshd server remote access terminal sharing",

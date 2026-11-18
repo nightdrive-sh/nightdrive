@@ -84,15 +84,16 @@ PanelWindow {
     readonly property int detailWidth: 860    // the card's width while showing them
     property alias detailCard: details
     // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts, notes } in ~/.local/state/nightdrive/launcher.json (missing = on;
-    // deck, the music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for)
-    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true, notes: true, calendar: true })
+    // deck, the music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for).
+    // shelf is Settings › Shelf's switch, kept here with the other switches; Shelf.qml reads the same file
+    property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true, notes: true, calendar: true, shelf: true })
     readonly property string prefsFile: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
     FileView {
         path: win.prefsFile; watchChanges: true; onFileChanged: reload(); printErrors: false
         onLoaded: {
             let v = {}
             try { v = JSON.parse(text()) || {} } catch (e) {}
-            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true, contacts: v.contacts !== false, notes: v.notes !== false, calendar: v.calendar !== false }
+            const n = { fuzzy: v.fuzzy !== false, shortcuts: v.shortcuts !== false, deck: v.deck === true, comma: v.comma === true, contacts: v.contacts !== false, notes: v.notes !== false, calendar: v.calendar !== false, shelf: v.shelf !== false }
             if (JSON.stringify(n) !== JSON.stringify(win.prefs)) win.prefs = n
         }
     }

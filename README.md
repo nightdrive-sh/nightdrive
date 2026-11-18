@@ -198,7 +198,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 
 ### Little things that add up
 
-- **Shelf**: drag a file to the top edge of the screen to park it, then drag it into another app.
+- **Shelf**: drag a file to the top edge of the screen to park it, then drag it into another app. Settings › Shelf
+  turns it off.
 - **Dictation**: hold F5 or Fn on a Mac, Insert on a PC, speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Snippets**: Launcher › Tools › Snippets; Enter pastes one. With auto-expand on, typing a trigger anywhere replaces it
   with the text. A snippet can have several lines (Shift+Enter), like an email signature.
