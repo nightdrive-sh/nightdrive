@@ -101,6 +101,26 @@ class SocketTest(unittest.TestCase):
             self.assertIn(" 403 ", self.get(path, "friend@example.com").splitlines()[0])
             self.assertIn(" 403 ", self.get(path).splitlines()[0])
 
+    def test_page_load_burst_fits_the_backlog(self):
+        """A page load asks for all its files at once, and tailscaled dials without waiting (EAGAIN → 502). With
+        socketserver's backlog of 5 a module now and then got a 502, and one failed import stops the whole page: only
+        index.html's static Dictate showed (#3080). Nothing is accepted here, so every dial must fit the backlog."""
+        folder = tempfile.mkdtemp()
+        path = os.path.join(folder, "s.sock")
+        httpd = server.TailscaleServer(path, server.Handler)
+        self.addCleanup(httpd.server_close)
+        burst = 2 * len(os.listdir(server.WEB))     # every file of the page, twice over: room to grow
+        clients = []
+        try:
+            for _ in range(burst):
+                c = socket.socket(socket.AF_UNIX)
+                clients.append(c)
+                c.setblocking(False)
+                c.connect(path)         # BlockingIOError when the backlog is full
+        finally:
+            for c in clients:
+                c.close()
+
     def test_security_headers(self):
         path = self.serve()
         with mock.patch.object(access, "TAILSCALED_UID", os.getuid()):

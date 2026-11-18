@@ -299,6 +299,9 @@ class Handler(BaseHTTPRequestHandler):
 class TailscaleServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     """HTTP on a Unix socket, for tailscaled alone (access.py)."""
     daemon_threads = True
+    # A page load dials once per file, all at once, and tailscaled doesn't wait on a full backlog: it answers 502. With
+    # socketserver's 5, a module now and then failed, and one failed import stops the whole page (#3080)
+    request_queue_size = socket.SOMAXCONN
 
     def verify_request(self, request, client_address):
         return access.peer_uid(request) == access.TAILSCALED_UID
