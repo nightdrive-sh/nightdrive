@@ -154,6 +154,7 @@ body.offline .sessions, body.offline .actions { opacity: .45; transition: opacit
 .dhead .who b { font-size: 18px; font-weight: 500; color: var(--title); }
 .dhead .who span, .dhead .who b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dhead .who span { font-size: 13px; color: var(--dim); }
+.dhead .who em { font-style: normal; }
 .close { width: 44px; height: 44px; border-radius: 22px; background: var(--hover); border: 1px solid var(--border); flex: none;
          display: flex; align-items: center; justify-content: center; }
 .log { flex: 1; min-height: 0; overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-radius: 14px;

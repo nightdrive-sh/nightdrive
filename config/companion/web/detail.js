@@ -121,9 +121,10 @@ function frame(state) {
   if (!view) return;
   const s = state?.sessions?.find(x => x.id === view.id);
   const [text, colour] = s ? label(s) : ["Ended", "var(--dim)"];
-  const head = `<div class="who"><b>${esc(s ? s.name || s.project : "The session has ended")}</b><span>${esc(s?.name ? s.project : "")}</span></div>
-    <span class="spacer"></span><span class="sec" style="color:${colour}">${esc(text)}</span>
-    <button class="close" aria-label="Close">${icon("x", 20)}</button>`;
+  // Under the name, after its project: what it is doing (Working · 5 min), where the eye already is
+  const what = `<em style="color:${colour}">${esc(text)}</em>`;
+  const head = `<div class="who"><b>${esc(s ? s.name || s.project : "The session has ended")}</b><span>${s?.name ? `${esc(s.project)} · ${what}` : what}</span></div>
+    <span class="spacer"></span><button class="close" aria-label="Close">${icon("x", 20)}</button>`;
   const foot = s ? buttons(s) : "";
   if (head !== view.headSig) { view.headSig = head; view.el.querySelector(".dhead").innerHTML = head; }
   // the buttons stay as they are under a held Answer (not taken from under the finger), and when nothing changed
