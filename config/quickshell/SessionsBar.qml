@@ -19,7 +19,7 @@ import "SessionGroups.js" as Groups
 // number small before its time instead of in its name, which starts with a capital (#2427), and the time in brackets
 // ("#2427 8 min" read as one number); the number goes before the name is shortened (SessionChip.tagShown). The number
 // is hidden for now (showTaskTag; #3043).
-// At its right end, Inbox's button (SessionsInbox.qml, #3179): the sessions' unread messages.
+// At its right end, Inbox's button (SessionsInbox.qml, #3179): the unread messages, as the top bar's mailbox.
 PanelWindow {
     id: sb
     readonly property int barH: Theme.barHeight   // as tall as the top bar

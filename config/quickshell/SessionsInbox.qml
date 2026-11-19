@@ -3,8 +3,8 @@ import Quickshell
 import Quickshell.Io
 
 // The sessions bar's Inbox button (#3179), at its right end: the mailbox (Inbox's own icons, plugins/inbox/icons), its
-// flag raised and the count while Claude's sessions have left messages you haven't read; a click opens Inbox with only
-// the sessions' messages (`inbox from claude`). Nothing pops up and nothing sounds: a message waits until you have time.
+// flag raised and the count while there are messages you haven't read; a click opens Inbox. The same as the top bar's
+// mailbox, for every sender: one Inbox, no sessions-only view (#3257). Nothing pops up and nothing sounds.
 // The numbers come from `nightdrive inbox count --json` (config/inbox), every pollEvery ms while the bar shows: the
 // core's command is there on every install, the window may not be (then there's no button: installed).
 Rectangle {
@@ -17,7 +17,7 @@ Rectangle {
     readonly property int pad: 10
     readonly property int iconW: 19        // as the top bar's Inbox module (#3212)
 
-    property int unread: 0                 // the sessions' unread messages, all of them
+    property int unread: 0                 // every unread message
 
     visible: installed
     width: installed ? pad + iconW + (unread ? 6 + num.implicitWidth : 0) + pad : 0
@@ -48,7 +48,7 @@ Rectangle {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {
-            Quickshell.execDetached([btn.home + "/.local/bin/inbox", "from", "claude"])
+            Quickshell.execDetached([btn.home + "/.local/bin/inbox"])
             poll.restart()
         }
     }
@@ -60,8 +60,8 @@ Rectangle {
             onStreamFinished: {
                 try {
                     const r = JSON.parse(text)
-                    btn.unread = r.claude || 0
-                } catch (e) { /* an older core without the sessions' count: no number */ }
+                    btn.unread = r.unread || 0
+                } catch (e) { /* not JSON: no number */ }
             }
         }
     }

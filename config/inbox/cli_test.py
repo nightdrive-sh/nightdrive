@@ -112,7 +112,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual([m["id"] for m in self.jcli("list", "--mine")["messages"]], [a])
         self.jcli("read", a)
         self.assertEqual([m["id"] for m in self.jcli("list", "--unread")["messages"]], [b])
-        self.assertEqual(self.jcli("count"), {"unread": 1, "total": 2, "claude": 0})
+        self.assertEqual(self.jcli("count"), {"unread": 1, "total": 2})
         self.jcli("archive", b[-4:])
         self.assertEqual(self.jcli("count")["unread"], 0)
         self.assertEqual([m["id"] for m in self.jcli("list", "--archived")["messages"]], [b])
@@ -123,15 +123,15 @@ class CliTest(unittest.TestCase):
         self.jcli("delete", a)
         self.assertEqual(self.jcli("count")["total"], 1)
 
-    def test_the_sessions_count_and_key(self):
+    def test_one_count_for_every_sender(self):
+        # The sessions bar's button counts what the top bar's does: no sessions-only number or key (#3257)
         a = self.jcli("post", "Mine")["id"]
         self.jcli("post", "Theirs", session=OTHER)
-        self.jcli("post", "Theirs too", session=OTHER)
         self.jcli("post", "An app's", "--app", "Tasks")
-        self.assertEqual(self.jcli("count"), {"unread": 4, "total": 4, "claude": 3})
+        self.assertEqual(self.jcli("count"), {"unread": 3, "total": 3})
         self.jcli("read", a)
-        self.assertEqual(self.jcli("count")["claude"], 2)
-        self.assertEqual(len(self.jcli("list", "--from", "claude")["messages"]), 3)
+        self.assertEqual(self.jcli("count")["unread"], 2)
+        self.assertEqual(self.jcli("list", "--from", "claude")["messages"], [])
 
     def test_text_output(self):
         mid = self.jcli("post", "Readable", "--action", "run", "Go", "echo 'a b'")["id"]

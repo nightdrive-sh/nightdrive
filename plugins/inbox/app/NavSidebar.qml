@@ -20,8 +20,7 @@ AppSidebar {
         { key: "archive", glyph: "archive", label: "Archive" }
     ]
     // Every row in order, for the keys
-    // …or every session's, from the sessions bar's Inbox button (`inbox from claude`, #3179)
-    readonly property bool sessionPicked: store.from.startsWith("session:") || store.from === "claude"
+    readonly property bool sessionPicked: store.from.startsWith("session:")
     readonly property var entries: views.map(v => ({ view: v.key, from: "" }))
         .concat(sessionPicked ? [{ view: store.view, from: store.from, label: store.fromLabel }] : [])
         .concat(store.senders.map(s => ({ view: store.view, from: s.key, label: s.label })))

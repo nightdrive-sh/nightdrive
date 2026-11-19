@@ -37,7 +37,7 @@ session can leave one whether this window is installed or not.
 | --- | --- |
 | `inbox` | Open the window |
 | `inbox show ID` | The window on that message (an id or its last four characters) |
-| `inbox from KEY` | The window on one sender's messages (`nightdrive inbox list --from`'s keys; `claude`: every session's) |
+| `inbox from KEY` | The window on one sender's messages (`nightdrive inbox list --from`'s keys) |
 
 The messages are `nightdrive inbox`'s: `post`, `list` (`--from`, `--search`), `show`, `read`, `archive`, `delete` and
 `press` (docs/inbox.md).

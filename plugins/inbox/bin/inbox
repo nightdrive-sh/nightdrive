@@ -45,15 +45,10 @@ show() {
   open_ready && ipc pick "$id"
 }
 
-# from KEY: the window open on one sender's messages (nightdrive inbox list --from's keys); "claude" is every Claude
-# session's, as the sessions bar's Inbox button opens it (#3179)
+# from KEY: the window open on one sender's messages (nightdrive inbox list --from's keys)
 from() {
-  local key=${1:?usage: inbox from KEY} label
-  case $key in
-    claude) label="Claude's sessions" ;;
-    *)      label=${key#*:} ;;
-  esac
-  open_ready && ipc from "$key" "$label"
+  local key=${1:?usage: inbox from KEY}
+  open_ready && ipc from "$key" "${key#*:}"
 }
 
 usage() {
@@ -62,7 +57,7 @@ Usage: inbox [command]
 
   (none), open     open Inbox, or bring it forward if it is open
   show ID          open Inbox on that message
-  from KEY         open Inbox on one sender's messages (claude: every session's)
+  from KEY         open Inbox on one sender's messages
   install          Inbox among the desktop's apps (the installer)
   uninstall        take it out again (the messages stay)
   restart          close and open again (after a change to the app)

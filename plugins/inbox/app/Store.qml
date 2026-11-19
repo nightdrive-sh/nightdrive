@@ -74,8 +74,7 @@ Item {
                     store.unread = r.unread
                     store.error = ""
                     // A sender no longer there (its last message archived): every sender again
-                    if (store.from && !r.senders.some(s => s.key === store.from) && !store.from.startsWith("session:")
-                        && store.from !== "claude") {
+                    if (store.from && !r.senders.some(s => s.key === store.from) && !store.from.startsWith("session:")) {
                         store.from = ""; store.fromLabel = ""; store.raw = ""; store.again = true
                     }
                 } catch (e) {

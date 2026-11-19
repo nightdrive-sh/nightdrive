@@ -26,8 +26,7 @@ the number.
 The top bar shows a mailbox: its flag up and how many while some are unread, its flag down once all are read (Settings › Top bar › Items
 hides it). A click opens its menu: the newest messages, unread ones marked; a click on one opens Inbox on it, and Open
 Inbox the whole window. The sessions bar
-ends with the same mailbox for the sessions' messages (its flag down when you've read them all; a click shows only
-theirs). Nothing more: no sound, no pop-up.
+ends with the same mailbox, which opens Inbox. Nothing more: no sound, no pop-up.
 
 ## The command
 
@@ -40,8 +39,8 @@ nightdrive inbox press ID N|session|task [--yes]
 
 Each takes `--json`. An id may be shortened to its last four characters. A button is `--action open|url|run|session|task
 LABEL VALUE`, e.g. `--action run "Start the game" "godot --path ."` (run from `--dir`, default the current folder).
-`--from` narrows the list to `session:ID`, `project:NAME`, `app:NAME`, `other` or `claude` (every session's); `list --json` gives each
-message's sender keys and the senders with their counts. `count --json` gives the unread ones and the sessions' (`claude`). `press` does what a button does (N: 0 the first), or goes to
+`--from` narrows the list to `session:ID`, `project:NAME`, `app:NAME` or `other`; `list --json` gives each
+message's sender keys and the senders with their counts. `count --json` gives the unread ones and the total. `press` does what a button does (N: 0 the first), or goes to
 the sender's session or task; a run button only with `--yes`. An app names itself with `--app NAME`; a message from neither a Claude session nor an app is marked as such.
 
 Files can come from your home folder or `/tmp`, up to 10 per message and 25 MB each, and never hidden ones (`~/.ssh`,

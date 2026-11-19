@@ -212,12 +212,11 @@ def cmd_press(a):
 
 
 def cmd_count(a):
-    """The bars' numbers (#3179): every unread message for the top bar's icon, Claude's sessions' for the sessions
-    bar's button."""
+    """The bars' number (#3179): every unread message, for the top bar's icon and the sessions bar's button alike
+    (one Inbox for all, #3257)."""
     msgs = store.messages(False)
     unread = [m for m in msgs if not m.get("read")]
-    claude = sum(1 for m in unread if (m.get("from") or {}).get("kind") == "claude")
-    emit(a, {"unread": len(unread), "total": len(msgs), "claude": claude}, str(len(unread)))
+    emit(a, {"unread": len(unread), "total": len(msgs)}, str(len(unread)))
 
 
 def parser():
@@ -257,7 +256,7 @@ def parser():
     g.add_argument("--all", action="store_true")
     p.add_argument("--unread", action="store_true")
     p.add_argument("--mine", action="store_true", help="only this session's (or --app's) own")
-    p.add_argument("--from", dest="sender", metavar="KEY", help="one sender's: session:ID, project:NAME, app:NAME, other; claude = every session's")
+    p.add_argument("--from", dest="sender", metavar="KEY", help="one sender's: session:ID, project:NAME, app:NAME, other")
     p.add_argument("--search", metavar="WORDS", help="those with every word in the title, text or sender")
     p.add_argument("--limit", type=int, default=LIST_LIMIT, help=f"at most N (default {LIST_LIMIT}, 0 for all)")
     p = add("show", cmd_show, "one message, whole")
