@@ -75,13 +75,34 @@ def _from_file(path):
     return ""
 
 
+def _queued(entry):
+    """A prompt you gave while the session was at work (#3147): Claude Code reads it in with its next tool result and
+    writes it not as a user's message but as an attachment, {"type": "attachment", "attachment": {"type":
+    "queued_command", "prompt": …, "origin": {"kind": "human"}}}, where it was read in. The prompt is text, or a
+    list of parts when it came with an image. Another session's message and a background task's notice come the same
+    way, with another origin: not yours, so not shown."""
+    a = entry.get("attachment") or {}
+    if a.get("type") != "queued_command" or (a.get("origin") or {}).get("kind") != "human":
+        return None
+    prompt = a.get("prompt")
+    if isinstance(prompt, list):
+        prompt = "\n".join(str(c.get("text") or "") for c in prompt if isinstance(c, dict) and c.get("type") == "text")
+    text = str(prompt or "").strip()
+    return text if text and not text.startswith("<") else None
+
+
 def _conversation(path):
-    """What the session's own view shows (web/detail.js): your prompts, Claude's texts whole up to LONG, and its tool
-    calls as one line each. Tool results, thinking and Claude Code's own wrappers (<command-name>, <system-reminder>,
-    which come as a user's text) are left out."""
+    """What the session's own view shows (web/detail.js): your prompts, also those given while it worked, Claude's
+    texts whole up to LONG, and its tool calls as one line each. Tool results, thinking and Claude Code's own wrappers
+    (<command-name>, <system-reminder>, which come as a user's text) are left out."""
     out = []
     for entry in _lines(path, RECENT_TAIL):
         role = entry.get("type")
+        if role == "attachment":
+            text = _queued(entry)
+            if text:
+                out.append({"role": "user", "kind": "text", "text": text[:LONG]})
+            continue
         if role not in ("user", "assistant") or entry.get("isMeta"):
             continue
         for item in _items(entry):
