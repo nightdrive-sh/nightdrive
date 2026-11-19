@@ -11,7 +11,7 @@ const FINAL_WAIT_MS = 1500;    // then stop(): its final result comes before its
 const TAP_MS = 350;            // a press shorter than this, with no words, is a tap (tapped(), when given)
 
 // The language it listens for: the device's own (one saved as companion.lang wins, for a later choice)
-function lang() {
+export function lang() {
   try { return localStorage.getItem("companion.lang") || navigator.language || "fi-FI"; } catch { return navigator.language || "fi-FI"; }
 }
 

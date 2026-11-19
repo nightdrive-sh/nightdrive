@@ -2,6 +2,12 @@
 
 export const store = { state: null, online: false, listeners: [] };
 
+// Nightdrive's iOS app (bridge 2 and later) can be the computer's microphone (mic.js): its event stream names this page,
+// so the server sends that page alone its start and stop (protocol.md › The microphone)
+export const micDevice = window.nightdrive?.version >= 2 ? `app-${crypto.randomUUID()}` : null;
+const micListeners = [];
+export function onMic(fn) { micListeners.push(fn); }
+
 // Returns its undo: a box that follows the state (question.js) stops when it closes
 export function subscribe(fn) {
   store.listeners.push(fn);
@@ -25,7 +31,7 @@ function heard() {
 export function connect() {
   es?.close();
   heardAt = Date.now();
-  es = new EventSource("/api/events");
+  es = new EventSource(micDevice ? `/api/events?mic=${micDevice}` : "/api/events");
   es.addEventListener("state", e => {
     try { store.state = JSON.parse(e.data); } catch { return; }
     heardAt = Date.now();
@@ -33,6 +39,12 @@ export function connect() {
     changed();
   });
   es.addEventListener("ping", heard);
+  es.addEventListener("mic", e => {
+    heard();
+    let command;
+    try { command = JSON.parse(e.data); } catch { return; }
+    for (const fn of micListeners) fn(command);
+  });
   es.onerror = () => { store.online = false; changed(); };
 }
 
@@ -44,15 +56,16 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 window.addEventListener("pageshow", check);
 window.addEventListener("online", check);
 
-export async function post(path, body) {
+// quiet: no toast when it fails (what the page sends by itself, unasked: mic.js)
+export async function post(path, body, { quiet = false } = {}) {
   try {
     const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Companion": "1" },
                                   body: body === undefined ? "" : JSON.stringify(body) });
     const answer = await r.json().catch(() => ({}));
-    if (!r.ok) { toast(answer.error || `It didn't work (${r.status})`, true); return false; }
+    if (!r.ok) { quiet || toast(answer.error || `It didn't work (${r.status})`, true); return false; }
     return true;
   } catch {
-    toast("No connection to the computer", true);
+    quiet || toast("No connection to the computer", true);
     return false;
   }
 }

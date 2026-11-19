@@ -9,6 +9,9 @@ Companion (quickshell/CompanionLevels.qml).
     companion url                the address to open on the iPad
     companion run [--demo]       the server itself (the service); --demo: made-up sessions, nothing done on the desktop
     companion demo               the demo on http://127.0.0.1:8746, to look at in a browser here
+    companion mic status [--json]  whether Nightdrive's iOS app is ready as the computer's microphone (#3173)
+    companion mic start          the app listens: prints "ID NAME" once it does; exit 1 when no app is ready
+    companion mic stop [ID]      it stops: prints its words; mic abort drops them (hypr/scripts/dictate uses these)
 
 On the tailnet it is https://<this computer>.<tailnet>.ts.net:8443. Port 443 is left to Ferry, which serves there.
 The server itself has no port: tailscale serve proxies to its Unix socket (lib/access.py: who gets in).
@@ -98,6 +101,26 @@ def status(as_json):
                       "url": tailnet_url(st) or "", "tailscale": st.get("BackendState") == "Running"}))
 
 
+def mic(args):
+    """The app as the computer's microphone, through the running server (lib/mic_socket.py)."""
+    import mic_socket
+    op = args[0] if args else "status"
+    if op not in ("status", "start", "stop", "abort"):
+        sys.exit(__doc__)
+    req = {"op": op}
+    if op == "stop" and len(args) > 1 and args[1].isdigit():
+        req["id"] = int(args[1])
+    got = mic_socket.ask(req)
+    if "error" in got:
+        sys.exit(f"companion: {got['error']}")
+    if op == "status":
+        print(json.dumps(got) if "--json" in args else got.get("ready") or "none")
+    elif op == "start":
+        print(got["id"], got["name"])
+    elif op == "stop":
+        print(got.get("text", ""))
+
+
 def main(args):
     cmd = args[0] if args else "status"
     if cmd == "run":
@@ -112,6 +135,8 @@ def main(args):
         off()
     elif cmd == "status":
         status("--json" in args)
+    elif cmd == "mic":
+        mic(args[1:])
     elif cmd == "url":
         url = tailnet_url(tailscale())
         if not url:

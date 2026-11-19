@@ -124,8 +124,8 @@ Answers: `200 {"ok": true}`, or `4xx {"error": "…"}` with the reason in plain 
 ## The app
 
 Nightdrive's iOS app (iPhone and iPad; its own repo, `nightdrive-companion`) shows this page in a web view and adds,
-before the page's scripts run, `window.nightdrive`: `{ app: "ios", version: 1, SpeechRecognition }`. A browser has no
-`window.nightdrive`.
+before the page's scripts run, `window.nightdrive`: `{ app: "ios", version: 2, device: "iPad", SpeechRecognition,
+microphone }`. A browser has no `window.nightdrive`; version 1 (no `device`, `microphone`, `remote`) is the app's first.
 
 `SpeechRecognition` is the app's own dictation (Apple's speech recognition, natively) in the Web Speech API's shape:
 `lang`, `continuous`, `interimResults`, `start()`, `stop()`, `abort()`, and `onstart`, `onresult` (`results[0][0].transcript`:
@@ -134,3 +134,32 @@ all the words so far; `results[0].isFinal`), `onerror` (`error`: `not-allowed`, 
 browser's. Underneath, the page posts `{ id, op: "start" | "stop" | "abort", lang }` to
 `webkit.messageHandlers.nightdriveSpeech`, and the app answers by calling `window.nightdrive._speech({ id, type, text,
 final, error })`. Only this page's own origin, in the main frame, is heard. A new `start` ends the one before.
+
+A recognition with `remote = true` (its `start` posts `remote: true`) is the computer's dictation, not a button held on
+the page: while it listens the app shows a banner of its own over the page, *Listening for <computer>*.
+`microphone(wanted)` posts `{ id: 0, op: "microphone", wanted }`: the page says whether the computer wants this device
+as its microphone (the state's `mic.wanted`); while it does and the device is charging, the app keeps the screen on.
+
+## The microphone
+
+With the lid closed, the computer's dictation key listens through the app instead of the built-in microphone
+(`lib/mic.py`, Dashboard #3173). The state has `"mic": { "wanted": true }` while the lid is closed.
+
+A page in the app (bridge 2 and later) names itself with a random id per load, `DEVICE` (`app-<uuid>`), opens its stream
+as `GET /api/events?mic=DEVICE`, and says it is ready while it is shown:
+
+| Request | Body | Does |
+| --- | --- | --- |
+| `POST /api/mic` | `{ "device": "…", "name": "iPad", "ready": true }` | Ready (every 10 s while shown; it lapses after 25 s), or `false` when hidden |
+| `POST /api/mic/event` | `{ "device": "…", "id": 3, "type": "started" \| "error" \| "text", "text": "…", "error": "…" }` | The app's answer about dictation `id` |
+
+The server sends commands on that stream alone (its newest, if the page opened another), as `event: mic` with
+`{ "op": "start" | "stop" | "abort", "id": 3 }`. On `start` the page listens (`remote`) and posts `started`, or `error`
+when it can't; on `stop` it hears 0.4 s more, then posts `text`, its words (also after an error once it listened). On
+`abort` it drops them and posts nothing.
+
+The computer's side is `companion mic start | stop [ID] | abort | status [--json]` (`bin/companion`), over a Unix socket
+only this user's processes may use (`lib/mic_socket.py`). `start` uses the device ready most recently and returns once it
+listens; it gives up after 2.5 s (aborting it) and `hypr/scripts/dictate` then uses the computer's own microphone. `stop`
+waits up to 8 s for the words. Meanwhile the server keeps `$XDG_RUNTIME_DIR/dictate-remote` (`waiting NAME`, `listening
+NAME`, `transcribing NAME`) for the dictation card (`quickshell/Dictation.qml`).

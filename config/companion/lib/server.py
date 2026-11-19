@@ -11,10 +11,13 @@ import subprocess
 import threading
 import time
 import zlib
+from urllib.parse import parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import access
 import control
+import mic
+import mic_socket
 import presence
 import sessions
 
@@ -69,8 +72,9 @@ class State:
         self.demo = demo
         self.sessions = sessions.Demo() if demo else sessions.Sessions()
         self.presence = presence.Demo() if demo else presence.Presence()
-        self.actions = control.DEMO_CONFIG if demo else control.CONFIG
         self.cond = threading.Condition()
+        self.mic = mic.Mic(self.cond)     # the app as the computer's microphone (mic.py)
+        self.actions = control.DEMO_CONFIG if demo else control.CONFIG
         self.json = "{}"
         self.version = 0
         self.usage = DEMO_USAGE if demo else []
@@ -103,6 +107,8 @@ class State:
                 "usage": self._usage(), "sessions": self.sessions.look(), "active": self.sessions.active,
                 # away from the computer (locked, idle, or as set on the page): a tile's tap opens its view there
                 "presence": self.presence.look(),
+                # the lid is closed: the dictation key wants the app's microphone (mic.py), and the app keeps awake
+                "mic": {"wanted": not self.demo and mic.lid_closed()},
                 "actions": control.public_actions(self.actions), "web": web_version()}
 
     def loop(self):
@@ -167,7 +173,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/presets":
             return self._send(200, control.presets())
         if path == "/api/events":
-            return self._events()
+            # the app's page, ready to be the computer's microphone, gets its commands on its stream (mic.py)
+            query = parse_qs(self.path.partition("?")[2])
+            return self._events(None if self.state.demo else mic.device_id((query.get("mic") or [None])[0]))
         parts = path.strip("/").split("/")
         if len(parts) == 4 and parts[:2] == ["api", "sessions"] and parts[3] in ("log", "permission"):
             ses = self.state.sessions
@@ -203,7 +211,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def _events(self):
+    def _events(self, device=None):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
@@ -212,23 +220,30 @@ class Handler(BaseHTTPRequestHandler):
         seen = -1
         came = time.time()
         self.state.watch(1)
+        m = self.state.mic
+        token = m.open(device) if device else None
         try:
             with self.state.cond:        # the desktop as it is now, not as it was when the last page went
                 self.state.cond.wait_for(lambda: self.state.built >= came, timeout=FRESH_WAIT)
             while True:
                 with self.state.cond:
-                    if self.state.version == seen:
+                    if self.state.version == seen and not m.pending(device, token):
                         self.state.cond.wait(KEEPALIVE)
                     version, text = self.state.version, self.state.json
+                    commands = m.take(device, token)
+                for c in commands:
+                    self.wfile.write(f"event: mic\ndata: {json.dumps(c)}\n\n".encode())
                 if version != seen:
                     seen = version
                     self.wfile.write(f"event: state\ndata: {text}\n\n".encode())
-                else:
+                elif not commands:
                     self.wfile.write(b"event: ping\ndata:\n\n")    # an event, not a comment: the page sees it
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         finally:
+            if device:
+                m.close(device, token)
             self.state.watch(-1)
 
     def do_POST(self):
@@ -288,6 +303,18 @@ class Handler(BaseHTTPRequestHandler):
                 # "session": Enter only when the window that has the keyboard is a session's (the dictation button)
                 submit = ses.active_is_session() if body.get("submit") == "session" else bool(body.get("submit"))
                 demo or control.type_text(None, body.get("text", ""), submit)
+            case ["mic"]:
+                # the app's page is shown (ready: true, every few seconds) or went (false): mic.py
+                device = mic.device_id(body.get("device"))
+                if not device:
+                    raise ValueError("No device")
+                demo or self.state.mic.ready(device, body.get("name"), bool(body.get("ready")))
+            case ["mic", "event"]:
+                device = mic.device_id(body.get("device"))
+                if not device or not isinstance(body.get("id"), int):
+                    raise ValueError("No device")
+                demo or self.state.mic.event(device, body["id"], body.get("type"), body.get("text", ""),
+                                             body.get("error", ""))
             case ["presence"]:
                 self.state.presence.set(body.get("away"))
             case ["actions", n, "run"]:
@@ -321,6 +348,7 @@ def serve(port, demo):
     else:
         Handler.owner = access.Owner()
         access.make_socket_dir()
+        mic_socket.serve(state.mic)     # the dictation key's way to the app's microphone
         old = os.umask(0o177)       # the socket rw for its user alone; root (tailscaled) gets in regardless
         try:
             httpd = TailscaleServer(access.SOCKET, Handler)

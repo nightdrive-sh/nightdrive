@@ -5,6 +5,7 @@ import { connect, esc, store, subscribe } from "./api.js";
 import "./sessions.js";
 import "./dictate.js";
 import "./actions.js";
+import "./mic.js";
 import { icon } from "./icons.js";
 import { openUsage } from "./usage.js";
 import { presenceSwitch, togglePresence } from "./presence.js";

@@ -22,7 +22,7 @@ Item {
     Text {
         id: ico
         anchors { left: parent.left; leftMargin: l.inset; verticalCenter: parent.verticalCenter }
-        text: Icons.g("mic")
+        text: Icons.g(l.vt.source ? "tablet" : "mic")
         font { family: Icons.family; pixelSize: 20 }
         color: l.vt.waiting || l.vt.transcribing ? Theme.dim : Theme.accent
         // Breathes while it listens; back to full when it stops, so the next dictation doesn't start dimmed
@@ -57,7 +57,9 @@ Item {
         anchors { right: parent.right; rightMargin: l.inset; verticalCenter: parent.verticalCenter }
         width: l.labelWidth
         horizontalAlignment: Text.AlignRight
-        text: l.vt.transcribing ? "Transcribing…" : l.vt.waiting ? "Please wait…" : "Listening…"
+        // The app's device when it listens instead of the computer (#3173): which microphone hears you
+        text: l.vt.transcribing ? "Transcribing…" : l.vt.waiting ? "Please wait…"
+            : l.vt.source ? l.vt.source + " listening…" : "Listening…"
         color: Theme.dim
         font { family: Theme.font; pixelSize: 14 }
     }

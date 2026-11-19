@@ -27,7 +27,8 @@ voxtype-onnx setup --download --model parakeet-tdt-0.6b-v3-int8
 
 The settings are in `config/voxtype/config.toml`, which `link.sh` links into `~/.config/voxtype/`. `hypr/scripts/dictate`
 starts the daemon with the best model installed, and handles the keys and the muted-mic check. The mic is the MacBook's
-own on a Mac, and the default one elsewhere.
+own on a Mac, and the default one elsewhere. With the lid closed it is Nightdrive's iOS app, when it is open on an iPad
+or iPhone ([Companion](companion.md)): the card names the device instead of showing the level.
 
 ## Your own corrections
 
