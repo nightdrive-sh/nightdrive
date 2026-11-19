@@ -89,6 +89,8 @@ ShellRoot {
                     let d
                     try { d = JSON.parse(text) } catch (e) { console.warn("cli.py list: " + e); return }
                     const keep = win.keepNext || (win.shown[win.current] ? win.shown[win.current].id : "")
+                    const show = win.keepNext !== ""   // one just added or brought back: scrolled to if it is out of sight
+                    const seen = win.view.kind + ":" + (win.view.id || "")
                     win.keepNext = ""
                     const was = win.keepList || (win.view.kind === "list" ? win.view.id : "")
                     win.keepList = ""
@@ -100,7 +102,9 @@ ShellRoot {
                     // The same list stays picked when one before it comes or goes; Today when it has gone itself
                     if (was) { const i = win.sources.findIndex(s => s.id === was); win.source = i >= 0 ? i : 0 }
                     win.source = Math.min(win.source, win.sources.length - 1)
-                    win.filter(keep, win.current)
+                    // The same view read again keeps its scroll (#3249); another one (its list gone) starts at the top
+                    const same = seen === win.view.kind + ":" + (win.view.id || "")
+                    win.filter(keep, win.current, same ? (show ? "show" : "hold") : "")
                 }
             }
         }
@@ -108,7 +112,7 @@ ShellRoot {
         // Today moves on with the clock, and a sync or another app may change the files: read them again each minute
         Timer { interval: 60000; running: true; repeat: true; onTriggered: win.load() }
         // Upcoming's headings are worked out with the rows: a change of region writes them again at once
-        Connections { target: Regional; function onRegionChanged() { win.filter(win.shown[win.current] ? win.shown[win.current].id : "", win.current) } }
+        Connections { target: Regional; function onRegionChanged() { win.filter(win.shown[win.current] ? win.shown[win.current].id : "", win.current, "hold") } }
 
         // When a task is due, the region's way (Settings › Region, the kit's Regional), as lib/when.py's label writes it
         // for the notifications and Claude: "Today 14:00", "Tomorrow", "Fri 6.11." this week, "20.11.", "4.1.2027";
@@ -134,13 +138,19 @@ ShellRoot {
         function viewOptions() {
             return { today: today, query: query, lists: lists, doneMax: doneMax, dayLabel: day => dueLabel(day, true) }
         }
-        // keep: the task to pick again; at: the row to stay at when it has gone (done, moved, trashed), else the first
-        function filter(keep, at) {
+        // keep: the task to pick again; at: the row to stay at when it has gone (done, moved, trashed), else the first.
+        // scroll "hold" (a read of the view on show): the rows stay where they were, see holdScroll; "show": the same,
+        // but the picked one is scrolled to when out of sight; "": a new view, from the picked row
+        function filter(keep, at, scroll) {
+            const place = scroll ? holdScroll.mark() : null
             shown = Views.rows(tasks, view, viewOptions())
             const i = keep ? shown.findIndex(t => t.id === keep) : -1
             current = i >= 0 ? i : shown.length ? Math.max(0, Math.min(at || 0, shown.length - 1)) : -1
-            if (shown.length) listView.positionViewAtIndex(current, ListView.Contain)
+            if (!shown.length) return
+            if (place) holdScroll.restore(place, scroll === "show")
+            else listView.positionViewAtIndex(current, ListView.Contain)
         }
+        ScrollHold { id: holdScroll; view: listView; app: win }
         function pickSource(i) {
             if (i < 0 || i >= sources.length) return
             if (searching) endSearch()
