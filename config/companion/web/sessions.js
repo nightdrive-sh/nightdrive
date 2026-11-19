@@ -47,7 +47,7 @@ function permission(s) {
   return `<article class="tile permission" data-act="focus" data-id="${esc(s.id)}">
     ${head(s)}
     ${p.allow ? `<div class="code">${esc(p.tool)}${p.what ? ": " + esc(p.what) : ""}</div>`
-              : '<div class="meta">Too long to show here whole: tap to answer in its terminal.</div>'}
+              : '<div class="say">[Too long to show here whole: tap to answer in its terminal]</div>'}
     <div class="fill"></div>
     <div class="row">
       <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
@@ -75,7 +75,7 @@ function waiting(s) {
   const asks = s.wants && !s.done;
   return `<article class="tile ${asks ? "ask" : s.done && !s.pm ? "done" : ""}" data-act="focus" data-id="${esc(s.id)}">
     ${head(s)}
-    ${s.asks ? `<div class="meta asks">${ASKS} Tap the tile to answer there.</div>`     // the help alone: room for the buttons
+    ${s.asks ? `<div class="say">${ASKS}</div>`                       // in place of its last words, as grey as they
              : s.last ? `<div class="say">${esc(plain(s.last))}</div>` : ""}
     <div class="fill"></div>
     <div class="row">

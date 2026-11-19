@@ -6,7 +6,8 @@ import { openPermission } from "./permission.js";
 
 // A question with choices (AskUserQuestion) that Companion can't answer (the hook stopped waiting, or you were in its
 // window): only the terminal shows it, as Claude Code writes it nowhere until answered. Otherwise question.js has it.
-export const ASKS = "It asks you something in its terminal.";
+// A state, not something to do here: grey and in brackets, as Claude Code's own notes ([Request interrupted by user]).
+export const ASKS = "[Claude asks you something in its terminal]";
 
 export async function act(id, what, button = null) {
   const s = store.state?.sessions.find(x => x.id === id);

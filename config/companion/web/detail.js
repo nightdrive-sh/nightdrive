@@ -96,7 +96,7 @@ function buttons(s) {
     const p = s.permission;
     // Review: the request whole before its Allow (permission.js); none: too long to show here
     return `<div class="code">${esc(p.tool)}${p.what ? ": " + esc(p.what) : ""}</div>${CLOSE}
-      ${p.allow ? "" : '<span class="meta">Too long to show here whole: answer it at the computer.</span>'}<span class="spacer"></span>
+      ${p.allow ? "" : '<span class="meta">[Too long to show here whole: answer it at the computer]</span>'}<span class="spacer"></span>
       <button class="pill" data-act="deny">Deny</button>
       ${p.review ? `<button class="pill main" data-act="review">${icon("shield", 16)}Review</button>`
         : p.allow ? `<button class="pill main" data-act="allow">${icon("check", 16, 2.2)}Allow</button>` : ""}`;
@@ -109,7 +109,7 @@ function buttons(s) {
       <button class="pill quiet squeeze" data-act="stop" aria-label="Stop">${icon("square", 14, 2.2)}<span>Stop</span></button>
       ${TALK.replace('class="pill"', 'class="pill squeeze"')}`;
   }
-  return `${CLOSE}${s.asks ? `<span class="meta">${ASKS} Answer it on the desktop.</span>` : ""}<span class="spacer"></span>
+  return `${CLOSE}${s.asks ? `<span class="meta">${ASKS}</span>` : ""}<span class="spacer"></span>
     ${TALK}`;
 }
 
