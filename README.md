@@ -137,7 +137,8 @@ Click an icon and a small menu opens under it:
 - **Claude**: your Claude Code sessions and usage limits. A dot on the icon tells a session finished while you were
   elsewhere, and a click goes to its window. A right click changes what the icon shows (5-hour or weekly usage, or the
   number of sessions). Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
-  (windows make room): one asking you something gets a red question mark, one whose last reply ends on a ✅ line
+  (windows make room): one asking you something gets a red question mark, which hops until you go to its window
+  (a permission request too), one whose last reply ends on a ✅ line
   gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
   session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a bold name, the ones it
   opened following it; the groups, their sessions and the others go in the order of their workspaces, and on one

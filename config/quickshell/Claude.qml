@@ -20,6 +20,9 @@ Singleton {
     property var wants: ({})           // address → true: finished while you were elsewhere
     property var lastState: ({})       // address → "working" | "waiting", to see the change
     property var changedAt: ({})       // address → epoch seconds its title's state last changed, as seen here
+    // address → true: it asks you something and you have been to its window since it began to. Its chip hops (hop,
+    // SessionChip.qml) only until then: you've seen the question, and a chip that kept on would be noise (#3126)
+    property var askSeen: ({})
     // Leads (sessions that opened others, SessionGroups.js) stay leads once their openings close, so a project manager
     // keeps its group and its place in the bar while nothing of its runs: by window while it lives, and by name (if
     // it has one) in leadsFile, so also after the shell or the session restarts. The last maxLeads names are kept.
@@ -142,7 +145,8 @@ Singleton {
         const agrees = s.status && (s.status === "busy") === (s.state === "working")
         return agrees || !changedAt[s.address] ? s.since : changedAt[s.address]
     }
-    readonly property var sessions: seen.map(s => Object.assign({ wants: !!wants[s.address] }, s, { since: since(s) }))
+    readonly property var sessions: seen.map(s => Object.assign({ wants: !!wants[s.address] }, s,
+                                                                { since: since(s), hop: s.asking && !askSeen[s.address] }))
                                         .sort((a, b) => (b.wants - a.wants) || (b.started - a.started))
     readonly property int wanting: sessions.filter(s => s.wants).length
     // Which account's a session is: its place in accounts (claude-accounts' order); 0, the default's, also for one on a
@@ -171,9 +175,20 @@ Singleton {
         lastState = st
         if (JSON.stringify(at) !== JSON.stringify(changedAt)) changedAt = at
         if (changed) wants = w
+        noteAskSeen()
         rememberLeads()
     }
-    onActiveAddrChanged: if (wants[activeAddr]) { const w = Object.assign({}, wants); delete w[activeAddr]; wants = w }
+    onActiveAddrChanged: {
+        if (wants[activeAddr]) { const w = Object.assign({}, wants); delete w[activeAddr]; wants = w }
+        noteAskSeen()
+    }
+    // askSeen: kept for a session while it asks, set once its window has the focus (also when it began to ask while
+    // you were there), dropped when it no longer asks, so the next question hops again
+    function noteAskSeen() {
+        const a = {}
+        for (const s of seen) if (s.asking && (askSeen[s.address] || s.address === activeAddr)) a[s.address] = true
+        if (JSON.stringify(a) !== JSON.stringify(askSeen)) askSeen = a
+    }
 
     // Claude Code's Notification hook (hypr/scripts/claude-notify): it asked for you, from a window you're not in
     IpcHandler {

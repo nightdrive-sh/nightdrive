@@ -6,6 +6,9 @@ import QtQuick
 // off with ✅): a green check; finished while you were in another window: the bell with a dot, as in the Claude menu;
 // working: the spinner; waiting for you: a prompt (›; the terminal >_ read as noise). iconOnly on a crowded, narrow
 // bar.
+// Asking and not yet seen (Claude.qml's hop: you haven't been to its window since it began to ask, a permission request
+// too): its icon hops twice, hopHeight px up and back, every hopEvery ms, the bar's one movement that wants you
+// (#3126). One 2 px hop every 8 s went unseen; it stays slow, as the pinned notification is there too.
 // A lead (a session that opened others, SessionGroups.js) has its name in bold and the bot for its icon, which
 // breathes while it works; the chips it opened follow it.
 // After its name, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
@@ -42,6 +45,9 @@ Rectangle {
     readonly property bool asking: !!session.asking
     readonly property bool done: !!session.done
     readonly property bool working: session.state === "working"
+    readonly property bool hop: !!session.hop
+    property int hopEvery: 6000
+    property int hopHeight: 3
     readonly property string icon: asking ? "message-circle-question" : lead ? "bot" : done ? "circle-check-big"
                                  : session.wants ? "bell-dot" : working ? "loader" : "chevron-right"
     // Asking: the question in the top bar's critical red (as the Dashboard's tasks there), so it stands out without a box
@@ -65,6 +71,18 @@ Rectangle {
         text: Icons.g(chip.icon)
         color: chip.iconColor
         font { family: Icons.family; pixelSize: 14 }
+        transform: Translate { id: lift }
+        // The hop: at once when it begins to ask, then every hopEvery ms; two quick ones, a knock rather than a wave
+        SequentialAnimation {
+            running: chip.hop && chip.visible
+            loops: Animation.Infinite
+            NumberAnimation { target: lift; property: "y"; to: -chip.hopHeight; duration: 120; easing.type: Easing.OutQuad }
+            NumberAnimation { target: lift; property: "y"; to: 0; duration: 140; easing.type: Easing.InQuad }
+            NumberAnimation { target: lift; property: "y"; to: -chip.hopHeight; duration: 120; easing.type: Easing.OutQuad }
+            NumberAnimation { target: lift; property: "y"; to: 0; duration: 220; easing.type: Easing.OutBounce }
+            PauseAnimation { duration: Math.max(0, chip.hopEvery - 600) }
+            onRunningChanged: if (!running) lift.y = 0
+        }
         // The spinner turns while it works (on the render thread: no cost to the rest)
         RotationAnimator on rotation {
             running: chip.working && !chip.asking && !chip.lead && chip.visible
