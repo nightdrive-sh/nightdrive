@@ -134,9 +134,10 @@ Click an icon and a small menu opens under it:
   screen until you answer or dismiss it, and gets through Do Not Disturb without a sound; a low one goes straight to
   this list, without a popup. The list stacks them the same way, under **Needs you** what still waits for an answer.
 - **Music**: what Deck is playing, with the cover, the progress and the controls
-- **Claude**: your Claude Code sessions and usage limits. A dot on the icon tells a session finished while you were
-  elsewhere, and a click goes to its window. A right click changes what the icon shows (5-hour or weekly usage, or the
-  number of sessions). Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
+- **Claude**: your Claude Code sessions and usage limits, under a robot (the sessions bar's too). A red dot on it tells a
+  session is asking you something or finished while you were elsewhere, and a click goes to its window. A right click
+  changes what it shows beside it: 5-hour or weekly usage as a number or a thin bar under the robot (orange past 90 %,
+  red past 95 %), the number of sessions, or nothing. Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
   (windows make room): one asking you something gets a red question mark, which hops until you go to its window
   (a permission request too), one whose last reply ends on a ✅ line
   gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A

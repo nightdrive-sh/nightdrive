@@ -116,7 +116,7 @@ Singleton {
         if (names.join() !== allModules.map(m => m.name).join()) saveItems({ hidden: items.hidden, order: names })
     }
     // Names and glyphs for the launcher's list; a module can give its own "label" and "glyph" in modules.jsonc
-    readonly property var moduleLabels: ({ claude: ["Claude", "gauge"], claude2: ["Claude, second account", "gauge"], system: ["CPU and memory", "cpu"],
+    readonly property var moduleLabels: ({ claude: ["Claude", "bot"], claude2: ["Claude, second account", "bot"], system: ["CPU and memory", "cpu"],
                                            bluetooth: ["Bluetooth", "bluetooth"], wifi: ["Wi-Fi", "wifi"],
                                            volume: ["Volume", "volume-2"], headphones: ["Headphones", "headphones"], display: ["Display", "monitor"], battery: ["Battery", "battery-medium"],
                                            calendar: ["Date and time", "clock"], notifications: ["Notifications", "menu"],
@@ -244,6 +244,8 @@ Singleton {
         if (svgs[ref] !== undefined) return svgs[ref]
         const g = ref.match(/^gauge@(\d+)$/)
         if (g) return gauge(Math.min(100, parseInt(g[1])))
+        const b = ref.match(/^bot-bar@(\d+)$/)
+        if (b) return botBar(Math.min(100, parseInt(b[1])))
         if (!loading[ref]) {
             loading[ref] = true
             iconProc.createObject(tb, { ref: ref }).running = true
@@ -289,6 +291,16 @@ Singleton {
         return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
              + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14 L' + x + ' ' + y + '"/>'
              + '<path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>'
+    }
+    // bot-bar@<percent>: Lucide's bot (icons/lucide/bot.svg, the sessions bar's lead) lifted over a thin bar showing the
+    // Claude module's usage, the rest of the bar faint (claude-bar's modes 2 and 3)
+    function botBar(p) {
+        const w = (16 * p / 100).toFixed(2)
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+             + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 -2)">'
+             + '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/>'
+             + '<path d="M15 13v2"/><path d="M9 13v2"/></g><path d="M4 22.5h16" opacity="0.3"/>'
+             + (p > 0 ? '<path d="M4 22.5h' + w + '"/>' : '') + '</svg>'
     }
     // An SVG drawn in one colour: currentColor -> the colour (opaque; the caller applies its alpha as opacity)
     function iconUrl(ref, color) {
