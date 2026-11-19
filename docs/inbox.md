@@ -23,8 +23,9 @@ marked, grouped by the project, session or app that left them, with their text, 
 button opens `task_url` from `~/.config/nightdrive/inbox.json` (`{"task_url": "https://…/tasks/{n}"}`), else copies
 the number.
 
-The top bar shows a mailbox: its flag up and how many while some are unread, its flag down once all are read; a click
-opens Inbox (Settings › Top bar › Items hides it). The sessions bar
+The top bar shows a mailbox: its flag up and how many while some are unread, its flag down once all are read (Settings › Top bar › Items
+hides it). A click opens its menu: the newest messages, unread ones marked; a click on one opens Inbox on it, and Open
+Inbox the whole window. The sessions bar
 ends with the same mailbox for the sessions' messages (its flag down when you've read them all; a click shows only
 theirs). Nothing more: no sound, no pop-up.
 
