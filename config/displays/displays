@@ -9,7 +9,9 @@ set -u
 QS_DIR=$(dirname "$(readlink -f "$0")")                 # this folder: the window's own Quickshell config
 
 # The window: started, brought forward and stopped by the apps' kit (kit/app.sh)
+# shellcheck disable=SC2034  # read by kit/app.sh, sourced below
 APP_TITLE=Displays
+# shellcheck disable=SC2034  # read by kit/app.sh
 APP_IPC=displays
 . "$QS_DIR/kit/app.sh"
 
