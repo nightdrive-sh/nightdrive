@@ -9,7 +9,7 @@ import qs.kit
 // as a process of its own, so it goes on with the window closed). While a recording is made the window is a low wide
 // strip (RecordPane: the time, the level, the mic, Pause / Save / New); otherwise it is taller, with the recordings
 // under the strip (RecordingList) and the picked one beside them (RecordingView), or in a narrow window on a page of its
-// own. Record makes it the strip, Save tall again (WindowSize). The picked recording plays in Player, and
+// own. Record makes it the strip, Save tall again (WindowSize). The picked recording plays in AppAudio (the kit's), and
 // RecordingActions renames, exports, shows and trashes it; TranscriptView, in the view, transcribes it. This file holds the window together: the layout, the keys
 // (their sheet: KeyHelp.qml) and the IPC the recorder command calls when something changed elsewhere.
 ShellRoot {
@@ -28,8 +28,9 @@ ShellRoot {
             onSaved: name => toast.show("Saved " + name)
         }
         KeyHelp { id: keyHelp }
-        Player {
+        AppAudio {
             id: player
+            app: "Recorder"
             path: store.current ? store.current.path : ""
             title: store.current ? store.current.name : ""
             duration: store.current ? store.current.duration : 0

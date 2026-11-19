@@ -39,6 +39,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppNote` | What went wrong, at the foot of the page, in the danger colour, until ✕; two lines at most |
 | `AppToast` | What just happened, in a rounded card at the top of the window: `show(text, { sticky, danger, duration, action, run })`, gone after 4 s (a failure 8 s, one with an action such as Undo 7 s), sticky until the next; a click dismisses it, `act()` runs the action for a key (⌘Z) |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |
+| `AppAudio` | Plays a sound file through ffmpeg into PipeWire, no visuals: `path`, `duration` (the caller knows it), `app` and `title` (its names in the Sound menu); `play()`, `pause()`, `toggle()`, `seek(t)`, `skip(d)`, `stop()`, `position`, `progress`, `playing`, `failed(text)`. Recorder's player, Inbox's sound files |
 | `Tip` | A button's tip: what it does and its key |
 | `Spinner` | A turning glyph while something runs in the background (Mail's fetch), shown at least a moment; a tip says what runs |
 | `KeyCap` | Keys as caps: "⌘N  c" is [⌘][N] [c] (`or`: a "/" between the alternatives); `tint` colours them |
