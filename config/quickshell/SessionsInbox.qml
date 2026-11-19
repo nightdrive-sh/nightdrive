@@ -15,7 +15,7 @@ Rectangle {
     // Its icons come with the plugin (nightdrive plugins installed lists them); without it, no window to open
     readonly property bool installed: icons.loaded
     readonly property int pad: 10
-    readonly property int iconW: 16
+    readonly property int iconW: 19        // as the top bar's Inbox module (#3212)
 
     property int unread: 0                 // the sessions' unread messages, all of them
 
