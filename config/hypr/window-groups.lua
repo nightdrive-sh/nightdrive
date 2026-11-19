@@ -12,6 +12,7 @@
 local mod = "SUPER"
 
 local function tiled(w) return w and w.mapped and not w.floating and not w.hidden end
+local function window_of(addr) return addr and hl.get_window("address:" .. addr) or nil end
 
 local function in_group(group, addr)
     for _, m in ipairs((group and group.members) or {}) do
@@ -75,6 +76,30 @@ function NIGHTDRIVE_GROUP_MOVE(dir)
         w = leave_group(w)
         if w then hl.dispatch(hl.dsp.focus({ window = "address:" .. w.address })) end
     end
+end
+
+-- ⌘⇧ + a number (bindings.lua, #3194): the window to that workspace. Hyprland's own move takes a tab's whole group
+-- with it; a tab goes alone, out of its group, and the tab after it is shown in its place (the one before, when it
+-- was the last; Hyprland's remove would show the first). The other tabs stay. On the workspace it lands on it doesn't
+-- join a group (auto_group is for windows that open, not ones moved), and a PM's space (pm-space.lua) only gathers
+-- the sessions on its own workspace, so one moved out of it stays out. Global, as NIGHTDRIVE_SWAP: a test calls it.
+function NIGHTDRIVE_MOVE_TO_WORKSPACE(ws)
+    local w = hl.get_active_window()
+    if not (w and w.group and w.group.size > 1) then
+        hl.dispatch(hl.dsp.window.move({ workspace = ws }))
+        return
+    end
+    local addr, index = w.address, w.group.current_index
+    local stay = nil   -- a tab that stays, to find the group by after the remove
+    for _, m in ipairs(w.group.members or {}) do
+        if m.address ~= addr then stay = stay or m.address end
+    end
+    w = leave_group(w)
+    local g = (window_of(stay) or {}).group
+    if g and g.size > 1 then
+        hl.dispatch(hl.dsp.group.active({ index = math.min(index, g.size), window = "address:" .. stay }))
+    end
+    if w then hl.dispatch(hl.dsp.window.move({ workspace = ws, window = "address:" .. addr })) end
 end
 
 hl.bind(mod .. " + SHIFT + G", hl.dsp.group.toggle())

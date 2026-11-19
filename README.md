@@ -161,7 +161,7 @@ Click an icon and a small menu opens under it:
   of tabs: one shows, its tab strip lists them, and a click, **⌃⌥⌘ ← / →** or the Hyper keys above switch between
   them. A new one is the last tab, behind the one shown, and the keyboard stays where you are. Alone, once its sessions
   have all closed, it fills the width; restarted, it goes back to its space (by its name). Moved to another workspace,
-  it makes that one its space. Other workspaces, and sessions no PM opened, are as before.
+  it makes that one its space; a session moved away with ⌘ ⇧ + a number leaves the group and stays where it went. Other workspaces, and sessions no PM opened, are as before.
   **Two Claude accounts** (a Claude Code config dir each, `CLAUDE_CONFIG_DIR`): `~/.claude` and every `~/.claude-*`
   you have signed in to are found by themselves. The second account then gets a Claude icon of its own beside the
   first, each with its own menu (its sessions, **New session** on it and its usage), right-click setting and dot,
@@ -568,7 +568,7 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | ⌘ ⇧ T | Tile or float the window |
 | ⌘ ⌥ − / ⌘ ⌥ + | The window narrower / wider (US keyboard: ⌘ ⌥ =) |
 | ⌘ ⇧ J | Split direction (⌘ ⇧ arrows move the window) |
-| ⌘ ⇧ G | Window tabs: make the window a group, or break it up (⌘ ⌥ ⇧ arrows: into the group that way, or out; ⌃ ⌥ ⌘ ← / →: its previous / next tab) |
+| ⌘ ⇧ G | Window tabs: make the window a group, or break it up (⌘ ⌥ ⇧ arrows: into the group that way, or out; ⌃ ⌥ ⌘ ← / →: its previous / next tab; ⌘ ⇧ + a number moves a tab alone, out of its group) |
 | ⌥ Tab / ⌥ ⇧ Tab | The app's next / previous window |
 | ⌘ 1…0 | Go to a workspace |
 | ⌘ ⇧ 1…0 | Move the window there |
