@@ -1,0 +1,234 @@
+#!/usr/bin/python3 -I
+"""Commands run at a time (Dashboard #3121): `nightdrive schedule …` runs this.
+
+  schedule WHEN COMMAND… [--json]      runs COMMAND at WHEN: minutes (15, 90m, 2h, 1h30m, up to a week) or a time of
+                                       day (14:45, 14.45: the next one); @UNIX: that moment (the undo of a cancel).
+                                       One argument is a shell line as such ("make && notify-send done"); several are
+                                       words, quoted for the shell as given. --json: the row, as list gives each
+  schedule list [--json]               the waiting ones, soonest first. --json: {commands: [{id, at, at_unix, clock,
+                                       minutes_left, command}]}, at ISO 8601, clock HH:MM
+  schedule show ID --json              one of them, as list gives it
+  schedule cancel ID|all [--json]      takes one (or every one) away before it runs
+  schedule fire ID                     the timer's own call: runs the command, with a notification
+
+Nothing runs unseen: what waits is in `schedule list`, and a run shows a notification with the command (Running…, then
+Done, or Failed with the end of its output, pinned). The whole output goes to the journal:
+journalctl --user -u nightdrive-schedule-ID. A command runs once, in a systemd scope of its own (a window it opens stays
+open after the run), from the home folder, with the desktop's environment and ~/.local/bin in PATH.
+
+The timers are timers.py's, as Remind's: a transient systemd user timer on the wall clock, so a time that passed while
+the computer slept comes as it wakes. Over a logout or a reboot the timer goes; the row stays in the state file.
+"""
+import argparse, json, os, secrets, shlex, subprocess, sys, tempfile, time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import timers  # noqa: E402  the timer base shared with remind (timers.py)
+
+STATE = os.path.expanduser("~/.local/state/nightdrive/schedule.json")
+UNIT = "nightdrive-schedule-"       # + the id: the timer, its service and the command's scope (+ -run)
+MAX_MINUTES = 7 * 24 * 60           # a week, as Remind's
+APP, ICON = "Schedule", "lucide:calendar-clock"
+TAIL_LINES = 3                      # of a failed run's output, in its notification
+SELF = os.path.realpath(__file__)   # the timer runs this checkout's script (a worktree's or the sandbox's own)
+
+
+def die(msg, code=1):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def state():
+    # STATE read at each call: the tests point it elsewhere
+    return timers.locked_rows(STATE, "commands")
+
+
+def arm(r):
+    return timers.arm(UNIT + r["id"], r["at"], "Nightdrive schedule: " + r["command"][:60], [SELF, "fire", r["id"]])
+
+
+def disarm(rid):
+    timers.disarm(UNIT + rid)
+
+
+def command_line(words):
+    """The words after WHEN → one shell line. A single word is a line as typed (it may hold && or a pipe); several
+    are quoted one by one, so `schedule 15 notify-send "Tea is ready"` keeps its message whole."""
+    words = [w for w in words if w.strip()]
+    if len(words) == 1:
+        return words[0].strip()
+    return shlex.join(words)
+
+
+def syntax_error(line):
+    """sh's complaint about the line (an unclosed quote), or "" when it would parse: caught now, not at its time."""
+    p = subprocess.run(["sh", "-n", "-c", line], capture_output=True, text=True)
+    return "" if p.returncode == 0 else (p.stderr.strip() or "it doesn't parse")
+
+
+def public(r, now=None):
+    now = time.time() if now is None else now
+    return {"id": r["id"], "at": timers.iso(r["at"]), "at_unix": int(r["at"]), "clock": timers.clock(r["at"]),
+            "minutes_left": timers.minutes_left(r["at"], now), "command": r["command"]}
+
+
+def notify(rid, summary, body="", pinned=False):
+    # One notification per run: the stack tag makes Done or Failed take Running's place (Notifs.qml), without a sound
+    args = ["notify-send", "-a", APP, "-i", ICON, "-h", "string:x-dunst-stack-tag:schedule-" + rid]
+    if pinned:   # a failure stays until dismissed (Notifs.qml's x-nightdrive-pin)
+        args += ["-h", "boolean:x-nightdrive-pin:true"]
+    subprocess.run([*args, "--", summary, body], capture_output=True)
+
+
+def run_command(rid, line):
+    """Runs the line to its end → (exit code, its output). In a scope of its own: the timer's service is stopped when
+    this returns, and with it whatever is left in its cgroup, such as a terminal the command opened."""
+    env = dict(os.environ)
+    local_bin = os.path.expanduser("~/.local/bin")   # `nightdrive …`: the user's PATH has it, systemd's may not
+    if local_bin not in env.get("PATH", "").split(":"):
+        env["PATH"] = local_bin + ":" + env.get("PATH", "/usr/bin:/bin")
+    # Output to a file, not a pipe: a window the command leaves running would hold a pipe open, and this would wait
+    with tempfile.TemporaryFile("w+") as out:
+        try:
+            code = subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit",
+                                   UNIT + rid + "-run", "--", "sh", "-c", line],
+                                  stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
+                                  cwd=os.path.expanduser("~"), env=env).returncode
+        except OSError as e:
+            return 127, str(e)
+        out.seek(0)
+        return code, out.read()
+
+
+def cmd_add(a):
+    now = int(time.time())
+    at = timers.when(a.when, now, MAX_MINUTES)
+    if at is None:
+        die("Minutes up to a week (15, 90m, 2h, 1h30m) or a time of day (14:45); "
+            "a moment (@UNIX) not past and within a week", 2)
+    line = command_line(a.command)
+    if not line:
+        die("What to run: schedule WHEN COMMAND", 2)
+    err = syntax_error(line)
+    if err:
+        die("The command doesn't parse: " + err, 2)
+    r = {"id": secrets.token_hex(4), "at": at, "command": line}
+    with state() as rows:
+        ok, err = arm(r)
+        if not ok:
+            die("The timer didn't start: " + (err or "systemd-run failed"))
+        rows.append(r)
+    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"At {timers.clock(at)}: {line}  ({r['id']})")
+
+
+def cmd_list(a):
+    with state() as rows:
+        rows.sort(key=lambda r: r["at"])
+        out = [public(r) for r in rows]
+    if a.json:
+        print(json.dumps({"commands": out}, ensure_ascii=False))
+    elif not out:
+        print("No commands waiting")
+    for r in [] if a.json else out:
+        print(f"{r['clock']}  in {r['minutes_left']} min  {r['command']}  ({r['id']})")
+
+
+def cmd_show(a):
+    with state() as rows:
+        r = next((r for r in rows if r["id"] == a.id), None)
+    if not r:
+        die(f"No command {a.id}: it ran already, or was cancelled (schedule list)")
+    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"{timers.clock(r['at'])}  {r['command']}")
+
+
+def cmd_cancel(a):
+    with state() as rows:
+        gone = [r for r in rows if a.id in ("all", r["id"])]
+        if not gone and a.id != "all":
+            die(f"No command {a.id}: it ran already, or was cancelled (schedule list)")
+        for r in gone:
+            disarm(r["id"])
+            rows.remove(r)
+    if a.json:
+        print(json.dumps({"cancelled": [public(r) for r in gone]}, ensure_ascii=False))
+    else:
+        print("\n".join(f"Cancelled: {r['command']}" for r in gone) or "No commands waiting")
+
+
+def cmd_fire(a):
+    # The row goes before the run: a command runs once, even if this is stopped halfway (a logout mid-run)
+    with state() as rows:
+        r = next((r for r in rows if r["id"] == a.id), None)
+        if r:
+            rows.remove(r)
+    if not r:   # cancelled meanwhile: nothing runs
+        return
+    notify(r["id"], "Running: " + r["command"], "Scheduled for " + timers.clock(r["at"]))
+    code, output = run_command(r["id"], r["command"])
+    if output:
+        print(output, end="" if output.endswith("\n") else "\n")   # to the journal, whole
+    if code == 0:
+        notify(r["id"], "Done: " + r["command"])
+    else:
+        tail = "\n".join(output.strip().splitlines()[-TAIL_LINES:])
+        notify(r["id"], f"Failed (exit {code}): " + r["command"],
+               (tail + "\n" if tail else "") + f"journalctl --user -u {UNIT}{r['id']}", pinned=True)
+
+
+def parse_add(argv):
+    """[--json] WHEN [--json] [--] COMMAND…: options only before the command, so `schedule 15 ls -la` keeps its -la
+    and a command ending in --json keeps it. None when WHEN is missing or an option is unknown."""
+    a = argparse.Namespace(cmd="add", json=False, when=None, command=[])
+    for i, w in enumerate(argv):
+        if w == "--json":
+            a.json = True
+        elif w == "--":
+            a.command = argv[i + 1:]
+            break
+        elif a.when is None and not w.startswith("-"):
+            a.when = w
+        elif a.when is not None:
+            a.command = argv[i:]
+            break
+        else:
+            return None
+    return a if a.when is not None else None
+
+
+def main():
+    p = argparse.ArgumentParser(prog="nightdrive schedule", description=__doc__.split("\n\n")[0],
+                                formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n\n")[1])
+    sub = p.add_subparsers(dest="cmd")
+    sub.add_parser("add")   # parsed by parse_add: the command's own options aren't argparse's
+    ls = sub.add_parser("list")
+    ls.add_argument("--json", action="store_true")
+    show = sub.add_parser("show")
+    show.add_argument("id")
+    show.add_argument("--json", action="store_true")
+    cancel = sub.add_parser("cancel")
+    cancel.add_argument("id")
+    cancel.add_argument("--json", action="store_true")
+    fire = sub.add_parser("fire")
+    fire.add_argument("id")
+    argv = sys.argv[1:]
+    first = next((w for w in argv if not w.startswith("-")), None)   # past a leading --json
+    if any(w in ("-h", "--help") for w in argv[:1]):
+        pass
+    elif first is None:
+        argv = ["list", *argv]          # `schedule` or `schedule --json`: the list
+    elif first in sub.choices:
+        argv.remove(first)
+        argv = [first, *argv]           # `schedule --json list`
+    else:
+        argv = ["add", *argv]           # `schedule 15 make`, `schedule --json 15 make`
+    if argv[0] == "add":
+        a = parse_add(argv[1:])
+        if a is None:
+            p.print_help(sys.stderr)
+            sys.exit(2)
+    else:
+        a = p.parse_args(argv)
+    {"add": cmd_add, "list": cmd_list, "show": cmd_show, "cancel": cmd_cancel, "fire": cmd_fire}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    main()

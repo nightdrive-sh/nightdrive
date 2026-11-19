@@ -18,7 +18,10 @@ later: after waking, a due one comes at once. Such a timer goes with the user's 
 a reboot, so the reminders are kept in a state file too, and `restore` arms them again at the next login; one that came
 due meanwhile is told then, as missed. A plain one-shot timer, not a task: it needs no Tasks app (Jari's call in #3118).
 """
-import argparse, contextlib, datetime, fcntl, json, os, re, secrets, subprocess, sys, time
+import argparse, json, os, secrets, subprocess, sys, time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import timers  # noqa: E402  the timer base shared with schedule (timers.py)
 
 STATE = os.path.expanduser("~/.local/state/nightdrive/reminders.json")
 UNIT = "nightdrive-remind-"         # + the id: the timer and its service
@@ -26,6 +29,7 @@ MAX_MINUTES = 7 * 24 * 60           # a week: longer is a calendar event's or a 
 APP, ICON = "Remind", "lucide:alarm-clock"
 DEFAULT_MESSAGE = "Reminder"
 SELF = os.path.realpath(__file__)   # the timer runs this checkout's script (a worktree's or the sandbox's own)
+clock_time, clock = timers.clock_time, timers.clock
 
 
 def die(msg, code=1):
@@ -33,85 +37,29 @@ def die(msg, code=1):
     sys.exit(code)
 
 
-def clock_time(text, now):
-    """22:45 or 22.45 (also 9:05) → the next such moment as Unix time: today's, or tomorrow's once it has passed.
-    None when it isn't one. Counted on the calendar, not as 24 h, so a daylight saving change keeps the clock time."""
-    m = re.fullmatch(r"([01]?\d|2[0-3])[:.]([0-5]\d)", str(text).strip())
-    if not m:
-        return None
-    today = datetime.datetime.fromtimestamp(now)
-    at = today.replace(hour=int(m.group(1)), minute=int(m.group(2)), second=0, microsecond=0)
-    if at.timestamp() <= now:
-        at = (today + datetime.timedelta(days=1)).replace(hour=at.hour, minute=at.minute, second=0, microsecond=0)
-    return int(at.timestamp())
-
-
 def when(text, now):
-    """WHEN as the command takes it (@UNIX, a time of day, minutes) → Unix time, or None."""
-    if re.fullmatch(r"@\d+", str(text)):
-        at = int(text[1:])
-        return at if now < at <= now + MAX_MINUTES * 60 else None
-    at = clock_time(text, now)
-    if at is not None:
-        return at
-    minutes = parse_minutes(text)
-    return None if minutes is None else now + minutes * 60
+    return timers.when(text, now, MAX_MINUTES)
 
 
 def parse_minutes(text):
-    """15, 15m, 2h, 1h30m, 1h 30m → minutes; None when it isn't one or is out of range."""
-    t = re.sub(r"\s+", "", str(text).lower())
-    if re.fullmatch(r"\d+", t):
-        n = int(t)
-    else:
-        m = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m(?:in)?)?", t)
-        if not m or not (m.group(1) or m.group(2)):
-            return None
-        n = int(m.group(1) or 0) * 60 + int(m.group(2) or 0)
-    return n if 1 <= n <= MAX_MINUTES else None
+    return timers.parse_minutes(text, MAX_MINUTES)
 
 
-@contextlib.contextmanager
 def state():
-    """The reminders, read and written under a lock: a timer's `fire` may land while the launcher adds one."""
-    os.makedirs(os.path.dirname(STATE), exist_ok=True)
-    with open(STATE + ".lock", "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        try:
-            with open(STATE) as f:
-                rows = json.load(f).get("reminders", [])
-        except (OSError, ValueError, AttributeError):
-            rows = []
-        rows = [r for r in rows if isinstance(r, dict) and r.get("id") and isinstance(r.get("at"), (int, float))]
-        before = json.dumps(rows)
-        yield rows
-        if json.dumps(rows) != before:
-            tmp = STATE + ".tmp"
-            with open(tmp, "w") as f:
-                json.dump({"reminders": rows}, f, ensure_ascii=False, indent=1)
-            os.replace(tmp, STATE)
-
-
-def systemctl(*args):
-    return subprocess.run(["systemctl", "--user", *args], capture_output=True, text=True)
+    # STATE read at each call: the tests point it elsewhere
+    return timers.locked_rows(STATE, "reminders")
 
 
 def armed(rid):
-    return systemctl("is-active", "--quiet", UNIT + rid + ".timer").returncode == 0
+    return timers.armed(UNIT + rid)
 
 
 def arm(r):
-    """The timer for one reminder, on the wall clock in UTC (a time zone change doesn't move it)."""
-    when = datetime.datetime.fromtimestamp(r["at"], datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    p = subprocess.run(["systemd-run", "--user", "--quiet", "--collect", "--unit", UNIT + r["id"],
-                        "--on-calendar", when, "--timer-property=AccuracySec=1s", "--timer-property=Persistent=false",
-                        "--description", "Nightdrive reminder: " + r["message"][:60], "--", SELF, "fire", r["id"]],
-                       capture_output=True, text=True)
-    return p.returncode == 0, p.stderr.strip()
+    return timers.arm(UNIT + r["id"], r["at"], "Nightdrive reminder: " + r["message"][:60], [SELF, "fire", r["id"]])
 
 
 def disarm(rid):
-    systemctl("stop", UNIT + rid + ".timer")
+    timers.disarm(UNIT + rid)
 
 
 def banner(rid, message, note, tries=1):
@@ -142,14 +90,10 @@ def notify(summary, body=""):
                     "-h", "string:x-dunst-stack-tag:remind", "--", summary, body], capture_output=True)
 
 
-def clock(ts):
-    return datetime.datetime.fromtimestamp(ts).strftime("%H:%M")
-
-
 def public(r, now=None):
     now = time.time() if now is None else now
-    return {"id": r["id"], "at": datetime.datetime.fromtimestamp(r["at"]).astimezone().isoformat(timespec="seconds"),
-            "at_unix": int(r["at"]), "clock": clock(r["at"]), "minutes_left": max(0, int((r["at"] - now + 59) // 60)), "message": r["message"]}
+    return {"id": r["id"], "at": timers.iso(r["at"]), "at_unix": int(r["at"]), "clock": clock(r["at"]),
+            "minutes_left": timers.minutes_left(r["at"], now), "message": r["message"]}
 
 
 def cmd_add(a):
