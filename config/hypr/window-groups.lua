@@ -78,17 +78,15 @@ function NIGHTDRIVE_GROUP_MOVE(dir)
     end
 end
 
--- ⌘⇧ + a number (bindings.lua, #3194): the window to that workspace. Hyprland's own move takes a tab's whole group
--- with it; a tab goes alone, out of its group, and the tab after it is shown in its place (the one before, when it
--- was the last; Hyprland's remove would show the first). The other tabs stay. On the workspace it lands on it doesn't
--- join a group (auto_group is for windows that open, not ones moved), and a PM's space (pm-space.lua) only gathers
--- the sessions on its own workspace, so one moved out of it stays out. Global, as NIGHTDRIVE_SWAP: a test calls it.
-function NIGHTDRIVE_MOVE_TO_WORKSPACE(ws)
-    local w = hl.get_active_window()
-    if not (w and w.group and w.group.size > 1) then
-        hl.dispatch(hl.dsp.window.move({ workspace = ws }))
-        return
-    end
+-- A tab alone (#3194, #3220): a key that sends the window elsewhere sends one tab, not its group (Hyprland's own move
+-- takes a tab's whole group with it). The tab leaves its group and the tab after it is shown in its place (the one
+-- before, when it was the last; Hyprland's remove would show the first); the other tabs stay. Returns w, alone (a
+-- window in no group as it is), and where it left, for NIGHTDRIVE_TAB_BACK: { stay = a tab that stayed, index }.
+-- Where it lands it doesn't join a group (auto_group is for windows that open, not ones moved), and a PM's space
+-- (pm-space.lua) only gathers the sessions on its own workspace, so one moved out stays out. ⌘⇧D (bindings.lua)
+-- sends a tab to the drawer through here too. Global, as NIGHTDRIVE_SWAP: a test calls it.
+function NIGHTDRIVE_TAB_ALONE(w)
+    if not (w and w.group and w.group.size > 1) then return w, nil end
     local addr, index = w.address, w.group.current_index
     local stay = nil   -- a tab that stays, to find the group by after the remove
     for _, m in ipairs(w.group.members or {}) do
@@ -99,7 +97,34 @@ function NIGHTDRIVE_MOVE_TO_WORKSPACE(ws)
     if g and g.size > 1 then
         hl.dispatch(hl.dsp.group.active({ index = math.min(index, g.size), window = "address:" .. stay }))
     end
-    if w then hl.dispatch(hl.dsp.window.move({ workspace = ws, window = "address:" .. addr })) end
+    return w, { stay = stay, index = index }
+end
+
+-- Back from the drawer to the workspace it left (bindings.lua, #3220): a tab rejoins its group at its old place and is
+-- the tab shown. The group is found by a tab that stayed, while that one is still on the workspace; when only it was
+-- left (two tabs make no group of one) the two are a group again. One the user has since grouped elsewhere, or that
+-- has gone, leaves w an ordinary window. ⌘⇧ + a number remembers nothing: a window moved back is an ordinary one.
+function NIGHTDRIVE_TAB_BACK(addr, from)
+    local w, stay = window_of(addr), from and window_of(from.stay)
+    if not (w and stay and tiled(w) and tiled(stay) and w.workspace and stay.workspace
+            and stay.workspace.id == w.workspace.id) or w.group then return end
+    if not stay.group then
+        hl.dispatch(hl.dsp.group.toggle({ window = "address:" .. stay.address }))
+        stay = window_of(stay.address)
+        if not (stay and stay.group) then return end
+    end
+    local g = stay.group
+    local index = math.min(from.index, g.size + 1)
+    g:add(w, index)
+    hl.dispatch(hl.dsp.group.active({ index = index, window = "address:" .. stay.address }))
+    hl.dispatch(hl.dsp.focus({ window = "address:" .. addr }))
+end
+
+-- ⌘⇧ + a number (bindings.lua), and ⌘W hiding a background app in special:bg (scripts/close-or-hide, follow = false):
+-- the active window to that workspace, a tab alone
+function NIGHTDRIVE_MOVE_TO_WORKSPACE(ws, follow)
+    local w = NIGHTDRIVE_TAB_ALONE(hl.get_active_window())
+    if w then hl.dispatch(hl.dsp.window.move({ workspace = ws, follow = follow, window = "address:" .. w.address })) end
 end
 
 hl.bind(mod .. " + SHIFT + G", hl.dsp.group.toggle())

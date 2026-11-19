@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""⌘⇧ + a number moves a tab alone (window-groups.lua, #3194), in the sandbox only:
+"""⌘⇧ + a number and ⌘⇧D move a tab alone (window-groups.lua, #3194, #3220), in the sandbox only:
 
     nightdrive sandbox exec python3 nightdrive/config/hypr/group_move_test.py
 
 A tab goes to the workspace out of its group, the tab after it is shown in its place (the one before, when it was the
 last) and the other tabs stay; a window in no group moves as before. On a workspace whose focused window is a group it
 doesn't join that group. A session moved out of a project manager's space (pm-space.lua) isn't taken back into its group.
+⌘⇧D sends a tab to the drawer the same way, and back on the workspace it left it rejoins its group at its old place
+(two tabs a group again); moved anywhere else from the drawer it is an ordinary window. A PM's session in the drawer
+stays there, and back on the PM's space it is in the sessions' group.
 
 It opens real windows (kitty), so it runs only inside the sandbox's container, never on a desktop someone uses: elsewhere
 (CI, check.py without a desktop, your own Hyprland) it skips itself.
@@ -50,11 +53,12 @@ def lua(code):
 
 
 def where(title):
-    """A window's workspace and its group's tabs in order (titles, no prefix; [] in none)."""
+    """A window's workspace (its id, or "drawer") and its group's tabs in order (titles, no prefix; [] in none)."""
     by_addr = {c["address"]: c["title"].removeprefix(PREFIX) for c in clients()}
     for c in clients():
         if c["title"] == PREFIX + title:
-            return c["workspace"]["id"], [by_addr.get(a, a) for a in c["grouped"]]
+            ws = "drawer" if c["workspace"]["name"] == "special:drawer" else c["workspace"]["id"]
+            return ws, [by_addr.get(a, a) for a in c["grouped"]]
     return None, []
 
 
@@ -105,15 +109,22 @@ def move(ws):
     time.sleep(SETTLE)
 
 
+def drawer():
+    """What ⌘⇧D does (bindings.lua): to the drawer, or back out of it. The throw takes 360 ms."""
+    hyprctl("eval", "NIGHTDRIVE_DRAWER_SEND()")
+    time.sleep(SETTLE)
+
+
 @unittest.skipUnless(IN_SANDBOX, "opens windows: only inside nightdrive sandbox (nightdrive sandbox exec python3 …)")
 class MoveTab(unittest.TestCase):
     """Built up in order, each step a check: unittest runs the methods in name order."""
 
     @classmethod
     def setUpClass(cls):
-        taken = [c["title"] for c in json.loads(hyprctl("-j", "clients")) if c["workspace"]["id"] in (SRC, DEST, PM_WS)]
+        taken = [c["title"] for c in json.loads(hyprctl("-j", "clients"))
+                 if c["workspace"]["id"] in (SRC, DEST, PM_WS) or c["workspace"]["name"] == "special:drawer"]
         if taken:
-            raise unittest.SkipTest(f"workspaces {SRC}, {DEST} and {PM_WS} aren't empty: {taken}")
+            raise unittest.SkipTest(f"workspaces {SRC}, {DEST}, {PM_WS} and the drawer aren't empty: {taken}")
         for t in ("a", "b", "c", "d"):
             open_window(t, SRC)
         group("a", "b", "c", "d")
@@ -168,6 +179,52 @@ class MoveTab(unittest.TestCase):
         time.sleep(SETTLE)
         self.assertEqual(where("s2"), (DEST, []), "s2 went back, or into a group")
         self.assertEqual(where("s1"), (PM_WS, ["s1", "s3"]))
+        self.assertEqual(where("pm"), (PM_WS, []))
+
+    def test_6_a_tab_goes_to_the_drawer_alone(self):
+        for t in ("e", "f", "g"):
+            open_window(t, SRC)
+        group("e", "f", "g")
+        focus("f")
+        drawer()
+        self.assertEqual(where("f"), ("drawer", []), "f went to the drawer in a group, or not at all")
+        self.assertEqual(where("e"), (SRC, ["e", "g"]))
+        self.assertEqual(shown(SRC)[0], "g", "the tab after f isn't shown")
+
+    def test_7_back_where_it_was_it_rejoins_its_group(self):
+        focus("f")
+        drawer()
+        self.assertEqual(where("f"), (SRC, ["e", "f", "g"]), "f didn't rejoin its group at its old place")
+        self.assertEqual(shown(SRC), ["f", "f"])
+
+    def test_8_moved_elsewhere_from_the_drawer_it_joins_nothing(self):
+        focus("g")
+        drawer()
+        self.assertEqual(where("g"), ("drawer", []))
+        focus("g")
+        move(DEST)
+        self.assertEqual(where("g"), (DEST, []), "g joined a group")
+        self.assertEqual(where("e"), (SRC, ["e", "f"]))
+
+    def test_9_two_tabs_are_a_group_again(self):
+        focus("e")
+        drawer()
+        self.assertEqual(where("e"), ("drawer", []))
+        self.assertEqual(where("f"), (SRC, []), "a group of one was left behind")
+        focus("e")
+        drawer()
+        self.assertEqual(where("e"), (SRC, ["e", "f"]))
+
+    def test_9b_a_pm_session_stays_in_the_drawer_and_comes_back_to_its_group(self):
+        focus("s3")
+        drawer()
+        time.sleep(SETTLE)   # pm-space.lua arranges once events settle: it mustn't take s3 back
+        self.assertEqual(where("s3"), ("drawer", []), "s3 was taken back from the drawer")
+        focus("s3")
+        drawer()
+        time.sleep(SETTLE)
+        ws, tabs = where("s3")
+        self.assertEqual((ws, sorted(tabs)), (PM_WS, ["s1", "s3"]), "s3 isn't back in the sessions' group")
         self.assertEqual(where("pm"), (PM_WS, []))
 
 

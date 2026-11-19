@@ -397,20 +397,21 @@ hl.bind(mod .. " + TAB",         hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mod .. " + SHIFT + TAB", hl.dsp.focus({ workspace = "e-1" }))
 
 -- Drawer: a special workspace that slides up over the windows (look in appearance.lua)
--- ⌘⇧D puts the active window in the drawer, or takes it back out; ⌘D shows/hides the drawer (⌘S is Save, above)
--- A window remembers where it came from (until Hyprland reloads its config): ⌘⇧D in the drawer takes it back to that
--- workspace, a floating one to its old place and size, a tiled one next to the window now at its old place
-local drawerOrigin = {}   -- window address -> { ws, floating, x, y, w, h }
+-- ⌘⇧D puts the active window in the drawer (a tab alone, out of its group), or takes it back out; ⌘D shows/hides the
+-- drawer (⌘S is Save, above). A window remembers where it came from (until Hyprland reloads its config): ⌘⇧D in the
+-- drawer takes it back to that workspace, a floating one to its old place and size, a tiled one next to the window now
+-- at its old place, a tab into its group
+local drawerOrigin = {}   -- window address -> { ws, floating, x, y, w, h, group }
 local function xy(t) return t.x or t[1], t.y or t[2] end   -- Hyprland gives positions and sizes as {x, y} or {1, 2}
 -- ⌘⇧D throws the window down off the screen before it goes into the drawer: it floats at its own place, slides down
 -- (only this move is animated, windows otherwise switch instantly) and is tiled again in the drawer
 hl.curve("throw", { type = "bezier", points = { {0.5, 0}, {0.75, 0} } })   -- ease in: speeds up as it falls
-local function drawer_throw(w)
+-- was: { x, y, w, h } before it left its group (the group's place and size); from: the group it left (window-groups.lua)
+local function drawer_throw(w, was, from)
     local win = "address:" .. w.address
-    local x, y = xy(w.at)
-    local sw, sh = xy(w.size)
+    local x, y, sw, sh = was.x, was.y, was.w, was.h
     local tiled = not w.floating
-    drawerOrigin[w.address] = { ws = w.workspace.id, floating = w.floating, x = x, y = y, w = sw, h = sh }
+    drawerOrigin[w.address] = { ws = w.workspace.id, floating = w.floating, x = x, y = y, w = sw, h = sh, group = from }
     if tiled then
         hl.dispatch(hl.dsp.window.float({ action = "enable", window = win }))
         hl.dispatch(hl.dsp.window.resize({ x = sw, y = sh, exact = true, window = win }))
@@ -474,17 +475,27 @@ local function drawer_return(w)
     local target = o and hl.get_workspace(o.ws) and o.ws or w.monitor.active_workspace.id
     hl.dispatch(hl.dsp.workspace.toggle_special("drawer"))   -- hide the drawer, the window is shown where it lands
     hl.dispatch(NIGHTDRIVE_PLACE("address:" .. w.address, o, target))
+    -- to the workspace it left: back into its group, if that is there (anywhere else it stays out of groups)
+    if o and o.group and target == o.ws then NIGHTDRIVE_TAB_BACK(w.address, o.group) end
 end
-local function drawer_send()
+function NIGHTDRIVE_DRAWER_SEND()   -- global, as NIGHTDRIVE_SWAP: group_move_test.py calls it
     local w = hl.get_active_window()
+    if not w then return end
+    -- A tab goes alone, out of its group (window-groups.lua, #3220); it falls from the group's place, and coming
+    -- back to that workspace it rejoins the group
+    local x, y = xy(w.at)
+    local sw, sh = xy(w.size)
+    local was = { x = x, y = y, w = sw, h = sh }   -- copied: a window from hl may be read live
+    local from
+    w, from = NIGHTDRIVE_TAB_ALONE(w)
     if not w then return end
     if w.workspace and w.workspace.name == "special:drawer" then
         drawer_return(w)
     else
-        drawer_throw(w)
+        drawer_throw(w, was, from)
     end
 end
-hl.bind(mod .. " + SHIFT + D", drawer_send)
+hl.bind(mod .. " + SHIFT + D", function() NIGHTDRIVE_DRAWER_SEND() end)
 hl.bind(mod .. " + D", hl.dsp.workspace.toggle_special("drawer"))   -- empty, it shows a hint (quickshell/Drawer.qml)
 
 -- Mouse: ⌘+drag moves, ⌘+right-drag resizes. Over the top bar there's no window, so the press goes on to the bar, where

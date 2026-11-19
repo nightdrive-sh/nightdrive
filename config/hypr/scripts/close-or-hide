@@ -20,7 +20,8 @@ if [[ -n $main && $addr == "$main" ]]; then
     # The window is on the background workspace, which has become visible (the app asked for focus): hide the whole workspace
     hyprctl dispatch 'hl.dsp.workspace.toggle_special("bg")' >/dev/null
   else
-    hyprctl dispatch "hl.dsp.window.move({ workspace = \"special:bg\", follow = false, window = \"address:$addr\" })" >/dev/null
+    # A tab alone, out of its group (window-groups.lua, #3220): the rest of the group stays
+    hyprctl eval 'NIGHTDRIVE_MOVE_TO_WORKSPACE("special:bg", false)' >/dev/null
   fi
 else
   "$d/scripts/reopen" save 2>/dev/null   # ⌘⇧U opens it again

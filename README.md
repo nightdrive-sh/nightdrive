@@ -162,7 +162,7 @@ Click an icon and a small menu opens under it:
   them. A new one is the last tab, behind the one shown, and the keyboard stays where you are. Alone, once its sessions
   have all closed, it fills the width; restarted, it goes back to its space (by its name). Moved to another workspace,
   alone or with ⌘ ⌥ + a number, it makes that one its space, and its sessions open there whichever workspace you are
-  on; a session moved away with ⌘ ⇧ + a number leaves the group and stays where it went. Other workspaces, and sessions no PM opened, are as before.
+  on; a session moved away with ⌘ ⇧ + a number or ⌘ ⇧ D leaves the group and stays where it went (back from the drawer, it rejoins it). Other workspaces, and sessions no PM opened, are as before.
   **Two Claude accounts** (a Claude Code config dir each, `CLAUDE_CONFIG_DIR`): `~/.claude` and every `~/.claude-*`
   you have signed in to are found by themselves. The second account then gets a Claude icon of its own beside the
   first, each with its own menu (its sessions, **New session** on it and its usage), right-click setting and dot,
@@ -195,7 +195,8 @@ A part that isn't installed doesn't show anywhere: no Launcher level, bar icon o
 ### A drawer for what you want at hand
 
 ⌘⇧D drops the active window into the drawer, and ⌘D slides the drawer up over your windows, dimming and blurring the rest.
-⌘D again puts it away. ⌘⇧D in the drawer sends the window back to the workspace and place it came from. It suits notes,
+⌘D again puts it away. ⌘⇧D in the drawer sends the window back to the workspace and place it came from. A tab goes alone,
+out of its group, and back on its workspace it is a tab in that group again. It suits notes,
 a to-do list or a chat you want one keystroke away without giving them a workspace of their own.
 
 ![The drawer empty, and with a terminal and Files in it](docs/screenshots/drawer.jpg)
@@ -224,7 +225,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   these and video calls, asks in a themed window: the whole screen or one window.
 - **Themes**: seven colours that change the whole desktop at once, two synthwave wallpapers and your own (Settings ›
   Theme). GTK windows such as Files and the file picker follow the colour too.
-- **Background apps**: ⌘W only hides chat apps and the music player, so they keep running. Their shortcut brings them straight back.
+- **Background apps**: ⌘W only hides chat apps and the music player, so they keep running (a tab alone: the rest of its group stays). Their shortcut brings them straight back.
 - **Claude Code waits for you?** Its notification says which session and what it wants, and a permission request can
   be answered right there (Allow, Deny) when the notification shows all it allows: a long command, one run outside the
   sandbox, a file edit or an MCP tool gets Review instead, which goes to its session. While the sessions
@@ -569,12 +570,12 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | ⌘ ⇧ T | Tile or float the window |
 | ⌘ ⌥ − / ⌘ ⌥ + | The window narrower / wider (US keyboard: ⌘ ⌥ =) |
 | ⌘ ⇧ J | Split direction (⌘ ⇧ arrows move the window) |
-| ⌘ ⇧ G | Window tabs: make the window a group, or break it up (⌘ ⌥ ⇧ arrows: into the group that way, or out; ⌃ ⌥ ⌘ ← / →: its previous / next tab; ⌘ ⇧ + a number moves a tab alone, out of its group) |
+| ⌘ ⇧ G | Window tabs: make the window a group, or break it up (⌘ ⌥ ⇧ arrows: into the group that way, or out; ⌃ ⌥ ⌘ ← / →: its previous / next tab; ⌘ ⇧ + a number and ⌘ ⇧ D move a tab alone, out of its group) |
 | ⌥ Tab / ⌥ ⇧ Tab | The app's next / previous window |
 | ⌘ 1…0 | Go to a workspace |
 | ⌘ ⇧ 1…0 | Move the window there |
 | ⌘ D | Drawer: show or hide |
-| ⌘ ⇧ D | Put the window in the drawer, or take it back out |
+| ⌘ ⇧ D | Put the window in the drawer, or take it back out (a tab alone; back, into its group) |
 | ⌘ ⇧ V | Clipboard history |
 | ⌘ ⇧ E | Emoji |
 | ⌘ ⇧ C | Claude writes, in any app ([Claude writes](#claude-writes)) |
