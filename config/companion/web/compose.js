@@ -3,12 +3,13 @@
 // instead. Enter as the panel's: into a session as its prompt, into the window only when that window is a session's.
 // With words, the box gives them to it instead of sending (a question's Own answer, question.js): it returns true
 // when they went. write opens the box at its keyboard (the session view's Write), text already in it.
-// Sent, the box goes at once; when the words don't get there (post's toast says why), it opens again with them in it.
+// Sent, the box goes at once, without a word; when the words don't get there (post's toast says why), it opens again
+// with them in it.
 import { esc, post, sheet, store, toast } from "./api.js";
 import { icon } from "./icons.js";
 import { holdToTalk, Recognition } from "./speech.js";
 
-// Where the words go, as a request, and what the toast says
+// Where the words go, as a request
 function pathFor(t) {
   return t === "window" ? "/api/send" : t === "new" ? "/api/sessions/new" : `/api/sessions/${encodeURIComponent(t)}/send`;
 }
@@ -28,7 +29,9 @@ function nameOf(t) {
 export async function send(t, words) {
   const submit = t === "window" ? "session" : true;     // the server decides for the window, when it types
   const ok = await post(pathFor(t), { text: words, submit });
-  if (ok) toast(t === "new" ? "A new session starts on the desktop" : `Sent to ${nameOf(t)}`);
+  // Sent, nothing is said: the words show where they went (the session's view and its tile, the panel under its
+  // button). A new session is the exception: its tile takes a few seconds to come.
+  if (ok && t === "new") toast("A new session starts on the desktop");
   return ok;
 }
 
