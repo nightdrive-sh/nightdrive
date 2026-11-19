@@ -65,7 +65,8 @@ class Rows(unittest.TestCase):
                            ("arm", lambda r: (self.armed.append(r["id"]), (True, ""))[1]),
                            ("disarm", self.disarmed.append),
                            ("notify", lambda rid, summary, body="", pinned=False: self.notes.append((summary, body, pinned))),
-                           ("run_command", lambda rid, line: (self.ran.append(line), self.result)[1])]:
+                           ("run_command", lambda rid, line: (self.ran.append(line), self.result)[1]),
+                           ("screen_locked", lambda: False)]:   # the desktop's own lock mustn't hold a run back
             patcher = mock.patch.object(schedule, name, stub)
             patcher.start()
             self.addCleanup(patcher.stop)

@@ -66,7 +66,8 @@ def minutes_left(ts, now):
 @contextlib.contextmanager
 def locked_rows(path, key):
     """The rows under `key` in the JSON file at `path`, as a list to change in place; written back (atomically) only
-    if it changed. A missing or broken file is an empty list, and a row without an id or a numeric at is dropped."""
+    if it changed. A missing or broken file is an empty list, and a row without an id is dropped, as is one with neither
+    a numeric at nor an event (on: schedule's wake and login rows, which wait for no time)."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path + ".lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -75,7 +76,8 @@ def locked_rows(path, key):
                 rows = json.load(f).get(key, [])
         except (OSError, ValueError, AttributeError):
             rows = []
-        rows = [r for r in rows if isinstance(r, dict) and r.get("id") and isinstance(r.get("at"), (int, float))]
+        rows = [r for r in rows if isinstance(r, dict) and r.get("id")
+                and (isinstance(r.get("at"), (int, float)) or isinstance(r.get("on"), str))]
         before = json.dumps(rows)
         yield rows
         if json.dumps(rows) != before:

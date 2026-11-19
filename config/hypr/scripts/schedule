@@ -1,23 +1,35 @@
 #!/usr/bin/python3 -I
-"""Commands run at a time (Dashboard #3121): `nightdrive schedule …` runs this.
+"""Commands run at a time or on an event (Dashboard #3121): `nightdrive schedule …` runs this.
 
-  schedule WHEN COMMAND… [--json]      runs COMMAND at WHEN: minutes (15, 90m, 2h, 1h30m, up to a week) or a time of
-                                       day (14:45, 14.45: the next one); @UNIX: that moment (the undo of a cancel).
-                                       One argument is a shell line as such ("make && notify-send done"); several are
-                                       words, quoted for the shell as given. --json: the row, as list gives each
-  schedule list [--json]               the waiting ones, soonest first. --json: {commands: [{id, at, at_unix, clock,
-                                       minutes_left, command}]}, at ISO 8601, clock HH:MM
+  schedule WHEN COMMAND… [--json]      runs COMMAND at WHEN: minutes (15, 90m, 2h, 1h30m, up to a week), a time of
+                                       day (14:45, 14.45: the next one), wake (the first unlock after the computer
+                                       next wakes from sleep) or login (the next login); @UNIX: that moment (the undo
+                                       of a cancel). One argument is a shell line as such ("make && notify-send done");
+                                       several are words, quoted for the shell as given. --json: the row, as list
+                                       gives each
+  schedule list [--json]               the waiting ones, by time, then wake and login. --json: {commands: [{id, when,
+                                       at, at_unix, clock, minutes_left, state, command}]}: when is time, wake or
+                                       login (at, at_unix, clock, minutes_left are null for wake and login); state is
+                                       waiting, unlock (its time came under the lock), missed (asks Run or Skip) or due
   schedule show ID --json              one of them, as list gives it
+  schedule run ID                      runs one now, whatever it waits for (a missed one, say)
   schedule cancel ID|all [--json]      takes one (or every one) away before it runs
-  schedule fire ID                     the timer's own call: runs the command, with a notification
+  schedule restore                     at login (hypr/autostart.lua): the timers again, login's rows run, missed ones
+                                       under LATE_HOURS late run and older ones ask (Run / Skip)
+  schedule woke                        after sleep (hypridle's after_sleep_cmd): wake's rows wait for the unlock
+  schedule unlocked                    at each unlock but the login's (autostart.lua): what waited for it runs
+  schedule fire ID [--now]             the timer's own call: runs the command, with a notification; under the lock
+                                       it waits for the unlock instead (--now: runs it anyway)
 
 Nothing runs unseen: what waits is in `schedule list`, and a run shows a notification with the command (Running…, then
 Done, or Failed with the end of its output, pinned). The whole output goes to the journal:
-journalctl --user -u nightdrive-schedule-ID. A command runs once, in a systemd scope of its own (a window it opens stays
-open after the run), from the home folder, with the desktop's environment and ~/.local/bin in PATH.
+journalctl --user -u 'nightdrive-schedule-ID*'. A command runs once, in a systemd scope of its own (a window it opens
+stays open after the run), from the home folder, with the desktop's environment and ~/.local/bin in PATH.
 
 The timers are timers.py's, as Remind's: a transient systemd user timer on the wall clock, so a time that passed while
-the computer slept comes as it wakes. Over a logout or a reboot the timer goes; the row stays in the state file.
+the computer slept comes as it wakes, and waits for the unlock (Jari 19.11.: nothing runs behind the lock). Over a
+logout or a restart the timer goes and the row stays: the next login runs it if it is under LATE_HOURS late, and asks
+about an older one.
 """
 import argparse, json, os, secrets, shlex, subprocess, sys, tempfile, time
 
@@ -25,11 +37,17 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import timers  # noqa: E402  the timer base shared with remind (timers.py)
 
 STATE = os.path.expanduser("~/.local/state/nightdrive/schedule.json")
-UNIT = "nightdrive-schedule-"       # + the id: the timer, its service and the command's scope (+ -run)
+UNIT = "nightdrive-schedule-"       # + the id: the timer, its service, a run now (-now) and the command's scope (-run)
 MAX_MINUTES = 7 * 24 * 60           # a week, as Remind's
+LATE_HOURS = 12                     # missed over a logout: run at login under this late, else asked (Jari 19.11.)
+EVENTS = ("wake", "login")
 APP, ICON = "Schedule", "lucide:calendar-clock"
 TAIL_LINES = 3                      # of a failed run's output, in its notification
 SELF = os.path.realpath(__file__)   # the timer runs this checkout's script (a worktree's or the sandbox's own)
+# Set by `woke` while the lock is up: the next unlock is the first after waking. In the runtime dir, so a logout or a
+# restart drops it with the session it belongs to.
+WOKE = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or "/tmp", "nightdrive-schedule-woke")
+LOCKS = ("[q]s -p .*/greeter/lock\\.qml", "^hyprlock")   # the lock and its fallback (hypr/scripts/lock)
 
 
 def die(msg, code=1):
@@ -50,6 +68,21 @@ def disarm(rid):
     timers.disarm(UNIT + rid)
 
 
+def screen_locked():
+    """The session's lock is up: this session's only (a container's runs as the same user), as hypr/scripts/lock asks."""
+    mine = ["--ns", str(os.getpid()), "--nslist", "pid", "-u", str(os.getuid())]
+    return any(subprocess.run(["pgrep", *mine, "-f", p], capture_output=True).returncode == 0 for p in LOCKS)
+
+
+def start_now(rid):
+    """Runs a row now as a service of its own (`fire --now`), so its output goes to the journal as a timer's would, and
+    the caller (a login's restore, an unlock) doesn't wait for it. The unit's name keeps one row from running twice."""
+    p = subprocess.run(["systemd-run", "--user", "--quiet", "--collect", "--unit", UNIT + rid + "-now",
+                        "--description", "Nightdrive schedule: run now", "--", SELF, "fire", rid, "--now"],
+                       capture_output=True, text=True)
+    return p.returncode == 0
+
+
 def command_line(words):
     """The words after WHEN → one shell line. A single word is a line as typed (it may hold && or a pipe); several
     are quoted one by one, so `schedule 15 notify-send "Tea is ready"` keeps its message whole."""
@@ -67,16 +100,33 @@ def syntax_error(line):
 
 def public(r, now=None):
     now = time.time() if now is None else now
-    return {"id": r["id"], "at": timers.iso(r["at"]), "at_unix": int(r["at"]), "clock": timers.clock(r["at"]),
-            "minutes_left": timers.minutes_left(r["at"], now), "command": r["command"]}
+    out = {"id": r["id"], "when": r.get("on", "time"), "at": None, "at_unix": None, "clock": None,
+           "minutes_left": None, "state": r.get("state", "waiting"), "command": r["command"]}
+    if "on" not in r:
+        out.update(at=timers.iso(r["at"]), at_unix=int(r["at"]), clock=timers.clock(r["at"]),
+                   minutes_left=timers.minutes_left(r["at"], now))
+    return out
 
 
-def notify(rid, summary, body="", pinned=False):
-    # One notification per run: the stack tag makes Done or Failed take Running's place (Notifs.qml), without a sound
+def label(r):
+    """When it runs, for the list and the notifications: 14:45, wake, login."""
+    return r["on"] if "on" in r else timers.clock(r["at"])
+
+
+def order(r):
+    return (1, EVENTS.index(r["on"])) if "on" in r else (0, r["at"])
+
+
+def notify(rid, summary, body="", pinned=False, actions=()):
+    """One notification per run: the stack tag makes Done or Failed take Running's place (Notifs.qml), without a sound.
+    With actions ([(key, label)]) it waits for the answer and returns the key, "" when it was dismissed."""
     args = ["notify-send", "-a", APP, "-i", ICON, "-h", "string:x-dunst-stack-tag:schedule-" + rid]
-    if pinned:   # a failure stays until dismissed (Notifs.qml's x-nightdrive-pin)
+    if pinned:   # stays until dismissed (Notifs.qml's x-nightdrive-pin)
         args += ["-h", "boolean:x-nightdrive-pin:true"]
-    subprocess.run([*args, "--", summary, body], capture_output=True)
+    if actions:
+        args += ["-w", *[f"--action={k}={v}" for k, v in actions]]
+    p = subprocess.run([*args, "--", summary, body], capture_output=True, text=True)
+    return p.stdout.strip()
 
 
 def run_command(rid, line):
@@ -99,70 +149,15 @@ def run_command(rid, line):
         return code, out.read()
 
 
-def cmd_add(a):
-    now = int(time.time())
-    at = timers.when(a.when, now, MAX_MINUTES)
-    if at is None:
-        die("Minutes up to a week (15, 90m, 2h, 1h30m) or a time of day (14:45); "
-            "a moment (@UNIX) not past and within a week", 2)
-    line = command_line(a.command)
-    if not line:
-        die("What to run: schedule WHEN COMMAND", 2)
-    err = syntax_error(line)
-    if err:
-        die("The command doesn't parse: " + err, 2)
-    r = {"id": secrets.token_hex(4), "at": at, "command": line}
-    with state() as rows:
-        ok, err = arm(r)
-        if not ok:
-            die("The timer didn't start: " + (err or "systemd-run failed"))
-        rows.append(r)
-    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"At {timers.clock(at)}: {line}  ({r['id']})")
-
-
-def cmd_list(a):
-    with state() as rows:
-        rows.sort(key=lambda r: r["at"])
-        out = [public(r) for r in rows]
-    if a.json:
-        print(json.dumps({"commands": out}, ensure_ascii=False))
-    elif not out:
-        print("No commands waiting")
-    for r in [] if a.json else out:
-        print(f"{r['clock']}  in {r['minutes_left']} min  {r['command']}  ({r['id']})")
-
-
-def cmd_show(a):
-    with state() as rows:
-        r = next((r for r in rows if r["id"] == a.id), None)
-    if not r:
-        die(f"No command {a.id}: it ran already, or was cancelled (schedule list)")
-    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"{timers.clock(r['at'])}  {r['command']}")
-
-
-def cmd_cancel(a):
-    with state() as rows:
-        gone = [r for r in rows if a.id in ("all", r["id"])]
-        if not gone and a.id != "all":
-            die(f"No command {a.id}: it ran already, or was cancelled (schedule list)")
-        for r in gone:
-            disarm(r["id"])
-            rows.remove(r)
-    if a.json:
-        print(json.dumps({"cancelled": [public(r) for r in gone]}, ensure_ascii=False))
+def execute(r):
+    """The run as such, with its notifications: Running, then Done or Failed (pinned, with its output's end)."""
+    if "on" in r:
+        note = {"wake": "On waking", "login": "At login"}[r["on"]]
+    elif time.time() - r["at"] > 120:   # a late one says it is: the clock time alone would look wrong
+        note = "Was due at " + timers.clock(r["at"])
     else:
-        print("\n".join(f"Cancelled: {r['command']}" for r in gone) or "No commands waiting")
-
-
-def cmd_fire(a):
-    # The row goes before the run: a command runs once, even if this is stopped halfway (a logout mid-run)
-    with state() as rows:
-        r = next((r for r in rows if r["id"] == a.id), None)
-        if r:
-            rows.remove(r)
-    if not r:   # cancelled meanwhile: nothing runs
-        return
-    notify(r["id"], "Running: " + r["command"], "Scheduled for " + timers.clock(r["at"]))
+        note = "Scheduled for " + timers.clock(r["at"])
+    notify(r["id"], "Running: " + r["command"], note)
     code, output = run_command(r["id"], r["command"])
     if output:
         print(output, end="" if output.endswith("\n") else "\n")   # to the journal, whole
@@ -171,7 +166,186 @@ def cmd_fire(a):
     else:
         tail = "\n".join(output.strip().splitlines()[-TAIL_LINES:])
         notify(r["id"], f"Failed (exit {code}): " + r["command"],
-               (tail + "\n" if tail else "") + f"journalctl --user -u {UNIT}{r['id']}", pinned=True)
+               (tail + "\n" if tail else "") + f"journalctl --user -u '{UNIT}{r['id']}*'", pinned=True)
+
+
+def due(pick):
+    """The rows pick(row) chooses become due and start now, each in its own service. They are marked first, under the
+    lock, so a second caller (two unlocks close together) starts none twice; one whose start failed stays due, and the
+    next unlock or login starts it."""
+    with state() as rows:
+        ids = [r["id"] for r in rows if pick(r)]
+        for r in rows:
+            if r["id"] in ids:
+                r["state"] = "due"
+    for rid in ids:
+        start_now(rid)
+    return ids
+
+
+def cmd_add(a):
+    now = int(time.time())
+    on = a.when if a.when in EVENTS else None
+    at = None if on else timers.when(a.when, now, MAX_MINUTES)
+    if not on and at is None:
+        die("Minutes up to a week (15, 90m, 2h, 1h30m), a time of day (14:45), wake or login; "
+            "a moment (@UNIX) not past and within a week", 2)
+    line = command_line(a.command)
+    if not line:
+        die("What to run: schedule WHEN COMMAND", 2)
+    err = syntax_error(line)
+    if err:
+        die("The command doesn't parse: " + err, 2)
+    r = {"id": secrets.token_hex(4), "command": line, **({"on": on, "added": now} if on else {"at": at})}
+    with state() as rows:
+        if not on:
+            ok, err = arm(r)
+            if not ok:
+                die("The timer didn't start: " + (err or "systemd-run failed"))
+        rows.append(r)
+    if a.json:
+        print(json.dumps(public(r), ensure_ascii=False))
+    else:
+        print(f"{'On ' + on if on else 'At ' + timers.clock(at)}: {line}  ({r['id']})")
+
+
+def cmd_list(a):
+    with state() as rows:
+        rows.sort(key=order)
+        out = [public(r) for r in rows]
+    if a.json:
+        print(json.dumps({"commands": out}, ensure_ascii=False))
+    elif not out:
+        print("No commands waiting")
+    for r in [] if a.json else out:
+        if not r["clock"]:
+            when = "on " + r["when"]
+        elif r["at_unix"] <= time.time():   # waits for the unlock, or missed: when it was due
+            when = "was due " + r["at"][:16].replace("T", " ")
+        else:
+            when = f"{r['clock']}  in {r['minutes_left']} min"
+        st = "" if r["state"] == "waiting" else f"  [{r['state']}]"
+        print(f"{when}  {r['command']}{st}  ({r['id']})")
+
+
+def find(rows, rid):
+    r = next((r for r in rows if r["id"] == rid), None)
+    if not r:
+        die(f"No command {rid}: it ran already, or was cancelled (schedule list)")
+    return r
+
+
+def cmd_show(a):
+    with state() as rows:
+        r = find(rows, a.id)
+    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"{label(r)}  {r['command']}")
+
+
+def cmd_run(a):
+    with state() as rows:
+        find(rows, a.id)
+    disarm(a.id)   # its timer, if it has one, would run it again at its time
+    if not start_now(a.id):
+        die("It didn't start: systemd-run failed")
+    print("Running: see its notification")
+
+
+def cmd_cancel(a):
+    with state() as rows:
+        gone = [r for r in rows if a.id in ("all", r["id"])]
+        if not gone and a.id != "all":
+            die(f"No command {a.id}: it ran already, or was cancelled (schedule list)")
+        for r in gone:
+            if "on" not in r:
+                disarm(r["id"])
+            rows.remove(r)
+    if a.json:
+        print(json.dumps({"cancelled": [public(r) for r in gone]}, ensure_ascii=False))
+    else:
+        print("\n".join(f"Cancelled: {r['command']}" for r in gone) or "No commands waiting")
+
+
+def cmd_fire(a):
+    # The row goes before the run: a command runs once, even if this is stopped halfway (a logout mid-run). Under the
+    # lock (its time came while the computer slept, or while away) it stays, to run at the unlock
+    with state() as rows:
+        r = next((r for r in rows if r["id"] == a.id), None)
+        if r and not getattr(a, "now", False) and screen_locked():
+            r["state"] = "unlock"
+            return
+        if r:
+            rows.remove(r)
+    if r:   # cancelled meanwhile: nothing runs
+        execute(r)
+
+
+def cmd_restore(a):
+    """At login: a timer that went with the last session is armed again; login's rows run; a time missed meanwhile runs
+    if it is under LATE_HOURS late, an older one asks. Wake's rows wait for a wake."""
+    now = time.time()
+    try:
+        os.remove(WOKE)   # a wake before the logout isn't this session's
+    except OSError:
+        pass
+
+    def runs(r):
+        if "on" in r:
+            return r["on"] == "login"
+        return r["at"] <= now and r.get("state") != "missed" and now - r["at"] < LATE_HOURS * 3600
+
+    due(runs)
+    ask = []
+    with state() as rows:
+        for r in rows:
+            if "on" in r or r.get("state") == "due":
+                continue
+            if r["at"] <= now:
+                r["state"] = "missed"
+                ask.append(r["id"])
+            elif not timers.armed(UNIT + r["id"]):
+                r.pop("state", None)
+                arm(r)
+    for rid in ask:
+        ask_later(rid)
+
+
+def ask_later(rid):
+    # Each its own question, in the background: an unanswered one mustn't hold the others, nor the login
+    subprocess.Popen([SELF, "ask", rid], start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def cmd_ask(a):
+    """A missed one's question: Run or Skip. Dismissed, it stays in the list as missed (schedule run / cancel)."""
+    with state() as rows:
+        r = next((r for r in rows if r["id"] == a.id and r.get("state") == "missed"), None)
+    if not r:
+        return
+    answer = notify(r["id"], "Missed: " + r["command"],
+                    f"Was due {timers.iso(r['at'])[:16].replace('T', ' at ')}, while the computer was off",
+                    pinned=True, actions=[("run", "Run"), ("skip", "Skip")])
+    if answer == "run":
+        due(lambda x: x["id"] == r["id"] and x.get("state") == "missed")
+    elif answer == "skip":
+        with state() as rows:
+            rows[:] = [x for x in rows if x["id"] != r["id"]]
+
+
+def cmd_woke(a):
+    """After sleep: wake's rows run at the first unlock. Under no lock (none came before the sleep) that is now."""
+    if screen_locked():
+        with open(WOKE, "w"):
+            pass
+    else:
+        due(lambda r: r.get("on") == "wake")
+
+
+def cmd_unlocked(a):
+    """At an unlock: what came due under the lock runs, and wake's rows if this is the first unlock after waking."""
+    woke = os.path.exists(WOKE)
+    if woke:
+        os.remove(WOKE)
+    due(lambda r: r.get("state") in ("unlock", "due") or woke and r.get("on") == "wake")
 
 
 def parse_add(argv):
@@ -201,14 +375,17 @@ def main():
     sub.add_parser("add")   # parsed by parse_add: the command's own options aren't argparse's
     ls = sub.add_parser("list")
     ls.add_argument("--json", action="store_true")
-    show = sub.add_parser("show")
-    show.add_argument("id")
-    show.add_argument("--json", action="store_true")
-    cancel = sub.add_parser("cancel")
-    cancel.add_argument("id")
-    cancel.add_argument("--json", action="store_true")
+    for name in ("show", "cancel"):
+        s = sub.add_parser(name)
+        s.add_argument("id")
+        s.add_argument("--json", action="store_true")
+    for name in ("run", "ask"):
+        sub.add_parser(name).add_argument("id")
     fire = sub.add_parser("fire")
     fire.add_argument("id")
+    fire.add_argument("--now", action="store_true")
+    for name in ("restore", "woke", "unlocked"):
+        sub.add_parser(name)
     argv = sys.argv[1:]
     first = next((w for w in argv if not w.startswith("-")), None)   # past a leading --json
     if any(w in ("-h", "--help") for w in argv[:1]):
@@ -219,7 +396,7 @@ def main():
         argv.remove(first)
         argv = [first, *argv]           # `schedule --json list`
     else:
-        argv = ["add", *argv]           # `schedule 15 make`, `schedule --json 15 make`
+        argv = ["add", *argv]           # `schedule 15 make`, `schedule --json wake make`
     if argv[0] == "add":
         a = parse_add(argv[1:])
         if a is None:
@@ -227,7 +404,8 @@ def main():
             sys.exit(2)
     else:
         a = p.parse_args(argv)
-    {"add": cmd_add, "list": cmd_list, "show": cmd_show, "cancel": cmd_cancel, "fire": cmd_fire}[a.cmd](a)
+    {"add": cmd_add, "list": cmd_list, "show": cmd_show, "run": cmd_run, "cancel": cmd_cancel, "fire": cmd_fire,
+     "restore": cmd_restore, "ask": cmd_ask, "woke": cmd_woke, "unlocked": cmd_unlocked}[a.cmd](a)
 
 
 if __name__ == "__main__":
