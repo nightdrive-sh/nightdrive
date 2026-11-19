@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""How Notes reads lists and tables (Markdown.js, MarkdownTable.js; #2056, #3209): `python3 plugins/notes/app/markdown_test.py`. A numbered list goes on
+"""How Notes reads lists and tables (Markdown.js, MarkdownTable.js; #2056, #3209): `python3 config/quickshell/kit/markdown_test.py`. A numbered list goes on
 counting after a list nested in it (it started again at 1), lists nest at several levels, bullets and numbers mixed,
 task boxes keep their order for TaskBoxes.qml, a blank line between items keeps one list, and "7." starts at 7. A
 #tag is a link to its notes, where lib/tags.py reads one (#2016).

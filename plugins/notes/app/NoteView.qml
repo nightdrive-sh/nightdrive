@@ -1,9 +1,9 @@
 import QtQuick
 import qs.kit
-import "Markdown.js" as Markdown
+import "kit/Markdown.js" as Markdown
 
 // The open note, laid out as Mail's message: its buttons in the bar at the top (NoteBar), then its header (NoteHeader:
-// title, when it was saved, its file) and its Markdown as formatted text to read (Markdown.js), scrolling together; or,
+// title, when it was saved, its file) and its Markdown as formatted text to read (kit/Markdown.js), scrolling together; or,
 // while it is written in (edit(), Enter), the text as it is in the file in NoteEditor under the bar. A link opens in the
 // browser. Apostrophe is still a click away (Open in Apostrophe). The reading keys are shell.qml's, the writing ones
 // NoteEditor's.

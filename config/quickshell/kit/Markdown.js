@@ -1,7 +1,7 @@
 .pragma library
 .import "MarkdownTable.js" as Table
 
-// A note's Markdown as the HTML Qt's rich text shows (NoteView.qml). Qt's own MarkdownText would do, but it colours links
+// A note's Markdown as the HTML Qt's rich text shows (Notes' NoteView.qml, Inbox's MessageView.qml). Qt's own MarkdownText would do, but it colours links
 // its own blue whatever the theme, and it passes HTML in the note through, pictures from the web and all. This one knows
 // what notes use (headings, paragraphs, lists and checkboxes, quotes, code, rules, tables, bold, italic, code, links) and shows
 // anything else, HTML included, as the text it is: a note Claude wrote can't load anything or look like something else.

@@ -1,9 +1,9 @@
 import QtQuick
 import qs.kit
-import "Markdown.js" as Markdown
+import "kit/Markdown.js" as Markdown
 
 // The open message, laid out as Notes' note: its bar at the top (MessageBar), then, scrolling together, its header
-// (title, sender, when, the sender's session and task), its buttons, its text as formatted Markdown (Notes' Markdown.js,
+// (title, sender, when, the sender's session and task), its buttons, its text as formatted Markdown (the kit's Markdown.js,
 // which shows HTML in it as the text it is and loads nothing from the web), and its files, pictures large
 // (Attachments). A link opens in the browser, its address shown at the foot while hovered. The keys are shell.qml's.
 Item {
