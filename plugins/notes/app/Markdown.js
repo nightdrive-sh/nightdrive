@@ -1,8 +1,9 @@
 .pragma library
+.import "MarkdownTable.js" as Table
 
 // A note's Markdown as the HTML Qt's rich text shows (NoteView.qml). Qt's own MarkdownText would do, but it colours links
 // its own blue whatever the theme, and it passes HTML in the note through, pictures from the web and all. This one knows
-// what notes use (headings, paragraphs, lists and checkboxes, quotes, code, rules, bold, italic, code, links) and shows
+// what notes use (headings, paragraphs, lists and checkboxes, quotes, code, rules, tables, bold, italic, code, links) and shows
 // anything else, HTML included, as the text it is: a note Claude wrote can't load anything or look like something else.
 
 function escape(s) {
@@ -86,7 +87,8 @@ function html(md, c) {
     }
     function flush() { flushPara(); flushList(); flushQuote() }
 
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
         if (fence !== null) {
             if (/^\s*(```|~~~)/.test(line)) {
                 out.push(`<pre style="color:${c.accent}">${escape(fence.join("\n"))}</pre>`)
@@ -101,7 +103,17 @@ function html(md, c) {
         if ((m = line.match(/^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/))) {
             flush()
             const n = m[1].length
-            out.push(`<p style="font-size:${sizes[n]}px; font-weight:600; color:${c.title}">${inline(m[2], c)}</p>`)
+            // Room above a heading, more than below it, so it reads as the start of what follows; none at the very top
+            const above = out.length ? "margin-top:18px; " : ""
+            out.push(`<p style="${above}font-size:${sizes[n]}px; font-weight:600; color:${c.title}">${inline(m[2], c)}</p>`)
+            continue
+        }
+        // Before the rule: a table's separator ("|---|") would read as one
+        if (Table.starts(lines, i)) {
+            flush()
+            const n = Table.length(lines, i)
+            out.push(Table.html(lines.slice(i, i + n), inline, c))
+            i += n - 1
             continue
         }
         if (/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); out.push("<hr>"); continue }

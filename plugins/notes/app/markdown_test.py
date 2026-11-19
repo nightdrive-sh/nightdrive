@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""How Notes reads lists (Markdown.js, #2056): `python3 plugins/notes/app/markdown_test.py`. A numbered list goes on
+"""How Notes reads lists and tables (Markdown.js, MarkdownTable.js; #2056, #3209): `python3 plugins/notes/app/markdown_test.py`. A numbered list goes on
 counting after a list nested in it (it started again at 1), lists nest at several levels, bullets and numbers mixed,
 task boxes keep their order for TaskBoxes.qml, a blank line between items keeps one list, and "7." starts at 7. A
 #tag is a link to its notes, where lib/tags.py reads one (#2016).
@@ -61,6 +61,10 @@ CASES = {
     "paragraph_ends": "1. a\n2. b\n\nAfter\n\n1. new",
     # #2016: tags as lib/tags.py reads them
     "tags": "#idea and #työ/koti, task #2016, page#part, `#code`, [#in a link](https://a.b/#x) (#paren)",
+    # #3209: pipe tables, aligned, with Markdown in their cells
+    "table": ("Before\n| Task | What | Try |\n| :--- | :---: | ---: |\n| #1 | **bold** | `./play --skip` |\n"
+              "| [site](https://a.b) | `a \\| b` and a\\|b | |\nshort | row\n\nAfter"),
+    "not_table": "a | b\n\n| x |\n| --- | --- |\n\n---",
 }
 
 
@@ -163,6 +167,36 @@ class Lists(unittest.TestCase):
 
     def test_hash_tags_are_links(self):
         self.assertEqual(re.findall(r'href="tag:([^"]+)"', self.out["tags"]["html"]), ["idea", "työ/koti", "paren"])
+
+    def cells(self, name):
+        rows = re.findall(r"<tr>(.*?)</tr>", self.out[name]["html"])
+        return [[re.sub(r"<[^>]*>", "", cell).replace("\u2060", "")
+                 for cell in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row)] for row in rows]
+
+    def test_table_rows_and_cells(self):
+        self.assertEqual(self.cells("table"), [
+            ["Task", "What", "Try"], ["#1", "bold", "./play --skip"], ["site", "a | b and a|b", ""],
+            ["short", "row", ""]])
+        html = self.out["table"]["html"]
+        self.assertEqual(html.count("<table"), 1)
+        self.assertIn("<p>Before</p>", html)
+        self.assertIn("<p>After</p>", html)
+
+    def test_table_alignment_and_header(self):
+        head = re.search(r"<thead>(.*?)</thead>", self.out["table"]["html"]).group(1)
+        self.assertEqual(re.findall(r'<th align="(\w+)"', head), ["left", "center", "right"])
+
+    def test_table_cells_keep_their_markdown(self):
+        html = self.out["table"]["html"]
+        self.assertIn("<b>bold</b>", html)
+        self.assertIn('<a href="https://a.b"', html)
+        # A hyphen in code doesn't break the line: "--skip" stays whole in a narrow column
+        self.assertIn("-\u2060-\u2060skip", html)
+
+    def test_not_a_table(self):
+        html = self.out["not_table"]["html"]
+        self.assertNotIn("<table", html.replace('<table width="100%"', ""))   # a pipe, or a separator that doesn't fit
+        self.assertIn("<hr>", html)
 
     def test_tags_balance(self):
         for name, result in self.out.items():
