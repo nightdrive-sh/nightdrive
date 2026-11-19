@@ -2,10 +2,11 @@
 # Claude Code's Notification and PermissionRequest hooks (link.sh puts them in ~/.claude/settings.json): when a session
 # waits for you while you're in another window, a notification from "Claude" that says which one (its topic from the
 # window title, the project) and what it wants; a click, or its Show session button, goes to its window. The bar's
-# Claude icon gets its dot (Claude.qml). Nothing while you're in that window, and no Notification or question while the
-# sessions bar shows (below). Claude Code's own terminal notification (kitty's, all alike) is turned off by link.sh.
+# Claude icon gets its dot (Claude.qml). Nothing while you're in that window, and nothing while the sessions bar shows
+# (below). Claude Code's own terminal notification (kitty's, all alike) is turned off by link.sh.
 #   Notification: "Waiting for your input" and the like.
-#   PermissionRequest: what it wants to run or change, with Deny, and Allow when it shows all it allows. Companion gets
+#   PermissionRequest: what it wants to run or change, with Allow and Deny when it shows all it allows, else Review
+#   (the terminal shows it whole). Companion gets
 #   the request's whole input (<addr>.input) and offers Allow there after showing it (companion/lib/permission.py). Pinned
 #   (x-nightdrive-pin, quickshell/Notifs.qml): it stays on screen until answered and gets through do not disturb. The hook waits
 #   for the answer (Claude Code asks in the terminal at the same time): Allow or Deny answers for you; going to the
@@ -89,14 +90,13 @@ fi
 [[ $event == Notification && -n $addr && ( -e $state/$addr.perm || -e $state/$addr.ask ) ]] && exit 0
 [[ -n $addr && -z ${here-} ]] && qs ipc call claude want "$addr" >/dev/null 2>&1
 # While the sessions bar is there for you to see (Claude.qml's barShown: on, not covered, you at the computer), its chip
-# says it: no notification, and none in the history either (#3126). A question too (quiet): its chip has the red
-# question mark and hops, and Companion still gets it; nearly every session ends on one, so they came as often as
-# before. A permission request keeps its pinned notification: the session is stuck mid-work. A question without the
-# session's record (an older Claude Code) has nothing to end it but the window, so it notifies as before, and so does
-# everything when Quickshell doesn't answer.
+# says it: no notification, and none in the history either (#3126). A question or a permission request too (quiet):
+# its chip has the red question mark or the shield and hops (SessionChip.qml), and Companion still gets it; nearly
+# every session ends on a question, so they came as often as before, and with five sessions the permission requests
+# were too many as well (#3182). One without the session's record (an older Claude Code) has nothing to end it but the
+# window, so it notifies as before, and so does everything when Quickshell doesn't answer.
 quiet=''
-if [[ $event == Notification || ( $event == PermissionRequest && -n $rec && -z ${here-} \
-      && $(jq -r '.tool_name // ""' <<<"$in") == AskUserQuestion ) ]] \
+if [[ $event == Notification || ( $event == PermissionRequest && -n $rec && -z ${here-} ) ]] \
    && [[ $(qs ipc call claude barShown 2>/dev/null) == true ]]; then
   [[ $event == Notification ]] && exit 0
   quiet=1
@@ -132,13 +132,15 @@ if [[ $event == PermissionRequest ]]; then
   # text above is (SHOWN_KEYS; an edit's or an MCP tool's is not), with nothing else set (a command outside the
   # sandbox), not cut and without characters that don't show (bidi overrides, zero-width, escapes). The card takes it
   # away too when the text doesn't fit (x-nightdrive-whole, NotificationCard.qml). Otherwise Show session: you read it in
-  # the terminal.
+  # the terminal: Review, its only button then (#3182), as denying what you haven't read is seldom right.
   allow=()
   if [[ -n ${SHOWN_KEYS[$tool]-} ]] && (( ${#full} <= SHOWN )) && ! printf '%s' "$full" | LC_ALL=C.UTF-8 grep -qaP '[^\P{C}\t]' &&
      jq -e --arg keys "${SHOWN_KEYS[$tool]}" '($keys | split(" ")) as $ks | .tool_input
        | all(to_entries[]; .value == null or .value == false or (.key | IN($ks[])))' <<<"$in" >/dev/null; then
     allow=(-A allow=Allow)
   fi
+  show=(-A show="Show session")
+  [[ -z $ask && ${#allow[@]} -eq 0 ]] && { deny=(); show=(-A show=Review); }
   out=$(mktemp "$state/perm.XXXXXX")
   # What it asks, for Companion (config/companion), which answers by writing "allow|deny REQUEST" to $addr.answer. The
   # request's id (out's random part) ties the answer to what its page showed, not to a newer request of the session.
@@ -165,7 +167,7 @@ if [[ $event == PermissionRequest ]]; then
   ns=''
   if [[ -z ${here-}${quiet} ]]; then
     notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" "${deny[@]}" \
-      -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
+      "${show[@]}" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
     ns=$!
   fi
   # The terminal's answer may not end this hook (Claude Code let it run on after a question answered there): the

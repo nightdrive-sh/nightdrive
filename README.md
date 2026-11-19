@@ -138,9 +138,9 @@ Click an icon and a small menu opens under it:
   session is asking you something or finished while you were elsewhere, and a click goes to its window. A right click
   changes what it shows beside it: 5-hour or weekly usage as a number or a thin bar under the robot (orange past 90 %,
   red past 95 %), the number of sessions, or nothing. Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
-  (windows make room): one asking you something gets a red question mark, which hops until you go to its window
-  (a permission request too), one whose last reply ends on a ✅ line
-  gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
+  (windows make room): one asking you something gets a red question mark and one waiting for your permission an
+  orange shield (red after 3 minutes, hopping faster), which hop until you go to its window, one whose last reply
+  ends on a ✅ line gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
   session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a bold name, the ones it
   opened following it; the groups, their sessions and the others go in the order of their workspaces, and on one
   workspace by window, left to right and top to bottom, a dot between each group or lone session.
@@ -225,12 +225,12 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   Theme). GTK windows such as Files and the file picker follow the colour too.
 - **Background apps**: ⌘W only hides chat apps and the music player, so they keep running. Their shortcut brings them straight back.
 - **Claude Code waits for you?** Its notification says which session and what it wants, and a permission request can
-  be answered right there (Allow, Deny). Allow is offered only when the notification shows all it allows: a long
-  command, one run outside the sandbox, a file edit or an MCP tool is answered in its session. While the sessions
+  be answered right there (Allow, Deny) when the notification shows all it allows: a long command, one run outside the
+  sandbox, a file edit or an MCP tool gets Review instead, which goes to its session. While the sessions
   bar is there to see (on, not under a fullscreen window or the drawer, you at the computer), it does the telling: a
-  session that finishes, waits or asks you something gets its chip's mark and no notification (none in the history
-  either; Companion still gets a question), and one opened in the background says nothing. Nor does one opened from
-  the window you're in, as you asked for it. A permission request still gets its notification.
+  session that finishes, waits, asks you something or wants your permission gets its chip's mark and no notification
+  (none in the history either; Companion still gets the question or request), and one opened in the background says
+  nothing. Nor does one opened from the window you're in, as you asked for it.
 - **Closed by mistake?** ⌘⇧U opens the window you closed with ⌘W again, in the same place. A terminal comes back in the
   same folder, with Claude Code in the same conversation. Press again for the one before it. A fullscreen window (a
   game) isn't closed by a stray key: ⌘W or ⌘Q asks you to press it again within 2 s.

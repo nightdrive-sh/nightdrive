@@ -8,7 +8,11 @@ import QtQuick
 // bar.
 // Asking and not yet seen (Claude.qml's hop: you haven't been to its window since it began to ask, a permission request
 // too): its icon hops twice, hopHeight px up and back, every hopEvery ms, the bar's one movement that wants you
-// (#3126). One 2 px hop every 8 s went unseen; it stays slow, as the pinned notification is there too.
+// (#3126). One 2 px hop every 8 s went unseen. A permission request (Claude Code's record waits for a "permission
+// prompt", not a question's "input needed") has a shield in the warning colour instead of the question: it stops the
+// session mid-work, while a question waits at its end. While the bar shows, the chip is all you get of it (no
+// notification, #3182), so one left unseen for urgentAfter (SessionsBar) turns red and hops every 2 s: a stuck
+// session doesn't go unnoticed, and still nothing pops up.
 // A lead (a session that opened others, SessionGroups.js) has its name in bold and the bot for its icon, which
 // breathes while it works; the chips it opened follow it.
 // After its name, small and grey: how long it has worked on this turn or waited for you (SessionsBar.age); a turn
@@ -46,12 +50,18 @@ Rectangle {
     readonly property bool done: !!session.done
     readonly property bool working: session.state === "working"
     readonly property bool hop: !!session.hop
-    property int hopEvery: 6000
+    // What it waits for, from Claude Code's record (claude-sessions): "input needed" is a question (AskUserQuestion),
+    // the rest ("permission prompt", "sandbox request", …) want your permission
+    readonly property bool permission: asking && !!session.waitingFor && session.waitingFor !== "input needed"
+    property bool urgent: false          // a permission request left unseen too long (SessionsBar.urgentAfter)
+    property int hopEvery: urgent ? 2000 : 6000
     property int hopHeight: 3
-    readonly property string icon: asking ? "message-circle-question" : lead ? "bot" : done ? "circle-check-big"
-                                 : session.wants ? "bell-dot" : working ? "loader" : "chevron-right"
-    // Asking: the question in the top bar's critical red (as the Dashboard's tasks there), so it stands out without a box
-    readonly property color iconColor: asking ? Theme.danger : lead || (session.wants && !done) ? Theme.accent
+    readonly property string icon: permission ? "shield-alert" : asking ? "message-circle-question" : lead ? "bot"
+                                 : done ? "circle-check-big" : session.wants ? "bell-dot" : working ? "loader" : "chevron-right"
+    // Asking: the question in the top bar's critical red (as the Dashboard's tasks there), so it stands out without a
+    // box; a permission request's shield in the warning colour, red once urgent
+    readonly property color iconColor: permission && !urgent ? Theme.warning : asking ? Theme.danger
+                                     : lead || (session.wants && !done) ? Theme.accent
                                      : done ? Theme.ok : working ? Theme.text : Theme.dim
 
     height: 27   // SessionsBar.chipH sets it (anchors.fill)

@@ -27,8 +27,9 @@ case "$*" in
   "-j clients") printf '[{"pid": %s, "address": "%s", "title": "✳ test"}]' "$CN_PID" "$CN_ADDR" ;;
   "-j activewindow") printf '{"address": "%s"}' "${CN_ACTIVE:-0xother}" ;;
 esac""",
-    # prints its id at once, then waits as -w does for an action that never comes (CN_CLOSE: closed with none)
-    "notify-send": "#!/bin/bash\n: > \"$CN_NOTIFIED\"\necho 7\n[[ -n ${CN_CLOSE:-} ]] && exit 0\nexec sleep 600",
+    # keeps its arguments, prints its id at once, then waits as -w does for an action that never comes (CN_CLOSE:
+    # closed with none)
+    "notify-send": "#!/bin/bash\nprintf '%s\\n' \"$@\" > \"$CN_NOTIFIED\"\necho 7\n[[ -n ${CN_CLOSE:-} ]] && exit 0\nexec sleep 600",
     # answers barShown with CN_BAR (the sessions bar there to see), else as if Quickshell weren't running
     "qs": "#!/bin/bash\n[[ $* == *barShown* && -n ${CN_BAR:-} ]] && { echo true; exit 0; }\nexit 1",
     "gdbus": "#!/bin/bash\nexit 0",
@@ -177,8 +178,8 @@ class CompanionAnswer(unittest.TestCase):
         self.answer(f"deny {p['request']}")
         self.assertEqual(self.decision(), {"behavior": "deny", "message": "Denied from Companion"})
 
-    # #3126: while the sessions bar is there to see, a question pops up nothing (its chip asks) but still reaches
-    # Companion; a permission request keeps its notification
+    # #3126, #3182: while the sessions bar is there to see, a question or a permission request pops up nothing (its
+    # chip asks) but still reaches Companion
     def test_a_question_while_the_bar_shows_is_quiet_but_reaches_companion(self):
         self.env["CN_BAR"] = "1"
         self.record("waiting", "question")
@@ -195,15 +196,41 @@ class CompanionAnswer(unittest.TestCase):
         self.assertIsNone(self.proc.poll())                                            # waits for an answer
         self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
 
-    def test_a_permission_request_while_the_bar_shows_still_notifies(self):
+    def notified(self):
+        """The notification's arguments, once the hook has sent it (None: it sent none)."""
+        for _ in range(40):
+            if os.path.exists(self.env["CN_NOTIFIED"]) and os.path.getsize(self.env["CN_NOTIFIED"]):
+                with open(self.env["CN_NOTIFIED"]) as f:
+                    return f.read().splitlines()
+            time.sleep(0.05)
+        return None
+
+    def test_a_permission_request_while_the_bar_shows_is_quiet_but_reaches_companion(self):
         self.env["CN_BAR"] = "1"
         self.record("waiting", "permission prompt")
+        p, _ = self.ask("Edit", EDIT)
+        time.sleep(0.6)
+        self.assertIsNone(self.proc.poll())                                            # waits for an answer
+        self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
+        self.answer(f"allow {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "allow"})
+
+    def test_without_the_sessions_record_it_notifies_while_the_bar_shows(self):
+        self.env["CN_BAR"] = "1"                                                       # an older Claude Code: no record
         self.ask("Edit", EDIT)
-        for _ in range(40):
-            if os.path.exists(self.env["CN_NOTIFIED"]):
-                break
-            time.sleep(0.05)
-        self.assertTrue(os.path.exists(self.env["CN_NOTIFIED"]))
+        self.assertIsNotNone(self.notified())
+
+    # #3182: the notification offers Allow and Deny only when it shows all it allows; else Review alone
+    def test_what_it_cannot_show_gets_review_alone(self):
+        self.ask("Edit", EDIT)
+        args = self.notified()
+        self.assertIn("show=Review", args)
+        self.assertFalse([a for a in args if a.startswith(("allow=", "deny="))])
+
+    def test_what_it_shows_gets_allow_and_deny(self):
+        self.ask("Bash", {"command": "ls", "description": "List"})
+        args = self.notified()
+        self.assertTrue({"allow=Allow", "deny=Deny", "show=Show session"} <= set(args))
 
     # #3162: a question stays on Companion for as long as it is open in the terminal: in the active window, after its
     # notification closed, past Claude Code's default 600 s for a hook; it goes once answered or the session is gone

@@ -38,6 +38,7 @@ PanelWindow {
     readonly property int iconW: 16
     readonly property int timeAfter: 300  // a shorter turn shows no time: seconds and a minute or two say nothing
     readonly property int stuckAfter: 600 // a turn running longer is probably stuck: its time in the warning colour
+    readonly property int urgentAfter: 180 // a permission request unseen this long: its chip red and hopping faster (#3182)
     // The task number of a "#N topic" session on its chip: hidden for now (#3043), its room goes to the name; the tip
     // and the Claude menu keep the full name. Kept as a switch, as it may come back or become a setting
     readonly property bool showTaskTag: false
@@ -210,6 +211,7 @@ PanelWindow {
                     tagGap: sb.tagGap
                     time: visible ? sb.chipTime(chip.session) : ""
                     stuck: chip.working && !chip.asking && chip.session.since > 0 && sb.now - chip.session.since >= sb.stuckAfter
+                    urgent: chip.permission && chip.hop && chip.session.since > 0 && sb.now - chip.session.since >= sb.urgentAfter
                     padding: sb.chipPad
                     timeGap: sb.timeGap
                     active: !!cell.it.session && cell.it.session.address === Claude.activeAddr
