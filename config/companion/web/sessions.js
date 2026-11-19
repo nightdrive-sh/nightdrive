@@ -80,9 +80,14 @@ function waiting(s) {
     <div class="fill"></div>
     <div class="row">
       <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
+      ${s.done && !s.pm ? END(s) : ""}
       <button class="pill main" data-act="answer" data-id="${esc(s.id)}">${icon("mic", 16)}Answer</button>
     </div></article>`;
 }
+
+// A finished session (#3219) has End on its tile, between Show and Answer: done with it, it goes without opening Show.
+// End as in Show, not Close: Close would read as the view's ×, which only closes the view
+const END = s => `<button class="pill quiet danger" data-act="close" data-id="${esc(s.id)}">${icon("x", 16)}End</button>`;
 
 // At work it still takes words, as its terminal does mid-turn (Claude Code reads them as soon as it can): Answer beside
 // Stop

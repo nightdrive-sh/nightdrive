@@ -262,4 +262,6 @@ body.offline .sessions, body.offline .actions { opacity: .45; transition: opacit
   /* End, Stop, Write and Answer (a session at work): Stop and Write as their icons alone */
   .dfoot .pill.squeeze { padding: 0; width: 44px; flex: none; }
   .dfoot .pill.squeeze span { display: none; }
+  /* a tile's three buttons (a finished session's Show, End and Answer, #3219) inside its edges */
+  .tile .row .pill { padding: 0 14px; }
 }
