@@ -7,6 +7,10 @@ A session that `nightdrive ask --background` opens becomes the group's last tab,
 keyboard stay where they were, whether you are in the PM's window, in one of the tabs or on another workspace. The PM
 alone has no group yet: its first session is shown, still without the keyboard.
 
+A project manager that is a background session of Claude Code's daemon (`claude --bg`, shown in its window by `claude
+agents`) isn't up its window's process chain: its sessions still open on its space, after ⌘⌥ moved the whole space to
+another workspace and while another one is active (#3196).
+
 It opens real windows (kitty), so it runs only inside the sandbox's container, never on a desktop someone uses: elsewhere
 (CI, check.py without a desktop, your own Hyprland) it skips itself.
 """
@@ -20,6 +24,8 @@ import time
 import unittest
 
 PM_WS, OTHER_WS = 7, 8            # workspaces the test takes; they must be empty
+BG_WS, BG_MOVED_WS = 5, 6         # the daemon PM's, before and after ⌘⌥ moves it; empty too
+TERMINAL_OR_CLAUDE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "terminal-or-claude")
 PREFIX = "pmtest_"                # the test windows' titles
 SESSION_CLASS = "claude-background"   # terminal-or-claude's --background class (rules.lua, pm-space.lua)
 SETTLE = 1.0                      # pm-space.lua arranges 120 ms after events settle; a window takes a moment to map
@@ -138,6 +144,69 @@ class BackgroundSession(unittest.TestCase):
         focus("s5")
         s = self.open_session("s6")
         self.assertEqual((s["focus"], s["shown"], s["tabs"]), ("s5", "s5", ["s1", "s2", "s3", "s4", "s5", "s6"]))
+
+
+@unittest.skipUnless(IN_SANDBOX, "opens windows: only inside nightdrive sandbox (nightdrive sandbox exec python3 …)")
+class DaemonProjectManager(unittest.TestCase):
+    """`nightdrive ask --background` from a PM no window is a parent of, after its space was moved with ⌘⌥ (#3196)."""
+
+    NAME = "Test Daemon Manager"
+
+    def setUp(self):
+        taken = [c["title"] for c in clients() if c["workspace"].get("id") in (BG_WS, BG_MOVED_WS)]
+        if taken:
+            self.skipTest(f"workspaces {BG_WS} and {BG_MOVED_WS} aren't empty: {taken}")
+        self.home = tempfile.TemporaryDirectory()
+        self.addCleanup(self.home.cleanup)
+        self.addCleanup(BackgroundSession.tearDownClass)
+
+    def ask(self):
+        """terminal-or-claude --background as the PM's Bash would run it: CLAUDE_PID is a session named NAME, and no
+        window is up the chain (the test runs under no window, as the daemon's sessions do). A throwaway HOME gives it
+        a claude that only waits, and the session's record."""
+        home = self.home.name
+        os.makedirs(f"{home}/.local/bin")
+        os.makedirs(f"{home}/.claude/sessions")
+        os.makedirs(f"{home}/.config")
+        os.symlink(os.path.expanduser("~/.config/hypr"), f"{home}/.config/hypr")
+        with open(f"{home}/.local/bin/claude", "w") as f:
+            f.write("#!/bin/sh\nexec sleep 600\n")
+        os.chmod(f"{home}/.local/bin/claude", 0o755)
+        with open(f"{home}/.claude/sessions/{os.getpid()}.json", "w") as f:
+            json.dump({"pid": os.getpid(), "name": self.NAME, "kind": "bg"}, f)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE")}
+        env.update(HOME=home, CLAUDE_PID=str(os.getpid()))
+        before = {c["address"] for c in clients() if c["class"] == SESSION_CLASS}
+        subprocess.run([TERMINAL_OR_CLAUDE, "--background", "--dir", home, "--", "hi"], env=env, check=True)
+        for _ in range(80):
+            new = [c for c in clients() if c["class"] == SESSION_CLASS and c["address"] not in before]
+            if new:
+                self.addCleanup(os.kill, new[0]["pid"], signal.SIGTERM)   # titled by the command, not PREFIX
+                time.sleep(SETTLE)
+                return next(c for c in clients() if c["address"] == new[0]["address"])
+            time.sleep(0.1)
+        raise AssertionError("the session didn't open")
+
+    def test_session_opens_on_the_moved_space(self):
+        # The PM's window, titled as Claude Code titles it, its process a plain terminal's
+        pm = open_window("kitty", "pm", BG_WS)
+        hyprctl("eval", f'NightdrivePmSpaces({{ {{ a = "{pm}", n = "{self.NAME}" }} }})')
+        time.sleep(SETTLE)
+        # ⌘⌥ to an empty workspace renumbers the whole workspace (bindings.lua, move_all_windows): no window event
+        hyprctl("dispatch", f"hl.dsp.workspace.change_id({{ workspace = {BG_WS}, id = {BG_MOVED_WS} }})")
+        time.sleep(SETTLE)
+        # You are elsewhere: a window on the PM's old number, which is an ordinary workspace again
+        hyprctl("dispatch", f'hl.dsp.exec_cmd("kitty -T {PREFIX}there sleep 600", {{ workspace = "{BG_WS}" }})')
+        for _ in range(80):
+            if address("there"):
+                break
+            time.sleep(0.1)
+        focus("there")
+        session = self.ask()
+        self.assertEqual(session["workspace"]["id"], BG_MOVED_WS, "the session didn't open on the PM's workspace")
+        self.assertTrue(session["grouped"], "the session isn't a tab of the space's group")
+        self.assertEqual(json.loads(hyprctl("-j", "activeworkspace"))["id"], BG_WS, "the view moved")
+        self.assertEqual(json.loads(hyprctl("-j", "activewindow"))["address"], address("there"), "the keyboard moved")
 
 
 if __name__ == "__main__":

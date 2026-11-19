@@ -7,8 +7,8 @@
 # another session starts, e.g. the project manager's): its class has a no_initial_focus rule in hyprland.lua, and a
 # notification says it opened, a click on it going to the window (none when you were in the window that called it: you
 # asked for it; none while the sessions bar shows, where its chip appears). It opens on the workspace of the window it was called
-# from (found up the process chain: the project manager's terminal), even if the user has moved to another one since;
-# called from no window, on the active one. --workspace WS (a number or special:NAME) names the workspace instead.
+# from (found up the process chain: the project manager's terminal; for a background session of Claude Code's daemon,
+# the window showing it), even if the user has moved to another one since; called from no window, on the active one. --workspace WS (a number or special:NAME) names the workspace instead.
 # --resume ID: goes on with that conversation instead (claude --resume), PROMPT its next one; give its --dir and
 # --account, where Claude Code finds it (schedule's message to a closed session, schedule_claude.py).
 # --account NAME: on that Claude Code account (topbar/scripts/claude-accounts; the Claude menu's New session · NAME).
@@ -86,6 +86,23 @@ caller_window() {
     pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
   done
 }
+# The window showing session NAME when it isn't up the process chain (#3196): a Claude Code background session (the
+# daemon's, `claude --bg`) runs under the daemon and is only shown in a terminal by `claude agents` or an attach, so the
+# project manager's window was never found and its sessions opened on whatever workspace was active. Its project
+# manager space (hypr/pm-space.lua's STATE: "ws<TAB>address<TAB>sid<TAB>name") knows its window, else the title Claude
+# Code gives it ("✳ NAME", a spinner while it works). Same output as caller_window: its workspace now, not the space's.
+session_window() {
+  local name=$1 clients addr w
+  [[ -n $name ]] || return
+  clients=$(hyprctl -j clients 2>/dev/null) || return
+  addr=$(awk -F'\t' -v n="$name" '$4 == n { print $2; exit }' "${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive-pm-spaces" 2>/dev/null)
+  w=$(jq -r --arg a "$addr" --arg n "$name" --arg c "$BG_CLASS" 'def ws: .workspace | if .id < 0 then .name else (.id | tostring) end;
+        first((.[] | select($a != "" and .address == $a)), (.[] | select((.class | sub("^sh\\.nightdrive\\."; "")) != $c
+          and (.title | sub("^\\S\\s+"; "")) == $n)) | "\(.address) \(ws)") // empty' <<<"$clients")
+  [[ -n $w ]] || return
+  [[ ${w#* } =~ ^(-?[0-9]+|special(:[A-Za-z0-9_-]+)?)$ ]] || w=${w%% *}
+  echo "$w"
+}
 targs=(--dir "$dir")
 # asked: you were in the window that opened it (the project manager's, as you asked it to), so its opening needs no
 # notification (#3126). One opened while you were elsewhere, later on its own, still says so.
@@ -93,6 +110,7 @@ asked=0
 if (( bg )); then
   targs+=(--class "$BG_CLASS"); before=$(bg_windows)
   read -r caddr cws < <(caller_window) || true
+  [[ -n ${caddr:-} ]] || read -r caddr cws < <(session_window "${oname:-}") || true
   [[ -n $ws ]] || ws=${cws:-}
   [[ -n ${caddr:-} && $(hyprctl -j activewindow 2>/dev/null | jq -r '.address // ""') == "$caddr" ]] && asked=1
 fi
