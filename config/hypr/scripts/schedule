@@ -11,6 +11,9 @@
                                        Claude, schedule_claude.py): a new session in a window of its own gets it, or
                                        with --to that session (an id or a name, as `nightdrive sessions` shows them).
                                        --run and --claude say which instead. --json: the row, as list gives each.
+                                       --dry-run: nothing added, only how it is read (the launcher's Schedule shows Run
+                                       or Ask Claude before Enter): the row with id null, or {error} with --json; no
+                                       LINE: only WHEN is checked (kind and command null)
                                        --card: what Claude's card shows of it (schedule_add), as JSON; adds nothing.
                                        One Claude's tool adds (NIGHTDRIVE_MCP=1) is by Claude in the list and in its
                                        notifications (Jari 19.11.: it was allowed on the card as it was added)
@@ -219,33 +222,47 @@ def due(pick):
 
 
 def cmd_add(a):
+    dry = getattr(a, "dry_run", False)
+
+    def refuse(msg):
+        if dry and a.json:   # the launcher reads stdout only: the reason there, as JSON
+            print(json.dumps({"error": msg}, ensure_ascii=False))
+            sys.exit(2)
+        die(msg, 2)
     now = int(time.time())
     on = a.when if a.when in EVENTS else None
     at = None if on else timers.when(a.when, now, MAX_MINUTES)
     if not on and at is None:
-        die("Minutes up to a week (15, 90m, 2h, 1h30m), a time of day (14:45), wake or login; "
-            "a moment (@UNIX) not past and within a week", 2)
+        refuse("Minutes up to a week (15, 90m, 2h, 1h30m), a time of day (14:45), wake or login; "
+            "a moment (@UNIX) not past and within a week")
+    if dry and not [w for w in a.command if w.strip()]:   # the time alone, as the launcher's first step checks it
+        r = {"id": None, "command": None, **({"on": on} if on else {"at": at})}
+        print(json.dumps({**public(r, now), "kind": None}, ensure_ascii=False) if a.json else label(r))
+        return
     forced = getattr(a, "run", False) or getattr(a, "claude", False) or getattr(a, "to", None)
     k = "claude" if getattr(a, "claude", False) or getattr(a, "to", None) else \
         "run" if getattr(a, "run", False) else claude.kind(a.command)
     line = command_line(a.command) if k == "run" else claude.message(a.command)
     if not line:
-        die("What to run: schedule WHEN COMMAND, or a message to Claude", 2)
+        refuse("What to run: schedule WHEN COMMAND, or a message to Claude")
     err = syntax_error(line) if k == "run" else ""
     if err:
-        die("The command doesn't parse: " + err, 2)
+        refuse("The command doesn't parse: " + err)
     to = None
     if getattr(a, "to", None):
         try:
             to = claude.target(a.to, claude.sessions())
         except ValueError as e:
-            die(str(e), 2)
-    r = {"id": secrets.token_hex(4), "command": line, **({"on": on, "added": now} if on else {"at": at}),
+            refuse(str(e))
+    r = {"id": None if dry else secrets.token_hex(4), "command": line, **({"on": on, "added": now} if on else {"at": at}),
          **({"kind": "claude", "to": to} if k == "claude" else {})}
     if os.environ.get("NIGHTDRIVE_MCP") == "1":   # Claude's tool (config/mcp/run.py sets it), not an argument: what
         r["by"] = "claude"                         # Claude gives can't take the mark away
     if getattr(a, "card", False):
         print(json.dumps(card(r, now), ensure_ascii=False))
+        return
+    if dry:
+        print(json.dumps(public(r, now), ensure_ascii=False) if a.json else f"{label(r)}  {k}: {what(r)}")
         return
     with state() as rows:
         if not on:
@@ -452,18 +469,18 @@ def cmd_unlocked(a):
 
 
 def parse_add(argv):
-    """[options] WHEN [options] [--] COMMAND…: options (--json, --run, --claude, --to SESSION) only before the command,
+    """[options] WHEN [options] [--] COMMAND…: options (--json, --dry-run, --run, --claude, --to SESSION) only before the command,
     so `schedule 15 ls -la` keeps its -la and a command ending in --json keeps it. None when WHEN is missing, an option
     is unknown, --to has no session, or --run comes with --claude or --to."""
-    a = argparse.Namespace(cmd="add", json=False, run=False, claude=False, card=False, to=None, when=None,
-                           command=[])
+    a = argparse.Namespace(cmd="add", json=False, run=False, claude=False, to=None, when=None, command=[], dry_run=False,
+                           card=False)
     skip = False
     for i, w in enumerate(argv):
         if skip:
             skip = False
             continue
-        if w in ("--json", "--run", "--claude", "--card"):
-            setattr(a, w[2:], True)
+        if w in ("--json", "--run", "--claude", "--dry-run", "--card"):
+            setattr(a, w[2:].replace("-", "_"), True)
         elif w == "--to" or w.startswith("--to="):
             a.to = w[5:] if w.startswith("--to=") else (argv[i + 1] if i + 1 < len(argv) else "")
             if not a.to.strip():

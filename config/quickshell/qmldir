@@ -104,6 +104,7 @@ InstallLevels 1.0 InstallLevels.qml
 ToolsLevels 1.0 ToolsLevels.qml
 RemindLevels 1.0 RemindLevels.qml
 RemindToast 1.0 RemindToast.qml
+ScheduleLevels 1.0 ScheduleLevels.qml
 SwipeOff 1.0 SwipeOff.qml
 SessionsLevels 1.0 SessionsLevels.qml
 ClipPicker 1.0 ClipPicker.qml
