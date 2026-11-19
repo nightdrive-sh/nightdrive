@@ -22,13 +22,11 @@ function NIGHTDRIVE_IS_TERMINAL(w)
     return w ~= nil and TERMINAL_CLASSES[(w.class:gsub("^sh%.nightdrive%.", ""))] == true
 end
 
--- A layer surface with the keyboard (the launcher, a menu): it gets the keys, not the active window behind it
-function NIGHTDRIVE_LAYER_HAS_KEYBOARD()
-    for _, l in ipairs(hl.get_layers()) do
-        if l.mapped and l.interactivity == 1 then return true end   -- 1: exclusive keyboard focus
-    end
-    return false
-end
+-- A layer surface with the keyboard (the launcher, a menu, Ask Claude's toast): it gets the keys, not the active window
+-- behind it. keyboard-layer.lua reads the field Hyprland has (keyboard_interactivity) and counts the on-demand launcher
+-- and menus too: this used to read l.interactivity, which is always nil, so ⌘Enter over the toast opened a bare
+-- terminal instead of going on with its conversation (#3270)
+NIGHTDRIVE_LAYER_HAS_KEYBOARD = require("keyboard-layer").held
 
 -- Installed optional parts (plugins.txt, plugins/): a part's keys are bound only when it is there. `nightdrive plugins
 -- installed` writes the list and reloads Hyprland when it changes (an installer from launcher › Install › Plugins).
