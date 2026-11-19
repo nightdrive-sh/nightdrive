@@ -33,7 +33,7 @@ Singleton {
     // decides, and sets card); the toast shows it while pendingCard and answers through card.decide()
     property bool toastViewing: false
     readonly property bool viewing: toastViewing
-    property var card: null
+    property var card: null              // set by ClaudeConfirm as it is made, cleared as it is destroyed (a reload)
     readonly property bool pendingCard: !!card && card.open && card.inlined
     signal answered()                    // a request finished (its answer, an error, or stopped)
 

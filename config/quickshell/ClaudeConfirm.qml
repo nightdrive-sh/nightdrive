@@ -44,6 +44,9 @@ PanelWindow {
     property bool inlined: false
     readonly property int inlineFields: 6
     Component.onCompleted: AskClaudeSession.card = win
+    // A Quickshell reload destroys this card; a reference left behind is truthy but its properties read undefined,
+    // which made AskClaudeSession.pendingCard's binding warn "Unable to assign [undefined] to bool" (#3204)
+    Component.onDestruction: if (AskClaudeSession.card === win) AskClaudeSession.card = null
     Connections {
         target: AskClaudeSession
         function onViewingChanged() {
