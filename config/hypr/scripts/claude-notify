@@ -9,12 +9,17 @@
 #   the request's whole input (<addr>.input) and offers Allow there after showing it (companion/lib/permission.py). Pinned
 #   (x-nightdrive-pin, quickshell/Notifs.qml): it stays on screen until answered and gets through do not disturb. The hook waits
 #   for the answer (Claude Code asks in the terminal at the same time): Allow or Deny answers for you; going to the
-#   window, Show session, closing the notification or the terminal's own answer leave it to the terminal.
+#   window, Show session or closing the notification leave it to the terminal, and Companion keeps it until it is
+#   answered anywhere (the session's record, below), for up to a day.
 #   A question with choices (AskUserQuestion) comes the same way, as a permission request: its notification says what it
 #   asks, and Companion shows it whole and answers it (below).
 # Reads the hook's JSON on stdin: {hook_event_name, cwd, message | tool_name, tool_input, ...}.
 set -uo pipefail
-readonly WAIT=590   # seconds a permission notification waits; Claude Code gives a hook 600
+begun_ms=${EPOCHREALTIME//[!0-9]/}; begun_ms=${begun_ms:0:13}  # when this hook began (ms), before anything else
+readonly WAIT=590   # seconds a request waits that the session's record can't end; Claude Code's default for a hook is 600
+# One it can end waits as long as it is open in the terminal, so a question left for an hour still has its buttons on
+# Companion (#3162): up to a day, just under the timeout link.sh gives this hook (Claude Code kills it then)
+readonly WAIT_OPEN=86390
 readonly SHOWN=300  # characters of the command or path the notification shows; a longer one gets no Allow
 readonly WHOLE=200000  # characters of the input Companion gets whole, to show before its Allow; a longer one: the terminal
 # The tools whose permission notification can offer Allow: the keys of their input that it shows, or that don't change
@@ -52,12 +57,25 @@ rec=''
   2>/dev/null | xargs -r ls -t 2>/dev/null | head -n 1)
 start_ms=$(( $(date +%s%3N) - 3000 ))  # the record shows the request waiting as the hook starts: an older stamp is another's
 seen=''
-# The record has shown this request waiting (its stamp kept in seen), and now says something else: answered elsewhere
+# The record has shown this request waiting (its stamp kept in seen), and now says something else: answered elsewhere.
+# Or the session is gone (its record goes, or Claude Code, this hook's parent, ended): nothing waits for the answer.
+# Read with builtins only, four times a second for as long as it waits (hours, #3162): no process each time.
 over() {
-  local s; s=$(jq -r 'select(.status) | "\(.status) \(.statusUpdatedAt // 0)"' "$rec" 2>/dev/null) || return 1
+  local j='' s
+  [[ -e $rec ]] && kill -0 "$PPID" 2>/dev/null || return 0
+  read -r -d '' j < "$rec" 2>/dev/null
+  [[ $j =~ \"status\":\"([a-z_]+)\" ]] || return 1
+  s=${BASH_REMATCH[1]}
+  [[ $j =~ \"statusUpdatedAt\":([0-9]+) ]] && s+=" ${BASH_REMATCH[1]}" || s+=" 0"
   if [[ -z $seen ]]; then
-    [[ $s == waiting\ * ]] && (( ${s#* } >= start_ms )) && seen=$s
-    return 1
+    if [[ $s == waiting\ * ]]; then
+      (( ${s#* } >= start_ms )) && seen=$s
+      return 1
+    fi
+    # Anything else since this hook began: answered before the hook first looked (a quick pick in the terminal takes a
+    # second, the hook's start about as long), so Companion mustn't show it for the next ten minutes
+    (( ${s#* } >= begun_ms ))
+    return
   fi
   [[ -n $s && $s != "$seen" ]]
 }
@@ -153,7 +171,12 @@ if [[ $event == PermissionRequest ]]; then
   # The terminal's answer may not end this hook (Claude Code let it run on after a question answered there): the
   # session's record changing ends it within a second (over, above), else your going to the window (active), and the
   # notification goes with it
-  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; [[ -n $ns ]] && kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm" "$state/$addr.input" "$state/$addr.ask" "$ans"; }
+  # Only this request's files and answer: a newer request of the session (its own hook) may have put its own there
+  mine() { local j=''; read -r -d '' j < "$1" 2>/dev/null; [[ $j == *"\"request\":\"$req\""* || $j == *" $req"* ]]; }
+  cleanup() {
+    close "$(sed -n 1p "$out" 2>/dev/null)"; [[ -n $ns ]] && kill "$ns" 2>/dev/null; rm -f "$out"
+    for f in "$state/$addr".{perm,input,ask,answer}; do mine "$f" && rm -f "$f"; done
+  }
   trap cleanup EXIT
   trap 'exit 0' TERM INT HUP
   # The answers for the questions it asked, and no others; the terminal's question closes as if answered there
@@ -162,9 +185,12 @@ if [[ $event == PermissionRequest ]]; then
                and (.key as $k | any($t.questions[]?; .question == $k)))))})}}}' <<<"$in"; }
   decide() { jq -nc --arg b "$1" --arg from "${2:-the desktop notification}" '{hookSpecificOutput: {hookEventName: "PermissionRequest",
              decision: ({behavior: $b} + (if $b == "deny" then {message: "Denied from \($from)"} else {} end))}}'; }
-  for (( i = 0; i < WAIT * 4; i++ )); do
-    sleep 0.25
-    [[ -n $ns ]] && sed -n 1p "$out" > "$idf" 2>/dev/null
+  # A pipe nothing writes to: read -t on it is a sleep that starts no process
+  exec {nap}<> <(:)
+  id='' closed=''
+  for (( i = 0; i < (${#seen} ? WAIT_OPEN : WAIT) * 4; i++ )); do
+    read -rt 0.25 -u "$nap"
+    [[ -n $ns ]] && read -r id < "$out" 2>/dev/null && echo "$id" > "$idf"
     if [[ -s $ans ]]; then                  # answered on Companion: Allow when the notification offers it, or the input
                                             # went to Companion whole (its Review showed all of it)
       read -r verdict rid answers < "$ans"
@@ -179,17 +205,19 @@ if [[ $event == PermissionRequest ]]; then
     fi
     if [[ -n $ns ]] && ! kill -0 "$ns" 2>/dev/null; then    # answered, or closed without one
       case $(sed -n 2p "$out") in
-        allow) decide allow ;;
-        deny) decide deny ;;
+        allow) decide allow; exit 0 ;;
+        deny) decide deny; exit 0 ;;
         default|show) focus ;;
       esac
-      exit 0
+      # Gone to the window or closed: the terminal has it, and while the session's record can end it, Companion
+      # keeps it too until it's answered somewhere (#3162); else it ends below
+      closed=1 ns=''
     fi
     # Answered elsewhere (the terminal), as the session's record says; one that hasn't shown it waiting in three
     # seconds (an older Claude Code) goes by the window as before: you went to it, answer there
     if [[ -n $rec ]] && { [[ -n $seen ]] || (( i < 12 )); }; then
       over && exit 0
-    elif (( i % 4 == 3 )) && active; then
+    elif [[ -n $closed ]] || { (( i % 4 == 3 )) && active; }; then
       exit 0
     fi
   done

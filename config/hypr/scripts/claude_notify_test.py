@@ -6,6 +6,7 @@ stubbed: nothing shows and no window moves."""
 
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -26,8 +27,8 @@ case "$*" in
   "-j clients") printf '[{"pid": %s, "address": "%s", "title": "✳ test"}]' "$CN_PID" "$CN_ADDR" ;;
   "-j activewindow") printf '{"address": "%s"}' "${CN_ACTIVE:-0xother}" ;;
 esac""",
-    # prints its id at once, then waits as -w does for an action that never comes
-    "notify-send": "#!/bin/bash\n: > \"$CN_NOTIFIED\"\necho 7\nexec sleep 600",
+    # prints its id at once, then waits as -w does for an action that never comes (CN_CLOSE: closed with none)
+    "notify-send": "#!/bin/bash\n: > \"$CN_NOTIFIED\"\necho 7\n[[ -n ${CN_CLOSE:-} ]] && exit 0\nexec sleep 600",
     # answers barShown with CN_BAR (the sessions bar there to see), else as if Quickshell weren't running
     "qs": "#!/bin/bash\n[[ $* == *barShown* && -n ${CN_BAR:-} ]] && { echo true; exit 0; }\nexit 1",
     "gdbus": "#!/bin/bash\nexit 0",
@@ -203,6 +204,78 @@ class CompanionAnswer(unittest.TestCase):
                 break
             time.sleep(0.05)
         self.assertTrue(os.path.exists(self.env["CN_NOTIFIED"]))
+
+    # #3162: a question stays on Companion for as long as it is open in the terminal: in the active window, after its
+    # notification closed, past Claude Code's default 600 s for a hook; it goes once answered or the session is gone
+    def question(self):
+        self.record("waiting", "question")
+        self.start("AskUserQuestion", {"questions": [{"question": "Commit?", "header": "Commit",
+                                                      "options": [{"label": "Yes", "description": "Commit it"}]}]})
+        ask = os.path.join(self.state, f"{ADDR}.ask")
+        for _ in range(100):
+            if os.path.exists(ask) and os.path.getsize(ask):
+                break
+            time.sleep(0.05)
+        with open(ask) as f:
+            return json.load(f)
+
+    def left(self):
+        """What the hook left for Companion (not the notification's id, which it keeps by window)."""
+        return [n for n in os.listdir(self.state) if n != ADDR]
+
+    def test_a_question_in_the_active_window_reaches_companion(self):
+        self.env["CN_ACTIVE"] = ADDR
+        q = self.question()
+        self.assertEqual(q["questions"][0]["options"], [{"label": "Yes", "description": "Commit it"}])
+        time.sleep(1.2)
+        self.assertIsNone(self.proc.poll())
+        self.answer(f'answer {q["request"]} {{"Commit?": "Yes"}}')
+        self.assertEqual(self.decision()["updatedInput"]["answers"], {"Commit?": "Yes"})
+
+    def test_a_closed_notification_leaves_the_question_on_companion(self):
+        self.env["CN_CLOSE"] = "1"                                                     # closed at once, no action
+        self.question()
+        time.sleep(1.2)
+        self.assertIsNone(self.proc.poll())                                            # still waits for an answer
+        self.assertTrue(os.path.exists(os.path.join(self.state, f"{ADDR}.ask")))
+        self.record("busy")                                                            # answered in the terminal
+        self.assertIsNone(self.decision())
+        self.assertEqual(self.left(), [])
+
+    def test_the_session_gone_takes_the_question_away(self):
+        self.question()
+        time.sleep(0.6)
+        os.remove(os.path.join(self.env["CLAUDE_CONFIG_DIR"], "sessions", "4242.json"))  # Claude Code quit
+        self.assertIsNone(self.decision())
+        self.assertEqual(self.left(), [])
+
+    def test_answered_before_the_hook_looks_it_goes(self):
+        # a pick in the terminal within a second: the record never shows the hook its request waiting, only what came
+        # after (stamped after the hook began); before, the hook waited 590 s and Companion showed a question gone
+        self.record("busy", "", int(time.time() * 1000) + 400)
+        self.start("AskUserQuestion", {"questions": [{"question": "Commit?", "options": [{"label": "Yes"}]}]})
+        self.assertIsNone(self.decision(timeout=4))
+        self.assertEqual(self.left(), [])
+
+    def test_an_old_request_leaves_the_newer_question_alone(self):
+        self.question()
+        time.sleep(0.6)                                                                # seen waiting
+        ask = os.path.join(self.state, f"{ADDR}.ask")
+        newer = {"request": "Newer1", "questions": [{"question": "Push?", "options": [{"label": "No"}]}]}
+        with open(ask, "w") as f:                                                      # the next request's hook
+            json.dump(newer, f, separators=(",", ":"))
+        self.record("waiting", "question", int(time.time() * 1000) + 5)              # its prompt ends this one
+        self.assertIsNone(self.decision())
+        with open(ask) as f:
+            self.assertEqual(json.load(f), newer)                                      # left where it was
+
+    def test_link_sh_gives_the_hook_longer_than_it_waits(self):
+        with open(HOOK) as f:
+            wait = int(re.search(r"^readonly WAIT_OPEN=(\d+)", f.read(), re.M).group(1))
+        with open(os.path.join(HERE, "..", "..", "..", "link.sh")) as f:
+            timeout = int(re.search(r"^hook_timeout=(\d+)", f.read(), re.M).group(1))
+        self.assertGreater(wait, 3600)                                                 # an hour's question still waits
+        self.assertLess(wait, timeout)                                                 # and ends before it is killed
 
     def test_without_a_record_the_active_window_answers_in_the_terminal(self):
         self.env["CN_ACTIVE"] = ADDR
