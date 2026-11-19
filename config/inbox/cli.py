@@ -9,20 +9,24 @@ buttons actions.py, attachments attach.py, the sender sender.py.
   post TITLE [--body TEXT|-] [--attach PATH]… [--action KIND LABEL VALUE]… [--task N] [--app NAME] [--dir DIR]
   update ID [--title T] [--body TEXT|-] [--append TEXT|-] [--attach PATH]… [--action …]…   the sender's own only
   revert ID REV            undoes update REV (inbox_update's undo)
-  list [--unread|--archived|--all] [--mine] [--limit N]
+  list [--unread|--archived|--all] [--mine] [--from KEY] [--search WORDS] [--limit N]
   show ID [--mark-read]    the whole message, with its files' paths
+  press ID N|session|task [--yes]      a button (press.py; run only with --yes)
   read ID…|--all [--unread]     archive ID… [--undo]     delete ID     count
 Every command takes --json. post and update take --stdin-json: {title, body, append, attachments, actions, task}.
 """
 import argparse
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import actions as act      # noqa: E402
 import attach              # noqa: E402
+import press as button     # noqa: E402
+import query               # noqa: E402
 import sender as who       # noqa: E402
 import store               # noqa: E402
 from store import InboxError   # noqa: E402
@@ -88,9 +92,11 @@ def summary(msg):
 def full(msg):
     """A message as show gives it: everything, its files with their paths."""
     path = store.folder(msg["id"])
-    out = dict(msg)
+    out = query.decorate(dict(msg))
     out["folder"] = str(path) if path else None
     out["attachments"] = [{**f, "path": str(path / f["name"]) if path else None} for f in msg.get("attachments", [])]
+    # A run button's command as one line, quoted as a shell would need it: what the window shows under it and on its card
+    out["actions"] = [{**b, "line": shlex.join(b["argv"])} if b["kind"] == "run" else b for b in msg.get("actions") or []]
     return out
 
 
@@ -156,11 +162,15 @@ def cmd_list(a):
     if a.mine:
         me = who.detect()
         msgs = [m for m in msgs if who.same(m.get("from") or {}, me)]
+    senders = query.groups(msgs)       # before --from and --search: the sidebar shows every sender there is
+    wanted = query.words(a.search)
+    msgs = [m for m in msgs if query.matches_from(m, a.sender) and query.matches_search(m, wanted)]
     unread = sum(1 for m in store.messages(False) if not m.get("read"))
-    shown = msgs[:a.limit]
+    shown = msgs[:a.limit] if a.limit > 0 else msgs
     lines = [f"{'●' if not m.get('read') else ' '} {m['id']}  {m['title']}  ({who.label(m.get('from') or {})})"
              + ("  [archived]" if m.get("archived") and a.all else "") for m in shown]
-    emit(a, {"messages": [summary(m) for m in shown], "total": len(msgs), "unread": unread},
+    emit(a, {"messages": [query.decorate(summary(m)) for m in shown], "total": len(msgs), "unread": unread,
+             "senders": senders},
          "\n".join(lines) or "No messages.")
 
 
@@ -192,6 +202,13 @@ def cmd_archive(a):
 def cmd_delete(a):
     msg = store.delete(store.resolve(a.id))
     emit(a, summary(msg), f"Deleted {msg['id']}: {msg['title']}")
+
+
+def cmd_press(a):
+    mid = store.resolve(a.id)
+    done = button.press(store.load(store.folder(mid)), a.which, a.yes)
+    what = done.get("opened") or done.get("copied") or done.get("session") or " ".join(done.get("ran") or [])
+    emit(a, done, f"{done['label']}: {what}")
 
 
 def cmd_count(a):
@@ -237,7 +254,9 @@ def parser():
     g.add_argument("--all", action="store_true")
     p.add_argument("--unread", action="store_true")
     p.add_argument("--mine", action="store_true", help="only this session's (or --app's) own")
-    p.add_argument("--limit", type=int, default=LIST_LIMIT)
+    p.add_argument("--from", dest="sender", metavar="KEY", help="one sender's: session:ID, project:NAME, app:NAME, other")
+    p.add_argument("--search", metavar="WORDS", help="those with every word in the title, text or sender")
+    p.add_argument("--limit", type=int, default=LIST_LIMIT, help=f"at most N (default {LIST_LIMIT}, 0 for all)")
     p = add("show", cmd_show, "one message, whole")
     p.add_argument("id")
     p.add_argument("--mark-read", action="store_true")
@@ -250,6 +269,10 @@ def parser():
     p.add_argument("--undo", action="store_true")
     p = add("delete", cmd_delete, "remove for good")
     p.add_argument("id")
+    p = add("press", cmd_press, "do what a button does: N (0 the first), or the sender's session or task")
+    p.add_argument("id")
+    p.add_argument("which", metavar="N|session|task")
+    p.add_argument("--yes", action="store_true", help="a run button: the command has been seen, run it")
     add("count", cmd_count, "how many are unread")
     return ap
 

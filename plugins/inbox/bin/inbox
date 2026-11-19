@@ -1,0 +1,75 @@
+#!/bin/bash
+# inbox: Nightdrive Inbox's window (plugins/inbox, README.md). The messages themselves are the core's: kept in
+# ~/.local/share/nightdrive/inbox by `nightdrive inbox` (config/inbox, docs/inbox.md), which the window reads and acts
+# through, so this command only opens, installs and points the window at a message.
+set -uo pipefail
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app                                     # Inbox's own Quickshell config, apart from the desktop's shell
+CLI=$APP_DIR/../../config/inbox/cli.py                  # nightdrive inbox, by its path: this may run without ~/.local/bin
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+# shellcheck disable=SC2034  # read by kit/app.sh, sourced below
+APP_TITLE=Inbox
+# shellcheck disable=SC2034  # read by kit/app.sh
+APP_IPC=inbox
+. "$QS_DIR/kit/app.sh"
+
+# Puts Inbox among the desktop's apps (share/inbox.desktop), with Exec's full path filled in: the compositor's PATH may
+# not have ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/inbox.svg" "$icons/nightdrive-inbox.svg"
+  sed "s|^Exec=inbox|Exec=$HOME/.local/bin/inbox|" "$APP_DIR/share/inbox.desktop" > "$apps/nightdrive-inbox.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Installed: $apps/nightdrive-inbox.desktop"
+}
+
+# Takes Inbox out of the desktop's apps; the messages stay, and sessions can still leave them
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  app_command quit >/dev/null 2>&1 || true
+  rm -f "$data/applications/nightdrive-inbox.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-inbox.svg"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$data/applications" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Inbox is out of your apps; the messages stay (nightdrive inbox list)."
+}
+
+# show ID: the window open on that message (an id or its last four characters, as nightdrive inbox takes them)
+show() {
+  local id
+  id=$(python3 "$CLI" show --json "${1:-}" | jq -r .id) || return 1
+  open_ready && ipc pick "$id"
+}
+
+usage() {
+  cat <<USAGE
+Usage: inbox [command]
+
+  (none), open     open Inbox, or bring it forward if it is open
+  show ID          open Inbox on that message
+  install          Inbox among the desktop's apps (the installer)
+  uninstall        take it out again (the messages stay)
+  restart          close and open again (after a change to the app)
+  quit             close the window
+  log              follow the app's log (QML errors show up here)
+  help             this text
+
+The messages are nightdrive inbox's (post, list, show, read, archive, press…: nightdrive inbox --help).
+USAGE
+}
+
+case ${1:-open} in
+  show)      show "${@:2}" ;;
+  install)   install_app ;;
+  uninstall) uninstall_app ;;
+  help|-h|--help) usage ;;
+  *)
+    app_command "$@"; status=$?        # open (the default), restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac

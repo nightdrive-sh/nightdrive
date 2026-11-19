@@ -60,7 +60,7 @@ usage() {
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
   row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --model MODEL (opus), --effort LEVEL (medium), --account NAME, --background, --workspace WS)"
   row "claude accounts"          "Your Claude Code accounts, NAME and config dir (--json); ~/.config/nightdrive/claude-accounts names them"
-  row "inbox [COMMAND]"           "Messages to look at later (docs/inbox.md): post TITLE, update, list, show, read, archive, delete, count (--json)"
+  row "inbox [COMMAND]"           "Messages to look at later (docs/inbox.md): post TITLE, update, list, show, read, archive, delete, press, count (--json)"
   row "sessions [resume ID]"     "Claude Code's sessions, running and closed, the newest first (--json, --query TEXT, --limit N)"
   row "claude usage"             "The default account's plan limits as JSON, as the Claude menu shows them (--account NAME, --all)"
   row "companion [on|off|url]"   "Companion: your Claude sessions and dictation on an iPad over Tailscale; status (--json)"
