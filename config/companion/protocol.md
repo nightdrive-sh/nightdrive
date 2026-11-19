@@ -120,3 +120,17 @@ Six slots. `GET /api/presets` → `[{ "id": "lock", "label": "Lock", "icon": "lo
 They're kept in `~/.config/nightdrive/companion.json`. A command runs with `bash -c`, detached, as you.
 
 Answers: `200 {"ok": true}`, or `4xx {"error": "…"}` with the reason in plain words.
+
+## The app
+
+Nightdrive's iOS app (iPhone and iPad; its own repo, `nightdrive-companion`) shows this page in a web view and adds,
+before the page's scripts run, `window.nightdrive`: `{ app: "ios", version: 1, SpeechRecognition }`. A browser has no
+`window.nightdrive`.
+
+`SpeechRecognition` is the app's own dictation (Apple's speech recognition, natively) in the Web Speech API's shape:
+`lang`, `continuous`, `interimResults`, `start()`, `stop()`, `abort()`, and `onstart`, `onresult` (`results[0][0].transcript`:
+all the words so far; `results[0].isFinal`), `onerror` (`error`: `not-allowed`, `no-speech`, `network`,
+`language-not-supported`, `audio-capture`, `aborted`) and `onend`, last and once. `web/speech.js` takes it before the
+browser's. Underneath, the page posts `{ id, op: "start" | "stop" | "abort", lang }` to
+`webkit.messageHandlers.nightdriveSpeech`, and the app answers by calling `window.nightdrive._speech({ id, type, text,
+final, error })`. Only this page's own origin, in the main frame, is heard. A new `start` ends the one before.

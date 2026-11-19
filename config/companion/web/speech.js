@@ -1,9 +1,11 @@
-// Hold to talk, with the browser's own speech recognition (Safari's: Apple's, the same as the keyboard's dictation):
-// hold a button and talk, let go and the words go to done(). The panel's big button (dictate.js) and the box's
-// (compose.js) both use it. Where there is none, the callers fall back to writing.
+// Hold to talk, with Apple's speech recognition (the same as the keyboard's dictation): hold a button and talk, let go
+// and the words go to done(). The panel's big button (dictate.js) and the box's (compose.js) both use it. In Nightdrive's
+// iOS app it is the app's own (window.nightdrive, protocol.md › The app), which keeps working where the web view's
+// falters; elsewhere the browser's. Where there is none, the callers fall back to writing.
 import { toast } from "./api.js";
 
-export const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+export const Recognition =
+  window.nightdrive?.SpeechRecognition || window.SpeechRecognition || window.webkitSpeechRecognition;
 const LAST_WORDS_MS = 400;     // the recognizer still hears this long after you let go: the last words
 const FINAL_WAIT_MS = 1500;    // then stop(): its final result comes before its end, which this caps
 const TAP_MS = 350;            // a press shorter than this, with no words, is a tap (tapped(), when given)
