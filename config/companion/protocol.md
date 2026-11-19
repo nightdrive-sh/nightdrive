@@ -90,8 +90,11 @@ or JSON, nothing cut; a character that wouldn't show (a bidi override, a zero-wi
 `⟨U+202E⟩`, and `hidden` counts them. 404 when it no longer asks, or its input wasn't left.
 
 `GET /api/sessions/ID/log` → what the session said and did lately, oldest first, from its transcript (the page's view
-of one session): `[{ "role": "user" | "assistant", "kind": "text" | "tool", "text": "…" }]`, at most 60, a text up to
-6000 characters. Tool results and thinking are left out.
+of one session): `[{ "role": "user" | "assistant", "kind": "text" | "tool", "text": "…", "status": "…" }]`, at most 60, a
+text up to 6000 characters. Tool results and thinking are left out, but a tool line has `status` from its result:
+`error` (it failed), `denied` (you or a safety check said no), `running` (no result yet); none when it went through. A
+tool's `text` is named to read: `Dashboard: log add` for `mcp__claude_ai_Dashboard__log_add`, `Inbox: update` for
+`mcp__nightdrive__inbox_update`, a command without its leading `cd …&&`. `last` uses the same names.
 
 | Request | Body | Does |
 | --- | --- | --- |

@@ -19,7 +19,11 @@ RECENT = 60           # things said and done the session's own view shows
 RECENT_TAIL = 1024 * 1024   # bytes read for it
 LONG = 6000           # characters of one text in it
 # The input key that says what a tool call does, by tool
-KEYS = ("command", "file_path", "notebook_path", "url", "pattern", "query", "description", "prompt")
+KEYS = ("command", "file_path", "notebook_path", "url", "pattern", "query", "description", "prompt", "skill", "to")
+# A tool_result that says you said no, rather than that the tool failed (Claude Code's wording, and its safety check's)
+DENIED = re.compile(r"doesn't want to proceed|tool use was rejected|denied by|permission .{0,40}denied", re.I)
+# A command's own `cd somewhere &&` (or ;) before what it runs: the session's folder is on its tile already
+CD = re.compile(r"^\s*cd\s+(\"[^\"]*\"|'[^']*'|\S+)\s*(&&|;)\s*")
 
 _cache = {}           # path → (mtime, size, result), for last()
 _recent_cache = {}    # the same for recent()
@@ -31,11 +35,28 @@ def _short(text, limit=SHOWN):
     return text if len(text) <= limit else text[:limit - 1] + "…"
 
 
+def _tool(name):
+    """A tool's name to read (#3218): mcp__claude_ai_Dashboard__log_add → Dashboard: log add, mcp__nightdrive__inbox_update
+    → Inbox: update (Nightdrive's tools are named area_verb), mcp__easel__chart → Easel: chart; the rest as it is."""
+    parts = name.split("__")
+    if len(parts) < 3 or parts[0] != "mcp":
+        return name
+    server, tool = re.sub(r"^(claude_ai_|plugin_[^_]+_)", "", parts[1]), "__".join(parts[2:])
+    if server == "nightdrive" and "_" in tool:
+        server, tool = tool.split("_", 1)
+    server = server.replace("_", " ").replace("-", " ").strip()
+    return f"{server[:1].upper()}{server[1:]}: {tool.replace('_', ' ')}"
+
+
 def _describe(item):
     if item.get("type") == "tool_use":
         inp = item.get("input") or {}
         what = next((inp[k] for k in KEYS if inp.get(k)), "")
-        return _short(f"{item.get('name', 'Tool')}: {what}" if what else item.get("name", "Tool"))
+        if item.get("name") == "Bash" and isinstance(what, str):
+            what = CD.sub("", what, count=1)
+        name = _tool(item.get("name") or "Tool")
+        # an MCP tool's name has its own colon: what it did on goes after a dot
+        return _short(f"{name}{' · ' if ': ' in name else ': '}{what}" if what else name)
     if item.get("type") == "text" and item.get("text", "").strip():
         return _short(item["text"], SAID)
     return None
@@ -94,8 +115,11 @@ def _queued(entry):
 def _conversation(path):
     """What the session's own view shows (web/detail.js): your prompts, also those given while it worked, Claude's
     texts whole up to LONG, and its tool calls as one line each. Tool results, thinking and Claude Code's own wrappers
-    (<command-name>, <system-reminder>, which come as a user's text) are left out."""
+    (<command-name>, <system-reminder>, which come as a user's text) are left out, but a result's outcome marks its
+    call (#3218): "error" (is_error: a command's exit code other than 0, a refused edit), "denied" (you, or a safety
+    check, said no), "running" (no result yet: at work, or waiting for your permission); none when it went through."""
     out = []
+    calls = {}            # tool_use id → its line in out
     for entry in _lines(path, RECENT_TAIL):
         role = entry.get("type")
         if role == "attachment":
@@ -106,12 +130,31 @@ def _conversation(path):
         if role not in ("user", "assistant") or entry.get("isMeta"):
             continue
         for item in _items(entry):
+            if item.get("type") == "tool_result" and item.get("tool_use_id") in calls:
+                _outcome(calls.pop(item["tool_use_id"]), item)
+                continue
             text = str(item.get("text") or "").strip()
             if item.get("type") == "text" and text and not (role == "user" and text.startswith("<")):
                 out.append({"role": role, "kind": "text", "text": text[:LONG]})
             elif item.get("type") == "tool_use" and role == "assistant":
-                out.append({"role": role, "kind": "tool", "text": _describe(item)})
+                out.append({"role": role, "kind": "tool", "text": _describe(item), "status": "running"})
+                if item.get("id"):
+                    calls[item["id"]] = out[-1]
+    waiting = {id(line) for line in calls.values()}
+    for line in out:
+        if line.get("status") == "running" and id(line) not in waiting:
+            del line["status"]            # a call with no id to match its result by: nothing known, shown as done
     return out[-RECENT:]
+
+
+def _outcome(line, result):
+    del line["status"]
+    if not result.get("is_error"):
+        return
+    said = result.get("content")
+    if isinstance(said, list):
+        said = " ".join(str(c.get("text") or "") for c in said if isinstance(c, dict))
+    line["status"] = "denied" if DENIED.search(str(said or "")[:300]) else "error"
 
 
 def _newest(cwd, started):

@@ -3,6 +3,7 @@
 // A tap on a tile opens it; × or Esc closes it. It stays at the end as new lines come, unless you scrolled up to read.
 // A question with choices shows whole above the buttons, to answer there (question.js). Answer is held to talk, as
 // on a tile (let go and it is sent; a tap opens its box), and Write beside it opens the box at its keyboard.
+// Its steps (tool calls) are kept quiet, a run of them one line that a tap opens (steps.js).
 // The view is a step in the browser's history, so Back (Android's, Safari's edge gesture in a tab) closes it; in the
 // app on the home screen a swipe from the left edge does (swipe.js).
 import { esc, get, since, store, subscribe } from "./api.js";
@@ -11,12 +12,13 @@ import { act, ASKS } from "./act.js";
 import { compose, send } from "./compose.js";
 import { holdToTalk, Recognition } from "./speech.js";
 import { markdown } from "./markdown.js";
+import { logHTML } from "./steps.js";
 import { keepScroll, questionClick, questionHTML } from "./question.js";
 import { edgeSwipe } from "./swipe.js";
 
 const REFRESH_MS = 2000;
 const AT_END_PX = 40;      // this close to the bottom still counts as following along
-let view = null;           // { id, el, timer, logSig, headSig, footSig, holding }
+let view = null;           // { id, el, timer, log, logSig, headSig, footSig, holding, open: runs of steps opened }
 
 export function openDetail(id) {
   // one step in the history however many views open one after another (a tile's Show over another's)
@@ -27,10 +29,13 @@ export function openDetail(id) {
   el.setAttribute("role", "dialog");
   el.innerHTML = '<header class="dhead"></header><div class="log"></div><footer class="dfoot"></footer>';
   document.body.append(el);
-  view = { id, el, timer: setInterval(load, REFRESH_MS), logSig: "", headSig: "", footSig: "", holding: false };
+  view = { id, el, timer: setInterval(load, REFRESH_MS), log: [], logSig: "", headSig: "", footSig: "", holding: false,
+           open: new Set() };
   el.addEventListener("click", e => {
     if (e.target.closest(".close")) return close();
     if (questionClick(e)) return;
+    const run = e.target.closest("button[data-steps]");
+    if (run) return toggle(run.dataset.steps);
     const b = e.target.closest("button[data-act]");
     if (b?.dataset.act === "write") return compose(view.id, { write: true });
     if (b?.dataset.act === "answer" && Recognition) return;    // held or tapped: talk() has it
@@ -57,9 +62,8 @@ function shut() {
 }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !document.querySelector(".scrim")) close(); });
 
-// Claude's texts are Markdown; your prompts and the tool lines are shown as they are
+// Claude's texts are Markdown; your prompts are shown as they are, the steps by steps.js
 function line(e) {
-  if (e.kind === "tool") return `<div class="msg tool">${esc(e.text)}</div>`;
   if (e.role === "user") return `<div class="msg you">${esc(e.text)}</div>`;
   return `<div class="msg claude md">${markdown(e.text)}</div>`;
 }
@@ -74,10 +78,31 @@ async function load() {
   if (sig === view.logSig) return;
   const first = !view.logSig;
   view.logSig = sig;
+  view.log = log;
+  draw(first);
+}
+
+// The newest step stays in sight while the session works or waits on a permission (steps.js)
+function live() {
+  const s = store.state?.sessions?.find(x => x.id === view.id);
+  return s?.state === "working" || s?.state === "permission";
+}
+
+function draw(first) {
   const box = view.el.querySelector(".log");
   const atEnd = first || box.scrollHeight - box.scrollTop - box.clientHeight < AT_END_PX;
-  box.innerHTML = log.map(line).join("") || '<div class="msg tool">Nothing said yet</div>';
+  view.live = live();
+  box.innerHTML = logHTML(view.log, { live: view.live, open: view.open, text: line })
+    || '<div class="msg tool">Nothing said yet</div>';
   if (atEnd) box.scrollTop = box.scrollHeight;
+}
+
+// A tap on a run's line opens its steps, another closes them; the log stays where it was scrolled
+function toggle(k) {
+  if (view.open.has(k)) view.open.delete(k); else view.open.add(k);
+  const box = view.el.querySelector(".log"), top = box.scrollTop;
+  draw(false);
+  box.scrollTop = top;
 }
 
 function label(s) {
@@ -127,6 +152,7 @@ function frame(state) {
     <span class="spacer"></span><button class="close" aria-label="Close">${icon("x", 20)}</button>`;
   const foot = s ? buttons(s) : "";
   if (head !== view.headSig) { view.headSig = head; view.el.querySelector(".dhead").innerHTML = head; }
+  if (view.logSig && live() !== view.live) draw(false);     // done now: its newest step goes into its run
   // the buttons stay as they are under a held Answer (not taken from under the finger), and when nothing changed
   if (view.holding || foot === view.footSig) return;
   view.footSig = foot;

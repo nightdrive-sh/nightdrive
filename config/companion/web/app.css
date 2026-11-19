@@ -161,6 +161,18 @@ body.offline .sessions, body.offline .actions { opacity: .45; transition: opacit
 .msg.you { align-self: flex-end; max-width: 80%; background: var(--sel); color: var(--accent); border-radius: 12px; padding: 10px 14px; }
 .msg.tool { font-size: 12px; color: var(--dim); background: var(--bg); border-radius: 8px; padding: 6px 10px; white-space: nowrap;
             overflow: hidden; text-overflow: ellipsis; flex: none; }
+/* A run of steps as one quiet line, opened by a tap (steps.js); a failed or denied step, and the newest at work, show */
+.steps { align-self: flex-start; max-width: 100%; font: inherit; font-size: 12px; color: var(--dim); background: none; border: 0;
+         padding: 4px 0; min-height: 32px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
+.steps::before { content: "▸"; display: inline-block; width: 1.4em; }
+.steps.opened::before { content: "▾"; }
+.steps .n { color: var(--muted); }
+.msg.tool.failed { color: var(--danger); box-shadow: inset 2px 0 var(--danger); }
+.msg.tool.denied { color: var(--caution); box-shadow: inset 2px 0 var(--caution); }
+.msg.tool .why { margin-right: 8px; font-weight: 500; }
+/* the newest step while it works: a line of its own, no box, as what it is doing now ("› Running make") */
+.msg.tool.now { background: none; padding: 4px 0; color: var(--text); }
+.msg.tool.now::before { content: "›"; display: inline-block; width: 1.4em; color: var(--primary); }
 /* Claude's Markdown in it (markdown.js) */
 .md { white-space: normal; }
 .md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }

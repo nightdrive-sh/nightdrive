@@ -315,10 +315,14 @@ class Demo:
 
     def log(self, addr):
         s = next(s for s in self.look() if s["id"] == self.window(addr))
+        working = s["state"] == "working"
         return [{"role": "user", "kind": "text", "text": f"Let's work on {s['topic'].lower()} in {s['project']}."},
                 {"role": "assistant", "kind": "text", "text": "Looking at it now."},
-                {"role": "assistant", "kind": "tool", "text": "Read: src/main.rs"},
-                {"role": "assistant", "kind": "text", "text": s["last"]}]
+                *DEMO_STEPS,
+                {"role": "assistant", "kind": "text", "text": "The tests pass. Logged it and left a message."},
+                *DEMO_STEPS[:2],
+                {"role": "assistant", "kind": "text" if not working else "tool",
+                 "text": s["last"], **({"status": "running"} if working else {})}]
 
     def permission(self, addr):
         return next((s.get("permission") for s in self.look() if s["id"] == addr), None)
@@ -336,6 +340,13 @@ class Demo:
     def reply(self, addr, request, answers):
         self.answered[addr] = check_answers(self.question(addr), request, answers)
 
+
+# A run of steps as a session's view gets them (transcript.py): one failed, one you denied
+DEMO_STEPS = [{"role": "assistant", "kind": "tool", "text": t, **({"status": st} if st else {})} for t, st in [
+    ("Skill: run", ""), ("Bash: git status --short", ""), ("Read: src/main.rs", ""),
+    ("Bash: cargo test --workspace", "error"), ("Edit: src/queue.rs", ""), ("Bash: cargo test --workspace", ""),
+    ("Bash: rm -rf target", "denied"), ("Dashboard: log add", ""), ("Inbox: update", ""),
+    ("SendMessage: Nightdrive Project Manager", "")]]
 
 DEMO_EDIT_INPUT = {"file_path": "~/Projects/nightdrive-website/data/docs.json", "old_string": '  "companion": "Companion",',
                    "new_string": '  "companion": "Companion",\n  "companion-permissions": "Permission requests",',
