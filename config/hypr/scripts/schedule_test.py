@@ -70,12 +70,17 @@ class Rows(unittest.TestCase):
             patcher = mock.patch.object(schedule, name, stub)
             patcher.start()
             self.addCleanup(patcher.stop)
+        # Every word a program: these are about commands, whatever this machine's PATH has (schedule_claude_test.py
+        # tells commands and messages apart)
+        patcher = mock.patch.object(schedule.claude, "is_command", lambda word: True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def tearDown(self):
         self.dir.cleanup()
 
-    def add(self, when, *command):
-        schedule.cmd_add(types.SimpleNamespace(json=True, when=when, command=list(command)))
+    def add(self, when, *command, run=False):
+        schedule.cmd_add(types.SimpleNamespace(json=True, when=when, command=list(command), run=run))
 
     def rows(self):
         with open(schedule.STATE) as f:
@@ -96,7 +101,7 @@ class Rows(unittest.TestCase):
     def test_refused_adds_nothing(self):
         for when, command in [("soon", ["make"]), ("15", []), ("15", ['echo "x']), ("10081", ["make"])]:
             with self.assertRaises(SystemExit):
-                self.add(when, *command)
+                self.add(when, *command, run=True)   # a broken line not said to be a command is a message
         self.assertEqual(self.armed, [])
         self.assertFalse(os.path.exists(schedule.STATE))
 

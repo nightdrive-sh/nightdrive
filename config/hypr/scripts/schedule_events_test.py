@@ -54,6 +54,11 @@ class Events(unittest.TestCase):
             patcher = mock.patch.object(schedule, name, stub)
             patcher.start()
             self.addCleanup(patcher.stop)
+        # Every word a program: these are about commands, whatever this machine's PATH has (schedule_claude_test.py
+        # tells commands and messages apart)
+        patcher = mock.patch.object(schedule.claude, "is_command", lambda word: True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         for target, name, stub in [(schedule.timers, "armed", lambda unit: unit in self.timer_up),
                                    (schedule, "ask_later", self.asked.append)]:
             patcher = mock.patch.object(target, name, stub)

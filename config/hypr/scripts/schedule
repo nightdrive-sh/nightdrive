@@ -1,16 +1,22 @@
 #!/usr/bin/python3 -I
 """Commands run at a time or on an event (Dashboard #3121): `nightdrive schedule …` runs this.
 
-  schedule WHEN COMMAND… [--json]      runs COMMAND at WHEN: minutes (15, 90m, 2h, 1h30m, up to a week), a time of
-                                       day (14:45, 14.45: the next one), wake (the first unlock after the computer
-                                       next wakes from sleep) or login (the next login); @UNIX: that moment (the undo
-                                       of a cancel). One argument is a shell line as such ("make && notify-send done");
-                                       several are words, quoted for the shell as given. --json: the row, as list
-                                       gives each
+  schedule WHEN [--run|--claude|--to SESSION] LINE… [--json]
+                                       LINE at WHEN: minutes (15, 90m, 2h, 1h30m, up to a week), a time of day (14:45,
+                                       14.45: the next one), wake (the first unlock after the computer next wakes from
+                                       sleep) or login (the next login); @UNIX: that moment (the undo of a cancel).
+                                       A LINE whose first word is a program in PATH, or nightdrive, is a command (Run):
+                                       one argument is a shell line as such ("make && notify-send done"); several are
+                                       words, quoted for the shell as given. Any other is a message to Claude (Ask
+                                       Claude, schedule_claude.py): a new session in a window of its own gets it, or
+                                       with --to that session (an id or a name, as `nightdrive sessions` shows them).
+                                       --run and --claude say which instead. --json: the row, as list gives each
   schedule list [--json]               the waiting ones, by time, then wake and login. --json: {commands: [{id, when,
-                                       at, at_unix, clock, minutes_left, state, command}]}: when is time, wake or
-                                       login (at, at_unix, clock, minutes_left are null for wake and login); state is
-                                       waiting, unlock (its time came under the lock), missed (asks Run or Skip) or due
+                                       at, at_unix, clock, minutes_left, state, kind, to, command}]}: when is time,
+                                       wake or login (at, at_unix, clock, minutes_left are null for wake and login);
+                                       state is waiting, unlock (its time came under the lock), missed (asks Run or
+                                       Skip) or due; kind is run or claude, to the session a message is for (or null),
+                                       command the line or the message
   schedule show ID --json              one of them, as list gives it
   schedule run ID                      runs one now, whatever it waits for (a missed one, say)
   schedule cancel ID|all [--json]      takes one (or every one) away before it runs
@@ -20,6 +26,7 @@
   schedule unlocked                    at each unlock but the login's (autostart.lua): what waited for it runs
   schedule fire ID [--now]             the timer's own call: runs the command, with a notification; under the lock
                                        it waits for the unlock instead (--now: runs it anyway)
+  schedule send [--to SESSION] MESSAGE…   a message's run (fire runs it as a command): to that session, or a new one
 
 Nothing runs unseen: what waits is in `schedule list`, and a run shows a notification with the command (Running…, then
 Done, or Failed with the end of its output, pinned). The whole output goes to the journal:
@@ -35,6 +42,7 @@ import argparse, json, os, secrets, shlex, subprocess, sys, tempfile, time
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import timers  # noqa: E402  the timer base shared with remind (timers.py)
+import schedule_claude as claude  # noqa: E402  a message to Claude: how it is told apart and where it goes
 
 STATE = os.path.expanduser("~/.local/state/nightdrive/schedule.json")
 UNIT = "nightdrive-schedule-"       # + the id: the timer, its service, a run now (-now) and the command's scope (-run)
@@ -101,11 +109,19 @@ def syntax_error(line):
 def public(r, now=None):
     now = time.time() if now is None else now
     out = {"id": r["id"], "when": r.get("on", "time"), "at": None, "at_unix": None, "clock": None,
-           "minutes_left": None, "state": r.get("state", "waiting"), "command": r["command"]}
+           "minutes_left": None, "state": r.get("state", "waiting"), "kind": r.get("kind", "run"),
+           "to": r.get("to"), "command": r["command"]}
     if "on" not in r:
         out.update(at=timers.iso(r["at"]), at_unix=int(r["at"]), clock=timers.clock(r["at"]),
                    minutes_left=timers.minutes_left(r["at"], now))
     return out
+
+
+def what(r):
+    """What a row does, as the list and the notifications say it: the command, or Ask Claude [→ SESSION]: message."""
+    if r.get("kind") != "claude":
+        return r["command"]
+    return "Ask Claude" + (" → " + r["to"] if r.get("to") else "") + ": " + r["command"]
 
 
 def label(r):
@@ -157,15 +173,17 @@ def execute(r):
         note = "Was due at " + timers.clock(r["at"])
     else:
         note = "Scheduled for " + timers.clock(r["at"])
-    notify(r["id"], "Running: " + r["command"], note)
-    code, output = run_command(r["id"], r["command"])
+    ask = r.get("kind") == "claude"
+    notify(r["id"], ("" if ask else "Running: ") + what(r), note)
+    line = claude.send_line(SELF, r.get("to"), r["command"]) if ask else r["command"]
+    code, output = run_command(r["id"], line)
     if output:
         print(output, end="" if output.endswith("\n") else "\n")   # to the journal, whole
-    if code == 0:
-        notify(r["id"], "Done: " + r["command"])
+    if code == 0:   # a message's says where it went: its window, a resumed one, a new session
+        notify(r["id"], "Done: " + what(r), output.strip().splitlines()[-1] if ask and output.strip() else "")
     else:
         tail = "\n".join(output.strip().splitlines()[-TAIL_LINES:])
-        notify(r["id"], f"Failed (exit {code}): " + r["command"],
+        notify(r["id"], f"Failed (exit {code}): " + what(r),
                (tail + "\n" if tail else "") + f"journalctl --user -u '{UNIT}{r['id']}*'", pinned=True)
 
 
@@ -190,13 +208,23 @@ def cmd_add(a):
     if not on and at is None:
         die("Minutes up to a week (15, 90m, 2h, 1h30m), a time of day (14:45), wake or login; "
             "a moment (@UNIX) not past and within a week", 2)
-    line = command_line(a.command)
+    forced = getattr(a, "run", False) or getattr(a, "claude", False) or getattr(a, "to", None)
+    k = "claude" if getattr(a, "claude", False) or getattr(a, "to", None) else \
+        "run" if getattr(a, "run", False) else claude.kind(a.command)
+    line = command_line(a.command) if k == "run" else claude.message(a.command)
     if not line:
-        die("What to run: schedule WHEN COMMAND", 2)
-    err = syntax_error(line)
+        die("What to run: schedule WHEN COMMAND, or a message to Claude", 2)
+    err = syntax_error(line) if k == "run" else ""
     if err:
         die("The command doesn't parse: " + err, 2)
-    r = {"id": secrets.token_hex(4), "command": line, **({"on": on, "added": now} if on else {"at": at})}
+    to = None
+    if getattr(a, "to", None):
+        try:
+            to = claude.target(a.to, claude.sessions())
+        except ValueError as e:
+            die(str(e), 2)
+    r = {"id": secrets.token_hex(4), "command": line, **({"on": on, "added": now} if on else {"at": at}),
+         **({"kind": "claude", "to": to} if k == "claude" else {})}
     with state() as rows:
         if not on:
             ok, err = arm(r)
@@ -206,7 +234,11 @@ def cmd_add(a):
     if a.json:
         print(json.dumps(public(r), ensure_ascii=False))
     else:
-        print(f"{'On ' + on if on else 'At ' + timers.clock(at)}: {line}  ({r['id']})")
+        print(f"{'On ' + on if on else 'At ' + timers.clock(at)}: {'' if k == 'claude' else 'Run: '}{what(r)}  "
+              f"({r['id']})")
+        if not forced:   # read by its first word: how to say the other
+            print("  A message to Claude: --run runs it as a command" if k == "claude" else
+                  "  A command: --claude sends it to Claude as a message")
 
 
 def cmd_list(a):
@@ -225,7 +257,7 @@ def cmd_list(a):
         else:
             when = f"{r['clock']}  in {r['minutes_left']} min"
         st = "" if r["state"] == "waiting" else f"  [{r['state']}]"
-        print(f"{when}  {r['command']}{st}  ({r['id']})")
+        print(f"{when}  {'' if r['kind'] == 'claude' else 'Run: '}{what(r)}{st}  ({r['id']})")
 
 
 def find(rows, rid):
@@ -238,7 +270,7 @@ def find(rows, rid):
 def cmd_show(a):
     with state() as rows:
         r = find(rows, a.id)
-    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"{label(r)}  {r['command']}")
+    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"{label(r)}  {what(r)}")
 
 
 def cmd_run(a):
@@ -321,7 +353,7 @@ def cmd_ask(a):
         r = next((r for r in rows if r["id"] == a.id and r.get("state") == "missed"), None)
     if not r:
         return
-    answer = notify(r["id"], "Missed: " + r["command"],
+    answer = notify(r["id"], "Missed: " + what(r),
                     f"Was due {timers.iso(r['at'])[:16].replace('T', ' at ')}, while the computer was off",
                     pinned=True, actions=[("run", "Run"), ("skip", "Skip")])
     if answer == "run":
@@ -349,12 +381,22 @@ def cmd_unlocked(a):
 
 
 def parse_add(argv):
-    """[--json] WHEN [--json] [--] COMMAND…: options only before the command, so `schedule 15 ls -la` keeps its -la
-    and a command ending in --json keeps it. None when WHEN is missing or an option is unknown."""
-    a = argparse.Namespace(cmd="add", json=False, when=None, command=[])
+    """[options] WHEN [options] [--] COMMAND…: options (--json, --run, --claude, --to SESSION) only before the command,
+    so `schedule 15 ls -la` keeps its -la and a command ending in --json keeps it. None when WHEN is missing, an option
+    is unknown, --to has no session, or --run comes with --claude or --to."""
+    a = argparse.Namespace(cmd="add", json=False, run=False, claude=False, to=None, when=None, command=[])
+    skip = False
     for i, w in enumerate(argv):
-        if w == "--json":
-            a.json = True
+        if skip:
+            skip = False
+            continue
+        if w in ("--json", "--run", "--claude"):
+            setattr(a, w[2:], True)
+        elif w == "--to" or w.startswith("--to="):
+            a.to = w[5:] if w.startswith("--to=") else (argv[i + 1] if i + 1 < len(argv) else "")
+            if not a.to.strip():
+                return None
+            skip = w == "--to"
         elif w == "--":
             a.command = argv[i + 1:]
             break
@@ -365,7 +407,33 @@ def parse_add(argv):
             break
         else:
             return None
+    if a.run and (a.claude or a.to):
+        return None
     return a if a.when is not None else None
+
+
+def cmd_send(argv):
+    """[--to SESSION] [--] MESSAGE…: a message's run, or one sent now by hand. SESSION as the row keeps it (an id or a
+    name: schedule_claude.target); what happened goes to stdout, the run's notification shows its last line."""
+    to = None
+    if argv[:1] == ["--to"] and len(argv) > 1:
+        to, argv = argv[1], argv[2:]
+    if argv[:1] == ["--"]:
+        argv = argv[1:]
+    text = claude.message(argv)
+    if not text:
+        die("What to send: schedule send [--to SESSION] MESSAGE", 2)
+    found = claude.sessions()
+    if to and not claude.pick(to, found):   # typed by hand: a part of a name, as an add takes it
+        try:
+            to = claude.target(to, found)
+        except claude.Ambiguous as e:
+            die(str(e), 2)
+        except ValueError:
+            pass   # none has it: a new session of that name, as for a row whose sessions are gone
+    code, said = claude.deliver(to, text, found)
+    print(said)
+    sys.exit(code)
 
 
 def main():
@@ -373,6 +441,7 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n\n")[1])
     sub = p.add_subparsers(dest="cmd")
     sub.add_parser("add")   # parsed by parse_add: the command's own options aren't argparse's
+    sub.add_parser("send")  # parsed by cmd_send: the message's words are its own
     ls = sub.add_parser("list")
     ls.add_argument("--json", action="store_true")
     for name in ("show", "cancel"):
@@ -397,6 +466,8 @@ def main():
         argv = [first, *argv]           # `schedule --json list`
     else:
         argv = ["add", *argv]           # `schedule 15 make`, `schedule --json wake make`
+    if argv[0] == "send":
+        return cmd_send(argv[1:])
     if argv[0] == "add":
         a = parse_add(argv[1:])
         if a is None:

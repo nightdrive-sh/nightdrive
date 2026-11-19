@@ -9,12 +9,14 @@
 # asked for it; none while the sessions bar shows, where its chip appears). It opens on the workspace of the window it was called
 # from (found up the process chain: the project manager's terminal), even if the user has moved to another one since;
 # called from no window, on the active one. --workspace WS (a number or special:NAME) names the workspace instead.
+# --resume ID: goes on with that conversation instead (claude --resume), PROMPT its next one; give its --dir and
+# --account, where Claude Code finds it (schedule's message to a closed session, schedule_claude.py).
 # --account NAME: on that Claude Code account (topbar/scripts/claude-accounts; the Claude menu's New session · NAME).
 # Without it, on the caller's (its CLAUDE_CONFIG_DIR: a session on another account opens its own there), else the default.
 # The launcher's askClaude, ask-claude, crash reports and `nightdrive ask` call this.
 readonly BG_CLASS=claude-background   # hyprland.lua's rule, and TERMINAL_CLASSES in bindings.lua
 readonly BG_WAIT=15                   # seconds to wait for the window before giving up on the notification
-dir="$HOME/Projects"; name=; model=; effort=; bg=0; ws=; bare=$(( $# == 0 )); conf=${CLAUDE_CONFIG_DIR:-}
+dir="$HOME/Projects"; name=; model=; effort=; resume=; bg=0; ws=; bare=$(( $# == 0 )); conf=${CLAUDE_CONFIG_DIR:-}
 while (( $# )); do
   case $1 in
     --dir) [[ -n ${2:-} ]] || { echo "--dir needs a folder" >&2; exit 1; }; dir=$2; shift 2 ;;
@@ -26,6 +28,8 @@ while (( $# )); do
     # checked here: a wrong level would only show as an error in the new terminal
     --effort) [[ ${2:-} =~ ^(low|medium|high|xhigh|max)$ ]] || { echo "--effort needs low, medium, high, xhigh or max" >&2; exit 1; }
               effort=$2; shift 2 ;;
+    --resume) [[ ${2:-} =~ ^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$ ]] || { echo "--resume needs a session id" >&2; exit 1; }
+              resume=$2; shift 2 ;;
     --account) conf=$("$HOME/.config/topbar/scripts/claude-accounts" dir "${2:-}") || exit 1; shift 2 ;;
     --background) bg=1; shift ;;
     # it goes into a Lua string in hyprctl dispatch: no quotes or spaces
@@ -58,6 +62,7 @@ claude=("${opener[@]}" "$HOME/.local/bin/claude")   # env execs into claude: its
 [[ -n $name ]] && claude+=(-n "$name")
 [[ -n $model ]] && claude+=(--model "$model")
 [[ -n $effort ]] && claude+=(--effort "$effort")
+[[ -n $resume ]] && claude+=(--resume "$resume")
 (( $# )) && claude+=(-- "$*")
 if (( bare )); then
   [ "$(qs ipc call launcher askClaude terminal 2>/dev/null)" = "ok" ] && exit 0
