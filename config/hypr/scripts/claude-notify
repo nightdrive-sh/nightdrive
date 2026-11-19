@@ -41,11 +41,35 @@ while (( p > 1 )); do
   p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || break
 done
 active() { [[ -n $addr && $(hyprctl -j activewindow 2>/dev/null | jq -r '.address // ""') == "$addr" ]]; }
-active && exit 0
+# Claude Code's own record of the session (<its config dir>/sessions/<pid>.json, which claude-sessions reads too): its
+# status changes when the request is answered, wherever. With it a permission request no longer goes by the window
+# alone (#3146): Companion brings a session's window up to type into it, and away from the computer it stays the
+# active one, so "you're in that window, answer there" left Companion nothing to answer, only "It asks you something
+# in its terminal". Found by the session's id, the newest record first (a resumed session's old one may linger).
+sid=$(jq -r '.session_id // empty' <<<"$in")
+rec=''
+[[ $sid =~ ^[0-9a-f-]{8,64}$ ]] && rec=$(grep -lF "\"sessionId\":\"$sid\"" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/sessions/*.json \
+  2>/dev/null | xargs -r ls -t 2>/dev/null | head -n 1)
+start_ms=$(( $(date +%s%3N) - 3000 ))  # the record shows the request waiting as the hook starts: an older stamp is another's
+seen=''
+# The record has shown this request waiting (its stamp kept in seen), and now says something else: answered elsewhere
+over() {
+  local s; s=$(jq -r 'select(.status) | "\(.status) \(.statusUpdatedAt // 0)"' "$rec" 2>/dev/null) || return 1
+  if [[ -z $seen ]]; then
+    [[ $s == waiting\ * ]] && (( ${s#* } >= start_ms )) && seen=$s
+    return 1
+  fi
+  [[ -n $s && $s != "$seen" ]]
+}
+if [[ $event == PermissionRequest && -n $rec ]]; then
+  active && here=1 || here=''          # you may be in it: no notification, but Companion still gets the request
+else
+  active && exit 0
+fi
 # A permission notification of this session is up (below): Claude Code's own "needs your permission" comes six seconds
 # later and would replace it with one without the buttons
 [[ $event == Notification && -n $addr && ( -e $state/$addr.perm || -e $state/$addr.ask ) ]] && exit 0
-[[ -n $addr ]] && qs ipc call claude want "$addr" >/dev/null 2>&1
+[[ -n $addr && -z ${here-} ]] && qs ipc call claude want "$addr" >/dev/null 2>&1
 # While the sessions bar is there for you to see (Claude.qml's barShown: on, not covered, you at the computer), its chip
 # says it: no notification, and none in the history either (#3126). A permission or a question still gets its pinned
 # one below, the only place to answer it from. No answer (Quickshell not running) notifies as before.
@@ -111,12 +135,16 @@ if [[ $event == PermissionRequest ]]; then
       --argjson allow "$(( ${#allow[@]} > 0 ))" --argjson whole "${whole:-0}" \
       '{tool: $tool, what: $what, project: $project, request: $req, allow: ($allow == 1), whole: ($whole == 1)}' > "$state/$addr.perm"
   fi
-  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" "${deny[@]}" \
-    -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
-  ns=$!
-  # The terminal's answer may not end this hook (Claude Code let it run on after a question answered there): you answer
-  # there in the window, which ends it within a second (active, below), and the notification goes with it
-  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm" "$state/$addr.input" "$state/$addr.ask" "$ans"; }
+  ns=''
+  if [[ -z ${here-} ]]; then
+    notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" "${deny[@]}" \
+      -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
+    ns=$!
+  fi
+  # The terminal's answer may not end this hook (Claude Code let it run on after a question answered there): the
+  # session's record changing ends it within a second (over, above), else your going to the window (active), and the
+  # notification goes with it
+  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; [[ -n $ns ]] && kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm" "$state/$addr.input" "$state/$addr.ask" "$ans"; }
   trap cleanup EXIT
   trap 'exit 0' TERM INT HUP
   # The answers for the questions it asked, and no others; the terminal's question closes as if answered there
@@ -127,7 +155,7 @@ if [[ $event == PermissionRequest ]]; then
              decision: ({behavior: $b} + (if $b == "deny" then {message: "Denied from \($from)"} else {} end))}}'; }
   for (( i = 0; i < WAIT * 4; i++ )); do
     sleep 0.25
-    sed -n 1p "$out" > "$idf" 2>/dev/null
+    [[ -n $ns ]] && sed -n 1p "$out" > "$idf" 2>/dev/null
     if [[ -s $ans ]]; then                  # answered on Companion: Allow when the notification offers it, or the input
                                             # went to Companion whole (its Review showed all of it)
       read -r verdict rid answers < "$ans"
@@ -140,7 +168,7 @@ if [[ $event == PermissionRequest ]]; then
       fi
       rm -f "$ans"
     fi
-    if ! kill -0 "$ns" 2>/dev/null; then    # answered, or closed without one
+    if [[ -n $ns ]] && ! kill -0 "$ns" 2>/dev/null; then    # answered, or closed without one
       case $(sed -n 2p "$out") in
         allow) decide allow ;;
         deny) decide deny ;;
@@ -148,7 +176,13 @@ if [[ $event == PermissionRequest ]]; then
       esac
       exit 0
     fi
-    (( i % 4 == 3 )) && active && exit 0   # you went to the window: answer there
+    # Answered elsewhere (the terminal), as the session's record says; one that hasn't shown it waiting in three
+    # seconds (an older Claude Code) goes by the window as before: you went to it, answer there
+    if [[ -n $rec ]] && { [[ -n $seen ]] || (( i < 12 )); }; then
+      over && exit 0
+    elif (( i % 4 == 3 )) && active; then
+      exit 0
+    fi
   done
   exit 0
 fi

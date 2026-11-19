@@ -16,17 +16,18 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOK = os.environ.get("CLAUDE_NOTIFY", os.path.join(HERE, "claude-notify"))
 ADDR = "0xtest"
+SID = "0b6c4a3e-1d2f-4e5a-9b8c-7d6e5f4a3b2c"
 EDIT = {"file_path": "/tmp/x/notes.md", "old_string": "a", "new_string": "a\nb", "replace_all": False}
 
 STUBS = {
-    # the session's window is this test's process (the hook's parent); another window has the keyboard
+    # the session's window is this test's process (the hook's parent); another window has the keyboard, unless CN_ACTIVE
     "hyprctl": """#!/bin/bash
 case "$*" in
   "-j clients") printf '[{"pid": %s, "address": "%s", "title": "✳ test"}]' "$CN_PID" "$CN_ADDR" ;;
-  "-j activewindow") echo '{"address": "0xother"}' ;;
+  "-j activewindow") printf '{"address": "%s"}' "${CN_ACTIVE:-0xother}" ;;
 esac""",
     # prints its id at once, then waits as -w does for an action that never comes
-    "notify-send": "#!/bin/bash\necho 7\nexec sleep 600",
+    "notify-send": "#!/bin/bash\n: > \"$CN_NOTIFIED\"\necho 7\nexec sleep 600",
     "qs": "#!/bin/bash\nexit 1",
     "gdbus": "#!/bin/bash\nexit 0",
 }
@@ -45,7 +46,9 @@ class CompanionAnswer(unittest.TestCase):
             os.chmod(path, 0o755)
         self.state = os.path.join(self.tmp, "run", "nightdrive", "claude-notify")
         self.env = {"PATH": f"{bin_}:/usr/bin:/bin", "HOME": self.tmp, "XDG_RUNTIME_DIR": os.path.join(self.tmp, "run"),
-                    "CN_PID": str(os.getpid()), "CN_ADDR": ADDR, "LANG": "C.UTF-8"}
+                    "CN_PID": str(os.getpid()), "CN_ADDR": ADDR, "LANG": "C.UTF-8",
+                    "CLAUDE_CONFIG_DIR": os.path.join(self.tmp, "claude"),
+                    "CN_NOTIFIED": os.path.join(self.tmp, "notified")}
         self.proc = None
 
     def tearDown(self):
@@ -54,12 +57,25 @@ class CompanionAnswer(unittest.TestCase):
             self.proc.wait()
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def ask(self, tool, tool_input):
-        """Starts the hook on a permission request; returns what it left for Companion: (perm, input or None)."""
-        event = {"hook_event_name": "PermissionRequest", "cwd": "/home/me/proj", "tool_name": tool, "tool_input": tool_input}
+    def record(self, status, waiting_for="", at=None):
+        """Claude Code's record of the session (<config dir>/sessions/<pid>.json), as it writes it: compact JSON."""
+        d = os.path.join(self.env["CLAUDE_CONFIG_DIR"], "sessions")
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "4242.json.tmp"), "w") as f:
+            json.dump({"pid": 4242, "sessionId": SID, "status": status, "waitingFor": waiting_for,
+                       "statusUpdatedAt": at or int(time.time() * 1000)}, f, separators=(",", ":"))
+        os.replace(os.path.join(d, "4242.json.tmp"), os.path.join(d, "4242.json"))
+
+    def start(self, tool, tool_input):
+        event = {"hook_event_name": "PermissionRequest", "cwd": "/home/me/proj", "session_id": SID, "tool_name": tool,
+                 "tool_input": tool_input}
         self.proc = subprocess.Popen([HOOK], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=self.env)
         self.proc.stdin.write(json.dumps(event))
         self.proc.stdin.close()
+
+    def ask(self, tool, tool_input):
+        """Starts the hook on a permission request; returns what it left for Companion: (perm, input or None)."""
+        self.start(tool, tool_input)
         perm = os.path.join(self.state, f"{ADDR}.perm")
         for _ in range(100):
             if os.path.exists(perm) and os.path.getsize(perm):
@@ -118,6 +134,52 @@ class CompanionAnswer(unittest.TestCase):
         self.assertIsNone(self.proc.poll())                                            # refused: still waits
         self.proc.send_signal(signal.SIGTERM)
         self.assertIsNone(self.decision())                                             # left to the terminal
+
+
+    # #3146: Companion types into a session by bringing its window up, and away from the computer it stays the active
+    # one. A request then still reaches Companion (no notification: you may be in that window), and ends when the
+    # session's record says it was answered elsewhere, so Companion never offers Allow for one that's gone.
+    def test_the_active_window_still_leaves_the_request_for_companion(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.record("waiting", "permission prompt")
+        p, inp = self.ask("Edit", EDIT)
+        self.assertEqual(inp, {"request": p["request"], "input": EDIT})
+        time.sleep(1.2)
+        self.assertIsNone(self.proc.poll())                                            # waits, though active
+        self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
+        self.answer(f"allow {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "allow"})
+
+    def test_answered_in_the_terminal_the_request_goes(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.record("waiting", "permission prompt")
+        self.ask("Edit", EDIT)
+        time.sleep(0.6)
+        self.record("busy")                                                            # the terminal's Yes
+        self.assertIsNone(self.decision())                                             # left to the terminal
+        self.assertEqual(os.listdir(self.state), [])                                   # Companion has nothing
+
+    def test_a_newer_request_ends_the_one_before(self):
+        self.record("waiting", "permission prompt")
+        self.ask("Write", {"file_path": "/tmp/x/a", "content": "a"})
+        time.sleep(0.6)
+        self.record("waiting", "permission prompt", int(time.time() * 1000) + 5)      # the next one's prompt
+        self.assertIsNone(self.decision())
+
+    def test_an_older_waiting_stamp_is_not_this_request(self):
+        self.record("waiting", "permission prompt", int(time.time() * 1000) - 60_000)  # the request before this one
+        p, _ = self.ask("Edit", EDIT)
+        self.record("waiting", "permission prompt")                                    # this one's
+        time.sleep(0.6)
+        self.assertIsNone(self.proc.poll())
+        self.answer(f"deny {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "deny", "message": "Denied from Companion"})
+
+    def test_without_a_record_the_active_window_answers_in_the_terminal(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.start("Edit", EDIT)
+        self.assertIsNone(self.decision())                                             # as before #3146
+        self.assertFalse(os.path.exists(os.path.join(self.state, f"{ADDR}.perm")))
 
 
 if __name__ == "__main__":
