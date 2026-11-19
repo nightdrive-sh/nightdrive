@@ -1,0 +1,48 @@
+# Files
+
+Your files and folders in a window of Nightdrive's own, run from the keyboard: yazi's letters and the Mac's ⌘ keys side
+by side, a preview of the picked file at the right and a big one on Space, and the desktop's clipboard and trash, which
+Nautilus and other apps share. It opens folders for the whole desktop: Hyper F, a folder another app opens, and a
+browser's "Show in folder".
+
+## Using it
+
+| Keys | |
+| --- | --- |
+| `?` | Files' keys |
+| ↑ ↓ or `j` `k` | Move in the list |
+| → ⏎ or `l` | Open: into a folder, a file in its app (a double click too; ⌘O) |
+| ← ⌫ or `h` | Up a folder |
+| `gg` `G` | First, last |
+| ⌥← ⌥→ (⌃⌘← ⌃⌘→) | Back, forward |
+| `~` `gh` `gd` | Home, home, Downloads |
+| ⌘L | Go to a folder by its path |
+| Space | The big preview: a picture, a PDF's first page, a video's frame or a text; ↑ ↓ go through the files, Space or Esc closes it |
+| `i` | The preview at the right (a narrow window leaves it out) |
+| `/` or ⌘F | Filter by name as you type: ⏎ back to the list with it kept, Esc shows all again |
+| `.` | Hidden files (⌘⇧. too) |
+| `s` `S` | Sort by name, time, size or type; the other way round (a click on a column's title too) |
+| `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, ⌘-click and ⇧-click with the mouse, Esc unmarks |
+| `y` `x` `p` or ⌘C ⌘X ⌘V | Copy, cut, paste here: the marked files, else the picked one |
+| `d` or ⌘⌫ | To the trash |
+| `r` or F2 | Rename (the name without its ending is picked) |
+| `a` | A new file; a name ending in `/` makes a folder (⌘⇧N: a folder) |
+| ⌘Z | Undo the last change (also Undo in the message at the top) |
+| `b` or ⌘D | Bookmark the folder in the sidebar, or take it away |
+| `Tab` | Keys between the sidebar and the list |
+| ⌘B ⌘R | Hide the sidebar, read the folder again |
+
+- The sidebar has home's folders, your bookmarks, the disks and the trash. The bookmarks are GTK's (`~/.config/gtk-3.0/bookmarks`), the same the apps' Open dialogs list. A USB stick shows when it is plugged in, mounts as you pick it and has an eject button.
+- The clipboard is the desktop's: files copied here paste into a mail, a chat or a browser, and files copied in Nautilus paste here. A cut moves the files once pasted.
+- Drag files out of the list into another app, or onto a folder in the list or the sidebar; files dragged in from another app are copied, and from Files itself moved. Dropped on Trash, they go there.
+- A copy or move never writes over a file: a name already there gets " (2)". A long one shows how far it is, with Stop.
+- The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
+
+## In a terminal
+
+    files                        # open Files, or bring it forward
+    files ~/Projects             # a folder in it; a file shows in its folder, picked
+    files enable                 # Files opens folders for the desktop (the installer runs it)
+    files disable                # folders open in Nautilus again
+
+Needs: nothing to set up (Python, GObject, wl-clipboard and poppler-utils, which Nightdrive has)

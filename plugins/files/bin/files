@@ -1,0 +1,85 @@
+#!/bin/bash
+# files: Nightdrive Files (plugins/files, README.md), the file manager: the window, and what puts it among the desktop's
+# apps as the one that opens folders (Hyper F, a folder from another app) and shows a file in its folder for other apps
+# (org.freedesktop.FileManager1: a browser's "Show in folder", Recorder).
+set -u
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app                                     # Files' own Quickshell config, apart from the desktop's shell
+REPO=$(dirname "$(dirname "$APP_DIR")")
+DEFAULT_APPS=$REPO/config/hypr/scripts/default-apps
+DESKTOP_ID=nightdrive-files.desktop
+FALLBACK=org.gnome.Nautilus.desktop                     # what opens folders again after `files disable`
+DBUS_NAME=org.freedesktop.FileManager1
+
+# shellcheck disable=SC2034  # read by kit/app.sh, sourced next
+APP_TITLE=Files
+# shellcheck disable=SC2034  # the same
+APP_IPC=files
+. "$QS_DIR/kit/app.sh"
+
+data=${XDG_DATA_HOME:-$HOME/.local/share}
+
+# A path, a file:// URL (what a .desktop's %U gives) or nothing (home), made absolute
+resolve() {
+  local p=${1:-$HOME}
+  if [[ $p == file://* ]]; then
+    p=$(python3 -c 'import sys, urllib.parse as u; print(u.unquote(u.urlparse(sys.argv[1]).path))' "$p")
+  fi
+  realpath -s -- "$p"
+}
+
+# A folder opens in the window; a file shows in its folder, picked
+open_path() {
+  local p
+  p=$(resolve "${1:-}")
+  if [[ -d $p ]]; then open_ready && ipc openFolder "$p"
+  elif [[ -e $p || -L $p ]]; then open_ready && ipc showFile "$p"
+  else echo "files: $p isn't there." >&2; return 1
+  fi
+}
+
+enable() {
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps services=$data/dbus-1/services
+  mkdir -p "$apps" "$icons" "$services"
+  cp "$APP_DIR/share/files.svg" "$icons/nightdrive-files.svg"
+  sed "s|^Exec=files|Exec=$HOME/.local/bin/files|" "$APP_DIR/share/files.desktop" > "$apps/$DESKTOP_ID"
+  sed "s|@FM1@|$APP_DIR/lib/fm1.py|" "$APP_DIR/share/$DBUS_NAME.service" > "$services/$DBUS_NAME.service"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  "$DEFAULT_APPS" set files "$DESKTOP_ID"
+  echo "Files opens folders now (Hyper F too), and shows the files other apps point to."
+}
+
+disable() {
+  if [[ $("$DEFAULT_APPS" 2>/dev/null | awk '/^Files /') == *"$DESKTOP_ID"* && -f /usr/share/applications/$FALLBACK ]]; then
+    "$DEFAULT_APPS" set files "$FALLBACK"
+  fi
+  rm -f "$data/applications/$DESKTOP_ID" "$data/icons/hicolor/scalable/apps/nightdrive-files.svg" \
+        "$data/dbus-1/services/$DBUS_NAME.service"
+  echo "Files is out of the desktop's apps; folders open in ${FALLBACK%.desktop} again."
+}
+
+usage() {
+  cat <<USAGE
+Usage: files [PATH | command]
+
+  (none)         open Files, or bring it forward if it is open
+  PATH, URL      a folder in Files; a file in its folder, picked
+  show PATH      the same, for a file
+  enable         Files among the desktop's apps, as the one that opens folders (the installer)
+  disable        take it away again: folders open in Nautilus
+  restart, quit, log
+  help           this text
+USAGE
+}
+
+case ${1:-open} in
+  open)       if [[ -n ${2:-} ]]; then open_path "$2"; else app_command open; fi ;;
+  show)       open_path "${2:-}" ;;
+  enable)     enable ;;
+  disable)    disable ;;
+  help|-h|--help) usage ;;
+  restart|quit|log|settings) app_command "$@" ;;
+  -*)         usage >&2; exit 2 ;;
+  *)          open_path "$1" ;;
+esac

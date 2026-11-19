@@ -30,7 +30,7 @@ Nightdrive puts all of that together into one opinionated desktop.
   dictation, and sleep is tuned for Asahi.
 - **Everything is a keystroke away.** One launcher handles apps, passwords, clipboard history, emoji, screenshots, settings,
   installing packages and power. You rarely need a terminal for everyday things.
-- **Apps of its own.** Mail, Contacts, Calendar, Tasks, Notes, Recorder, Deck, Garage and Ferry come with it, made for the
+- **Apps of its own.** Files, Mail, Contacts, Calendar, Tasks, Notes, Recorder, Deck, Garage and Ferry come with it, made for the
   keyboard and in the desktop's colours.
 - **Simple and readable.** Plain config files, a few small scripts, and comments that explain *why*.
 
@@ -63,10 +63,12 @@ copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal 
 
 ### Apps of its own
 
-Mail, Contacts, Deck, Ferry, Notes, Tasks and Calendar come with every install; Garage waits in Launcher › System ›
+Files, Mail, Contacts, Deck, Ferry, Notes, Tasks and Calendar come with every install; Garage waits in Launcher › System ›
 Install › Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the
 sidebar steps aside; narrower still, the list and the message take turns.
 
+- **[Files](plugins/files/README.md)**: your files and folders, with yazi's keys beside the ⌘ ones, a preview at the
+  side and a big one on Space; it opens the folders other apps open, and shares the clipboard and trash with them
 - **[Mail](plugins/mail/README.md)**: any IMAP account, quiet reading, notifications you can answer from
 - **[Contacts](plugins/contacts/README.md)**: iCloud, Google or CardDAV, in sync both ways; Mail and the Launcher find them
 - **[Deck](plugins/deck/README.md)**: Spotify (Premium) with your albums on a shelf, in the bar, the Launcher and the media keys
@@ -184,7 +186,7 @@ workspaces make room.
 details before installing (Tab there takes Flathub's when both have it). Browse has the 100 most popular apps and
 categories. System › Remove takes software and web apps away; Ctrl+Enter there removes one without asking.
 
-Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) and Tailscale come with every install;
+Nightdrive's own apps (Files, Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) and Tailscale come with every install;
 Garage, Nightdrive's app for virtual machines, waits in System › Install › Recommended. The rest are optional parts,
 under System › Install:
 
@@ -300,7 +302,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 % and forgotten at the next login, as on a Mac), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
 | Notifications | Quickshell | the app's icon and buttons, history and Do Not Disturb in the bar, a low battery warning, the internet dropping; a crashed app's notification can Ask Claude why |
 | Sounds | Nightdrive's own, made from scratch | notification sounds to choose from, and the desktop's own (volume, screenshot, charger, devices, lock); Launcher › Settings › Notifications turns them off |
-| Files and images | Nautilus, Loupe | |
+| Files and images | [Files](plugins/files/README.md) (Nightdrive's own), Loupe | yazi's keys, a preview, Quick Look on Space; Nautilus stays installed for now |
 | Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) | `.md` files open in it, themed |
 | Web apps | Chromium app windows | your own, or ready-made ones with a key: WhatsApp, Slack, Teams, YouTube |
 | External display | Hyprland | workspaces 1–9 on the main display, one on the laptop's screen (⌘0) and one on a second display (⌘§, the key left of 1); with the lid closed only the displays are used; where the screens are and which is the main one in Launcher › Settings › Display › Arrange displays |
@@ -360,7 +362,7 @@ A minimal Fedora gets what a desktop edition would have: it boots to the login s
 AirPlay in as on Fedora KDE, and SSH stays off until you turn on Remote login (Launcher › Settings), unless you install
 over ssh.
 
-Claude Code, Tailscale and Nightdrive's apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) come with every
+Claude Code, Tailscale and Nightdrive's apps (Files, Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) come with every
 install and stay quiet until you set them up. The optional parts that are on by default (Apostrophe, YouTube) come too;
 the rest can be added later from the Launcher (System › Install) or with `nightdrive plugins install ID`
 (`nightdrive apps install garage` for an app).
@@ -488,7 +490,7 @@ You can also update any time from the Launcher (**Update**) or a terminal:
 nightdrive update
 ```
 
-An install without one of Nightdrive's apps (Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) gets it with the next
+An install without one of Nightdrive's apps (Files, Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) gets it with the next
 update, once. Remove one, and it stays removed: Launcher › System › Install › Recommended or
 `nightdrive apps install mail` brings it back.
 Settings › Apps › Nightdrive apps turns one off or on.
@@ -540,7 +542,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
 | `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the region's, Settings › Region, which also sets its time: 2:30 PM in the US); also Launcher › Settings › Top bar › Date format |
 | `nightdrive region set fi` | How dates and times are written: `fi`, `se`, `de`, `uk`, `us` or `iso`; `nightdrive region` shows it, `list` lists them (`--json`); also Launcher › Settings › Region |
-| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage, Notes, Tasks, Calendar) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
+| `nightdrive apps` | Nightdrive's own apps (Files, Mail, Contacts, Deck, Ferry, Garage, Notes, Tasks, Calendar) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
 | `nightdrive plugins` | Optional parts and whether each is installed and on; `nightdrive plugins install home-assistant` runs one's installer |
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |
 | `nightdrive software search gimp` | Fedora's packages and Flathub's apps, as System › Install › Software finds them; `info dnf ID` (or `flatpak`, `plugin`), `installed` and `plugins` tell more (`--json`). `install dnf ID` or `install flatpak ID` installs one, `remove` removes it, `preview install …` shows first what would change; dnf asks for the password in the system's own dialog |

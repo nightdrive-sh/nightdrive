@@ -1,0 +1,14 @@
+[Desktop Entry]
+# `files enable` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH may
+# not have ~/.local/bin), and makes it the app that opens folders (inode/directory, default-apps' Files).
+Type=Application
+Name=Files
+GenericName=Nightdrive Files
+Comment=Your files and folders
+Keywords=files;folders;file manager;explorer;finder;
+Icon=nightdrive-files
+Exec=files %U
+MimeType=inode/directory;
+Terminal=false
+Categories=System;FileTools;FileManager;
+StartupNotify=false
