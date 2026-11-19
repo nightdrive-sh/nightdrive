@@ -579,7 +579,7 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | ⌘ ⇧ Space | Walk through the top bar menus with the keyboard |
 | ⌘ Esc | Notifications |
 | F5 / Fn / Insert | Dictation, held: F5 or Fn on a Mac, Insert on a PC ([another key](docs/dictation.md)) |
-| ⌘ ⇧ + dictation key | Dictate a question to Ask Claude, to check and send with Enter ([Claude](docs/claude.md)) |
+| ⌘ ⇧ + dictation key | Dictate to Ask Claude: sent as you let go, a small card shows the answer ([Claude](docs/claude.md)) |
 | ⌘ ⇧ K | All shortcuts (also in the Launcher under *Keybindings*) |
 
 The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).

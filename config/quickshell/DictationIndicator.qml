@@ -1,13 +1,14 @@
 import QtQuick
 
 // Dictation's indicator (F5, docs/dictation.md) while Voxtype records or transcribes:
-//   mic icon | equalizer (DictationMeter) | LISTENING / PLEASE WAIT / TRANSCRIBING
+//   mic icon (Claude's when it goes to Ask Claude) | equalizer (DictationMeter) | LISTENING / PLEASE WAIT / TRANSCRIBING
 // The whole of the toast during dictation (AskClaudeToast.qml); Ask Claude's field has a wave of its own while you
 // dictate to it (AskClaudeListening.qml). Its state comes from Dictation.qml.
 Item {
     id: ind
     required property Dictation dictation
     property bool running: false     // the meter animates only while it's seen
+    property bool toClaude: false    // the dictation goes to Ask Claude (⌘⇧, #3122): Claude's glyph for the mic
     readonly property var vt: dictation
 
     implicitWidth: 16 + ico.implicitWidth + 14 + meter.implicitWidth + 12 + 88 + 16   // the card fits its content
@@ -16,7 +17,7 @@ Item {
     Text {
         id: ico
         anchors { left: parent.left; leftMargin: 16; verticalCenter: parent.verticalCenter }
-        text: Icons.g("mic")
+        text: Icons.g(ind.toClaude ? AskClaudeSession.thinkingGlyph : "mic")
         font { family: Icons.family; pixelSize: 18 }
         color: ind.vt.waiting ? Theme.dim : Theme.accent
         // Breathes while it listens; back to full when it stops, so the next dictation doesn't start dimmed

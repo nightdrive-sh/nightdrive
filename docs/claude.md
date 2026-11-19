@@ -21,9 +21,11 @@ what it asks then as in any session. Without the tools on, or without Claude Cod
 terminal.
 
 To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
-let go: Ask Claude's toast opens as you start, with its recent conversation, and listens without taking the keyboard;
-what you said comes into the field to check before Enter sends it. Without the tools on, it goes to Claude Code in a
-terminal instead.
+let go: what you said is sent at once, as a new request, and you can go on with your work. The small card below the top
+bar shows Claude working and then, for a moment, its answer; a click on it opens the conversation. With Ask Claude's
+toast open, what you dictate goes into its field instead, to check before Enter sends it. While Claude is still busy with
+an earlier request, the toast opens with what you said in the field. Without the tools on, it goes to Claude Code in a
+terminal.
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.

@@ -105,7 +105,7 @@ hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate start"), { lock
 -- The releases are transparent: a mouse click while the key is held "shadows" the binds of every held key (Hyprland's
 -- shadowKeybinds), and the release would be skipped, so dictation kept recording until the key was pressed again.
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true, ignore_mods = true })    -- release -> transcribe and type
--- ⌘⇧ + the dictation key: the text goes to the launcher's Ask Claude field instead, to check and send (Dashboard #1908).
+-- ⌘⇧ + the dictation key: the text goes to Ask Claude instead, sent as you let go (Dashboard #1908, #3122).
 -- The releases above ignore modifiers, so the key's own release stops it whether ⌘⇧ is let go first or last.
 hl.bind(mod .. " + SHIFT + XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
 hl.bind(mod .. " + SHIFT + Insert", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
