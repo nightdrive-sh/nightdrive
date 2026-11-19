@@ -1,6 +1,7 @@
 -- Window groups by key (#3045): ⌘⇧G makes the active window a group of tabs or breaks its group up; ⌘⌥⇧ + an arrow
--- moves it into the group that way, or out of its own group. ⌘←/→ already goes through a group's tabs
--- (movefocus_cycles_groupfirst, bindings.lua), and the tabs look as #3042 made them (appearance.lua).
+-- moves it into the group that way, or out of its own group; ⌃⌥⌘←/→ shows its previous / next tab (#3164: ⌘←/→ goes
+-- to the next window, a group being one; ⌘⌥←/→ is the apps' own tabs, a browser's), and the tabs look as #3042 made
+-- them (appearance.lua).
 --
 -- A submap (⌘⇧G, then an arrow) was the first idea, but ⌘⇧G must act at once: in a group it would break the group up
 -- before the arrow came, or a plain ⌘⇧G would wait for a timeout. So the arrows have keys of their own.
@@ -77,6 +78,14 @@ function NIGHTDRIVE_GROUP_MOVE(dir)
 end
 
 hl.bind(mod .. " + SHIFT + G", hl.dsp.group.toggle())
+-- Round from the last tab to the first. Outside a group nothing: Hyprland's own would warn that it isn't one.
+-- (The bind wrapper in bindings.lua adds the same with MOD5, the ⌥ of a Mac layout.)
+for dir, step in pairs({ left = hl.dsp.group.prev, right = hl.dsp.group.next }) do
+    hl.bind(mod .. " + CTRL + ALT + " .. dir, function()
+        local w = hl.get_active_window()
+        if w and w.group and w.group.size > 1 then hl.dispatch(step()) end
+    end)
+end
 for _, dir in ipairs({ "left", "right", "up", "down" }) do
     hl.bind(mod .. " + ALT + SHIFT + " .. dir, function() NIGHTDRIVE_GROUP_MOVE(dir) end)
 end
