@@ -250,6 +250,7 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Ferry | whether it's on, devices, the box | send files or a text to a device † | |
 | Home Assistant | devices and sensors (presence and location: a choice) | switch a device, dim a light (with Undo), lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
 | Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail) | send one, Do Not Disturb off; on † | |
+| Inbox | the messages in [Inbox](inbox.md) | leave you a message, add to one it left | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Low Power Mode, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |

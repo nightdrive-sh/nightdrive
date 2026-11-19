@@ -209,6 +209,8 @@ def problem(spec, plugin, external=False):
         return f"{name}: {', '.join(sorted(unknown))} in its before isn't in inputSchema"
     if not isinstance(spec.get("notice", ""), str):
         return f"{name}: notice must be a string"
+    if not isinstance(spec.get("notify", True), bool) or "notify" in spec and spec["class"] != "change":
+        return f"{name}: notify is a change tool's, true or false"
     paths = spec.get("mask", [])
     if not isinstance(paths, list) or not all(isinstance(p, str) and p.strip(".") for p in paths):
         return f"{name}: mask must be a list of fields of its output (\"messages.text\")"

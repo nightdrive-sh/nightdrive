@@ -113,9 +113,14 @@ def offer(tool, arguments, answer, state=None):
         "area": tool.area, "options_from": tool.spec.get("options_from", []),
         "deletes": bool(tool.spec.get("deletes")), "server": server_id(os.getpid()),
     })
-    show(entry["id"], "undo")
-    answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: the user can undo it from the "
-                                                      "notification, or you with undo_change.)"})
+    # A tool whose change is plain to see where it lands, and shouldn't interrupt (inbox_post: a message is the
+    # opposite of a notification), says notify: false. It is logged all the same, for recent_changes and undo_change.
+    if tool.spec.get("notify", True):
+        show(entry["id"], "undo")
+        answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: the user can undo it from the "
+                                                          "notification, or you with undo_change.)"})
+    else:
+        answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: you can undo it with undo_change.)"})
 
 
 def show(entry_id, action):
