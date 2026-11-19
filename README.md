@@ -137,7 +137,9 @@ Click an icon and a small menu opens under it:
 - **Claude**: your Claude Code sessions and usage limits, under a robot (the sessions bar's too). A red dot on it tells a
   session is asking you something or finished while you were elsewhere, and a click goes to its window. A right click
   changes what it shows beside it: 5-hour or weekly usage as a number or a thin bar under the robot (orange past 90 %,
-  red past 95 %), the number of sessions, or nothing. Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
+  red past 95 %), the number of sessions, or nothing. **runs out Tue** after Weekly's reset says the week's limit would
+  end before it at your pace, judged by your earlier weeks once there are some (it needs half a day of use first;
+  the history is in `~/.local/state/nightdrive/claude-usage`). Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
   (windows make room): one asking you something gets a red question mark and one waiting for your permission an
   orange shield (red after 3 minutes, hopping faster), which hop until you go to its window, one whose last reply
   ends on a ✅ line gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A

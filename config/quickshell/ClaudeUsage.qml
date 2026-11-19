@@ -3,7 +3,7 @@ import qs.kit
 
 // One Claude Code account's plan usage in the Claude menu (ClaudeMenu.qml): its section, then a meter for each window
 // (5-hour session, week, per-model week) with when it resets. usage is one of
-// topbar/scripts/claude-usage --all's: { account, plan, windows: [{ key, percent, resetsAt, model }], error }.
+// topbar/scripts/claude-usage --all's: { account, plan, windows: [{ key, percent, resetsAt, model, runsOut }], error }.
 Column {
     id: u
     width: parent ? parent.width : 300
@@ -19,7 +19,7 @@ Column {
     }
     // "resets in 1h 28m" (under 24 h) or "resets Wed 01:00"
     function resets(iso) {
-        const t = new Date(iso)
+        const t = new Date(Math.round(new Date(iso) / 60000) * 60000)   // the API's time jitters: 21:59:59.9 is 22:00
         if (isNaN(t)) return ""
         const d = Math.round((t - new Date()) / 1000)
         if (d <= 0) return "resetting now"
@@ -28,6 +28,15 @@ Column {
             return "resets in " + (h > 0 ? h + "h " : "") + mi + "m"
         }
         return "resets " + Regional.dayName(t.getDay(), true) + " " + Regional.format(t, "time")   // the region's time: 1:00 AM in the US
+    }
+    // "runs out in 5h" (under 24 h) or "runs out Tue": when the weekly quota ends at this pace, before it resets
+    // (runsOut: topbar/scripts/claude-forecast; absent when it lasts or there is too little history)
+    function runsOut(iso) {
+        const t = new Date(iso)
+        if (!iso || isNaN(t)) return ""
+        const d = Math.round((t - new Date()) / 1000)
+        if (d < 86400) return "runs out in " + Math.max(1, Math.round(d / 3600)) + "h"
+        return "runs out " + Regional.dayName(t.getDay(), true)
     }
     readonly property var windows: usage && usage.windows ? usage.windows : []
 
@@ -69,7 +78,7 @@ Column {
                     color: modelData.percent > 95 ? Theme.danger : (modelData.percent > 90 ? Theme.warning : Theme.accent)
                 }
             }
-            MenuNote { text: u.resets(modelData.resetsAt) }
+            MenuNote { text: [u.resets(modelData.resetsAt), u.runsOut(modelData.runsOut)].filter(t => t).join(" · ") }
         }
     }
 }

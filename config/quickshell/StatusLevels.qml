@@ -50,12 +50,18 @@ Item {
     function mb(b) { return b >= 1073741824 ? gb(b) + " GB" : Math.round(b / 1048576) + " MB" }
     function usageLabel(w) { return w.key === "session" ? "5-hour session" : w.key === "weekly" ? "Weekly" : "Weekly · " + (w.model || "model") }
     function resets(iso) {           // "resets in 1h 28m" (under 24 h) or "resets Wed 01:00"
-        const t = new Date(iso)
+        const t = new Date(Math.round(new Date(iso) / 60000) * 60000)   // the API's time jitters: 21:59:59.9 is 22:00
         if (isNaN(t)) return ""
         const d = Math.round((t - new Date()) / 1000)
         if (d <= 0) return "resetting now"
         if (d < 86400) { const h = Math.floor(d / 3600), mi = Math.floor(d % 3600 / 60); return "resets in " + (h > 0 ? h + "h " : "") + mi + "m" }
         return "resets " + Regional.dayName(t.getDay(), true) + " " + Regional.format(t, "time")   // the region's time: 1:00 AM in the US
+    }
+    function runsOut(iso) {          // "runs out in 5h" or "runs out Tue", as in ClaudeUsage.qml (claude-forecast)
+        const t = new Date(iso)
+        if (!iso || isNaN(t)) return ""
+        const d = Math.round((t - new Date()) / 1000)
+        return "runs out " + (d < 86400 ? "in " + Math.max(1, Math.round(d / 3600)) + "h" : Regional.dayName(t.getDay(), true))
     }
     function statusLive(key) {
         const d = sysData
@@ -67,7 +73,7 @@ Item {
         if (k === "proc") return d && d.top[i] ? d.top[i].cpu.toFixed(1) + "%  ·  " + mb(d.top[i].rss) : ""
         if (k === "usage") {   // usage:ACCOUNT_INDEX:WINDOW_INDEX
             const a = usage[i], w = a && a.windows ? a.windows[key.split(":")[2]] : null
-            return w ? w.percent + "%  ·  " + resets(w.resetsAt) : ""
+            return w ? [w.percent + "%", resets(w.resetsAt), runsOut(w.runsOut)].filter(t => t).join("  ·  ") : ""
         }
         return undefined   // not one of ours: Launcher.qml asks the next file
     }

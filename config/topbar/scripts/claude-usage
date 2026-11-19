@@ -4,7 +4,8 @@
 #   claude-usage --account NAME   that account's
 #   claude-usage --all            every account's, as an array in claude-accounts' order (the menu, the bar's gauges)
 # Each is {account, plan, windows: [{key, percent, resetsAt, model}], fetchedAt, error}, cached for two minutes per
-# account, so the bar and the Claude menu can both call this freely.
+# account, so the bar and the Claude menu can both call this freely. The weekly window also has runsOut (ISO) when the
+# quota would run out before it resets at this pace (claude-forecast).
 # The token is only read: Claude Code refreshes it whenever it runs. If it has expired, the last data is shown with an error.
 set -uo pipefail
 here=$(dirname "$0")
@@ -59,5 +60,8 @@ jq -c --arg a "$account" --arg plan "$plan" '{
     key: ({session: "session", weekly_all: "weekly"}[.kind] // "model"),
     percent: .percent, resetsAt: .resets_at, model: .scope.model.display_name? }],
   fetchedAt: (now | todate) }' <<<"$r" > "$cache.tmp" || fail "Unexpected usage response"
+# The weekly window's runsOut, when the quota would end before its reset at this pace (claude-forecast keeps the history)
+"$here/claude-forecast" < "$cache.tmp" > "$cache.fc" 2>/dev/null && [[ -s $cache.fc ]] && mv "$cache.fc" "$cache.tmp"
+rm -f "$cache.fc"
 mv "$cache.tmp" "$cache"
 cat "$cache"
