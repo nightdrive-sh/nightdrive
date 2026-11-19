@@ -22,8 +22,7 @@ If Tailscale refuses (*Run once: sudo tailscale set --operator=$USER*), run that
 - Several computers: each has its own address, and a web app of its own on the iPad.
 - Sending text and Stop bring the session's window to the front on the computer, as Send to Claude does.
 - A permission request for an edit, a write, an MCP tool or a long command has *Review*: it shows what it would do whole (the file, the text taken out and put in, the tool's input), with Deny and Allow under it. A character that wouldn't show is written out as ⟨U+…⟩. One over 200,000 characters is answered in the terminal.
-- A question with choices can be answered here for about ten minutes, and not when it was asked while you were in that session's window on the computer, or once you go there or close its notification: then answer it in its terminal (the tile says so).
-- A permission request asked while you're in that session's window on the computer isn't shown: Claude Code asks there.
+- A question with choices or a permission request stays here as long as it is open in the terminal, up to a day, and goes once it is answered anywhere. With an older Claude Code, which keeps no record of its sessions, it is here for about ten minutes, and not when it was asked while you were in that session's window: then answer it in its terminal (the tile says so).
 - Dictation uses the browser's speech recognition (Apple's). Where there is none, a tap opens a box to write in.
 - Only your own Tailscale user gets in, from their own devices (not a tagged one, not over Funnel); nothing else on the computer reaches the server. Anyone with that login's device in hand can type into your sessions, and a command in a slot runs on the computer as you: keep the iPad locked.
 - How the page and the server talk: [config/companion/protocol.md](../config/companion/protocol.md).

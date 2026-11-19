@@ -71,9 +71,11 @@ its whole input in `<window>.input`, and the page shows it with `GET /api/sessio
 A question with choices (AskUserQuestion) reaches the same hook as a permission request, which leaves `<window>.ask`
 (the `question` above) and waits for `answer REQUEST {"question": "answer", …}` in `<window>.answer`; it hands that to
 Claude Code as the terminal would, and the terminal's question closes. An answer is a choice's `label`, several joined
-with `", "` (`multiSelect`), or words of your own (the terminal's *Type something*), after them. The hook waits as long as
-for a permission request (590 s) and stops when its window gets the keyboard: then `question` goes and `asks` stays,
-answered in the terminal.
+with `", "` (`multiSelect`), or words of your own (the terminal's *Type something*), after them. The hook follows Claude
+Code's record of the session (`<config dir>/sessions/<pid>.json`): it waits while the question or request is open in the
+terminal, up to a day (link.sh gives the hook that timeout), and stops within a second when it is answered anywhere or
+the session ends, taking `question` (or `permission`) with it. Without that record (an older Claude Code) it waits 590 s
+and stops when its window gets the keyboard: then `question` goes and `asks` stays, answered in the terminal.
 
 `presence` says whether you are at the computer: away (`why`) when it is `locked`, `idle` (no input for 5 minutes,
 from logind's idle hint, which hypridle sets) or you `set` it. Away, a tap on a tile opens the session's view on the

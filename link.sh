@@ -127,12 +127,20 @@ mkdir -p "$HOME/Projects"
 # same for every session) goes off, unless you picked a channel.
 cn='~/.config/hypr/scripts/claude-notify'
 cs="$HOME/.claude/settings.json"
+# A permission request or question waits in the hook for Companion's answer as long as it is open in the terminal, up
+# to a day (claude-notify's WAIT_OPEN, #3162), not Claude Code's default 600 s: its PermissionRequest hook gets this
+hook_timeout=86400
 mkdir -p "$HOME/.claude"; [[ -s $cs ]] || echo '{}' > "$cs"
 for ev in Notification PermissionRequest; do
   jq -e --arg e "$ev" --arg c "$cn" '[.hooks[$e][]?.hooks[]?.command] | index($c)' "$cs" >/dev/null 2>&1 && continue
   jq --arg e "$ev" --arg c "$cn" '.hooks[$e] += [{matcher: "", hooks: [{type: "command", command: $c}]}]' "$cs" > "$cs.tmp" \
     && mv "$cs.tmp" "$cs" || rm -f "$cs.tmp"
 done
+if jq -e --arg c "$cn" --argjson t "$hook_timeout" 'any(.hooks.PermissionRequest[]?.hooks[]?; .command == $c and .timeout != $t)' \
+     "$cs" >/dev/null 2>&1; then
+  jq --arg c "$cn" --argjson t "$hook_timeout" '.hooks.PermissionRequest[]?.hooks[]? |= (if .command == $c then .timeout = $t else . end)' \
+    "$cs" > "$cs.tmp" && mv "$cs.tmp" "$cs" || rm -f "$cs.tmp"
+fi
 cg="$HOME/.claude.json"
 if [[ -s $cg ]] && jq -e '.preferredNotifChannel == null or .preferredNotifChannel == "auto"' "$cg" >/dev/null 2>&1; then
   jq '.preferredNotifChannel = "notifications_disabled"' "$cg" > "$cg.tmp" && mv "$cg.tmp" "$cg" || rm -f "$cg.tmp"

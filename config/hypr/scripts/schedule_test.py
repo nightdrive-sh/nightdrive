@@ -6,6 +6,7 @@ starts a timer; the run itself goes through sh for real, without systemd-run."""
 
 import importlib.machinery
 import importlib.util
+import io
 import json
 import os
 import subprocess
@@ -14,6 +15,7 @@ import tempfile
 import time
 import types
 import unittest
+from contextlib import redirect_stdout
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -104,6 +106,22 @@ class Rows(unittest.TestCase):
                 self.add(when, *command, run=True)   # a broken line not said to be a command is a message
         self.assertEqual(self.armed, [])
         self.assertFalse(os.path.exists(schedule.STATE))
+
+    def test_dry_run_adds_nothing(self):
+        """The launcher's look before Enter: how the line is read, or why not, and nothing armed or saved."""
+        out = io.StringIO()
+        with redirect_stdout(out):
+            schedule.cmd_add(types.SimpleNamespace(json=True, when="15", command=["make"], dry_run=True))
+            schedule.cmd_add(types.SimpleNamespace(json=True, when="wake", command=[], dry_run=True))
+            with self.assertRaises(SystemExit):
+                schedule.cmd_add(types.SimpleNamespace(json=True, when="soon", command=["make"], dry_run=True))
+        made, when_only, refused = [json.loads(line) for line in out.getvalue().splitlines()]
+        self.assertEqual((made["id"], made["kind"], made["command"], made["minutes_left"]), (None, "run", "make", 15))
+        self.assertEqual((when_only["when"], when_only["kind"], when_only["command"]), ("wake", None, None))
+        self.assertIn("error", refused)
+        self.assertEqual(self.armed, [])
+        self.assertFalse(os.path.exists(schedule.STATE))
+        self.assertTrue(schedule.parse_add(["--dry-run", "--json", "15", "--", "x"]).dry_run)
 
     def test_put_back_at_its_time(self):
         """A cancel undone: the same moment and command again (schedule add @UNIX)."""

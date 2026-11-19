@@ -134,12 +134,13 @@ Click an icon and a small menu opens under it:
   screen until you answer or dismiss it, and gets through Do Not Disturb without a sound; a low one goes straight to
   this list, without a popup. The list stacks them the same way, under **Needs you** what still waits for an answer.
 - **Music**: what Deck is playing, with the cover, the progress and the controls
-- **Claude**: your Claude Code sessions and usage limits. A dot on the icon tells a session finished while you were
-  elsewhere, and a click goes to its window. A right click changes what the icon shows (5-hour or weekly usage, or the
-  number of sessions). Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
-  (windows make room): one asking you something gets a red question mark, which hops until you go to its window
-  (a permission request too), one whose last reply ends on a ✅ line
-  gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
+- **Claude**: your Claude Code sessions and usage limits, under a robot (the sessions bar's too). A red dot on it tells a
+  session is asking you something or finished while you were elsewhere, and a click goes to its window. A right click
+  changes what it shows beside it: 5-hour or weekly usage as a number or a thin bar under the robot (orange past 90 %,
+  red past 95 %), the number of sessions, or nothing. Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
+  (windows make room): one asking you something gets a red question mark and one waiting for your permission an
+  orange shield (red after 3 minutes, hopping faster), which hop until you go to its window, one whose last reply
+  ends on a ✅ line gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
   session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a bold name, the ones it
   opened following it; the groups, their sessions and the others go in the order of their workspaces, and on one
   workspace by window, left to right and top to bottom, a dot between each group or lone session.
@@ -209,6 +210,10 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   message, Enter. It comes as a banner at the top of the screen with a sound, apart from the notifications, and stays
   until you dismiss it. The waiting ones are listed there too: Enter twice cancels one. They wait over a logout or a
   restart; one that came due meanwhile shows at the next login.
+- **Schedule**: Launcher › Tools › Schedule, pick when (minutes, a time, On wake, At login; or type it: 25, 14:45), type a
+  command or a message to Claude, Enter. The row says how it is read, **Run** or **Ask Claude**; the row under it is
+  the other reading. The waiting ones are listed there: Enter twice cancels one, Ctrl+Enter runs it now. The same as
+  `nightdrive schedule` (below).
 - **From your phone**: [Ferry](plugins/ferry/README.md), one of Nightdrive's apps, is a mailbox over Tailscale between your
   computers and your phone. Two experimental plugins: [LocalSend](plugins/localsend/README.md) receives files from a
   phone once you accept them, and [AirPlay Receiver](plugins/airplay-receiver/README.md) mirrors an iPhone, iPad or Mac
@@ -220,12 +225,12 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   Theme). GTK windows such as Files and the file picker follow the colour too.
 - **Background apps**: ⌘W only hides chat apps and the music player, so they keep running. Their shortcut brings them straight back.
 - **Claude Code waits for you?** Its notification says which session and what it wants, and a permission request can
-  be answered right there (Allow, Deny). Allow is offered only when the notification shows all it allows: a long
-  command, one run outside the sandbox, a file edit or an MCP tool is answered in its session. While the sessions
+  be answered right there (Allow, Deny) when the notification shows all it allows: a long command, one run outside the
+  sandbox, a file edit or an MCP tool gets Review instead, which goes to its session. While the sessions
   bar is there to see (on, not under a fullscreen window or the drawer, you at the computer), it does the telling: a
-  session that finishes, waits or asks you something gets its chip's mark and no notification (none in the history
-  either; Companion still gets a question), and one opened in the background says nothing. Nor does one opened from
-  the window you're in, as you asked for it. A permission request still gets its notification.
+  session that finishes, waits, asks you something or wants your permission gets its chip's mark and no notification
+  (none in the history either; Companion still gets the question or request), and one opened in the background says
+  nothing. Nor does one opened from the window you're in, as you asked for it.
 - **Closed by mistake?** ⌘⇧U opens the window you closed with ⌘W again, in the same place. A terminal comes back in the
   same folder, with Claude Code in the same conversation. Press again for the one before it. A fullscreen window (a
   game) isn't closed by a stray key: ⌘W or ⌘Q asks you to press it again within 2 s.
@@ -525,7 +530,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |
 | `nightdrive notifications` | The latest notifications (`--limit N`, `--json`); `dnd on` / `off` turns Do Not Disturb on or off, `send "Title" "Text"` shows one (`--app NAME`) and `remove TAG` takes it away again |
 | `nightdrive remind 15 "Tea"` | A reminder in 15 minutes (`90m`, `1h30m`; up to a week) or at a time (`22:45`, the next one), as Launcher › Tools › Remind sets one; `remind list` shows the waiting ones (`--json`), `remind cancel ID` (or `all`) takes one away |
-| `nightdrive schedule 14:45 "make"` | Runs a command at a time (`14:45`, the next one), in minutes (`15`, `1h30m`; up to a week), on `wake` (the first unlock after the computer next wakes from sleep) or at the next `login`, once, with a notification saying what ran and how it went (its output: `journalctl --user -u 'nightdrive-schedule-ID*'`); one argument is a shell line, several are words. A line whose first word isn't a program (`schedule wake "start the morning's tasks"`) is a message to Claude instead: a new Claude Code session gets it in a window of its own, or with `--to SESSION` (an id or a name from `nightdrive sessions`, e.g. `--to "Nightdrive Project Manager"`) that session: typed into its window after a 5-second warning if it runs (not while it waits for your answer), else resumed with it. Adding it says which it is (**Run** or **Ask Claude**, as `schedule list` does); `--run` or `--claude` says it instead. `schedule list` shows the waiting ones (`--json`), `schedule run ID` runs one now, `schedule cancel ID` (or `all`) takes one away. Nothing runs behind the lock: a time that comes while the computer sleeps or is locked runs at the unlock. One missed over a logout or a restart runs at login if it is under 12 hours late; an older one asks, **Run** or **Skip** |
+| `nightdrive schedule 14:45 "make"` | Runs a command at a time (`14:45`, the next one), in minutes (`15`, `1h30m`; up to a week), on `wake` (the first unlock after the computer next wakes from sleep) or at the next `login`, once, with a notification saying what ran and how it went (its output: `journalctl --user -u 'nightdrive-schedule-ID*'`); one argument is a shell line, several are words. A line whose first word isn't a program (`schedule wake "start the morning's tasks"`) is a message to Claude instead: a new Claude Code session gets it in a window of its own, or with `--to SESSION` (an id or a name from `nightdrive sessions`, e.g. `--to "Nightdrive Project Manager"`) that session: typed into its window after a 5-second warning if it runs (not while it waits for your answer), else resumed with it. Adding it says which it is (**Run** or **Ask Claude**, as `schedule list` does); `--run` or `--claude` says it instead. `--dry-run --json` only says how it would be read. `schedule list` shows the waiting ones (`--json`), `schedule run ID` runs one now, `schedule cancel ID` (or `all`) takes one away and `schedule uncancel ID` gives it back. Claude can schedule one too (its tools in [Claude](docs/claude.md)), say to go on with the work in the morning: you allow each on the card, and it shows as by Claude. Nothing runs behind the lock: a time that comes while the computer sleeps or is locked runs at the unlock. One missed over a logout or a restart runs at login if it is under 12 hours late; an older one asks, **Run** or **Skip** |
 | `nightdrive windows` | The open windows (`--json`); `focus WINDOW` brings one forward (an address or an app), `shot WINDOW` takes a picture of one on screen (never of one Send to Claude leaves out), `open firefox` opens an app or brings it forward, `open https://…` an address |
 | `nightdrive files recent` | The newest files in Downloads, Pictures and Documents (`--in downloads`, `--name TEXT`, `--json`); `open PATH` opens one in its default app, `trash PATH…` moves to the trash, `restore NAME…` puts back, `mkdir PATH` makes a folder, `move --into FOLDER PATH…` and `rename PATH NAME` move and rename (never over a file; `move-back` is their undo) and `check PATH…` lists what a send (Claude's Ferry tool) would take. Only in your home folder and nothing hidden; programs and scripts aren't opened. Claude's tools keep also to the folders in Access (docs/claude.md); `folders` lists those it offers |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |

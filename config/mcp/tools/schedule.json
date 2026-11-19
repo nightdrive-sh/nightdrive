@@ -1,0 +1,59 @@
+{
+  "tools": [
+    {
+      "name": "schedule_add",
+      "title": "Schedule for later",
+      "description": "Leaves something to happen later, once, on this computer, as `nightdrive schedule` does: at a time of day, in so many minutes (up to a week), at the first unlock after the computer next wakes from sleep (wake), or at the next login. Use it to carry on later by yourself: when the user says to go on in the morning, schedule a message to Claude for wake (or a time), saying what to do and where the work stands, to this session (to: its name or id from sessions_list) or to a new session. A text whose first word is a program (or nightdrive) runs as a shell command, any other is a message to Claude; as says which instead. The user always allows it on Nightdrive's card first, and the list and its notifications show it as by Claude. Nothing runs behind the lock: a time that passes while the computer sleeps runs at the unlock. Returns the row as schedule_list gives it. For a reminder banner, a reminder is better.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "when": {"type": "string", "maxLength": 20, "pattern": "^([0-9hmin:. ]+|wake|login)$", "title": "When",
+                   "description": "Minutes from now (15, 90m, 1h30m; up to a week), a time of day (07:30: the next one, tomorrow's once today's has passed), wake (the first unlock after the computer next wakes from sleep) or login (the next login)"},
+          "text": {"type": "string", "minLength": 1, "maxLength": 4000, "title": "What",
+                   "description": "A shell command line (make && notify-send done), or a message to Claude: what to do then, whole, as the session will read it with nothing else to go on"},
+          "as": {"type": "string", "enum": ["run", "claude"], "title": "As",
+                 "description": "run: a shell command; claude: a message to Claude. Without it, read from the text's first word"},
+          "to": {"type": "string", "maxLength": 200, "title": "To session",
+                 "description": "For a message: the Claude Code session that gets it (its id, or its name as sessions_list gives it); it is typed into its window if it runs, else resumed with it. Without it a new session gets the message. Not with as: run"}
+        },
+        "required": ["when", "text"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "schedule", "--json", "{when}", ["--{as}"], ["--to", "{to}"], "--", "{text}"],
+      "asks_if": ["echo", "yes"],
+      "card": ["nightdrive", "schedule", "--card", "{when}", ["--{as}"], ["--to", "{to}"], "--", "{text}"],
+      "class": "change",
+      "undo": ["nightdrive", "schedule", "cancel", "{id}"],
+      "notice": "Scheduled ({label}): {command}",
+      "area": "apps-files"
+    },
+    {
+      "name": "schedule_list",
+      "title": "Scheduled for later",
+      "description": "What waits in `nightdrive schedule` (schedule_add's and the user's own), by time, then wake and login: {commands: [{id, when (time, wake or login), label, at (ISO 8601), at_unix, clock (HH:MM), minutes_left, state (waiting; unlock: its time came under the lock; missed: asks Run or Skip; due), kind (run or claude), to (the session a message is for), command (the line or the message), by (user or claude)}]}.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "schedule", "list", "--json"],
+      "class": "read",
+      "area": "apps-files"
+    },
+    {
+      "name": "schedule_cancel",
+      "title": "Cancel a scheduled one",
+      "description": "Takes one that waits in `nightdrive schedule` away before it runs, by its id from schedule_list. Undo gives it back as it was, unless its time has passed meanwhile.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "pattern": "^[0-9a-f]{8}$", "title": "Scheduled one", "description": "Its id from schedule_list"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "schedule", "cancel", "{id}", "--json"],
+      "before": ["nightdrive", "schedule", "show", "{id}", "--json"],
+      "undo": ["nightdrive", "schedule", "uncancel", "{id}", "--json"],
+      "notice": "Cancelled ({label}): {command}",
+      "class": "change",
+      "area": "apps-files"
+    }
+  ]
+}

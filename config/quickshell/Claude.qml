@@ -156,6 +156,8 @@ Singleton {
         return i < 0 ? 0 : i
     }
     function wantingIn(i) { return sessions.filter(s => s.wants && accountIndex(s) === i).length }
+    // The ones asking you something (the sessions bar's red question mark): the bar's robot carries it too, sessions bar or none
+    function askingIn(i) { return sessions.filter(s => s.asking && accountIndex(s) === i).length }
 
     // working → waiting while another window is focused: it wants you
     onSeenChanged: {

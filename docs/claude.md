@@ -254,7 +254,7 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Low Power Mode, Wi-Fi or networking off † | |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
-| Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †) | **files to the trash** |
+| Apps and files | windows, newest files (in the folders it can use: a choice), Claude Code sessions, what's scheduled | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †); schedule a command or a message to Claude for later † (`nightdrive schedule`: it shows as by Claude), cancel one | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
 
 Claude doesn't bring a window forward while you type, nor open an app, a file or an address: it waits until you pause

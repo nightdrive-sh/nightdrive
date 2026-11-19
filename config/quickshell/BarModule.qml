@@ -105,11 +105,12 @@ Item {
         }
 
         // A red dot on the icon: the status asks for it ("dot": true), or for Claude while a session that finished in the
-        // background waits for you (Claude.qml): on the icon of the session's account (claude, claude2)
+        // background waits for you or one asks you something (Claude.qml): on the icon of the session's account (claude, claude2)
         Rectangle {
-            visible: mod.icon !== "" && (!!(mod.st && mod.st.dot) || (mod.claudeAccount >= 0 && Claude.wantingIn(mod.claudeAccount) > 0))
+            visible: mod.icon !== "" && (!!(mod.st && mod.st.dot) || (mod.claudeAccount >= 0
+                     && Claude.wantingIn(mod.claudeAccount) + Claude.askingIn(mod.claudeAccount) > 0))
             width: 7; height: 7; radius: 3.5
-            x: mod.snap(img.x + img.width - 7); y: mod.snap(img.y + 1)
+            x: mod.snap(img.x + img.width - 5); y: mod.snap(img.y - 1)   // off the icon's corner, clear of the bot's head
             color: Theme.danger   // red like a critical module (the Dashboard's tasks); no ring around it: the bar's background can be see-through
         }
 
