@@ -296,7 +296,15 @@ hl.bind(mod .. " + SHIFT + U",   hl.dsp.exec_cmd(scripts .. "/reopen"))   -- ope
 hl.bind(mod .. " + SHIFT + F",   hl.dsp.window.fullscreen(), { dont_inhibit = true })   -- also over a VM window (dont_inhibit: see Workspaces)
 require("float-toggle")   -- ⌘⇧T: toggle floating, at a size the window fits
 
-hl.bind(mod .. " + SHIFT + J",   hl.dsp.layout("togglesplit"))
+-- ⌘⇧J turns the split: a dwindle message. A project manager's space (pm-space.lua) has a layout of its own that rejects
+-- it with an error on screen, and its PM can't be split the other way, so there the key does nothing (#3222)
+-- (a global so it can be tried with hyprctl eval, as NIGHTDRIVE_SWAP)
+function NIGHTDRIVE_TOGGLESPLIT()
+    local w = hl.get_active_window()
+    if w and w.workspace and w.workspace.tiled_layout == "lua:pmspace" then return end
+    hl.dispatch(hl.dsp.layout("togglesplit"))
+end
+hl.bind(mod .. " + SHIFT + J", function() NIGHTDRIVE_TOGGLESPLIT() end)
 
 -- Focus with arrows, move window with Shift+arrows
 -- A window group (a project manager's sessions, pm-space.lua) is one window to ⌘ arrows: they go straight to the next
