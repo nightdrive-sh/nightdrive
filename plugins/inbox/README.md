@@ -18,13 +18,14 @@ session can leave one whether this window is installed or not.
 | `1` … `8` | Press the message's buttons in order |
 | `s`, `t` | Go to the session that left it; open its task |
 | `i` | Its first picture over the whole window: ← → the others, `Esc` back, `o` in the image viewer |
+| `p`, ← → | Play or pause its sound file; play the one before or after, to compare a few |
 | `f` | Inbox, Unread, Archive and the senders: ↑ ↓ pick, `Enter` back to the messages |
 | `Space` ⇧Space | Scroll the message |
 | ⌘B | Hide or show the sidebars |
 
 - A message is marked read once it has been open a moment, so moving past one with the arrows leaves it unread.
 - From lists each project Claude's sessions worked in, each app, and Other. A click on a message's sender shows only that session's (or app's) messages; `Esc` shows every one again.
-- Pictures show large, two side by side where there is room (a before and an after); a click shows one over the window. Other files are listed under them, and a click opens one in its app.
+- Pictures show large, two side by side where there is room (a before and an after); a click shows one over the window. Sound files (ogg, wav, mp3, m4a, flac, opus) come next, each with Play, its length and a Copy button for its name; one plays at a time, so starting another stops it. Other files are listed under them, and a click on a file's row opens it in its app.
 - A button that runs a command shows the whole command while the pointer is on it. Pressing it only shows a card with the command and the folder it runs in; `Enter` there runs it, in the background, its output in `~/.local/state/nightdrive/inbox-runs/`. Nothing runs by itself.
 - A message from neither a Claude session nor an app (a terminal, a script) has its sender in red: nothing says who left it, so look at its buttons first.
 - The task button opens the task at the address in `~/.config/nightdrive/inbox.json` (`{"task_url": "https://…/tasks/{n}"}`); without one, it copies the task's number.

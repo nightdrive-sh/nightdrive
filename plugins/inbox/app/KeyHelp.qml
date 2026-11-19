@@ -15,6 +15,8 @@ QtObject {
             ["s", "Go to the session that left it"],
             ["t", "Open its task"],
             ["i", "Its first picture over the window (← → the others)"],
+            ["p", "Play or pause its sound file (one at a time)"],
+            ["← →", "Play the sound before or after: compare a few quickly"],
             ["f", "Inbox, archive and senders: ↑ ↓ pick, ⏎ back"],
             ["Space  ⇧Space", "Scroll the message"],
             ["⌘B", "Show or hide the sidebars"],

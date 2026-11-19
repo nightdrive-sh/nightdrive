@@ -4,16 +4,21 @@ import qs.kit
 
 // The message's files: its pictures large, as wide as the text, two side by side where there is room (a before and an
 // after, a few screenshots), each with its name under it, and a click shows one over the whole window (ImageViewer).
-// The other files under them, a row each with its size: a click opens one in its app. The files are the copies in the
-// message's own folder (config/inbox/attach.py), so they look as they did when the message was left.
+// Its sound files under them, each with a play button (SoundFiles), and the other files after those, a row each with
+// its size: a click opens one in its app. The files are the copies in the message's own folder (config/inbox/attach.py),
+// so they look as they did when the message was left.
 Column {
     id: root
     required property QtObject c
     property var files: []               // Store.message.attachments: { name, type, size, path }
     signal view(int index)               // an index in images
+    signal notice(string text, bool danger)   // SoundFiles': a copied name, a sound that can't play
+    readonly property alias sounds: soundList
     spacing: 14
     readonly property var images: files.filter(f => (f.type || "").startsWith("image/"))
-    readonly property var others: files.filter(f => !(f.type || "").startsWith("image/"))
+    // By the name's ending: Python's mimetypes doesn't know every one of them (.opus, .m4a)
+    function isSound(f) { return /\.(ogg|oga|opus|wav|mp3|m4a|flac)$/i.test(f.name || "") }
+    readonly property var others: files.filter(f => !(f.type || "").startsWith("image/") && !isSound(f))
     readonly property int columns: images.length > 1 && width >= 640 ? 2 : 1
     function size(n) {
         return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : n >= 1024 ? Math.round(n / 1024) + " kB" : n + " B"
@@ -67,6 +72,15 @@ Column {
                 }
             }
         }
+    }
+
+    SoundFiles {
+        id: soundList
+        visible: any
+        width: parent.width
+        c: root.c
+        files: root.files.filter(f => root.isSound(f))
+        onNotice: (text, danger) => root.notice(text, danger)
     }
 
     Column {

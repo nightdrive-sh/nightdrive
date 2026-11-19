@@ -5,7 +5,7 @@ import "kit/Markdown.js" as Markdown
 // The open message, laid out as Notes' note: its bar at the top (MessageBar), then, scrolling together, its header
 // (title, sender, when, the sender's session and task), its buttons, its text as formatted Markdown (the kit's Markdown.js,
 // which shows HTML in it as the text it is and loads nothing from the web), and its files, pictures large
-// (Attachments). A link opens in the browser, its address shown at the foot while hovered. The keys are shell.qml's.
+// and sounds to play (Attachments). A link opens in the browser, its address shown at the foot while hovered. The keys are shell.qml's.
 Item {
     id: root
     required property QtObject c
@@ -20,6 +20,8 @@ Item {
     signal ask(int index)                      // a run button: RunPanel first
     signal viewImage(var images, int index)
     signal fromPicked(string key, string label)
+    signal notice(string text, bool danger)
+    readonly property QtObject sounds: files.sounds    // its sound files' player, for p and ← → (shell.qml)
     readonly property var message: store.message
     readonly property int margin: width < 520 ? 22 : 40
     function scroll(d) { flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY + d)) }
@@ -93,6 +95,7 @@ Item {
                 c: root.c
                 files: root.message ? root.message.attachments || [] : []
                 onView: i => root.viewImage(files.images, i)
+                onNotice: (text, danger) => root.notice(text, danger)
             }
         }
     }

@@ -19,7 +19,7 @@ session can add to a message it left (the build is ready, here's its button); it
 ## The window
 
 Inbox (one of Nightdrive's apps, `inbox`; plugins/inbox/README.md) shows the messages newest first, the unread ones
-marked, grouped by the project, session or app that left them, with their text, pictures large and buttons. The task
+marked, grouped by the project, session or app that left them, with their text, pictures large, sound files to play and buttons. The task
 button opens `task_url` from `~/.config/nightdrive/inbox.json` (`{"task_url": "https://…/tasks/{n}"}`), else copies
 the number.
 

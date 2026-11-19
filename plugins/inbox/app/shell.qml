@@ -183,6 +183,7 @@ ShellRoot {
                 onAsk: i => win.ask(i)
                 onViewImage: (images, i) => viewer.show(images, i)
                 onFromPicked: (key, label) => win.fromPicked(key, label)
+                onNotice: (text, danger) => toast.show(text, { danger: danger })
                 Keys.onPressed: e => win.key(e)
             }
         }
@@ -205,6 +206,10 @@ ShellRoot {
             else if (e.text === "s" && store.message && store.message.from.kind === "claude") win.press("session")
             else if (e.text === "t" && store.message && store.message.task) win.press("task")
             else if (e.text === "i") win.firstImage()
+            // The message's sounds: p plays or pauses, ← → the one before or after (to compare a few quickly)
+            else if (e.text === "p" && view.sounds.any) view.sounds.toggle()
+            else if (k === Qt.Key_Left && view.sounds.any) view.sounds.step(-1)
+            else if (k === Qt.Key_Right && view.sounds.any) view.sounds.step(1)
             else if (e.text === "f") win.toFolders()
             else if (k === Qt.Key_Space) view.scroll((shift ? -1 : 1) * (view.height - 120))
             else if (k === Qt.Key_PageDown) view.scroll(view.height - 120)
