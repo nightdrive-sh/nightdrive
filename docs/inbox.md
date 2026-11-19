@@ -10,7 +10,8 @@ Any Claude Code session can leave one, in any project and on any of your Claude 
 Inbox", or let a long piece of work end there. The session is named as the sender by itself, with its folder, its
 account and the Dashboard task number in its name, so you can go back to it. Apps and scripts can leave messages too.
 
-A message has a title, text, files (pictures, a diff, a log) copied in so they stay as they were, and buttons: open a
+A message has a title, text (Markdown: headings, lists, bold and italic, `code` and code blocks, quotes, links and
+pipe tables), files (pictures, a diff, a log) copied in so they stay as they were, and buttons: open a
 file or folder, open a web address, run a command, go to a session, open a task. A button that runs a command shows
 the whole command and the folder it runs in, and runs only after you confirm it; nothing in Inbox runs by itself. A
 session can add to a message it left (the build is ready, here's its button); it then comes back as unread.
@@ -22,7 +23,8 @@ marked, grouped by the project, session or app that left them, with their text, 
 button opens `task_url` from `~/.config/nightdrive/inbox.json` (`{"task_url": "https://…/tasks/{n}"}`), else copies
 the number.
 
-While some are unread, the top bar shows a mailbox with its flag up and how many; a click opens Inbox. The sessions bar
+The top bar shows a mailbox: its flag up and how many while some are unread, its flag down once all are read; a click
+opens Inbox (Settings › Top bar › Items hides it). The sessions bar
 ends with the same mailbox for the sessions' messages (its flag down when you've read them all; a click shows only
 theirs). Nothing more: no sound, no pop-up.
 
