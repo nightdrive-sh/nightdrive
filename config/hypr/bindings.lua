@@ -367,8 +367,8 @@ local function move_all_windows(i)
     hl.dispatch(hl.dsp.focus({ workspace = i }))
 end
 
--- Workspaces ⌘1–⌘0, move window ⌘⇧1–⌘⇧0, move all windows ⌘⌥1–⌘⌥0. With the drawer open ⌘1–⌘0 closes it first,
--- otherwise it stays over the new workspace. dont_inhibit: they work over a window that takes the keyboard (a VM's qemu
+-- Workspaces ⌘1–⌘0, move window ⌘⇧1–⌘⇧0 (a tab alone, out of its group: window-groups.lua), move all windows
+-- ⌘⌥1–⌘⌥0. With the drawer open ⌘1–⌘0 closes it first, otherwise it stays over the new workspace. dont_inhibit: they work over a window that takes the keyboard (a VM's qemu
 -- window, a remote desktop) too, so it can be left with them; the desktop inside a VM doesn't get them.
 for i = 1, 10 do
     local key = i % 10
@@ -377,7 +377,7 @@ for i = 1, 10 do
         if special and special.name == "special:drawer" then hl.dispatch(hl.dsp.workspace.toggle_special("drawer")) end
         hl.dispatch(hl.dsp.focus({ workspace = i }))
     end, { dont_inhibit = true })
-    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + " .. key, function() NIGHTDRIVE_MOVE_TO_WORKSPACE(i) end, { dont_inhibit = true })
     hl.bind(mod .. " + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
 end
 -- ⌘§ / ⌘⇧§ / ⌘⌥§: the second external display's own workspace (display.lua: SIDE_WORKSPACE), the key left of 1 as the
@@ -390,7 +390,7 @@ for _, key in ipairs({ "section", "grave" }) do
         if special and special.name == "special:drawer" then hl.dispatch(hl.dsp.workspace.toggle_special("drawer")) end
         hl.dispatch(hl.dsp.focus({ workspace = i }))
     end, { dont_inhibit = true })
-    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + " .. key, function() NIGHTDRIVE_MOVE_TO_WORKSPACE(i) end, { dont_inhibit = true })
     hl.bind(mod .. " + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
 end
 hl.bind(mod .. " + TAB",         hl.dsp.focus({ workspace = "e+1" }))
