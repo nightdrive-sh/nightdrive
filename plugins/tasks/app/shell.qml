@@ -176,6 +176,16 @@ ShellRoot {
         Actions { id: ops; app: win }
         // A task's circle, Space: done, or back to open in Done
         function toggleDone(index) { ops.toggle(shown[index === undefined ? current : index]) }
+        // c or Copy text under the picked task's note: the note to the clipboard, as it is. copied names the task for a
+        // moment, so its button says Copied
+        property string copied: ""
+        Timer { id: copiedFor; interval: 1500; onTriggered: win.copied = "" }
+        function copyNote(index) {
+            const t = shown[index === undefined ? current : index]
+            if (!t || !t.note) { say("No note to copy"); return }
+            Quickshell.execDetached(["wl-copy", "--", t.note])
+            copied = t.id; copiedFor.restart()
+        }
         function move(d) {
             if (!shown.length) return
             current = Math.max(0, Math.min(shown.length - 1, current + d))
@@ -269,6 +279,7 @@ ShellRoot {
                     else if (k === Qt.Key_Delete && !ctrl && win.pane === "sources") { if (win.view.kind === "list") listOps.remove(win.view) }
                     else if ((k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_E) && !ctrl) win.editTask()
                     else if (k === Qt.Key_Space && !ctrl) win.toggleDone()
+                    else if (k === Qt.Key_C && !ctrl) win.copyNote()
                     else if (k === Qt.Key_Delete && !ctrl) ops.trash(win.shown[win.current])
                     else return
                     e.accepted = true
@@ -357,7 +368,7 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
+                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again"], ["c", "Copy its note"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "Search", keys: [["/  ⌘F", "Search every list"], ["⏎  ↓", "To the tasks found"], ["Esc", "End the search"]] },
                 { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"]] },
