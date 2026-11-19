@@ -88,11 +88,27 @@ local function arrange(s)
     end
     if #loose == 0 then return end
     if not group then
+        -- The PM alone: the first session makes the group, and is the tab shown
         hl.dispatch(hl.dsp.group.toggle({ window = "address:" .. loose[1].address }))
         group = (window(loose[1].address) or {}).group
         table.remove(loose, 1)
     end
-    if group then for _, w in ipairs(loose) do group:add(w) end end
+    if not group or #loose == 0 then return end
+    -- A new session is a tab in the background, the last (#3158): add() puts it after the tab shown and shows it, which
+    -- took the tab you were reading, and the keyboard with it when you were in it. So it goes last and the tab shown
+    -- before is shown again; the keyboard is given back to whichever window had it. (rules.lua bars the sessions from
+    -- group.auto_group, which would have put them in the group as they opened, shown, before this runs.)
+    local focused = hl.get_active_window()
+    local shown, anchor = group.current_index, group.current.address
+    for _, w in ipairs(loose) do
+        local g = (window(anchor) or {}).group
+        if g then g:add(w, g.size + 1) end
+    end
+    hl.dispatch(hl.dsp.group.active({ index = shown, window = "address:" .. anchor }))
+    local now = hl.get_active_window()
+    if focused and (not now or now.address ~= focused.address) and window(focused.address) then
+        hl.dispatch(hl.dsp.focus({ window = "address:" .. focused.address }))
+    end
 end
 
 -- Every space: one whose PM the user moved to another workspace follows it there, one whose workspace is gone

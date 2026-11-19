@@ -89,11 +89,13 @@ hl.window_rule({
     size  = "760 520",
 })
 -- A Claude session opened in the background (nightdrive ask --background, scripts/terminal-or-claude): tiled on the
--- workspace as usual, but the keyboard stays where you are typing; a notification says it opened
+-- workspace as usual, but the keyboard stays where you are typing; a notification says it opened. Barred from
+-- group.auto_group, which would make it the shown tab of the group you are in (a PM's, pm-space.lua adds it there last)
 hl.window_rule({
     name  = "claude-background",
     match = { class = "^(sh\\.nightdrive\\.)?claude-background$" },
     no_initial_focus = true,
+    group = "barred",
 })
 hl.window_rule({
     name  = "float-help",
