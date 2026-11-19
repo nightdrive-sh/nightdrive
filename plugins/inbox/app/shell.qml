@@ -118,6 +118,8 @@ ShellRoot {
             // `inbox show ID`: picked, from the inbox or the archive it is in
             function pick(id: string): void { store.follow(id, false); win.listOpen = false }
             function pickArchived(id: string): void { store.follow(id, true); win.listOpen = false }
+            // `inbox from KEY`: one sender's messages; "claude" is every session's (the sessions bar's button, #3179)
+            function from(key: string, label: string): void { store.view = "inbox"; store.search = ""; store.pickFrom(key, label) }
         }
         Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }

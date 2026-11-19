@@ -7,6 +7,7 @@ A sender key names what a list can be narrowed to:
     project:<name>    every session's in one project folder (its last part: "dotfiles", "coldstart")
     app:<name>        one app's
     other             a terminal's or a script's: nothing says who sent them
+    claude            every Claude Code session's (the sessions bar's Inbox button, #3179)
 """
 import re
 
@@ -49,7 +50,7 @@ def decorate(summary):
 
 def matches_from(msg, key):
     sender = msg.get("from") or {}
-    return not key or key in (session_key(sender), group_key(sender))
+    return not key or key in (session_key(sender), group_key(sender)) or (key == "claude" and sender.get("kind") == "claude")
 
 
 def words(text):

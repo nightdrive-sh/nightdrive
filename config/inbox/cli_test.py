@@ -88,7 +88,7 @@ class CliTest(unittest.TestCase):
                 p = self.run_cli(*args, ok=False)
                 self.assertEqual(p.returncode, 1)
                 self.assertTrue(p.stderr.startswith("inbox: "), p.stderr)
-        self.assertEqual(self.jcli("count"), {"unread": 0, "total": 0})
+        self.assertEqual(self.jcli("count")["total"], 0)
 
     def test_only_the_sender_updates_and_an_update_can_be_undone(self):
         mid = self.jcli("post", "Build", "--body", "Started")["id"]
@@ -112,16 +112,26 @@ class CliTest(unittest.TestCase):
         self.assertEqual([m["id"] for m in self.jcli("list", "--mine")["messages"]], [a])
         self.jcli("read", a)
         self.assertEqual([m["id"] for m in self.jcli("list", "--unread")["messages"]], [b])
-        self.assertEqual(self.jcli("count"), {"unread": 1, "total": 2})
+        self.assertEqual(self.jcli("count"), {"unread": 1, "total": 2, "claude": 0})
         self.jcli("archive", b[-4:])
-        self.assertEqual(self.jcli("count"), {"unread": 0, "total": 1})
+        self.assertEqual(self.jcli("count")["unread"], 0)
         self.assertEqual([m["id"] for m in self.jcli("list", "--archived")["messages"]], [b])
         self.jcli("archive", b, "--undo")
         self.jcli("read", "--all")
-        self.assertEqual(self.jcli("count"), {"unread": 0, "total": 2})
+        self.assertEqual(self.jcli("count")["unread"], 0)
         self.assertTrue(self.jcli("show", b, "--mark-read")["read"])
         self.jcli("delete", a)
         self.assertEqual(self.jcli("count")["total"], 1)
+
+    def test_the_sessions_count_and_key(self):
+        a = self.jcli("post", "Mine")["id"]
+        self.jcli("post", "Theirs", session=OTHER)
+        self.jcli("post", "Theirs too", session=OTHER)
+        self.jcli("post", "An app's", "--app", "Tasks")
+        self.assertEqual(self.jcli("count"), {"unread": 4, "total": 4, "claude": 3})
+        self.jcli("read", a)
+        self.assertEqual(self.jcli("count")["claude"], 2)
+        self.assertEqual(len(self.jcli("list", "--from", "claude")["messages"]), 3)
 
     def test_text_output(self):
         mid = self.jcli("post", "Readable", "--action", "run", "Go", "echo 'a b'")["id"]

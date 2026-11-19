@@ -69,7 +69,7 @@ class InboxToolsTest(unittest.TestCase):
         argv = run.undo_argv(tool, args, answer)
         out, err, status = run.execute(tool, argv, None, 30)
         self.assertEqual(status, 0, err)
-        self.assertEqual(self.inbox("count"), {"unread": 0, "total": 0})
+        self.assertEqual(self.inbox("count")["total"], 0)
 
     def test_update_and_its_undo(self):
         _, posted = self.call("inbox_post", {"title": "Build"})

@@ -1,0 +1,3 @@
+// Inbox's top bar module: the mailbox, its flag raised, and the unread count, shown only while some are unread (./status,
+// its icons in icons/). A click opens the window; a message never pops up or sounds (#3179).
+{ "interval": 5, "click": "bin/inbox", "menu": "", "before": ["claude"], "size": 17, "label": "Inbox – Unread messages", "glyph": "mailbox" }

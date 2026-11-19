@@ -1,0 +1,7 @@
+#!/bin/bash
+# Inbox's top bar module (module.jsonc): the mailbox with its flag raised and how many are unread, only while there are
+# some (#3179). Nothing pops up and nothing sounds: a message is to look at when you have time, not now (docs/inbox.md).
+# The core's command by its path (config/inbox): it's there whether ~/.local/bin is in the bar's PATH or not.
+. ~/.config/topbar/scripts/emit
+n=$(python3 ../../config/inbox/cli.py count 2>/dev/null)
+if (( ${n:-0} > 0 )); then emit mailbox-flag-up "$n"; else emit "" ""; fi
