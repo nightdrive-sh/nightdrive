@@ -6,7 +6,7 @@
 # on MODEL (claude --model: an alias such as opus, or a full model id) at effort LEVEL (claude --effort). --background opens its window without the keyboard, so typing elsewhere isn't cut off (a session
 # another session starts, e.g. the project manager's): its class has a no_initial_focus rule in hyprland.lua, and a
 # notification says it opened, a click on it going to the window (none when you were in the window that called it: you
-# asked for it). It opens on the workspace of the window it was called
+# asked for it; none while the sessions bar shows, where its chip appears). It opens on the workspace of the window it was called
 # from (found up the process chain: the project manager's terminal), even if the user has moved to another one since;
 # called from no window, on the active one. --workspace WS (a number or special:NAME) names the workspace instead.
 # --account NAME: on that Claude Code account (topbar/scripts/claude-accounts; the Claude menu's New session · NAME).
@@ -127,6 +127,8 @@ setsid -f bash -c '
     [[ -n $at && $at != "$ws" ]] && hyprctl dispatch "hl.dsp.window.move({ workspace = $target, follow = false, window = \"address:$addr\" })" >/dev/null
   fi
   (( asked )) && exit 0   # you asked for it: the window is all the answer it needs
+  # the sessions bar there for you to see (Claude.qml'"'"'s barShown): its new chip is the news, no notification (#3126)
+  [[ $(qs ipc call claude barShown 2>/dev/null) == true ]] && exit 0
   action=$(notify-send -a Claude -i "$icon" -h string:x-nightdrive-group:sessions -A default=Open -A show="Show session" -w -- "Claude session opened: $1" "$2")
   [[ $action == default || $action == show ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
 ' _ "${name:-${dir##*/}}" "${prompt:+$prompt · }$project" >/dev/null 2>&1 < /dev/null

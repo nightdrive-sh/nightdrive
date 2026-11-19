@@ -219,7 +219,11 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Background apps**: ⌘W only hides chat apps and the music player, so they keep running. Their shortcut brings them straight back.
 - **Claude Code waits for you?** Its notification says which session and what it wants, and a permission request can
   be answered right there (Allow, Deny). Allow is offered only when the notification shows all it allows: a long
-  command, one run outside the sandbox, a file edit or an MCP tool is answered in its session.
+  command, one run outside the sandbox, a file edit or an MCP tool is answered in its session. While the sessions
+  bar is there to see (on, not under a fullscreen window or the drawer, you at the computer), it does the telling: a
+  session that finishes or waits gets its chip's mark and no notification (none in the history either), and one
+  opened in the background says nothing. Nor does one opened from the window you're in, as you asked for it. A
+  permission request or a question still gets its notification.
 - **Closed by mistake?** ⌘⇧U opens the window you closed with ⌘W again, in the same place. A terminal comes back in the
   same folder, with Claude Code in the same conversation. Press again for the one before it. A fullscreen window (a
   game) isn't closed by a stray key: ⌘W or ⌘Q asks you to press it again within 2 s.
