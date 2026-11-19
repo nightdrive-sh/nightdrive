@@ -11,6 +11,9 @@ A project manager that is a background session of Claude Code's daemon (`claude 
 agents`) isn't up its window's process chain: its sessions still open on its space, after ⌘⌥ moved the whole space to
 another workspace and while another one is active (#3196).
 
+A session that opens while the launcher or a menu has the keyboard leaves it there: the space is put in order once the
+layer closes (#3206).
+
 It opens real windows (kitty), so it runs only inside the sandbox's container, never on a desktop someone uses: elsewhere
 (CI, check.py without a desktop, your own Hyprland) it skips itself.
 """
@@ -25,6 +28,7 @@ import unittest
 
 PM_WS, OTHER_WS = 7, 8            # workspaces the test takes; they must be empty
 BG_WS, BG_MOVED_WS = 5, 6         # the daemon PM's, before and after ⌘⌥ moves it; empty too
+LAYER_WS = 4                      # a space with a layer open over it (#3206); empty too
 TERMINAL_OR_CLAUDE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "terminal-or-claude")
 PREFIX = "pmtest_"                # the test windows' titles
 SESSION_CLASS = "claude-background"   # terminal-or-claude's --background class (rules.lua, pm-space.lua)
@@ -207,6 +211,80 @@ class DaemonProjectManager(unittest.TestCase):
         self.assertTrue(session["grouped"], "the session isn't a tab of the space's group")
         self.assertEqual(json.loads(hyprctl("-j", "activeworkspace"))["id"], BG_WS, "the view moved")
         self.assertEqual(json.loads(hyprctl("-j", "activewindow"))["address"], address("there"), "the keyboard moved")
+
+
+# A layer as the launcher and the top bar menus are (on-demand, overlay), saying whether it has the keyboard: Hyprland
+# doesn't tell which surface has it, Qt's window does (Window.active)
+PROBE_QML = """import QtQuick
+import Quickshell
+import Quickshell.Io
+import Quickshell.Wayland
+ShellRoot {
+    PanelWindow {
+        anchors { top: true; left: true }
+        implicitWidth: 200; implicitHeight: 100
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.namespace: "pmtest-probe"
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+        Item { id: probe; property bool keys: Window.active }
+        IpcHandler { target: "probe"; function keys(): string { return String(probe.keys) } }
+    }
+}
+"""
+
+
+@unittest.skipUnless(IN_SANDBOX, "opens windows: only inside nightdrive sandbox (nightdrive sandbox exec python3 …)")
+class LauncherKeepsTheKeyboard(unittest.TestCase):
+    """A session opened while the launcher (or a menu) is open, you having been in a tab of the space (#3206): putting
+    it in the group showed the tab again and focused it, and the keys went to it instead of the launcher. The space is
+    put in order once the launcher closes."""
+
+    def setUp(self):
+        taken = [c["title"] for c in clients() if c["workspace"].get("id") == LAYER_WS]
+        if taken:
+            self.skipTest(f"workspace {LAYER_WS} isn't empty: {taken}")
+        self.addCleanup(BackgroundSession.tearDownClass)
+        self.probe_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.probe_dir.cleanup)
+        with open(os.path.join(self.probe_dir.name, "shell.qml"), "w") as f:
+            f.write(PROBE_QML)
+
+    def qs(self, *args):
+        return subprocess.run(["qs", "-p", self.probe_dir.name, *args], capture_output=True, text=True).stdout.strip()
+
+    def open_layer(self):
+        proc = subprocess.Popen(["qs", "-p", self.probe_dir.name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(proc.wait)
+        self.addCleanup(self.close_layer)
+        for _ in range(80):
+            if self.qs("ipc", "call", "probe", "keys") == "true":
+                return
+            time.sleep(0.1)
+        raise AssertionError("the layer didn't get the keyboard")
+
+    def close_layer(self):
+        self.qs("kill")
+
+    def tabs(self):
+        for w in clients():
+            if w["workspace"]["id"] == LAYER_WS and w["grouped"]:
+                return [next(c["title"] for c in clients() if c["address"] == a).removeprefix(PREFIX) for a in w["grouped"]]
+        return []
+
+    def test_session_opened_under_the_launcher(self):
+        pm = open_window("pm", "lpm", LAYER_WS)
+        hyprctl("eval", f'NightdrivePmSpaces({{ {{ a = "{pm}", n = "Test Layer Manager" }} }})')
+        time.sleep(SETTLE)
+        open_window(SESSION_CLASS, "l1", LAYER_WS)
+        open_window(SESSION_CLASS, "l2", LAYER_WS)
+        focus("l1")   # the tab you were reading
+        self.open_layer()
+        open_window(SESSION_CLASS, "l3", LAYER_WS)
+        self.assertEqual(self.qs("ipc", "call", "probe", "keys"), "true", "a window took the keyboard from the layer")
+        self.close_layer()
+        time.sleep(SETTLE)
+        self.assertEqual(self.tabs(), ["l1", "l2", "l3"], "the space wasn't put in order once the layer closed")
+        self.assertEqual(json.loads(hyprctl("-j", "activewindow"))["address"], address("l1"), "the keyboard moved")
 
 
 if __name__ == "__main__":

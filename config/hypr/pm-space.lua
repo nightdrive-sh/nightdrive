@@ -13,14 +13,20 @@
 -- when it had it). One restarted (a new window, the same name) goes back to its space, where its sessions are. A PM the
 -- user moves to another workspace makes that one its space, in place, and the old one is ordinary again.
 -- A reload starts Lua afresh and drops the rules (groups survive): the spaces are kept in STATE and made again.
+-- Nothing happens while a layer has the keyboard (the launcher, a menu: keyboard-layer.lua, #3206): putting a space in
+-- order focuses windows and shows tabs, which took the keyboard from under the open launcher when a PM opened a session.
+-- It waits until the layer closes; a session that opened meanwhile is a window beside the group until then.
 
 local PM_WIDTH = 0.50   -- the PM's column, a share of the width (1/3, then 40 %, too narrow, #3042)
 local SESSION_CLASS = "claude-background"   -- terminal-or-claude's --background sessions (Ghostty prefixes sh.nightdrive.)
 local STATE = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/nightdrive-pm-spaces"   -- "ws<TAB>address<TAB>name" lines
 local SETTLE_MS = 120   -- events come in bursts (a window opens, joins a group, moves): arrange once they settle
+local HELD_MS = 250     -- while a layer has the keyboard, how often to look whether it has let go
 local LAYOUT = "pmspace" -- pm-layout.lua; a workspace rule names it "lua:pmspace"
 
+local held = require("keyboard-layer").held
 local spaces = {}   -- workspace id → { ws, pm = address, sid = its stable_id, name, rule, ruleKey }
+local queued = nil  -- the PMs Claude.qml last sent while a layer had the keyboard, handled once it lets go
 
 local function is_session(w)
     return (w.class or ""):gsub("^sh%.nightdrive%.", "") == SESSION_CLASS
@@ -130,10 +136,20 @@ local function arrange_all()
     for _, sp in pairs(spaces) do arrange(sp) end
 end
 
+-- Once events settle, and no layer has the keyboard: until it lets go, looked at again every HELD_MS (Hyprland has
+-- layer.closed, but a layer can also stop asking for the keyboard while it stays mapped)
 local pending = nil
-local function settle()
+local function settle(ms)
     if pending then return end
-    pending = hl.timer(function() pending = nil; arrange_all() end, { timeout = SETTLE_MS, type = "oneshot" })
+    pending = hl.timer(function()
+        pending = nil
+        if held() then settle(HELD_MS)
+        elseif queued then
+            local list = queued
+            queued = nil
+            NightdrivePmSpaces(list)   -- settles again itself
+        else arrange_all() end
+    end, { timeout = ms or SETTLE_MS, type = "oneshot" })
 end
 
 -- The first empty workspace for a PM (not the laptop's own, display.lua)
@@ -154,6 +170,8 @@ end
 
 -- Claude.qml: list = { { a = "0x…", n = "Nightdrive Project Manager" }, … }, the PMs running now
 function NightdrivePmSpaces(list)
+    -- A new PM may be moved to a space of its own, focus following it: not from under an open launcher
+    if held() then queued = list; settle(); return end
     local known = {}
     for _, s in pairs(spaces) do
         local w = pm_of(s)
