@@ -5,6 +5,8 @@
 // its own blue whatever the theme, and it passes HTML in the note through, pictures from the web and all. This one knows
 // what notes use (headings, paragraphs, lists and checkboxes, quotes, code, rules, tables, bold, italic, code, links) and shows
 // anything else, HTML included, as the text it is: a note Claude wrote can't load anything or look like something else.
+// Optional parts of the look, for a view other than a note's (Ask Claude's answers, AskClaudeMarkdown.js): c.headings,
+// the headings' sizes in px by level (index 1-6); c.code, a background behind code blocks; c.tags false: no #tag links.
 
 function escape(s) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
@@ -36,6 +38,7 @@ function inline(text, c) {
 const L = "A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u0370-\u03FF\u0400-\u04FF"
 const TAG = new RegExp(`(^|[\\s(\\[])#([${L}][${L}0-9_/-]*[${L}0-9_]|[${L}])`, "g")
 function tags(s, c) {
+    if (c.tags === false) return s
     return s.split(/(<a [^>]*>.*?<\/a>)/).map((part, i) => i % 2 ? part : part.replace(TAG, (m, before, tag) =>
         `${before}<a href="tag:${tag}" style="color:${c.primary}; text-decoration:none">#${tag}</a>`)).join("")
 }
@@ -76,7 +79,11 @@ function html(md, c) {
     // until the next one at its level, so a list nested in it is inside it and Qt numbers the outer one on after it
     // (with each item closed, every "1." under a nested list started again at 1).
     let lists = [], gap = false
-    const sizes = [0, 22, 19, 17, 15, 14, 14]
+    const sizes = c.headings || [0, 22, 19, 17, 15, 14, 14]
+    // On c.code, a block sits in a table's cell: Qt's rich text has no padding for a <pre> of its own
+    const pre = c.code ? `<table width="100%" cellpadding="10" cellspacing="0" bgcolor="${c.code}"><tr><td><pre style="color:${c.accent}">`
+                       : `<pre style="color:${c.accent}">`
+    const endPre = c.code ? "</pre></td></tr></table>" : "</pre>"
     function flushPara() { if (para.length) out.push(`<p>${para.map(l => inline(l, c)).join("<br>")}</p>`); para = [] }
     function flushList() { while (lists.length) closeList(lists, out); gap = false }
     function flushQuote() {
@@ -91,7 +98,7 @@ function html(md, c) {
         const line = lines[i]
         if (fence !== null) {
             if (/^\s*(```|~~~)/.test(line)) {
-                out.push(`<pre style="color:${c.accent}">${escape(fence.join("\n"))}</pre>`)
+                out.push(`${pre}${escape(fence.join("\n"))}${endPre}`)
                 fence = null
             } else fence.push(line)
             continue
@@ -140,7 +147,7 @@ function html(md, c) {
         flushList(); flushQuote()
         para.push(line.trim())
     }
-    if (fence !== null) out.push(`<pre style="color:${c.accent}">${escape(fence.join("\n"))}</pre>`)
+    if (fence !== null) out.push(`${pre}${escape(fence.join("\n"))}${endPre}`)
     flush()
     return out.join("\n")
 }
