@@ -66,10 +66,12 @@ hl.workspace_rule({ workspace = "special:drawer", gaps_out = { top = drawerTop, 
 -- Hyprland's gap above the tabs is the one below them (gaps_out, with keep_upper_gap), so 1 px there and the other 5
 -- from the hidden line's gap (indicator_gap); 6 px between tabs. The window keeps its rounded corners: Hyprland
 -- rounds all four or none, and square ones at the bottom looked out of place. Colours and font, the UI's, come from
--- the theme (look.lua above); ⌘←/→ goes through the tabs first (bindings.lua)
+-- the theme (look.lua above), nearly opaque over a blurred wallpaper and the shown tab's title bold, so a bright
+-- wallpaper doesn't wash them out (#3195); ⌘←/→ goes through the tabs first (bindings.lua)
 hl.config({
     group = {
-        groupbar = { font_size = 12, height = 32, gradients = true, rounding = 0, text_padding = 12,
+        groupbar = { font_size = 12, height = 32, gradients = true, rounding = 0, text_padding = 12, blur = true,
+                     font_weight_active = "bold", font_weight_inactive = "normal",
                      gradient_rounding = math.floor(6 * (mon and mon.scale or 1) + 0.5), gradient_round_only_edges = false, indicator_height = 0, gaps_out = 1,
                      keep_upper_gap = true, indicator_gap = 5, gaps_in = 6 },
     },
