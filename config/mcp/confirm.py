@@ -161,6 +161,14 @@ def card(tool, arguments, timeout=TIMEOUT):
     if isinstance(extra, str) and extra:
         note = f"{note} {extra}" if note else extra
     rows, ask = facts(tool, arguments)
+    # Asked only because of the pace (pace.py): the card says so, else it reads as Access asking for every change, and
+    # offers Allow all (#3224)
+    paced = getattr(tool, "paced", None)
+    if paced:
+        where = areas.name(tool.area)
+        heading = f"Claude has made {paced['count']} changes in {where} within a minute"
+        note = (f"Past {paced['pace']} a minute each change asks, so a loop can't fill {where} unseen. Allow all "
+                f"lets Claude go on here without asking for a minute, up to {paced['burst']} changes. {note}")
     return {
         "title": visible(str(title)),
         "source": visible(areas.name(tool.area)),
@@ -170,6 +178,7 @@ def card(tool, arguments, timeout=TIMEOUT):
         "glyph": glyph,
         "fields": rows + [field(n, props.get(n), arguments[n]) for n in names],
         "timeout": timeout,
+        **({"rest": True} if paced else {}),
         **({} if ask else {"unasked": True}),
     }
 
@@ -226,7 +235,7 @@ def show(request):
 
 
 def wait(cid, tool, timeout):
-    """The card's answer: True to allow, False to deny; ToolError for no answer."""
+    """The card's answer: True to allow, "rest" for Allow all, False to deny; ToolError for no answer."""
     deadline = time.monotonic() + timeout + 3   # the card's own countdown ends first; this is in case it hangs
     try:
         while time.monotonic() < deadline:
@@ -235,6 +244,8 @@ def wait(cid, tool, timeout):
             said = qs("answer", cid)
             if said == "allow":
                 return True
+            if said == "rest":
+                return "rest"
             if said == "deny":
                 return False
             if said == "timeout":
@@ -253,8 +264,9 @@ def wait(cid, tool, timeout):
 
 
 def ask(tool, arguments, timeout=TIMEOUT):
-    """registry.py's seam: True only when the user allowed this call of an act tool on the card. A refusal is False;
-    a card that couldn't ask raises ToolError with the reason, so Claude can tell the user why nothing happened."""
+    """registry.py's seam: True only when the user allowed this call of an act tool on the card, "rest" when they
+    chose Allow all on a card that offered it (else it is this call's Allow alone). A refusal is False; a card
+    that couldn't ask raises ToolError with the reason, so Claude can tell the user why nothing happened."""
     request = card(tool, arguments, timeout)
     if request.get("unasked"):
         return True   # on the user's own list in Access: they said this one needs no card
@@ -262,7 +274,8 @@ def ask(tool, arguments, timeout=TIMEOUT):
         raise ToolError(f"{tool.name} wasn't run: the call was cancelled.")
     request["id"] = secrets.token_hex(8)
     cid = show(request)
-    return wait(cid, tool.name, timeout)
+    said = wait(cid, tool.name, timeout)
+    return True if said == "rest" and not request.get("rest") else said
 
 
 DEMOS = {
@@ -286,6 +299,11 @@ DEMOS = {
     "trash": ({"title": "Move a note to the trash", "class": "change", "area": "notes", "deletes": True,
                "inputSchema": {"type": "object", "properties": {"path": {"type": "string", "title": "Note"}}}},
               {"path": "Shopping.md"}),
+    # The 21st change in a minute: why it asks, and Allow all (pace.py, #3224)
+    "paced": ({"title": "Add a task", "class": "change", "area": "tasks",
+               "inputSchema": {"type": "object", "properties": {
+                   "title": {"type": "string", "title": "Task"}, "list": {"type": "string", "title": "List"}}}},
+              {"title": "Draw the bakery's sign", "list": "Shop signs"}),
     "package": ({"title": "Install software", "class": "act", "area": "software",
                  "inputSchema": {"type": "object", "properties": {
                      "package": {"type": "string"}, "source": {"type": "string"}, "options": {"type": "object"}}}},
@@ -303,6 +321,7 @@ DEMOS = {
 class Demo:
     def __init__(self, name, spec):
         self.name, self.spec, self.area = name, spec, spec["area"]
+        self.paced = {"count": 20, "pace": 20, "burst": 100} if name == "demo_paced" else None
 
 
 def main():
@@ -312,7 +331,8 @@ def main():
     timeout = int(args[3]) if args[2:3] == ["--timeout"] and len(args) > 3 else TIMEOUT
     spec, arguments = DEMOS[args[1]]
     try:
-        print("allow" if ask(Demo(f"demo_{args[1]}", spec), arguments, timeout) else "deny")
+        said = ask(Demo(f"demo_{args[1]}", spec), arguments, timeout)
+        print("allow the rest" if said == "rest" else "allow" if said else "deny")
     except ToolError as e:
         print(f"refused: {e}")
 

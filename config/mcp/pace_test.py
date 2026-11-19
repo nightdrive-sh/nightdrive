@@ -58,17 +58,35 @@ class Pacing(unittest.TestCase):
         self.clock.now += pace.WINDOW
         self.assertFalse(self.pace.due(tool, "allow"))
 
-    def test_the_card_says_why_and_the_title_comes_back(self):
+    def test_the_card_is_told_why_for_that_call_only(self):
         tool = change()
         for _ in range(pace.PACE):
             self.pace.ran(tool)
         with self.pace.noted(tool, True):
-            self.assertEqual(tool.spec["title"], f"Create a note ({pace.PACE} changes here in a minute)")
+            self.assertEqual(tool.paced, {"count": pace.PACE, "pace": pace.PACE, "burst": pace.BURST})
+        self.assertIsNone(tool.paced)
+        with self.pace.noted(tool, False):
+            self.assertIsNone(tool.paced)
         self.assertEqual(tool.spec["title"], "Create a note")
-        untitled = SimpleNamespace(name="x", cls="change", area="a", spec={})
-        with self.pace.noted(untitled, True):
-            self.assertTrue(untitled.spec["title"].startswith("x ("))
-        self.assertNotIn("title", untitled.spec)
+
+    def test_allow_the_rest_holds_for_a_minute_and_burst_changes(self):
+        tool = change()
+        for _ in range(pace.PACE):
+            self.pace.ran(tool)
+        self.pace.grant(tool)
+        for _ in range(pace.BURST):
+            self.assertFalse(self.pace.due(tool, "allow"))
+            self.pace.ran(tool)
+        self.assertTrue(self.pace.due(tool, "allow"))          # BURST spent
+        self.pace.grant(tool)
+        self.assertFalse(self.pace.due(tool, "allow"))         # allowed again: a new grant
+        self.clock.now += pace.WINDOW - 1
+        self.assertFalse(self.pace.due(tool, "allow"))
+        self.clock.now += 1
+        for _ in range(pace.PACE):
+            self.pace.ran(tool)
+        self.assertTrue(self.pace.due(tool, "allow"))          # the minute is over: the pace again
+        self.assertEqual(self.pace.grants, {})
 
     def test_a_refused_call_is_not_asked_again_at_once(self):
         tool, args = change(), {"title": "Buy", "text": "milk"}
@@ -102,7 +120,7 @@ class Calls(unittest.TestCase):
         self.addCleanup(p.stop)
 
     def card(self, tool, arguments):
-        self.cards.append(tool.spec["title"])
+        self.cards.append((tool.spec["title"], tool.paced and tool.paced["count"]))
         return self.answer
 
     def run_(self, tool, arguments):
@@ -116,7 +134,7 @@ class Calls(unittest.TestCase):
         self.answer = False
         with self.assertRaises(ToolError):
             self.reg.call("notes_create", {"t": "again"})
-        self.assertEqual(self.cards, [f"Create a note ({pace.PACE} changes here in a minute)"])
+        self.assertEqual(self.cards, [("Create a note", pace.PACE)])
         with self.assertRaises(ToolError) as said:
             self.reg.call("notes_create", {"t": "again"})
         self.assertIn("refused this same call", str(said.exception))
@@ -126,6 +144,34 @@ class Calls(unittest.TestCase):
         self.answer = True
         self.reg.call("notes_create", {"t": "allowed"})
         self.assertEqual(self.ran, pace.PACE + 1)
+
+    def test_allow_the_rest_skips_the_cards_that_follow(self):
+        """43 tasks in a row (#3224): one card past the 20th, not 23."""
+        for i in range(pace.PACE):
+            self.reg.call("notes_create", {"t": str(i)})
+        self.answer = "rest"
+        for i in range(23):
+            self.reg.call("notes_create", {"t": f"more {i}"})
+        self.assertEqual(self.cards, [("Create a note", pace.PACE)])
+        self.assertEqual(self.ran, pace.PACE + 23)
+
+    def test_allow_the_rest_does_not_skip_an_ask_in_access(self):
+        """The grant only lifts the pace: a right the user set to Ask still asks every time."""
+        for i in range(pace.PACE):
+            self.reg.call("notes_create", {"t": str(i)})
+        self.answer = "rest"
+        self.reg.call("notes_create", {"t": "rest"})
+        self.reg.rules = SimpleNamespace(decide=lambda cls, area, right: "ask")
+        self.answer = True
+        self.reg.call("notes_create", {"t": "asked"})
+        self.reg.call("notes_create", {"t": "asked again"})
+        self.assertEqual(self.cards, [("Create a note", pace.PACE), ("Create a note", None), ("Create a note", None)])
+
+    def test_rest_from_a_card_the_pace_did_not_show_grants_nothing(self):
+        self.reg.rules = SimpleNamespace(decide=lambda cls, area, right: "ask")
+        self.answer = "rest"
+        self.reg.call("notes_create", {"t": "asked"})
+        self.assertEqual(self.reg.pace.grants, {})
 
 
 class Sizes(unittest.TestCase):

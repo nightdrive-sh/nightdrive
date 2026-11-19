@@ -3,7 +3,8 @@
 Only for a tool that names its list in `unasked_by`, when that list isn't empty, and never for an act tool: a card
 command that says so for another list of its area (files_trash under Normal's folders) still gets the card.
 And what the card spells out as ⟨U+…⟩: every invisible or format character it would send (#1922), and a tool's
-card_note under the card's note (#1913). And how qs's answer to the card is read (#1877)."""
+card_note under the card's note (#1913). And how qs's answer to the card is read (#1877), and what a card the pace
+asked says and offers (#3224)."""
 
 import sys
 import tempfile
@@ -124,6 +125,40 @@ class Show(unittest.TestCase):
 
     def test_wrong_digest(self):
         self.assertIn("didn't show the request", self.show("shown 0123"))
+
+
+class Paced(unittest.TestCase):
+    """A card shown only because of the pace (pace.py) says why, and is the only one that offers Allow all."""
+
+    def tool(self, paced):
+        tool = Tool(cls="change", right="modify", title="Add a task", card=None)
+        tool.area, tool.paced = "tasks", paced
+        return tool
+
+    def ask(self, tool, said):
+        real = confirm.show, confirm.wait
+        confirm.show, confirm.wait = (lambda request: request["id"]), (lambda cid, name, timeout: said)
+        try:
+            return confirm.ask(tool, {})
+        finally:
+            confirm.show, confirm.wait = real
+
+    def test_card_says_why(self):
+        card = confirm.card(self.tool({"count": 20, "pace": 20, "burst": 100}), {})
+        self.assertEqual(card["heading"], "Claude has made 20 changes in Tasks within a minute")
+        self.assertIn("Past 20 a minute each change asks", card["note"])
+        self.assertIn("up to 100 changes", card["note"])
+        self.assertTrue(card["note"].endswith(confirm.KINDS["modify"][1]))
+        self.assertEqual(card["title"], "Add a task")
+        self.assertTrue(card["rest"])
+        plain = confirm.card(self.tool(None), {})
+        self.assertEqual(plain["heading"], confirm.KINDS["modify"][0])
+        self.assertNotIn("rest", plain)
+
+    def test_rest_only_where_offered(self):
+        self.assertEqual(self.ask(self.tool({"count": 20, "pace": 20, "burst": 100}), "rest"), "rest")
+        self.assertIs(self.ask(self.tool(None), "rest"), True)   # this call's Allow alone
+        self.assertIs(self.ask(self.tool(None), False), False)
 
 
 if __name__ == "__main__":

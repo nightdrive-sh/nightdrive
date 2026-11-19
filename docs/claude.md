@@ -75,7 +75,8 @@ undo that puts the sound back on such a speaker or a light back to its brightnes
 was made with (a draft's text) only for an area it may read now without asking, masked as that area's reads are.
 
 **How much:** an area takes 20 changes a minute without asking; past that each one asks on the card, which says how
-many there were. A call you refused on the card isn't shown to you again for two minutes (Claude is told to ask you in
+many there were. When you asked for them (fifty tasks), **Allow all** (⇧ Enter) on that card lets the area take up
+to 100 more without a card for a minute; what Access sets to Ask still asks. A call you refused on the card isn't shown to you again for two minutes (Claude is told to ask you in
 the chat), and a text Claude gives a tool is at most 100 000 characters. The last 20 changes keep their Undo button;
 an older one's notification says to ask Claude, who can still undo it.
 

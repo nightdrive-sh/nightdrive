@@ -395,6 +395,8 @@ class Registry:
             if not ok:
                 self.pace.refused(tool, arguments)
                 raise ToolError(f"The user didn't allow {name} on screen, so it wasn't run. Don't try it another way.")
+            if ok == "rest" and paced:   # Allow all: only a card the pace showed offers it (#3224)
+                self.pace.grant(tool)
             allowed_once(tool, first)
         self.pace.ran(tool)
         undoable = tool.cls == "change" and self.undo is not None
