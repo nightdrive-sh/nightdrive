@@ -29,7 +29,12 @@ ShellRoot {
         // onePaneMax the list and the message take turns: Esc on the message shows the list, a click or Enter on a
         // message the message; there f shows the sidebar in the list's place. ⌘B shows and hides the sidebars.
         readonly property int navMin: 960
-        readonly property int onePaneMax: 640
+        readonly property int onePaneMax: 720
+        // Mail's measures, so the two windows line up: the sidebar's title and the list's search are headerHeight
+        // high, the first row headerGap under them, and the bar over the message barHeight high
+        readonly property int headerHeight: 22
+        readonly property int headerGap: 30
+        readonly property int barHeight: 54
         readonly property bool onePane: width < onePaneMax
         property var sidebarChoice: null
         property var navChoice: null
@@ -128,11 +133,13 @@ ShellRoot {
             NavSidebar {
                 id: nav
                 visible: win.navShown
-                Layout.preferredWidth: win.onePane ? -1 : win.width < 1200 ? 190 : 220
+                Layout.preferredWidth: win.onePane ? -1 : win.width < 900 ? 168 : 208
                 Layout.fillWidth: win.onePane
                 z: 1
                 c: win.look
                 store: store
+                headerHeight: 2 * 18 + win.headerHeight
+                contentTop: 18 + win.headerHeight + win.headerGap
                 active: activeFocus
                 onDone: win.fromFolders()
                 onChosen: if (win.onePane) win.navOpen = false
@@ -142,7 +149,10 @@ ShellRoot {
                 visible: win.sidebarShown
                 navShown: win.navShown
                 onShowNav: win.toFolders()
-                Layout.preferredWidth: win.onePane ? -1 : win.width < 1200 ? 300 : 360
+                Layout.preferredWidth: win.onePane ? -1 : Math.max(250, Math.min(370, win.width * 0.3 - 30))
+                barHeight: win.barHeight
+                searchHeight: win.headerHeight
+                firstRow: 18 + win.headerHeight + win.headerGap
                 Layout.fillWidth: win.onePane
                 c: win.look
                 store: store
@@ -161,6 +171,7 @@ ShellRoot {
                 c: win.look
                 store: store
                 onePane: win.onePane
+                barHeight: win.barHeight
                 focus: true
                 onBack: win.listOpen = true
                 onArchive: win.archive()
@@ -185,9 +196,9 @@ ShellRoot {
             else if (k === Qt.Key_Home) store.pickAt(0)
             else if (k === Qt.Key_End) store.pickAt(store.messages.length - 1)
             else if (e.text === "/") win.find()
-            else if (e.text === "e") win.archive()
+            else if (e.text === "a") win.archive()
             else if (e.text === "u") win.toggleRead()
-            else if (k === Qt.Key_Delete) win.askDelete()
+            else if (e.text === "d" || k === Qt.Key_Delete) win.askDelete()
             else if (e.text >= "1" && e.text <= "8") win.ask(+e.text - 1)
             else if (e.text === "s" && store.message && store.message.from.kind === "claude") win.press("session")
             else if (e.text === "t" && store.message && store.message.task) win.press("task")
@@ -211,7 +222,7 @@ ShellRoot {
             c: win.look
             cardWidth: Math.min(440, win.width - 32)
             question: store.message ? "Delete “" + store.message.title + "”?" : ""
-            detail: "It goes for good, with its files. Archive (e) keeps it out of the way instead."
+            detail: "It goes for good, with its files. Archive (a) keeps it out of the way instead."
             onAnswered: ok => { visible = false; if (ok) win.remove(); view.forceActiveFocus() }
         }
         RunPanel {

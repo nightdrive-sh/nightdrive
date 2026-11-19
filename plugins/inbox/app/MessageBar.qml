@@ -17,12 +17,12 @@ Item {
     height: 62
     readonly property var actions: !message ? [] : [
         message.archived
-            ? { id: "archive", glyph: "archive-restore", label: "Back to Inbox", strong: true, tip: "Back to the inbox", keys: "e" }
-            : { id: "archive", glyph: "archive", label: "Archive", strong: true, tip: "Done with it: to the archive", keys: "e" },
+            ? { id: "archive", glyph: "archive-restore", label: "Back to Inbox", tip: "Back to the inbox", keys: "a" }
+            : { id: "archive", glyph: "archive", label: "Archive", tip: "Done with it: to the archive", keys: "a" },
         message.read
             ? { id: "read", glyph: "mail", label: "Unread", tip: "Mark unread", keys: "u" }
             : { id: "read", glyph: "mail-open", label: "Read", tip: "Mark read", keys: "u" },
-        { id: "delete", glyph: "trash-2", label: "Delete", tip: "Delete for good", keys: "Del" }
+        { id: "delete", glyph: "trash-2", label: "Delete", tip: "Delete for good", keys: "d  Del" }
     ]
     function act(id) {
         if (id === "archive") archive()
@@ -56,7 +56,7 @@ Item {
             model: root.actions
             delegate: AppBarButton {
                 required property var modelData
-                c: root.c; glyph: modelData.glyph; label: modelData.label; compact: !root.labels; strong: !!modelData.strong
+                c: root.c; glyph: modelData.glyph; label: modelData.label; compact: !root.labels
                 tip: modelData.tip; keys: modelData.keys
                 onClicked: root.act(modelData.id)
             }

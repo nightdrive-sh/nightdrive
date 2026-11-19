@@ -11,6 +11,7 @@ Item {
     required property QtObject c
     required property QtObject store
     property bool onePane: false
+    property int barHeight: 54
     signal back()
     signal archive()
     signal toggleRead()
@@ -30,6 +31,7 @@ Item {
         id: bar
         z: 2                                   // its tips over the message under it
         width: parent.width
+        height: root.barHeight
         c: root.c
         onePane: root.onePane
         message: root.message
@@ -50,10 +52,13 @@ Item {
         Column {
             id: page
             visible: !!root.message
-            x: root.margin; y: 28
+            x: root.margin; y: 33           // as Mail's message under its bar
             width: Math.min(root.width - 2 * root.margin, 900)
             spacing: 22
+            // Each part over the ones after it: a tip (the Session and task buttons', a command's card) reaches down
+            // over what follows in the column, which would otherwise be drawn on top of it
             MessageHeader {
+                z: 4
                 width: parent.width
                 c: root.c
                 message: root.message
@@ -75,7 +80,7 @@ Item {
                 wrapMode: Text.Wrap
                 textFormat: Text.RichText
                 text: root.message && root.message.body ? Markdown.html(root.message.body, root.c) : ""
-                font.family: root.c.font; font.pixelSize: 14
+                font.family: root.c.font; font.pixelSize: 13     // a touch smaller than a note's: a report to skim
                 color: root.c.body
                 // Only addresses on the web: a box or a #tag (Notes' own links) does nothing here
                 onLinkActivated: link => { if (/^(https?:\/\/|mailto:)/i.test(link)) Qt.openUrlExternally(link) }
