@@ -9,7 +9,8 @@ alone has no group yet: its first session is shown, still without the keyboard.
 
 A project manager that is a background session of Claude Code's daemon (`claude --bg`, shown in its window by `claude
 agents`) isn't up its window's process chain: its sessions still open on its space, after ⌘⌥ moved the whole space to
-another workspace and while another one is active (#3196).
+another workspace and while another one is active (#3196). A new `claude agents` window showing one is a PM by its name
+too, as claude-sessions tells the bar, and gets a space of its own (#3200).
 
 A session that opens while the launcher or a menu has the keyboard leaves it there: the space is put in order once the
 layer closes (#3206).
@@ -20,6 +21,7 @@ It opens real windows (kitty), so it runs only inside the sandbox's container, n
 
 import json
 import os
+import re
 import signal
 import subprocess
 import tempfile
@@ -29,7 +31,10 @@ import unittest
 PM_WS, OTHER_WS = 7, 8            # workspaces the test takes; they must be empty
 BG_WS, BG_MOVED_WS = 5, 6         # the daemon PM's, before and after ⌘⌥ moves it; empty too
 LAYER_WS = 4                      # a space with a layer open over it (#3206); empty too
+AGENTS_WS = 3                     # a `claude agents` window opens here beside another window (#3200); empty too
 TERMINAL_OR_CLAUDE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "terminal-or-claude")
+CLAUDE_SESSIONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "topbar", "scripts", "claude-sessions")
+PM_NAME = re.compile(r"\s+(project\s+manager|pm)\s*$", re.I)   # SessionGroups.js isPm
 PREFIX = "pmtest_"                # the test windows' titles
 SESSION_CLASS = "claude-background"   # terminal-or-claude's --background class (rules.lua, pm-space.lua)
 SETTLE = 1.0                      # pm-space.lua arranges 120 ms after events settle; a window takes a moment to map
@@ -285,6 +290,74 @@ class LauncherKeepsTheKeyboard(unittest.TestCase):
         time.sleep(SETTLE)
         self.assertEqual(self.tabs(), ["l1", "l2", "l3"], "the space wasn't put in order once the layer closed")
         self.assertEqual(json.loads(hyprctl("-j", "activewindow"))["address"], address("l1"), "the keyboard moved")
+
+
+@unittest.skipUnless(IN_SANDBOX, "opens windows: only inside nightdrive sandbox (nightdrive sandbox exec python3 …)")
+class AgentsWindow(unittest.TestCase):
+    """A new window showing a background PM with `claude agents` (#3200): its claude has no record and the session runs
+    under no window, so claude-sessions gave it no name and the bar never told pm-space it is a PM. Through
+    claude-sessions, as Claude.qml's pmKey reads it, it now moves off a crowded workspace to a space of its own."""
+
+    NAME = "Test Agents Project Manager"
+
+    def setUp(self):
+        taken = [c["title"] for c in clients() if c["workspace"].get("id") == AGENTS_WS]
+        if taken:
+            self.skipTest(f"workspace {AGENTS_WS} isn't empty: {taken}")
+        self.addCleanup(BackgroundSession.tearDownClass)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = tmp.name
+        self.home = os.path.join(self.tmp, "home")
+        os.makedirs(os.path.join(self.home, ".claude", "sessions"))
+        # The daemon's session: under no window, its record named and kind bg, as Claude Code writes it
+        bg = subprocess.Popen(["sleep", "600"], cwd=self.tmp)
+        self.addCleanup(bg.wait)
+        self.addCleanup(bg.kill)
+        with open(f"/proc/{bg.pid}/stat") as f:
+            start = f.read().rsplit(") ", 1)[1].split()[19]
+        with open(os.path.join(self.home, ".claude", "sessions", f"{bg.pid}.json"), "w") as f:
+            json.dump({"pid": bg.pid, "name": self.NAME, "kind": "bg", "cwd": self.tmp, "procStart": start,
+                       "sessionId": "00000000-0000-4000-8000-000000000000", "status": "idle"}, f)
+        self.bg = bg.pid
+        # `claude agents`: a process named claude (a script's name is its process's), with no record
+        self.agents = os.path.join(self.tmp, "claude")
+        with open(self.agents, "w") as f:
+            f.write("#!/bin/sh\nsleep 600\n")
+        os.chmod(self.agents, 0o755)
+
+    def agents_window(self):
+        """The terminal running it on AGENTS_WS, titled as Claude Code titles the session it shows."""
+        hyprctl("dispatch", f'hl.dsp.exec_cmd("kitty -T \'✳ {self.NAME}\' {self.agents} agents", '
+                            f'{{ workspace = "{AGENTS_WS} silent" }})')
+        for _ in range(80):
+            win = next((c for c in clients() if c["title"] == "✳ " + self.NAME), None)
+            if win:
+                self.addCleanup(os.kill, win["pid"], signal.SIGTERM)
+                time.sleep(SETTLE)
+                return win["address"]
+            time.sleep(0.1)
+        raise AssertionError("the agents window didn't open")
+
+    def test_gets_a_space_of_its_own(self):
+        open_window("other", "beside", AGENTS_WS)
+        pm = self.agents_window()
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE")}
+        env["HOME"] = self.home
+        out = subprocess.run([CLAUDE_SESSIONS], env=env, capture_output=True, text=True, timeout=30, check=True).stdout
+        found = next((s for s in json.loads(out) if s["address"] == pm), None)
+        self.assertIsNotNone(found, f"claude-sessions didn't list the window: {out}")
+        self.assertEqual((found["name"], found["pid"], found["dir"]), (self.NAME, self.bg, self.tmp))
+        # Claude.qml's pmKey: the PMs among them, by name
+        pms = [s for s in json.loads(out) if PM_NAME.search(s["name"])]
+        self.assertIn(pm, [s["address"] for s in pms], "not a PM by its name")
+        hyprctl("eval", "NightdrivePmSpaces({ " + ", ".join(f'{{ a = "{s["address"]}", n = "{s["name"]}" }}' for s in pms) + " })")
+        time.sleep(SETTLE)
+        win = next(c for c in clients() if c["address"] == pm)
+        ws = win["workspace"]["id"]
+        self.assertNotEqual(ws, AGENTS_WS, "the PM stayed on a crowded workspace")
+        self.assertEqual([c["title"] for c in clients() if c["workspace"]["id"] == ws], ["✳ " + self.NAME],
+                         "the PM's new workspace isn't its own")
 
 
 if __name__ == "__main__":

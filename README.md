@@ -155,14 +155,14 @@ Click an icon and a small menu opens under it:
   **Launcher › Sessions** lists them all, the closed ones too: the running first (Enter goes to the window), then the
   rest, the newest first (Enter opens a terminal in its folder and goes on with the conversation, on its account).
   Typing searches their names, folders and task numbers (`#3120` or `3120`).
-  **A project manager's space**: a session named *… Project Manager* or *… PM* (`claude -n`) gets a workspace of its
-  own, as the left column, full height and half the width; started on a workspace with other windows, it moves to
+  **A project manager's space**: a session named *… Project Manager* or *… PM* (`claude -n`; or a background session,
+  `claude --bg`, in the window that shows it with `claude agents`) gets a workspace of its own, as the left column, full height and half the width; started on a workspace with other windows, it moves to
   the first empty one. The sessions it opens with `nightdrive ask --background` open there on the right, as one group
   of tabs: one shows, its tab strip lists them, and a click, **⌃⌥⌘ ← / →** or the Hyper keys above switch between
   them. A new one is the last tab, behind the one shown, and the keyboard stays where you are. Alone, once its sessions
   have all closed, it fills the width; restarted, it goes back to its space (by its name). Moved to another workspace,
   alone or with ⌘ ⌥ + a number, it makes that one its space, and its sessions open there whichever workspace you are
-  on, also when the PM is a background session of Claude Code (`claude --bg`, shown with `claude agents`); a session moved away with ⌘ ⇧ + a number leaves the group and stays where it went. Other workspaces, and sessions no PM opened, are as before.
+  on; a session moved away with ⌘ ⇧ + a number leaves the group and stays where it went. Other workspaces, and sessions no PM opened, are as before.
   **Two Claude accounts** (a Claude Code config dir each, `CLAUDE_CONFIG_DIR`): `~/.claude` and every `~/.claude-*`
   you have signed in to are found by themselves. The second account then gets a Claude icon of its own beside the
   first, each with its own menu (its sessions, **New session** on it and its usage), right-click setting and dot,

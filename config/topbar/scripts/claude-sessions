@@ -12,7 +12,9 @@
 # environment), 0 and "" for one you opened; the bar groups a session's openings beside it (SessionGroups.js).
 # transcript: the path of its conversation (<its config dir>/projects/<dir>/<sessionId>.jsonl), "" when not found; Companion
 # reads it (config/companion/lib/transcript.py), as a folder may hold several sessions' transcripts on several accounts.
-# A session in tmux or over ssh has no window of its own and isn't listed.
+# A background session of Claude Code's daemon (`claude --bg`) is listed by the window showing it (`claude agents`),
+# found by the window's title: its record, PID and folder (bg_record). A session in tmux or over ssh has no window of its
+# own and isn't listed.
 set -uo pipefail
 readonly TAIL=300    # transcript lines read from the end for the last reply: a long tool run has no text in between
 readonly LAST=300    # characters of the last line kept
@@ -30,6 +32,24 @@ current() {
     t=${t%/*}/$next.jsonl
   done
   printf '%s\n' "$t"
+}
+
+# The record of the background session a window shows (#3200), for a claude with no record of its own: a session of
+# Claude Code's daemon (`claude --bg`, /bg) runs under the daemon, no window's child (its process isn't even named
+# claude), and a terminal shows it with `claude agents`, which has no record. Nothing on disk says which session that
+# shows (the daemon's attach journal names only its PID), but its window's title is the session's name as Claude Code
+# titles any session ("✳ NAME", a spinner while it works). A bg record of that name in the same account whose process
+# lives (procStart: its start time, so a reused PID doesn't count); the newest if there are several.
+bg_record() {
+  local conf=$1 title=$2 p start f
+  [[ -n $title ]] || return
+  jq -r --arg t "$title" 'select(.kind == "bg" and (.name // "") != "" and (.name == $t or .name == ($t | sub("^\\S+\\s+"; ""))))
+        | "\(.updatedAt // 0)\t\(.pid)\t\(.procStart // "")\t\(input_filename)"' "$conf"/sessions/*.json 2>/dev/null \
+    | sort -rn | while IFS=$'\t' read -r _ p start f; do
+        [[ $p =~ ^[0-9]+$ && -r /proc/$p/stat ]] || continue
+        [[ -z $start || $(sed 's/.*) //' "/proc/$p/stat" | awk '{print $20}') == "$start" ]] || continue
+        echo "$f"; break
+      done
 }
 
 clients=$(hyprctl -j clients 2>/dev/null) || { echo '[]'; exit 0; }
@@ -57,6 +77,15 @@ for pid in $(pgrep -x claude); do
   # A dir no account lists (a one-off CLAUDE_CONFIG_DIR) goes by its own name, as claude-accounts would name it
   account=${accounts[$conf]:-$(b=${conf##*/}; b=${b#.}; echo "${b#claude-}")}
   rec="$conf/sessions/$pid.json"
+  # No record: a window showing a background session (bg_record). The session stands in for it, the window kept: its
+  # PID (the sessions it opened name it as their opener, SessionGroups.js), folder, start, account and opener
+  if [[ ! -r $rec ]] && bg=$(bg_record "$conf" "$(jq -r --arg a "$addr" 'first(.[] | select(.address == $a) | .title) // ""' <<<"$clients")") \
+     && [[ -n $bg ]]; then
+    rec=$bg pid=$(jq -r .pid "$rec")
+    dir=$(jq -r '.cwd // empty' "$rec"); dir=${dir:-$(readlink "/proc/$pid/cwd" 2>/dev/null)}
+    age=$(ps -o etimes= -p "$pid" | tr -d ' ')
+    env=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -E '^(NIGHTDRIVE_OPENER_(PID|NAME))=')
+  fi
   [[ -r $rec ]] && info=$(jq -c '{name: (.name // ""), status: (.status // ""), waitingFor: (.waitingFor // ""), sid: (.sessionId // ""),
                                     since: ((.statusUpdatedAt // 0) / 1000 | floor)}' "$rec" 2>/dev/null) || info=
   [[ -n $info ]] || info='{"name":"","status":"","waitingFor":"","sid":"","since":0}'
