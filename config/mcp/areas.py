@@ -139,6 +139,12 @@ AREAS = {
                             "off": "Claude doesn't get presence, occupancy or motion sensors, nor where your phones "
                                    "are: they tell whether anyone is home."},
                        ]},
+    # Messages for the user to look at later (#3132, docs/inbox.md): mostly Claude's own sessions', so reading and
+    # leaving them is allowed on Normal (a session reads its own to add to one); apps may write there too, hence secrets
+    "inbox": {"name": "Inbox", "glyph": "mailbox",
+              "read": "lists the messages in your Inbox",
+              "modify": "leaves you a message in Inbox, with files and buttons, and adds to one it left",
+              "options": [SECRETS]},
     "notifications": {"name": "Notifications", "glyph": "bell-ring",
                       "read": "reads the latest notifications of every app, and the reminders waiting",
                       "modify": "sends you a notification or sets a reminder, turns Do Not Disturb on or off",

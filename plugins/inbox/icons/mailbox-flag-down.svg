@@ -1,0 +1,2 @@
+<!-- Lucide's mailbox (ISC: config/topbar/icons/lucide/LICENSE), moved 2 px down as mailbox-flag-up.svg is, so the two swap in place -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7.5C2 9 4 7 6.5 7H18c2.2 0 4 1.8 4 4z"/><path d="M6.5 7C9 7 11 9 11 11.5V19a2 2 0 0 1-2 2m-3-9h1"/><path d="M15 11h3v2"/></g></svg>
