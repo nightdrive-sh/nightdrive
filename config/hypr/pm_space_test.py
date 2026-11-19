@@ -15,6 +15,10 @@ too, as claude-sessions tells the bar, and gets a space of its own (#3200).
 A session that opens while the launcher or a menu has the keyboard leaves it there: the space is put in order once the
 layer closes (#3206).
 
+A window a session opens itself (a test terminal, a preview: CLAUDECODE=1 in its environment) is a tile where it opens,
+never in the group, and the keyboard stays where it was, under the launcher too; one you open yourself on the space is
+no tab either, but has the keyboard (#3168).
+
 It opens real windows (kitty), so it runs only inside the sandbox's container, never on a desktop someone uses: elsewhere
 (CI, check.py without a desktop, your own Hyprland) it skips itself.
 """
@@ -32,6 +36,7 @@ PM_WS, OTHER_WS = 7, 8            # workspaces the test takes; they must be empt
 BG_WS, BG_MOVED_WS = 5, 6         # the daemon PM's, before and after ⌘⌥ moves it; empty too
 LAYER_WS = 4                      # a space with a layer open over it (#3206); empty too
 AGENTS_WS = 3                     # a `claude agents` window opens here beside another window (#3200); empty too
+AGENT_WS, AGENT_OTHER_WS = 2, 9   # a space a session opens windows on, and another workspace (#3168); empty too
 TERMINAL_OR_CLAUDE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "terminal-or-claude")
 CLAUDE_SESSIONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "topbar", "scripts", "claude-sessions")
 PM_NAME = re.compile(r"\s+(project\s+manager|pm)\s*$", re.I)   # SessionGroups.js isPm
@@ -64,12 +69,12 @@ def lua(code):
         return json.loads(f.read() or "null")
 
 
-def state():
+def state(ws=PM_WS):
     """The focused window's title, and the PM space's group: the tab shown and the tabs in order (titles, no prefix)."""
     return lua(f"""
         local function t(w) return w and (w.title:gsub("^{PREFIX}", "")) or "" end
         local s = {{ focus = t(hl.get_active_window()), shown = "", tabs = {{}} }}
-        for _, w in ipairs(hl.get_workspace_windows({PM_WS}) or {{}}) do
+        for _, w in ipairs(hl.get_workspace_windows({ws}) or {{}}) do
             if w.group and #s.tabs == 0 then
                 s.shown = t(w.group.current)
                 for _, m in ipairs(w.group.members or {{}}) do s.tabs[#s.tabs + 1] = t(m) end
@@ -238,17 +243,10 @@ ShellRoot {
 """
 
 
-@unittest.skipUnless(IN_SANDBOX, "opens windows: only inside nightdrive sandbox (nightdrive sandbox exec python3 …)")
-class LauncherKeepsTheKeyboard(unittest.TestCase):
-    """A session opened while the launcher (or a menu) is open, you having been in a tab of the space (#3206): putting
-    it in the group showed the tab again and focused it, and the keys went to it instead of the launcher. The space is
-    put in order once the launcher closes."""
+class ProbeLayer:
+    """A layer with the keyboard, as the launcher has it: PROBE_QML."""
 
-    def setUp(self):
-        taken = [c["title"] for c in clients() if c["workspace"].get("id") == LAYER_WS]
-        if taken:
-            self.skipTest(f"workspace {LAYER_WS} isn't empty: {taken}")
-        self.addCleanup(BackgroundSession.tearDownClass)
+    def make_probe(self):
         self.probe_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.probe_dir.cleanup)
         with open(os.path.join(self.probe_dir.name, "shell.qml"), "w") as f:
@@ -270,6 +268,20 @@ class LauncherKeepsTheKeyboard(unittest.TestCase):
     def close_layer(self):
         self.qs("kill")
 
+
+@unittest.skipUnless(IN_SANDBOX, "opens windows: only inside nightdrive sandbox (nightdrive sandbox exec python3 …)")
+class LauncherKeepsTheKeyboard(ProbeLayer, unittest.TestCase):
+    """A session opened while the launcher (or a menu) is open, you having been in a tab of the space (#3206): putting
+    it in the group showed the tab again and focused it, and the keys went to it instead of the launcher. The space is
+    put in order once the launcher closes."""
+
+    def setUp(self):
+        taken = [c["title"] for c in clients() if c["workspace"].get("id") == LAYER_WS]
+        if taken:
+            self.skipTest(f"workspace {LAYER_WS} isn't empty: {taken}")
+        self.addCleanup(BackgroundSession.tearDownClass)
+        self.make_probe()
+
     def tabs(self):
         for w in clients():
             if w["workspace"]["id"] == LAYER_WS and w["grouped"]:
@@ -290,6 +302,93 @@ class LauncherKeepsTheKeyboard(unittest.TestCase):
         time.sleep(SETTLE)
         self.assertEqual(self.tabs(), ["l1", "l2", "l3"], "the space wasn't put in order once the layer closed")
         self.assertEqual(json.loads(hyprctl("-j", "activewindow"))["address"], address("l1"), "the keyboard moved")
+
+
+@unittest.skipUnless(IN_SANDBOX, "opens windows: only inside nightdrive sandbox (nightdrive sandbox exec python3 …)")
+class SessionOpensAWindow(ProbeLayer, unittest.TestCase):
+    """A window a session opens itself (#3168): from the session's shell, as Claude Code runs a command, on the workspace
+    you are on. It joined the group you were in, shown, and took the keyboard (agent-windows.lua, pm-space.lua)."""
+
+    @classmethod
+    def setUpClass(cls):
+        taken = [c["title"] for c in clients() if c["workspace"].get("id") in (AGENT_WS, AGENT_OTHER_WS)]
+        if taken:
+            raise unittest.SkipTest(f"workspaces {AGENT_WS} and {AGENT_OTHER_WS} aren't empty: {taken}")
+        open_window("other", "a-other", AGENT_OTHER_WS)
+        pm = open_window("pm", "apm", AGENT_WS)
+        hyprctl("eval", f'NightdrivePmSpaces({{ {{ a = "{pm}", n = "Test Agent Manager" }} }})')
+        time.sleep(SETTLE)
+        open_window(SESSION_CLASS, "a1", AGENT_WS)
+        open_window(SESSION_CLASS, "a2", AGENT_WS)
+
+    @classmethod
+    def tearDownClass(cls):
+        BackgroundSession.tearDownClass()
+
+    def setUp(self):
+        self.make_probe()
+
+    def launch(self, title, claude=True):
+        """A test window on the active workspace: run from a session's command (CLAUDECODE=1, detached as setsid -f
+        leaves it), or as you open one (through Hyprland, as a key or the launcher does)."""
+        if claude:
+            env = dict(os.environ, CLAUDECODE="1")
+            subprocess.run(["setsid", "-f", "kitty", "--class", "demo", "-T", PREFIX + title, "sleep", "600"], env=env,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        else:
+            hyprctl("dispatch", f'hl.dsp.exec_cmd("kitty --class demo -T {PREFIX}{title} sleep 600")')
+        for _ in range(80):
+            win = next((c for c in clients() if c["title"] == PREFIX + title), None)
+            if win:
+                self.addCleanup(self.close_window, win["pid"], title)
+                time.sleep(SETTLE)
+                return next(c for c in clients() if c["title"] == PREFIX + title)
+            time.sleep(0.1)
+        raise AssertionError(f"{title} didn't open")
+
+    def close_window(self, pid, title):
+        os.kill(pid, signal.SIGTERM)
+        for _ in range(50):
+            if not address(title):
+                return
+            time.sleep(0.1)
+
+    def assert_tile(self, win, ws):
+        self.assertEqual((win["workspace"]["id"], win["floating"], win["grouped"]), (ws, False, []),
+                         "not a tile of its own where it opened")
+
+    def test_from_a_tab(self):
+        focus("a1")   # the tab you read and type in
+        win = self.launch("demo1")
+        self.assert_tile(win, AGENT_WS)
+        s = state(AGENT_WS)
+        self.assertEqual((s["focus"], s["shown"], s["tabs"]), ("a1", "a1", ["a1", "a2"]))
+
+    def test_from_the_pm(self):
+        focus("apm")
+        self.assert_tile(self.launch("demo2"), AGENT_WS)
+        self.assertEqual(state(AGENT_WS)["focus"], "apm")
+
+    def test_on_another_workspace(self):
+        focus("a-other")
+        self.assert_tile(self.launch("demo3"), AGENT_OTHER_WS)
+        self.assertEqual(state(AGENT_WS)["focus"], "a-other")
+
+    def test_under_the_launcher(self):
+        focus("a1")
+        self.open_layer()
+        self.assert_tile(self.launch("demo4"), AGENT_WS)
+        self.assertEqual(self.qs("ipc", "call", "probe", "keys"), "true", "the window took the keyboard from the layer")
+        self.close_layer()
+        time.sleep(SETTLE)
+        s = state(AGENT_WS)
+        self.assertEqual((s["shown"], s["tabs"]), ("a1", ["a1", "a2"]))
+
+    def test_your_own_window(self):
+        focus("a1")
+        self.assert_tile(self.launch("mine", claude=False), AGENT_WS)
+        s = state(AGENT_WS)
+        self.assertEqual((s["focus"], s["shown"], s["tabs"]), ("mine", "a1", ["a1", "a2"]))
 
 
 @unittest.skipUnless(IN_SANDBOX, "opens windows: only inside nightdrive sandbox (nightdrive sandbox exec python3 …)")

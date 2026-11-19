@@ -159,7 +159,9 @@ Click an icon and a small menu opens under it:
   `claude --bg`, in the window that shows it with `claude agents`) gets a workspace of its own, as the left column, full height and half the width; started on a workspace with other windows, it moves to
   the first empty one. The sessions it opens with `nightdrive ask --background` open there on the right, as one group
   of tabs: one shows, its tab strip lists them, and a click, **⌃⌥⌘ ← / →** or the Hyper keys above switch between
-  them. A new one is the last tab, behind the one shown, and the keyboard stays where you are. Alone, once its sessions
+  them. A new one is the last tab, behind the one shown, and the keyboard stays where you are. Nothing else joins
+  the group: another window opened there is a tile beside it. A window a Claude session opens itself (a test terminal,
+  an app's preview) never takes the keyboard, on any workspace: it is a tile where you are, for you to click. Alone, once its sessions
   have all closed, it fills the width; restarted, it goes back to its space (by its name). Moved to another workspace,
   alone or with ⌘ ⌥ + a number, it makes that one its space, and its sessions open there whichever workspace you are
   on; a session moved away with ⌘ ⇧ + a number or ⌘ ⇧ D leaves the group and stays where it went (back from the drawer, it rejoins it). Other workspaces, and sessions no PM opened, are as before.

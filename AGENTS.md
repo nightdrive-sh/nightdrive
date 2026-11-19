@@ -19,6 +19,9 @@ The user may be typing on this same desktop, and the launcher and menus take the
 agent-warn "the launcher"` before opening one (once per burst of tests) and open it only after it returns (~5 s countdown
 with sound). Use the full path: an agent's shell may not have `~/.local/bin` in its PATH, and if the command fails, don't
 open anything.
+A window you start from your own shell (a test terminal, an app's preview) opens as a tile without the keyboard, never
+in a tab group (`config/hypr/agent-windows.lua` knows it by `CLAUDECODE=1`, so start it from your shell, not through
+`hyprctl dispatch exec`): it needs no agent-warn, but say it opened, as the user has to click it.
 Don't press Enter over IPC on rows that act on real things (Home Assistant devices, Power).
 On a machine without Hyprland, or to leave the user's desktop alone, use the headless container: `nightdrive sandbox
 check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` for the rest (docs/sandbox.md; no agent-warn there).

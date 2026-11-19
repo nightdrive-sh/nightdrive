@@ -63,9 +63,18 @@ local function set_rule(s, layout)
     s.ruleKey = layout
 end
 
+-- No window joins the space's group by itself (#3168): group.auto_group put any window that opened while you were in a
+-- tab into the group, shown, the keyboard with it (from the launcher too), a session's test window or an app's preview
+-- as well. Only arrange() adds to it: the background sessions, last. A window rule by workspace, as a space's number
+-- changes; disabled with the space (a rule can't be taken away until a reload).
+local function bar_groups(s)
+    s.bar = hl.window_rule({ match = { workspace = tostring(s.ws) }, group = "barred" })
+end
+
 local function open_space(id, pm, sid, name)
     local s = { ws = id, pm = pm, sid = sid, name = name }
     set_rule(s, "lua:" .. LAYOUT)
+    bar_groups(s)
     spaces[id] = s
     return s
 end
@@ -73,6 +82,7 @@ end
 -- disabled one would leave its gaps)
 local function close_space(s)
     set_rule(s, hl.get_config("general.layout") or "dwindle")
+    if s.bar then s.bar:set_enabled(false) end
     spaces[s.ws] = nil
 end
 
@@ -80,7 +90,7 @@ end
 -- pm-layout.lua, puts the PM left)
 local function arrange(s)
     local pm = pm_of(s)
-    -- A restarted PM opened over the group's focused tab lands in the group (group.auto_group)
+    -- A PM in the group (moved in by hand: the space bars group.auto_group, bar_groups, and a restarted one opens loose)
     if pm and pm.group and pm.workspace and pm.workspace.id == s.ws and tiled(pm) then
         pm.group:remove(pm); pm = pm_of(s)
     end
