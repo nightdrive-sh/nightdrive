@@ -28,7 +28,8 @@ case "$*" in
 esac""",
     # prints its id at once, then waits as -w does for an action that never comes
     "notify-send": "#!/bin/bash\n: > \"$CN_NOTIFIED\"\necho 7\nexec sleep 600",
-    "qs": "#!/bin/bash\nexit 1",
+    # answers barShown with CN_BAR (the sessions bar there to see), else as if Quickshell weren't running
+    "qs": "#!/bin/bash\n[[ $* == *barShown* && -n ${CN_BAR:-} ]] && { echo true; exit 0; }\nexit 1",
     "gdbus": "#!/bin/bash\nexit 0",
 }
 
@@ -174,6 +175,34 @@ class CompanionAnswer(unittest.TestCase):
         self.assertIsNone(self.proc.poll())
         self.answer(f"deny {p['request']}")
         self.assertEqual(self.decision(), {"behavior": "deny", "message": "Denied from Companion"})
+
+    # #3126: while the sessions bar is there to see, a question pops up nothing (its chip asks) but still reaches
+    # Companion; a permission request keeps its notification
+    def test_a_question_while_the_bar_shows_is_quiet_but_reaches_companion(self):
+        self.env["CN_BAR"] = "1"
+        self.record("waiting", "question")
+        q = {"questions": [{"question": "Commit?", "options": [{"label": "Yes"}, {"label": "No"}]}]}
+        self.start("AskUserQuestion", q)
+        ask = os.path.join(self.state, f"{ADDR}.ask")                                 # Companion's copy of it
+        for _ in range(100):
+            if os.path.exists(ask) and os.path.getsize(ask):
+                break
+            time.sleep(0.05)
+        with open(ask) as f:
+            self.assertEqual(json.load(f)["questions"][0]["question"], "Commit?")
+        time.sleep(0.6)
+        self.assertIsNone(self.proc.poll())                                            # waits for an answer
+        self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
+
+    def test_a_permission_request_while_the_bar_shows_still_notifies(self):
+        self.env["CN_BAR"] = "1"
+        self.record("waiting", "permission prompt")
+        self.ask("Edit", EDIT)
+        for _ in range(40):
+            if os.path.exists(self.env["CN_NOTIFIED"]):
+                break
+            time.sleep(0.05)
+        self.assertTrue(os.path.exists(self.env["CN_NOTIFIED"]))
 
     def test_without_a_record_the_active_window_answers_in_the_terminal(self):
         self.env["CN_ACTIVE"] = ADDR

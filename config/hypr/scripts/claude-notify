@@ -2,8 +2,8 @@
 # Claude Code's Notification and PermissionRequest hooks (link.sh puts them in ~/.claude/settings.json): when a session
 # waits for you while you're in another window, a notification from "Claude" that says which one (its topic from the
 # window title, the project) and what it wants; a click, or its Show session button, goes to its window. The bar's
-# Claude icon gets its dot (Claude.qml). Nothing while you're in that window, and no Notification while the sessions bar
-# shows (below). Claude Code's own terminal notification (kitty's, all alike) is turned off by link.sh.
+# Claude icon gets its dot (Claude.qml). Nothing while you're in that window, and no Notification or question while the
+# sessions bar shows (below). Claude Code's own terminal notification (kitty's, all alike) is turned off by link.sh.
 #   Notification: "Waiting for your input" and the like.
 #   PermissionRequest: what it wants to run or change, with Deny, and Allow when it shows all it allows. Companion gets
 #   the request's whole input (<addr>.input) and offers Allow there after showing it (companion/lib/permission.py). Pinned
@@ -71,9 +71,18 @@ fi
 [[ $event == Notification && -n $addr && ( -e $state/$addr.perm || -e $state/$addr.ask ) ]] && exit 0
 [[ -n $addr && -z ${here-} ]] && qs ipc call claude want "$addr" >/dev/null 2>&1
 # While the sessions bar is there for you to see (Claude.qml's barShown: on, not covered, you at the computer), its chip
-# says it: no notification, and none in the history either (#3126). A permission or a question still gets its pinned
-# one below, the only place to answer it from. No answer (Quickshell not running) notifies as before.
-[[ $event == Notification && $(qs ipc call claude barShown 2>/dev/null) == true ]] && exit 0
+# says it: no notification, and none in the history either (#3126). A question too (quiet): its chip has the red
+# question mark and hops, and Companion still gets it; nearly every session ends on one, so they came as often as
+# before. A permission request keeps its pinned notification: the session is stuck mid-work. A question without the
+# session's record (an older Claude Code) has nothing to end it but the window, so it notifies as before, and so does
+# everything when Quickshell doesn't answer.
+quiet=''
+if [[ $event == Notification || ( $event == PermissionRequest && -n $rec && -z ${here-} \
+      && $(jq -r '.tool_name // ""' <<<"$in") == AskUserQuestion ) ]] \
+   && [[ $(qs ipc call claude barShown 2>/dev/null) == true ]]; then
+  [[ $event == Notification ]] && exit 0
+  quiet=1
+fi
 
 # Claude Code's title: a status glyph (✳, a spinner), then the topic
 topic=$(sed -E 's/^[^[:alnum:][:space:]]+[[:space:]]+//' <<<"$title")
@@ -136,7 +145,7 @@ if [[ $event == PermissionRequest ]]; then
       '{tool: $tool, what: $what, project: $project, request: $req, allow: ($allow == 1), whole: ($whole == 1)}' > "$state/$addr.perm"
   fi
   ns=''
-  if [[ -z ${here-} ]]; then
+  if [[ -z ${here-}${quiet} ]]; then
     notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" "${deny[@]}" \
       -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
     ns=$!
