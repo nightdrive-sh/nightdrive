@@ -21,7 +21,7 @@ ShellRoot {
         implicitHeight: 720
         color: c.bg
         // Closing the window (⌘W) quits Tasks, as Contacts: a process left without its window would only look open
-        onClosed: Qt.quit()
+        onClosed: { ops.flush(); Qt.quit() }
 
         AppLook { id: c }
         readonly property QtObject look: c
@@ -93,6 +93,7 @@ ShellRoot {
                     const was = win.keepList || (win.view.kind === "list" ? win.view.id : "")
                     win.keepList = ""
                     win.tasks = d.tasks
+                    ops.settle(d.tasks)
                     win.lists = d.lists
                     win.today = d.now.slice(0, 10)
                     win.loaded = true
@@ -174,6 +175,7 @@ ShellRoot {
         function say(t, danger) { toast.show(t, { danger: !!danger }) }
         function offer(t, undo) { toast.show(t, { action: "Undo", run: undo }) }
         Actions { id: ops; app: win }
+        readonly property var ticking: ops.ticking   // the rows ticked a moment ago (Actions.toggle)
         // A task's circle, Space: done, or back to open in Done
         function toggleDone(index) { ops.toggle(shown[index === undefined ? current : index]) }
         // c or Copy text under the picked task's note: the note to the clipboard, as it is. copied names the task for a
@@ -368,7 +370,7 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again"], ["c", "Copy its note"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
+                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again (again within 2 s: called off)"], ["c", "Copy its note"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "Search", keys: [["/  ⌘F", "Search every list"], ["⏎  ↓", "To the tasks found"], ["Esc", "End the search"]] },
                 { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"]] },

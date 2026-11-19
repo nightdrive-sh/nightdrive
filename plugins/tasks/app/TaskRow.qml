@@ -21,21 +21,26 @@ AppRow {
         onDoubleTapped: row.app.editTask(row.index)
     }
 
-    Text {
+    // Ticked a moment ago (Actions.ticking): the row shows the new state at once and fades just before it leaves
+    readonly property var tick: app.ticking[task.id]
+    readonly property bool ticked: tick !== undefined
+    readonly property bool done: ticked ? tick : task.done
+    SequentialAnimation {
+        id: leaving
+        PauseAnimation { duration: 1500 }
+        NumberAnimation { target: row; property: "opacity"; to: 0.5; duration: 450 }
+    }
+    onTickedChanged: { leaving.stop(); if (ticked) leaving.start(); else opacity = 1 }
+
+    // The circle ticks it off (or, in Done, opens it again)
+    TaskCheck {
         id: mark
         anchors.left: parent.left; anchors.leftMargin: 14
         anchors.top: parent.top; anchors.topMargin: 11
-        text: Icons.g(row.task.done ? "circle-check" : "circle")
-        font.family: Icons.family; font.pixelSize: 16
-        color: row.task.done ? row.c.faint : row.task.priority === "high" ? row.c.accent : row.c.dim
-    }
-
-    // The circle ticks it off (or, in Done, opens it again): a target larger than the glyph, and its own press, so the
-    // row's tap (pick) and double tap (edit) don't come with it
-    MouseArea {
-        anchors.centerIn: mark
-        width: 36; height: 36
-        cursorShape: Qt.PointingHandCursor
+        c: row.c
+        done: row.done
+        fresh: row.ticked
+        important: row.task.priority === "high"
         onClicked: { row.app.current = row.index; row.app.toggleDone(row.index) }
     }
 
@@ -49,8 +54,8 @@ AppRow {
             textFormat: Text.PlainText
             width: parent.width; elide: Text.ElideRight
             text: row.task.title
-            font.family: row.c.font; font.pixelSize: 13; font.strikeout: row.task.done
-            color: row.task.done ? row.c.faint : row.c.title
+            font.family: row.c.font; font.pixelSize: 13; font.strikeout: row.done
+            color: row.done ? row.c.faint : row.c.title
         }
         Row {
             width: parent.width

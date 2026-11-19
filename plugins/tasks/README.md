@@ -11,7 +11,7 @@ Claude › Access › Tasks).
 | `?` | Tasks' keys |
 | `n` | New task (also New, or `tasks new [LIST]`): ⏎ or Ctrl+⏎ adds it, Tab the next field, ← → another list |
 | ⏎ or `e` | Edit the picked task (a double click too): Ctrl+⏎ saves |
-| Space | Done (a click on its circle too); in Done, open again |
+| Space | Done (a click on its circle too); in Done, open again. The circle shows it at once and the task leaves after 2 s: press again by then to call it off |
 | `c` | Copy the picked task's note, to paste it elsewhere (also Copy text under it) |
 | Delete | To the trash |
 | ⌘Z | Undo the last change (also Undo in the message at the top) |
