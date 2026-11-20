@@ -111,6 +111,23 @@ class ReplyTest(unittest.TestCase):
         self.assertEqual(self.stored_partstat(), "DECLINED")
         self.assertEqual(len(self.files()), 1)
 
+    def test_outlooks_long_uid_is_found_again_once_added(self):
+        # Its UID folds over two lines in the file, which a plain text search missed: Accept wrote the event, then
+        # failed to find it to mark the answer (#3310)
+        text = invite_test.INVITE.format(method="REQUEST", start="1000", end="1100", seq=1)
+        long = icalendar.Calendar.from_ical(text.replace("040000008200E00074C5B7101A82E008-ONE", LONG_UID))
+        out = invite_reply.answered(long, "accept", ME, "acc/home")
+        self.assertEqual((out["done"], out["calendar_name"]), ("answered", "Home"))
+        self.assertIn("\n ", self.files()[0].read_text())             # folded, as Outlook's always is
+        self.assertEqual(self.stored_partstat(), "ACCEPTED")
+        self.assertEqual(invite.describe(long)["state"], "added")       # the card no longer offers it as new
+        self.assertIsNone(invite.find(LONG_UID[:-4]))                   # a UID that only begins it isn't it
+
+
+# Outlook's, as the invitation of #3310 had it
+LONG_UID = ("040000008200E00074C5B7101A82E008000000006043A323FA70DD01000000000000000010000000DF280EE410FC7F40ACBEB5BF"
+            "0787BE02")
+
 
 if __name__ == "__main__":
     unittest.main()

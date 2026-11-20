@@ -159,8 +159,11 @@ def answered(ics, answer, address, calendar_id=None):
         if state == "DECLINED" or not calendar_id:
             return {"done": "none", "said": f"{WORDS[state]}: {info['title']}"}
         import invite_write
-        invite_write.run(ics, "add", calendar_id)
+        added = invite_write.run(ics, "add", calendar_id)
         found = invite.find(uid)
+        if found is None:   # written, yet not found again (#3310): say where it went rather than fail on it
+            return {"done": "none", "said": f"{WORDS[state]}: {info['title']}",
+                    "note": f"It is in {added['calendar_name']}, without your answer marked on it."}
     cal, path, stored, old_events = found
     if cal["read_only"]:
         return {"done": "none", "said": f"{WORDS[state]}: {info['title']}",

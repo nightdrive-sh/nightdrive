@@ -27,6 +27,7 @@ it recurring; changing an event is change.py's.
 
 import datetime as dt
 import json
+import re
 import subprocess
 import sys
 import uuid
@@ -171,9 +172,13 @@ def event_file(cal, uid):
     direct = folder / f"{uid}.ics"
     if direct.is_file():
         return direct
+    # A long UID (Outlook's are 112 characters) is folded over lines in the file, as iCalendar folds at 75 octets:
+    # the lines are unfolded before the search, or an invitation just added isn't found again (#3310). The whole line
+    # must match, so a UID that begins another's isn't taken for it.
+    line = re.compile(r"^UID(;[^:\r\n]*)?:" + re.escape(uid) + r"\r?$", re.M)
     for path in folder.glob("*.ics"):
         try:
-            if f"UID:{uid}" in path.read_text(errors="replace"):
+            if line.search(re.sub(r"\r?\n[ \t]", "", path.read_text(errors="replace"))):
                 return path
         except OSError:
             continue

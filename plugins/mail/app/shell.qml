@@ -308,8 +308,8 @@ ShellRoot {
         onConfirmChanged: if (confirm) confirmPanel.forceActiveFocus(); else list.forceActiveFocus()
 
         // What just happened, in the kit's toast at the top of the window (a line under the list went unnoticed);
-        // say("") takes it away
-        function say(t) { toast.show(t) }
+        // say("") takes it away; opts are AppToast.show's (danger: a failure, which stays longer)
+        function say(t, opts) { toast.show(t, opts) }
 
         // Opens the thread of a message in the inbox (or wherever it is now, if it has left it), then calls then().
         function openMessage(id, then) {

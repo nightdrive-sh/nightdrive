@@ -74,4 +74,14 @@ Column {
         text: root.reply ? "Your answer goes to " + root.reply.to + (root.card.narrow ? "" : ", from " + root.reply.as) : ""
         color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
     }
+    // And where a yes puts a new one, before the press: the picker shows only with two calendars or more, and an Accept
+    // once went unseen into a test calendar (#3310)
+    Text {
+        readonly property var cal: root.card.info && root.card.info.state === "new"
+            ? root.card.info.calendars.find(x => x.id === root.card.app.inviteCalendar) || null : null
+        width: parent.width; visible: cal !== null
+        textFormat: Text.PlainText; elide: Text.ElideRight
+        text: cal ? "Accept or Maybe adds it to " + cal.name : ""
+        color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
+    }
 }
