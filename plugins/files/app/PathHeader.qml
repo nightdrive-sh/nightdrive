@@ -129,6 +129,14 @@ RowLayout {
         onEscapePressed: root.app.endFilter()
     }
 
+    // How many a search found, once it is done, before the scope; none when it stopped at its limit (Jari: no "first 2000")
+    Text {
+        visible: !root.compact && root.app.searching && !root.app.search.running && !root.app.search.capped
+                 && root.app.marked.length === 0 && root.app.rows.length > 0
+        text: root.app.rows.length + " found"
+        color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
+        Layout.rightMargin: 8
+    }
     // The filter's scope, at the field's end: a click (or Tab, ⌘F again) turns it between this folder and all of home
     // (outside home: the folder and the ones below it). Not a second search button: the one field does both, as the
     // Mac's ⌘F does with the folder and "This Mac"
@@ -163,13 +171,6 @@ RowLayout {
             text: root.app.below ? "Only this folder"
                 : root.app.inHome ? "All of home, every folder in it" : "This folder and every folder below it"
         }
-    }
-    // How many a search found, once it is done (2000 at most: more words narrow it)
-    Text {
-        visible: !root.compact && root.app.searching && !root.app.search.running && root.app.marked.length === 0 && root.app.rows.length > 0
-        text: root.app.search.capped ? "first " + root.app.rows.length : root.app.rows.length + " found"
-        color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
-        Layout.rightMargin: 8
     }
     // How many are marked, while some are (the folder's own count isn't shown: Jari's call)
     Text {
