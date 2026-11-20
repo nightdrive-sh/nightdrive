@@ -73,7 +73,7 @@ Toast {
                         elide: Text.ElideRight
                         font { family: Theme.font; pixelSize: 14 }
                     }
-                    Text {   // only a missed one has a note (why it comes late)
+                    Text {   // why it comes now: missed, on arriving at work, on waking (remind_events.py)
                         width: parent.width
                         visible: text !== ""
                         text: modelData.note

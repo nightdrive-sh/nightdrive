@@ -71,7 +71,6 @@ MAX_MINUTES = 7 * 24 * 60           # a week, as Remind's
 APP, ICON = "Schedule", "lucide:calendar-clock"
 TAIL_LINES = 3                      # of a failed run's output, in its notification
 SELF = os.path.realpath(__file__)   # the timer runs this checkout's script (a worktree's or the sandbox's own)
-LOCKS = ("[q]s -p .*/greeter/lock\\.qml", "^hyprlock")   # the lock and its fallback (hypr/scripts/lock)
 
 
 def die(msg, code=1):
@@ -105,9 +104,7 @@ def disarm(rid):
 
 
 def screen_locked():
-    """The session's lock is up: this session's only (a container's runs as the same user), as hypr/scripts/lock asks."""
-    mine = ["--ns", str(os.getpid()), "--nslist", "pid", "-u", str(os.getuid())]
-    return any(subprocess.run(["pgrep", *mine, "-f", p], capture_output=True).returncode == 0 for p in LOCKS)
+    return events.screen_locked()   # here by name: the tests patch schedule.screen_locked
 
 
 def start_now(rid):

@@ -89,7 +89,8 @@ Item {
         if (!pending.length) return q !== "" ? rows : rows.concat([{ kind: "note", name: "A banner then, with a sound, until you dismiss it. It waits over a logout or a restart." }])
         return rows.concat([{ kind: "header", name: "Waiting" }], pending.map(p => ({
             kind: "reminder", id: p.id, name: p.message, glyph: "alarm-clock", armKey: "remind:" + p.id,
-            summary: "at " + clock(p.at_unix * 1000) + " · in " + span(Math.max(1, p.minutes_left)) })))
+            // wake, login, arrive work (#3279) as the script labels them, until Settings › Places gives them rows (#3281)
+            summary: p.at_unix === null ? p.label : "at " + clock(p.at_unix * 1000) + " · in " + span(Math.max(1, p.minutes_left)) })))
     }
 
     function activate(it) {

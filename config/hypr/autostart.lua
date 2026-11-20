@@ -81,11 +81,13 @@ function NightdriveLocked()
 end
 
 -- The login apps: after the password at an autologin start, as they may ask the keyring (the lock's PAM opens it)
--- The lock calls it at every unlock (lock.qml, and hyprlock's in scripts/lock): the ones after the first are for schedule,
--- whose commands that came due under the lock, or wait for the first unlock after waking, run then, and for places
+-- The lock calls it at every unlock (lock.qml, and hyprlock's in scripts/lock): the ones after the first are for schedule
+-- and remind, whose commands and reminders that came due under the lock, or wait for the first unlock after waking,
+-- come then, and for places
 function NightdriveUnlocked()
     if not once(UNLOCKED_FLAG) then
         hl.exec_cmd(HOME .. "/.config/hypr/scripts/schedule unlocked")
+        hl.exec_cmd(HOME .. "/.config/hypr/scripts/remind unlocked")   -- reminders that came under the lock, and wake's
         hl.exec_cmd(HOME .. "/.config/hypr/scripts/places check")   -- arrived or left while locked (net-watch tells the rest)
         return
     end

@@ -11,7 +11,7 @@ and `schedule` share, beside timers.py (which keeps the times), so neither grows
 
 Imported by the scripts beside it (sys.path gets this folder, as with timers.py).
 """
-import datetime, re
+import datetime, os, re, subprocess
 
 import places
 import timers
@@ -20,6 +20,7 @@ EVENTS = ("wake", "login", "arrive", "leave")
 PLACED = ("arrive", "leave")       # the events that name a place
 WAIT_DAYS = 7                      # an arrival or a leaving not seen in this long is asked about
 FROM_MINUTES = 7 * 24 * 60         # --from at most a week ahead, as a time is
+LOCKS = ("[q]s -p .*/greeter/lock\\.qml", "^hyprlock")   # the lock and its fallback (hypr/scripts/lock)
 
 
 class WhenError(ValueError):
@@ -139,3 +140,10 @@ def deadline(r):
 def public(r):
     """The fields the commands' --json adds: place (or null) and from (ISO, or null)."""
     return {"place": r.get("place"), "from": timers.iso(r["from"]) if r.get("from") else None}
+
+
+def screen_locked():
+    """The session's lock is up: this session's only (a container's runs as the same user), as hypr/scripts/lock asks.
+    An event under it waits for the unlock, in remind and schedule alike."""
+    mine = ["--ns", str(os.getpid()), "--nslist", "pid", "-u", str(os.getuid())]
+    return any(subprocess.run(["pgrep", *mine, "-f", p], capture_output=True).returncode == 0 for p in LOCKS)
