@@ -23,13 +23,13 @@ loader.exec_module(schedule)
 HOUR = 3600
 
 
-class Events(unittest.TestCase):
+class Stubbed(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
         self.locked = False
         self.answer = ""
-        self.armed, self.ran, self.notes, self.asked, self.started = [], [], [], [], []
+        self.armed, self.ran, self.notes, self.asked, self.started, self.disarmed = [], [], [], [], [], []
         self.timer_up = set()
         self.bodies = []
 
@@ -44,9 +44,8 @@ class Events(unittest.TestCase):
             return self.answer if actions else ""
 
         for name, stub in [("STATE", os.path.join(self.dir.name, "schedule.json")),
-                           ("WOKE", os.path.join(self.dir.name, "woke")),
                            ("arm", lambda r: (self.armed.append(r["id"]), (True, ""))[1]),
-                           ("disarm", lambda rid: None),
+                           ("disarm", self.disarmed.append),
                            ("screen_locked", lambda: self.locked),
                            ("start_now", start_now),
                            ("notify", notify),
@@ -60,13 +59,14 @@ class Events(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         for target, name, stub in [(schedule.timers, "armed", lambda unit: unit in self.timer_up),
-                                   (schedule, "ask_later", self.asked.append)]:
+                                   (schedule.event_runs, "WOKE", os.path.join(self.dir.name, "woke")),
+                                   (schedule.event_runs, "ask_later", lambda s, rid: self.asked.append(rid))]:
             patcher = mock.patch.object(target, name, stub)
             patcher.start()
             self.addCleanup(patcher.stop)
 
-    def add(self, when, command):
-        schedule.cmd_add(types.SimpleNamespace(json=True, when=when, command=[command]))
+    def add(self, when, command, start=None):
+        schedule.cmd_add(types.SimpleNamespace(json=True, when=when, command=[command], from_=start))
         return self.rows()[-1]["id"]
 
     def rows(self):
@@ -84,6 +84,9 @@ class Events(unittest.TestCase):
     def call(self, name, **kw):
         getattr(schedule, "cmd_" + name)(types.SimpleNamespace(**kw))
 
+
+
+class Events(Stubbed):
     def test_events_need_no_timer_and_list_last(self):
         self.add("wake", "open-pm")
         self.add("login", "make")
@@ -120,7 +123,7 @@ class Events(unittest.TestCase):
         self.call("unlocked")
         self.assertEqual(self.ran, ["open-pm"])
         self.assertEqual([r["on"] for r in self.rows()], ["login"])
-        self.assertFalse(os.path.exists(schedule.WOKE))
+        self.assertFalse(os.path.exists(schedule.event_runs.WOKE))
 
     def test_wake_without_a_lock_runs_at_once(self):
         self.add("wake", "open-pm")
@@ -137,7 +140,7 @@ class Events(unittest.TestCase):
                  {"id": "login", "on": "login", "added": now - HOUR, "command": "at-login"},
                  {"id": "wake", "on": "wake", "added": now - HOUR, "command": "on-wake"})
         self.timer_up.add(schedule.UNIT + "up")
-        with open(schedule.WOKE, "w"):
+        with open(schedule.event_runs.WOKE, "w"):
             pass
         self.call("restore")
         self.assertEqual(sorted(self.ran), ["at-login", "late", "slept"])
@@ -145,7 +148,7 @@ class Events(unittest.TestCase):
         self.assertEqual(self.armed, ["soon"])   # "up" still has its timer
         left = {r["id"]: r.get("state", "waiting") for r in self.rows()}
         self.assertEqual(left, {"old": "missed", "soon": "waiting", "up": "waiting", "wake": "waiting"})
-        self.assertFalse(os.path.exists(schedule.WOKE))   # a wake before the logout isn't this session's
+        self.assertFalse(os.path.exists(schedule.event_runs.WOKE))   # a wake before the logout isn't this session's
 
     def test_missed_asks_run_or_skip(self):
         old = time.time() - 20 * HOUR
@@ -175,6 +178,133 @@ class Events(unittest.TestCase):
         self.call("fire", id="x", now=True)
         self.assertEqual((self.notes[0], self.ran), ("Running: make", ["make"]))
         self.assertTrue(self.bodies[0].startswith("Was due at "))
+
+
+class Places(Stubbed):
+    """arrive PLACE and leave PLACE (#3278): places.json in a throwaway home, events as `places check` sends them."""
+
+    def setUp(self):
+        super().setUp()
+        home = os.path.join(self.dir.name, "home")
+        os.makedirs(os.path.join(home, ".config", "nightdrive"))
+        with open(os.path.join(home, ".config", "nightdrive", "places.json"), "w") as f:
+            json.dump({"places": [{"name": "work", "wifi": ["Office"]}, {"name": "home", "wifi": ["Den"]}]}, f)
+        patcher = mock.patch.dict(os.environ, {"HOME": home})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def listed(self):
+        with mock.patch("builtins.print") as out:
+            self.call("list", json=True)
+        return json.loads(out.call_args[0][0])["commands"]
+
+    def event(self, kind="arrive", place="work"):
+        with mock.patch("builtins.print") as out:
+            self.call("event", kind=kind, place=place, json=True)
+        return json.loads(out.call_args[0][0])
+
+    def test_added_with_its_place_and_its_week(self):
+        rid = self.add("arrive Work", "make", start="05:00")
+        r = self.rows()[0]
+        self.assertEqual((r["on"], r["place"]), ("arrive", "work"))
+        self.assertEqual(self.armed, [rid])   # the week's timer, not a run's
+        c = self.listed()[0]
+        self.assertEqual((c["when"], c["label"], c["place"], c["clock"]), ("arrive", "arrive work", "work", None))
+        self.assertIn("T05:00:00", c["from"])
+        with mock.patch("builtins.print") as out:
+            self.call("list", json=False)
+        self.assertIn("on arriving at work, not before 05:00", out.call_args_list[0][0][0])
+
+    def test_unknown_place_and_from_on_a_time_refused(self):
+        for when, start in (("arrive gym", None), ("leave", None), ("15", "05:00"), ("arrive work", "soon")):
+            with self.assertRaises(SystemExit), mock.patch("sys.stderr"):
+                self.add(when, "make", start=start)
+        self.assertEqual(self.rows(), [])
+
+    def test_typed_unquoted(self):
+        a = schedule.parse_add(["arrive", "work", "--from", "05:00", "make", "--json"])
+        self.assertEqual((a.when, a.from_, a.command), ("arrive work", "05:00", ["make", "--json"]))
+        a = schedule.parse_add(["--from=8h", "leave", "home", "--", "make"])
+        self.assertEqual((a.when, a.from_, a.command), ("leave home", "8h", ["make"]))
+
+    def test_its_own_event_runs_it_once(self):
+        rid = self.add("arrive work", "make")
+        self.add("leave work", "lock-vpn")
+        self.assertEqual(self.event("arrive", "home")["due"], [])
+        self.assertEqual(self.event("arrive", "WORK")["due"], [rid])
+        self.assertEqual(self.event("arrive", "work")["due"], [])   # once
+        self.assertEqual(self.ran, ["make"])
+        self.assertIn(rid, self.disarmed)                           # its week's timer goes
+        self.assertEqual([r["on"] for r in self.rows()], ["leave"])
+
+    def test_not_before_its_from(self):
+        self.add("arrive work", "make", start="2h")
+        self.assertEqual(self.event()["due"], [])
+        later = time.time() + 3 * HOUR
+        with mock.patch.object(schedule.event_runs.time, "time", lambda: later):
+            self.event()
+        self.assertEqual(self.ran, ["make"])
+
+    def test_under_the_lock_it_waits_for_the_unlock(self):
+        rid = self.add("arrive work", "make")
+        self.locked = True
+        self.assertEqual(self.event()["unlock"], [rid])
+        self.assertEqual(self.ran, [])
+        self.locked = False
+        self.call("unlocked")
+        self.assertEqual(self.ran, ["make"])
+
+    def test_a_week_without_it_asks(self):
+        rid = self.add("arrive work", "make")
+        self.call("expire", id=rid)                  # an early call does nothing
+        self.assertEqual(self.notes, [])
+        r = self.rows()[0]
+        r["added"] -= 8 * 24 * HOUR
+        self.put(r)
+        self.answer = ""                             # dismissed: missed, and the arrival still runs it
+        self.call("expire", id=rid)
+        self.assertEqual(self.notes, ["You didn't arrive at work: make"])
+        self.assertEqual(self.rows()[0]["state"], "missed")
+        self.event()
+        self.assertEqual(self.ran, ["make"])
+
+    def test_a_week_without_it_run_or_skip(self):
+        old = time.time() - 8 * 24 * HOUR
+        self.put({"id": "a", "on": "leave", "place": "work", "added": old, "command": "a"},
+                 {"id": "b", "on": "leave", "place": "work", "added": old, "command": "b"})
+        self.answer = "run"
+        self.call("expire", id="a")
+        self.answer = "skip"
+        self.call("expire", id="b")
+        self.assertEqual((self.ran, self.rows()), (["a"], []))
+        self.assertEqual(self.notes[0], "You didn't leave work: a")
+
+    def test_login_arms_the_week_asks_past_ones_runs_what_came_locked(self):
+        now = time.time()
+        self.put({"id": "wait", "on": "arrive", "place": "work", "added": now - HOUR, "command": "wait"},
+                 {"id": "old", "on": "arrive", "place": "work", "added": now - 8 * 24 * HOUR, "command": "old"},
+                 {"id": "came", "on": "leave", "place": "home", "added": now - HOUR, "command": "came",
+                  "state": "unlock"})
+        self.call("restore")
+        self.assertEqual(self.ran, ["came"])
+        self.assertEqual(self.asked, ["old"])
+        self.assertEqual(self.armed, ["wait"])
+        self.assertEqual({r["id"]: r.get("state") for r in self.rows()}, {"wait": None, "old": "missed"})
+
+    def test_login_and_its_arrival_side_by_side_run_it_once(self):
+        """autostart.lua starts `schedule restore` and `places check --wake` together: either order starts it once,
+        and a start that came twice still runs it once."""
+        for steps in (("restore", "event"), ("event", "restore")):
+            self.ran.clear()
+            rid = self.add("arrive work", "make")
+            starts = []
+            with mock.patch.object(schedule, "start_now", starts.append):
+                for step in steps:
+                    self.call("restore") if step == "restore" else self.event()
+            self.assertEqual(starts, [rid], steps)
+            for _ in range(2):
+                schedule.cmd_fire(types.SimpleNamespace(id=rid, now=True))
+            self.assertEqual((self.ran, self.rows()), (["make"], []), steps)
 
 
 if __name__ == "__main__":

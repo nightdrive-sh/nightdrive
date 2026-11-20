@@ -37,7 +37,8 @@ Item {
         return h + " h" + (rest ? " " + rest + " min" : "")
     }
     function whenLabel(row) {
-        return row.when === "wake" ? "On wake" : row.when === "login" ? "At login" : "At " + row.clock
+        // arrive work and leave work (#3278) as the script labels them, until Settings › Places gives them rows (#3281)
+        return row.when === "wake" ? "On wake" : row.when === "login" ? "At login" : !row.clock ? row.label : "At " + row.clock
     }
     // What a kind is called on its row: the same words as the script's list (Run, Ask Claude)
     function kindName(k) { return k === "claude" ? "Ask Claude" : "Run" }
@@ -97,6 +98,7 @@ Item {
     }
     function waitingRow(p) {
         const when = p.when === "wake" ? "on wake" : p.when === "login" ? "at login"
+                   : !p.clock ? (p.state === "missed" ? "missed · Ctrl+Enter: run · " : "") + p.label   // arrive work
                    : p.state === "missed" ? "missed " + p.clock + " · Ctrl+Enter: run"
                    : p.state === "unlock" ? "waits for the unlock"
                    : p.state === "due" ? "running"
