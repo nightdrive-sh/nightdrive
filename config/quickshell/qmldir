@@ -69,6 +69,7 @@ WiredProfiles 1.0 WiredProfiles.qml
 Toggle 1.0 Toggle.qml
 TouchScroll 1.0 TouchScroll.qml
 AppIcon 1.0 AppIcon.qml
+singleton IconFiles 1.0 IconFiles.qml
 RowCopy 1.0 RowCopy.qml
 WifiLevels 1.0 WifiLevels.qml
 BluetoothLevels 1.0 BluetoothLevels.qml
