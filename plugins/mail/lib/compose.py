@@ -52,6 +52,7 @@ import sys
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, getaddresses, make_msgid, parseaddr, parsedate_to_datetime
 
+import blanks
 import ids
 
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "nightmail", "account.conf")
@@ -151,8 +152,9 @@ def reply(msgid, to_all):
     h, orig = data["reply-headers"], data["original"]
     when = parsedate_to_datetime(orig["headers"]["Date"]).strftime("%a %d %b %Y, %H:%M") if orig["headers"].get("Date") else ""
     name, addr = parseaddr(orig["headers"].get("From", ""))
-    # notmuch reply leaves an HTML part's text out: an HTML-only message is read from its file
-    quoted = "\n".join(">" + line if line.startswith(">") else "> " + line if line else ">" for line in (plain_text(orig.get("body", [])) or body_text(parsed(msgid))).rstrip().split("\n"))
+    # notmuch reply leaves an HTML part's text out: an HTML-only message is read from its file. Its blank lines are
+    # tidied as the read view shows them (blanks.py): no long runs of ">" lines from a newsletter's padding.
+    quoted = "\n".join(">" + line if line.startswith(">") else "> " + line if line else ">" for line in blanks.tidy(plain_text(orig.get("body", [])) or body_text(parsed(msgid))).split("\n"))
     return {
         "to": h.get("To", ""),
         "cc": h.get("Cc", ""),

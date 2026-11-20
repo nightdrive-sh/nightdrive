@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "blanks.js" as Blanks
 
 // The only part that talks to notmuch, and the only Quickshell import besides the window:
 // a later native host replaces this file and keeps the same functions.
@@ -188,7 +189,8 @@ QtObject {
             timestamp: m.timestamp,
             tags: m.tags || [],
             draft: (m.filename || []).some(f => /\/Drafts\/(cur|new)\//.test(f)),
-            body: (parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)).replace(/^\s+|\s+$/g, ""),
+            // Blank lines tidied for reading (blanks.js): a newsletter's runs of empty and NBSP lines become one
+            body: Blanks.tidy(parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)),
             html: parts.html !== "" ? safeHtml(parts.html) : "",
             files: parts.files,     // attachments: { part, name, size } (size in bytes, or -1)
             invite: parts.invite    // a calendar invitation in it: Invitation.qml reads it by Calendar
