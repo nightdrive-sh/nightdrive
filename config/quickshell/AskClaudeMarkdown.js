@@ -44,7 +44,8 @@ function ready(md) {
     return lines.join("\n")
 }
 
-// The HTML for a TextEdit's RichText; live: the answer is still coming
+// The HTML for a TextEdit's RichText; live: the answer is still coming. A code block's long line wraps (pre-wrap) rather
+// than running out of the card, which is as narrow as the screen on a small one (#3274); a note's blocks stay as they are.
 function html(md, c, size, live) {
-    return Markdown.html(live ? ready(md) : md, look(c, size))
+    return Markdown.html(live ? ready(md) : md, look(c, size)).replace(/<pre style="/g, '<pre style="white-space:pre-wrap; ')
 }

@@ -101,6 +101,7 @@ class AskClaudeMarkdown(unittest.TestCase):
         html = self.out["html"]
         self.assertIn("font-size:18px", html["heading"])    # the answer's 15 px + 3, not a note's 22
         self.assertIn('bgcolor="#111111"', html["fence"])
+        self.assertIn("white-space:pre-wrap", html["fence"])   # a long line wraps in the card (#3274)
         self.assertNotIn("tag:", html["tag"])
 
 

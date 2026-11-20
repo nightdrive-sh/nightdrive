@@ -26,7 +26,11 @@ Toast {
     property bool stepAside: false        // a password prompt or Claude's full card is up: they get the keys
 
     // --- Tunables ---
-    readonly property int askWidth: 660            // as the launcher's card
+    // As the launcher's card, and as it does on a narrow screen (a phone's, a VM's window): edge px from each side
+    // (#3274). Its content wraps to it (AskClaudeThread's text, AskClaudeMarkdown's code blocks, the footer's lines).
+    readonly property int wideWidth: 660
+    readonly property int edge: 12                 // the launcher's
+    readonly property int askWidth: Math.min(wideWidth, (Screen.width || wideWidth + 2 * edge) - 2 * edge)
     readonly property real screenShare: 0.6        // the most of the screen's height it grows to before it scrolls
     readonly property int listenGrace: 3000        // ms the card waits for the text after Voxtype is done
     readonly property int answeredFor: 10000       // ms the closed card says Claude answered
