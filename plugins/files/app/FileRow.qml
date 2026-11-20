@@ -14,12 +14,15 @@ AppRow {
     required property var app
     readonly property var file: modelData
     readonly property bool isMarked: app.marks[file.path] === true
+    // The size, date and folder: faint on the window, but on the checked bar faint fell to 1.8:1, so lighter there (~5:1)
+    readonly property color quiet: checked ? Qt.lighter(c.dim, 1.3) : c.faint
 
     implicitHeight: app.rowHeight
     selected: index === app.current
     active: app.listFocused
     opacity: app.clip.cutSet[file.path] ? 0.5 : 1
-    color: drop.containsDrag ? c.hover : selected ? c.sel : marked || hovered ? c.hover : "transparent"
+    checked: isMarked                    // the kit's bar beside the tick: the tick alone was easy to miss in a range
+    color: drop.containsDrag ? c.hover : checked ? (selected ? c.checkedPicked : c.checked) : selected ? c.sel : hovered ? c.hover : "transparent"
     border.color: drop.containsDrag ? c.primary : selected && active ? c.frame : "transparent"
 
     TapHandler {
@@ -29,14 +32,19 @@ AppRow {
         // The picture a drag from here would carry, taken now: it isn't ready in time once the drag starts
         onPressedChanged: if (pressed && !row.app.trashShown) row.app.drag.prepare(row.file, row.app.dragPaths(row.file.path).length)
     }
-    // ⌘-click marks or unmarks it, ⇧-click marks the rows from the picked one to it
+    // ⌘-click marks or unmarks it, ⇧-click marks the rows from the anchor to it, ⌘⇧-click adds them (the window's
+    // markTo). One handler for every modifier: acceptedModifiers wants them exact, and ⌘ comes as Ctrl or as Meta
+    // (Hyprland turns only some ⌘ keys into Ctrl). The plain click is the handler above.
     TapHandler {
-        acceptedModifiers: Qt.ControlModifier
-        onTapped: { row.app.current = row.index; row.app.toggleMarkAt(row.index); row.app.toList() }
-    }
-    TapHandler {
-        acceptedModifiers: Qt.ShiftModifier
-        onTapped: { row.app.markRange(row.app.current, row.index); row.app.current = row.index; row.app.toList() }
+        acceptedModifiers: Qt.KeyboardModifierMask
+        onTapped: {
+            const m = point.modifiers
+            const cmd = (m & (Qt.ControlModifier | Qt.MetaModifier)) !== 0
+            if (m & Qt.ShiftModifier) row.app.markTo(row.index, cmd)
+            else if (cmd) { row.app.current = row.index; row.app.toggleMarkAt(row.index) }
+            else return
+            row.app.toList()
+        }
     }
     DragHandler {
         id: dragger
@@ -84,7 +92,7 @@ AppRow {
         anchors.verticalCenter: parent.verticalCenter
         elide: Text.ElideLeft          // the nearest folders matter most
         text: row.hasFolder ? row.file.folder : ""
-        font.family: row.c.font; font.pixelSize: 12; color: row.c.faint
+        font.family: row.c.font; font.pixelSize: 12; color: row.quiet
     }
     // Size, or in the trash where it came from
     Text {
@@ -97,7 +105,7 @@ AppRow {
         horizontalAlignment: row.app.trashShown ? Text.AlignLeft : Text.AlignRight
         elide: Text.ElideMiddle
         text: row.app.trashShown ? row.app.tilde(Format.parent(row.file.origin)) : row.file.dir ? "" : Format.size(row.file.size)
-        font.family: row.c.font; font.pixelSize: 12; color: row.c.faint
+        font.family: row.c.font; font.pixelSize: 12; color: row.quiet
     }
     Text {
         id: third
@@ -107,6 +115,6 @@ AppRow {
         visible: width > 0
         horizontalAlignment: Text.AlignRight
         text: Regional.relative(row.file.modified)
-        font.family: row.c.font; font.pixelSize: 12; color: row.c.faint
+        font.family: row.c.font; font.pixelSize: 12; color: row.quiet
     }
 }

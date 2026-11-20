@@ -11,6 +11,11 @@ QtObject {
     readonly property color divider: Qt.lighter(line, 1.2)     // the lines between the panes
     // Under the pointer: the selected row's colour, fainter, so a row you point at never looks picked
     readonly property color hover: Qt.rgba(sel.r, sel.g, sel.b, 0.5)
+    // A row marked for what the keys do next (AppRow's checked: Files' marked files): a bar in the theme's colour, so a
+    // range of them reads at a glance, unlike a tick alone
+    readonly property color checked: Qt.rgba(primary.r, primary.g, primary.b, 0.32)
+    // The picked one of them: stronger, as the plain selection colour (sel) looked fainter than its checked neighbours
+    readonly property color checkedPicked: Qt.rgba(primary.r, primary.g, primary.b, 0.45)
     // The picked row where the keys are (active), framed only while the keys are in use (AppPointer.qml)
     property bool keyboard: false
     // Any key but a lone modifier puts the pointer's hover colour away (AppRow), as a Mac does, till the mouse moves

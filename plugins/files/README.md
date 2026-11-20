@@ -23,7 +23,7 @@ browser's "Show in folder".
 | `f`, or Tab in the filter | Search all of home by name, and Tab back to this folder; ⌘F again or a click on the scope at the field's end does the same. Outside home (a USB stick) it searches the folder and every one below it. Each file shows the folder it is in, ← goes there |
 | `.` | Hidden files (⌘⇧. too) |
 | `s` `S` | Sort by name, time, size or type; the other way round (a click on a column's title too) |
-| `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, ⌘-click and ⇧-click with the mouse, Esc unmarks |
+| `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, Esc unmarks. With the mouse ⌘-click marks one, ⇧-click the files from the one last clicked or picked to it (in place of the marks before), ⌘⇧-click adds them; in a filter or a search only the files shown |
 | `y` `x` `p` or ⌘C ⌘X ⌘V | Copy, cut, paste here: the marked files, else the picked one |
 | `d` or ⌘⌫ | To the trash |
 | `r` or F2 | Rename (the name without its ending is picked) |

@@ -162,6 +162,20 @@ FloatingWindow {
         for (let i = Math.min(a, b); i <= Math.max(a, b); i++) if (rows[i]) m[rows[i].path] = true
         marks = m
     }
+    // ⇧-click marks the rows from the anchor to row i in place of the marks before, ⌘⇧-click (add) beside them, as
+    // Finder and Nautilus do. The anchor is the row last picked by a click or the keys, and a ⇧-click leaves it, so a
+    // second one changes the span. Indexes are the shown rows', so in a filter or a search's results only those count.
+    property string anchor: ""
+    property bool holdAnchor: false
+    // rows[current], not picked: its binding may not have caught up yet when this runs
+    onCurrentChanged: if (!holdAnchor) anchor = rows[current] ? rows[current].path : ""
+    function markTo(i, add) {
+        let a = rows.findIndex(r => r.path === anchor)
+        if (a < 0) a = current >= 0 ? current : i
+        if (!add) marks = ({})
+        markRange(a, i)
+        holdAnchor = true; current = i; holdAnchor = false
+    }
     function markAll() { const m = {}; for (const r of rows) m[r.path] = true; marks = m }
     function selection() { return marked.length ? marked.map(r => r.path) : picked ? [picked.path] : [] }
     function selectionIds() { return marked.length ? marked.map(r => r.id) : picked ? [picked.id] : [] }
@@ -310,7 +324,7 @@ FloatingWindow {
         groups: [
             { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l", "Open: into a folder, a file in its app"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
             { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
-            { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["⌘-click  ⇧-click", "Mark one, mark up to it"], ["Esc", "No marks"]] },
+            { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["⌘-click", "Mark one"], ["⇧-click  ⌘⇧-click", "Mark up to it, add up to it"], ["Esc", "No marks"]] },
             { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["⌘Z", "Undo"]] },
             { title: "Places", keys: [["Tab", "Sidebar, list"], ["⌘N", "A new window, in this folder"], ["b  ⌘D", "Bookmark the picked folder, or not"], ["Drag", "Onto a folder or the sidebar: moved; from another app: copied"], ["Drag in the sidebar", "A folder to another place, or to the other group"]] },
             { title: "Trash", keys: [["u", "Put back"], ["d", "Delete for good"], ["⌘⇧⌫", "Empty the trash"]] }
