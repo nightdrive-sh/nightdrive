@@ -10,7 +10,7 @@ import Quickshell.Io
 QtObject {
     id: root
     required property var app              // the window: helper, active
-    property var data: ({ pinned: [], bookmarks: [], devices: [], trash: 0, downloads: "" })
+    property var data: ({ pinned: [], bookmarks: [], devices: [], trash: 0, downloads: "", standard: [] })
     readonly property var pinnedRows: data.pinned.map(p => ({ kind: "place", name: p.name, path: p.path, glyph: p.glyph }))
     readonly property var bookmarkRows: data.bookmarks.map((b, i) => ({ kind: "bookmark", name: b.name, path: b.path,
                                                                         glyph: b.missing ? "folder-x" : "bookmark", gap: i === 0 }))

@@ -38,7 +38,7 @@ browser's "Show in folder".
 - The clipboard is the desktop's: files copied here paste into a mail, a chat or a browser, and files copied in Nautilus paste here. A cut moves the files once pasted.
 - Drag files out of the list into another app, or onto a folder in the list, the sidebar or the path at the top; files dragged in from another app are copied, and from Files itself moved. Dropped on Trash, they go there.
 - A copy or move never writes over a file: a name already there gets " (2)". A long one shows how far it is, with Stop.
-- The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
+- The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). `d` moves to it at once (Undo brings it back), but asks first about home's own folders (Documents…), the sidebar's and home's hidden ones (`.config`…); home itself, the folders above it and the trash never go. In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
 
 ## In a terminal
 

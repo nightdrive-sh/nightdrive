@@ -26,6 +26,18 @@ class Trash(unittest.TestCase):
         del os.environ["XDG_DATA_HOME"]
         self.tmp.cleanup()
 
+    def test_home_and_the_trash_are_kept(self):
+        old = os.environ.get("HOME")
+        os.environ["HOME"] = str(self.docs)
+        try:
+            for p in (self.docs, self.home, Path("/"), self.home / "data", self.home / "data/Trash"):
+                with self.assertRaises(trash.Refused, msg=str(p)):
+                    trash.trash_one(p)
+            (self.docs / "keep me").mkdir()
+            trash.trash_one(self.docs / "keep me")            # a folder in home still goes
+        finally:
+            os.environ["HOME"] = old
+
     def test_spec_layout_and_restore(self):
         f = self.docs / "plan b.txt"
         f.write_text("x")

@@ -171,6 +171,7 @@ def unmount(path):
 
 
 def all_places():
-    """The sidebar's groups but the first (pinned.rows, which cli.py adds), and Downloads' folder for gd"""
+    """The sidebar's groups but the first (pinned.rows, which cli.py adds), Downloads' folder for gd, and home's own
+    folders, which the window asks about before they go to the trash"""
     return {"bookmarks": bookmarks(), "devices": devices(), "trash": trash.count(),
-            "downloads": str(user_dirs()["DOWNLOAD"])}
+            "downloads": str(user_dirs()["DOWNLOAD"]), "standard": [r["path"] for r in standard()]}

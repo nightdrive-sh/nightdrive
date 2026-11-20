@@ -58,11 +58,29 @@ def _write_info(info_dir, name, origin):
     return True
 
 
+def _refuse_kept(path):
+    """Home, the folders above it, and the trash (or a folder it is in) never go to the trash, whoever asks: the window
+    asks first for home's own folders, but this holds for a drop, a script or a slip too. A link is judged as itself,
+    not as where it points."""
+    real = Path(os.path.realpath(path.parent)) / path.name
+    home = Path(os.path.realpath(Path.home()))
+    trash = Path(os.path.realpath(home_trash()))
+    if real == home:
+        raise Refused("Home can't go to the trash.")
+    if home.is_relative_to(real):
+        raise Refused(f"{path.name} holds your home: it can't go to the trash.")
+    if trash.is_relative_to(real):
+        raise Refused(f"{path.name} holds the trash: it can't go to the trash.")
+    if real.is_relative_to(trash):
+        raise Refused(f"{path.name} is in the trash already.")
+
+
 def trash_one(path):
     """Moves one path to its trash; the id (info file) it has there."""
     path = Path(os.path.abspath(path))
     if not os.path.lexists(path):
         raise Refused(f"{path.name} isn't there any more.")
+    _refuse_kept(path)
     trash, top = trash_for(path)
     files, info = trash / "files", trash / "info"
     try:

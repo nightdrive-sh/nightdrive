@@ -20,7 +20,26 @@ QtObject {
     function paste() { if (!app.trashShown) app.clip.paste(app.path) }
     function trashPicked() {
         const ps = app.selection()
-        if (ps.length && !app.trashShown) { app.ops.trash(ps); app.marks = ({}) }
+        if (ps.length && !app.trashShown) { trashPaths(ps); app.marks = ({}) }
+    }
+    // To the trash at once, but asked first when home's own folders (Documents…), the sidebar's or home's hidden ones
+    // (.config, .local…) are among them: one d away, a running desktop's settings went with no word. Home itself, the
+    // folders above it and the trash are refused by lib/trash.py whatever asks.
+    function kept(p) {
+        const d = app.places.data
+        const name = Format.base(p)
+        return d.standard.indexOf(p) >= 0 || d.pinned.some(e => e.path === p) || d.bookmarks.some(e => e.path === p)
+            || (Format.parent(p) === app.home && name.startsWith("."))
+    }
+    function trashPaths(ps) {
+        const ask = ps.filter(kept)
+        if (!ask.length) { app.ops.trash(ps); return }
+        pending = () => app.ops.trash(ps)
+        confirm.question = ps.length === 1 ? "Move “" + Format.base(ps[0]) + "” to the trash?" : "Move " + ps.length + " items to the trash?"
+        confirm.detail = (ps.length === 1 ? "It is" : "Among them, " + ask.map(Format.base).join(", ") + (ask.length === 1 ? " is" : " are"))
+                       + " one of home's own folders or the sidebar's. Undo or the trash puts " + (ps.length === 1 ? "it" : "them") + " back."
+        confirm.action = "Move to Trash"
+        confirm.visible = true
     }
 
     // r / F2: the name with its stem picked, so typing keeps ".pdf"
@@ -128,7 +147,7 @@ QtObject {
         const ps = (e.urls || []).map(u => Format.path(u)).filter(p => p)
         if (!ps.length) return
         e.accept(Qt.CopyAction)
-        if (toTrash) { app.ops.trash(ps); return }
+        if (toTrash) { trashPaths(ps); return }
         if (ps.indexOf(into) >= 0) return
         if (app.drag.ours(e)) app.ops.move(ps, into)
         else app.ops.copy(ps, into)
