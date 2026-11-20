@@ -22,6 +22,7 @@ passwords do, and never goes in a file. The ICS sources are fetched by feeds.py,
 """
 
 import configparser
+import importlib.util
 import json
 import os
 import re
@@ -45,8 +46,19 @@ YES = ("yes", "true", "on", "1")
 # source here is named by contacts.pair_name, - as _)
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_]*$")
 
-sys.path.insert(0, str(REPO / "plugins/contacts/lib"))
-import config as contacts  # noqa: E402  (Contacts' accounts.conf; its files are in every checkout)
+
+def _contacts_config():
+    """Contacts' lib/config.py (its accounts.conf; its files are in every checkout), loaded from its file under a name
+    of its own. Not by putting Contacts' lib on sys.path: a module there then shadows Calendar's of the same name, as
+    Contacts' settings.py did Calendar's on 16.11. and every reminder check failed (#3309)"""
+    spec = importlib.util.spec_from_file_location("contacts_config", REPO / "plugins/contacts/lib/config.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+contacts = _contacts_config()
 
 
 def own():
