@@ -16,6 +16,8 @@ launcher's Tools › Remind (quickshell/RemindLevels.qml) and Claude's tools (co
                                        and minutes_left null for an event, state waiting or unlock (came under the lock)
   remind show ID --json                one of them, as list gives it
   remind cancel ID|all [--json]        takes one (or every one) away before it's due
+  remind uncancel ID [--json]          a cancelled one back as it was (the undo of Claude's remind_cancel), unless its
+                                       time or its week of waiting has passed
   remind restore                       at login (hypr/autostart.lua): sets the timers again, tells the missed ones and
                                        login's (remind_events.py: also woke, unlocked, event, expire)
   remind event arrive|leave PLACE [--json]
@@ -37,6 +39,8 @@ import events  # noqa: E402  the event WHENs shared with schedule: wake, login, 
 import remind_events as event_runs  # noqa: E402  restore, woke, unlocked, event, expire: what tells one but its timer
 
 STATE = os.path.expanduser("~/.local/state/nightdrive/reminders.json")
+CANCELLED = os.path.expanduser("~/.local/state/nightdrive/reminders-cancelled.json")   # for uncancel, the last KEEP
+KEEP_CANCELLED = 20
 UNIT = "nightdrive-remind-"         # + the id: the timer and its service
 MAX_MINUTES = 7 * 24 * 60           # a week: longer is a calendar event's or a task's job
 APP, ICON = "Remind", "lucide:alarm-clock"
@@ -61,6 +65,10 @@ def parse_minutes(text):
 def state():
     # STATE read at each call: the tests point it elsewhere
     return timers.locked_rows(STATE, "reminders")
+
+
+def cancelled():
+    return timers.locked_rows(CANCELLED, "reminders")
 
 
 def armed(rid):
@@ -198,10 +206,41 @@ def cmd_cancel(a):
         for r in gone:
             disarm(r["id"])
             rows.remove(r)
+    if gone:   # kept a while, whole: an event's row (arrive work --from 05:00) has no @UNIX to be added again from
+        with cancelled() as kept:
+            kept[:] = [k for k in kept if k["id"] not in {r["id"] for r in gone}] + gone
+            del kept[:-KEEP_CANCELLED]
     if a.json:
         print(json.dumps({"cancelled": [public(r) for r in gone]}, ensure_ascii=False))
     else:
         print("\n".join(f"Cancelled: {r['message']}" for r in gone) or "No reminders waiting")
+
+
+def cmd_uncancel(a):
+    """A cancelled reminder back as it was, its timer armed again: the undo of Claude's remind_cancel, as schedule's.
+    One whose time has passed meanwhile stays cancelled: it would come at once, which the undo never meant."""
+    with cancelled() as kept:
+        r = next((k for k in kept if k["id"] == a.id), None)
+        if not r:
+            die(f"No cancelled reminder {a.id}: it is back already, or was cancelled long ago")
+        if "on" not in r and r["at"] <= time.time():
+            die(f"Its time ({clock(r['at'])}) has passed: set it again")
+        if (events.deadline(r) or float("inf")) <= time.time():
+            die("Its week of waiting has passed: set it again")
+        r = {k: v for k, v in r.items() if k != "state"}   # unlock was about the event it had
+        with state() as rows:
+            if any(x["id"] == r["id"] for x in rows):
+                die(f"{a.id} is waiting already (remind list)")
+            if timed(r):
+                ok, err = arm(r)
+                if not ok:
+                    die("The timer didn't start: " + (err or "systemd-run failed"))
+            rows.append(r)
+        kept[:] = [k for k in kept if k["id"] != a.id]
+    if a.json:
+        print(json.dumps(public(r), ensure_ascii=False))
+    else:
+        print(f"Back: {said(r, time.time())}  {r['message']}  ({r['id']})")
 
 
 def cmd_fire(a):
@@ -259,9 +298,10 @@ def main():
     show = sub.add_parser("show")
     show.add_argument("id")
     show.add_argument("--json", action="store_true")
-    cancel = sub.add_parser("cancel")
-    cancel.add_argument("id")
-    cancel.add_argument("--json", action="store_true")
+    for name in ("cancel", "uncancel"):
+        cancel = sub.add_parser(name)
+        cancel.add_argument("id")
+        cancel.add_argument("--json", action="store_true")
     fire = sub.add_parser("fire")
     fire.add_argument("id")
     for name in ("restore", "woke", "unlocked"):
@@ -285,8 +325,8 @@ def main():
     if argv[0] == "add":
         argv = join_place(argv)
     a = p.parse_args(argv)
-    {"add": cmd_add, "list": cmd_list, "show": cmd_show, "cancel": cmd_cancel, "fire": cmd_fire, "restore": cmd_restore,
-     "woke": cmd_woke, "unlocked": cmd_unlocked, "event": cmd_event, "expire": cmd_expire}[a.cmd](a)
+    {"add": cmd_add, "list": cmd_list, "show": cmd_show, "cancel": cmd_cancel, "uncancel": cmd_uncancel,
+     "fire": cmd_fire, "restore": cmd_restore, "woke": cmd_woke, "unlocked": cmd_unlocked, "event": cmd_event, "expire": cmd_expire}[a.cmd](a)
 
 
 def join_place(argv):

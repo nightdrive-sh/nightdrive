@@ -3,12 +3,14 @@
     {
       "name": "schedule_add",
       "title": "Schedule for later",
-      "description": "Leaves something to happen later, once, on this computer, as `nightdrive schedule` does: at a time of day, in so many minutes (up to a week), at the first unlock after the computer next wakes from sleep (wake), or at the next login. Use it to carry on later by yourself: when the user says to go on in the morning, schedule a message to Claude for wake (or a time), saying what to do and where the work stands, to this session (to: its name or id from sessions_list) or to a new session. A text whose first word is a program (or nightdrive) runs as a shell command, any other is a message to Claude; as says which instead. The user always allows it on Nightdrive's card first, and the list and its notifications show it as by Claude. Nothing runs behind the lock: a time that passes while the computer sleeps runs at the unlock. Returns the row as schedule_list gives it. For a reminder banner, a reminder is better.",
+      "description": "Leaves something to happen later, once, on this computer, as `nightdrive schedule` does: at a time of day, in so many minutes (up to a week), at the first unlock after the computer next wakes from sleep (wake), at the next login, or on arriving at or leaving a place (arrive work, leave home: a place is a name the user gave Wi-Fi networks; look it up among the user's places, and one that isn't there, ask once which network it is, offering the one now, and add it as a place first). With from, an event counts only after then: \"when I get to work in the morning\" said in the evening is arrive work, from 05:00. An arrival or a leaving not seen in a week asks Run or Skip. Use it to carry on later by yourself: when the user says to go on in the morning, schedule a message to Claude for wake (or a time), saying what to do and where the work stands, to this session (to: its name or id from sessions_list) or to a new session. A text whose first word is a program (or nightdrive) runs as a shell command, any other is a message to Claude; as says which instead. The user always allows it on Nightdrive's card first, and the list and its notifications show it as by Claude. Nothing runs behind the lock: a time that passes while the computer sleeps runs at the unlock. Returns the row as schedule_list gives it. For a reminder banner, a reminder is better.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "when": {"type": "string", "maxLength": 20, "pattern": "^([0-9hmin:. ]+|wake|login)$", "title": "When",
-                   "description": "Minutes from now (15, 90m, 1h30m; up to a week), a time of day (07:30: the next one, tomorrow's once today's has passed), wake (the first unlock after the computer next wakes from sleep) or login (the next login)"},
+          "when": {"type": "string", "maxLength": 60, "pattern": "^([0-9hmin:. ]+|wake|login|(arrive|leave) [^ -].*)$", "title": "When",
+                   "description": "Minutes from now (15, 90m, 1h30m; up to a week), a time of day (07:30: the next one, tomorrow's once today's has passed), wake (the first unlock after the computer next wakes from sleep), login (the next login), or arrive PLACE / leave PLACE (PLACE: the name of one of the user's places)"},
+          "from": {"type": "string", "maxLength": 25, "pattern": "^[0-9hmin:. T-]+$", "title": "Not before",
+                   "description": "With an event only: it counts only after then. A time of day (05:00: the next one), minutes from now (8h) or a date and time (2026-11-23 05:00); within a week"},
           "text": {"type": "string", "minLength": 1, "maxLength": 4000, "title": "What",
                    "description": "A shell command line (make && notify-send done), or a message to Claude: what to do then, whole, as the session will read it with nothing else to go on"},
           "as": {"type": "string", "enum": ["run", "claude"], "title": "As",
@@ -19,9 +21,9 @@
         "required": ["when", "text"],
         "additionalProperties": false
       },
-      "command": ["nightdrive", "schedule", "--json", "{when}", ["--{as}"], ["--to", "{to}"], "--", "{text}"],
+      "command": ["nightdrive", "schedule", "--json", "{when}", ["--from", "{from}"], ["--{as}"], ["--to", "{to}"], "--", "{text}"],
       "asks_if": ["echo", "yes"],
-      "card": ["nightdrive", "schedule", "--card", "{when}", ["--{as}"], ["--to", "{to}"], "--", "{text}"],
+      "card": ["nightdrive", "schedule", "--card", "{when}", ["--from", "{from}"], ["--{as}"], ["--to", "{to}"], "--", "{text}"],
       "class": "change",
       "undo": ["nightdrive", "schedule", "cancel", "{id}"],
       "notice": "Scheduled ({label}): {command}",
@@ -30,7 +32,7 @@
     {
       "name": "schedule_list",
       "title": "Scheduled for later",
-      "description": "What waits in `nightdrive schedule` (schedule_add's and the user's own), by time, then wake and login: {commands: [{id, when (time, wake or login), label, at (ISO 8601), at_unix, clock (HH:MM), minutes_left, state (waiting; unlock: its time came under the lock; missed: asks Run or Skip; due), kind (run or claude), to (the session a message is for), command (the line or the message), by (user or claude)}]}.",
+      "description": "What waits in `nightdrive schedule` (schedule_add's and the user's own), by time, then wake, login, arrive and leave: {commands: [{id, when (time, wake, login, arrive or leave), label (07:30, wake, arrive work), at (ISO 8601), at_unix, clock (HH:MM), minutes_left (these four null for an event), place (or null), from (ISO 8601, or null), state (waiting; unlock: its time came under the lock; missed: asks Run or Skip; due), kind (run or claude), to (the session a message is for), command (the line or the message), by (user or claude)}]}.",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
       "command": ["nightdrive", "schedule", "list", "--json"],
       "class": "read",

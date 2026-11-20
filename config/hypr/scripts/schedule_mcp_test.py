@@ -61,6 +61,11 @@ class Tools(unittest.TestCase):
         self.assertEqual((a.when, a.command, a.run, a.claude), ("07:30", ["make && notify-send done"], True, False))
         a = self.argv(add["card"], when="15", text="check CI", **{"as": "claude"})
         self.assertEqual((a.card, a.claude, a.json), (True, True, False))
+        # #3280: an arrival, not before the morning (the place is one word of WHEN's, its own argument)
+        a = self.argv(add["command"], when="arrive the office", text="go on with the portraits", **{"from": "05:00"})
+        self.assertEqual((a.when, a.from_, a.command), ("arrive the office", "05:00", ["go on with the portraits"]))
+        a = self.argv(add["card"], when="leave home", text="make", **{"from": "2026-11-23 05:00", "as": "run"})
+        self.assertEqual((a.when, a.from_, a.run, a.card), ("leave home", "2026-11-23 05:00", True, True))
 
 
 class Rows(unittest.TestCase):

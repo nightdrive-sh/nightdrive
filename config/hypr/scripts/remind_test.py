@@ -47,6 +47,7 @@ class Timers(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         remind.STATE = os.path.join(self.dir.name, "reminders.json")
+        remind.CANCELLED = os.path.join(self.dir.name, "reminders-cancelled.json")   # never the user's own
         self.armed, self.disarmed, self.told, self.active = [], [], [], set()
         remind.arm = lambda r: (self.armed.append(r["id"]), (True, ""))[1]
         remind.disarm = self.disarmed.append
@@ -80,6 +81,30 @@ class Timers(unittest.TestCase):
         self.assertEqual([(r["at"], r["message"]) for r in self.rows()], [(at, "Back")])
         with self.assertRaises(SystemExit):
             self.run_cmd(remind.cmd_add, when=f"@{int(time.time()) - 5}", message=["Too late"])
+
+    def test_cancel_undone_gives_the_same_row(self):
+        """Claude's cancel undone (remind uncancel): the same row, also an event's, which has no @UNIX to add back."""
+        self.run_cmd(remind.cmd_add, when="10", message=["Tea"])
+        rid = self.rows()[0]["id"]
+        self.run_cmd(remind.cmd_cancel, id=rid)
+        self.run_cmd(remind.cmd_uncancel, id=rid)
+        self.assertEqual([(r["id"], r["message"]) for r in self.rows()], [(rid, "Tea")])
+        self.assertEqual(self.armed, [rid, rid])
+        with self.assertRaises(SystemExit):   # once only
+            self.run_cmd(remind.cmd_uncancel, id=rid)
+
+    def test_no_uncancel_once_its_time_passed(self):
+        self.run_cmd(remind.cmd_add, when="5", message=["Late"])
+        rid = self.rows()[0]["id"]
+        self.run_cmd(remind.cmd_cancel, id=rid)
+        real = time.time
+        remind.time.time = lambda: real() + 3600
+        try:
+            with self.assertRaises(SystemExit):
+                self.run_cmd(remind.cmd_uncancel, id=rid)
+        finally:
+            remind.time.time = real
+        self.assertEqual(self.rows(), [])
 
     def test_fire_tells_once(self):
         self.run_cmd(remind.cmd_add, when="1", message=["Call back"])

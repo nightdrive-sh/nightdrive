@@ -251,12 +251,12 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Deck | what plays, search, albums | play, queue, pause and skip, like, Pick for me | |
 | Ferry | whether it's on, devices, the box | send files or a text to a device † | |
 | Home Assistant | devices and sensors (presence and location: a choice) | switch a device, dim a light (with Undo), lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
-| Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail) | send one, Do Not Disturb off; on † | |
+| Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail), reminders waiting | send one, Do Not Disturb off, set a reminder (in minutes, at a time, on waking, at login, on arriving at or leaving a place) or cancel one; Do Not Disturb on † | |
 | Inbox | the messages in [Inbox](inbox.md) | leave you a message, add to one it left | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
 | Sound and display | volume, outputs, screens, network, places, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Low Power Mode, Wi-Fi or networking off †; add a place | a place |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
-| Apps and files | windows, newest files (in the folders it can use: a choice), Claude Code sessions, what's scheduled | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †); schedule a command or a message to Claude for later † (`nightdrive schedule`: it shows as by Claude), cancel one | **files to the trash** |
+| Apps and files | windows, newest files (in the folders it can use: a choice), Claude Code sessions, what's scheduled | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †); schedule a command or a message to Claude for later, also on arriving at or leaving a place † (`nightdrive schedule`: it shows as by Claude), cancel one | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
 
 Claude doesn't bring a window forward while you type, nor open an app, a file or an address: it waits until you pause

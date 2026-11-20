@@ -38,6 +38,7 @@ class Stubbed(unittest.TestCase):
         patches = [mock.patch.dict(os.environ, {"HOME": home}),
                    mock.patch.object(remind.event_runs, "WOKE", os.path.join(self.dir.name, "woke"))]
         for name, stub in [("STATE", os.path.join(self.dir.name, "reminders.json")),
+                           ("CANCELLED", os.path.join(self.dir.name, "reminders-cancelled.json")),
                            ("arm", lambda r: (self.armed.append(r["id"]), (True, ""))[1]),
                            ("disarm", self.disarmed.append),
                            ("armed", lambda rid: rid in self.active),
