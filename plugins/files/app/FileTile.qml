@@ -5,7 +5,7 @@ import "Format.js" as Format
 // A file or folder in the grid (FileGrid): its thumbnail (Thumbs: a picture, a PDF's first page, a video's frame), or
 // its glyph large while there is none, and its name under it in two lines at most. The same hands as a list's row
 // (FileRow): a click picks it, a double click opens it, ⌘-click and ⇧-click mark, a drag takes it out with the other
-// marked ones, and a folder's tile takes a drop. Marked it has a tick in the accent at its corner; cut, it is faded.
+// marked ones, and a folder's tile takes a drop. Marked it has the list's bar colour and a tick at its corner; cut, it is faded.
 Rectangle {
     id: tile
     required property var modelData
@@ -24,7 +24,8 @@ Rectangle {
     height: GridView.view ? GridView.view.cellHeight - 6 : pic + 50
     radius: 8
     opacity: app.clip.cutSet[file.path] ? 0.5 : 1
-    color: drop.containsDrag ? c.hover : selected ? c.sel : isMarked || hovered ? c.hover : "transparent"
+    // Marked: the list's bar colour (AppRow's checked), stronger for the picked one
+    color: drop.containsDrag ? c.hover : isMarked ? (selected ? c.checkedPicked : c.checked) : selected ? c.sel : hovered ? c.hover : "transparent"
     border.color: drop.containsDrag ? c.primary : selected && app.listFocused ? c.frame : "transparent"
     border.width: selected && app.listFocused ? 2 : 1
 
@@ -36,13 +37,18 @@ Rectangle {
         // The drag's picture, taken now: it isn't ready in time once the drag starts (FileDrag)
         onPressedChanged: if (pressed && !tile.app.trashShown) tile.app.drag.prepare(tile.file, tile.app.dragPaths(tile.file.path).length)
     }
+    // ⌘-click marks or unmarks it, ⇧-click marks from the anchor to it, ⌘⇧-click adds those (as FileRow): one
+    // handler for every modifier, as acceptedModifiers wants an exact match and ⌘ arrives as Meta or Ctrl
     TapHandler {
-        acceptedModifiers: Qt.ControlModifier
-        onTapped: { tile.app.current = tile.index; tile.app.toggleMarkAt(tile.index); tile.app.toList() }
-    }
-    TapHandler {
-        acceptedModifiers: Qt.ShiftModifier
-        onTapped: { tile.app.markRange(tile.app.current, tile.index); tile.app.current = tile.index; tile.app.toList() }
+        acceptedModifiers: Qt.KeyboardModifierMask
+        onTapped: {
+            const m = point.modifiers
+            const cmd = (m & (Qt.ControlModifier | Qt.MetaModifier)) !== 0
+            if (m & Qt.ShiftModifier) tile.app.markTo(tile.index, cmd)
+            else if (cmd) { tile.app.current = tile.index; tile.app.toggleMarkAt(tile.index) }
+            else return
+            tile.app.toList()
+        }
     }
     DragHandler {
         target: null
