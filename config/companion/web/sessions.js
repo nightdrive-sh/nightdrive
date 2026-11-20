@@ -42,6 +42,9 @@ function mark(s) {
   return [icon("chevron-right", 18, 2), "var(--dim)"];
 }
 
+// Show, Stop and End give up their words on a narrow tile (.squeeze, app.css), so Answer fits beside them (#3167)
+const SHOW = s => `<button class="pill squeeze" data-act="open" data-id="${esc(s.id)}" aria-label="Show">${icon("show", 16)}<span>Show</span></button>`;
+
 function permission(s) {
   const p = s.permission;
   return `<article class="tile permission" data-act="focus" data-id="${esc(s.id)}">
@@ -50,7 +53,7 @@ function permission(s) {
               : '<div class="say">[Too long to show here whole: tap to answer in its terminal]</div>'}
     <div class="fill"></div>
     <div class="row">
-      <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
+      ${SHOW(s)}
       <button class="pill" data-act="deny" data-id="${esc(s.id)}">Deny</button>
       ${p.review ? `<button class="pill main" data-act="review" data-id="${esc(s.id)}">${icon("shield", 16)}Review</button>`
         : p.allow ? `<button class="pill main" data-act="allow" data-id="${esc(s.id)}">${icon("check", 16, 2.2)}Allow</button>` : ""}
@@ -65,7 +68,7 @@ function question(s) {
     <div class="say">${esc(qs[0].question)}${qs.length > 1 ? ` <span class="more-q">+${qs.length - 1} more</span>` : ""}</div>
     <div class="fill"></div>
     <div class="row">
-      <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
+      ${SHOW(s)}
       <button class="pill main" data-act="question" data-id="${esc(s.id)}">${icon("message-circle-question", 16)}Question</button>
     </div></article>`;
 }
@@ -79,7 +82,7 @@ function waiting(s) {
              : s.last ? `<div class="say">${esc(plain(s.last))}</div>` : ""}
     <div class="fill"></div>
     <div class="row">
-      <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
+      ${SHOW(s)}
       ${s.done && !s.pm ? END(s) : ""}
       <button class="pill main" data-act="answer" data-id="${esc(s.id)}">${icon("mic", 16)}Answer</button>
     </div></article>`;
@@ -87,7 +90,7 @@ function waiting(s) {
 
 // A finished session (#3219) has End on its tile, between Show and Answer: done with it, it goes without opening Show.
 // End as in Show, not Close: Close would read as the view's ×, which only closes the view
-const END = s => `<button class="pill quiet danger" data-act="close" data-id="${esc(s.id)}">${icon("x", 16)}End</button>`;
+const END = s => `<button class="pill quiet danger squeeze" data-act="close" data-id="${esc(s.id)}" aria-label="End">${icon("x", 16)}<span>End</span></button>`;
 
 // At work it still takes words, as its terminal does mid-turn (Claude Code reads them as soon as it can): Answer beside
 // Stop
@@ -97,8 +100,8 @@ function working(s) {
     ${s.last ? `<div class="code quiet">${esc(s.last)}</div>` : ""}
     <div class="fill"></div>
     <div class="row">
-      <button class="pill" data-act="open" data-id="${esc(s.id)}">${icon("show", 16)}Show</button>
-      <button class="pill quiet" data-act="stop" data-id="${esc(s.id)}">${icon("square", 14, 2.2)}Stop</button>
+      ${SHOW(s)}
+      <button class="pill quiet squeeze" data-act="stop" data-id="${esc(s.id)}" aria-label="Stop">${icon("square", 14, 2.2)}<span>Stop</span></button>
       <button class="pill main" data-act="answer" data-id="${esc(s.id)}">${icon("mic", 16)}Answer</button>
     </div></article>`;
 }

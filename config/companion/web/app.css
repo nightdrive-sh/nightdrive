@@ -85,6 +85,14 @@ body.offline .sessions, body.offline .actions { opacity: .45; transition: opacit
                          overflow-y: auto; -webkit-user-select: text; user-select: text; }
 .tile .fill { flex: 1; }
 .tile .row { display: flex; gap: 10px; align-items: center; margin-top: auto; }   /* the buttons at the bottom */
+/* Three buttons in a narrow tile (a phone, a portrait iPad's two columns) ran over its edge: Show, Stop and End as
+   their icons alone, Answer the rest (#3167). By the tile's own width, as the columns change with the screen. */
+.tile { container-type: inline-size; }
+.tile .row .pill.main { min-width: 0; }
+@container (max-width: 340px) {
+  .tile .row .pill.squeeze { padding: 0; width: 44px; flex: none; }
+  .tile .row .pill.squeeze span { display: none; }
+}
 .unseen { width: 8px; height: 8px; border-radius: 4px; background: var(--primary); flex: none; }
 .tile.new { background: transparent; border: 1.5px dashed var(--border); align-items: center; justify-content: center;
             color: var(--dim); font-size: 13px; text-align: center; }
