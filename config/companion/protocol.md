@@ -122,6 +122,10 @@ archived, added to), and the page reads the list again then while its view is op
 --json` gives them (`id`, `title`, `at`, `read`, `task`, `sender: { short, label }`, `attachments`: how many) without
 `from`. `GET /api/inbox/ID` → the message whole: its `body` (Markdown) and `attachments: [{ name, type, size, url }]`,
 `actions` as a count. `GET /api/inbox/ID/files/NAME` → one of its files, only one it lists. 404 when it isn't there.
+It answers byte ranges (`Range: bytes=…` → 206 with `Content-Range`, 416 past the end): iOS's `<audio>` and `<video>`
+play nothing without them. `?as=m4a` on an audio file gives it as AAC (`audio/mp4`), converted by ffmpeg once and kept
+in `~/.cache/nightdrive/companion/media` (30 days unused): the page asks for that when the browser can't play the file
+itself, as Safari can't Ogg/Opus (`lib/media.py`, `web/media.js`). Video isn't converted.
 
 | Request | Body | Does |
 | --- | --- | --- |

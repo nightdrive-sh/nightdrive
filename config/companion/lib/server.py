@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import access
 import control
 import inbox
+import media
 import mic
 import mic_socket
 import presence
@@ -204,9 +205,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, box.show(parts[0]))
             if len(parts) == 3 and parts[1] == "files":
                 path, ctype = box.file(parts[0], unquote(parts[2]))
-                with open(path, "rb") as f:
-                    return self._send(200, f.read(), ctype)
-        except inbox.InboxError as e:
+                # ?as=m4a: audio Safari can't play (Ogg), converted; ranges either way, for <audio>/<video> (media.py)
+                if parse_qs(self.path.partition("?")[2]).get("as") == ["m4a"]:
+                    path, ctype = media.as_m4a(path, ctype), "audio/mp4"
+                return media.send(self, path, ctype)
+        except (inbox.InboxError, media.MediaError) as e:
             return self._send(404, {"error": str(e)})
         except (OSError, subprocess.SubprocessError, ValueError) as e:
             return self._send(500, {"error": f"Inbox didn't answer: {e}"})

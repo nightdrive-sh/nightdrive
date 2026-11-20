@@ -7,6 +7,7 @@
 import { esc, get, post, store, subscribe, toast } from "./api.js";
 import { icon } from "./icons.js";
 import { markdown } from "./markdown.js";
+import { isMedia, keepPlayers, playerFallback, players } from "./media.js";
 import { edgeSwipe } from "./swipe.js";
 
 const WIDE = "(min-width: 900px) and (orientation: landscape)";
@@ -56,6 +57,7 @@ export function openInbox() {
   document.body.append(el);
   view = { el, list: null, msg: null, stamp: null };
   el.addEventListener("click", click);
+  playerFallback(el.querySelector(".imsg"));
   edgeSwipe(el, back);
   load();
 }
@@ -114,9 +116,10 @@ function renderList() {
 
 function files(list) {
   const pics = list.filter(f => f.type.startsWith("image/"));
-  const rest = list.filter(f => !f.type.startsWith("image/"));
+  const media = list.filter(isMedia);     // sound and video play here (media.js); what can't is a link
+  const rest = list.filter(f => !f.type.startsWith("image/") && !isMedia(f));
   return (pics.length ? `<div class="ipics">${pics.map(f => `<a href="${esc(f.url)}" target="_blank" rel="noopener">
-      <img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`).join("")}</div>` : "") +
+      <img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`).join("")}</div>` : "") + players(media) +
     (rest.length ? `<div class="iattach">${rest.map(f => `<a class="pill quiet" href="${esc(f.url)}" target="_blank"
       rel="noopener">${icon("paperclip", 15)}<span>${esc(f.name)}</span></a>`).join("")}</div>` : "");
 }
@@ -130,7 +133,7 @@ function renderMsg(top = true) {
     return;
   }
   const scroll = pane.querySelector(".ibody")?.scrollTop || 0;
-  pane.innerHTML = `
+  keepPlayers(pane, () => pane.innerHTML = `
     <div class="ihead">
       <button class="close iback" aria-label="Back to the list">${icon("chevron-left", 20)}</button>
       <div class="who"><b>${esc(msg.title)}</b>
@@ -145,7 +148,7 @@ function renderMsg(top = true) {
       <button class="pill" data-do="${msg.read ? "unread" : "read"}">${icon("mail", 16)}<span>${msg.read ? "Mark unread" : "Mark read"}</span></button>
       <span class="spacer"></span>
       <button class="pill main" data-do="archive">${icon("archive", 16)}<span>Archive</span></button>
-    </div>`;
+    </div>`);
   if (!top) pane.querySelector(".ibody").scrollTop = scroll;
 }
 
