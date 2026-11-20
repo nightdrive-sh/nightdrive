@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """How Mail finds links in a plain-text message (links.js, #2224): `python3 plugins/mail/app/links_test.py`.
 A URL in parentheses or at the end of a sentence leaves the ")" and "." out, a Wikipedia address keeps its own
-parentheses, and a Markdown link [text](url) shows its text as the link.
+parentheses, a Markdown link [text](url) shows its text as the link, and an address alone in brackets [url] shows
+without them (#3321).
 
 links.js is QML's JavaScript, so it runs in Quickshell (offscreen) and its HTML is read back here."""
 
@@ -51,6 +52,14 @@ CASES = {
     "tags": 'Look <b>here</b> "https://example.com/z"',
     "two": "[one](https://one.example) and [two](https://two.example/(x))",
     "broken_markdown": "[text](https://example.com/open",
+    # A newsletter's text made from HTML (#3321): the address alone in brackets
+    "bracketed": "Docs: Variants \u2192 [https://www.sketch.com/docs/components-and-styles/variants/]",
+    "bracketed_stop": "Download the latest version [https://example.com/dl/]. Or not.",
+    "bracketed_two": "Privacy [https://example.com/p] | Unsubscribe [https://example.com/u?id=1&x=2]",
+    "bracketed_text": "[see https://example.com/b]",
+    "bracketed_markdown": "[https://shown.example](https://real.example)",
+    "bracketed_quoted": "> Discord [https://discord.gg/abc] if",
+    "bracketed_open": "[https://example.com/a](https://example.com/open",
 }
 
 
@@ -115,6 +124,34 @@ class Links(unittest.TestCase):
 
     def test_unclosed_markdown_falls_back_to_the_url(self):
         self.assertEqual(links(self.out["broken_markdown"])[0][0], "https://example.com/open")
+
+    def test_bracketed_address_loses_its_brackets(self):
+        url = "https://www.sketch.com/docs/components-and-styles/variants/"
+        self.assertEqual(links(self.out["bracketed"]), [(url, url)])
+        self.assertEqual(text(self.out["bracketed"]), "Docs: Variants \u2192 " + url)
+        self.assertEqual(text(self.out["bracketed_stop"]), "Download the latest version https://example.com/dl/. Or not.")
+        self.assertEqual(links(self.out["bracketed_stop"])[0][0], "https://example.com/dl/")
+
+    def test_several_bracketed_addresses(self):
+        self.assertEqual([h for h, _ in links(self.out["bracketed_two"])],
+                         ["https://example.com/p", "https://example.com/u?id=1&x=2"])
+        self.assertEqual(text(self.out["bracketed_two"]),
+                         "Privacy https://example.com/p | Unsubscribe https://example.com/u?id=1&x=2")
+
+    def test_brackets_around_more_than_an_address_stay(self):
+        # Only the address is linked: the "]" isn't part of it
+        self.assertEqual(links(self.out["bracketed_text"]), [("https://example.com/b", "https://example.com/b")])
+        self.assertEqual(text(self.out["bracketed_text"]), CASES["bracketed_text"])
+
+    def test_markdown_link_with_an_address_as_its_text(self):
+        self.assertEqual(links(self.out["bracketed_markdown"]), [("https://real.example", "https://shown.example")])
+
+    def test_bracketed_in_a_quote(self):
+        self.assertTrue(self.out["bracketed_quoted"].startswith('<span style="color:gray">'))
+        self.assertEqual(text(self.out["bracketed_quoted"]), "> Discord https://discord.gg/abc if")
+
+    def test_bracketed_before_an_unclosed_markdown_url(self):
+        self.assertEqual(links(self.out["bracketed_open"])[0][0], "https://example.com/a")
 
 
 if __name__ == "__main__":

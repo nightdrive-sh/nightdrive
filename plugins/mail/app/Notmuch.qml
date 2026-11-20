@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "blanks.js" as Blanks
+import "flowed.js" as Flowed
 
 // The only part that talks to notmuch, and the only Quickshell import besides the window:
 // a later native host replaces this file and keeps the same functions.
@@ -92,7 +93,27 @@ QtObject {
     // The thread's messages in order, each { from, to, date, subject, tags, body } with the body as plain text.
     function show(thread, done) {
         json(["show", "--format=json", "--include-html", "--entire-thread=true", "thread:" + thread],
-             t => { const out = []; flatten(JSON.parse(t), out); return out }, [], done)
+             t => { const out = []; flatten(JSON.parse(t), out); return out }, [], list => unflow(list, done))
+    }
+
+    // A format=flowed text's paragraphs joined (flowed.js, #3321). notmuch's JSON leaves Content-Type's parameters
+    // out, so lib/flowed.py reads the header from the file, for the messages whose text looks flowed (a line ending
+    // in a space goes on in the next): most mail isn't asked about. If it can't answer, the lines stay as they are.
+    readonly property string flowReader: composer.replace(/compose\.py$/, "flowed.py")
+    function unflow(list, done) {
+        const maybe = list.filter(m => m.flowable)
+        for (const m of list) delete m.flowable
+        if (!maybe.length) { done(list); return }
+        // (reduce, not flatMap: Qt's engine has no flatMap)
+        const pairs = maybe.reduce((a, m) => a.concat([m.id, m.file]), [])
+        proc.createObject(nm, { command: ["python3", flowReader].concat(pairs), done: t => {
+            let r = {}
+            try { r = JSON.parse(t) } catch (e) {}
+            for (const m of maybe)
+                if (r[m.id] !== undefined) m.body = Blanks.tidy(plainText(Flowed.unflow(m.plain, r[m.id])))
+            for (const m of maybe) { delete m.plain; delete m.file }
+            done(list)
+        } })
     }
 
     // Mail's own command (bin/nightmail), e.g. for Claude's card: its output as text.
@@ -200,6 +221,8 @@ QtObject {
     function message(m) {
         const parts = { plain: "", html: "", files: [], invite: false }
         collect(m.body || [], parts, "")
+        const file = Array.isArray(m.filename) ? m.filename[0] : m.filename
+        const flowable = parts.plain !== "" && !!file && Flowed.maybe(parts.plain)
         return {
             id: m.id,
             from: m.headers.From || "",
@@ -212,7 +235,11 @@ QtObject {
             body: Blanks.tidy(parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)),
             html: parts.html !== "" ? safeHtml(parts.html) : "",
             files: parts.files,     // attachments: { part, name, size } (size in bytes, or -1)
-            invite: parts.invite    // a calendar invitation in it: Invitation.qml reads it by Calendar
+            invite: parts.invite,   // a calendar invitation in it: Invitation.qml reads it by Calendar
+            // For unflow() only, which takes them off: the raw text and its file, when it may be format=flowed
+            flowable: flowable,
+            plain: flowable ? parts.plain : undefined,
+            file: flowable ? file : undefined
         }
     }
 
