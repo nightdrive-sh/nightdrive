@@ -49,11 +49,30 @@ QtObject {
         })
     }
 
-    // Threads matching the query, newest first.
+    // Threads matching the query, newest first, each with attachments: true when a message in it has a file attached.
     function search(query, done) {
         json(["search", "--format=json", "--limit=500", query],
              t => JSON.parse(t).map(x => Object.assign(x, { subject: oneLine(x.subject), authors: authors(x.authors) })),
-             [], done)
+             [], rows => attachments(rows, done))
+    }
+
+    // notmuch tags a message "attachment" when a part of it is sent as one (signature and other inline pictures
+    // aren't), but an invitation's invite.ics is one too: a message whose only files are calendar ones doesn't count,
+    // unless a PDF (an agenda) came with it. The same query is in lib/browse.py (FILES), for `nightmail search`.
+    readonly property string files: "tag:attachment and not ((mimetype:application/ics or mimetype:text/calendar)"
+                                    + " and not mimetype:application/pdf)"
+    // Only the threads already tagged are asked about (a few dozen ids, ~25 ms), so a folder of thousands costs the
+    // same. If notmuch can't answer, the tag alone decides.
+    function attachments(rows, done) {
+        const maybe = rows.filter(r => r.tags.indexOf("attachment") >= 0)
+        for (const r of rows) r.attachments = false
+        if (!maybe.length) { done(rows); return }
+        json(["search", "--format=json", "--output=threads",
+              "(" + maybe.map(r => "thread:" + r.thread).join(" or ") + ") and " + files],
+             t => JSON.parse(t), null, ids => {
+                 for (const r of maybe) r.attachments = !ids || ids.indexOf(r.thread) >= 0
+                 done(rows)
+             })
     }
 
     // notmuch lists the authors of the messages the query matched, then "| " and the rest's (e.g. your own reply in

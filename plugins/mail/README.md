@@ -25,6 +25,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 
 - The next sync makes every move on the server too, so your phone sees it.
 - In a narrow window the list and the thread take turns: `Enter` or → opens the thread, `Esc` or ← goes back. Moving in the list marks nothing read.
+- A paperclip after a thread's date: a file is attached to a message in it. An invitation's own `.ics` doesn't count, nor do pictures in the text (a signature's logo).
 - In a long thread, the read messages fold to one line each, and a quote that is all in an earlier message hides behind `•••`.
 - The text view shows a run of blank lines as one (also lines of only invisible characters, which newsletters pad with), and so does a reply's quote. The message itself stays as it came.
 - Remote images stay off, and so does the sender's tracking. In the browser (⇧H), Load images brings them, still without scripts.
@@ -190,7 +191,7 @@ An iCloud account (with an app-specific password) is `imap.mail.me.com` and `smt
 | `nightmail show ID`, `reply ID`, `claude ID` | A message by its notmuch id, as the notifications use them |
 | `nightmail archive ID…`, `unarchive ID…`, `delete ID…` | From the inbox to Archive (and back) or Trash, as `a` and `d` do; an ID is one message's id or a thread (`thread:…`), exactly, never a query |
 | `nightmail empty Spam` (or `Trash`) `[--account ID]` | Everything in Spam or Trash deleted for good, as ⌘⇧⌫ does, without asking; `--card` shows what it would delete |
-| `nightmail unread`, `search QUERY [LIMIT]`, `thread ID`, `accounts` | Mail as JSON, without the window: unread threads, a notmuch search, a thread's messages as text |
+| `nightmail unread`, `search QUERY [LIMIT]`, `thread ID`, `accounts` | Mail as JSON, without the window: unread threads, a notmuch search (each thread's `attachments`: true when a file is attached, as the list's paperclip), a thread's messages as text |
 | `nightmail invitation ID` | A message's calendar invitation as JSON, by Calendar (`calendar invite`); `--add CALENDAR` puts it in a calendar or updates it there, `--remove` takes a cancelled one out, `--reply accept|maybe|decline` sends the answer to its organiser |
 | `nightmail draft`, `draft-show ID`, `discard ID`, `send ID` | Drafts without the window: `draft` saves one from JSON on stdin (`{to, cc, subject, body, account}`, or a reply: `{reply_to, reply_all, body}`), with the signature and quote; `send` sends one |
 | `nightmail unsubscribe MSGID…` | The messages' unsubscribe links as JSON (`links`: url, kind web or mail, from header or body); only reads |
