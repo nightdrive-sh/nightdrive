@@ -355,7 +355,7 @@ end
 hl.bind("ALT + TAB",         function () cycle_app_windows(1) end)
 hl.bind("ALT + SHIFT + TAB", function () cycle_app_windows(-1) end)
 
--- ⌘⌥1–⌘⌥0: every window of the active workspace to workspace i (joining the ones there), and focus follows them.
+-- ⌘⌥⇧1–⌘⌥⇧0: every window of the active workspace to workspace i (joining the ones there), and focus follows them.
 -- To an empty workspace the whole workspace is renumbered, which keeps its layout as it was: moved one by one, dwindle
 -- splits them anew. Not the laptop's own workspace with an external display, nor the second display's: the screen would lose it.
 -- Otherwise one at a time with follow = false, so the source stays active until the last one has gone.
@@ -374,7 +374,7 @@ local function move_all_windows(i)
 end
 
 -- Workspaces ⌘1–⌘0, move window ⌘⇧1–⌘⇧0 (a tab alone, out of its group: window-groups.lua), move all windows
--- ⌘⌥1–⌘⌥0. With the drawer open ⌘1–⌘0 closes it first, otherwise it stays over the new workspace. dont_inhibit: they work over a window that takes the keyboard (a VM's qemu
+-- ⌘⌥⇧1–⌘⌥⇧0 (⇧ moves one, ⌥ on top of it all). With the drawer open ⌘1–⌘0 closes it first, otherwise it stays over the new workspace. dont_inhibit: they work over a window that takes the keyboard (a VM's qemu
 -- window, a remote desktop) too, so it can be left with them; the desktop inside a VM doesn't get them.
 for i = 1, 10 do
     local key = i % 10
@@ -384,9 +384,9 @@ for i = 1, 10 do
         hl.dispatch(hl.dsp.focus({ workspace = i }))
     end, { dont_inhibit = true })
     hl.bind(mod .. " + SHIFT + " .. key, function() NIGHTDRIVE_MOVE_TO_WORKSPACE(i) end, { dont_inhibit = true })
-    hl.bind(mod .. " + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
 end
--- ⌘§ / ⌘⇧§ / ⌘⌥§: the second external display's own workspace (display.lua: SIDE_WORKSPACE), the key left of 1 as the
+-- ⌘§ / ⌘⇧§ / ⌘⌥⇧§: the second external display's own workspace (display.lua: SIDE_WORKSPACE), the key left of 1 as the
 -- display is usually left of the main one. By the symbol, not the keycode: Apple's and Keychron's ISO boards swap the §
 -- and < keys' codes. grave is the same key on a US layout.
 for _, key in ipairs({ "section", "grave" }) do
@@ -397,7 +397,7 @@ for _, key in ipairs({ "section", "grave" }) do
         hl.dispatch(hl.dsp.focus({ workspace = i }))
     end, { dont_inhibit = true })
     hl.bind(mod .. " + SHIFT + " .. key, function() NIGHTDRIVE_MOVE_TO_WORKSPACE(i) end, { dont_inhibit = true })
-    hl.bind(mod .. " + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
 end
 hl.bind(mod .. " + TAB",         hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mod .. " + SHIFT + TAB", hl.dsp.focus({ workspace = "e-1" }))

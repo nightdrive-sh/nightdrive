@@ -82,7 +82,7 @@ Variants {
         // The laptop's own workspace (hypr/display.lua: LAPTOP_WORKSPACE, ⌘0) is a laptop icon after them, there while an
         // external display is connected or while it exists; the laptop's screen then shows only it. Number size: the `workspaces` row in adjust.conf.
         // What exists is read from the windows and the screens, not Hyprland.workspaces: a workspace given a new id
-        // (⌘⌥1–0, hypr/bindings.lua) stays there under its old id with its windows, as Hyprland sends no event for it.
+        // (⌘⌥⇧1–0, hypr/bindings.lua) stays there under its old id with its windows, as Hyprland sends no event for it.
         // On a screen too narrow even with the modules tucked away, the left side gives way too (layout's squeeze), and
         // as a last resort is cut at the clock, so the two never overlap.
         Item {

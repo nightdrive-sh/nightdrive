@@ -167,7 +167,7 @@ Click an icon and a small menu opens under it:
   the group: another window opened there is a tile beside it. A window a Claude session opens itself (a test terminal,
   an app's preview) never takes the keyboard, on any workspace: it is a tile where you are, for you to click. Alone, once its sessions
   have all closed, it fills the width; restarted, it goes back to its space (by its name). Moved to another workspace,
-  alone or with ⌘ ⌥ + a number, it makes that one its space, and its sessions open there whichever workspace you are
+  alone or with ⌘ ⌥ ⇧ + a number, it makes that one its space, and its sessions open there whichever workspace you are
   on; a session moved away with ⌘ ⇧ + a number or ⌘ ⇧ D leaves the group and stays where it went (back from the drawer, it rejoins it). Other workspaces, and sessions no PM opened, are as before.
   **Two Claude accounts** (a Claude Code config dir each, `CLAUDE_CONFIG_DIR`): `~/.claude` and every `~/.claude-*`
   you have signed in to are found by themselves. The second account then gets a Claude icon of its own beside the
