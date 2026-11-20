@@ -15,6 +15,8 @@ import { markdown } from "./markdown.js";
 import { logHTML } from "./steps.js";
 import { keepScroll, questionClick, questionHTML } from "./question.js";
 import { edgeSwipe } from "./swipe.js";
+import { pendingHTML, pendingClick } from "./pendingview.js";
+import { onPending, reconcile } from "./pending.js";
 
 const REFRESH_MS = 2000;
 const AT_END_PX = 40;      // this close to the bottom still counts as following along
@@ -34,6 +36,7 @@ export function openDetail(id) {
   el.addEventListener("click", e => {
     if (e.target.closest(".close")) return close();
     if (questionClick(e)) return;
+    if (pendingClick(e, view.id, send)) return;
     const run = e.target.closest("button[data-steps]");
     if (run) return toggle(run.dataset.steps);
     const b = e.target.closest("button[data-act]");
@@ -74,8 +77,9 @@ async function load() {
   let log;
   try { log = await get(`/api/sessions/${encodeURIComponent(id)}/log`); } catch { return; }
   if (!view || view.id !== id || !Array.isArray(log)) return;     // closed meanwhile, or the session is gone
+  const settled = reconcile(id, log);     // words sent that the log has now, or that didn't get there (pending.js)
   const sig = JSON.stringify(log);
-  if (sig === view.logSig) return;
+  if (sig === view.logSig) { if (settled) draw(false); return; }
   const first = !view.logSig;
   view.logSig = sig;
   view.log = log;
@@ -92,7 +96,8 @@ function draw(first) {
   const box = view.el.querySelector(".log");
   const atEnd = first || box.scrollHeight - box.scrollTop - box.clientHeight < AT_END_PX;
   view.live = live();
-  box.innerHTML = logHTML(view.log, { live: view.live, open: view.open, text: line })
+  const sent = pendingHTML(view.id);       // your words on their way, after all the log has
+  box.innerHTML = (logHTML(view.log, { live: view.live, open: view.open, text: line }) + sent)
     || '<div class="msg tool">Nothing said yet</div>';
   if (atEnd) box.scrollTop = box.scrollHeight;
 }
@@ -189,3 +194,5 @@ function talk() {
 }
 
 subscribe(frame);
+// Words sent show at once at the end, following them down, as your own words do
+onPending(id => { if (view?.id === id && view.logSig) draw(true); });

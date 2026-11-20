@@ -8,6 +8,7 @@
 import { esc, post, sheet, store, toast } from "./api.js";
 import { icon } from "./icons.js";
 import { holdToTalk, Recognition } from "./speech.js";
+import { track } from "./pending.js";
 
 // Where the words go, as a request
 function pathFor(t) {
@@ -28,7 +29,9 @@ function nameOf(t) {
 // Sends the words to t; true when it went. Shared with the panel (dictate.js).
 export async function send(t, words) {
   const submit = t === "window" ? "session" : true;     // the server decides for the window, when it types
-  const ok = await post(pathFor(t), { text: words, submit });
+  const go = () => post(pathFor(t), { text: words, submit });
+  // into a session: shown in its view at once, faded, until its log has them (pending.js)
+  const ok = t === "window" || t === "new" ? await go() : await track(t, words, go);
   // Sent, nothing is said: the words show where they went (the session's view and its tile, the panel under its
   // button). A new session is the exception: its tile takes a few seconds to come.
   if (ok && t === "new") toast("A new session starts on the desktop");
