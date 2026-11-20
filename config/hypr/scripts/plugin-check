@@ -13,7 +13,7 @@ reads), hyprland.lua (no keys: those go in bindings.lua), the scripts' syntax (b
 a luac). A plugins.txt line: its fields, icon, default and group, and
 docs/plugins/<id>.md as a README. Findings as file:line: message, one per line; exit 1 if any, 2 for an unknown id.
 Warnings (file:line: warning: …, on stderr) don't change the exit: a plugin with commands in bin/ but no mcp.json
-and no mcp=none."""
+and no mcp=none; a timer's service in systemd/ without the failure notice (OnFailure=nightdrive-unit-failed@%n.service)."""
 import ast, glob, json, os, re, shutil, subprocess, sys
 
 REPO = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../.."))
@@ -413,6 +413,18 @@ def check_mcp(d, conf):
         warn(path, 1, f"bin/{cmds[0]} but no mcp.json: give Claude its tools, or mcp=none (plugins/README.md)")
 
 
+# A timer's service fails where nobody looks (#3309): it gets the notice when it keeps failing (#3313). Only a warning: a
+# plugin may tell of failures its own way.
+def check_units(d):
+    for timer in sorted(glob.glob(os.path.join(d, "systemd", "*.timer"))):
+        service = timer[:-len(".timer")] + ".service"
+        if not os.path.isfile(service):
+            continue
+        if not re.search(r"^OnFailure=.*\bnightdrive-unit-failed@%n\.service", open(service).read(), re.M):
+            warn(service, 1, "a timer's service without OnFailure=nightdrive-unit-failed@%n.service: its failures "
+                             "show nowhere (plugins/README.md › Services)")
+
+
 def check_scripts(d):
     """The syntax of its scripts: by extension or #! line. web/ and other data files are left alone."""
     luac = next((c for c in ("luac", "luac5.4", "luac5.5", "luac5.3") if shutil.which(c)), None)
@@ -458,6 +470,7 @@ def check_folder(pid, d, src, taken, icons):
     check_menus(d, opens)
     check_shortcuts(d)
     check_hyprland(d)
+    check_units(d)
     check_scripts(d)
 
 

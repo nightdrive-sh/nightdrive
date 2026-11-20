@@ -2,6 +2,8 @@
 # every minute by nightdrive-calendar-remind.timer; each notification waits in a unit of its own (lib/remind.py).
 [Unit]
 Description=Nightdrive Calendar: notify the events' reminders
+# A notification when it keeps failing (config/hypr/scripts/unit_failed.py)
+OnFailure=nightdrive-unit-failed@%n.service
 
 [Service]
 Type=oneshot

@@ -659,6 +659,10 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
 
 - **Known issues** that have a workaround but no fix in Nightdrive yet are listed in [docs/known-issues.md](docs/known-issues.md),
   each with its own issue labelled `known issue`.
+- **A background service that keeps failing tells you.** Mail's, Calendar's and Contacts' syncs, the reminders, due
+  tasks and the update check run on timers, out of sight: when one fails 3 times in a row, a notification says which,
+  with its last error and **Show the log** (`journalctl --user -u UNIT`), at most once a day per service. A sync
+  doesn't count a failure while you're offline, and waits until it has failed for 2 hours.
 - **Hyprland comes from Nightdrive's own COPR.** Fedora's own repositories have no Hyprland, so on every machine the
   installer takes the Hyprland packages from [`@nightdrive/nightdrive`](https://copr.fedorainfracloud.org/coprs/g/nightdrive/nightdrive/)
   (aarch64 and x86_64; specs in [nightdrive-packages](https://github.com/nightdrive-sh/nightdrive-packages)) and limits

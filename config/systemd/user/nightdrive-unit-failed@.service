@@ -1,0 +1,8 @@
+# Run after a Nightdrive service fails (its OnFailure=nightdrive-unit-failed@%n.service): one notification once it has
+# failed again and again (config/hypr/scripts/unit_failed.py has the rules). No OnFailure= here: it would call itself.
+[Unit]
+Description=Nightdrive: notice %i failing again and again
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/hypr/scripts/unit-failed %i

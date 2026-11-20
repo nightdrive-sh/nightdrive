@@ -332,6 +332,21 @@ tests for that. Enable a unit by its path in the folder (`systemctl --user enabl
 so they can't clash: `nightdrive-<id>.service`, a command named after the plugin. A Files extension runs whether the
 plugin is on or not, so it checks that itself (LocalSend's tests its unit and `~/.local/state/nightdrive/plugins-off/<id>`).
 
+A service that a timer runs fails out of sight, so give it Nightdrive's failure notice: one line in its `[Unit]`,
+
+```ini
+OnFailure=nightdrive-unit-failed@%n.service
+```
+
+After each failure `unit-failed` ([unit_failed.py](../config/hypr/scripts/unit_failed.py) has the rules) counts it, and
+once the service has failed 3 times in a row (a successful run starts the count again) shows one notification: its
+`Description=`, the last line it wrote and **Show the log**; then at most one a day while it keeps failing. A unit with
+`After=network-online.target` counts no failure while the computer is offline and notifies only once it has failed for
+2 hours, so a sync without a network stays quiet. Exit with 0 when there is nothing to do, and skip a round that can't
+run with `ExecCondition=` (a locked keyring, no account yet), as Mail's sync does: those aren't failures.
+`nightdrive plugin check` warns about a timer's service without the line. `~/.config/hypr/scripts/unit-failed list
+[--json]` shows the services failing now.
+
 ## Tools for Claude: mcp.json
 
 `nightdrive mcp`, Nightdrive's MCP server, gives Claude the tools in the `mcp.json` of every plugin that is installed and

@@ -2,6 +2,8 @@
 # sends the notifications (`nightmail notify`). Run by nightdrive-mail-sync.timer and `nightmail sync`.
 [Unit]
 Description=Nightdrive Mail: fetch mail (mbsync) and index it (notmuch)
+# A notification when it keeps failing (config/hypr/scripts/unit_failed.py)
+OnFailure=nightdrive-unit-failed@%n.service
 After=network-online.target
 # Mail is installed before its account is set up (its first start offers that): nothing to fetch until then
 ConditionPathExists=%h/.config/isyncrc
