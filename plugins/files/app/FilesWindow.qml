@@ -7,7 +7,7 @@ import qs.kit
 import "Format.js" as Format
 
 // One of Files' windows (shell.qml keeps them): the places in the sidebar (Places, Sidebar), the folder's files in a
-// list (Folder, FileList), the picked one in the preview at the right (Preview) and over the window on Space
+// list (Folder, FileList), the picked one in the preview at the right (Preview) and over the screen on Space
 // (QuickLook). The keys are yazi's letters with the desktop's ⌘ keys beside them (FileKeys); the changes run
 // lib/cli.py (Ops), each with Undo, and the clipboard is the desktop's (Clip). Files go out and come in by dragging too
 // (FileDrag, the rows' DropAreas).
@@ -316,7 +316,7 @@ FloatingWindow {
         }
     }
 
-    QuickLook { id: quick; anchors.fill: parent; c: win.look; app: win }
+    QuickLook { id: quick; c: win.look; app: win }       // a layer over the screen, not in the window
 
     KeySheet {
         id: sheet

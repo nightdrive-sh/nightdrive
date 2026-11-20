@@ -17,7 +17,7 @@ browser's "Show in folder".
 | ⌥← ⌥→ (⌃⌘← ⌃⌘→) | Back, forward |
 | `~` `gh` `gd` | Home, home, Downloads |
 | ⌘L | Go to a folder by its path |
-| Space | The big preview: a picture, a PDF's first page, a video's frame or a text; ↑ ↓ go through the files, Space or Esc closes it |
+| Space | The big preview, over the whole screen Files is on: a picture (never larger than its own size; the wheel zooms in where the pointer is, a drag moves it, a double click fits it again), a PDF's first page, a video's frame or a text; ↑ ↓ go through the files, Space, Esc or a click beside it closes it |
 | `i` | The preview at the right (a narrow window leaves it out) |
 | `/` or ⌘F | Filter by name as you type: ⏎ back to the list with it kept, Esc shows all again |
 | `f`, or Tab in the filter | Search all of home by name, and Tab back to this folder; ⌘F again or a click on the scope at the field's end does the same. Outside home (a USB stick) it searches the folder and every one below it. Each file shows the folder it is in, ← goes there |
