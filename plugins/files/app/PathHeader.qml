@@ -5,7 +5,7 @@ import qs.kit
 import "Format.js" as Format
 
 // Over the list: back and forward, where the window is, as a path whose parts are clicked to go up to them (home is
-// ~) and take files dropped on them, level with the sidebar's title, and the buttons: Filter, New folder, the preview;
+// its glyph) and take files dropped on them, level with the sidebar's title, and the buttons: Filter, New folder, the preview;
 // in the trash, Put back and Empty. With the filter open (/ or ⌘F) the field takes the path's place: typing narrows
 // the list at once, ⏎ or ↓ go back to the rows with it kept, Esc ends it. In a narrow window the buttons give up their
 // words, and the path its first parts.
@@ -40,7 +40,7 @@ RowLayout {
             required property var modelData
             required property int index
             implicitWidth: 34; implicitHeight: 30
-            Layout.rightMargin: index === 1 ? 10 : 0
+            Layout.rightMargin: index === 1 ? 15 : 0
             AppIconButton {
                 anchors.centerIn: parent
                 implicitWidth: 34; implicitHeight: 34; radius: 8
@@ -82,12 +82,16 @@ RowLayout {
                         text: "›"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 13
                         leftPadding: 8; rightPadding: 8
                     }
+                    // Home is its glyph, as in the sidebar, rather than ~
                     Text {
+                        readonly property bool home: modelData.name === "~"
                         textFormat: Text.PlainText
                         anchors.verticalCenter: parent.verticalCenter
-                        text: modelData.name
+                        text: home ? Icons.g("house") : modelData.name
                         color: last ? root.c.title : crumbHover.hovered ? root.c.text : root.c.dim
-                        font.family: root.c.font; font.pixelSize: 13; font.weight: last ? Font.Medium : Font.Normal
+                        font.family: home ? Icons.family : root.c.font; font.pixelSize: home ? 14 : 13
+                        font.weight: last ? Font.Medium : Font.Normal
+                        topPadding: home ? 2 : 0         // centred, the glyph sat 1 px above the names' line
                         HoverHandler { id: crumbHover; cursorShape: Qt.PointingHandCursor }
                         TapHandler { onTapped: root.app.go(modelData.path, "") }
                         // Files dropped on a part of the path go into that folder, as onto a folder's row: moved from
