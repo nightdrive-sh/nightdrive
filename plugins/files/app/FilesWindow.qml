@@ -178,7 +178,8 @@ FloatingWindow {
         filtering = true; header.field.text = filter; pane = "list"; header.field.forceActiveFocus()
     }
     readonly property bool fieldFocused: header.field.activeFocus
-    function toggleScope() { below = !below; if (filtering) header.field.forceActiveFocus() }
+    // The field keeps the keys: Tab's own move to the next item comes after this handler, so focus goes back once it has
+    function toggleScope() { below = !below; if (filtering) { header.field.forceActiveFocus(); Qt.callLater(() => { if (filtering) header.field.forceActiveFocus() }) } }
     function endFilter() { filtering = false; filter = ""; below = false; header.field.text = ""; toList() }
 
     // s goes through the orders, S (or the same column's title again) turns it round
