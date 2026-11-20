@@ -214,16 +214,17 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Dictation**: hold F5 or Fn on a Mac, Insert on a PC, speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Snippets**: Launcher › Tools › Snippets; Enter pastes one. With auto-expand on, typing a trigger anywhere replaces it
   with the text. A snippet can have several lines (Shift+Enter), like an email signature.
-- **Remind**: Launcher › Tools › Remind, pick the minutes (or type them: 25, 1h30m, or a time: 22:45), type the
-  message, Enter. It comes as a banner at the top of the screen with a sound, apart from the notifications, and stays
-  until you dismiss it. The waiting ones are listed there too: Enter twice cancels one. They wait over a logout or a
-  restart; one that came due meanwhile shows at the next login.
-- **Schedule**: Launcher › Tools › Schedule, pick when (minutes, a time, On wake, At login; or type it: 25, 14:45), type a
-  command or a message to Claude, Enter. The row says how it is read, **Run** or **Ask Claude**; the row under it is
-  the other reading. The waiting ones are listed there: Enter twice cancels one, Ctrl+Enter runs it now. The same as
-  `nightdrive schedule` (below).
-- **Places**: name the Wi-Fi networks where you are (`nightdrive places add work` at the office), or tell Claude
-  "this network is work". A place is known by its network, so no location service is needed.
+- **Remind**: Launcher › Tools › Remind, pick the minutes (or type them: 25, 1h30m, or a time: 22:45), On wake, At
+  login or On arriving / On leaving a place, type the message, Enter. It comes as a banner at the top of the screen with
+  a sound, apart from the notifications, and stays until you dismiss it. The waiting ones are listed there too: Enter
+  twice cancels one. They wait over a logout or a restart; one that came due meanwhile shows at the next login.
+- **Schedule**: Launcher › Tools › Schedule, pick when (minutes, a time, On wake, At login, On arriving / On leaving a
+  place; or type it: 25, 14:45, arrive work), type a command or a message to Claude, Enter. The row says how it is read,
+  **Run** or **Ask Claude**; the row under it is the other reading. The waiting ones are listed there: Enter twice
+  cancels one, Ctrl+Enter runs it now. The same as `nightdrive schedule` (below).
+- **Places**: name the Wi-Fi networks where you are: Settings › Places › "*network* is…" at the office (or
+  `nightdrive places add work`), or tell Claude "this network is work". A place is known by its network, so no location
+  service is needed. Enter on a place lists its networks: Enter twice takes one off, and typing a name adds another.
 - **From your phone**: [Ferry](plugins/ferry/README.md), one of Nightdrive's apps, is a mailbox over Tailscale between your
   computers and your phone. Two experimental plugins: [LocalSend](plugins/localsend/README.md) receives files from a
   phone once you accept them, and [AirPlay Receiver](plugins/airplay-receiver/README.md) mirrors an iPhone, iPad or Mac

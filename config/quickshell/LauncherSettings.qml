@@ -20,6 +20,8 @@ Item {
         settings: [
             { kind: "header", name: "Connections" },
             { kind: "nav", name: "Wi-Fi", glyph: "wifi", target: "wifi" },
+            // Names for Wi-Fi networks, which Remind and Schedule wait for arriving at or leaving (PlacesLevels.qml)
+            { kind: "nav", name: "Places", glyph: "map-pin", target: "places" },
             { kind: "nav", name: "Bluetooth", glyph: "bluetooth", target: "bluetooth" }
         ].concat(Plugins.has("tailscale") ? [{ kind: "nav", name: "Tailscale", glyph: "shield-check", target: "tailscale" }] : [], [
             // Companion: the iPad's web app over Tailscale (CompanionLevels.qml)
@@ -69,7 +71,7 @@ Item {
                .map(t => Object.assign({}, t, { appName: t.name })))   // an app's own: "Mail settings" in the root search
     })
 
-    readonly property var settingsAliases: ({ "Wi-Fi": "wifi wlan network internet", "Sound": "audio volume output speakers headphones airpods noise cancelling equalizer", "Battery": "power charge charging health cycles low power mode saver saving",
+    readonly property var settingsAliases: ({ "Wi-Fi": "wifi wlan network internet", "Places": "place location work home arrive leave paikat", "Sound": "audio volume output speakers headphones airpods noise cancelling equalizer", "Battery": "power charge charging health cycles low power mode saver saving",
                                               "Display": "brightness keyboard backlight night light warm scale scaling resolution monitor screen retina hidpi zoom size bigger smaller arrange arrangement position place side left right above below main primary order displays",
                                               "Other displays": "ipad iphone tablet phone android second screen extra extend sidecar vnc airplay apple tv mirror cast",
                                               "Notifications": "notification sounds alert chime beep ping tone urgent critical popup timeout seconds duration",

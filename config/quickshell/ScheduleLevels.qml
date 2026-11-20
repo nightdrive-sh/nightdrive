@@ -2,7 +2,8 @@ import QtQuick
 import Quickshell
 
 // The launcher's Tools › Schedule (Dashboard #3152, part 5 of #3121): a command, or a message to Claude, run once later.
-// Pick when (minutes, a time of day, wake or login; or type it: 25, 1h30m, 14:45), then type what and Enter. How the
+// Pick when (minutes, a time of day, wake or login, arriving at or leaving a place of Settings › Places: PlacesLevels.qml,
+// #3281; or type it: 25, 1h30m, 14:45, arrive work), then type what and Enter. How the
 // line is read shows on its row before Enter (Run or Ask Claude), and the row under it is the other reading. The
 // waiting ones are listed under the choices: Enter twice (or ⌘⌫ twice) cancels one, Ctrl+Enter runs it now (a missed
 // one, say). hypr/scripts/schedule does the work and the reading: this asks it (`add --dry-run --json`, `list --json`)
@@ -15,7 +16,7 @@ Item {
     readonly property string cmdPath: Quickshell.env("HOME") + "/.config/hypr/scripts/schedule"
     readonly property var presets: [15, 30, 60]
     property var pending: []        // schedule list --json's commands: by time, then wake and login
-    // When, as picked on the way to Schedule › What: { when: "15" | "14:45" | "wake" | "login", label }
+    // When, as picked on the way to Schedule › What: { when: "15" | "14:45" | "wake" | "login" | "arrive work", label }
     property var pick: ({ when: "15", label: "In 15 min" })
     // The script's reading of what is typed: { level, query, row } with row its --dry-run --json answer ({error} or a
     // row: when, clock, minutes_left, kind, command). A row is shown only for the query it was asked about.
@@ -36,10 +37,13 @@ Item {
         const h = Math.floor(m / 60), rest = m % 60
         return h + " h" + (rest ? " " + rest + " min" : "")
     }
-    function whenLabel(row) {
-        // arrive work and leave work (#3278) as the script labels them, until Settings › Places gives them rows (#3281)
-        return row.when === "wake" ? "On wake" : row.when === "login" ? "At login" : !row.clock ? row.label : "At " + row.clock
+    readonly property var places: launcher ? launcher.levels.places : null
+    // On wake, At login, On arriving: work (the script's arrive and leave, #3278), At 14:45
+    function whenLabel(row) { return row.clock ? "At " + row.clock : places.eventLabel(row.when, row.place) }
+    function whenGlyph(when) {
+        return when === "wake" ? "sunrise" : when === "login" ? "log-in" : when === "arrive" ? "map-pin-check" : when === "leave" ? "map-pin-x" : "calendar-clock"
     }
+    function whenRow(when, name, glyph, summary) { return { kind: "schedulewhen", when: when, name: name, glyph: glyph, summary: summary } }
     // What a kind is called on its row: the same words as the script's list (Run, Ask Claude)
     function kindName(k) { return k === "claude" ? "Ask Claude" : "Run" }
     function kindGlyph(k) { return k === "claude" ? "bot" : "terminal" }
@@ -50,12 +54,12 @@ Item {
         if (cur.kind === "scheduled") return "Enter twice or Cmd+Backspace twice: cancel  ·  Ctrl+Enter: run now"
         if (level === "schedulewhat") return cur.kind === "scheduleadd" ? "Enter: " + kindName(cur.as) + " " + pick.label.toLowerCase()
                                              + "  ·  ↑↓: Run or Ask Claude  ·  Esc: other time" : "Esc: other time"
-        if (level === "schedule") return "Enter: then what to run  ·  or type the minutes or a time: 25, 1h30m, 14:45"
+        if (level === "schedule") return "Enter: then what to run  ·  or type the minutes, a time or an event: 25, 14:45, arrive work"
         return ""
     }
     function opened() { listProc.running = true }
     function entered(level) {
-        if (level === "schedule") listProc.running = true
+        if (level === "schedule") { listProc.running = true; places.refresh() }
         check()
     }
     function shiftActivate(it) {}
@@ -68,15 +72,16 @@ Item {
         if (q !== "") {   // typed: the script says what time that is, or why not
             const row = fresh(level, launcher.query.trim())
             rows = !row ? launcher.hint("…")
-                 : row.error ? launcher.hint("Minutes up to a week (25, 90m, 1h30m), a time of day (14:45), wake or login")
+                 : row.error ? launcher.hint("Minutes up to a week (25, 90m, 1h30m), a time of day (14:45), wake, login or arrive PLACE")
                  : [{ kind: "schedulewhen", when: launcher.query.trim(), name: whenLabel(row),
-                      glyph: row.clock ? "calendar-clock" : row.when === "wake" ? "sunrise" : "log-in",
+                      glyph: whenGlyph(row.clock ? "" : row.when),
                       summary: row.clock ? "in " + span(Math.max(1, row.minutes_left)) : undefined }]
         } else {
             rows = [{ kind: "header", name: "Run" }].concat(presets.map(m => ({
                 kind: "schedulewhen", when: String(m), name: "In " + span(m), glyph: "timer", summary: "at " + clock(now + m * 60000) })),
-                [{ kind: "schedulewhen", when: "wake", name: "On wake", glyph: "sunrise", summary: "the first unlock after sleep" },
-                 { kind: "schedulewhen", when: "login", name: "At login", glyph: "log-in", summary: "the next login" }])
+                [whenRow("wake", "On wake", "sunrise", "the first unlock after sleep"),
+                 whenRow("login", "At login", "log-in", "the next login")],
+                places.eventRows((when, name, glyph) => whenRow(when, name, glyph)))
         }
         // Two notes, not one: a note row is a single line and would be cut off at the launcher's width
         if (!pending.length) return q !== "" ? rows : rows.concat([
@@ -98,7 +103,8 @@ Item {
     }
     function waitingRow(p) {
         const when = p.when === "wake" ? "on wake" : p.when === "login" ? "at login"
-                   : !p.clock ? (p.state === "missed" ? "missed · Ctrl+Enter: run · " : "") + p.label   // arrive work
+                   : !p.clock ? (p.state === "missed" ? "missed · Ctrl+Enter: run · " : p.state === "unlock" ? "waits for the unlock · " : "")
+                                + places.eventPhrase(p.when, p.place)   // on arriving at work
                    : p.state === "missed" ? "missed " + p.clock + " · Ctrl+Enter: run"
                    : p.state === "unlock" ? "waits for the unlock"
                    : p.state === "due" ? "running"
