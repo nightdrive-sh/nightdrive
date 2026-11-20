@@ -96,6 +96,8 @@ QtObject {
         else if (t === "f" || t === "F") a.startFilter(true)
         else if (t === ".") a.showHidden = !a.showHidden
         else if (t === "t") a.toggleView()
+        else if (t === "o") a.openPicked()
+        else if (t === "O") a.openWith.start()          // yazi's open interactively (OpenWith)
         else if (t === "s") a.cycleSort()
         else if (t === "S") a.reversed = !a.reversed
         else if (t === "~") a.go(a.home, "")

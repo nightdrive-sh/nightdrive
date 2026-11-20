@@ -221,6 +221,7 @@ FloatingWindow {
     function offer(t, undo) { toast.show(t, { action: "Undo", run: undo }) }
 
     Ops { id: ops; app: win }
+    OpenWith { id: openWith; app: win }
     Clip { id: clip; app: win; shared: win.manager }
     Places { id: places; app: win }
     FileActions { id: acts; app: win; prompt: prompt; confirm: confirm }
@@ -235,6 +236,7 @@ FloatingWindow {
     readonly property alias grid: grid
     readonly property alias toast: toast
     readonly property alias compress: compressPanel
+    readonly property alias openWith: openWith
     function changed(d) { acts.changed(d) }
 
     // Tab moves the keys between the sidebar and the list
@@ -336,7 +338,7 @@ FloatingWindow {
         id: sheet
         c: win.look
         groups: [
-            { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l", "Open: into a folder, a file in its app"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
+            { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l  o", "Open: into a folder, a file in its app"], ["O", "Open with: pick the app (⌘⏎: always)"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
             { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["t", "Thumbnails in a grid, or the list (hjkl move in it)"], ["+  −", "Larger, smaller thumbnails"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
             { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["⌘-click", "Mark one"], ["⇧-click  ⌘⇧-click", "Mark up to it, add up to it"], ["Esc", "No marks"]] },
             { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["⌘Z", "Undo"]] },

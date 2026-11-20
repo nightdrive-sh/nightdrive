@@ -9,6 +9,7 @@ Row {
     property QtObject c: null           // the app's look, as every kit part takes it; the caps use the theme's colours
     property string keys: ""
     property color tint: Theme.dim      // the keys' colour: a hint's dim, as the launcher's secondary caps; the key sheet's accent
+    property int capSize: 22            // each cap's height (Key.size): a smaller hint (AppMenu's) takes less
     property bool or: false             // "/" between the alternatives (the key sheet), as the launcher's Keybindings show them
     readonly property string symbols: "⌘⇧⌥⌃⏎⌫↑↓←→"
     // "⌘⇧C" → [{ key: "⌘" }, { key: "⇧" }, { key: "C" }]; "Ctrl+B" → [Ctrl, B]; "⇧-click" → [⇧, text "click"]
@@ -58,7 +59,7 @@ Row {
                     anchors.verticalCenter: parent.verticalCenter
                     width: modelData.key ? cap.width : word.implicitWidth
                     height: modelData.key ? cap.height : word.implicitHeight
-                    Key { id: cap; visible: !!part.modelData.key; key: part.modelData.key || ""; ink: root.tint }
+                    Key { id: cap; visible: !!part.modelData.key; key: part.modelData.key || ""; ink: root.tint; size: root.capSize }
                     Text {
                         id: word
                         visible: !part.modelData.key

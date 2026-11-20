@@ -11,7 +11,8 @@ browser's "Show in folder".
 | --- | --- |
 | `?` | Files' keys |
 | ↑ ↓ or `j` `k` | Move in the list |
-| → ⏎ or `l` | Open: into a folder, a file in its app (a double click too; ⌘O); an archive is extracted instead (⌘O opens it) |
+| → ⏎ or `l` `o` | Open: into a folder, a file in its app (a double click too; ⌘O); an archive is extracted instead (⌘O opens it) |
+| `O` | Open with: the apps for the file's type, its default first, in a menu at the file; type to find any other app. ⏎ opens the file (or the marked ones) in it, ⌘⏎ also makes it the default for every file of the type |
 | ← ⌫ or `h` | Up a folder |
 | `gg` `G` | First, last |
 | ⌥← ⌥→ (⌃⌘← ⌃⌘→) | Back, forward |
