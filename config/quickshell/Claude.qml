@@ -108,7 +108,10 @@ Singleton {
 
     // Hyprland's addresses with or without 0x
     function addr(a) { return String(a).replace(/^0x/, "") }
-    readonly property string activeAddr: Hyprland.activeToplevel ? addr(Hyprland.activeToplevel.address) : ""
+    // A string, but var: on a Quickshell reload this singleton's old copy outlives its context for a moment, and a
+    // window change then re-runs its Hyprland bindings to undefined, which a typed property logs as a warning ("Unable
+    // to assign [undefined] to QString") that fails sandbox check. A var takes the undefined quietly.
+    readonly property var activeAddr: Hyprland.activeToplevel ? addr(Hyprland.activeToplevel.address) : ""
 
     // [{ address, dir, project, topic, state, started }] from the windows' titles. Kept apart from wants: the change
     // handler below writes wants, and a binding that read it would be re-evaluated from its own change (a binding loop).
@@ -148,7 +151,6 @@ Singleton {
     readonly property var sessions: seen.map(s => Object.assign({ wants: !!wants[s.address] }, s,
                                                                 { since: since(s), hop: s.asking && !askSeen[s.address] }))
                                         .sort((a, b) => (b.wants - a.wants) || (b.started - a.started))
-    readonly property int wanting: sessions.filter(s => s.wants).length
     // Which account's a session is: its place in accounts (claude-accounts' order); 0, the default's, also for one on a
     // config dir no account lists. The bar's claude / claude2 icons and their menus go by it.
     function accountIndex(s) {
