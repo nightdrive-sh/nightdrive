@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import qs.kit
 
-// The list: the columns' titles (a click sorts by one, again turns it round, as s and S do), the rows (FileRow) and
-// what an empty folder or filter says. Dropped on its free space, files land in the folder on show.
+// The list: the columns' titles (a click sorts by one, again turns it round, as s and S do; no line under them, the
+// header's is enough), the rows (FileRow) and what an empty folder or filter says. Dropped on its free space, files
+// land in the folder on show.
 ColumnLayout {
     id: root
     required property QtObject c
@@ -27,7 +28,7 @@ ColumnLayout {
             TapHandler { enabled: parent.field !== ""; onTapped: root.app.sortOn(parent.field) }
             HoverHandler { cursorShape: parent.field ? Qt.PointingHandCursor : Qt.ArrowCursor }
         }
-        Title { x: 42; field: root.app.trashShown ? "" : "name"; label: "Name" }
+        Title { x: 14; field: root.app.trashShown ? "" : "name"; label: "Name" }
         // The same widths and gaps as FileRow's columns, from the right
         Row {
             anchors.right: parent.right; anchors.rightMargin: 16
@@ -48,7 +49,6 @@ ColumnLayout {
             }
         }
     }
-    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: root.c.divider }
 
     ListView {
         id: list

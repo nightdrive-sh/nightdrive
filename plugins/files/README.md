@@ -28,11 +28,13 @@ browser's "Show in folder".
 | `r` or F2 | Rename (the name without its ending is picked) |
 | `a` | A new file; a name ending in `/` makes a folder (⌘⇧N: a folder) |
 | ⌘Z | Undo the last change (also Undo in the message at the top) |
-| `b` or ⌘D | Bookmark the folder in the sidebar, or take it away |
+| `b` or ⌘D | Bookmark the picked folder (with a file picked, the one you're in), or take it away |
 | `Tab` | Keys between the sidebar and the list |
+| ⌘N | A new window, in the same folder (a folder from another app goes to the one last used) |
 | ⌘B ⌘R | Hide the sidebar, read the folder again |
+| ⌘, | Settings (also the gear on the sidebar's title): Normal rows, taller and easy to click, or Compact |
 
-- The sidebar has home's folders, your bookmarks, the disks and the trash. The bookmarks are GTK's (`~/.config/gtk-3.0/bookmarks`), the same the apps' Open dialogs list. A USB stick shows when it is plugged in, mounts as you pick it and has an eject button.
+- The sidebar has two groups of folders, then the disks and the trash. The first is Files' own, home's folders to start with (`~/.config/nightdrive/files/places.json`); the second, the bookmarks, are GTK's (`~/.config/gtk-3.0/bookmarks`), the same the apps' Open dialogs list: a quick place for a project's folders. Drag a folder to another place in its group or into the other one; its ✕ takes it out (with Undo). A USB stick shows when it is plugged in, mounts as you pick it and has an eject button.
 - The clipboard is the desktop's: files copied here paste into a mail, a chat or a browser, and files copied in Nautilus paste here. A cut moves the files once pasted.
 - Drag files out of the list into another app, or onto a folder in the list or the sidebar; files dragged in from another app are copied, and from Files itself moved. Dropped on Trash, they go there.
 - A copy or move never writes over a file: a name already there gets " (2)". A long one shows how far it is, with Stop.

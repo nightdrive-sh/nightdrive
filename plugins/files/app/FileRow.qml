@@ -15,7 +15,7 @@ AppRow {
     readonly property var file: modelData
     readonly property bool isMarked: app.marks[file.path] === true
 
-    implicitHeight: 30
+    implicitHeight: app.rowHeight
     selected: index === app.current
     active: app.listFocused
     opacity: app.clip.cutSet[file.path] ? 0.5 : 1
@@ -55,7 +55,7 @@ AppRow {
         anchors.left: parent.left; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter
         width: 18
         text: Icons.g(row.isMarked ? "circle-check" : Format.glyph(row.file))
-        font.family: Icons.family; font.pixelSize: 14
+        font.family: Icons.family; font.pixelSize: row.app.compact ? 14 : 16
         color: row.isMarked ? row.c.accent : row.file.dir ? row.c.primary : row.c.dim
     }
     Text {

@@ -11,7 +11,8 @@ import "Format.js" as Format
 QtObject {
     id: root
     required property var app              // the window: say(), ops
-    property var cut: []                    // the paths of the last cut, while the clipboard still holds them
+    required property QtObject shared       // shell.qml, whose cut every window shares: cut in one, pasted in another
+    readonly property var cut: shared.cut   // the paths of the last cut, while the clipboard still holds them
     readonly property var cutSet: { const s = {}; for (const p of cut) s[p] = true; return s }
 
     function uris(paths) { return paths.map(Format.url).join("\r\n") + "\r\n" }
@@ -19,7 +20,7 @@ QtObject {
     function copy(paths, isCut) {
         if (!paths.length) return
         Quickshell.execDetached(["wl-copy", "--type", "text/uri-list", "--", uris(paths)])
-        cut = isCut ? paths.slice() : []
+        shared.cut = isCut ? paths.slice() : []
         app.say((isCut ? "Cut " : "Copied ") + (paths.length === 1 ? Format.base(paths[0]) : paths.length + " items"))
     }
 
@@ -53,7 +54,7 @@ QtObject {
         if (!paths.length) { app.say("No files on the clipboard"); return }
         if (op === "cut" || (cut.length === paths.length && paths.every(p => cutSet[p]))) {
             app.ops.move(paths, into)
-            cut = []
+            shared.cut = []
             Quickshell.execDetached(["wl-copy", "--clear"])
         } else app.ops.copy(paths, into)
     }

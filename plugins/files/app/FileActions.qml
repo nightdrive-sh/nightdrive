@@ -48,12 +48,32 @@ QtObject {
         })
     }
 
+    // b, ⌘D: the picked folder among the bookmarks, or out of them; with a file picked, the folder on show
     function toggleBookmark() {
         if (app.trashShown) return
-        const on = !app.places.bookmarked(app.path)
-        app.ops.run([on ? "bookmark" : "unbookmark", app.path], (d, why) => {
-            app.say(d ? (on ? "Bookmarked " : "Bookmark removed: ") + Format.base(app.path) : why, !d)
-            app.places.refresh()
+        const p = app.picked && app.picked.dir ? app.picked.path : app.path
+        const on = !app.places.bookmarked(p)
+        app.ops.run([on ? "bookmark" : "unbookmark", p], (d, why) => {
+            app.say(d ? (on ? "Bookmarked " : "Bookmark removed: ") + Format.base(p) : why, !d)
+            app.manager.placesChanged()
+        })
+    }
+    // The sidebar's ✕ on one of its folders: out of its group, with Undo putting it back where it was
+    function removePlace(entry) {
+        const own = entry.kind === "place"
+        const group = own ? app.places.pinnedRows : app.places.bookmarkRows
+        const next = group[group.findIndex(e => e.path === entry.path) + 1]
+        app.ops.run([own ? "unpin" : "unbookmark", entry.path], (d, why) => {
+            app.manager.placesChanged()
+            if (!d) { app.say(why, true); return }
+            app.offer("Removed " + entry.name, () => movePlace(entry.path, own ? "places" : "bookmarks", next ? next.path : ""))
+        })
+    }
+    // A sidebar folder dragged to another place: to group ("places" or "bookmarks"), before another of it or at its end
+    function movePlace(path, group, before) {
+        app.ops.run(["place-move", path, "--to", group, "--before", before], (d, why) => {
+            if (!d) app.say(why, true)
+            app.manager.placesChanged()
         })
     }
     function unmount(entry) {

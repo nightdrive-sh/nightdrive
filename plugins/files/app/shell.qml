@@ -1,281 +1,78 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import qs
-import qs.kit
 import "Format.js" as Format
 
-// Nightdrive Files: the places in the sidebar (Places, Sidebar), the folder's files in a list (Folder, FileList), the
-// picked one in the preview at the right (Preview) and over the window on Space (QuickLook). The keys are yazi's
-// letters with the desktop's ⌘ keys beside them (FileKeys); the changes run lib/cli.py (Ops), each with Undo, and the
-// clipboard is the desktop's (Clip). Files go out and come in by dragging too (FileDrag, the rows' DropAreas).
+// Nightdrive Files: its windows (FilesWindow), one at the start and another on ⌘N, all in one Quickshell. They share the
+// last cut (Clip), so files cut in one window and pasted in another move. A folder from another app (IPC: Hyper F,
+// `files DIR`, FileManager1) goes to the window last active. Closing the last one ends Files. The settings (⌘,) are
+// here too, for every window: ~/.config/nightdrive/files/settings.json.
 ShellRoot {
     id: shell
-    FloatingWindow {
-        id: win
-        title: "Files"
-        implicitWidth: 1100
-        implicitHeight: 720
-        color: c.bg
-        onClosed: Qt.quit()
+    property var cut: []                  // the paths of the last cut, while the clipboard still holds them (Clip)
+    property var windows: []              // [{ id, path, select }]: what Variants makes a window for
+    property int made: 0
+    property var last: null               // the window last active
 
-        AppLook { id: c }
-        readonly property QtObject look: c
+    readonly property var defaults: ({ layout: "normal" })
+    property var settings: defaults
+    readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/nightdrive/files"
+    FileView {
+        id: settingsFile
+        path: shell.configDir + "/settings.json"
+        watchChanges: true
+        printErrors: false                // none yet: the defaults
+        onFileChanged: reload()
+        onLoaded: { try { shell.settings = Object.assign({}, shell.defaults, JSON.parse(text())) } catch (e) {} }
+    }
+    function setting(key, value) {
+        const s = Object.assign({}, settings); s[key] = value; settings = s
+        settingsFile.setText(JSON.stringify(s, null, 2) + "\n")
+    }
 
-        IpcHandler {
-            target: "files"
-            function openFolder(path: string): void { win.go(path || win.home, "") }
-            // The folder a file is in, with the file picked (FileManager1's ShowItems, `files show`). Not "show" or
-            // "open": qs ipc takes those for its own subcommands
-            function showFile(path: string): void { win.go(Format.parent(path), path) }
-            function refresh(): void { win.reload() }
-            function openSettings(): void {}      // the kit's `files settings`: Files has none yet
+    function open(path, select) {
+        made++
+        windows = windows.concat([{ id: made, path: path || "", select: select || "" }])
+    }
+    function closed(w) {
+        if (last === w) last = null
+        windows = windows.filter(x => x.id !== w.key)
+        if (!windows.length) Qt.quit()
+    }
+    // Where IPC goes: the window last active, else the newest; with none open (closed while Quickshell stayed), a new one
+    function go(path, select) {
+        const all = instances.instances
+        const w = last || (all.length ? all[all.length - 1] : null)
+        if (w) w.go(path, select); else open(path, select)
+    }
+    // A change to the sidebar's folders (a bookmark, one moved) reaches every window's
+    function placesChanged() { for (const w of instances.instances) w.places.refresh() }
+    // The settings' folder made before the first write could need it (FileView doesn't make it)
+    Component.onCompleted: { Quickshell.execDetached(["mkdir", "-p", configDir]); open("", "") }
+
+    Variants {
+        id: instances
+        model: shell.windows
+        FilesWindow {
+            required property var modelData
+            manager: shell
+            key: modelData.id
+            startPath: modelData.path
+            startSelect: modelData.select
         }
+    }
 
-        readonly property string helper: Quickshell.shellDir + "/../lib/cli.py"
-        readonly property string home: Quickshell.env("HOME")
-        readonly property int headerHeight: 30
-
-        // Where the window is: a folder, or the trash (its own rows, from cli.py trash-list)
-        property string path: home
-        property bool trashShown: false
-        property var trashRows: []
-        property var history: []             // folders before this one, for ⌥← (⌃⌘←)
-        property var future: []              // and after it, for ⌥→
-        Folder { id: folder; path: win.path; onRebuilt: win.settle() }
-        property alias showHidden: folder.showHidden
-        property alias sortBy: folder.sortBy
-        property alias reversed: folder.reversed
-        property alias filter: folder.filter
-        property bool filtering: false
-        readonly property bool loading: !trashShown && folder.loading
-        readonly property var rows: trashShown ? trashRows : folder.rows
-
-        property int current: -1
-        property string keep: ""             // the path to pick once the rows come (one just made, the folder come up from)
-        readonly property var picked: rows[current] || null
-        property var marks: ({})            // path → true
-        readonly property var marked: rows.filter(r => marks[r.path] === true)
-        readonly property real markedSize: marked.reduce((n, r) => n + (r.dir ? 0 : r.size), 0)
-
-        function go(p, select) {
-            if (!p) return
-            if (!trashShown && p === path) { if (select) pick(select); return }
-            history = history.concat([trashShown ? "" : path]).slice(-100)
-            future = []
-            enter(p, select)
+    IpcHandler {
+        target: "files"
+        function openFolder(path: string): void { shell.go(path || Quickshell.env("HOME"), "") }
+        // The folder a file is in, with the file picked (FileManager1's ShowItems, `files show`). Not "show" or
+        // "open": qs ipc takes those for its own subcommands
+        function showFile(path: string): void { shell.go(Format.parent(path), path) }
+        function refresh(): void { for (const w of instances.instances) w.reload() }
+        function openSettings(): void {       // the kit's `files settings`
+            const all = instances.instances
+            const w = shell.last || all[all.length - 1]
+            if (w) w.showSettings = true
         }
-        function enter(p, select) {
-            trashShown = false
-            endFilter()
-            marks = ({})
-            keep = select || ""
-            current = -1
-            path = p
-            if (!trashShown) list.view.positionViewAtBeginning()
-        }
-        function back() { if (history.length) { const p = history[history.length - 1]; history = history.slice(0, -1); future = [trashShown ? "" : path].concat(future); p ? enter(p, path) : showTrash() } }
-        function forward() { if (future.length) { const p = future[0]; future = future.slice(1); history = history.concat([trashShown ? "" : path]); p ? enter(p, "") : showTrash() } }
-        function up() { if (trashShown) go(home, ""); else if (path !== "/") go(Format.parent(path), path) }
-        function goDownloads() { const d = places.data.standard.find(p => p.glyph === "download"); if (d) go(d.path, "") }
-        function goEntry(e) {
-            if (e.kind === "trash") { if (!trashShown) history = history.concat([path]); showTrash() }
-            else if (e.kind === "device" && !e.path) acts.mount(e, p => go(p, ""))
-            else go(e.path, "")
-        }
-        function showTrash() { trashShown = true; endFilter(); marks = ({}); current = -1; loadTrash() }
-        function loadTrash() { trashReader.running = true }
-        Process {
-            id: trashReader
-            command: ["python3", win.helper, "trash-list"]
-            stdout: StdioCollector {
-                onStreamFinished: {
-                    let d
-                    try { d = JSON.parse(text) } catch (e) { return }
-                    win.trashRows = d.items.map(r => ({ name: r.name, path: r.path, dir: r.dir, size: r.size, modified: r.deleted, origin: r.origin, id: r.id }))
-                    win.settle()
-                }
-            }
-        }
-        function reload() { if (trashShown) loadTrash(); else folder.rebuild(); places.refresh() }
-
-        // The rows came (again): the same file stays picked, or the one asked for, or the row at the same place
-        function settle() {
-            const want = keep || (picked ? picked.path : "")
-            const i = want ? rows.findIndex(r => r.path === want) : -1
-            if (i >= 0 || !keep) keep = ""
-            current = i >= 0 ? i : rows.length ? Math.max(0, Math.min(current, rows.length - 1)) : -1
-            if (current >= 0) list.view.positionViewAtIndex(current, ListView.Contain)
-            // Marks of files gone stay out of what the keys act on (marked only counts the rows there)
-            preview.again()
-        }
-        function pick(p) { keep = p; settle() }
-        function move(d) { moveTo((current < 0 ? 0 : current) + d) }
-        function moveTo(i) {
-            if (!rows.length) return
-            current = Math.max(0, Math.min(rows.length - 1, i))
-            list.view.positionViewAtIndex(current, ListView.Contain)
-        }
-        function page() { return Math.max(1, Math.floor(list.view.height / 31) - 1) }
-        function openAt(i) { current = i; openPicked() }
-        function openPicked() {
-            const f = picked
-            if (!f || trashShown) return
-            if (f.dir) go(f.path, "")
-            else Quickshell.execDetached(["gio", "open", f.path])
-        }
-
-        // Marks (v, ⇧↑ ⇧↓, ⌘-click, ⇧-click): the files the keys act on, else the picked one
-        function setMark(p, on) { const m = Object.assign({}, marks); if (on) m[p] = true; else delete m[p]; marks = m }
-        function toggleMarkAt(i) { const r = rows[i]; if (r) setMark(r.path, marks[r.path] !== true) }
-        function toggleMark() { toggleMarkAt(current); move(1) }
-        function markMove(d) { if (picked) setMark(picked.path, true); move(d); if (picked) setMark(picked.path, true) }
-        function markRange(a, b) {
-            const m = Object.assign({}, marks)
-            for (let i = Math.min(a, b); i <= Math.max(a, b); i++) if (rows[i]) m[rows[i].path] = true
-            marks = m
-        }
-        function markAll() { const m = {}; for (const r of rows) m[r.path] = true; marks = m }
-        function selection() { return marked.length ? marked.map(r => r.path) : picked ? [picked.path] : [] }
-        function selectionIds() { return marked.length ? marked.map(r => r.id) : picked ? [picked.id] : [] }
-        function dragPaths(p) { return marks[p] === true ? marked.map(r => r.path) : [p] }
-        function letGo() {
-            if (filter || filtering) endFilter()
-            else if (marked.length) marks = ({})
-            else if (clip.cut.length) clip.cut = []
-        }
-
-        // The filter (/, ⌘F): the field in the header narrows the rows as it is typed into
-        function startFilter() { if (trashShown) return; filtering = true; header.field.text = filter; pane = "list"; header.field.forceActiveFocus() }
-        function endFilter() { filtering = false; filter = ""; header.field.text = ""; toList() }
-
-        // s goes through the orders, S (or the same column's title again) turns it round
-        readonly property var sorts: ["name", "modified", "size", "type"]
-        function cycleSort() { sortBy = sorts[(sorts.indexOf(sortBy) + 1) % sorts.length]; reversed = false; say("By " + sortBy) }
-        function sortOn(field) { if (sortBy === field) reversed = !reversed; else { sortBy = field; reversed = false } }
-
-        function tilde(p) { return p === home ? "~" : p.startsWith(home + "/") ? "~" + p.slice(home.length) : p }
-        function say(t, danger) { toast.show(t, { danger: !!danger }) }
-        function offer(t, undo) { toast.show(t, { action: "Undo", run: undo }) }
-
-        Ops { id: ops; app: win }
-        Clip { id: clip; app: win }
-        Places { id: places; app: win }
-        FileActions { id: acts; app: win; prompt: prompt; confirm: confirm }
-        FileKeys { id: keys; app: win }
-        FileDrag { id: dragger }
-        readonly property alias ops: ops
-        readonly property alias clip: clip
-        readonly property alias places: places
-        readonly property alias acts: acts
-        readonly property alias drag: dragger
-        readonly property alias quick: quick
-        readonly property alias toast: toast
-        function changed(d) { acts.changed(d) }
-
-        // Tab moves the keys between the sidebar and the list
-        property string pane: "list"
-        property int sideIndex: 0
-        readonly property bool listFocused: listScope.activeFocus && pane === "list"
-        // The filter's field is in the same focus scope: it lets go first, or the scope would hand the keys back to it
-        // (and the next letters would filter by themselves)
-        function toList() { pane = "list"; header.field.focus = false; listScope.forceActiveFocus() }
-        function switchPane() {
-            if (pane === "list" && sidebarShown) {
-                const i = places.entries.findIndex(e => trashShown ? e.kind === "trash" : e.path === path)
-                sideIndex = Math.max(0, i); pane = "side"
-            } else pane = "list"
-        }
-        function sideMove(d) { sideIndex = Math.max(0, Math.min(places.entries.length - 1, sideIndex + d)) }
-        function sideOpen() { const e = places.entries[sideIndex]; if (e) goEntry(e); pane = "list" }
-
-        Shortcut { sequence: "Ctrl+Z"; enabled: !prompt.visible && !confirm.visible; onActivated: if (!toast.act()) ops.undo() }
-        Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
-        Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
-
-        property var sidebarChoice: null
-        readonly property bool sidebarShown: sidebarChoice !== null ? sidebarChoice : width >= 640
-        property var previewChoice: null
-        readonly property bool previewShown: previewChoice !== null ? previewChoice : width >= 900
-        onSidebarShownChanged: if (!sidebarShown) pane = "list"
-        // The columns the list has room for (FileRow, FileList): the size, then the time, give way first
-        readonly property int listWidth: list.width
-        readonly property int secondWidth: listWidth >= 520 ? (trashShown ? 180 : 72) : 0
-        readonly property int thirdWidth: listWidth >= 400 ? 96 : 0
-
-        RowLayout {
-            id: content
-            anchors.fill: parent
-            spacing: 0
-            AppPointer { c: win.look }
-
-            Sidebar {
-                Layout.preferredWidth: win.width < 800 ? 176 : 212
-                visible: win.sidebarShown
-                c: win.look
-                app: win
-                headerHeight: 2 * 18 + win.headerHeight
-                contentTop: 18 + win.headerHeight + 22
-                bottomMargin: 18
-            }
-
-            FocusScope {
-                id: listScope
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                focus: true
-                Keys.onPressed: e => {
-                    win.look.moved(e)
-                    sheet.pressed(e)
-                    if (e.accepted) return
-                    if (keys.press(e)) e.accepted = true
-                }
-                ColumnLayout {
-                    anchors.fill: parent
-                    spacing: 0
-                    PathHeader {
-                        id: header
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 28; Layout.rightMargin: 16
-                        Layout.topMargin: 18
-                        Layout.preferredHeight: win.headerHeight
-                        Layout.fillHeight: false        // a layout in a layout fills by default
-                        c: win.look
-                        app: win
-                    }
-                    Item { Layout.preferredHeight: 17 }
-                    FileList { id: list; Layout.fillWidth: true; Layout.fillHeight: true; c: win.look; app: win }
-                }
-            }
-
-            Preview {
-                id: preview
-                visible: win.previewShown
-                Layout.preferredWidth: Math.min(340, Math.max(240, win.width * 0.26))
-                Layout.fillHeight: true
-                c: win.look
-                app: win
-            }
-        }
-
-        QuickLook { id: quick; anchors.fill: parent; c: win.look; app: win }
-
-        KeySheet {
-            id: sheet
-            c: win.look
-            groups: [
-                { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l", "Open: into a folder, a file in its app"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
-                { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["⌘B", "The sidebar"]] },
-                { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["⌘-click  ⇧-click", "Mark one, mark up to it"], ["Esc", "No marks"]] },
-                { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["⌘Z", "Undo"]] },
-                { title: "Places", keys: [["Tab", "Sidebar, list"], ["b  ⌘D", "Bookmark this folder, or not"], ["Drag", "Onto a folder or the sidebar: moved; from another app: copied"]] },
-                { title: "Trash", keys: [["u", "Put back"], ["d", "Delete for good"], ["⌘⇧⌫", "Empty the trash"]] }
-            ]
-        }
-
-        AppPrompt { id: prompt; c: win.look; behind: content; onClosed: win.toList() }
-        AppConfirm { id: confirm; c: win.look; behind: content; visible: false; onAnswered: ok => acts.answered(ok) }
-        AppToast { id: toast; c: win.look }
     }
 }

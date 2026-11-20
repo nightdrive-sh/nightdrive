@@ -1,4 +1,5 @@
-"""What Files' sidebar lists: home's own folders (xdg-user-dirs), the bookmarks, the disks, and the trash's count.
+"""What Files' sidebar lists but its own first group (pinned.py): the bookmarks, the disks, and the trash's count;
+and home's own folders (xdg-user-dirs), which that group starts with.
 
 The bookmarks are GTK's (~/.config/gtk-3.0/bookmarks: "file:///path Optional name" a line), the same Nautilus and every
 app's Open dialog show, so one added here is there too and theirs are here. Only local folders are listed; a line for
@@ -88,6 +89,24 @@ def _write(lines):
     os.replace(tmp, f)
 
 
+def _path_of(line):
+    u = urlparse(line.partition(" ")[0])
+    return unquote(u.path) if u.scheme == "file" else None
+
+
+def bookmark_at(path, before=""):
+    """Puts path among the bookmarks before before (one of them) or at the end; a line it had already moves there with
+    its name. Lines for anything but a local folder stay where they are."""
+    path = str(Path(path))
+    lines = _lines()
+    entry = next((line for line in lines if _path_of(line) == path), _uri(path))
+    lines = [line for line in lines if _path_of(line) != path]
+    at = next((i for i, line in enumerate(lines) if before and _path_of(line) == before), len(lines))
+    lines.insert(at, entry)
+    _write(lines)
+    return {"bookmarked": True, "path": path}
+
+
 def bookmark(path, on):
     """Adds path at the end of the bookmarks (on), or takes it away; {bookmarked: on, path}"""
     path = str(Path(path))
@@ -152,4 +171,6 @@ def unmount(path):
 
 
 def all_places():
-    return {"standard": standard(), "bookmarks": bookmarks(), "devices": devices(), "trash": trash.count()}
+    """The sidebar's groups but the first (pinned.rows, which cli.py adds), and Downloads' folder for gd"""
+    return {"bookmarks": bookmarks(), "devices": devices(), "trash": trash.count(),
+            "downloads": str(user_dirs()["DOWNLOAD"])}

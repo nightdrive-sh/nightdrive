@@ -15,13 +15,15 @@ done exits 1 with the reason on stderr, in words for the toast.
   peek PATH [--long]           what the preview shows (--long: more of a text, for the big preview)
   places                       the sidebar's rows
   bookmark PATH | unbookmark PATH
+  unpin PATH                   out of the sidebar's first group (pinned.py)
+  place-move PATH --to places|bookmarks [--before PATH]   a folder to a group, before another of it or at its end
   mount DEVICE | unmount PATH
 """
 import argparse, json, os, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # -I leaves the script's folder out
-import fsops, peek, places, trash                          # noqa: E402
+import fsops, peek, pinned, places, trash                  # noqa: E402
 from fsops import Refused                                  # noqa: E402
 
 
@@ -77,7 +79,11 @@ def run(a):
     if v == "peek":
         return peek.peek(a.path, a.long)
     if v == "places":
-        return places.all_places()
+        return {"pinned": pinned.rows(), **places.all_places()}
+    if v == "unpin":
+        return pinned.remove(a.path)
+    if v == "place-move":
+        return pinned.move(a.path, a.to, a.before)
     if v in ("bookmark", "unbookmark"):
         return places.bookmark(a.path, v == "bookmark")
     if v == "mount":
@@ -104,6 +110,9 @@ def parser():
         sub.add_parser(verb)
     for verb in ("bookmark", "unbookmark", "unmount"):
         sub.add_parser(verb).add_argument("path")
+    sub.add_parser("unpin").add_argument("path")
+    s = sub.add_parser("place-move"); s.add_argument("path"); s.add_argument("--to", choices=("places", "bookmarks"), required=True)
+    s.add_argument("--before", default="")
     s = sub.add_parser("peek"); s.add_argument("path"); s.add_argument("--long", action="store_true")
     sub.add_parser("mount").add_argument("device")
     return p
