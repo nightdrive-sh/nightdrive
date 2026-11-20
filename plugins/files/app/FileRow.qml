@@ -26,6 +26,8 @@ AppRow {
         acceptedModifiers: Qt.NoModifier
         onTapped: { row.app.current = row.index; row.app.toList() }
         onDoubleTapped: row.app.openAt(row.index)
+        // The picture a drag from here would carry, taken now: it isn't ready in time once the drag starts
+        onPressedChanged: if (pressed && !row.app.trashShown) row.app.drag.prepare(row.file, row.app.dragPaths(row.file.path).length)
     }
     // ⌘-click marks or unmarks it, ⇧-click marks the rows from the picked one to it
     TapHandler {

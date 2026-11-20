@@ -174,7 +174,7 @@ FloatingWindow {
     Places { id: places; app: win }
     FileActions { id: acts; app: win; prompt: prompt; confirm: confirm }
     FileKeys { id: keys; app: win }
-    FileDrag { id: dragger }
+    FileDrag { id: dragger; c: win.look }
     readonly property alias ops: ops
     readonly property alias clip: clip
     readonly property alias places: places

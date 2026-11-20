@@ -79,7 +79,7 @@ RowLayout {
                         visible: index > 1 || (index === 1 && root.crumbs[0].name !== "/")
                         anchors.verticalCenter: parent.verticalCenter
                         text: "›"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 13
-                        leftPadding: 5; rightPadding: 5
+                        leftPadding: 8; rightPadding: 8
                     }
                     Text {
                         textFormat: Text.PlainText
