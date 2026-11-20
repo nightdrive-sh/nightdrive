@@ -291,7 +291,10 @@ class Handler(BaseHTTPRequestHandler):
                 ses.seen(sid)
             case ["sessions", sid, "send"]:
                 ses.seen(ses.window(sid))
-                demo or control.type_text(sid, body.get("text", ""), bool(body.get("submit")))
+                if demo:
+                    ses.typed(sid, body.get("text", ""))
+                else:
+                    control.type_text(sid, body.get("text", ""), bool(body.get("submit")))
             case ["sessions", sid, "stop"]:
                 demo or control.stop(ses.window(sid))
             case ["sessions", sid, "close"]:
