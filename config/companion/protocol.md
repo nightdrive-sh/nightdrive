@@ -111,6 +111,27 @@ tool's `text` is named to read: `Dashboard: log add` for `mcp__claude_ai_Dashboa
 `ID` must be a session's window from the state: no other window is typed into. Sending and stopping go through the
 desktop: its window comes to the front, as with ⌘⌃C (Send to Claude), and nothing is typed until it has the keyboard.
 
+## Inbox
+
+Nightdrive Inbox's messages (docs/inbox.md), through its own command (`nightdrive inbox … --json`, `lib/inbox.py`): the
+store and its rules are the Inbox's, the same for its window, Claude's tools and this page. The state has
+`"inbox": { "unread": 3, "total": 16, "stamp": "afba79a1" }`; `stamp` changes with any message (a new one, read,
+archived, added to), and the page reads the list again then while its view is open.
+
+`GET /api/inbox` → `{ "messages": [...], "total": 16, "unread": 3 }`, the newest 100 not archived, as `inbox list
+--json` gives them (`id`, `title`, `at`, `read`, `task`, `sender: { short, label }`, `attachments`: how many) without
+`from`. `GET /api/inbox/ID` → the message whole: its `body` (Markdown) and `attachments: [{ name, type, size, url }]`,
+`actions` as a count. `GET /api/inbox/ID/files/NAME` → one of its files, only one it lists. 404 when it isn't there.
+
+| Request | Body | Does |
+| --- | --- | --- |
+| `POST /api/inbox/ID/read` | | Marks it read (the page does when it opens one) |
+| `POST /api/inbox/ID/unread` | | Marks it unread |
+| `POST /api/inbox/ID/archive` | | Moves it to the archive |
+| `POST /api/inbox/ID/unarchive` | | Back in the Inbox |
+
+`ID` is a whole id (`20261120-133100-da82`). The buttons (open, run, session, task) and push are not here yet.
+
 ## Actions
 
 Six slots. `GET /api/presets` → `[{ "id": "lock", "label": "Lock", "icon": "lock" }, …]`.

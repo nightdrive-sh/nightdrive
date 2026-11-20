@@ -9,12 +9,14 @@ import "./mic.js";
 import { icon } from "./icons.js";
 import { openUsage } from "./usage.js";
 import { presenceSwitch, togglePresence } from "./presence.js";
+import { inboxButton, openInbox } from "./inbox.js";
 
 const top = document.querySelector(".top");
 let loadedWeb = null;     // the page files' stamp (server.web_version) this page was loaded with
 top.addEventListener("click", e => {
   if (e.target.closest(".update")) location.reload();
   if (e.target.closest(".usage-btn")) openUsage();
+  if (e.target.closest(".inbox-btn")) openInbox();
   const p = e.target.closest(".presence");
   if (p) togglePresence(p);
 });
@@ -57,6 +59,7 @@ function render(state) {
       ${work ? `<span>${need ? "· " : ""}${work} working</span>` : ""}</div>
     <span class="spacer"></span>
     ${stale ? '<button class="update">New version available<b>Reload</b></button>' : ""}
+    ${inboxButton(state)}
     <button class="usage-btn" aria-label="Usage">${icon("gauge", 20)}</button>`;
   theme(state?.theme);
   offline(!store.online);

@@ -266,9 +266,6 @@ def _ordered(sessions, bar=()):
                                            s["started"], s["id"]))
 
 
-DEMO_TAKES = 3     # seconds before the demo's log has words you sent
-
-
 class Demo:
     """Made-up sessions that change over time, for a machine without Hyprland (and the sandbox, a screenshot)."""
     active = {"session": "demo-mail", "name": "Thread sort order", "detail": "mail"}
@@ -277,12 +274,6 @@ class Demo:
         self.t0 = time.time()
         self.answered = {}
         self.wants = {"demo-mail"}
-        self.said = {}            # session → [(when it shows in the log, words)], what you sent it
-
-    def typed(self, addr, text):
-        """Words sent into a session: in its log after DEMO_TAKES s, as Claude Code writes a prompt once it took it
-        (the page shows them faded until then: web/pending.js)."""
-        self.said.setdefault(self.window(addr), []).append((time.time() + DEMO_TAKES, str(text)))
 
     def look(self):
         now = time.time()
@@ -331,8 +322,7 @@ class Demo:
                 {"role": "assistant", "kind": "text", "text": "The tests pass. Logged it and left a message."},
                 *DEMO_STEPS[:2],
                 {"role": "assistant", "kind": "text" if not working else "tool",
-                 "text": s["last"], **({"status": "running"} if working else {})},
-                *({"role": "user", "kind": "text", "text": t} for at, t in self.said.get(addr, []) if at <= time.time())]
+                 "text": s["last"], **({"status": "running"} if working else {})}]
 
     def permission(self, addr):
         return next((s.get("permission") for s in self.look() if s["id"] == addr), None)

@@ -11,11 +11,12 @@ import subprocess
 import threading
 import time
 import zlib
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, unquote
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import access
 import control
+import inbox
 import mic
 import mic_socket
 import presence
@@ -72,6 +73,7 @@ class State:
         self.demo = demo
         self.sessions = sessions.Demo() if demo else sessions.Sessions()
         self.presence = presence.Demo() if demo else presence.Presence()
+        self.inbox = inbox.Demo() if demo else inbox.Inbox()
         self.cond = threading.Condition()
         self.mic = mic.Mic(self.cond)     # the app as the computer's microphone (mic.py)
         self.actions = control.DEMO_CONFIG if demo else control.CONFIG
@@ -107,6 +109,8 @@ class State:
                 "usage": self._usage(), "sessions": self.sessions.look(), "active": self.sessions.active,
                 # away from the computer (locked, idle, or as set on the page): a tile's tap opens its view there
                 "presence": self.presence.look(),
+                # Nightdrive Inbox's unread count, and a stamp: the page reads the list again when it changes (inbox.py)
+                "inbox": self.inbox.state(),
                 # the lid is closed: the dictation key wants the app's microphone (mic.py), and the app keeps awake
                 "mic": {"wanted": not self.demo and mic.lid_closed()},
                 "actions": control.public_actions(self.actions), "web": web_version()}
@@ -184,9 +188,29 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, ses.log(parts[2]) if parts[3] == "log" else ses.request(ses.window(parts[2])))
             except ValueError as e:
                 return self._send(404, {"error": str(e)})
+        if parts[:2] == ["api", "inbox"]:
+            return self._inbox(parts[2:])
         if path.startswith("/fonts/"):
             return self._font(path.split("/")[-1])
         self._static(path)
+
+    def _inbox(self, parts):
+        """GET /api/inbox (the list), /api/inbox/ID (a message whole), /api/inbox/ID/files/NAME (one of its files)."""
+        box = self.state.inbox
+        try:
+            if not parts:
+                return self._send(200, box.list())
+            if len(parts) == 1:
+                return self._send(200, box.show(parts[0]))
+            if len(parts) == 3 and parts[1] == "files":
+                path, ctype = box.file(parts[0], unquote(parts[2]))
+                with open(path, "rb") as f:
+                    return self._send(200, f.read(), ctype)
+        except inbox.InboxError as e:
+            return self._send(404, {"error": str(e)})
+        except (OSError, subprocess.SubprocessError, ValueError) as e:
+            return self._send(500, {"error": f"Inbox didn't answer: {e}"})
+        return self._send(404, {"error": "Not found"})
 
     def _static(self, path):
         rel = "index.html" if path in ("", "/") else path.lstrip("/")
@@ -291,10 +315,7 @@ class Handler(BaseHTTPRequestHandler):
                 ses.seen(sid)
             case ["sessions", sid, "send"]:
                 ses.seen(ses.window(sid))
-                if demo:
-                    ses.typed(sid, body.get("text", ""))
-                else:
-                    control.type_text(sid, body.get("text", ""), bool(body.get("submit")))
+                demo or control.type_text(sid, body.get("text", ""), bool(body.get("submit")))
             case ["sessions", sid, "stop"]:
                 demo or control.stop(ses.window(sid))
             case ["sessions", sid, "close"]:
@@ -318,6 +339,10 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("No device")
                 demo or self.state.mic.event(device, body["id"], body.get("type"), body.get("text", ""),
                                              body.get("error", ""))
+            case ["inbox", mid, ("read" | "unread") as what]:
+                self.state.inbox.read(mid, unread=what == "unread")
+            case ["inbox", mid, ("archive" | "unarchive") as what]:
+                self.state.inbox.archive(mid, undo=what == "unarchive")
             case ["presence"]:
                 self.state.presence.set(body.get("away"))
             case ["actions", n, "run"]:
