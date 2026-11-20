@@ -222,6 +222,14 @@ if f then
     settle()
 end
 
+-- A background session joins its space's group as it opens (#3297), inside the map: the layout placed it a row of its
+-- own beside the group, and waiting SETTLE_MS showed that, the right column's windows shrinking and growing back. Done
+-- before the first frame, only the result is drawn. Not while a layer has the keyboard (settle waits for it then).
+hl.on("window.open", function(w)
+    local s = w and is_session(w) and w.workspace and spaces[w.workspace.id]
+    if s and not held() then arrange(s) end
+end)
+
 for _, ev in ipairs({ "window.open", "window.close", "window.destroy", "window.move_to_workspace", "workspace.removed" }) do
     hl.on(ev, function() if next(spaces) then settle() end end)
 end
