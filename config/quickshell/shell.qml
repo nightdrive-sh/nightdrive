@@ -45,6 +45,20 @@ ShellRoot {
     }
     property var navItem: null         // selected row / toggle
 
+    // Quickshell (0.3.2) gives each workspace switch (workspacev2) to the screen it takes as focused, and takes that both
+    // from focusedmon and from the focused flag in each j/monitors reply. A reply asked for before a focusedmon (on a
+    // monitoradded, as screens come up at login or on docking) but read after it set the screen focused before it again:
+    // every switch after that went to the laptop's screen, and the external one's bar kept its old number (#3289). So the
+    // screens are read again once such events settle, and the fresh reply is the last word.
+    Timer { id: monitorsAgain; interval: 400; onTriggered: Hyprland.refreshMonitors() }
+    Connections {
+        target: Hyprland
+        function onRawEvent(ev) {
+            if (ev.name === "focusedmon" || ev.name === "monitoraddedv2" || ev.name === "monitorremoved"
+                || ev.name === "configreloaded") monitorsAgain.restart()
+        }
+    }
+
     // Safety net: before #2039 an open menu put Hyprland in a submap (qsmenu); one left in it after an update has no keys
     Component.onCompleted: Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.submap("reset")'])
 
