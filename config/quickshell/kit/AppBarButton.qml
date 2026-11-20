@@ -10,6 +10,7 @@ Rectangle {
     id: root
     required property QtObject c
     property string glyph: ""
+    property int glyphSize: 14         // a bar of glyphs alone (Files' header) takes them a little bigger
     property string label: ""
     property bool compact: false
     property bool strong: false        // what Enter does (Notes' Edit): a quiet fill and the accent, still no frame
@@ -31,7 +32,7 @@ Rectangle {
         spacing: 7
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: Icons.g(root.glyph); font.family: Icons.family; font.pixelSize: 14
+            text: Icons.g(root.glyph); font.family: Icons.family; font.pixelSize: root.glyphSize
             color: root.strong ? root.c.accent : root.hovered ? root.c.text : root.c.dim
         }
         Text {
