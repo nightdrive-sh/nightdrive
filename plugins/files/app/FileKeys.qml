@@ -1,6 +1,6 @@
 import QtQuick
 
-// Files' keys, yazi's letters and the desktop's ⌘ keys side by side (⌘ reaches the app as Ctrl). Moving and opening
+// Files' keys, yazi's letters and the desktop's ⌘ keys side by side (⌘ reaches the app as Ctrl or Meta). Moving and opening
 // take hjkl and the arrows alone: ⌘ + an arrow is the window manager's. g starts a pair: gg the first row, gh home,
 // gd Downloads. Space is the big preview (Quick Look's key), so marking is v, ⇧↑ ⇧↓ and ⌘-click. press(e) does what e asks and answers whether it was one of these; the window's handler passes on the
 // rest. In the sidebar (Tab) the moving keys walk its rows instead.
@@ -12,7 +12,9 @@ QtObject {
 
     function press(e) {
         const a = app, k = e.key, t = e.text
-        const ctrl = (e.modifiers & Qt.ControlModifier) !== 0
+        // ⌘: Hyprland turns only some ⌘ keys into Ctrl (⌘C ⌘Z ⌘A ⌘F …, bindings.lua); the rest (⌘N ⌘D ⌘L ⌘O …) come as
+        // Meta, so either is ⌘ here
+        const ctrl = (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)) !== 0
         const shift = (e.modifiers & Qt.ShiftModifier) !== 0
         const alt = (e.modifiers & Qt.AltModifier) !== 0
         const enter = k === Qt.Key_Return || k === Qt.Key_Enter
@@ -44,6 +46,7 @@ QtObject {
             else if (k === Qt.Key_F) a.startFilter()
             else if (k === Qt.Key_L) a.acts.askGo()
             else if (k === Qt.Key_N && shift) a.acts.askNew(true)
+            else if (k === Qt.Key_N) a.newWindow()
             else if (k === Qt.Key_D) a.acts.toggleBookmark()
             else if (k === Qt.Key_R) a.reload()
             else if (k === Qt.Key_Backspace && shift && a.trashShown) a.acts.askEmpty()

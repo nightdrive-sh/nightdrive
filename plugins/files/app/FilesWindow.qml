@@ -202,8 +202,9 @@ FloatingWindow {
 
     Shortcut { sequence: "Ctrl+Z"; enabled: !prompt.visible && !confirm.visible; onActivated: if (!toast.act()) ops.undo() }
     Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
-    // A new window in the same folder, as Nautilus does (⌘ reaches the app as Ctrl)
-    Shortcut { sequences: ["Ctrl+N", "Meta+N"]; onActivated: win.manager.open(win.trashShown ? "" : win.path, "") }
+    // A new window in the same folder, as Nautilus does: ⌘N is FileKeys'. Not a Shortcut: Qt matches "Ctrl+N" on
+    // Ctrl+Shift+N too, which took ⌘⇧N (a new folder) from the keys
+    function newWindow() { manager.open(trashShown ? "" : path, "") }
     Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
     Shortcut { sequences: ["Ctrl+,", "Meta+,"]; enabled: !win.showSettings; onActivated: win.showSettings = true }
 
