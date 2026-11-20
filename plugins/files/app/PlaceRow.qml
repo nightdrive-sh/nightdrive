@@ -88,6 +88,7 @@ AppNavRow {
     AppIconButton {
         visible: row.movable && !moving.active && (row.hovered || hovered)
         anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
+        implicitWidth: 20; implicitHeight: 20; glyphSize: 11   // small, so a click meant for the row seldom lands on it
         c: row.c; glyph: "x"; tip: "Remove from the sidebar"; tipAlign: "right"
         onClicked: row.app.acts.removePlace(row.modelData)
     }
