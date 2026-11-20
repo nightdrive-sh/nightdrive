@@ -1,0 +1,126 @@
+#!/usr/bin/python3 -I
+"""Places: names for Wi-Fi networks (work = "Feature"), for reminders and commands that wait for arriving at or
+leaving one (Dashboard #3275). `nightdrive places …` runs it; Claude's tools (config/mcp/tools/places.json) use it.
+
+  places [list] [--json]           every place and its networks, and whether this computer is there now.
+                                   --json: {places: [{name, wifi, here}], wifi: [SSIDs now]}
+  places here [--json]             the Wi-Fi now and the places it makes this: {wifi: [...], places: [names]}
+  places add NAME [SSID…] [--json] adds the networks to NAME (made if it isn't there); without SSID the Wi-Fi now.
+                                   --json: {name, wifi, place: {name, wifi, here}, added, created,
+                                   shared: {ssid: [other places]}}
+  places remove NAME [--json]      takes the place away. --json: {name, removed: {name, wifi}}
+  places forget NAME SSID [--json] takes one network off a place. --json: {place: {…}}
+  places show NAME --json          {name, previous}: the place as JSON text ("null": none), for Claude's undo
+  places put NAME JSON|null        sets the place back to that (null: takes it away): that undo
+
+Names are compared without case; one SSID may be in two places (places.py says why). The file is
+~/.config/nightdrive/places.json, the user's own (mode 600).
+"""
+import json, os, sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import places  # noqa: E402  the places and the Wi-Fi now (places.py)
+
+USAGE = "usage: places [list|here|add NAME [SSID…]|remove NAME|forget NAME SSID|show NAME|put NAME JSON] [--json]"
+
+
+def out(data, as_json, text):
+    print(json.dumps(data, ensure_ascii=False) if as_json else text)
+
+
+def wifi_text(ssids):
+    return ", ".join(ssids) or "no networks"
+
+
+def cmd_list(as_json):
+    rows, wifi = places.load(), places.current_wifi()
+    views = [places.view(r, wifi) for r in rows]
+    lines = [f"{v['name']}: {wifi_text(v['wifi'])}" + ("  (here)" if v["here"] else "") for v in views]
+    out({"places": views, "wifi": wifi}, as_json,
+        "\n".join(lines) or "No places yet. Add one with: nightdrive places add NAME [SSID…]")
+
+
+def cmd_here(as_json):
+    rows, wifi = places.load(), places.current_wifi()
+    names = [r["name"] for r in places.here(rows, wifi)]
+    if names:
+        text = ", ".join(names)
+    elif wifi:
+        text = f"Not at a known place (Wi-Fi: {', '.join(wifi)})"
+    else:
+        text = "Not on Wi-Fi"
+    out({"wifi": wifi, "places": names}, as_json, text)
+
+
+def cmd_add(name, ssids, as_json):
+    ssids = ssids or places.current_wifi()
+    with places.editing() as rows:
+        place, added, created, shared = places.add(rows, name, ssids)
+        result = {"name": place["name"], "wifi": list(place["wifi"]), "place": places.view(place, places.current_wifi()),
+                  "added": added, "created": created, "shared": shared}
+    if created:
+        text = f"Added {place['name']}: {wifi_text(place['wifi'])}"
+    elif added:
+        text = f"{place['name']} now has {wifi_text(place['wifi'])}"
+    else:
+        text = f"{place['name']} has {wifi_text(place['wifi'])} already"
+    for ssid, others in shared.items():
+        text += f"\n{ssid} is in {', '.join(others)} too: both are there on it"
+    out(result, as_json, text)
+
+
+def cmd_remove(name, as_json):
+    with places.editing() as rows:
+        gone = places.remove(rows, name)
+    out({"name": gone["name"], "removed": {"name": gone["name"], "wifi": gone["wifi"]}}, as_json, f"Removed {gone['name']}")
+
+
+def cmd_forget(name, ssid, as_json):
+    with places.editing() as rows:
+        place = places.forget(rows, name, ssid)
+        view = places.view(place, places.current_wifi())
+    out({"place": view}, as_json, f"{place['name']} now has {wifi_text(place['wifi'])}")
+
+
+def cmd_put(name, previous, as_json):
+    try:
+        previous = json.loads(previous)
+    except ValueError:
+        raise places.PlaceError("put takes a place as JSON, or null.")
+    with places.editing() as rows:
+        place = places.put(rows, name, previous)
+    out({"place": place}, as_json, f"Set {place['name']} back" if place else f"Took {name} away")
+
+
+def main(argv):
+    as_json = "--json" in argv
+    args = [a for a in argv if a not in ("--json", "--")]
+    cmd, rest = (args[0], args[1:]) if args else ("list", [])
+    try:
+        if cmd == "list" and not rest:
+            cmd_list(as_json)
+        elif cmd == "here" and not rest:
+            cmd_here(as_json)
+        elif cmd == "add" and rest:
+            cmd_add(rest[0], rest[1:], as_json)
+        elif cmd == "remove" and len(rest) == 1:
+            cmd_remove(rest[0], as_json)
+        elif cmd == "forget" and len(rest) == 2:
+            cmd_forget(rest[0], rest[1], as_json)
+        elif cmd == "show" and len(rest) == 1:
+            print(json.dumps(places.snapshot(places.load(), rest[0]), ensure_ascii=False))
+        elif cmd == "put" and len(rest) == 2:
+            cmd_put(rest[0], rest[1], as_json)
+        elif cmd in ("-h", "--help", "help"):
+            print(__doc__.strip())
+        else:
+            print(USAGE, file=sys.stderr)
+            return 2
+    except places.PlaceError as e:
+        print(e, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
