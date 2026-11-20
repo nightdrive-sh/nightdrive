@@ -82,16 +82,19 @@ end
 
 -- The login apps: after the password at an autologin start, as they may ask the keyring (the lock's PAM opens it)
 -- The lock calls it at every unlock (lock.qml, and hyprlock's in scripts/lock): the ones after the first are for schedule,
--- whose commands that came due under the lock, or wait for the first unlock after waking, run then
+-- whose commands that came due under the lock, or wait for the first unlock after waking, run then, and for places
 function NightdriveUnlocked()
     if not once(UNLOCKED_FLAG) then
         hl.exec_cmd(HOME .. "/.config/hypr/scripts/schedule unlocked")
+        hl.exec_cmd(HOME .. "/.config/hypr/scripts/places check")   -- arrived or left while locked (net-watch tells the rest)
         return
     end
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/autostart")   -- the user's login apps (launcher › Settings › Apps › Startup; 1Password by default)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/reopen session offer")   -- the battery ran out: open its windows again?
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/remind restore")   -- quick reminders: their timers again, the missed ones told
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/schedule restore")   -- scheduled commands: timers again, login's and missed ones run or asked
+    -- Arriving at or leaving a place: --wake, as a login is like waking (it may have been shut down elsewhere)
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/places check --wake")
     hl.exec_cmd(HOME .. "/.config/welcome/welcome login")   -- a new install's first login: Welcome to Nightdrive (later ones: a reminder)
     session.unlocked()
 end

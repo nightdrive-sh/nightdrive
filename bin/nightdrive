@@ -50,7 +50,7 @@ usage() {
   row "files COMMAND"            "Newest in Downloads, Pictures, Documents: recent (--json); open PATH, trash PATH…, restore NAME…"
   row "remind WHEN [MESSAGE]"    "A reminder banner in minutes (15, 1h30m) or at a time (22:45): list, cancel ID|all (--json)"
   row "schedule WHEN COMMAND"    "Run a command once in minutes (15, 1h30m), at a time (14:45), on wake or at login, with a notification: list, run ID, cancel ID|all (--json); other text is a message to Claude (--to SESSION, --run, --claude)"
-  row "places [COMMAND]"         "Places: names for Wi-Fi networks (work, home): list, here, add NAME [SSID…], remove NAME, forget NAME SSID (--json)"
+  row "places [COMMAND]"         "Places: names for Wi-Fi networks (work, home): list, here, add NAME [SSID…], remove NAME, forget NAME SSID, check (--json)"
   row "clean [SECONDS]"          "Lock the keyboard and touchpad to clean them, 15 s or 5–60 (stop, status --json)"
   row "restart"                  "Restart the top bar, menus and notifications (Quickshell), e.g. after it crashed"
   row "topbar adjust"            "The top bar's icon and text sizes, live"

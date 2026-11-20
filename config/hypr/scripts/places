@@ -12,6 +12,11 @@ leaving one (Dashboard #3275). `nightdrive places …` runs it; Claude's tools (
   places forget NAME SSID [--json] takes one network off a place. --json: {place: {…}}
   places show NAME --json          {name, previous}: the place as JSON text ("null": none), for Claude's undo
   places put NAME JSON|null        sets the place back to that (null: takes it away): that undo
+  places check [--sleep|--wake] [--json]
+                                   notices arriving at and leaving places and tells Remind and Schedule
+                                   (place_check.py; net-watch, login and unlock run it). --json: {event, wifi,
+                                   here: [names], events: [{event: arrive|leave, place}], next_check: unix|null,
+                                   ran: [{command, ok, skipped}]}
 
 Names are compared without case; one SSID may be in two places (places.py says why). The file is
 ~/.config/nightdrive/places.json, the user's own (mode 600).
@@ -20,8 +25,10 @@ import json, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import places  # noqa: E402  the places and the Wi-Fi now (places.py)
+import place_check  # noqa: E402  arriving and leaving (place_check.py, place_rules.py)
 
-USAGE = "usage: places [list|here|add NAME [SSID…]|remove NAME|forget NAME SSID|show NAME|put NAME JSON] [--json]"
+USAGE = ("usage: places [list|here|add NAME [SSID…]|remove NAME|forget NAME SSID|show NAME|put NAME JSON"
+         "|check [--sleep|--wake]] [--json]")
 
 
 def out(data, as_json, text):
@@ -92,9 +99,15 @@ def cmd_put(name, previous, as_json):
     out({"place": place}, as_json, f"Set {place['name']} back" if place else f"Took {name} away")
 
 
+def cmd_check(event, as_json):
+    result = place_check.check(event)
+    out(result, as_json, place_check.text(result))
+
+
 def main(argv):
     as_json = "--json" in argv
-    args = [a for a in argv if a not in ("--json", "--")]
+    event = "sleep" if "--sleep" in argv else "wake" if "--wake" in argv else None
+    args = [a for a in argv if a not in ("--json", "--", "--sleep", "--wake")]
     cmd, rest = (args[0], args[1:]) if args else ("list", [])
     try:
         if cmd == "list" and not rest:
@@ -111,6 +124,8 @@ def main(argv):
             print(json.dumps(places.snapshot(places.load(), rest[0]), ensure_ascii=False))
         elif cmd == "put" and len(rest) == 2:
             cmd_put(rest[0], rest[1], as_json)
+        elif cmd == "check" and not rest:
+            cmd_check(event, as_json)
         elif cmd in ("-h", "--help", "help"):
             print(__doc__.strip())
         else:
