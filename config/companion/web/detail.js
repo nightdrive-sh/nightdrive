@@ -3,7 +3,7 @@
 // A tap on a tile opens it; × or Esc closes it. It stays at the end as new lines come, unless you scrolled up to read.
 // A question with choices shows whole above the buttons, to answer there (question.js). Answer is held to talk, as
 // on a tile (let go and it is sent; a tap opens its box), and Write beside it opens the box at its keyboard.
-// Its steps (tool calls) are kept quiet, a run of them one line that a tap opens (steps.js).
+// Its steps (tool calls) are kept quiet: a turn's work up to its newest text is one line that a tap opens (steps.js).
 // The view is a step in the browser's history, so Back (Android's, Safari's edge gesture in a tab) closes it; in the
 // app on the home screen a swipe from the left edge does (swipe.js).
 import { esc, get, since, store, subscribe } from "./api.js";
