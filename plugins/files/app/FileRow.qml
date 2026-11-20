@@ -32,16 +32,18 @@ AppRow {
         // The picture a drag from here would carry, taken now: it isn't ready in time once the drag starts
         onPressedChanged: if (pressed && !row.app.trashShown) row.app.drag.prepare(row.file, row.app.dragPaths(row.file.path).length)
     }
-    // ⌘-click marks or unmarks it, ⇧-click marks the rows from the anchor to it, ⌘⇧-click adds them (the window's
-    // markTo). One handler for every modifier: acceptedModifiers wants them exact, and ⌘ comes as Ctrl or as Meta
-    // (Hyprland turns only some ⌘ keys into Ctrl). The plain click is the handler above.
+    // Ctrl-click marks or unmarks it, ⇧-click marks the rows from the anchor to it, ⌘⇧-click adds them (the window's
+    // markTo). Not ⌘-click, as elsewhere: ⌘ + a press is Hyprland's window drag (hypr/bindings.lua) and never reaches
+    // the app, so a click with Ctrl held is the physical Control key. One handler for every modifier: acceptedModifiers
+    // wants them exact, and ⌘⇧ comes as Meta (Hyprland turns only some ⌘ keys into Ctrl). The plain click is the
+    // handler above.
     TapHandler {
         acceptedModifiers: Qt.KeyboardModifierMask
         onTapped: {
             const m = point.modifiers
             const cmd = (m & (Qt.ControlModifier | Qt.MetaModifier)) !== 0
             if (m & Qt.ShiftModifier) row.app.markTo(row.index, cmd)
-            else if (cmd) { row.app.current = row.index; row.app.toggleMarkAt(row.index) }
+            else if (m & Qt.ControlModifier) { row.app.current = row.index; row.app.toggleMarkAt(row.index) }
             else return
             row.app.toList()
         }

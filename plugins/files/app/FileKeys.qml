@@ -2,7 +2,7 @@ import QtQuick
 
 // Files' keys, yazi's letters and the desktop's ⌘ keys side by side (⌘ reaches the app as Ctrl or Meta). Moving and opening
 // take hjkl and the arrows alone: ⌘ + an arrow is the window manager's. g starts a pair: gg the first row, gh home,
-// gd Downloads. Space is the big preview (Quick Look's key), so marking is v, ⇧↑ ⇧↓ and ⌘-click. press(e) does what e asks and answers whether it was one of these; the window's handler passes on the
+// gd Downloads. Space is the big preview (Quick Look's key), so marking is v, ⇧↑ ⇧↓ and Ctrl-click. press(e) does what e asks and answers whether it was one of these; the window's handler passes on the
 // rest. In the sidebar (Tab) the moving keys walk its rows instead.
 QtObject {
     id: root

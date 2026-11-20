@@ -4,7 +4,7 @@ import "Format.js" as Format
 
 // A file or folder in the grid (FileGrid): its thumbnail (Thumbs: a picture, a PDF's first page, a video's frame), or
 // its glyph large while there is none, and its name under it in two lines at most. The same hands as a list's row
-// (FileRow): a click picks it, a double click opens it, ⌘-click and ⇧-click mark, a drag takes it out with the other
+// (FileRow): a click picks it, a double click opens it, Ctrl-click and ⇧-click mark, a drag takes it out with the other
 // marked ones, and a folder's tile takes a drop. Marked it has the list's bar colour and a tick at its corner; cut, it is faded.
 Rectangle {
     id: tile
@@ -37,15 +37,15 @@ Rectangle {
         // The drag's picture, taken now: it isn't ready in time once the drag starts (FileDrag)
         onPressedChanged: if (pressed && !tile.app.trashShown) tile.app.drag.prepare(tile.file, tile.app.dragPaths(tile.file.path).length)
     }
-    // ⌘-click marks or unmarks it, ⇧-click marks from the anchor to it, ⌘⇧-click adds those (as FileRow): one
-    // handler for every modifier, as acceptedModifiers wants an exact match and ⌘ arrives as Meta or Ctrl
+    // Ctrl-click marks or unmarks it, ⇧-click marks from the anchor to it, ⌘⇧-click adds those (as FileRow; not
+    // ⌘-click, Hyprland's window drag): one handler for every modifier, as acceptedModifiers wants an exact match
     TapHandler {
         acceptedModifiers: Qt.KeyboardModifierMask
         onTapped: {
             const m = point.modifiers
             const cmd = (m & (Qt.ControlModifier | Qt.MetaModifier)) !== 0
             if (m & Qt.ShiftModifier) tile.app.markTo(tile.index, cmd)
-            else if (cmd) { tile.app.current = tile.index; tile.app.toggleMarkAt(tile.index) }
+            else if (m & Qt.ControlModifier) { tile.app.current = tile.index; tile.app.toggleMarkAt(tile.index) }
             else return
             tile.app.toList()
         }

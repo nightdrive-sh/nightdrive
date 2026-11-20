@@ -26,7 +26,7 @@ browser's "Show in folder".
 | `+` `-` | Larger or smaller thumbnails in the grid (96, 128 or 192 px), the same in every folder |
 | `.` | Hidden files (⌘⇧. too) |
 | `s` `S` | Sort by name, time, size or type; the other way round (a click on a column's title too) |
-| `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, Esc unmarks. With the mouse ⌘-click marks one, ⇧-click the files from the one last clicked or picked to it (in place of the marks before), ⌘⇧-click adds them; in a filter or a search only the files shown |
+| `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, Esc unmarks. With the mouse Ctrl-click (the Control key: ⌘-click moves the window) marks one, ⇧-click the files from the one last clicked or picked to it (in place of the marks before), ⌘⇧-click adds them; in a filter or a search only the files shown |
 | `y` `x` `p` or ⌘C ⌘X ⌘V | Copy, cut, paste here: the marked files, else the picked one |
 | `d` or ⌘⌫ | To the trash |
 | `r` or F2 | Rename (the name without its ending is picked) |
