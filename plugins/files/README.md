@@ -11,7 +11,7 @@ browser's "Show in folder".
 | --- | --- |
 | `?` | Files' keys |
 | ↑ ↓ or `j` `k` | Move in the list |
-| → ⏎ or `l` | Open: into a folder, a file in its app (a double click too; ⌘O) |
+| → ⏎ or `l` | Open: into a folder, a file in its app (a double click too; ⌘O); an archive is extracted instead (⌘O opens it) |
 | ← ⌫ or `h` | Up a folder |
 | `gg` `G` | First, last |
 | ⌥← ⌥→ (⌃⌘← ⌃⌘→) | Back, forward |
@@ -28,6 +28,8 @@ browser's "Show in folder".
 | `d` or ⌘⌫ | To the trash |
 | `r` or F2 | Rename (the name without its ending is picked) |
 | `a` | A new file; a name ending in `/` makes a folder (⌘⇧N: a folder) |
+| `c` | Compress the marked files, else the picked one, into an archive here: its name and format (zip, tar.gz, tar.xz, tar; ↑ ↓ change it) |
+| `e` or ⏎ | Extract the picked archive (zip, tar, tar.gz, tar.bz2, tar.xz) beside it |
 | ⌘Z | Undo the last change (also Undo in the message at the top) |
 | `b` or ⌘D | Bookmark the picked folder (with a file picked, the one you're in), or take it away |
 | `Tab` | Keys between the sidebar and the list |
@@ -39,6 +41,7 @@ browser's "Show in folder".
 - The clipboard is the desktop's: files copied here paste into a mail, a chat or a browser, and files copied in Nautilus paste here. A cut moves the files once pasted.
 - Drag files out of the list into another app, or onto a folder in the list, the sidebar or the path at the top; files dragged in from another app are copied, and from Files itself moved. Dropped on Trash, they go there.
 - A copy or move never writes over a file: a name already there gets " (2)". A long one shows how far it is, with Stop.
+- An archive with one thing at its top extracts as that file or folder, one with several into a folder of the archive's name. Paths that would land outside it (`..`, `/etc/…`) and links pointing out are left out, and the message says how many. Nothing is written over: a name taken gets " (2)". Both show how far they are, with Stop, and Undo trashes what they made.
 - The search of home is fd's, always up to date: what it leaves out stays out (hidden files unless `.` shows them, `.git`, and what a `.gitignore`, `.ignore` or `.fdignore` excludes), and so do other disks under the folder. It stops at 2000 files: type more to narrow it.
 - The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). `d` moves to it at once (Undo brings it back), but asks first about home's own folders (Documents…), the sidebar's and home's hidden ones (`.config`…); home itself, the folders above it and the trash never go. In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
 

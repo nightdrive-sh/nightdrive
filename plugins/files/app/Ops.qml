@@ -4,7 +4,7 @@ import Quickshell.Io
 import "Format.js" as Format
 
 // Files' changes, each run as lib/cli.py's command in a process of its own: copy and move (paste, a drop), trash,
-// rename, new, and the trash's restore and delete. A change's result names its undo (cli.py's "undo"), which the toast's
+// rename, new, compress, extract, and the trash's restore and delete. A change's result names its undo (cli.py's "undo"), which the toast's
 // Undo and ⌘Z run. A copy or move that takes a while shows how far it is in a toast that stays, with Stop (SIGTERM:
 // cli.py removes the file it was writing and keeps what it had done, Undo included).
 QtObject {
@@ -81,6 +81,15 @@ QtObject {
     function move(paths, into) {
         if (paths.length) change(["move", "--into", into, "--"].concat(paths),
                                  d => d.moved.length ? "Moved " + count(d.moved.length, Format.base(d.moved[0][0])) : "Already here", "Moving")
+    }
+    // c and ⏎ on an archive (pack.py, unpack.py): what was left out of an archive as unsafe is said, not hidden
+    function compress(paths, into, name, format) {
+        if (paths.length) change(["compress", "--into", into, "--name", name, "--format", format, "--"].concat(paths),
+                                 d => "Compressed into " + Format.base(d.made[0] || ""), "Compressing")
+    }
+    function extract(path) {
+        change(["extract", "--", path], d => "Extracted " + Format.base(d.made[0] || "")
+               + (d.skipped && d.skipped.length ? " (" + count(d.skipped.length, "1 item") + " left out: unsafe paths or links)" : ""), "Extracting")
     }
     function trash(paths) {
         if (paths.length) change(["trash", "--"].concat(paths), "Moved " + count(paths.length, Format.base(paths[0])) + " to the trash")

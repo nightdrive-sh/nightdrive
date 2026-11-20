@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -I
 """Files' helper: the window (Ops.qml, Places.qml, Preview.qml) runs these and reads the JSON they print, one object a
-line. A copy or move prints {"progress": bytes, "total": bytes, "name": …} as it goes; the last line is the result.
+line. A copy, move, compress or extract prints {"progress": bytes, "total": bytes, "name": …} as it goes; the last
+line is the result.
 A change's result carries "undo": the command that takes it back, as the window runs it for Undo and ⌘Z. What can't be
 done exits 1 with the reason on stderr, in words for the toast.
 
@@ -8,6 +9,8 @@ done exits 1 with the reason on stderr, in words for the toast.
   move --into FOLDER PATH…     moves (a rename on the same disk)             undo: move-back
   rename PATH NAME             a new name in the same folder                 undo: move-back
   new FOLDER NAME [--dir]      an empty file, or a folder                    undo: trash it
+  compress --into FOLDER --name NAME --format zip|tar.gz|tar.xz|tar PATH…   an archive   undo: trash it
+  extract ARCHIVE [--into FOLDER]   unpacked beside it (pack.py, unpack.py)          undo: trash what it made
   trash PATH…                  to the trash                                  undo: restore
   move-back NEW OLD …          each NEW back to OLD
   restore ID…                  back from the trash (ID: its info file, as trash and trash-list give it)
@@ -23,7 +26,7 @@ import argparse, json, os, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # -I leaves the script's folder out
-import fsops, peek, pinned, places, trash                  # noqa: E402
+import fsops, pack, peek, pinned, places, trash, unpack                  # noqa: E402
 from fsops import Refused                                  # noqa: E402
 
 
@@ -60,6 +63,12 @@ def run(a):
     if v == "move":
         fsops.watch_stop()
         return with_undo(fsops.move(a.paths, a.into, progress))
+    if v == "compress":
+        fsops.watch_stop()
+        return with_undo(pack.compress(a.paths, a.into, a.name, a.format, progress))
+    if v == "extract":
+        fsops.watch_stop()
+        return with_undo(unpack.extract(a.archive, a.into, progress))
     if v == "rename":
         return with_undo(fsops.rename(a.path, a.name))
     if v == "new":
@@ -100,6 +109,9 @@ def parser():
         s = sub.add_parser(verb)
         s.add_argument("--into", required=True)
         s.add_argument("paths", nargs="+")
+    s = sub.add_parser("compress"); s.add_argument("--into", required=True); s.add_argument("--name", required=True)
+    s.add_argument("--format", choices=tuple(pack.FORMATS), default="zip"); s.add_argument("paths", nargs="+")
+    s = sub.add_parser("extract"); s.add_argument("archive"); s.add_argument("--into", default="")
     s = sub.add_parser("rename"); s.add_argument("path"); s.add_argument("name")
     s = sub.add_parser("new"); s.add_argument("folder"); s.add_argument("name"); s.add_argument("--dir", action="store_true")
     for verb in ("trash", "move-back"):

@@ -28,6 +28,8 @@ function suffix(name) {
     return i > 0 ? name.slice(i + 1).toLowerCase() : ""
 }
 function isImage(name) { return IMAGE.indexOf(suffix(name)) >= 0 }
+// What lib/unpack.py unpacks (its SUFFIXES): ⏎ and e extract these rather than open them
+function isArchive(name) { return /\.(zip|tar|tgz|tbz2?|txz|tar\.(gz|bz2|xz))$/i.test(name) }
 function glyph(row) {
     if (row.dir) return "folder"
     const s = suffix(row.name)

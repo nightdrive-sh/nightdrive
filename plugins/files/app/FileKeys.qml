@@ -43,7 +43,7 @@ QtObject {
             if (k === Qt.Key_C) a.acts.copy(false)
             else if (k === Qt.Key_X) a.acts.copy(true)
             else if (k === Qt.Key_V) a.acts.paste()
-            else if (k === Qt.Key_O) a.openPicked()
+            else if (k === Qt.Key_O) a.openPicked(true)
             else if (k === Qt.Key_A) a.markAll()
             else if (k === Qt.Key_F) a.startFilter()
             else if (k === Qt.Key_L) a.acts.askGo()
@@ -88,6 +88,8 @@ QtObject {
         else if (t === "u" && a.trashShown) a.acts.restorePicked()
         else if (t === "r" || k === Qt.Key_F2) a.acts.askRename()
         else if (t === "a") a.acts.askNew(false)
+        else if (t === "c") a.compress.ask()
+        else if (t === "e") a.extractPicked()
         else if (t === "/") a.startFilter()
         else if (t === "f" || t === "F") a.startFilter(true)
         else if (t === ".") a.showHidden = !a.showHidden

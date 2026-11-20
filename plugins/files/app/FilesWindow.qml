@@ -142,12 +142,15 @@ FloatingWindow {
     }
     function page() { return Math.max(1, Math.floor(list.view.height / (rowHeight + 1)) - 1) }
     function openAt(i) { current = i; openPicked() }
-    function openPicked() {
+    // An archive extracts beside itself (Ops, lib/unpack.py) on ⏎, e and a double click; ⌘O (inApp) opens it in its app
+    function openPicked(inApp) {
         const f = picked
         if (!f || trashShown) return
         if (f.dir) go(f.path, "")
+        else if (!inApp && Format.isArchive(f.name)) ops.extract(f.path)
         else Quickshell.execDetached(["gio", "open", f.path])
     }
+    function extractPicked() { if (picked && !picked.dir && !trashShown && Format.isArchive(picked.name)) ops.extract(picked.path) }
 
     // Marks (v, ⇧↑ ⇧↓, ⌘-click, ⇧-click): the files the keys act on, else the picked one
     function setMark(p, on) { const m = Object.assign({}, marks); if (on) m[p] = true; else delete m[p]; marks = m }
@@ -204,6 +207,7 @@ FloatingWindow {
     readonly property alias drag: dragger
     readonly property alias quick: quick
     readonly property alias toast: toast
+    readonly property alias compress: compressPanel
     function changed(d) { acts.changed(d) }
 
     // Tab moves the keys between the sidebar and the list
@@ -307,13 +311,14 @@ FloatingWindow {
             { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l", "Open: into a folder, a file in its app"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
             { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
             { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["⌘-click  ⇧-click", "Mark one, mark up to it"], ["Esc", "No marks"]] },
-            { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["⌘Z", "Undo"]] },
+            { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["⌘Z", "Undo"]] },
             { title: "Places", keys: [["Tab", "Sidebar, list"], ["⌘N", "A new window, in this folder"], ["b  ⌘D", "Bookmark the picked folder, or not"], ["Drag", "Onto a folder or the sidebar: moved; from another app: copied"], ["Drag in the sidebar", "A folder to another place, or to the other group"]] },
             { title: "Trash", keys: [["u", "Put back"], ["d", "Delete for good"], ["⌘⇧⌫", "Empty the trash"]] }
         ]
     }
 
     SettingsPanel { win: win; behind: content; onVisibleChanged: if (!visible) win.toList() }
+    CompressPanel { id: compressPanel; app: win; behind: content }
     AppPrompt { id: prompt; c: win.look; behind: content; onClosed: win.toList() }
     AppConfirm { id: confirm; c: win.look; behind: content; visible: false; onAnswered: ok => acts.answered(ok) }
     AppToast { id: toast; c: win.look }
