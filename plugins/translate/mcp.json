@@ -1,0 +1,32 @@
+{
+  "tools": [
+    {
+      "name": "translate_text",
+      "title": "Translate text",
+      "description": "Translates text with the engine the user picked in Launcher › Tools › Translate (an offline model, or an online service). Without from and to, the text's language is guessed between the user's two languages (usually Finnish and English) and it is translated to the other. Returns translation, alternatives (other translations of a single word or short phrase), from, to and the engine used. Use it when the user asks what their translator gives; your own translation is often as good.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "minLength": 1, "maxLength": 20000, "title": "Text"},
+          "from": {"type": "string", "pattern": "^[A-Za-z_]{2,12}$", "title": "From", "description": "Language code, e.g. fi. Leave out to have it guessed"},
+          "to": {"type": "string", "pattern": "^[A-Za-z_]{2,12}$", "title": "To", "description": "Language code, e.g. en. Leave out for the pair's other language"}
+        },
+        "required": ["text"],
+        "additionalProperties": false
+      },
+      "command": ["translate", "--json", ["--from", "{from}"], ["--to", "{to}"]],
+      "stdin": "{text}",
+      "class": "read",
+      "area": "translate"
+    },
+    {
+      "name": "translate_engines",
+      "title": "Translate's engines",
+      "description": "The translation engines Translate knows: id, name, whether each is installed, online or offline, and which one is in use (engine), with the user's language pair (langs).",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["translate", "engines", "--json"],
+      "class": "read",
+      "area": "translate"
+    }
+  ]
+}

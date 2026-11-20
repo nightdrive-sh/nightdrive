@@ -277,6 +277,8 @@ PanelWindow {
     // Ctrl+Enter, ⌘⌫ / Delete and Ctrl+Up/Down on an extension level, if its file has them (ctrlActivate, deleteSelected,
     // moveSelected); true = done
     function extCtrl(item) { const t = extOf(level); return !!(t && t.ctrlActivate && t.ctrlActivate(item)) }
+    // Tab on an extension level without a form, if its file has a use for it (tabPressed: Translate's direction)
+    function extTab(dir) { const t = extOf(level); return !!(t && t.tabPressed && t.tabPressed(dir)) }
     function extDelete() { const t = extOf(level); return !!(t && t.deleteSelected && t.deleteSelected()) }
     function extMove(dir) { const t = extOf(level); return !!(t && t.moveSelected && t.moveSelected(dir)) }   // Ctrl+Up/Down
     // ⌘⌫ / ⌥⌫ in the query (or Ask Claude's field): a selection goes first, otherwise to the line start (word = only the

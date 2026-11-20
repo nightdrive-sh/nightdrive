@@ -213,6 +213,8 @@ it (`nightdrive restart`).
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also
 have `rootItems` (rows at the Launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `displayRows()` (rows in Settings › Other displays: VNC Display's), `rootRows()`
 (rows for the root search: Deck's albums) and `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
+`tabPressed(dir)` takes Tab on its levels that have no form (true when it did something: Translate's direction).
+`cmdEnter()` takes ⌘Enter on its levels (true when it did something: Translate's "with Claude"; else the key opens a terminal as elsewhere).
 `inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
 into the field.
 A row may carry `footer`, its own keys for the footer while it is selected ("Enter: search Spotify").

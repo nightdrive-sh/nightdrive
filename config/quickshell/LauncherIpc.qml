@@ -28,6 +28,8 @@ Item {
                 launcher.levels.ask.terminal(AskClaudeSession.draft, true)
                 return "ok"
             }
+            // ⌘Enter on a level whose file has its own use for it (cmdEnter: Translate's "with Claude")
+            if (how === "key") { const ext = launcher.extOf(launcher.level); if (ext && ext.cmdEnter && ext.cmdEnter()) return "ok" }
             if (how === "key") how = (launcher.results[launcher.selIndex] || {}).kind === "askclaude" ? "terminal" : "background"
             if (["root", "apps"].indexOf(launcher.level) < 0) return ""
             if (how === "terminal") return launcher.query.trim() === "" ? "" : (launcher.levels.ask.terminal(launcher.query, false), "ok")
