@@ -7,7 +7,8 @@ import "Format.js" as Format
 // Over the list: back and forward, where the window is, as a path whose parts are clicked to go up to them (home is
 // its glyph) and take files dropped on them, level with the sidebar's title, and the buttons: Filter, New folder, the preview;
 // in the trash, Put back and Empty. With the filter open (/ or ⌘F) the field takes the path's place: typing narrows
-// the list at once, ⏎ or ↓ go back to the rows with it kept, Esc ends it. In a narrow window the buttons give up their
+// the list at once, ⏎ or ↓ go back to the rows with it kept, Esc ends it; its scope at its end turns it into a search of
+// all of home (Search). In a narrow window the buttons give up their
 // words, and the path its first parts.
 RowLayout {
     id: root
@@ -119,14 +120,57 @@ RowLayout {
         id: search
         visible: root.app.filtering
         Layout.fillWidth: true
+        Layout.minimumWidth: 90         // the scope beside it gives way first
         c: root.c
-        placeholder: "Filter by name"
+        placeholder: root.app.below ? "Search by name" : "Filter by name"
         onEdited: root.app.filter = text
         onReturnPressed: root.app.toList()
         onDownPressed: root.app.toList()
         onEscapePressed: root.app.endFilter()
     }
 
+    // The filter's scope, at the field's end: a click (or Tab, ⌘F again) turns it between this folder and all of home
+    // (outside home: the folder and the ones below it). Not a second search button: the one field does both, as the
+    // Mac's ⌘F does with the folder and "This Mac"
+    Rectangle {
+        id: scope
+        visible: root.app.filtering
+        Layout.maximumWidth: Math.max(70, root.width * 0.4)
+        Layout.preferredWidth: Math.min(scopeText.implicitWidth + 20, Layout.maximumWidth)
+        Layout.preferredHeight: 22
+        Layout.rightMargin: 8
+        radius: 6
+        color: root.app.below ? root.c.sel : scopeHover.hovered ? root.c.hover : "transparent"
+        border.color: root.app.below ? root.c.primary : root.c.divider
+        readonly property string place: Format.base(root.app.path)
+        Text {
+            id: scopeText
+            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+            verticalAlignment: Text.AlignVCenter
+            textFormat: Text.PlainText
+            elide: Text.ElideMiddle
+            text: !root.app.below ? (root.app.path === root.app.home ? "This folder" : scope.place)
+                : root.app.inHome ? "Home" : scope.place + " and below"
+            color: root.app.below ? root.c.primary : scopeHover.hovered ? root.c.text : root.c.dim
+            font.family: root.c.font; font.pixelSize: 11
+        }
+        HoverHandler { id: scopeHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: root.app.toggleScope() }
+        // Under the box, its right edge with the box's, as the header's buttons have theirs
+        Tip {
+            x: parent.width - width; y: parent.height + 6
+            c: root.c; hovered: scopeHover.hovered; keys: "Tab"
+            text: root.app.below ? "Only this folder"
+                : root.app.inHome ? "All of home, every folder in it" : "This folder and every folder below it"
+        }
+    }
+    // How many a search found, once it is done (2000 at most: more words narrow it)
+    Text {
+        visible: !root.compact && root.app.searching && !root.app.search.running && root.app.marked.length === 0 && root.app.rows.length > 0
+        text: root.app.search.capped ? "first " + root.app.rows.length : root.app.rows.length + " found"
+        color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
+        Layout.rightMargin: 8
+    }
     // How many are marked, while some are (the folder's own count isn't shown: Jari's call)
     Text {
         visible: root.app.marked.length > 0

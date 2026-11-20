@@ -56,9 +56,17 @@ FloatingWindow {
     property alias reversed: folder.reversed
     property alias filter: folder.filter
     property bool filtering: false
+    // The filter's scope, as the Mac's Finder has it: this folder (Folder narrows its rows), or all of home (Search, fd).
+    // Outside home (a USB stick, /etc) home wouldn't help: there it is the folder and every one below it
+    readonly property bool inHome: path === home || path.startsWith(home + "/")
+    readonly property string searchRoot: inHome ? home : path
+    Search { id: search; app: win; folder: win.searchRoot; words: win.filter; hidden: win.showHidden; onRebuilt: win.settle() }
+    property alias below: search.on
+    readonly property bool searching: !trashShown && search.active
+    readonly property alias search: search
     property string placeDrag: ""         // the sidebar folder being dragged to another place in it
-    readonly property bool loading: !trashShown && folder.loading
-    readonly property var rows: trashShown ? trashRows : folder.rows
+    readonly property bool loading: !trashShown && (searching ? search.running : folder.loading)
+    readonly property var rows: trashShown ? trashRows : searching ? search.rows : folder.rows
 
     property int current: -1
     property string keep: ""             // the path to pick once the rows come (one just made, the folder come up from)
@@ -87,7 +95,12 @@ FloatingWindow {
     }
     function back() { if (history.length) { const p = history[history.length - 1]; history = history.slice(0, -1); future = [trashShown ? "" : path].concat(future); p ? enter(p, path) : showTrash() } }
     function forward() { if (future.length) { const p = future[0]; future = future.slice(1); history = history.concat([trashShown ? "" : path]); p ? enter(p, "") : showTrash() } }
-    function up() { if (trashShown) go(home, ""); else if (path !== "/") go(Format.parent(path), path) }
+    // Up from a search's result is the folder it is in, with it picked
+    function up() {
+        if (trashShown) go(home, "")
+        else if (searching && picked) go(Format.parent(picked.path), picked.path)
+        else if (path !== "/") go(Format.parent(path), path)
+    }
     function goDownloads() { if (places.data.downloads) go(places.data.downloads, "") }
     function goEntry(e) {
         if (e.kind === "trash") { if (!trashShown) history = history.concat([path]); showTrash() }
@@ -156,9 +169,17 @@ FloatingWindow {
         else if (clip.cut.length) manager.cut = []
     }
 
-    // The filter (/, ⌘F): the field in the header narrows the rows as it is typed into
-    function startFilter() { if (trashShown) return; filtering = true; header.field.text = filter; pane = "list"; header.field.forceActiveFocus() }
-    function endFilter() { filtering = false; filter = ""; header.field.text = ""; toList() }
+    // The filter (/, ⌘F): the field in the header narrows the rows as it is typed into. Its scope is this folder, or with
+    // below all of home (f starts there; Tab, ⌘F again or a click on the scope in the field turns it)
+    function startFilter(deep) {
+        if (trashShown) return
+        if (deep !== undefined) below = deep
+        else if (filtering && header.field.activeFocus) below = !below
+        filtering = true; header.field.text = filter; pane = "list"; header.field.forceActiveFocus()
+    }
+    readonly property bool fieldFocused: header.field.activeFocus
+    function toggleScope() { below = !below; if (filtering) header.field.forceActiveFocus() }
+    function endFilter() { filtering = false; filter = ""; below = false; header.field.text = ""; toList() }
 
     // s goes through the orders, S (or the same column's title again) turns it round
     readonly property var sorts: ["name", "modified", "size", "type"]
@@ -283,7 +304,7 @@ FloatingWindow {
         c: win.look
         groups: [
             { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l", "Open: into a folder, a file in its app"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
-            { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
+            { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
             { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["⌘-click  ⇧-click", "Mark one, mark up to it"], ["Esc", "No marks"]] },
             { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["⌘Z", "Undo"]] },
             { title: "Places", keys: [["Tab", "Sidebar, list"], ["⌘N", "A new window, in this folder"], ["b  ⌘D", "Bookmark the picked folder, or not"], ["Drag", "Onto a folder or the sidebar: moved; from another app: copied"], ["Drag in the sidebar", "A folder to another place, or to the other group"]] },

@@ -4,7 +4,7 @@ import qs.kit
 import "Format.js" as Format
 
 // A file or folder in the list: its glyph, name, size and when it changed (in the trash: the folder it came from and
-// when it went). Marked (Space) it shows a tick in the accent; cut (x), it is faded until pasted. A click picks it, a
+// when it went; found by a search, the folder it is in after its name). Marked (Space) it shows a tick in the accent; cut (x), it is faded until pasted. A click picks it, a
 // double click opens it; dragged, it goes out as text/uri-list with the other marked ones (the window's FileDrag), and
 // a folder's row takes a drop itself.
 AppRow {
@@ -60,15 +60,31 @@ AppRow {
         font.family: Icons.family; font.pixelSize: row.app.compact ? 14 : 16
         color: row.isMarked ? row.c.accent : row.file.dir ? row.c.primary : row.c.dim
     }
+    // The name, and after it, faint, the folder a search found it in (relative to the folder searched): the name gets
+    // its full width first, and the folder at least a third of the room once both don't fit
+    readonly property real room: second.x - (glyph.x + glyph.width + 10) - 12
+    readonly property bool hasFolder: row.file.folder !== undefined && row.file.folder !== ""
     Text {
+        id: nameText
         textFormat: Text.PlainText
         anchors.left: glyph.right; anchors.leftMargin: 10
-        anchors.right: second.left; anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
+        width: row.hasFolder ? Math.min(implicitWidth, Math.max(row.room * 0.66, row.room - folderText.implicitWidth - 12)) : row.room
         elide: Text.ElideMiddle
         text: row.file.name
         font.family: row.c.font; font.pixelSize: 13
         color: row.isMarked ? row.c.accent : row.selected ? row.c.title : row.c.text
+    }
+    Text {
+        id: folderText
+        visible: row.hasFolder
+        textFormat: Text.PlainText
+        anchors.left: nameText.right; anchors.leftMargin: 12
+        anchors.right: second.left; anchors.rightMargin: 12
+        anchors.verticalCenter: parent.verticalCenter
+        elide: Text.ElideLeft          // the nearest folders matter most
+        text: row.hasFolder ? row.file.folder : ""
+        font.family: row.c.font; font.pixelSize: 12; color: row.c.faint
     }
     // Size, or in the trash where it came from
     Text {

@@ -20,6 +20,7 @@ browser's "Show in folder".
 | Space | The big preview: a picture, a PDF's first page, a video's frame or a text; ↑ ↓ go through the files, Space or Esc closes it |
 | `i` | The preview at the right (a narrow window leaves it out) |
 | `/` or ⌘F | Filter by name as you type: ⏎ back to the list with it kept, Esc shows all again |
+| `f`, or Tab in the filter | Search all of home by name, and Tab back to this folder; ⌘F again or a click on the scope at the field's end does the same. Outside home (a USB stick) it searches the folder and every one below it. Each file shows the folder it is in, ← goes there |
 | `.` | Hidden files (⌘⇧. too) |
 | `s` `S` | Sort by name, time, size or type; the other way round (a click on a column's title too) |
 | `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, ⌘-click and ⇧-click with the mouse, Esc unmarks |
@@ -38,6 +39,7 @@ browser's "Show in folder".
 - The clipboard is the desktop's: files copied here paste into a mail, a chat or a browser, and files copied in Nautilus paste here. A cut moves the files once pasted.
 - Drag files out of the list into another app, or onto a folder in the list, the sidebar or the path at the top; files dragged in from another app are copied, and from Files itself moved. Dropped on Trash, they go there.
 - A copy or move never writes over a file: a name already there gets " (2)". A long one shows how far it is, with Stop.
+- The search of home is fd's, always up to date: what it leaves out stays out (hidden files unless `.` shows them, `.git`, and what a `.gitignore`, `.ignore` or `.fdignore` excludes), and so do other disks under the folder. It stops at 2000 files: type more to narrow it.
 - The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). `d` moves to it at once (Undo brings it back), but asks first about home's own folders (Documents…), the sidebar's and home's hidden ones (`.config`…); home itself, the folders above it and the trash never go. In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
 
 ## In a terminal
@@ -47,4 +49,4 @@ browser's "Show in folder".
     files enable                 # Files opens folders for the desktop (the installer runs it)
     files disable                # folders open in Nautilus again
 
-Needs: nothing to set up (Python, GObject, wl-clipboard and poppler-utils, which Nightdrive has)
+Needs: nothing to set up (Python, GObject, wl-clipboard, poppler-utils and fd-find, which its installer adds)

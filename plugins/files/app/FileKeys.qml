@@ -25,6 +25,8 @@ QtObject {
             if (t === "h") { a.go(a.home, ""); return true }
             if (t === "d") { a.goDownloads(); return true }
         }
+        // Tab in the filter's field turns its scope (this folder, and below); elsewhere it moves between the panes
+        if ((k === Qt.Key_Tab || k === Qt.Key_Backtab) && a.filtering && a.fieldFocused) { a.toggleScope(); return true }
         if (k === Qt.Key_Tab || k === Qt.Key_Backtab) { a.switchPane(); return true }
 
         if (a.pane === "side") {
@@ -87,6 +89,7 @@ QtObject {
         else if (t === "r" || k === Qt.Key_F2) a.acts.askRename()
         else if (t === "a") a.acts.askNew(false)
         else if (t === "/") a.startFilter()
+        else if (t === "f" || t === "F") a.startFilter(true)
         else if (t === ".") a.showHidden = !a.showHidden
         else if (t === "s") a.cycleSort()
         else if (t === "S") a.reversed = !a.reversed
