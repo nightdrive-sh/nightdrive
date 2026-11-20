@@ -49,8 +49,9 @@ export function openInbox() {
   const el = document.createElement("div");
   el.className = "detail inbox";
   el.setAttribute("role", "dialog");
-  el.innerHTML = `<header class="dhead"><button class="close" aria-label="Close">${icon("x", 18)}</button>
-    <div class="who"><b>Inbox</b><span class="count"></span></div></header>
+  // × in the top right corner, as on a sheet; Back (a message on a narrow screen) stays on the left
+  el.innerHTML = `<header class="dhead"><div class="who"><b>Inbox</b><span class="count"></span></div>
+    <span class="spacer"></span><button class="close" aria-label="Close">${icon("x", 18)}</button></header>
     <div class="ibox"><nav class="ilist" aria-label="Messages"></nav><article class="imsg"></article></div>`;
   document.body.append(el);
   view = { el, list: null, msg: null, stamp: null };
