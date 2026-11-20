@@ -67,6 +67,8 @@ QtObject {
             return true
         }
 
+        // The grid moves in two directions (FileGrid): its arrows and hjkl, and + − its thumbnails' size
+        if (a.gridShown && a.grid.press(e)) return true
         if (k === Qt.Key_Down && shift) a.markMove(1)
         else if (k === Qt.Key_Up && shift) a.markMove(-1)
         else if (k === Qt.Key_Down || t === "j") a.move(1)
@@ -93,6 +95,7 @@ QtObject {
         else if (t === "/") a.startFilter()
         else if (t === "f" || t === "F") a.startFilter(true)
         else if (t === ".") a.showHidden = !a.showHidden
+        else if (t === "t") a.toggleView()
         else if (t === "s") a.cycleSort()
         else if (t === "S") a.reversed = !a.reversed
         else if (t === "~") a.go(a.home, "")

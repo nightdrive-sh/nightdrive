@@ -5,7 +5,7 @@ import qs.kit
 import "Format.js" as Format
 
 // Over the list: back and forward, where the window is, as a path whose parts are clicked to go up to them (home is
-// its glyph) and take files dropped on them, level with the sidebar's title, and the buttons: Filter, New folder, the preview;
+// its glyph) and take files dropped on them, level with the sidebar's title, and the buttons: Filter, New folder, the grid or the list, the preview;
 // in the trash, Put back and Empty. With the filter open (/ or ⌘F) the field takes the path's place: typing narrows
 // the list at once, ⏎ or ↓ go back to the rows with it kept, Esc ends it; its scope at its end turns it into a search of
 // all of home (Search). In a narrow window the buttons give up their
@@ -198,6 +198,13 @@ RowLayout {
         visible: !root.app.trashShown
         c: root.c; glyph: "folder-plus"; glyphSize: 17; compact: true; tip: "New folder"; keys: "⌘⇧N"
         onClicked: root.app.acts.askNew(true)
+    }
+    // The grid or the list (t): it shows the one it turns to
+    AppBarButton {
+        visible: !root.app.trashShown
+        c: root.c; glyph: root.app.gridShown ? "list" : "layout-grid"; glyphSize: 17; compact: true
+        tip: root.app.gridShown ? "As a list" : "As a grid, with thumbnails"; keys: "t"
+        onClicked: root.app.toggleView()
     }
     AppBarButton {
         c: root.c; glyph: root.app.previewShown ? "panel-right-close" : "panel-right-open"; glyphSize: 17; compact: true

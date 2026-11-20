@@ -38,6 +38,18 @@ FloatingWindow {
     readonly property bool compact: settings.layout === "compact"
     readonly property int rowHeight: compact ? 30 : 40     // FileRow's; normal is near Nautilus's, easy to click
 
+    // The grid (t, FileGrid): a folder's own choice (Views); the trash is always a list. tile is the thumbnails'
+    // square, + and − step it, the same in every window
+    Views { id: views; dir: win.manager.configDir }
+    readonly property bool gridShown: !trashShown && views.isGrid(path)
+    function toggleView() { if (!trashShown) views.set(path, !gridShown) }
+    readonly property var tiles: [96, 128, 192]
+    readonly property int tile: tiles.indexOf(settings.tile) >= 0 ? settings.tile : 128
+    function tileStep(d) { const i = tiles.indexOf(tile) + d; if (i >= 0 && i < tiles.length) setting("tile", tiles[i]) }
+    Thumbs { id: thumbs; helperDir: Quickshell.shellDir + "/../lib"; rows: win.rows; on: win.gridShown; size: win.tile > 128 ? "x-large" : "large" }
+    readonly property alias thumbs: thumbs
+    readonly property var view: gridShown ? grid.view : list.view
+
     readonly property string helper: Quickshell.shellDir + "/../lib/cli.py"
     readonly property string home: Quickshell.env("HOME")
     readonly property int headerHeight: 30
@@ -91,7 +103,7 @@ FloatingWindow {
         path = p
         // To the top, its margin in: positionViewAtBeginning() leaves the margin out, and the list jumped up by it and
         // back as a folder not read before came
-        list.view.contentY = list.view.originY - list.view.topMargin
+        view.contentY = view.originY - view.topMargin
     }
     function back() { if (history.length) { const p = history[history.length - 1]; history = history.slice(0, -1); future = [trashShown ? "" : path].concat(future); p ? enter(p, path) : showTrash() } }
     function forward() { if (future.length) { const p = future[0]; future = future.slice(1); history = history.concat([trashShown ? "" : path]); p ? enter(p, "") : showTrash() } }
@@ -129,7 +141,7 @@ FloatingWindow {
         const i = want ? rows.findIndex(r => r.path === want) : -1
         if (i >= 0 || !keep) keep = ""
         current = i >= 0 ? i : rows.length ? Math.max(0, Math.min(current, rows.length - 1)) : -1
-        if (current >= 0) list.view.positionViewAtIndex(current, ListView.Contain)
+        if (current >= 0) view.positionViewAtIndex(current, ListView.Contain)
         // Marks of files gone stay out of what the keys act on (marked only counts the rows there)
         preview.again()
     }
@@ -138,9 +150,9 @@ FloatingWindow {
     function moveTo(i) {
         if (!rows.length) return
         current = Math.max(0, Math.min(rows.length - 1, i))
-        list.view.positionViewAtIndex(current, ListView.Contain)
+        view.positionViewAtIndex(current, ListView.Contain)
     }
-    function page() { return Math.max(1, Math.floor(list.view.height / (rowHeight + 1)) - 1) }
+    function page() { return gridShown ? grid.perPage : Math.max(1, Math.floor(list.view.height / (rowHeight + 1)) - 1) }
     function openAt(i) { current = i; openPicked() }
     // An archive extracts beside itself (Ops, lib/unpack.py) on ⏎, e and a double click; ⌘O (inApp) opens it in its app
     function openPicked(inApp) {
@@ -220,6 +232,7 @@ FloatingWindow {
     readonly property alias acts: acts
     readonly property alias drag: dragger
     readonly property alias quick: quick
+    readonly property alias grid: grid
     readonly property alias toast: toast
     readonly property alias compress: compressPanel
     function changed(d) { acts.changed(d) }
@@ -302,7 +315,8 @@ FloatingWindow {
                 Item { Layout.preferredHeight: win.headerPad - 1 }
                 Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: win.look.divider }
                 Item { Layout.preferredHeight: 10 }
-                FileList { id: list; Layout.fillWidth: true; Layout.fillHeight: true; c: win.look; app: win }
+                FileList { id: list; visible: !win.gridShown; Layout.fillWidth: true; Layout.fillHeight: true; c: win.look; app: win }
+                FileGrid { id: grid; visible: win.gridShown; Layout.fillWidth: true; Layout.fillHeight: true; c: win.look; app: win }
             }
         }
 
@@ -323,7 +337,7 @@ FloatingWindow {
         c: win.look
         groups: [
             { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l", "Open: into a folder, a file in its app"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
-            { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
+            { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["t", "Thumbnails in a grid, or the list (hjkl move in it)"], ["+  −", "Larger, smaller thumbnails"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
             { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["⌘-click", "Mark one"], ["⇧-click  ⌘⇧-click", "Mark up to it, add up to it"], ["Esc", "No marks"]] },
             { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["⌘Z", "Undo"]] },
             { title: "Places", keys: [["Tab", "Sidebar, list"], ["⌘N", "A new window, in this folder"], ["b  ⌘D", "Bookmark the picked folder, or not"], ["Drag", "Onto a folder or the sidebar: moved; from another app: copied"], ["Drag in the sidebar", "A folder to another place, or to the other group"]] },

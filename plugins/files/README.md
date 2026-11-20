@@ -21,6 +21,8 @@ browser's "Show in folder".
 | `i` | The preview at the right (a narrow window leaves it out) |
 | `/` or ⌘F | Filter by name as you type: ⏎ back to the list with it kept, Esc shows all again |
 | `f`, or Tab in the filter | Search all of home by name, and Tab back to this folder; ⌘F again or a click on the scope at the field's end does the same. Outside home (a USB stick) it searches the folder and every one below it. Each file shows the folder it is in, ← goes there |
+| `t` | Thumbnails in a grid, or the list again (also the button in the header). Each folder keeps its own; a new one is a list. In the grid `h` `j` `k` `l` and the arrows move in all four ways, ⏎ opens and ⌫ goes up |
+| `+` `-` | Larger or smaller thumbnails in the grid (96, 128 or 192 px), the same in every folder |
 | `.` | Hidden files (⌘⇧. too) |
 | `s` `S` | Sort by name, time, size or type; the other way round (a click on a column's title too) |
 | `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, Esc unmarks. With the mouse ⌘-click marks one, ⇧-click the files from the one last clicked or picked to it (in place of the marks before), ⌘⇧-click adds them; in a filter or a search only the files shown |
@@ -43,6 +45,7 @@ browser's "Show in folder".
 - A copy or move never writes over a file: a name already there gets " (2)". A long one shows how far it is, with Stop.
 - An archive with one thing at its top extracts as that file or folder, one with several into a folder of the archive's name. Paths that would land outside it (`..`, `/etc/…`) and links pointing out are left out, and the message says how many. Nothing is written over: a name taken gets " (2)". Both show how far they are, with Stop, and Undo trashes what they made.
 - The search of home is fd's, always up to date: what it leaves out stays out (hidden files unless `.` shows them, `.git`, and what a `.gitignore`, `.ignore` or `.fdignore` excludes), and so do other disks under the folder. It stops at 2000 files: type more to narrow it.
+- The grid's thumbnails (pictures, a PDF's first page, a video's frame) are kept where Nautilus and the other apps keep theirs (`~/.cache/thumbnails`), so each is drawn once and shared with them. Video frames need ffmpeg.
 - The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). `d` moves to it at once (Undo brings it back), but asks first about home's own folders (Documents…), the sidebar's and home's hidden ones (`.config`…); home itself, the folders above it and the trash never go. In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
 
 ## In a terminal
@@ -52,4 +55,4 @@ browser's "Show in folder".
     files enable                 # Files opens folders for the desktop (the installer runs it)
     files disable                # folders open in Nautilus again
 
-Needs: nothing to set up (Python, GObject, wl-clipboard, poppler-utils and fd-find, which its installer adds)
+Needs: nothing to set up (Python, GObject, GdkPixbuf, wl-clipboard, poppler-utils and fd-find, which its installer adds)

@@ -34,6 +34,7 @@ jobs:
           dnf -y -q install git-core python3 ShellCheck gitleaks
           tzdata jq lua glib2 shared-mime-info xdg-user-dirs notmuch khal ffmpeg-free fd-find
           python3-icalendar python3-dateutil python3-vobject python3-cryptography
+          python3-gobject gdk-pixbuf2 poppler-utils
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # gitleaks reads every commit
