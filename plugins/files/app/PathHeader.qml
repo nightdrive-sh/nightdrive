@@ -4,10 +4,11 @@ import qs
 import qs.kit
 import "Format.js" as Format
 
-// Over the list: back and forward, where the window is, as a path whose parts are clicked to go up to them (home is ~), level with the
-// sidebar's title, and the buttons: Filter, New folder, the preview; in the trash, Put back and Empty. With the filter
-// open (/ or ⌘F) the field takes the path's place: typing narrows the list at once, ⏎ or ↓ go back to the rows with
-// it kept, Esc ends it. In a narrow window the buttons give up their words, and the path its first parts.
+// Over the list: back and forward, where the window is, as a path whose parts are clicked to go up to them (home is
+// ~) and take files dropped on them, level with the sidebar's title, and the buttons: Filter, New folder, the preview;
+// in the trash, Put back and Empty. With the filter open (/ or ⌘F) the field takes the path's place: typing narrows
+// the list at once, ⏎ or ↓ go back to the rows with it kept, Esc ends it. In a narrow window the buttons give up their
+// words, and the path its first parts.
 RowLayout {
     id: root
     required property QtObject c
@@ -89,6 +90,22 @@ RowLayout {
                         font.family: root.c.font; font.pixelSize: 13; font.weight: last ? Font.Medium : Font.Normal
                         HoverHandler { id: crumbHover; cursorShape: Qt.PointingHandCursor }
                         TapHandler { onTapped: root.app.go(modelData.path, "") }
+                        // Files dropped on a part of the path go into that folder, as onto a folder's row: moved from
+                        // Files, copied from another app. A frame shows where they would land
+                        Rectangle {
+                            z: -1
+                            anchors.fill: parent; anchors.margins: -5; anchors.leftMargin: -7; anchors.rightMargin: -7
+                            radius: 6
+                            visible: crumbDrop.containsDrag
+                            color: root.c.hover
+                            border.color: root.c.primary
+                        }
+                        DropArea {
+                            id: crumbDrop
+                            anchors.fill: parent; anchors.margins: -6
+                            keys: ["text/uri-list"]
+                            onDropped: e => root.app.acts.dropped(e, modelData.path, false)
+                        }
                     }
                 }
             }

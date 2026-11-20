@@ -36,7 +36,7 @@ browser's "Show in folder".
 
 - The sidebar has two groups of folders, then the disks and the trash. The first is Files' own, home's folders to start with (`~/.config/nightdrive/files/places.json`); the second, the bookmarks, are GTK's (`~/.config/gtk-3.0/bookmarks`), the same the apps' Open dialogs list: a quick place for a project's folders. Drag a folder to another place in its group or into the other one; its ✕ takes it out (with Undo). A USB stick shows when it is plugged in, mounts as you pick it and has an eject button.
 - The clipboard is the desktop's: files copied here paste into a mail, a chat or a browser, and files copied in Nautilus paste here. A cut moves the files once pasted.
-- Drag files out of the list into another app, or onto a folder in the list or the sidebar; files dragged in from another app are copied, and from Files itself moved. Dropped on Trash, they go there.
+- Drag files out of the list into another app, or onto a folder in the list, the sidebar or the path at the top; files dragged in from another app are copied, and from Files itself moved. Dropped on Trash, they go there.
 - A copy or move never writes over a file: a name already there gets " (2)". A long one shows how far it is, with Stop.
 - The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
 
