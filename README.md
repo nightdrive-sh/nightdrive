@@ -188,7 +188,7 @@ workspaces make room.
 details before installing (Tab there takes Flathub's when both have it). Browse has the 100 most popular apps and
 categories. System › Remove takes software and web apps away; Ctrl+Enter there removes one without asking.
 
-Nightdrive's own apps (Files, Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) and Tailscale come with every install;
+Nightdrive's own apps (Files, Mail, Contacts, Calendar, Notes, Tasks, Deck, Ferry, Recorder, Inbox) and Tailscale come with every install;
 Garage, Nightdrive's app for virtual machines, waits in System › Install › Recommended. The rest are optional parts,
 under System › Install:
 
@@ -307,7 +307,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 % and forgotten at the next login, as on a Mac), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
 | Notifications | Quickshell | the app's icon and buttons, history and Do Not Disturb in the bar, a low battery warning, the internet dropping; a crashed app's notification can Ask Claude why |
 | Sounds | Nightdrive's own, made from scratch | notification sounds to choose from, and the desktop's own (volume, screenshot, charger, devices, lock); Launcher › Settings › Notifications turns them off |
-| Files and images | [Files](plugins/files/README.md) (Nightdrive's own), Loupe | yazi's keys, a preview, Quick Look on Space; Nautilus stays installed for now |
+| Files and images | [Files](plugins/files/README.md) (Nightdrive's own), Loupe | yazi's keys, a preview, Quick Look on Space; opens every folder. Nautilus stays installed as Files (Nautilus), found by search |
 | Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) | `.md` files open in it, themed |
 | Web apps | Chromium app windows | your own, or ready-made ones with a key: WhatsApp, Slack, Teams, YouTube |
 | External display | Hyprland | workspaces 1–9 on the main display, one on the laptop's screen (⌘0) and one on a second display (⌘§, the key left of 1); with the lid closed only the displays are used; where the screens are and which is the main one in Launcher › Settings › Display › Arrange displays |
@@ -367,7 +367,7 @@ A minimal Fedora gets what a desktop edition would have: it boots to the login s
 AirPlay in as on Fedora KDE, and SSH stays off until you turn on Remote login (Launcher › Settings), unless you install
 over ssh.
 
-Claude Code, Tailscale and Nightdrive's apps (Files, Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) come with every
+Claude Code, Tailscale and Nightdrive's apps (Files, Mail, Contacts, Calendar, Notes, Tasks, Deck, Ferry, Recorder, Inbox) come with every
 install and stay quiet until you set them up. The optional parts that are on by default (Apostrophe, YouTube) come too;
 the rest can be added later from the Launcher (System › Install) or with `nightdrive plugins install ID`
 (`nightdrive apps install garage` for an app).
@@ -495,7 +495,7 @@ You can also update any time from the Launcher (**Update**) or a terminal:
 nightdrive update
 ```
 
-An install without one of Nightdrive's apps (Files, Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) gets it with the next
+An install without one of Nightdrive's apps (Files, Mail, Contacts, Calendar, Notes, Tasks, Deck, Ferry, Recorder, Inbox) gets it with the next
 update, once. Remove one, and it stays removed: Launcher › System › Install › Recommended or
 `nightdrive apps install mail` brings it back.
 Settings › Apps › Nightdrive apps turns one off or on.

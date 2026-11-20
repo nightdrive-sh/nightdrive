@@ -70,7 +70,7 @@ author=@jarilehtinen
 | `name` | Shown in the Launcher and `install.sh`; the README's title is the same |
 | `icon` | A [Lucide](https://lucide.dev/icons) icon name |
 | `description` | One line. Ending it in `(experimental)` marks the plugin as experimental in the Launcher and on the website (the README needn't say so) |
-| `default` | `on`: ticked in `install.sh`'s list; `off` (default): not |
+| `default` | `on`: ticked in `install.sh`'s list; `off` (default): not. Nightdrive's apps are `on` (an `app` comes anyway, unless `bundled=no`: Garage, `off`) |
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
 | `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
@@ -86,9 +86,11 @@ author=@jarilehtinen
 | `mcp` | `none`: the plugin gives Claude no tools, on purpose. Without it, a plugin with a command in `bin/` and no [`mcp.json`](#tools-for-claude-mcpjson) gets a warning from `nightdrive plugin check` |
 | `order` | A number, default 50: `install.sh` installs the plugins in this order, and the lists show them in it. Lower goes first; the same order keeps the folders' (alphabetical) order, then `plugins.txt`'s lines. Home Assistant has 90: its installer asks for addresses, so it runs last |
 
-An `app` (Mail, Contacts, Deck, Ferry) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
+An `app` (Files, Mail, Contacts, Calendar, Notes, Tasks, Deck, Ferry, Recorder, Inbox) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
 it isn't listed in System › Install while it's installed, and its settings are in Settings › Apps (Nightdrive apps
-turns one off or on). One the user removed is back in Install › Recommended, to install again from there.
+turns one off or on). It must be fine installed and never set up: one that needs an account (Mail,
+Contacts, Calendar) stays quiet without it, its timers' units skipped by a `Condition…`/`ExecCondition` rather than
+failing. One the user removed is back in Install › Recommended, to install again from there.
 `nightdrive update` installs an app that an existing install has never had (one made an app later, or a new one), once:
 the ids it has offered are kept in
 `~/.local/state/nightdrive/apps-offered` (`install.sh` writes the ones it offered, left out or not), and an app the

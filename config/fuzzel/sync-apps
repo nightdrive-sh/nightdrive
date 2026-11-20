@@ -15,9 +15,15 @@ HOME = os.path.expanduser("~")
 HERE = os.path.dirname(os.path.realpath(__file__))
 USER_DIR = HOME + "/.local/share/applications"
 SYS_DIRS = ["/usr/share/applications", "/usr/local/share/applications"]   # later one wins
+SYS_DIRS = os.environ.get("SYNC_APPS_SYS_DIRS", ":".join(SYS_DIRS)).split(":")   # a test's own (sync_apps_test.py)
 MARK = "# managed by fuzzel/sync-apps"
 HIDE_KEY = "X-Nightdrive-Hidden"   # own files (webapp-*) hidden from the launcher: NoDisplay is added and removed with this
 CHOICES = HOME + "/.local/state/nightdrive/apps.json"
+# A system app given another name while one of Nightdrive's own takes its place (#3317): Nautilus is "Files (Nautilus)"
+# beside Nightdrive's Files, out of the Apps list unless pinned there with ⌃Enter (search still finds it, after Files,
+# which matches "files" whole). Only while ours is installed: without it, Nautilus is the Files again. id -> (name, ours)
+RENAMES = {"org.gnome.Nautilus.desktop": ("Files (Nautilus)", "nightdrive-files.desktop")}
+RENAMED_KEY = "X-Nightdrive-Renamed"   # read by hypr/scripts/default-apps, which otherwise skips this script's copies
 
 
 def entry_section(text):
@@ -40,11 +46,13 @@ def entry_keys(text):
     return keys
 
 
-def edit(text, remove=(), add=()):
-    """Removes the keys and adds the lines at the start of the [Desktop Entry] section."""
+def edit(text, remove=(), add=(), localized=False):
+    """Removes the keys (with localized: their Name[fi]= forms too) and adds the lines at the start of the [Desktop Entry]
+    section."""
     head, body, tail = entry_section(text)
+    loc = r"(\[[^\]]*\])?" if localized else ""
     for k in remove:
-        body = re.sub(rf"^{re.escape(k)}=.*\n?", "", body, flags=re.M)
+        body = re.sub(rf"^{re.escape(k)}{loc}=.*\n?", "", body, flags=re.M)
     return head + "".join("\n" + a for a in add) + body + tail
 
 
@@ -69,7 +77,8 @@ def read_list(name):
 allow = set(read_list("apps-allow"))
 try: choices = json.load(open(CHOICES, encoding="utf-8"))
 except (OSError, ValueError): choices = {}
-allow |= set(choices.get("shown", []))
+pinned = set(choices.get("shown", []))
+allow |= pinned
 unpinned = set(choices.get("hidden", []))
 allow -= unpinned
 
@@ -91,14 +100,20 @@ for id_, path in sorted(sysdefs.items()):
     target = USER_DIR + "/" + id_
     ours = os.path.exists(target) and MARK in read(target)
     if os.path.exists(target) and not ours: continue          # the user's own file wins, handled in step 2
-    name = kv.get("Name", id_)
-    if id_ in allow:
+    ren = RENAMES.get(id_)
+    rename = ren[0] if ren and os.path.exists(USER_DIR + "/" + ren[1]) else None
+    name = rename or kv.get("Name", id_)
+    show = id_ in allow and (not rename or id_ in pinned)
+    if show and not rename:
         shown.append(name)
         if ours:
             os.remove(target); restored.append(name)
-    else:
-        open(target, "w", encoding="utf-8").write(MARK + "\n" + edit(text, remove=("NoDisplay",), add=("NoDisplay=true",)))
-        hidden.append(name)
+        continue
+    if rename:   # every Name[xx] goes too, or a localized desktop would still show the old one
+        text = edit(text, remove=("Name",), add=(f"Name={rename}", f"{RENAMED_KEY}=true"), localized=True)
+    text = edit(text, remove=("NoDisplay",), add=() if show else ("NoDisplay=true",))
+    open(target, "w", encoding="utf-8").write(MARK + "\n" + text)
+    (shown if show else hidden).append(name)
 
 # 2) Own files (e.g. webapp-*): hidden only when hidden from Apps in the launcher
 for f in sorted(glob.glob(USER_DIR + "/*.desktop")):
@@ -120,7 +135,8 @@ for f in glob.glob(USER_DIR + "/*.desktop"):
     if os.path.basename(f) not in sysdefs and MARK in read(f):
         os.remove(f)
 
-subprocess.run(["update-desktop-database", USER_DIR], stderr=subprocess.DEVNULL)
+try: subprocess.run(["update-desktop-database", USER_DIR], stderr=subprocess.DEVNULL)
+except OSError: pass   # desktop-file-utils missing (a test's container): the launcher reads the files anyway
 print(f"Hidden: {len(hidden)}   Visible (system): {len(shown)}   Restored: {len(restored)}")
 if "-v" in sys.argv:
     print("Hidden:", ", ".join(sorted(hidden)))

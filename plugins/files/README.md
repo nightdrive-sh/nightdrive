@@ -3,7 +3,8 @@
 Your files and folders in a window of Nightdrive's own, run from the keyboard: yazi's letters and the Mac's ⌘ keys side
 by side, a preview of the picked file at the right and a big one on Space, and the desktop's clipboard and trash, which
 Nautilus and other apps share. It opens folders for the whole desktop: Hyper F, a folder another app opens, and a
-browser's "Show in folder".
+browser's "Show in folder". Nautilus stays installed beside it as Files (Nautilus): out of the Launcher's Apps list,
+found by a search for "files" or "nautilus" after Files.
 
 ## Using it
 
@@ -54,6 +55,6 @@ browser's "Show in folder".
     files                        # open Files, or bring it forward
     files ~/Projects             # a folder in it; a file shows in its folder, picked
     files enable                 # Files opens folders for the desktop (the installer runs it)
-    files disable                # folders open in Nautilus again
+    files disable                # folders open in Nautilus again, under its own name
 
 Needs: nothing to set up (Python, GObject, GdkPixbuf, wl-clipboard, poppler-utils and fd-find, which its installer adds)

@@ -8,6 +8,7 @@ APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
 QS_DIR=$APP_DIR/app                                     # Files' own Quickshell config, apart from the desktop's shell
 REPO=$(dirname "$(dirname "$APP_DIR")")
 DEFAULT_APPS=$REPO/config/hypr/scripts/default-apps
+SYNC_APPS=$REPO/config/fuzzel/sync-apps                 # names Nautilus "Files (Nautilus)" while Files is there
 DESKTOP_ID=nightdrive-files.desktop
 FALLBACK=org.gnome.Nautilus.desktop                     # what opens folders again after `files disable`
 DBUS_NAME=org.freedesktop.FileManager1
@@ -47,6 +48,7 @@ enable() {
   sed "s|@FM1@|$APP_DIR/lib/fm1.py|" "$APP_DIR/share/$DBUS_NAME.service" > "$services/$DBUS_NAME.service"
   command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
   "$DEFAULT_APPS" set files "$DESKTOP_ID"
+  "$SYNC_APPS" >/dev/null 2>&1 || true
   echo "Files opens folders now (Hyper F too), and shows the files other apps point to."
 }
 
@@ -56,6 +58,7 @@ disable() {
   fi
   rm -f "$data/applications/$DESKTOP_ID" "$data/icons/hicolor/scalable/apps/nightdrive-files.svg" \
         "$data/dbus-1/services/$DBUS_NAME.service"
+  "$SYNC_APPS" >/dev/null 2>&1 || true   # Nautilus back under its own name, in the Apps list
   echo "Files is out of the desktop's apps; folders open in ${FALLBACK%.desktop} again."
 }
 

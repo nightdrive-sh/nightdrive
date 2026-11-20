@@ -85,17 +85,21 @@ def app_dirs():
 
 
 def entries():
-    """Desktop id -> the app's own entry: the first one in the search path that isn't sync-apps' hiding copy."""
-    found = {}
+    """Desktop id -> the app's own entry: the first one in the search path that isn't sync-apps' hiding copy. A copy
+    that renames the app (X-Nightdrive-Renamed: Nautilus as "Files (Nautilus)" beside Nightdrive's Files) lends it
+    its name, so the two Files rows here can be told apart."""
+    found, names = {}, {}
     for d in app_dirs():
         for path in glob.glob(d + "/**/*.desktop", recursive=True):
             app_id = os.path.relpath(path, d).replace("/", "-")
             if app_id in found and not found[app_id]["managed"]:
                 continue
             keys, managed = entry_keys(path)
+            if managed and keys.get("X-Nightdrive-Renamed") == "true" and "Name" in keys:
+                names.setdefault(app_id, keys["Name"])
             if app_id not in found or found[app_id]["managed"]:
                 found[app_id] = {"keys": keys, "managed": managed}
-    return {k: v["keys"] for k, v in found.items()}
+    return {k: dict(v["keys"], Name=names[k]) if k in names else v["keys"] for k, v in found.items()}
 
 
 def usable(keys, by_type=False):
