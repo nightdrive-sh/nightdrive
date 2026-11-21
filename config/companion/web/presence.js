@@ -10,14 +10,15 @@ export function away() {
   return !!store.state?.presence?.away;
 }
 
-// The switch, for app.js's top bar: "Away" stands out (the tiles act differently), "At the computer" stays quiet
+// The switch, for app.js's top bar: a switch named Away, on in the caution colour (the tiles act differently), off
+// quiet. A switch, not "At the computer" spelled out: on a phone that pushed Inbox and Usage onto a row of their own.
 export function presenceSwitch(state) {
   const p = state?.presence;
   if (!p) return "";
   const title = p.away ? `${WHY[p.why] || "Away"}: a tap on a session shows it here. Tap to say you're at the computer.`
                        : `${p.set ? "Set here" : "In use"}: a tap on a session brings its window up there. Tap to say you're away.`;
-  return `<button class="presence ${p.away ? "away" : ""}" title="${title}" aria-pressed="${p.away}">
-    <i></i>${p.away ? "Away" : "At the computer"}</button>`;
+  return `<button class="presence ${p.away ? "away" : ""}" title="${title}" role="switch" aria-checked="${p.away}">
+    <span class="track"><i></i></span><span class="name">Away</span></button>`;
 }
 
 export async function togglePresence(button) {

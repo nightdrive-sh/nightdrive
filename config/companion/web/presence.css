@@ -1,8 +1,17 @@
-/* The top bar's switch between at the computer and away (presence.js): quiet while you're there, the caution colour
-   when away, as a tap on a tile then does something else */
-.presence { height: 32px; border-radius: 8px; padding: 0 12px; display: flex; align-items: center; gap: 8px;
-            font-size: 12px; color: var(--muted); border: 1px solid var(--line); }
-.presence i { width: 8px; height: 8px; border-radius: 4px; background: var(--dim); }
-.presence.away { color: var(--caution); border-color: var(--caution); }
-.presence.away i { background: var(--caution); }
+/* The top bar's switch between at the computer and away (presence.js): a switch named Away, off and quiet while
+   you're there, on in the caution colour when away, as a tap on a tile then does something else */
+.presence { height: 32px; border-radius: 8px; padding: 0 4px; display: flex; align-items: center; gap: 8px;
+            font-size: 12px; color: var(--muted); }
+.presence .track { width: 30px; height: 18px; border-radius: 9px; background: var(--line); border: 1px solid var(--border);
+                   position: relative; transition: background .2s; flex: none; }
+.presence .track i { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 6px;
+                     background: var(--dim); transition: left .2s, background .2s; }
+.presence.away { color: var(--caution); }
+.presence.away .track { background: var(--caution); border-color: var(--caution); }
+.presence.away .track i { left: 14px; background: var(--bg); }
 .presence:active { filter: brightness(1.4); }
+/* A phone: the switch alone (its title says what it is), so Inbox and Usage stay on the bar's row */
+@media (max-width: 410px) {
+  .top { gap: 10px; }
+  .presence .name { display: none; }
+}

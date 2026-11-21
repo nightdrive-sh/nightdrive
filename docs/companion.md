@@ -8,7 +8,7 @@ Nightdrive on an iPad or a phone: your Claude Code sessions, a big dictation but
 - **Actions:** tap an empty slot to pick what it does (Lock, Mute mic, Do not disturb, music, a new Claude session) or write a command of your own. Hold a slot to change it.
 - **Usage:** the gauge in the top right corner: every Claude account's 5-hour and week limits.
 - **Inbox:** the mailbox beside it, with how many are unread, opens [Inbox](inbox.md)'s messages: their text and pictures, newest first; opening one marks it read. *Mark unread* and *Archive* are under it. On an iPad on its side the list and the message are side by side. Sound and video files play in the message (Ogg is converted to AAC on the computer for Safari, which needs `ffmpeg`); other files open in the browser; a message's buttons are only in the Inbox on the computer for now.
-- **Away:** when the computer is locked or has had no input for 5 minutes, the top bar says *Away* and a tap on a tile opens the session here instead of bringing its window up there. Tap *Away* / *At the computer* to say it yourself: that holds until the computer sees you lock it, leave it or come back.
+- **Away:** when the computer is locked or has had no input for 5 minutes, the top bar's *Away* switch turns on and a tap on a tile opens the session here instead of bringing its window up there. Tap the switch to say it yourself: that holds until the computer sees you lock it, leave it or come back.
 - The colours follow your theme.
 
 ## Turning it on
