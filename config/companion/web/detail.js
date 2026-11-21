@@ -2,14 +2,15 @@
 // Claude's texts, its tool calls), read again every REFRESH_MS while it is open, and the session's buttons below it.
 // A tap on a tile opens it; × or Esc closes it. It stays at the end as new lines come, unless you scrolled up to read.
 // A question with choices shows whole above the buttons, to answer there (question.js). Answer is held to talk, as
-// on a tile (let go and it is sent; a tap opens its box), and Write beside it opens the box at its keyboard.
+// on a tile (let go and it is sent), and Write beside it, or a tap on Answer, opens a field under the conversation
+// to type in, which scrolls while you write (writebar.js; keyboard.js keeps it above an on-screen keyboard).
 // Its steps (tool calls) are kept quiet: a turn's work up to its newest text is one line that a tap opens (steps.js).
 // The view is a step in the browser's history, so Back (Android's, Safari's edge gesture in a tab) closes it; in the
 // app on the home screen a swipe from the left edge does (swipe.js).
 import { esc, get, since, store, subscribe } from "./api.js";
 import { icon } from "./icons.js";
 import { act, ASKS } from "./act.js";
-import { compose, send } from "./compose.js";
+import { send } from "./compose.js";
 import { holdToTalk, Recognition } from "./speech.js";
 import { markdown } from "./markdown.js";
 import { logHTML } from "./steps.js";
@@ -17,10 +18,12 @@ import { keepScroll, questionClick, questionHTML } from "./question.js";
 import { edgeSwipe } from "./swipe.js";
 import { pendingHTML, pendingClick } from "./pendingview.js";
 import { onPending, reconcile } from "./pending.js";
+import { writeBar } from "./writebar.js";
+import { onViewport } from "./keyboard.js";
 
 const REFRESH_MS = 2000;
 const AT_END_PX = 40;      // this close to the bottom still counts as following along
-let view = null;           // { id, el, timer, log, logSig, headSig, footSig, holding, open: runs of steps opened }
+let view = null;           // { id, el, timer, log, logSig, headSig, footSig, holding, open: runs of steps opened, bar }
 
 export function openDetail(id) {
   // one step in the history however many views open one after another (a tile's Show over another's)
@@ -33,6 +36,11 @@ export function openDetail(id) {
   document.body.append(el);
   view = { id, el, timer: setInterval(load, REFRESH_MS), log: [], logSig: "", headSig: "", footSig: "", holding: false,
            open: new Set() };
+  const box = el.querySelector(".log");
+  // following along (at the end) as of the last scroll: a keyboard that comes up makes the log shorter without one
+  view.following = true;
+  box.addEventListener("scroll", () => { if (view) view.following = atEnd(box); }, { passive: true });
+  view.bar = writeBar(el, id, { atEnd: () => atEnd(box), toEnd: () => { box.scrollTop = box.scrollHeight; } });
   el.addEventListener("click", e => {
     if (e.target.closest(".close")) return close();
     if (questionClick(e)) return;
@@ -40,8 +48,8 @@ export function openDetail(id) {
     const run = e.target.closest("button[data-steps]");
     if (run) return toggle(run.dataset.steps);
     const b = e.target.closest("button[data-act]");
-    if (b?.dataset.act === "write") return compose(view.id, { write: true });
-    if (b?.dataset.act === "answer" && Recognition) return;    // held or tapped: talk() has it
+    if (b?.dataset.act === "write") return view.bar.open();
+    if (b?.dataset.act === "answer") return Recognition || view.bar.open();    // held or tapped: talk() has it; no speech: write
     if (b) act(view.id, b.dataset.act, b).then(ok => { if (ok && b.dataset.act === "close") close(); });
   });
   edgeSwipe(el, close);
@@ -92,14 +100,16 @@ function live() {
   return s?.state === "working" || s?.state === "permission";
 }
 
+const atEnd = box => box.scrollHeight - box.scrollTop - box.clientHeight < AT_END_PX;
+
 function draw(first) {
   const box = view.el.querySelector(".log");
-  const atEnd = first || box.scrollHeight - box.scrollTop - box.clientHeight < AT_END_PX;
+  const end = first || atEnd(box);
   view.live = live();
   const sent = pendingHTML(view.id);       // your words on their way, after all the log has
   box.innerHTML = (logHTML(view.log, { live: view.live, open: view.open, text: line }) + sent)
     || '<div class="msg tool">Nothing said yet</div>';
-  if (atEnd) box.scrollTop = box.scrollHeight;
+  if (end) box.scrollTop = box.scrollHeight;
 }
 
 // A tap on a run's line opens its steps, another closes them; the log stays where it was scrolled
@@ -156,6 +166,8 @@ function frame(state) {
   const head = `<div class="who"><b>${esc(s ? s.name || s.project : "The session has ended")}</b><span>${s?.name ? `${esc(s.project)} · ${what}` : what}</span></div>
     <span class="spacer"></span><button class="close" aria-label="Close">${icon("x", 20)}</button>`;
   const foot = s ? buttons(s) : "";
+  // the field for writing while the session takes words: not while a question or a permission waits on its answer
+  view.bar.shown(!!s && !s.question && s.state !== "permission");
   if (head !== view.headSig) { view.headSig = head; view.el.querySelector(".dhead").innerHTML = head; }
   if (view.logSig && live() !== view.live) draw(false);     // done now: its newest step goes into its run
   // the buttons stay as they are under a held Answer (not taken from under the finger), and when nothing changed
@@ -188,7 +200,7 @@ function talk() {
   holdToTalk(b, {
     started: () => { view.holding = true; heard().textContent = "Listening…"; },
     heard: w => { const el = heard(); if (el) el.textContent = `“${w}”`; },
-    tapped: () => { end(); compose(id); },
+    tapped: () => { end(); view?.bar.open(); },
     done: w => { end(); if (w) send(id, w); },
   });
 }
@@ -196,3 +208,8 @@ function talk() {
 subscribe(frame);
 // Words sent show at once at the end, following them down, as your own words do
 onPending(id => { if (view?.id === id && view.logSig) draw(true); });
+// The keyboard came or went (keyboard.js): the conversation's end stays in sight when it was
+onViewport(() => {
+  const box = view?.el.querySelector(".log");
+  if (box && view.following) box.scrollTop = box.scrollHeight;
+});

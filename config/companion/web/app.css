@@ -208,6 +208,21 @@ body.offline .sessions, body.offline .actions { opacity: .45; transition: opacit
 .md blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted); }
 .md a { color: var(--primary); }
 .md hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+/* The field for writing under the conversation (writebar.js), in place of the buttons: × , the words growing with
+   them, Send at their last line */
+.wbar { display: flex; gap: 10px; align-items: flex-end; flex: none; }
+.wbar[hidden], .detail.writing .dfoot { display: none; }
+.wbar textarea { flex: 1; min-width: 0; box-sizing: border-box; min-height: 44px; resize: none; background: var(--card);
+                 border: 1px solid var(--border); border-radius: 22px; padding: 10px 16px; font-size: 16px; line-height: 1.4;
+                 outline: none; overflow-y: auto; }
+.wbar textarea:focus { border-color: var(--primary); }
+.wbar .close { background: none; }
+.wbar .go { width: 44px; height: 44px; border-radius: 22px; flex: none; background: var(--primary); color: var(--bg);
+            display: flex; align-items: center; justify-content: center; }
+.wbar .go:active { filter: brightness(1.2); }
+/* The view in the part of the screen that shows (keyboard.js): with the keyboard up, its bottom on the keyboard */
+.detail { top: var(--vtop, 0); bottom: auto; height: var(--vh, 100%); }
+html.kb .detail { padding-bottom: 8px; }
 .dfoot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .dfoot .pill.main { flex: 0 1 220px; }
 .dfoot .meta { font-size: 13px; color: var(--muted); }   /* a state in brackets, as a tile's words: nothing to do here */

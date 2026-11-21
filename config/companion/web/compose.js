@@ -2,7 +2,8 @@
 // no menu), the big button to hold and talk (let go and it is sent, as the panel's), and Write for the keyboard
 // instead. Enter as the panel's: into a session as its prompt, into the window only when that window is a session's.
 // With words, the box gives them to it instead of sending (a question's Own answer, question.js): it returns true
-// when they went. write opens the box at its keyboard (the session view's Write), text already in it.
+// when they went. write opens the box at its keyboard, text already in it (words that didn't get there; the session view writes in
+// a field of its own, writebar.js).
 // Sent, the box goes at once, without a word; when the words don't get there (post's toast says why), it opens again
 // with them in it.
 import { esc, post, sheet, store, toast } from "./api.js";
