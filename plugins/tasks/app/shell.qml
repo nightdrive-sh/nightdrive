@@ -111,6 +111,15 @@ ShellRoot {
         Component.onCompleted: { load(); list.forceActiveFocus() }
         // Today moves on with the clock, and a sync or another app may change the files: read them again each minute
         Timer { interval: 60000; running: true; repeat: true; onTriggered: win.load() }
+        // A sync (nightdrive hub), Claude's tools or `tasks` in a terminal change the files too: lib/watch.py prints a
+        // line once such a burst is over, and the lists are read again then rather than up to a minute later. A read
+        // still running waits for its end, so the change isn't missed. Without the watcher, the minute's read remains.
+        Process {
+            running: true
+            command: ["python3", Quickshell.shellDir + "/../lib/watch.py"]
+            stdout: SplitParser { onRead: reread.restart() }
+        }
+        Timer { id: reread; interval: 150; onTriggered: loader.running ? restart() : win.load() }
         // Upcoming's headings are worked out with the rows: a change of region writes them again at once
         Connections { target: Regional; function onRegionChanged() { win.filter(win.shown[win.current] ? win.shown[win.current].id : "", win.current, "hold") } }
 
