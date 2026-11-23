@@ -25,6 +25,9 @@ import settings  # noqa: E402
 import sync  # noqa: E402
 
 TIMER = "nightdrive-hub-sync.timer"
+# The timer's file in this repo. link.sh links it into ~/.config/systemd/user, and `systemctl disable` removes such a
+# link along with the enablement, so "on" after "off" enables it by this path, which links it again (as bin/companion).
+TIMER_SRC = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "systemd", "user", TIMER)
 
 
 def now():
@@ -36,7 +39,7 @@ def timer(on):
     talks to the person's real systemd, which must not start syncing their own files."""
     if os.environ.get("NIGHTDRIVE_HUB_NO_TIMER"):
         return "left alone (NIGHTDRIVE_HUB_NO_TIMER)"
-    cmd = ["systemctl", "--user", "enable" if on else "disable", "--now", TIMER]
+    cmd = ["systemctl", "--user", "enable" if on else "disable", "--now", os.path.normpath(TIMER_SRC) if on else TIMER]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode:
         raise RuntimeError("systemctl: " + (r.stderr.strip() or "failed"))

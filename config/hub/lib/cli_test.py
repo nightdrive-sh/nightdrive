@@ -65,5 +65,25 @@ class CliTest(unittest.TestCase):
         self.assertIn("2 changes to send", self.d.run("status").stdout)
 
 
+class TimerTest(unittest.TestCase):
+    """systemctl disable removes the timer's link in ~/.config/systemd/user (link.sh's), so a plain `enable` by name
+    found no unit after `timer off` (#3396). "on" enables it by the repo's file, which links it again."""
+
+    def test_on_enables_the_repos_file_and_off_disables_by_name(self):
+        from unittest import mock
+        import cli
+        calls = []
+        ok = mock.Mock(returncode=0, stderr="")
+        with mock.patch.dict(os.environ, {"NIGHTDRIVE_HUB_NO_TIMER": ""}), \
+                mock.patch.object(cli.subprocess, "run", lambda cmd, **kw: calls.append(cmd) or ok):
+            self.assertEqual(cli.timer(True), "on")
+            self.assertEqual(cli.timer(False), "off")
+        on, off = calls
+        self.assertEqual(on[:4], ["systemctl", "--user", "enable", "--now"])
+        self.assertTrue(os.path.isabs(on[4]) and os.path.isfile(on[4]), on[4])
+        self.assertEqual(os.path.basename(on[4]), cli.TIMER)
+        self.assertEqual(off, ["systemctl", "--user", "disable", "--now", cli.TIMER])
+
+
 if __name__ == "__main__":
     unittest.main()
