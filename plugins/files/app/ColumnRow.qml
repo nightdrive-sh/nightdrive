@@ -27,18 +27,18 @@ AppRow {
     color: drop.containsDrag ? c.hover : checked ? (selected ? c.checkedPicked : c.checked) : selected ? c.sel : marked || hovered ? c.hover : "transparent"
     border.color: drop.containsDrag ? c.primary : selected && active ? c.frame : "transparent"
 
-    // A row another column shows becomes the window's own once clicked: the column it was in may be gone by the second
-    // click of a double one (the columns after it go), so the window's tapped() tells a double click by the path
+    // A row another column shows becomes the window's own once clicked, and the columns move: the window's columnTap()
+    // tells a double click by the row clicked first, wherever the second click lands
     TapHandler {
         acceptedModifiers: Qt.NoModifier
         onTapped: {
-            const a = row.app, p = row.file.path
-            if (row.own) a.current = row.index
-            else a.go(row.column.path, p)
+            const a = row.app
             a.toList()
-            if (a.columnTapped(p)) { const i = a.rows.findIndex(r => r.path === p); if (i >= 0) a.openAt(i) }
+            if (a.columnTap(row.file, !row.own)) return
+            if (row.own) a.current = row.index
+            else a.go(row.column.path, row.file.path)
         }
-        onPressedChanged: if (pressed && !row.app.trashShown) row.app.drag.prepare(row.file, row.dragPaths().length)
+        onPressedChanged: if (pressed && row.draggable) row.app.drag.prepare(row.file, row.dragPaths().length)
     }
     // Ctrl-click and ⇧-click mark, as in the list: only in the window's own column, where the marks are
     TapHandler {
@@ -53,17 +53,20 @@ AppRow {
             row.app.toList()
         }
     }
-    // Out of another column it is the one file: the marks are the window's own column's
+    // Out of another column it is the one file: the marks are the window's own column's. A file in an archive isn't on
+    // disk to drag (y and p take it out), and nothing drops into one
+    readonly property bool inArchive: file.member !== undefined
+    readonly property bool draggable: !app.trashShown && !inArchive
     function dragPaths() { return own ? app.dragPaths(file.path) : [file.path] }
     DragHandler {
         target: null
-        enabled: !row.app.trashShown
+        enabled: row.draggable
         onActiveChanged: active ? row.app.drag.start(row, row.dragPaths()) : row.app.drag.release(row)
     }
     DropArea {
         id: drop
         anchors.fill: parent
-        enabled: row.file.dir && !row.app.trashShown
+        enabled: row.file.dir && !row.app.trashShown && !row.inArchive
         keys: ["text/uri-list"]
         onDropped: e => row.app.acts.dropped(e, row.file.path, false)
     }

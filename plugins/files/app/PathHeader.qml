@@ -218,9 +218,10 @@ RowLayout {
     }
     // The list, the grid or the columns (t): it shows the one it turns to
     AppBarButton {
-        visible: !root.app.trashShown && !root.app.inArchive
-        c: root.c; glyph: root.app.columnsShown ? "list" : root.app.gridShown ? "columns" : "layout-grid"; glyphSize: 17; compact: true
-        tip: root.app.columnsShown ? "As a list" : root.app.gridShown ? "In columns" : "As a grid, with thumbnails"; keys: "t"
+        visible: !root.app.trashShown
+        readonly property bool toColumns: root.app.gridShown || root.app.inArchive     // an archive has no grid
+        c: root.c; glyph: root.app.columnsShown ? "list" : toColumns ? "columns" : "layout-grid"; glyphSize: 17; compact: true
+        tip: root.app.columnsShown ? "As a list" : toColumns ? "In columns" : "As a grid, with thumbnails"; keys: "t"
         onClicked: root.app.toggleView()
     }
     AppBarButton {

@@ -45,12 +45,12 @@ FloatingWindow {
     // the list. tile is the thumbnails' square, + and − step it, the same in every window
     Views { id: views; dir: win.manager.configDir }
     property bool columnsOn: false
-    readonly property bool columnsShown: columnsOn && !trashShown && !inArchive && !searching
+    readonly property bool columnsShown: columnsOn && !trashShown && !searching
     readonly property bool gridShown: !columnsShown && !trashShown && !inArchive && views.isGrid(path)
     function toggleView() {
         if (trashShown) return
         if (columnsOn) { columnsOn = false; if (!inArchive) views.set(path, false) }
-        else if (inArchive) return
+        else if (inArchive) columnsOn = true      // an archive has no grid: the list, then the columns
         else if (gridShown) { columnsOn = true; views.set(path, false) }   // a search in the columns, and t after them: the list
         else views.set(path, true)
         Qt.callLater(() => { if (current >= 0) view.positionViewAtIndex(current, ListView.Contain) })
@@ -210,23 +210,27 @@ FloatingWindow {
     }
     function page() { return gridShown ? grid.perPage : Math.max(1, Math.floor(view.height / (rowHeight + 1)) - 1) }
     function openAt(i) { current = i; openPicked() }
-    // A double click in the columns, told by its path (ColumnRow): a row clicked in another column moves to the
-    // window's own, so the second click may land on another row object, or on none if the columns moved
-    property string tappedPath: ""
-    property real tappedAt: 0
-    function columnTapped(p) {
-        const now = Date.now(), again = p === tappedPath && now - tappedAt < 400
-        tappedPath = again ? "" : p; tappedAt = now
-        return again
+    // A click in the columns (ColumnRow, moved: it was in another column than the window's own): whether it was the
+    // second of a double click, which opened the row clicked first. A row clicked in another column moves to the
+    // window's own column at once, so the second click lands on whatever came under the pointer: after such a click,
+    // any click soon after is the second one. In the window's own column it must be on the same row
+    property var lastTap: null
+    function columnTap(f, moved) {
+        const now = Date.now(), t = lastTap
+        lastTap = { file: f, at: now, moved: moved }
+        if (!t || now - t.at > 400 || (!t.moved && t.file.path !== f.path)) return false
+        lastTap = null
+        openRow(t.file)
+        return true
     }
     // An archive extracts beside itself (Ops, lib/unpack.py) on ⏎, e and a double click; → and l (look) go into it as
     // into a folder (Archive), and ⌘O (inApp) opens it in its app. A file in an archive shows in the big preview: it
     // isn't on disk to open, and y and p take it out
-    function openPicked(inApp, look) {
-        const f = picked
+    function openPicked(inApp, look) { openRow(picked, inApp, look) }
+    function openRow(f, inApp, look) {
         if (!f || trashShown) return
         if (f.dir) go(f.path, "")
-        else if (inArchive) { if (!quick.open) quick.toggle() }
+        else if (f.member !== undefined) { if (!quick.open) quick.toggle() }
         else if (look && Format.isArchive(f.name)) { archive.look(f.path); go(f.path, "") }
         else if (!inApp && Format.isArchive(f.name)) ops.extract(f.path)
         else launch.open(f.path)           // a program asks first, a file no app opens says so (Launch)

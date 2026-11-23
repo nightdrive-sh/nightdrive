@@ -98,14 +98,25 @@ Item {
         function onReversedChanged() { if (root.file) root.build() }
         function onShowHiddenChanged() { if (root.file) root.build() }
     }
-    function build() {
+    // A folder's rows in the archive on show ("" its top), as Folder gives a folder's
+    function entries(d) {
         const out = []
-        for (const e of children[dir] || []) {
+        for (const e of children[d] || []) {
             const name = e.name.slice(e.name.lastIndexOf("/") + 1)
             if (!app.showHidden && name.startsWith(".")) continue
             out.push({ name: name, path: file + "/" + e.name, dir: e.dir, size: e.size, member: e.name, link: e.link,
                        modified: new Date((e.modified || 0) * 1000) })
         }
+        return out
+    }
+    // Another of its folders, by its path, sorted as the window's (the columns' folders above and the one picked,
+    // ColumnView); null when p isn't in it
+    function rowsAt(p) {
+        if (!file || (p !== file && !p.startsWith(file + "/"))) return null
+        return Format.order(entries(p === file ? "" : p.slice(file.length + 1)), app.sortBy, app.reversed)
+    }
+    function build() {
+        const out = entries(dir)
         total = out.length
         const words = app.filter.trim().toLowerCase()
         changing()

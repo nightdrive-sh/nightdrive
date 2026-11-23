@@ -6,8 +6,9 @@ import qs.kit
 // folder above it, or the folder picked in it) reads its folder itself (Folder), sorted and with the hidden files as
 // the window has them, and lights the row on the way (next). Dropped on its free space, files land in its folder.
 // While a folder is read, the column shows its rows as last seen (store, ColumnView), else the rows it showed: never
-// a blank moment or the folder before, which flickered at each step. An empty folder shows nothing; a filter that
-// matches nothing says so.
+// a blank moment or the folder before, which flickered at each step. A folder in the archive looked into (Archive) has
+// its rows from the archive's listing instead, and takes no drop. An empty folder shows nothing; a filter that matches
+// nothing, or an archive still being read, says so.
 Item {
     id: root
     required property QtObject c
@@ -18,6 +19,7 @@ Item {
     property string next: ""                  // another column: the row on the way to the window's own column
     readonly property alias view: list
     readonly property string folderPath: own ? app.path : path
+    readonly property bool inArchive: own ? app.inArchive : app.inArchive && (path === app.archive.file || path.startsWith(app.archive.file + "/"))
     // The window's rows once they are its folder's; till then those seen last there
     readonly property var rows: own ? (app.fresh ? app.rows : store.rowsOf(app.path) || []) : shown
     readonly property int pick: own ? (app.fresh ? app.current : -1) : next ? rows.findIndex(r => r.path === next) : -1
@@ -25,15 +27,27 @@ Item {
     property var shown: []
     Folder {
         id: folder
-        path: root.own ? "" : root.path
+        path: root.own || root.inArchive ? "" : root.path
         showHidden: root.app.showHidden
         sortBy: root.app.sortBy
         reversed: root.app.reversed
         onRebuilt: root.refresh()
     }
     onPathChanged: refresh()
+    onInArchiveChanged: refresh()
+    Connections {
+        target: root.inArchive && !root.own ? root.app.archive : null
+        function onChildrenChanged() { root.refresh() }
+    }
+    Connections {
+        target: root.inArchive && !root.own ? root.app : null
+        function onSortByChanged() { root.refresh() }
+        function onReversedChanged() { root.refresh() }
+        function onShowHiddenChanged() { root.refresh() }
+    }
     function refresh() {
         if (own) return
+        if (inArchive) { shown = app.archive.rowsAt(path) || []; Qt.callLater(reveal); return }
         if (path && folder.readPath === path) { shown = folder.rows; store.put(path, folder.rows) }
         else if (!path) shown = []
         else { const seen = store.rowsOf(path); if (seen) shown = seen }    // else keep what shows until it comes
@@ -64,14 +78,18 @@ Item {
         DropArea {
             anchors.fill: parent
             z: -1
-            enabled: !root.app.trashShown
+            enabled: !root.app.trashShown && !root.inArchive
             keys: ["text/uri-list"]
             onDropped: e => root.app.acts.dropped(e, root.folderPath, false)
         }
         // A click below the rows: the keys back to the list, or into this column's folder
         TapHandler { onTapped: root.own ? root.app.toList() : (root.app.go(root.path, ""), root.app.toList()) }
 
-        // Only a filter that found nothing is worth words here: an empty folder is an empty column
-        EmptyNote { visible: root.own && shown && root.app.filter !== ""; anchors.centerIn: parent; most: list.width - 16; c: root.c; app: root.app }
+        // Only a filter that found nothing, or an archive still read or unreadable, is worth words here: an empty
+        // folder is an empty column
+        EmptyNote {
+            visible: root.own && shown && (root.app.filter !== "" || root.app.inArchive && (root.app.archive.loading || root.app.archive.error !== ""))
+            anchors.centerIn: parent; most: list.width - 16; c: root.c; app: root.app
+        }
     }
 }
