@@ -22,7 +22,7 @@ FloatingWindow {
     implicitWidth: 1100
     implicitHeight: 720
     color: c.bg
-    onClosed: manager.closed(win)
+    onClosed: { archive.leave(); manager.closed(win) }
     Component.onCompleted: if (startPath) enter(startPath, startSelect)
 
     // The window last active is the one a folder from another app (IPC) goes to
@@ -42,8 +42,8 @@ FloatingWindow {
     // The grid (t, FileGrid): a folder's own choice (Views); the trash is always a list. tile is the thumbnails'
     // square, + and − step it, the same in every window
     Views { id: views; dir: win.manager.configDir }
-    readonly property bool gridShown: !trashShown && views.isGrid(path)
-    function toggleView() { if (!trashShown) views.set(path, !gridShown) }
+    readonly property bool gridShown: !trashShown && !inArchive && views.isGrid(path)
+    function toggleView() { if (!trashShown && !inArchive) views.set(path, !gridShown) }
     readonly property var tiles: [96, 128, 192]
     readonly property int tile: tiles.indexOf(settings.tile) >= 0 ? settings.tile : 128
     function tileStep(d) { const i = tiles.indexOf(tile) + d; if (i >= 0 && i < tiles.length) setting("tile", tiles[i]) }
@@ -63,7 +63,11 @@ FloatingWindow {
     property var trashRows: []
     property var history: []             // folders before this one, for ⌥← (⌃⌘←)
     property var future: []              // and after it, for ⌥→
-    Folder { id: folder; path: win.path; onChanging: win.hold(); onRebuilt: win.settle() }
+    Folder { id: folder; path: win.inArchive ? "" : win.path; onChanging: win.hold(); onRebuilt: win.settle() }
+    // Inside an archive (→ on one): its folders, read-only, the path going on below the archive's (Archive)
+    Archive { id: archive; app: win; onChanging: win.hold(); onRebuilt: win.settle() }
+    readonly property alias archive: archive
+    readonly property bool inArchive: archive.file !== ""
     property alias showHidden: folder.showHidden
     property alias sortBy: folder.sortBy
     property alias reversed: folder.reversed
@@ -78,8 +82,8 @@ FloatingWindow {
     readonly property bool searching: !trashShown && search.active
     readonly property alias search: search
     property string placeDrag: ""         // the sidebar folder being dragged to another place in it
-    readonly property bool loading: !trashShown && (searching ? search.running : folder.loading)
-    readonly property var rows: trashShown ? trashRows : searching ? search.rows : folder.rows
+    readonly property bool loading: !trashShown && (inArchive ? archive.loading : searching ? search.running : folder.loading)
+    readonly property var rows: trashShown ? trashRows : inArchive ? archive.rows : searching ? search.rows : folder.rows
 
     property int current: -1
     property string keep: ""             // the path to pick once the rows come (one just made, the folder come up from)
@@ -102,6 +106,7 @@ FloatingWindow {
         keep = select || ""
         current = -1
         shown = []
+        archive.show(p)
         path = p
         // To the top, its margin in: positionViewAtBeginning() leaves the margin out, and the list jumped up by it and
         // back as a folder not read before came
@@ -121,7 +126,7 @@ FloatingWindow {
         else if (e.kind === "device" && !e.path) acts.mount(e, p => go(p, ""))
         else go(e.path, "")
     }
-    function showTrash() { trashShown = true; endFilter(); marks = ({}); current = -1; shown = []; loadTrash() }
+    function showTrash() { archive.leave(); trashShown = true; endFilter(); marks = ({}); current = -1; shown = []; loadTrash() }
     function loadTrash() { trashReader.running = true }
     Process {
         id: trashReader
@@ -136,7 +141,7 @@ FloatingWindow {
             }
         }
     }
-    function reload() { if (trashShown) loadTrash(); else folder.rebuild(); places.refresh() }
+    function reload() { if (trashShown) loadTrash(); else if (inArchive) archive.read(); else folder.rebuild(); places.refresh() }
 
     // The rows came (again): the one asked for (keep), else the same file stays picked, else the next row still there
     // in the place of those gone (Settle.place), and the view stays where it was (#3415). shown is the rows' paths as
@@ -187,15 +192,24 @@ FloatingWindow {
     }
     function page() { return gridShown ? grid.perPage : Math.max(1, Math.floor(list.view.height / (rowHeight + 1)) - 1) }
     function openAt(i) { current = i; openPicked() }
-    // An archive extracts beside itself (Ops, lib/unpack.py) on ⏎, e and a double click; ⌘O (inApp) opens it in its app
-    function openPicked(inApp) {
+    // An archive extracts beside itself (Ops, lib/unpack.py) on ⏎, e and a double click; → and l (look) go into it as
+    // into a folder (Archive), and ⌘O (inApp) opens it in its app. A file in an archive shows in the big preview: it
+    // isn't on disk to open, and y and p take it out
+    function openPicked(inApp, look) {
         const f = picked
         if (!f || trashShown) return
         if (f.dir) go(f.path, "")
+        else if (inArchive) { if (!quick.open) quick.toggle() }
+        else if (look && Format.isArchive(f.name)) { archive.look(f.path); go(f.path, "") }
         else if (!inApp && Format.isArchive(f.name)) ops.extract(f.path)
         else launch.open(f.path)           // a program asks first, a file no app opens says so (Launch)
     }
-    function extractPicked() { if (picked && !picked.dir && !trashShown && Format.isArchive(picked.name)) ops.extract(picked.path) }
+    function extractPicked() {
+        if (readOnly()) return
+        if (picked && !picked.dir && !trashShown && Format.isArchive(picked.name)) ops.extract(picked.path)
+    }
+    // What would change the folder on show, refused in words inside an archive
+    function readOnly() { if (inArchive) archive.refuse(); return inArchive }
 
     // Marks (v, ⇧↑ ⇧↓, Ctrl-click, ⇧-click): the files the keys act on, else the picked one
     function setMark(p, on) { const m = Object.assign({}, marks); if (on) m[p] = true; else delete m[p]; marks = m }
@@ -235,13 +249,14 @@ FloatingWindow {
     // below all of home (f starts there; Tab, ⌘F again or a click on the scope in the field turns it)
     function startFilter(deep) {
         if (trashShown) return
+        if (inArchive) deep = false        // an archive's folder is filtered, there's no search below it
         if (deep !== undefined) below = deep
         else if (filtering && header.field.activeFocus) below = !below
         filtering = true; header.field.text = filter; pane = "list"; header.field.forceActiveFocus()
     }
     readonly property bool fieldFocused: header.field.activeFocus
     // The field keeps the keys: Tab's own move to the next item comes after this handler, so focus goes back once it has
-    function toggleScope() { below = !below; if (filtering) { header.field.forceActiveFocus(); Qt.callLater(() => { if (filtering) header.field.forceActiveFocus() }) } }
+    function toggleScope() { if (inArchive) return; below = !below; if (filtering) { header.field.forceActiveFocus(); Qt.callLater(() => { if (filtering) header.field.forceActiveFocus() }) } }
     function endFilter() { filtering = false; filter = ""; below = false; header.field.text = ""; toList() }
 
     // s goes through the orders, S (or the same column's title again) turns it round
@@ -294,7 +309,7 @@ FloatingWindow {
     Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
     // A new window in the same folder, as Nautilus does: ⌘N is FileKeys'. Not a Shortcut: Qt matches "Ctrl+N" on
     // Ctrl+Shift+N too, which took ⌘⇧N (a new folder) from the keys
-    function newWindow() { manager.open(trashShown ? "" : path, "") }
+    function newWindow() { if (inArchive) manager.open(Format.parent(archive.file), archive.file); else manager.open(trashShown ? "" : path, "") }
     Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
     Shortcut { sequences: ["Ctrl+,", "Meta+,"]; enabled: !win.showSettings; onActivated: win.showSettings = true }
 
@@ -373,10 +388,10 @@ FloatingWindow {
         id: sheet
         c: win.look
         groups: [
-            { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l  o", "Open: into a folder, a file in its app"], ["⏎ on a program", "Asks: Run, Run in Terminal (⌘⏎)"], ["O", "Open with: pick the app (⌘⏎: always)"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
+            { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l  o", "Open: into a folder, a file in its app"], ["→  l on an archive", "Look into it, read-only (⏎ extracts it)"], ["⏎ on a program", "Asks: Run, Run in Terminal (⌘⏎)"], ["O", "Open with: pick the app (⌘⏎: always)"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
             { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["p  ←  →", "In it, a sound: play or pause, 5 s back or on"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["t", "Thumbnails in a grid, or the list (hjkl move in it)"], ["+  −", "Larger, smaller thumbnails"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
             { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["Ctrl-click", "Mark one (⌘-click moves the window)"], ["⇧-click  ⌘⇧-click", "Mark up to it, add up to it"], ["Esc", "No marks"]] },
-            { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["m", "Mail: attached to a new message"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["⌘Z", "Undo"]] },
+            { title: "Changing", keys: [["y  ⌘C", "Copy"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["m", "Mail: attached to a new message"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["y, then p", "In an archive: take files out, into a folder"], ["⌘Z", "Undo"]] },
             { title: "Places", keys: [["Tab", "Sidebar, list"], ["⌘N", "A new window, in this folder"], ["b  ⌘D", "Bookmark the picked folder, or not"], ["Drag", "Onto a folder or the sidebar: moved; from another app: copied"], ["Drag in the sidebar", "A folder to another place, or to the other group"]] },
             { title: "Trash", keys: [["u", "Put back"], ["d", "Delete for good"], ["⌘⇧⌫", "Empty the trash"]] }
         ]

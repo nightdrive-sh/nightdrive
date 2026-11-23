@@ -11,6 +11,10 @@ done exits 1 with the reason on stderr, in words for the toast.
   new FOLDER NAME [--dir]      an empty file, or a folder                    undo: trash it
   compress --into FOLDER --name NAME --format zip|tar.gz|tar.xz|tar PATH…   an archive   undo: trash it
   extract ARCHIVE [--into FOLDER]   unpacked beside it (pack.py, unpack.py)          undo: trash what it made
+  archive-list ARCHIVE         its members, without unpacking (members.py; progress as it reads a big tar)
+  member-peek ARCHIVE NAME --slot SLOT [--long]   peek of one member, taken out into the window's slot
+  member-clean --slot SLOT     the slot's members gone
+  extract-members ARCHIVE --into FOLDER NAME…   only those members (a folder with all in it)   undo: trash them
   trash PATH…                  to the trash                                  undo: restore
   move-back NEW OLD …          each NEW back to OLD
   restore ID…                  back from the trash (ID: its info file, as trash and trash-list give it)
@@ -26,7 +30,7 @@ import argparse, json, os, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # -I leaves the script's folder out
-import fsops, pack, peek, pinned, places, trash, unpack                  # noqa: E402
+import fsops, members, pack, peek, pinned, places, trash, unpack         # noqa: E402
 from fsops import Refused                                  # noqa: E402
 
 
@@ -69,6 +73,19 @@ def run(a):
     if v == "extract":
         fsops.watch_stop()
         return with_undo(unpack.extract(a.archive, a.into, progress))
+    if v == "extract-members":
+        fsops.watch_stop()
+        return with_undo(members.extract(a.archive, a.names, a.into, progress))
+    if v == "archive-list":
+        fsops.watch_stop()
+        try:
+            return members.listing(a.archive, progress)
+        except fsops.Stopped:
+            return {"stopped": True}
+    if v == "member-peek":
+        return members.peek_member(a.archive, a.name, a.slot, a.long)
+    if v == "member-clean":
+        return members.clean(a.slot)
     if v == "rename":
         return with_undo(fsops.rename(a.path, a.name))
     if v == "new":
@@ -112,6 +129,12 @@ def parser():
     s = sub.add_parser("compress"); s.add_argument("--into", required=True); s.add_argument("--name", required=True)
     s.add_argument("--format", choices=tuple(pack.FORMATS), default="zip"); s.add_argument("paths", nargs="+")
     s = sub.add_parser("extract"); s.add_argument("archive"); s.add_argument("--into", default="")
+    s = sub.add_parser("extract-members"); s.add_argument("archive"); s.add_argument("--into", required=True)
+    s.add_argument("names", nargs="+")
+    sub.add_parser("archive-list").add_argument("archive")
+    s = sub.add_parser("member-peek"); s.add_argument("archive"); s.add_argument("name"); s.add_argument("--slot", required=True)
+    s.add_argument("--long", action="store_true")
+    sub.add_parser("member-clean").add_argument("--slot", required=True)
     s = sub.add_parser("rename"); s.add_argument("path"); s.add_argument("name")
     s = sub.add_parser("new"); s.add_argument("folder"); s.add_argument("name"); s.add_argument("--dir", action="store_true")
     for verb in ("trash", "move-back"):

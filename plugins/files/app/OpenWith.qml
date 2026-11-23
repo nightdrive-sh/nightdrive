@@ -14,7 +14,7 @@ Item {
     property string kind: ""             // the type's name ("PDF document") for the hint and the toast
 
     function start() {
-        if (app.trashShown || lister.running) return
+        if (app.trashShown || lister.running || app.readOnly()) return
         const fs = app.selection()
         if (!fs.length) return
         files = fs

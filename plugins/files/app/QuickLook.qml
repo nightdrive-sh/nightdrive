@@ -43,7 +43,7 @@ PanelWindow {
         asked = p
         info = null
         if (peeker.running) peeker.running = false
-        peeker.command = ["python3", app.helper, "peek", p, "--long"]
+        peeker.command = file.member !== undefined ? app.archive.peek(file, true) : ["python3", app.helper, "peek", p, "--long"]
         peeker.running = true
     }
     Process {
@@ -68,7 +68,7 @@ PanelWindow {
             else if ((t === "p" || k === Qt.Key_P) && body.isAudio) body.toggleSound()
             else if (k === Qt.Key_Left && body.isAudio) body.skipSound(-5)
             else if (k === Qt.Key_Right && body.isAudio) body.skipSound(5)
-            else if (k === Qt.Key_Return || k === Qt.Key_Enter || t === "l") { root.close(); root.app.openPicked() }
+            else if ((k === Qt.Key_Return || k === Qt.Key_Enter || t === "l") && !(root.file && root.file.member !== undefined && !root.file.dir)) { root.close(); root.app.openPicked() }
             else return
             e.accepted = true
         }

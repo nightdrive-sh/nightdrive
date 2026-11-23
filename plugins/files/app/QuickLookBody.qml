@@ -15,8 +15,10 @@ Item {
     clip: true
 
     readonly property bool isAudio: !!info && info.audio === true
-    readonly property string picture: !info || isAudio ? "" : info.image ? Format.url(info.path) : info.picture ? Format.url(info.picture) : ""
+    readonly property string picture: !info || isAudio ? "" : info.image ? Format.url(info.file || info.path) : info.picture ? Format.url(info.picture) : ""
     readonly property bool isText: !!info && !picture && info.text !== undefined
+    // A file in an archive (Archive) isn't on disk to open: y and p take it out
+    readonly property string opens: file && file.member !== undefined ? "y, then p in a folder, takes it out" : "⏎ opens it"
     function page(d) { if (isText) textFlick.flick(0, -3000 * d) }
     function toggleSound() { if (isAudio) player.toggle() }
     function skipSound(d) { if (isAudio) player.skip(d) }
@@ -73,13 +75,13 @@ Item {
             autoplay: true
             c: root.c
             // Only while it is still the picked file: ↑ ↓ stop it at once, not when the next one has been read
-            path: root.active && root.isAudio && root.file && root.file.path === root.info.path ? root.info.path : ""
+            path: root.active && root.isAudio && root.file && root.file.path === root.info.path ? root.info.file || root.info.path : ""
             duration: root.isAudio && root.info.duration ? root.info.duration : 0
             title: root.file ? root.file.name : ""
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "p plays or pauses  ·  ← → 5 s  ·  ⏎ opens it"
+            text: "p plays or pauses  ·  ← → 5 s  ·  " + root.opens
             color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
         }
     }
@@ -102,7 +104,7 @@ Item {
         }
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: root.info && root.info.dir ? "⏎ goes into it" : "⏎ opens it"
+            text: root.info && root.info.dir ? "⏎ goes into it" : root.opens
             color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
         }
     }

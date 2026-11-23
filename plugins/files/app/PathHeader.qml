@@ -83,6 +83,16 @@ RowLayout {
                         text: "›"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 13
                         leftPadding: 8; rightPadding: 8
                     }
+                    // The archive looked into (Archive): its glyph before its name, so the parts after it read as
+                    // inside it
+                    Text {
+                        visible: modelData.path === root.app.archive.file
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: Icons.g("package-open")
+                        font.family: Icons.family; font.pixelSize: 14
+                        color: root.c.accent
+                        rightPadding: 4; topPadding: 2
+                    }
                     // Home is its glyph, as in the sidebar, rather than ~
                     Text {
                         readonly property bool home: modelData.name === "~"
@@ -194,14 +204,21 @@ RowLayout {
         c: root.c; glyph: "search"; glyphSize: 17; compact: true; tip: "Filter by name"; keys: "/"
         onClicked: root.app.startFilter()
     }
+    // Inside an archive: nothing in it changes (Archive)
+    Text {
+        visible: root.app.inArchive && !root.compact
+        text: "Read-only"
+        color: root.c.faint; font.family: root.c.font; font.pixelSize: 11
+        Layout.rightMargin: 8
+    }
     AppBarButton {
-        visible: !root.app.trashShown
+        visible: !root.app.trashShown && !root.app.inArchive
         c: root.c; glyph: "folder-plus"; glyphSize: 17; compact: true; tip: "New folder"; keys: "⌘⇧N"
         onClicked: root.app.acts.askNew(true)
     }
     // The grid or the list (t): it shows the one it turns to
     AppBarButton {
-        visible: !root.app.trashShown
+        visible: !root.app.trashShown && !root.app.inArchive
         c: root.c; glyph: root.app.gridShown ? "list" : "layout-grid"; glyphSize: 17; compact: true
         tip: root.app.gridShown ? "As a list" : "As a grid, with thumbnails"; keys: "t"
         onClicked: root.app.toggleView()

@@ -78,7 +78,8 @@ QtObject {
         else if (k === Qt.Key_Home) a.moveTo(0)
         else if (k === Qt.Key_End || t === "G") a.moveTo(a.rows.length - 1)
         else if (t === "g") { gPending = true; gTimer.restart() }
-        else if (enter || k === Qt.Key_Right || t === "l") a.openPicked()
+        else if (enter) a.openPicked()
+        else if (k === Qt.Key_Right || t === "l") a.openPicked(false, true)   // an archive: into it, as a folder
         else if (k === Qt.Key_Left || t === "h" || k === Qt.Key_Backspace) a.up()
         else if (k === Qt.Key_Space) a.quick.toggle()
         else if (t === "v") a.toggleMark()

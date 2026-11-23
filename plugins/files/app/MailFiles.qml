@@ -11,7 +11,7 @@ QtObject {
     readonly property string nightmail: Quickshell.env("HOME") + "/.local/bin/nightmail"
 
     function send() {
-        if (app.trashShown || runner.running) return
+        if (app.trashShown || runner.running || app.readOnly()) return
         const rows = app.marked.length ? app.marked : app.picked ? [app.picked] : []
         if (!rows.length) return
         const files = rows.filter(r => !r.dir).map(r => r.path)

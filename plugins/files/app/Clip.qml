@@ -26,14 +26,17 @@ QtObject {
 
     // Reads the types on offer, then the one wanted; then copies or moves into the folder
     property string into: ""
+    property bool members: false            // what is there is an archive's members (Archive.copy)
     readonly property Process types: Process {
         command: ["wl-paste", "--list-types"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const t = text.split("\n")
-                const type = t.indexOf("x-special/gnome-copied-files") >= 0 ? "x-special/gnome-copied-files"
+                const type = t.indexOf(root.app.archive.mime) >= 0 ? root.app.archive.mime
+                           : t.indexOf("x-special/gnome-copied-files") >= 0 ? "x-special/gnome-copied-files"
                            : t.indexOf("text/uri-list") >= 0 ? "text/uri-list" : ""
                 if (!type) { root.app.say("No files on the clipboard"); return }
+                root.members = type === root.app.archive.mime
                 reader.command = ["wl-paste", "--no-newline", "--type", type]
                 reader.running = true
             }
@@ -47,6 +50,13 @@ QtObject {
         types.running = true
     }
     function pasted(text) {
+        if (members) {                      // taken out of the archive, into the folder
+            let d = null
+            try { d = JSON.parse(text) } catch (e) {}
+            if (d && d.archive && d.members && d.members.length) app.ops.extractMembers(d.archive, d.members, into)
+            else app.say("No files on the clipboard")
+            return
+        }
         let lines = text.split(/\r?\n/).filter(l => l && !l.startsWith("#"))
         let op = "copy"
         if (lines[0] === "copy" || lines[0] === "cut") op = lines.shift()

@@ -70,7 +70,7 @@ ColumnLayout {
         DropArea {
             anchors.fill: parent
             z: -1
-            enabled: !root.app.trashShown
+            enabled: !root.app.trashShown && !root.app.inArchive
             keys: ["text/uri-list"]
             onDropped: e => root.app.acts.dropped(e, root.app.path, false)
         }

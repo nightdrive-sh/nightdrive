@@ -14,11 +14,17 @@ QtObject {
 
     function copy(isCut) {
         if (app.trashShown) return
+        if (app.inArchive) {                  // out of an archive: y now, p in a folder (Archive)
+            if (isCut) app.archive.refuse()
+            else app.archive.copy(app.marked.length ? app.marked : app.picked ? [app.picked] : [])
+            return
+        }
         app.clip.copy(app.selection(), isCut)
         if (isCut) app.marks = ({})
     }
-    function paste() { if (!app.trashShown) app.clip.paste(app.path) }
+    function paste() { if (!app.trashShown && !app.readOnly()) app.clip.paste(app.path) }
     function trashPicked() {
+        if (app.readOnly()) return
         const ps = app.selection()
         if (ps.length && !app.trashShown) { trashPaths(ps); app.marks = ({}) }
     }
@@ -45,13 +51,13 @@ QtObject {
     // r / F2: the name with its stem picked, so typing keeps ".pdf"
     function askRename() {
         const f = app.picked
-        if (!f || app.trashShown) return
+        if (!f || app.trashShown || app.readOnly()) return
         const dot = f.dir ? -1 : f.name.lastIndexOf(".")
         prompt.ask("Rename", f.name, name => { if (name && name !== f.name) app.ops.rename(f.path, name) }, dot > 0 ? dot : -1)
     }
     // a: a file, or a folder when the name ends in "/"; ⌘⇧N and the header's button: a folder
     function askNew(isDir) {
-        if (app.trashShown) return
+        if (app.trashShown || app.readOnly()) return
         prompt.ask(isDir ? "New folder" : "New file (end with / for a folder)", isDir ? "New folder" : "", name => {
             if (!name) return
             const dir = isDir || name.endsWith("/")
@@ -69,7 +75,7 @@ QtObject {
 
     // b, ⌘D: the picked folder among the bookmarks, or out of them; with a file picked, the folder on show
     function toggleBookmark() {
-        if (app.trashShown) return
+        if (app.trashShown || app.readOnly()) return
         const p = app.picked && app.picked.dir ? app.picked.path : app.path
         const on = !app.places.bookmarked(p)
         app.ops.run([on ? "bookmark" : "unbookmark", p], (d, why) => {
@@ -146,6 +152,7 @@ QtObject {
     function dropped(e, into, toTrash) {
         const ps = (e.urls || []).map(u => Format.path(u)).filter(p => p)
         if (!ps.length) return
+        if (app.archive.owner(into)) { app.archive.refuse(); return }
         e.accept(Qt.CopyAction)
         if (toTrash) { trashPaths(ps); return }
         if (ps.indexOf(into) >= 0) return

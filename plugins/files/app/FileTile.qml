@@ -35,7 +35,7 @@ Rectangle {
         onTapped: { tile.app.current = tile.index; tile.app.toList() }
         onDoubleTapped: tile.app.openAt(tile.index)
         // The drag's picture, taken now: it isn't ready in time once the drag starts (FileDrag)
-        onPressedChanged: if (pressed && !tile.app.trashShown) tile.app.drag.prepare(tile.file, tile.app.dragPaths(tile.file.path).length)
+        onPressedChanged: if (pressed && !tile.app.trashShown && !tile.app.inArchive) tile.app.drag.prepare(tile.file, tile.app.dragPaths(tile.file.path).length)
     }
     // Ctrl-click marks or unmarks it, ⇧-click marks from the anchor to it, ⌘⇧-click adds those (as FileRow; not
     // ⌘-click, Hyprland's window drag): one handler for every modifier, as acceptedModifiers wants an exact match

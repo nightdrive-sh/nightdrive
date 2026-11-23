@@ -22,6 +22,7 @@ AppPanel {
     onVisibleChanged: if (!visible) app.toList()
 
     function ask() {
+        if (app.readOnly()) return
         const ps = app.trashShown ? [] : app.selection()
         if (!ps.length) return
         paths = ps

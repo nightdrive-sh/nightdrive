@@ -30,7 +30,7 @@ AppRow {
         onTapped: { row.app.current = row.index; row.app.toList() }
         onDoubleTapped: row.app.openAt(row.index)
         // The picture a drag from here would carry, taken now: it isn't ready in time once the drag starts
-        onPressedChanged: if (pressed && !row.app.trashShown) row.app.drag.prepare(row.file, row.app.dragPaths(row.file.path).length)
+        onPressedChanged: if (pressed && !row.app.trashShown && !row.app.inArchive) row.app.drag.prepare(row.file, row.app.dragPaths(row.file.path).length)
     }
     // Ctrl-click marks or unmarks it, ⇧-click marks the rows from the anchor to it, ⌘⇧-click adds them (the window's
     // markTo). Not ⌘-click, as elsewhere: ⌘ + a press is Hyprland's window drag (hypr/bindings.lua) and never reaches
@@ -51,13 +51,13 @@ AppRow {
     DragHandler {
         id: dragger
         target: null
-        enabled: !row.app.trashShown
+        enabled: !row.app.trashShown && !row.app.inArchive
         onActiveChanged: active ? row.app.drag.start(row, row.app.dragPaths(row.file.path)) : row.app.drag.release(row)
     }
     DropArea {
         id: drop
         anchors.fill: parent
-        enabled: row.file.dir && !row.app.trashShown
+        enabled: row.file.dir && !row.app.trashShown && !row.app.inArchive
         keys: ["text/uri-list"]
         onDropped: e => row.app.acts.dropped(e, row.file.path, false)
     }

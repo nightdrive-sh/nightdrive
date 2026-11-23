@@ -91,6 +91,11 @@ QtObject {
         change(["extract", "--", path], d => "Extracted " + Format.base(d.made[0] || "")
                + (d.skipped && d.skipped.length ? " (" + count(d.skipped.length, "1 item") + " left out: unsafe paths or links)" : ""), "Extracting")
     }
+    // p after y in an archive (Archive, lib/members.py): only those members, under unpack.py's rules
+    function extractMembers(archive, members, into) {
+        change(["extract-members", archive, "--into", into, "--"].concat(members), d => "Took out " + count(d.made.length, Format.base(d.made[0] || ""))
+               + " from " + Format.base(archive) + (d.skipped && d.skipped.length ? " (" + count(d.skipped.length, "1 item") + " left out: unsafe paths or links)" : ""), "Extracting")
+    }
     function trash(paths) {
         if (paths.length) change(["trash", "--"].concat(paths), "Moved " + count(paths.length, Format.base(paths[0])) + " to the trash")
     }

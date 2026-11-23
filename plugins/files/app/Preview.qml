@@ -27,7 +27,8 @@ Rectangle {
         if (p === asked && info) return
         asked = p
         if (peeker.running) peeker.running = false
-        peeker.command = ["python3", app.helper, "peek", p]
+        // A file in an archive is taken out first, into the window's slot (Archive, lib/members.py)
+        peeker.command = file.member !== undefined ? app.archive.peek(file, false) : ["python3", app.helper, "peek", p]
         peeker.running = true
     }
     // A change in the folder (the picked file written again) reads it again
@@ -75,7 +76,7 @@ Rectangle {
                 horizontalAlignment: Image.AlignLeft
                 asynchronous: true
                 cache: false
-                source: !root.fresh ? "" : root.info.image === true ? Format.url(root.info.path) : root.info.picture ? Format.url(root.info.picture) : ""
+                source: !root.fresh ? "" : root.info.image === true ? Format.url(root.info.file || root.info.path) : root.info.picture ? Format.url(root.info.picture) : ""
                 sourceSize.width: 640
             }
             Text {
@@ -127,7 +128,7 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.topMargin: 4
                 c: root.c
-                path: visible && root.visible && !root.app.quick.open ? root.info.path : ""
+                path: visible && root.visible && !root.app.quick.open ? root.info.file || root.info.path : ""
                 duration: visible && root.info.duration ? root.info.duration : 0
                 title: root.file ? root.file.name : ""
             }
