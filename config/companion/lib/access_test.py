@@ -100,12 +100,15 @@ class SocketTest(unittest.TestCase):
             s.settimeout(5)
             s.connect(path)
             extra = f"Tailscale-User-Login: {login}\r\n" if login else ""
-            s.sendall(f"GET /api/state HTTP/1.0\r\nHost: x\r\n{extra}\r\n".encode())
             out = b""
             try:
+                s.sendall(f"GET /api/state HTTP/1.0\r\nHost: x\r\n{extra}\r\n".encode())
                 while chunk := s.recv(4096):
                     out += chunk
-            except ConnectionResetError:    # refused: closed before it was read
+            # Refused: the server closes a peer it won't serve as soon as it accepts it, so depending on who gets there
+            # first the request can't be sent (BrokenPipe) or the close comes as a reset (ConnectionReset). Either way
+            # nothing came back, which is what the caller checks; a served request's answer is read before its close.
+            except (BrokenPipeError, ConnectionResetError):
                 pass
             return out.decode()
 
