@@ -9,10 +9,11 @@ Item {
     required property var command             // Store.command: python3 and the core's cli.py
     property bool running: false
 
-    function archive(id, then, failed) { run(["archive", "--json", id], then, failed) }
-    function unarchive(id, then, failed) { run(["archive", "--json", "--undo", id], then, failed) }
-    function read(id, isRead, then, failed) { run(["read", "--json", id].concat(isRead ? [] : ["--unread"]), then, failed) }
-    function remove(id, then, failed) { run(["delete", "--json", id], then, failed) }
+    // ids: one message's id, or several (the window's selection): one command for them all
+    function archive(ids, then, failed) { run(["archive", "--json"].concat(ids), then, failed) }
+    function unarchive(ids, then, failed) { run(["archive", "--json", "--undo"].concat(ids), then, failed) }
+    function read(ids, isRead, then, failed) { run(["read", "--json"].concat(ids, isRead ? [] : ["--unread"]), then, failed) }
+    function remove(ids, then, failed) { run(["delete", "--json"].concat(ids), then, failed) }
     // which: the button's place (0 the first), or "session" / "task" for the sender's own. A run button only after
     // the user confirmed it on RunPanel: yes is that confirmation, and nothing else passes it.
     function press(id, which, yes, then, failed) {

@@ -122,6 +122,9 @@ class CliTest(unittest.TestCase):
         self.assertTrue(self.jcli("show", b, "--mark-read")["read"])
         self.jcli("delete", a)
         self.assertEqual(self.jcli("count")["total"], 1)
+        c, d = self.jcli("post", "C")["id"], self.jcli("post", "D")["id"]
+        self.assertEqual(len(self.jcli("delete", c, d)["messages"]), 2)
+        self.assertEqual(self.jcli("count")["total"], 1)
 
     def test_one_count_for_every_sender(self):
         # The sessions bar's button counts what the top bar's does: no sessions-only number or key (#3257)

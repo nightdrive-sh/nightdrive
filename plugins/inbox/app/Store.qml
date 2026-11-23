@@ -27,6 +27,8 @@ Item {
     property string picked: ""
     readonly property int index: messages.findIndex(m => m.id === picked)
     property var message: null                 // the picked one, whole (show --json): body, attachments, actions
+    // Several selected at once (⌘A, ⇧↓, ⇧-click): while some are, the picked one is only where the keys are
+    readonly property QtObject selection: Selection { store: store }
 
     function pickView(v) { view = v; from = ""; fromLabel = ""; reload() }
     function pickFrom(key, label) { from = key; fromLabel = label; reload() }
@@ -35,11 +37,14 @@ Item {
     function reload() { picked = ""; message = null; raw = ""; refresh() }
     function step(d) { const n = messages.length; if (n) picked = messages[Math.max(0, Math.min(n - 1, index + d))].id }
     function pickAt(i) { if (messages.length) picked = messages[Math.max(0, Math.min(messages.length - 1, i))].id }
-    // Gone from what is shown (archived, deleted): the one below it next, else the one above
-    function forget(id) {
-        const i = messages.findIndex(m => m.id === id)
-        messages = messages.filter(m => m.id !== id)
-        if (picked === id) picked = messages.length ? messages[Math.min(Math.max(i, 0), messages.length - 1)].id : ""
+    // Gone from what is shown (archived, deleted; one id or several): the one below them next, else the one above
+    function forget(ids) {
+        ids = [].concat(ids)
+        const i = messages.findIndex(m => ids.indexOf(m.id) >= 0)
+        const was = picked
+        messages = messages.filter(m => ids.indexOf(m.id) < 0)
+        selection.clear()
+        if (ids.indexOf(was) >= 0) picked = messages.length ? messages[Math.min(Math.max(i, 0), messages.length - 1)].id : ""
         raw = ""
         refresh()
     }
@@ -92,7 +97,7 @@ Item {
     // The picked message, whole; read after it has been open a moment, so stepping past one leaves it unread
     onPickedChanged: { message = null; readTimer.stop(); load() }
     function load() {
-        if (!picked) return
+        if (!picked || selection.any) return
         shower.command = command.concat(["show", "--json", picked])
         shower.running = true
     }
@@ -102,7 +107,7 @@ Item {
             onStreamFinished: {
                 let m = null
                 try { m = JSON.parse(text) } catch (e) {}
-                if (!m || m.id !== store.picked) return
+                if (!m || m.id !== store.picked || store.selection.any) return
                 // The same message as shown (a list read again): left alone, so its images don't load again
                 if (store.message && JSON.stringify(store.message) === JSON.stringify(m)) return
                 store.message = m
@@ -114,7 +119,7 @@ Item {
     Timer {
         id: readTimer
         interval: store.readAfter
-        onTriggered: if (store.message && !store.message.read) store.mark(store.message.id, true)
+        onTriggered: if (store.message && !store.message.read && !store.selection.any) store.mark(store.message.id, true)
     }
     function mark(id, read) {
         marker.command = command.concat(["read", "--json", id].concat(read ? [] : ["--unread"]))

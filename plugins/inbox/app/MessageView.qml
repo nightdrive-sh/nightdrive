@@ -43,9 +43,20 @@ Item {
         onToggleRead: root.toggleRead()
         onRemove: root.remove()
     }
+    // Several selected: how many and what can be done to them, in the message's place
+    SelectedPane {
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: bar.height + Math.max(0, (parent.height - bar.height - height) / 2)
+        c: root.c
+        store: root.store
+        onArchive: root.archive()
+        onToggleRead: root.toggleRead()
+        onRemove: root.remove()
+    }
 
     Flickable {
         id: flick
+        visible: !root.store.selection.any
         TouchScroll { view: flick }
         anchors.top: bar.bottom; anchors.bottom: parent.bottom
         width: parent.width

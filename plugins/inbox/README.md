@@ -12,6 +12,7 @@ session can leave one whether this window is installed or not.
 | `?` | Inbox's keys |
 | ↑ ↓ or `j` `k` | Move in the list (`Home` `End`: the newest, the oldest) |
 | `/` or ⌘F | Search the titles, text and senders. `Enter` or ↓ to the messages, `Esc` back to every one |
+| ⌘A, ⇧↑ ⇧↓ | Select every message shown; select from the open one up or down. ⇧-click selects a range, Ctrl-click one more or one less, `Esc` only one again |
 | `a` | Archive: out of the way, kept in Archive (there: back to the inbox). ⌘Z in the notice undoes it |
 | `u` | Mark read or unread |
 | `d` or `Delete` | Delete the message and its files for good, after asking |
@@ -23,6 +24,7 @@ session can leave one whether this window is installed or not.
 | `Space` ⇧Space | Scroll the message |
 | ⌘B | Hide or show the sidebars |
 
+- With several selected, `a`, `u` and `d` act on them all: `u` marks them read, or unread when they all are read.
 - A message is marked read once it has been open a moment, so moving past one with the arrows leaves it unread.
 - From lists each project Claude's sessions worked in, each app, and Other. A click on a message's sender shows only that session's (or app's) messages; `Esc` shows every one again.
 - Pictures show large, two side by side where there is room (a before and an after); a click shows one over the window. Sound files (ogg, wav, mp3, m4a, flac, opus) come next, each with Play, its length and a Copy button for its name; one plays at a time, so starting another stops it. Other files are listed under them, and a click on a file's row opens it in its app.

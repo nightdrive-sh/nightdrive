@@ -200,8 +200,12 @@ def cmd_archive(a):
 
 
 def cmd_delete(a):
-    msg = store.delete(store.resolve(a.id))
-    emit(a, summary(msg), f"Deleted {msg['id']}: {msg['title']}")
+    # Several at once for the window's selection (#3455); one keeps its own answer, as before
+    done = [summary(store.delete(store.resolve(i))) for i in a.ids]
+    if len(done) == 1:
+        emit(a, done[0], f"Deleted {done[0]['id']}: {done[0]['title']}")
+    else:
+        emit(a, {"messages": done}, f"Deleted: {len(done)}.")
 
 
 def cmd_press(a):
@@ -270,7 +274,7 @@ def parser():
     p.add_argument("ids", nargs="+")
     p.add_argument("--undo", action="store_true")
     p = add("delete", cmd_delete, "remove for good")
-    p.add_argument("id")
+    p.add_argument("ids", nargs="+")
     p = add("press", cmd_press, "do what a button does: N (0 the first), or the sender's session or task")
     p.add_argument("id")
     p.add_argument("which", metavar="N|session|task")

@@ -59,7 +59,7 @@ ShellRoot {
             navForKeys = false
             view.forceActiveFocus()
         }
-        function pick(id) { store.picked = id; listOpen = false; navOpen = false; view.forceActiveFocus() }
+        function pick(id) { sel.clear(); store.picked = id; listOpen = false; navOpen = false; view.forceActiveFocus() }
         function find() {
             if (onePane) { listOpen = true; navOpen = false } else sidebarChoice = true
             list.field.forceActiveFocus()
@@ -71,26 +71,15 @@ ShellRoot {
         function fromPicked(key, label) { if (key) { store.pickFrom(key, label); if (onePane) listOpen = true } }
 
         function failed(text) { toast.show(text, { danger: true }) }
-        // Archive (e): out of the list, the next one shown; Undo (⌘Z) puts it back where it was
-        function archive() {
-            const m = store.message
-            if (!m) return
-            if (m.archived) actions.unarchive(m.id, () => { store.forget(m.id); toast.show("Back in the inbox: " + m.title) }, failed)
-            else actions.archive(m.id, () => {
-                store.forget(m.id)
-                toast.show("Archived " + m.title, { action: "Undo", run: () =>
-                    actions.unarchive(m.id, () => { store.picked = m.id; store.raw = ""; store.refresh() }, win.failed) })
-            }, failed)
-        }
-        function toggleRead() {
-            const m = store.message
-            if (m) actions.read(m.id, !m.read, () => { store.message = null; store.raw = ""; store.refresh() }, failed)
-        }
-        function askDelete() { if (store.message) confirm.visible = true }
-        function remove() {
-            const m = store.message
-            if (m) actions.remove(m.id, () => { store.forget(m.id); toast.show("Deleted " + m.title) }, failed)
-        }
+        // Archive, read and delete, on the open message or every selected one (MessageOps.qml)
+        MessageOps { id: ops; store: store; actions: actions; toast: toast }
+        readonly property QtObject sel: store.selection
+        function archive() { ops.archive() }
+        function toggleRead() { ops.toggleRead() }
+        // Delete asks first, about what was selected when it was pressed
+        property var deleting: []
+        function askDelete() { deleting = sel.targets(); if (deleting.length) confirm.visible = true }
+        function remove() { if (deleting.length) ops.remove(deleting); deleting = [] }
         // A button, or the sender's session or task; a run one only by way of its card (ask)
         function press(which, yes) {
             const m = store.message
@@ -161,6 +150,8 @@ ShellRoot {
                 onSearchDone: clear => win.searchDone(clear)
                 active: view.activeFocus
                 onPicked: id => win.pick(id)
+                onPickedRange: i => { win.sel.range(i); view.forceActiveFocus() }
+                onPickedOne: i => { win.sel.toggle(i); view.forceActiveFocus() }
             }
             // While the list shows in one pane the message is there at no width: it keeps the keyboard, so the arrows
             // still move between the messages, as in Notes
@@ -194,10 +185,18 @@ ShellRoot {
             win.look.moved(e)                  // Tab and the arrows show the keys' frame (AppPointer)
             sheet.pressed(e)
             if (e.accepted) return
-            if (k === Qt.Key_Down || k === Qt.Key_J) store.step(1)
+            const cmd = e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
+            // ⇧↓ ⇧↑ (⇧J ⇧K) select from the open message on, ⌘A (Ctrl+A) every one, Esc none (Selection.qml)
+            if (shift && (k === Qt.Key_Down || k === Qt.Key_J)) sel.range(store.index + 1)
+            else if (shift && (k === Qt.Key_Up || k === Qt.Key_K)) sel.range(store.index - 1)
+            else if (cmd && k === Qt.Key_A) sel.all()
+            else if (k === Qt.Key_Escape && sel.any) sel.clear()
+            // Moving on from a selection leaves it, as Mail's arrows do
+            else if (k === Qt.Key_Down || k === Qt.Key_J) { sel.clear(); store.step(1) }
+            else if (k === Qt.Key_Up || k === Qt.Key_K) { sel.clear(); store.step(-1) }
             else if (k === Qt.Key_Up || k === Qt.Key_K) store.step(-1)
-            else if (k === Qt.Key_Home) store.pickAt(0)
-            else if (k === Qt.Key_End) store.pickAt(store.messages.length - 1)
+            else if (k === Qt.Key_Home) { sel.clear(); store.pickAt(0) }
+            else if (k === Qt.Key_End) { sel.clear(); store.pickAt(store.messages.length - 1) }
             else if (e.text === "/") win.find()
             else if (e.text === "a") win.archive()
             else if (e.text === "u") win.toggleRead()
@@ -228,9 +227,11 @@ ShellRoot {
             behind: content
             c: win.look
             cardWidth: Math.min(440, win.width - 32)
-            question: store.message ? "Delete “" + store.message.title + "”?" : ""
-            detail: "It goes for good, with its files. Archive (a) keeps it out of the way instead."
-            onAnswered: ok => { visible = false; if (ok) win.remove(); view.forceActiveFocus() }
+            question: win.deleting.length > 1 ? "Delete " + win.deleting.length + " messages?"
+                : win.deleting.length ? "Delete “" + win.deleting[0].title + "”?" : ""
+            detail: win.deleting.length > 1 ? "They go for good, with their files. Archive (a) keeps them out of the way instead."
+                : "It goes for good, with its files. Archive (a) keeps it out of the way instead."
+            onAnswered: ok => { visible = false; if (ok) win.remove(); else win.deleting = []; view.forceActiveFocus() }
         }
         RunPanel {
             id: runPanel

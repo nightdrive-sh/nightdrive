@@ -33,7 +33,7 @@ ends with the same mailbox, which opens Inbox. Nothing more: no sound, no pop-up
 ```
 nightdrive inbox post TITLE [--body TEXT|-] [--attach FILE]… [--action KIND LABEL VALUE]… [--task N] [--app NAME]
 nightdrive inbox list [--unread|--archived|--all] [--mine] [--from KEY] [--search WORDS]      show ID      count
-nightdrive inbox read ID…|--all [--unread]      archive ID… [--undo]      update ID …      delete ID
+nightdrive inbox read ID…|--all [--unread]      archive ID… [--undo]      update ID …      delete ID…
 nightdrive inbox press ID N|session|task [--yes]
 ```
 

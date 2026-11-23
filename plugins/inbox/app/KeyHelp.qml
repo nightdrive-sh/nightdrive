@@ -7,6 +7,9 @@ QtObject {
         { title: "Messages", keys: [
             ["↑ ↓  j k", "Move"],
             ["Home  End", "The newest, the oldest"],
+            ["⌘A", "Select every message: a, u and d act on them all"],
+            ["⇧↑ ⇧↓", "Select from the open message (⇧-click, Ctrl-click)"],
+            ["Esc", "Only one again"],
             ["/  ⌘F", "Search the titles, text and senders (Esc: every message)"],
             ["a", "Archive (in the archive: back to the inbox); ⌘Z undoes"],
             ["u", "Mark read or unread"],

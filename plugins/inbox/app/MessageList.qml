@@ -19,6 +19,8 @@ AppSidebar {
     property int searchHeight: 22
     property int firstRow: 70            // the first message level with the sidebar's first row (Inbox)
     signal picked(string id)
+    signal pickedRange(int index)        // ⇧-click: select from the open message to this one
+    signal pickedOne(int index)          // Ctrl-click: this one in or out of the selection
     signal showNav()
     title: navShown ? "" : store.scopeName
     headerHeight: barHeight
@@ -72,9 +74,15 @@ AppSidebar {
             readonly property bool unread: !modelData.read
             implicitHeight: rowCol.implicitHeight + 28     // as Mail's rows
             c: root.c
-            selected: index === root.store.index
-            active: root.active
-            TapHandler { onTapped: root.picked(row.modelData.id) }
+            // Selected (Selection.qml), or the open one; with several selected a thin frame shows where the keys are
+            readonly property bool chosen: root.store.selection.has(modelData.id)
+            selected: chosen || index === root.store.index && !root.store.selection.any
+            active: root.active && !root.store.selection.any
+            border.color: index === root.store.index && root.store.selection.any && root.active ? root.c.line
+                : selected && active ? root.c.frame : "transparent"
+            TapHandler { acceptedModifiers: Qt.NoModifier; onTapped: root.picked(row.modelData.id) }
+            TapHandler { acceptedModifiers: Qt.ShiftModifier; onTapped: root.pickedRange(row.index) }
+            TapHandler { acceptedModifiers: Qt.ControlModifier; onTapped: root.pickedOne(row.index) }
             Column {
                 id: rowCol
                 anchors.left: parent.left; anchors.leftMargin: 16
