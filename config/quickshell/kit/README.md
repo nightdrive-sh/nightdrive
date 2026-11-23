@@ -28,7 +28,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppSearchField` | The search glyph and a field; Return, ↓ and Esc come out as signals |
 | `AppPanel` | A card over the dimmed window (settings, a question, a first start); a click outside comes out as a signal. Never taller than the window: its content scrolls, and its last row of `AppPanelButton`s stays in sight under it |
 | `AppPanelButton` | A panel's answer (Create, Cancel): its keys in the theme colour, then the word; `strong` for the one Return gives |
-| `AppConfirm` | A yes-or-no `AppPanel` before what can't be undone: `question`, `detail`, `action`; Return yes, Esc no |
+| `AppConfirm` | A yes-or-no `AppPanel` before what can't be undone: `question`, `detail`, `action`; Return yes, Esc no; `other` a second answer on Ctrl+Return (`otherChosen`) |
 | `AppPrompt` | An `AppPanel` that asks for a name: `ask(title, initial, then, pickTo)`, the text picked (only up to `pickTo` when given: a name without its suffix); `then` gets it trimmed |
 | `AppMenu` | A small menu floating at a row, with a search over its rows (Files' Open with), no scrim: `open(anchor, items)` with `[{ text, detail, icon, section }]` (icon a theme name or a path, section a heading), `title`, `hint` with `hintKeys` as caps before it; ↑ ↓, ⏎ or a click `picked(item, modifiers)`, Esc or a click outside `closed()`. Drawn over the window, under the anchor or above it, inside the edges |
 | `AppField` | A labelled text field in a frame for the panels, with a `hint` ("GB"); typing into a read-only one comes out as `refused`; `keyFilter` sees each key first, for a part built on it |
