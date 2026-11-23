@@ -74,6 +74,7 @@
       "class": "change",
       "undo": ["calendar", "delete", "--scope", "all", "{calendar}", "{uid}"],
       "notice": "Added to {calendar_name}: {title}, {when}",
+      "notice_many": "Added {count} events to the calendar",
       "timeout": 120,
       "area": "calendar"
     },
@@ -106,6 +107,7 @@
       "class": "change",
       "undo": ["calendar", "restore", "{undo}"],
       "notice": "Changed in {calendar_name}: {title}, {when}",
+      "notice_many": "Changed {count} events in the calendar",
       "timeout": 180,
       "area": "calendar"
     },

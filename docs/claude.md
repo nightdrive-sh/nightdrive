@@ -64,7 +64,9 @@ without you seeing it first. A screen or network change also asks afterwards whe
 in 20 seconds unless you do; a screen's new scale or resolution is saved only once you keep it, so a restart in between
 brings back the one before.
 
-**Undo** is on the notification for an hour; then Redo undoes the undo. Claude keeps the last 100 changes (and a
+**Undo** is on the notification for an hour; then Redo undoes the undo. Changes a conversation makes in one area in a
+row (seven tasks; less than a minute and a half apart, for at most ten minutes) share one notification, "Added 7 tasks",
+whose Undo undoes them all. Claude keeps the last 100 changes (and a
 deletion as long as its Undo is on screen), so you can also ask it later ("undo the wallpaper"); "undo that" is the
 conversation's own last change. Undo runs only what the change's tool would: a log edited by hand runs nothing else.
 A change that couldn't be undone isn't offered as a change at all. An undo that does what only the card allows (Do Not
@@ -78,8 +80,8 @@ was made with (a draft's text) only for an area it may read now without asking, 
 **How much:** an area takes 20 changes a minute without asking; past that each one asks on the card, which says how
 many there were. When you asked for them (fifty tasks), **Allow all** (⇧ Enter) on that card lets the area take up
 to 100 more without a card for a minute; what Access sets to Ask still asks. A call you refused on the card isn't shown to you again for two minutes (Claude is told to ask you in
-the chat), and a text Claude gives a tool is at most 100 000 characters. The last 20 changes keep their Undo button;
-an older one's notification says to ask Claude, who can still undo it.
+the chat), and a text Claude gives a tool is at most 100 000 characters. The last 20 notifications keep their Undo
+button; an older one says to ask Claude, who can still undo each change.
 
 ## Settings › Claude › Access
 

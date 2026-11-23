@@ -349,7 +349,7 @@ class Retire(unittest.TestCase):
         proc = mock.Mock()
         undo.WAITING[5] = proc
         rows = []
-        with mock.patch.object(undo.changes, "get", return_value={"id": 5, "notice": "Made a note", "state": "done"}), \
+        with mock.patch.object(undo.changes, "batch", return_value=[{"id": 5, "notice": "Made a note", "state": "done"}]), \
                 mock.patch.object(undo, "notify", side_effect=lambda *a, **k: rows.append((a, k))):
             undo.retire(5)
         proc.terminate.assert_called_once()

@@ -385,6 +385,7 @@ card, undo, timeouts).
 | `undo_asks` | Optional, for `change`: `true` when undoing it does something only the card may allow. An undo whose argv is an `act` tool's command (dnd_off's undo is dnd_on's) asks without it |
 | `before` | Optional, for `change`: argv that prints the state the tool changes as a JSON object (`{"path": "…"}`, the wallpaper set now), run first. If it fails, the tool isn't run: a change must be one the user can undo |
 | `notice` | Optional, for `change`: the notification's line, e.g. `"Changed the wallpaper to {path}"` (the output's fields, then the arguments). Default: `title` |
+| `notice_many` | Optional, for `change`: the line of one notification for several of its changes in a row, with `{count}` and no other name: `"Added {count} tasks"`. Without it, such a batch reads "3 changes in Tasks" |
 | `notify` | Optional, for `change`: `false` logs the change for `recent_changes` and `undo_change` but shows no notification, for one plain to see where it lands that mustn't interrupt (inbox_post: a message in Inbox is the opposite of a notification) |
 | `card` | Optional: argv that prints, as a JSON object of label → text, what the confirmation card shows above the arguments, from what the tool acts on (`{"Device": "Oven", "Room": "Kitchen"}` for `switch.sonoff_1000a`). Run before the card; if it fails, the call stops there with its message. `"ask": false` in it lets the call past the card: only for a tool that names the list in `unasked_by`, when that list isn't empty and the tool isn't `act` |
 | `unasked_by` | Optional, with `card`: the area's list choice whose entries need no card (`"apps"`: windows_view's apps the user ticked). Only then does the card command's `"ask": false` count |
@@ -400,7 +401,8 @@ card, undo, timeouts).
 A `change` tool's call shows a notification with Undo (it stays in the history for an hour) and goes in
 `~/.local/state/nightdrive/claude-changes.jsonl` (the last 100), from which Claude can undo it too when asked
 (`recent_changes`, `undo_change`). Undo runs the logged `undo` argv the way the tool ran, and Redo the command again,
-filling `undo` from that run's output (a new draft's new id).
+filling `undo` from that run's output (a new draft's new id). One conversation's changes in one area at most 90 seconds
+apart share a notification (`notice_many`), whose Undo undoes them newest first; the log keeps each one.
 
 The command runs in the plugin's folder, with its `bin/` and Nightdrive's first in `PATH`. stdout is the result Claude
 reads (a JSON object also as structured content, at most 100 000 characters); an exit status other than 0 is an error

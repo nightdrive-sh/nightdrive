@@ -209,6 +209,10 @@ def problem(spec, plugin, external=False):
         return f"{name}: {', '.join(sorted(unknown))} in its before isn't in inputSchema"
     if not isinstance(spec.get("notice", ""), str):
         return f"{name}: notice must be a string"
+    many = spec.get("notice_many")
+    if many is not None and (spec["class"] != "change" or not isinstance(many, str)
+                             or run.placeholders(many) != {"count"}):
+        return f"{name}: notice_many is a change tool's line for several of its changes, with {{count}} and no other name"
     if not isinstance(spec.get("notify", True), bool) or "notify" in spec and spec["class"] != "change":
         return f"{name}: notify is a change tool's, true or false"
     paths = spec.get("mask", [])
