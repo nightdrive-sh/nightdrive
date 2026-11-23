@@ -108,6 +108,9 @@ flatpak
 unzip
 zip
 xdg-utils
+# xdg-open reads a file's type from its name (mimetype), as Files and gio open do: without it, under Hyprland, it asks
+# file(1), which calls a .md or .csv plain text and opens it in text/plain's app, not its own (#3273)
+perl-File-MimeInfo
 # Commands the scripts use that only KDE pulled in: pw-play, pw-dump, pw-cli, pw-record, pw-cat (sounds, the Volume menu,
 # dictation), pactl (sounds, Bluetooth audio; otherwise only nwg-panel's, which Nightdrive keeps out), xdg-user-dir
 # (screenshots, wallpapers), sensors (the System menu), tar (installers), lspci (hypr/scripts/platform)

@@ -9,6 +9,8 @@
   default-apps open KIND [--focus]  start the kind's app (Hyper B / F / E); --focus brings an open window up instead
   default-apps refresh              rewrite the browser's new-window entry for the chosen browser (setup-user.sh, at
                                     every update: a Chromium browser chosen before it existed gets one)
+  default-apps follow               write down text/plain's app for the source code types no code editor was chosen
+                                    for (setup-user.sh, at every update; set text does it too): see follow()
 
 A choice is written to ~/.config/mimeapps.list for every type of the kind. Left unwritten, the default can come from
 whatever registers the type last (mimeinfo.cache): that is how aerc's copy in ~/.local/share/applications took over
@@ -30,6 +32,8 @@ WRAP = "nightdrive-newwindow-"              # the new-window entry of a Chromium
 CHROMIUM = re.compile(r"chrom|brave|vivaldi|edge|opera|thorium|helium", re.I)   # its copies hide an app from the launcher: not a reason to leave it out here
 SCRIPTS = os.path.dirname(os.path.realpath(__file__))
 TERMINALS = os.environ.get("XDG_CONFIG_HOME", HOME + "/.config") + "/xdg-terminals.list"
+# The app follow() last wrote for the source code types (text/plain's then)
+FOLLOWED = os.environ.get("XDG_STATE_HOME", HOME + "/.local/state") + "/nightdrive/code-follows-text"
 
 # key, name, glyph, where Install › Software has more (a search, or cat:<category> where its most installed are the right
 # ones: the categories are broad, PDF readers are in Utilities, and the search matches the words as one phrase), types
@@ -121,8 +125,9 @@ def app_info(app_id, keys):
 
 
 def current(mime):
-    """The app that opens the type, as GIO (Files, the browsers, xdg-open) finds it: a type without a default of its own
-    gets its parent's (a .py file: text/plain's), which xdg-mime query doesn't tell."""
+    """The app that opens the type, as GIO (Files, gio open, the browsers) finds it: a type without a default of its own
+    gets its parent's (a .py file: text/plain's), which xdg-mime query doesn't tell. xdg-open doesn't ask GIO under
+    Hyprland: it reads the type with mimetype (perl-File-MimeInfo) and the default with xdg-mime, see follow()."""
     try:
         out = subprocess.run(["gio", "mime", mime], capture_output=True, text=True, timeout=5,
                              env=dict(os.environ, LC_ALL="C")).stdout
@@ -285,18 +290,70 @@ def set_default(kind, app_id, if_unset=False):
         exe = new_window_exec(app_id, apps[app_id])
         app_id = write_wrapper(app_id, apps[app_id], exe, types) if exe else app_id
         remove_wrappers(keep=app_id)
+    write_mimeapps(lines, {t: app_id for t in types})
+    if kind == "code":
+        forget_followed()   # the user's own choice now: follow() leaves it alone
+    elif kind == "text":
+        follow()
+
+
+def write_mimeapps(lines, values):
+    """mimeapps.list with values (type: app) as the types' defaults."""
     old = associations(lines)
-    lines = put(lines, "[Default Applications]", {t: app_id for t in types})
+    lines = put(lines, "[Default Applications]", values)
     # Also in [Added Associations] (first): GIO takes a default only from the apps that open the type, and an app that
     # doesn't list it (VS Code and source code) is one only from there, as after Files' "Open With"
     lines = put(lines, "[Added Associations]",
-                {t: ";".join([app_id] + [a for a in old.get(t, "").split(";")
-                                       if a and a != app_id and not a.startswith(WRAP)]) + ";" for t in types})
+                {t: ";".join([a] + [o for o in old.get(t, "").split(";")
+                                    if o and o != a and not o.startswith(WRAP)]) + ";" for t, a in values.items()})
     os.makedirs(os.path.dirname(MIMEAPPS), exist_ok=True)
     tmp = MIMEAPPS + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     os.replace(tmp, MIMEAPPS)
+
+
+def defaults(lines):
+    """[Default Applications] as type: app."""
+    out, inside = {}, False
+    for line in lines:
+        if line.startswith("["):
+            inside = line.strip() == "[Default Applications]"
+        elif inside and "=" in line:
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def forget_followed():
+    try:
+        os.remove(FOLLOWED)
+    except FileNotFoundError:
+        pass
+
+
+def follow():
+    """Source code with no code editor chosen opens in the text editor (text/plain's app), as GIO finds it through the
+    types' parents. xdg-open finds no default there: mimetype follows a type's parents only one step (application/json
+    → json5, not on to text/javascript and text/plain), and its fallback, mimeopen, then takes application/octet-stream's
+    app (Ferry's send window). So those types get text/plain's app written down, and again when it changes: FOLLOWED
+    keeps the app written, so a type with any other app (the user's choice, an app of its own) stays as it is."""
+    text = current("text/plain")
+    if not text: return
+    try:
+        with open(FOLLOWED, encoding="utf-8") as f:
+            last = f.read().strip()
+    except FileNotFoundError:
+        last = ""
+    lines = read_mimeapps()
+    own = defaults(lines)
+    values = {t: text for t in CODE
+              if own.get(t) != text and (own.get(t) == last if t in own else current(t) == text)}
+    if values: write_mimeapps(lines, values)
+    if text != last:
+        os.makedirs(os.path.dirname(FOLLOWED), exist_ok=True)
+        with open(FOLLOWED, "w", encoding="utf-8") as f:
+            f.write(text + "\n")
 
 
 def set_terminal(app_id, if_unset=False):
@@ -347,6 +404,8 @@ def main(args):
         open_kind(args[1], "--focus" in args[2:])
     elif args == ["refresh"]:
         refresh_browser()
+    elif args == ["follow"]:
+        follow()
     elif args == ["--json"]:
         print(json.dumps(kinds()))
     elif not args or args == ["list"]:

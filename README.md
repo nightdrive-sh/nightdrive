@@ -260,8 +260,9 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   link to the web version.
 - **Default apps**: which app opens links, mail, folders, text, code, images, video, music, PDFs and calendar files, and
   which terminal ⌘Enter opens: Launcher › Settings › Apps › Default apps (or `nightdrive defaults`). Hyper B, F and E
-  open the browser, Files and Email you chose. A link from another app opens in a new window, not as a tab: Firefox's
-  is a setting there (Settings › Apps › Firefox), and Brave, Chromium and Chrome always do.
+  open the browser, Files and Email you chose. Code opens in the text editor until you choose a code editor. A link
+  from another app opens in a new window, not as a tab: Firefox's is a setting there (Settings › Apps › Firefox), and
+  Brave, Chromium and Chrome always do.
 - **App shortcuts**: which app Hyper + a letter or digit opens: Launcher › Settings › Apps › App shortcuts. Your choice
   replaces a default, Nightdrive's or a plugin's. The other shortcuts are in the config files ([Make it yours](#make-it-yours)).
 - **Cleaning the keyboard**: search "clean keyboard" in the Launcher (or `nightdrive clean`): the keyboard and touchpad
