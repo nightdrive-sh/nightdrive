@@ -153,12 +153,13 @@ QtObject {
         else app.ops.copy(ps, into)
     }
 
-    // A change's result: pick what it made here, and read again what it may have moved
+    // A change's result: pick what it made here (a paste, a new name, an archive, what Undo put back), now if the
+    // folder's rows have it already, else once they come; and read again what it may have moved
     function changed(d) {
         if (d) {
             const made = d.made || (d.moved || []).map(m => m[0]) || []
             const here = (d.restored || []).concat(made).find(p => Format.parent(p) === app.path)
-            if (here) app.keep = here
+            if (here) app.pick(here)
         }
         app.places.refresh()
         if (app.trashShown) app.loadTrash()

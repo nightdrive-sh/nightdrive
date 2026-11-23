@@ -17,6 +17,7 @@ Item {
     property bool running: false
     property bool capped: false              // search.py stopped at its LIMIT: more words would narrow it
     property bool missing: false             // no fd on this machine
+    signal changing()                        // rows are about to be set again (the window holds its view's place)
     signal rebuilt()
 
     readonly property string helper: app.helper.replace(/cli\.py$/, "search.py")
@@ -41,7 +42,7 @@ Item {
     // Found rows land in found as they come (their time as a Date, as Folder's rows have it); the list's order is applied a few times a second, not per batch
     property var found: []
     Timer { id: settle; interval: 120; onTriggered: root.order() }
-    function order() { rows = Format.order(found, app.sortBy, app.reversed); rebuilt() }
+    function order() { changing(); rows = Format.order(found, app.sortBy, app.reversed); rebuilt() }
     Connections {
         target: root.app
         function onSortByChanged() { if (root.active) root.order() }

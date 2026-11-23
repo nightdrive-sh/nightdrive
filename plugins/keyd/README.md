@@ -5,7 +5,7 @@ The text keys your fingers know from macOS, in every app, and Finder's keys in F
 | Keys | |
 | --- | --- |
 | ⌥⌫ | Deletes the word before the cursor |
-| ⌘⌫ | Deletes to the start of the line; in Files, moves to the trash; in Thunderbird, deletes the message |
+| ⌘⌫ | Deletes to the start of the line; in Files and Nautilus, moves to the trash; in Thunderbird, deletes the message |
 | ⌘L | Goes to the address bar in a browser (Firefox, Chromium, Chrome, Brave, Vivaldi, Zen, LibreWolf, Epiphany, Ladybird), not in webapps; in Files, types a path |
 | ⌥← / ⌥→ | Moves by word (⇧ selects) in Apostrophe and Chromium too, where Alt+arrows would swap words or go back |
 | ⌘, | Opens the app's settings (Ctrl+,), not in the terminal; 1Password's Settings window comes up even when it is already open |

@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs
 import qs.kit
 import "Format.js" as Format
+import "Settle.js" as Settle
 
 // One of Files' windows (shell.qml keeps them): the places in the sidebar (Places, Sidebar), the folder's files in a
 // list (Folder, FileList), the picked one in the preview at the right (Preview) and over the screen on Space
@@ -62,7 +63,7 @@ FloatingWindow {
     property var trashRows: []
     property var history: []             // folders before this one, for ⌥← (⌃⌘←)
     property var future: []              // and after it, for ⌥→
-    Folder { id: folder; path: win.path; onRebuilt: win.settle() }
+    Folder { id: folder; path: win.path; onChanging: win.hold(); onRebuilt: win.settle() }
     property alias showHidden: folder.showHidden
     property alias sortBy: folder.sortBy
     property alias reversed: folder.reversed
@@ -72,7 +73,7 @@ FloatingWindow {
     // Outside home (a USB stick, /etc) home wouldn't help: there it is the folder and every one below it
     readonly property bool inHome: path === home || path.startsWith(home + "/")
     readonly property string searchRoot: inHome ? home : path
-    Search { id: search; app: win; folder: win.searchRoot; words: win.filter; hidden: win.showHidden; onRebuilt: win.settle() }
+    Search { id: search; app: win; folder: win.searchRoot; words: win.filter; hidden: win.showHidden; onChanging: win.hold(); onRebuilt: win.settle() }
     property alias below: search.on
     readonly property bool searching: !trashShown && search.active
     readonly property alias search: search
@@ -100,6 +101,7 @@ FloatingWindow {
         marks = ({})
         keep = select || ""
         current = -1
+        shown = []
         path = p
         // To the top, its margin in: positionViewAtBeginning() leaves the margin out, and the list jumped up by it and
         // back as a folder not read before came
@@ -119,7 +121,7 @@ FloatingWindow {
         else if (e.kind === "device" && !e.path) acts.mount(e, p => go(p, ""))
         else go(e.path, "")
     }
-    function showTrash() { trashShown = true; endFilter(); marks = ({}); current = -1; loadTrash() }
+    function showTrash() { trashShown = true; endFilter(); marks = ({}); current = -1; shown = []; loadTrash() }
     function loadTrash() { trashReader.running = true }
     Process {
         id: trashReader
@@ -128,6 +130,7 @@ FloatingWindow {
             onStreamFinished: {
                 let d
                 try { d = JSON.parse(text) } catch (e) { return }
+                win.hold()
                 win.trashRows = d.items.map(r => ({ name: r.name, path: r.path, dir: r.dir, size: r.size, modified: r.deleted, origin: r.origin, id: r.id }))
                 win.settle()
             }
@@ -135,12 +138,42 @@ FloatingWindow {
     }
     function reload() { if (trashShown) loadTrash(); else folder.rebuild(); places.refresh() }
 
-    // The rows came (again): the same file stays picked, or the one asked for, or the row at the same place
+    // The rows came (again): the one asked for (keep), else the same file stays picked, else the next row still there
+    // in the place of those gone (Settle.place), and the view stays where it was (#3415). shown is the rows' paths as
+    // last settled, which current indexes until then: by now rows is already the new set, so picked can't say what
+    // was picked. A folder entered starts with none, and at the top.
+    property var shown: []
+    property real heldY: NaN
+    property real heldAt: NaN            // the picked row's distance from the view's top, while it is in sight
+    // Before the rows are set again (Folder, Search, the trash): a new model takes the view to the top. The picked
+    // row keeps its place on screen (files added above it don't push it down), else the view its own
+    function hold() {
+        if (!isNaN(heldY)) return
+        heldY = view.contentY
+        const item = current >= 0 ? view.itemAtIndex(current) : null
+        const at = item ? item.y - view.contentY : NaN
+        heldAt = at >= 0 && at + item.height <= view.height ? at : NaN    // a row kept beyond the edge isn't in sight
+    }
     function settle() {
-        const want = keep || (picked ? picked.path : "")
-        const i = want ? rows.findIndex(r => r.path === want) : -1
-        if (i >= 0 || !keep) keep = ""
-        current = i >= 0 ? i : rows.length ? Math.max(0, Math.min(current, rows.length - 1)) : -1
+        const paths = rows.map(r => r.path)
+        const i = Settle.place(shown, current, paths, keep)
+        if (!keep || paths[i] === keep) keep = ""
+        let y = heldY
+        const at = heldAt
+        heldY = NaN; heldAt = NaN
+        const again = shown.length > 0
+        shown = paths
+        current = i
+        if (again && !isNaN(y)) {
+            view.forceLayout()
+            if (current >= 0 && !isNaN(at)) {
+                view.positionViewAtIndex(current, ListView.Beginning)
+                const item = view.itemAtIndex(current)
+                if (item) y = item.y - at
+            }
+            const top = view.originY - view.topMargin
+            view.contentY = Settle.scrollBack(y, top, view.contentHeight + view.topMargin + view.bottomMargin - view.height)
+        }
         if (current >= 0) view.positionViewAtIndex(current, ListView.Contain)
         // Marks of files gone stay out of what the keys act on (marked only counts the rows there)
         preview.again()

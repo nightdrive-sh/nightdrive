@@ -224,7 +224,8 @@ end
 if not plugins.keyd then
     hl.bind(mod .. " + BACKSPACE", function ()
         local w = hl.get_active_window()
-        if w and (w.class == "org.gnome.Nautilus" or w.class == "nautilus") then
+        -- Nightdrive's Files too (a Quickshell window titled Files): its Delete trashes the picked or marked files
+        if w and (w.class == "org.gnome.Nautilus" or w.class == "nautilus" or (w.class == "org.quickshell" and w.title == "Files")) then
             hl.dispatch(hl.dsp.send_shortcut({ mods = "", key = "Delete" }))
         else
             hl.dispatch(hl.dsp.exec_cmd("qs ipc call launcher deleteSelected"))
