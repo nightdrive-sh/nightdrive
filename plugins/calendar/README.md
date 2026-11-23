@@ -17,6 +17,7 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 | `/` | Search |
 | `Enter` | Open the day's first event (a click opens any); in the agenda or a search, the one picked (↑ ↓ or `j` `k`) |
 | `n` | New event on the day picked (also New, or a double click on a day or in the week's hours) |
+| `j` | Join the open event's meeting: Teams, Google Meet, Zoom, Webex (also Join on it) |
 | `e` | Edit the event open (also Edit on it) |
 | `Del` or `⌫` | Delete the event open, after you say yes (also Delete on it) |
 | ← → on a recurring event | Whether Edit and Delete are for this time or every time (also the chips on it) |
@@ -31,7 +32,7 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 - The top bar's clock menu lists today's events under the month; a click opens one in Calendar.
 - The Launcher's search (⌘Space) finds the next 30 days' events by title or place, and `Enter` opens one here; its New event row starts one. Settings › Launcher › Include calendar events leaves the events out.
 - **Invitations** in Mail (an `.ics` in a message) show as a card there, with Add to calendar; an update to one you added offers Update, a cancellation Remove (Mail's README › Reading). Only the event's own fields are kept: not the sender's alarms (your reminder, or the default in Settings, applies), attachments or links. An update keeps the reminder you gave the event, and the calendar it is in. Accept, Maybe and Decline on the card answer the organiser, and the event keeps your answer.
-- An event's place and notes show their web links clickable: a click opens one in the browser. An invitation's long addresses show short, and Outlook's and Teams' `Join the meeting<https://…>` as the words alone.
+- An event's place and notes show their web links clickable: a click opens one in the browser. An invitation's long addresses show short, and Outlook's and Teams' `Join the meeting<https://…>` as the words alone. An event with a meeting link, in its URL, place or notes, has Join (`j`), which opens the call in the browser.
 - The day view (`d`) is the week's hours for one day, wide enough for each event's time and place beside its title.
 - The agenda (`a`) lists the 30 days from the day picked that have events, under Today, Tomorrow and the days' names.
 - Search (`/`) finds the events whose title, place or notes have every word you type, half a year back and ahead of today, in the calendar picked in the sidebar. `↓` or `Enter` goes to the results, `/` back to the words, `Esc` leaves.
@@ -56,7 +57,7 @@ caldav-url = https://caldav.example.com/
 
 ## Claude
 
-With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events, add or change an event (its reminder too: "remind me an hour before") or give a calendar its colour (you can undo each from the notification), and delete one after you allow it on Nightdrive's card. It can make an event repeat, and change or delete one time of a recurring event or every time; nothing in a read-only calendar. Changing an event asks on the card the first time in each calendar, and every time in or out of a `shared` one.
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Calendar), Claude can read your calendars and events (with their meeting links), add or change an event (its reminder too: "remind me an hour before") or give a calendar its colour (you can undo each from the notification), and delete one after you allow it on Nightdrive's card. It can make an event repeat, and change or delete one time of a recurring event or every time; nothing in a read-only calendar. Changing an event asks on the card the first time in each calendar, and every time in or out of a `shared` one.
 
 The first event Claude adds to a calendar asks on the card, and once you allow it, Claude adds to that calendar without asking; a `shared` one asks every time, and a refusal remembers nothing. `nightdrive mcp access allowed` lists the calendars allowed so, and `nightdrive mcp access forget calendar_add` makes them all ask again (or `forget calendar_add "Family (icloud/family)"`, one of them).
 
@@ -69,7 +70,7 @@ The first event Claude adds to a calendar asks on the card, and once you allow i
 | `calendar search [TEXT]` | Opens its search (on TEXT) |
 | `calendar new [DAY]` | Opens it with a new event on DAY (or the day it shows) |
 | `calendar calendars` | The calendars and how many events each has (`--json`) |
-| `calendar events FROM TO` | The events from FROM up to TO, not included (YYYY-MM-DD; `--json`, `--calendar ID`, `--search TEXT`, `--limit N`) |
+| `calendar events FROM TO` | The events from FROM up to TO, not included (YYYY-MM-DD; `--json`, `--calendar ID`, `--search TEXT`, `--limit N`); the JSON's `meeting` is the link that joins the event's call |
 | `calendar add --title T --start S [--end E]` | A new event (`--calendar ID`, `--location L`, `--notes N`, `--reminder MINUTES` before the start, `--repeat daily\|weekdays\|weekly\|biweekly\|monthly\|yearly`); S and E are YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day. As JSON on stdin, `repeat` can also be `{"every": "week", "interval": 2, "days": ["MO", "TH"], "until": "2027-06-01"}` (or `"count": 10`) |
 | `calendar edit CALENDAR UID` | Changes an event: a JSON object on stdin of what changes (`title`, `start`, `end`, `location`, `notes`, `move_to` another calendar, `reminder` in minutes or `null`, `repeat` as add's or `null`); a recurring one's also `scope`: `this` with `occurrence` (that time's start, as `calendar events` gives it) or `all`. Prints the id `calendar restore UNDO` takes to put it back (`--json`) |
 | `calendar invite [FILE]` | An invitation's `.ics` (stdin without FILE): what it is, and whether its event is in a calendar already (`--json`); `--add CALENDAR` puts it in one or updates the copy there, `--remove` takes a cancelled one out; `--reply ANSWER --as ADDRESS` builds the answer to its organiser, which Mail sends |

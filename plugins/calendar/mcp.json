@@ -31,7 +31,7 @@
     {
       "name": "calendar_events",
       "title": "Events",
-      "description": "The user's events from one day up to another (to not included), in every calendar or one, a recurring event as each of its times: uid, calendar id and name, title, start and end (local time YYYY-MM-DDTHH:MM, or YYYY-MM-DD for an all-day event, whose end is its last day), all_day, location, notes, recurring, reminder (its first alarm in minutes before the start: 0 at the start; an all-day event's -540 is 9:00 on the day, 900 9:00 the day before; null for none), and for a recurring one repeat (its rule: every, interval, days, until, count, text). search keeps only those whose title, location or notes have every word. A range of a few months at most: count says how many there were, events at most limit of them, the earliest first.",
+      "description": "The user's events from one day up to another (to not included), in every calendar or one, a recurring event as each of its times: uid, calendar id and name, title, start and end (local time YYYY-MM-DDTHH:MM, or YYYY-MM-DD for an all-day event, whose end is its last day), all_day, location, notes, url (its URL field), meeting (the link that joins its video call: {url, service: Teams, Google Meet, Zoom, Webex or Jitsi}, from the URL field, location or notes; null for none), recurring, reminder (its first alarm in minutes before the start: 0 at the start; an all-day event's -540 is 9:00 on the day, 900 9:00 the day before; null for none), and for a recurring one repeat (its rule: every, interval, days, until, count, text). search keeps only those whose title, location or notes have every word. A range of a few months at most: count says how many there were, events at most limit of them, the earliest first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -45,7 +45,7 @@
         "additionalProperties": false
       },
       "command": ["calendar", "events", "--json", ["--calendar", "{calendar}"], ["--search", "{search}"], ["--limit", "{limit}"], "{from}", "{to}"],
-      "mask": ["events.title", "events.notes", "events.location"],
+      "mask": ["events.title", "events.notes", "events.location", "events.url", "events.meeting.url"],
       "class": "read",
       "area": "calendar"
     },

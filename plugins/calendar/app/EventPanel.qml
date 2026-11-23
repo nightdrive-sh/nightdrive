@@ -9,7 +9,8 @@ import "links.js" as Links
 // editor, and Delete (Del, ⌫), which asks first (EventDelete). A recurring one (#2009) says its repeat, and which of
 // its times Edit and Delete are for: this one or every one, two chips (← →); one in a read-only calendar says why
 // there are no buttons instead. Esc, Enter or a click outside close it. The place and notes show their web links
-// clickable and short (links.js, #3444): a click opens one in the browser.
+// clickable and short (links.js, #3444): a click opens one in the browser. An event with a meeting link (Teams, Meet,
+// Zoom, Webex: lib/meeting.py, in the event as `meeting`) has Join (j), which opens the call, read only or not.
 AppPanel {
     id: root
     required property var app           // the window: its calendars, to tell a read-only one
@@ -39,11 +40,13 @@ AppPanel {
     function openLink(link) {
         if (/^https?:\/\//i.test(link.trim())) Qt.openUrlExternally(link.trim())
     }
+    function join() { if (event && event.meeting) openLink(event.meeting.url) }
     function remove() { if (event && !fixed) { const e = event, s = scope(); close(); deleteRequested(e, s) } }
     onOutsideTapped: close()
     Keys.onPressed: e => {
         if (e.key === Qt.Key_Escape || e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space) close()
         else if (e.key === Qt.Key_E) edit()
+        else if (e.key === Qt.Key_J) join()
         else if (e.key === Qt.Key_Delete || e.key === Qt.Key_Backspace) remove()
         else if (asks && (e.key === Qt.Key_Left || e.key === Qt.Key_H)) which.picked = "this"
         else if (asks && (e.key === Qt.Key_Right || e.key === Qt.Key_L)) which.picked = "all"
@@ -141,6 +144,13 @@ AppPanel {
         width: parent.width
         spacing: 10
         layoutDirection: Qt.RightToLeft
+        // First, so it is on the right, where the strong answer is, and stays on the first line in a narrow card
+        AppPanelButton {
+            c: root.c; keys: ["j"]; strong: true
+            visible: !!(root.event && root.event.meeting)
+            label: root.event && root.event.meeting ? "Join " + root.event.meeting.service : ""
+            onClicked: root.join()
+        }
         AppPanelButton { c: root.c; keys: ["Esc"]; label: "Close"; onClicked: root.close() }
         AppPanelButton { c: root.c; keys: ["e"]; label: "Edit"; visible: !root.fixed; onClicked: root.edit() }
         AppPanelButton { c: root.c; keys: ["Del"]; label: "Delete"; visible: !root.fixed; onClicked: root.remove() }
