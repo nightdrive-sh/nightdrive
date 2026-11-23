@@ -9,6 +9,15 @@
       "stdin": "json",
       "class": "read",
       "area": "nightdrive"
+    },
+    {
+      "name": "hub_status",
+      "title": "Hub sync status",
+      "description": "Nightdrive Hub, which syncs Tasks between the user's computers: the Hub's address, when the last sync went through and the last try's state (ok, offline: the changes wait, error), and per app what the last sync did (fetched, sent, merged: a task edited on two computers, the older edit's values put in its notes; kept_both) and what waits to be sent from this computer. joined is false when this computer syncs with no Hub.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "hub", "status", "--json"],
+      "class": "read",
+      "area": "nightdrive"
     }
   ]
 }

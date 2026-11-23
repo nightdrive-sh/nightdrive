@@ -88,7 +88,9 @@ class Scenarios:
             self.assertIn("One, edited", d.read(t1))
             self.assertIn("Two, edited", d.read(t2))
 
-    def test_same_task_edited_on_both_keeps_both(self):
+    def test_same_task_edited_on_both_is_merged(self):
+        # Field by field (merge_sync_test.py has the cases): neither says when it changed, so the Hub's (first) title
+        # stays and b's goes in the notes. With no version both agreed on, both are kept (a fresh start, below).
         t = self.a.add("home", "Buy milk")
         uid = t[5:-4]
         self.join_both()
@@ -96,14 +98,12 @@ class Scenarios:
         self.b.write(t, devices.vtodo(uid, "Buy milk and bread"))
         self.a.sync()
         rep = self.b.sync()["collections"]["tasks"]
-        self.assertEqual(rep["kept_both"], [t])
+        self.assertEqual((rep["merged"], rep["kept_both"]), ([t], []))
         self.a.sync()
         self.assertEqual(self.a.files(), self.b.files())
-        texts = [v for k, v in self.b.files().items() if k.endswith(".ics")]
-        self.assertEqual(len(texts), 2)
-        self.assertIn("Buy milk today", self.b.read(t))     # the Hub's (first) stays in place
-        copy = [v for v in texts if "Buy milk and bread" in v][0]
-        self.assertNotIn("UID:%s\r\n" % uid, copy)             # a task of its own, not a second with the same UID
+        self.assertEqual(len([k for k in self.b.files() if k.endswith(".ics")]), 1)
+        self.assertIn("SUMMARY:Buy milk today\r\n", self.b.read(t))
+        self.assertIn("Title: Buy milk and bread", self.b.read(t))
 
     def test_offline_edits_on_both_meet(self):
         self.a.add("home", "Seed")

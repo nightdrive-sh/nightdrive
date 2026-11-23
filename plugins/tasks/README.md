@@ -40,7 +40,7 @@ or `+30m`, `+2h`. `tasks when "fri 930"` shows how one reads. `--json` gives wha
 
 ## Where they are
 
-- Each task is a VTODO file (iCalendar, the standard), a folder per list, in `~/.local/share/nightdrive/tasks`: the layout vdirsyncer keeps a CalDAV calendar in, so syncing them with iCloud or another server can come later without a conversion. What another app wrote in a file (alarms, repeats, its own fields) is kept when Tasks changes it.
+- Each task is a VTODO file (iCalendar, the standard), a folder per list, in `~/.local/share/nightdrive/tasks`: the layout vdirsyncer keeps a CalDAV calendar in, so syncing them with iCloud or another server can come later without a conversion. [Hub](../../docs/hub.md) syncs them between your computers now, a task edited on two of them merged field by field. What another app wrote in a file (alarms, repeats, its own fields) is kept when Tasks changes it.
 - A task moved to the trash stays in `~/.local/state/nightdrive/tasks/trash` for 30 days.
 - `tasks disable` stops the notifications and takes Tasks out of the apps; your tasks stay.
 

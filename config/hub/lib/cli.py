@@ -96,6 +96,8 @@ def summary(rep):
                       ("deleted_there", "deleted on the Hub")):
         if rep[key]:
             parts.append("%d %s" % (rep[key], word))
+    if rep.get("merged"):
+        parts.append("%d edited on two devices: merged" % len(rep["merged"]))
     if rep["kept_both"]:
         parts.append("%d edited on two devices: both kept" % len(rep["kept_both"]))
     if rep["revived"]:
@@ -159,6 +161,8 @@ def cmd_status(a):
     out = {"joined": bool(cfg), "url": cfg and cfg["url"], "server": cfg and cfg.get("server"),
            "state": st.get("state"), "error": st.get("error"), "last_try": st.get("last_try"),
            "last_ok": st.get("last_ok"), "collections": st.get("collections", {}), "pending": pending()}
+    # Each collection's line as the text below has it, for Settings › Hub (HubLevels.qml) and Claude's hub_status
+    out["lines"] = {name: status_line(out["collections"].get(name), p) for name, p in out["pending"].items()}
     if a.json:
         print(json.dumps(out, indent=1))
         return 0
@@ -168,13 +172,16 @@ def cmd_status(a):
     print("Hub: %s" % cfg["url"])
     print("Last sync: %s%s" % (out["last_ok"] or "never",
                                "" if out["state"] in (None, "ok") else " (then %s: %s)" % (out["state"], out["error"])))
-    for name, p in out["pending"].items():
-        rep = out["collections"].get(name)
-        line = summary(rep) if rep else "not synced yet"
-        wait = p["changed"] + p["deleted"]
-        print("%s: %s%s" % (name.capitalize(), line, "; %d change%s to send" % (wait, "s" * (wait != 1)) if wait
-                                                       else ""))
+    for name, line in out["lines"].items():
+        print("%s: %s" % (name.capitalize(), line))
     return 0
+
+
+def status_line(rep, p):
+    """What the last sync of a collection did, and what waits to be sent from here now."""
+    wait = p["changed"] + p["deleted"]
+    return (summary(rep) if rep else "not synced yet") + ("; %d change%s to send" % (wait, "s" * (wait != 1)) if wait
+                                                          else "")
 
 
 def cmd_timer(a):

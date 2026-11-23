@@ -26,7 +26,9 @@ Item {
         ].concat(Plugins.has("tailscale") ? [{ kind: "nav", name: "Tailscale", glyph: "shield-check", target: "tailscale" }] : [], [
             // Companion: the iPad's web app over Tailscale (CompanionLevels.qml)
             { kind: "nav", name: "Companion", glyph: "tablet-smartphone", target: "companion", summary: lv.companion.state === "on" ? "on" : undefined,
-              extra: "ipad phone remote" }
+              extra: "ipad phone remote" },
+            // Nightdrive Hub: Tasks synced between computers (HubLevels.qml)
+            { kind: "nav", name: "Hub", glyph: "server", target: "hub", summary: lv.hub.summary || undefined, extra: "sync nightdrive hub" }
         ], [
             { kind: "header", name: "Hardware" },
             { kind: "nav", name: "Sound", glyph: "volume-2", target: "sound" },   // Headphones are a row there, while connected
@@ -76,7 +78,7 @@ Item {
                                               "Other displays": "ipad iphone tablet phone android second screen extra extend sidecar vnc airplay apple tv mirror cast",
                                               "Notifications": "notification sounds alert chime beep ping tone urgent critical popup timeout seconds duration",
                                               "Crash reports": "crash crashes bug report claude app quit coredump",
-                                              "Tailscale": "vpn", "Game Mode": "games gaming performance fps stutter cpu speed power profile tuned", "Mouse": "scroll scrolling wheel speed fast slow",
+                                              "Tailscale": "vpn", "Hub": "sync synchronise devices computers tasks nightdrive hub server", "Game Mode": "games gaming performance fps stutter cpu speed power profile tuned", "Mouse": "scroll scrolling wheel speed fast slow",
                                               "Claude writes": "ai write rewrite polish text draft reply tone instructions prompt model",
                                               "Default apps": "browser email mail files folders text editor terminal images photos video music player pdf calendar open with",
                                               "App shortcuts": "keyboard shortcuts hyper caps lock keys keybindings hotkeys open app", "Theme": "appearance style look colors",

@@ -1,11 +1,15 @@
 """The collections this client syncs, and each one's rule for what the sync can't settle by itself.
 
 The Hub only carries files and refuses a write made without seeing the latest version (protocol.md); what to do then
-is the app's to say, because only the app knows its files (#3391 › Ristiriidat). A rule answers four things:
+is the app's to say, because only the app knows its files (#3391 › Ristiriidat). A rule answers these:
 
 - root(): the folder the collection is in on this computer;
 - accept(path): which files under it belong to the collection;
-- keep_both(path, data): an edit made here lost the race to the Hub's: keep this side too, so nothing is lost;
+- merge(path, base, mine, theirs): both sides edited the file since they last agreed (base): one file with both
+  sides' changes, or None when the app can't merge it; keeps_base(path) says which files it merges, so the sync
+  keeps their agreed version (bases.py);
+- keep_both(path, data): an edit made here lost the race to the Hub's and couldn't be merged: keep this side too,
+  so nothing is lost;
 - put_away(path): the file was deleted on another device: move it out of the app's sight, never unlink it.
 
 Rule is the cautious default every app starts from: the other side of a conflict and a deleted file go to the state
@@ -44,6 +48,13 @@ class Rule:
 
     def accept(self, path):
         return True
+
+    def keeps_base(self, path):
+        return False
+
+    def merge(self, path, base, mine, theirs):
+        """bytes with both sides' changes, or None: then keep_both. The default merges nothing."""
+        return None
 
     def full(self, path):
         return os.path.join(self.root(), *path.split("/"))

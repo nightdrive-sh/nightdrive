@@ -1,10 +1,12 @@
 """Tasks' rule for the Hub (apps.py): the vdir in ~/.local/share/nightdrive/tasks, a folder per list and an .ics file
 per task (plugins/tasks/lib/store.py).
 
-In this piece a conflict keeps both versions (#3395): the Hub's stays in the task's place, and this computer's
-becomes a task of its own beside it, with a UID of its own and the computer's name after its title ("Buy milk (laptop)"), so
-both show in the window and the person picks. Merging field by field comes in Hub 4 (#3397) and replaces this.
-A task deleted on another device goes to Tasks' own trash (30 days), as a deletion in the window does.
+A task edited on two devices is merged field by field from the version both last agreed on (Tasks' merge.py,
+#3397): a value that lost goes in the task's notes. When it can't be (no agreed version: a first sync, a new Hub; a
+file that isn't a task) both are kept (#3395): the Hub's stays in the task's place, and this computer's becomes a task
+of its own beside it, with a UID of its own and the computer's name after its title ("Buy milk (laptop)"), so both
+show in the window and the person picks. A task deleted on another device goes to Tasks' own trash (30 days), as a
+deletion in the window does.
 """
 import sys
 import uuid
@@ -17,6 +19,7 @@ import apps
 TASKS_LIB = Path(__file__).resolve().parents[3] / "plugins/tasks/lib"
 sys.path.insert(0, str(TASKS_LIB))
 import ics  # noqa: E402
+import merge as task_merge  # noqa: E402
 import store  # noqa: E402
 
 
@@ -30,6 +33,15 @@ class TasksRule(apps.Rule):
         # A list's folder and a file in it (task.ics, displayname, color): what a vdir holds. Anything deeper or at the
         # top is no list's, so not Tasks' to send.
         return path.count("/") == 1
+
+    def keeps_base(self, path):
+        return path.endswith(".ics")
+
+    def merge(self, path, base, mine, theirs):
+        if not self.keeps_base(path):
+            return None
+        m = task_merge.merge(base, mine, theirs, apps.host())
+        return m.text.encode("utf-8") if m else None
 
     def keep_both(self, path, data):
         if not path.endswith(".ics"):
