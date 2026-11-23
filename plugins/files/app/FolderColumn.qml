@@ -5,27 +5,41 @@ import qs.kit
 // window's own column (own) shows the window's rows, pick and marks, and the keys act there; any other column (a
 // folder above it, or the folder picked in it) reads its folder itself (Folder), sorted and with the hidden files as
 // the window has them, and lights the row on the way (next). Dropped on its free space, files land in its folder.
+// While a folder is read, the column shows its rows as last seen (store, ColumnView), else the rows it showed: never
+// a blank moment or the folder before, which flickered at each step. An empty folder shows nothing; a filter that
+// matches nothing says so.
 Item {
     id: root
     required property QtObject c
     required property var app
+    required property var store               // ColumnView: put() and rowsOf() the rows seen lately
     property bool own: false
     property string path: ""                  // the folder; the window's own column's is the window's path
     property string next: ""                  // another column: the row on the way to the window's own column
     readonly property alias view: list
     readonly property string folderPath: own ? app.path : path
-    readonly property var rows: own ? app.rows : folder.rows
-    readonly property int pick: own ? app.current : next ? rows.findIndex(r => r.path === next) : -1
+    // The window's rows once they are its folder's; till then those seen last there
+    readonly property var rows: own ? (app.fresh ? app.rows : store.rowsOf(app.path) || []) : shown
+    readonly property int pick: own ? (app.fresh ? app.current : -1) : next ? rows.findIndex(r => r.path === next) : -1
 
+    property var shown: []
     Folder {
         id: folder
         path: root.own ? "" : root.path
         showHidden: root.app.showHidden
         sortBy: root.app.sortBy
         reversed: root.app.reversed
-        // The row on the way into sight as the folder comes (another column has no pick the keys move)
-        onRebuilt: Qt.callLater(root.reveal)
+        onRebuilt: root.refresh()
     }
+    onPathChanged: refresh()
+    function refresh() {
+        if (own) return
+        if (path && folder.readPath === path) { shown = folder.rows; store.put(path, folder.rows) }
+        else if (!path) shown = []
+        else { const seen = store.rowsOf(path); if (seen) shown = seen }    // else keep what shows until it comes
+        Qt.callLater(reveal)
+    }
+    // The row on the way into sight as the folder comes (another column has no pick the keys move)
     function reveal() { if (!own && pick >= 0) list.positionViewAtIndex(pick, ListView.Contain) }
     onNextChanged: reveal()
 
@@ -57,13 +71,7 @@ Item {
         // A click below the rows: the keys back to the list, or into this column's folder
         TapHandler { onTapped: root.own ? root.app.toList() : (root.app.go(root.path, ""), root.app.toList()) }
 
-        // The window's own column says what an empty folder or filter says, in the column's width
-        EmptyNote { visible: root.own && shown; anchors.centerIn: parent; most: list.width - 16; c: root.c; app: root.app }
-        Text {
-            visible: !root.own && root.rows.length === 0 && !folder.loading && root.path !== ""
-            anchors.centerIn: parent
-            text: "Empty"
-            color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
-        }
+        // Only a filter that found nothing is worth words here: an empty folder is an empty column
+        EmptyNote { visible: root.own && shown && root.app.filter !== ""; anchors.centerIn: parent; most: list.width - 16; c: root.c; app: root.app }
     }
 }

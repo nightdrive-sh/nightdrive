@@ -15,7 +15,7 @@ Rectangle {
     id: root
     required property QtObject c
     required property var app
-    readonly property var file: app.picked
+    property var file: app.picked        // the columns' last slot holds it between folders (ColumnView)
     color: "transparent"
 
     property var info: null

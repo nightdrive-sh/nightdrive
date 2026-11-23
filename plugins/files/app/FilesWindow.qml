@@ -99,6 +99,8 @@ FloatingWindow {
     property string placeDrag: ""         // the sidebar folder being dragged to another place in it
     readonly property bool loading: !trashShown && (inArchive ? archive.loading : searching ? search.running : folder.loading)
     readonly property var rows: trashShown ? trashRows : inArchive ? archive.rows : searching ? search.rows : folder.rows
+    // The rows are the folder's on show: false for a moment after a step to another one, while it is read (ColumnView)
+    readonly property bool fresh: trashShown || inArchive || searching || folder.readPath === path
 
     property int current: -1
     property string keep: ""             // the path to pick once the rows come (one just made, the folder come up from)

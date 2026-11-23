@@ -19,7 +19,7 @@ AppRow {
     readonly property bool isMarked: own && app.marks[file.path] === true
 
     implicitHeight: app.rowHeight
-    selected: own && index === app.current
+    selected: own && index === column.pick   // none for the moment the column shows the rows seen before
     marked: !own && index === column.pick     // the folder on the way, while the keys are in a column to its right
     active: own && app.listFocused
     opacity: app.clip.cutSet[file.path] ? 0.5 : 1
