@@ -14,7 +14,8 @@ function read(s, line) {
     try { ev = JSON.parse(line) } catch (e) { return }
     if (!ev || typeof ev !== "object") return
     if (ev.type === "nightdrive_turn") {
-        s.add({ kind: "you", text: String(ev.prompt || "") })
+        // heard: dictated, so the conversation says it is what was heard (AskClaudeThread)
+        s.add({ kind: "you", text: String(ev.prompt || ""), heard: ev.dictated === true })
         s.busy = true
         s.dictated = ev.dictated === true   // its answer's unsure mark is read and left out (AskClaudeSession.flush)
         s.unsure = false

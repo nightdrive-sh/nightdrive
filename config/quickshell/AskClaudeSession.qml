@@ -31,6 +31,9 @@ Singleton {
     // or a tool refused, and asks. The mark itself is left out of the text shown.
     property bool dictated: false
     property bool unsure: false
+    // The finished request needs a look (AskClaudeUnsure.look, #3155): "unsure", "error" or "". Ask Claude's toast opens
+    // large for it instead of the small card's "answered"
+    readonly property string look: busy ? "" : Unsure.look(entries, dictated, unsure)
     property bool unseen: false          // an answer came while the toast was closed (the launcher's row says so)
     property double lastAt: 0
     // Ask Claude's toast (AskClaudeToast.qml) shows the conversation; the launcher's row and keys (AskClaudeLevels.qml)

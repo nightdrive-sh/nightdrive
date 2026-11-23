@@ -58,7 +58,8 @@ Item {
             id: field
             width: parent.width
             baseSize: p.fontSize
-            placeholder: p.session.entries.length ? "Write back…" : "Ask Claude…"
+            // Claude asks about a dictation (#3155): write or dictate the answer
+            placeholder: p.session.look !== "" ? "Answer, or dictate…" : p.session.entries.length ? "Write back…" : "Ask Claude…"
             opacity: p.dictating ? 0 : 1
             // One still running: the text waits in the field
             onSent: text => { if (p.session.ask(text)) field.begin(""); else p.refuse() }

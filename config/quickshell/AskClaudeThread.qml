@@ -177,8 +177,20 @@ Item {
                     readonly property string kind: modelData.kind
                     width: t.width
                     // A request opens a new exchange: a little room above it after the first, and below it before Claude's part
-                    readonly property int above: kind === "you" && index > 0 ? t.gap : 0
+                    readonly property int above: (kind === "you" && index > 0 ? t.gap : 0) + (heard.visible ? heard.height : 0)
                     height: above + (kind === "you" ? you.height + t.gap : kind === "step" ? t.stepHeight : said.height + 6)
+                    // A dictated request was sent unread (#3155): say it is what was heard, so a wrong word is seen as
+                        // the dictation's, not yours
+                    Text {
+                        id: heard
+                        visible: entry.kind === "you" && !!entry.modelData.heard
+                        y: index > 0 ? t.gap : 0
+                        x: t.width - width - 4
+                        height: implicitHeight + 4
+                        text: "Heard"
+                        color: Theme.dim
+                        font { family: Theme.font; pixelSize: t.fontSize - 5 }
+                    }
                     Rectangle {
                         id: you
                         visible: entry.kind === "you"

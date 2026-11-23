@@ -34,7 +34,9 @@ an earlier request, the toast opens with what you said in the field. Without the
 terminal. A request sent this way tells Claude it was dictated: Claude reads past the dictation's usual mistakes
 (product names spelled the Finnish way, words split wrong), makes "remind me …" (muistuta) a reminder and "idea …" a
 task in the Tasks list Ideas (Ideat in Finnish), and when it can't tell what you meant, or a tool refused, it doesn't
-guess but asks: its answer then begins with `[?]` (defined in `quickshell/AskClaudeUnsure.js`).
+guess but asks: its answer then begins with `[?]` (defined in `quickshell/AskClaudeUnsure.js`). Such an answer, or an
+error, opens the toast large with the keys, showing what was heard and Claude's question: write or dictate your answer
+there. If you are dictating into a window just then, it waits until you're done.
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.
