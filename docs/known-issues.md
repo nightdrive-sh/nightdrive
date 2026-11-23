@@ -15,8 +15,6 @@ the *Known issue* form.
   harmless; the image viewer (Loupe) opens a picture without the flash.
 - **[1Password's own keyboard shortcuts do nothing (Quick Access, Autofill)](https://github.com/nightdrive-sh/nightdrive/issues/5)**:
   Hyper P opens the app; its commands (`1password --quick-access`) can get keys in `~/.config/hypr/local.lua`.
-- **[iPhone mirroring stops when a screen comes or goes (AirPlay Receiver)](https://github.com/nightdrive-sh/nightdrive/issues/6)**:
-  start mirroring again from the phone; the receiver is back by itself.
 - **[WezTerm from Flathub doesn't open a window](https://github.com/nightdrive-sh/nightdrive/issues/7)**:
   WezTerm's own nightly builds (`wezfurlong/wezterm-nightly` COPR), not tried here yet.
 - **[EasyEffects stops when an autoload file is broken (headphone EQ)](https://github.com/nightdrive-sh/nightdrive/issues/8)**:

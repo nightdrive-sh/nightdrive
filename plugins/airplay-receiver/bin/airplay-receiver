@@ -102,11 +102,9 @@ case ${1:-status} in
     # once and remembers it. Not -pin (UxPlay's own pairing, a PIN per device): it fails with the iPhone (AirPlay 960)
     # in UxPlay 1.73.7 ("client_proof_len 20 invalid"). stdbuf: each line through the pipe at once, not when a buffer
     # fills. -rc also means ~/.uxplayrc isn't read.
-    # A crash comes back at once, even right after the start: an update or a channel switch reloads Hyprland a few
-    # times in a row. Five crashes within a minute are something else: exit with it and let systemd (and FUMonitor)
-    # handle it, as with any other exit. A crash within 5 s of a Hyprland config load (hyprland.lua leaves its time in
-    # $XDG_RUNTIME_DIR) doesn't count: closing and opening the lid a few times reloads it twice each time.
-    loaded=$XDG_RUNTIME_DIR/nightdrive-hypr-loaded
+    # A crash comes back at once, even right after the start. Five within a minute are a loop: exit with it and let
+    # systemd (and FUMonitor) handle it, as with any other exit. (Until GStreamer 1.28.9, waylandsink crashed at every
+    # screen change, and a Hyprland load was let off this count.)
     crashes=()
     watch_sleep &
     watch_bus &
@@ -118,8 +116,6 @@ case ${1:-status} in
       rc=${PIPESTATUS[0]}
       [[ -e $RECYCLE ]] && { rm -f "$RECYCLE"; continue; }   # watch_bus
       (( rc == 139 )) || exit "$rc"
-      sleep 1   # the load may be stamped a moment after the crash
-      if [[ -e $loaded ]] && (( $(date +%s) - $(stat -c %Y "$loaded") <= 5 )); then continue; fi
       crashes+=("$SECONDS")
       (( ${#crashes[@]} > 5 )) && crashes=("${crashes[@]:1}")
       (( ${#crashes[@]} == 5 && SECONDS - crashes[0] < 60 )) && exit "$rc"

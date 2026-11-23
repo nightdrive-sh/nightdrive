@@ -108,6 +108,16 @@ class Watch(unittest.TestCase):
                                  top=top), entry(19, "Hyprland", top=top))
         self.assertEqual(shown, ["Hyprland crashed | /usr/bin/Hyprland (SIGSEGV)"])
 
+    def test_uxplay_is_no_longer_muted_from_the_start(self):
+        # GStreamer 1.28.9 fixed waylandsink's crash at every screen change (#1675): UxPlay's crash now shows. A "-NAME"
+        # line left in the mute file (it unmuted a default) means nothing; a muted name still is
+        muted = os.path.join(self.dir, ".local/state/nightdrive/crash-reports-muted")
+        os.makedirs(os.path.dirname(muted))
+        with open(muted, "w") as f:
+            f.write("-gedit\nvim\n")
+        shown = self.watch(entry(20, "uxplay"), entry(21, "gedit"), entry(22, "vim"))
+        self.assertEqual(shown, ["gedit crashed | /usr/bin/gedit (SIGSEGV)", "uxplay crashed | /usr/bin/uxplay (SIGSEGV)"])
+
 
 if __name__ == "__main__":
     unittest.main()

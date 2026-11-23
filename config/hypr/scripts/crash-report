@@ -23,8 +23,6 @@ COREDUMP_MESSAGE = "fc2e22bc6ee647b6b90729ab34a250b1"   # systemd-coredump's "Pr
 MUTED_FILE = os.path.expanduser("~/.local/state/nightdrive/crash-reports-muted")
 MUTED_UNTIL_FILE = os.path.expanduser("~/.local/state/nightdrive/crash-reports-muted-until")   # NAME EPOCH per line
 SHORT_MUTE_MINUTES = 15
-# Muted from the start: UxPlay's waylandsink crashes at every screen change and comes back by itself (docs/known-issues.md)
-DEFAULT_MUTED = {"uxplay"}
 # Left out, as (process names, the crashing thread's top frame): crashes that only end what was ending anyway.
 # Quickshell 0.2.1 (Fedora's git20260209 build) segfaults on `qs kill` when its config is between generations
 # (IpcKillCommand::exec on a null currentGeneration, fixed upstream on 2026-03-07): the shell and the apps' windows
@@ -52,14 +50,14 @@ def systemctl(*args):
 
 
 def muted():
-    names = set(DEFAULT_MUTED)
+    names = set()
     try:
         with open(MUTED_FILE) as f:
             for line in f:
                 line = line.strip()
-                if line.startswith("-"):
-                    names.discard(line[1:])   # "-uxplay": a default unmuted
-                elif line:
+                # "-NAME" unmuted a default, and uxplay was one until GStreamer 1.28.9 fixed its crash at every screen
+                # change: such a line may still be in the file, and means nothing now
+                if line and not line.startswith("-"):
                     names.add(line)
     except FileNotFoundError:
         pass
@@ -102,10 +100,8 @@ def set_muted(name, on):
             lines = [l.strip() for l in f if l.strip() not in (name, "-" + name)]
     except FileNotFoundError:
         pass
-    if on and name not in DEFAULT_MUTED:
+    if on:
         lines.append(name)
-    if not on and name in DEFAULT_MUTED:
-        lines.append("-" + name)
     os.makedirs(os.path.dirname(MUTED_FILE), exist_ok=True)
     with open(MUTED_FILE, "w") as f:
         f.write("".join(l + "\n" for l in lines))
