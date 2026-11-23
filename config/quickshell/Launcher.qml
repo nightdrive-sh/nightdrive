@@ -85,7 +85,7 @@ PanelWindow {
     property alias detailCard: details
     // Settings › Launcher: { fuzzy, shortcuts, deck, comma, contacts, notes } in ~/.local/state/nightdrive/launcher.json (missing = on;
     // deck, the music player's albums and artists in the search, and comma, the calculator's decimal comma, only when asked for).
-    // shelf is Settings › Shelf's switch, kept here with the other switches; Shelf.qml reads the same file
+    // shelf is Settings › Shelf's switch, kept here with the other switches; shell.qml hands it to Shelf.qml
     property var prefs: ({ fuzzy: true, shortcuts: true, deck: false, comma: false, contacts: true, notes: true, calendar: true, shelf: true })
     readonly property string prefsFile: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
     FileView {

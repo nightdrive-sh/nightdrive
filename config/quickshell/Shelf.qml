@@ -14,19 +14,10 @@ Scope {
     property var items: []             // file:// URLs
     property bool open: false
     property bool pinned: false        // a shelf opened via IPC doesn't close by itself
-    // Settings › Shelf (launcher.json's shelf, missing = on; the launcher writes it). Off: the trigger at the top edge is
-    // gone and IPC toggle does nothing, so neither a dragged file nor a lingering cursor opens it (#3128)
+    // Settings › Shelf (launcher.json's shelf, missing = on). Off: the trigger at the top edge is gone and IPC toggle does
+    // nothing, so neither a dragged file nor a lingering cursor opens it (#3128). shell.qml binds it to the launcher's
+    // prefs, which already watch launcher.json: a FileView of its own here cost a second inotify instance (#3165)
     property bool enabled: true
-    FileView {
-        path: Quickshell.env("HOME") + "/.local/state/nightdrive/launcher.json"
-        watchChanges: true; onFileChanged: reload(); printErrors: false
-        onLoaded: {
-            let v = {}
-            try { v = JSON.parse(text()) || {} } catch (e) {}
-            shelf.enabled = v.shelf !== false
-        }
-        onLoadFailed: shelf.enabled = true
-    }
     onEnabledChanged: if (!enabled) { pinned = false; open = false }
     // An outgoing drag in progress (the shelf must not close mid-drag); it runs from DragOut.qml (#3020)
     readonly property int dragging: DragOut.active && DragOut.from(card) ? 1 : 0

@@ -265,7 +265,7 @@ ShellRoot {
 
     Drawer {}
 
-    Shelf {}
+    Shelf { enabled: launcher.prefs.shelf }
 
     PolkitWatch { id: polkit }
 
