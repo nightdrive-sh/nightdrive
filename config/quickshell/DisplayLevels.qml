@@ -13,7 +13,7 @@ Item {
 
     property var displays: null               // [{ name, desc, scale, opts: [{ value, size }] }] (hypr/scripts/display list)
     property var rates: ({})                  // { output: { current, chosen: hz or "auto", hz: [...] } } (display rates)
-    property real bright: -1                  // Brightness: 0..1 (brightnessctl), -1 = no backlight (a VM) or not read yet
+    property real bright: -1                  // Brightness: 0..1 (hypr/scripts/brightness), -1 = no backlight (a VM) or not read yet
     property real pendingBright: -1           // the slider's value waiting to be applied (throttled)
     property real keys: -1                    // Keyboard backlight: 0..1, -1 = none (a desktop) or not read yet
     property real pendingKeys: -1
@@ -23,7 +23,7 @@ Item {
     property bool hasBattery: false           // the machine has its own battery: Settings lists Battery only then
     property var low: null                    // Low Power Mode (hypr/scripts/low-power status --json), null until read
     property var game: null                   // Game Mode (hypr/scripts/game-mode status --json), null until read
-    readonly property int brightStep: 5       // ←/→ on the brightness row, the same step as the brightness keys (hypr/scripts/brightness)
+    readonly property string brightness: Quickshell.env("HOME") + "/.config/hypr/scripts/brightness"   // reads, sets and steps on the eye's curve
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
     readonly property var levels: ["display", "otherdisplays", "battery"]
@@ -186,17 +186,28 @@ Item {
         if (key === "keys") { keys = v; pendingKeys = v } else { bright = v; pendingBright = v }
         if (!brightApply.running) brightApply.start()
     }
-    // ←/→: to the next even step, like the brightness keys
+    // ←/→: the brightness keys' own step (the script knows which percent really changes the panel), then the new value
     function stepBright(dir, key) {
-        const pc = Math.round((key === "keys" ? keys : bright) * 100)
-        const n = dir > 0 ? (Math.floor(pc / brightStep) + 1) * brightStep : (pc % brightStep === 0 ? pc - brightStep : Math.floor(pc / brightStep) * brightStep)
-        setBright(Math.max(0, Math.min(100, n)) / 100, key)
+        if (stepProc.running) return   // a held key: the next repeat takes it from the new value
+        stepProc.key = key
+        stepProc.command = [brightness, key === "keys" ? "kbd" : "screen", dir > 0 ? "up" : "down", "--quiet"]
+        stepProc.running = true
+    }
+    Sh {
+        id: stepProc
+        property string key: ""
+        onResult: text => {
+            const j = text.match(/"brightness": (\d+)/)
+            if (!j) return
+            p.launcher.keepSelection()
+            if (key === "keys") p.keys = parseInt(j[1]) / 100; else p.bright = parseInt(j[1]) / 100
+        }
     }
     Timer {
         id: brightApply; interval: 60
         onTriggered: {
-            if (p.pendingBright >= 0) Quickshell.execDetached(["brightnessctl", "-c", "backlight", "-n2", "set", Math.round(p.pendingBright * 100) + "%"])
-            if (p.pendingKeys >= 0) Quickshell.execDetached(["brightnessctl", "-d", "*kbd_backlight*", "set", Math.round(p.pendingKeys * 100) + "%"])
+            if (p.pendingBright >= 0) Quickshell.execDetached([p.brightness, "screen", String(Math.round(p.pendingBright * 100)), "--quiet"])
+            if (p.pendingKeys >= 0) Quickshell.execDetached([p.brightness, "kbd", String(Math.round(p.pendingKeys * 100)), "--quiet"])
             p.pendingBright = -1; p.pendingKeys = -1
         }
     }
@@ -228,14 +239,14 @@ Item {
     // not while the slider is held or a value is waiting to be applied
     Sh {
         id: brightProc
-        // -c backlight: without a backlight brightnessctl would pick the first LED (a keyboard's Compose light)
-        command: ["brightnessctl", "-m", "-c", "backlight"]
+        // The script's percent is on the eye's curve; it fails without a backlight (a VM)
+        command: [p.brightness, "screen"]
         onResult: text => {
             if (p.pendingBright >= 0) return
             const l = p.launcher
             const first = p.bright < 0
-            const f = text.trim().split(",")
-            const v = f.length >= 4 ? parseInt(f[3]) / 100 : -1
+            const j = text.match(/"brightness": (\d+)/)
+            const v = j ? parseInt(j[1]) / 100 : -1
             if (v !== p.bright && !first) l.keepSelection()   // changed elsewhere (the brightness keys)
             p.bright = v
             // The rows above the scales appear only now: select the first one (the brightness row)
@@ -244,11 +255,11 @@ Item {
     }
     Sh {
         id: keysProc
-        command: ["brightnessctl", "-m", "-d", "*kbd_backlight*"]
+        command: [p.brightness, "kbd"]
         onResult: text => {
             if (p.pendingKeys >= 0) return
-            const f = text.trim().split(",")
-            const v = f.length >= 4 ? parseInt(f[3]) / 100 : -1
+            const j = text.match(/"brightness": (\d+)/)
+            const v = j ? parseInt(j[1]) / 100 : -1
             if (v !== p.keys && p.keys >= 0) p.launcher.keepSelection()   // changed elsewhere (⌘F1/⌘F2)
             p.keys = v
         }

@@ -517,9 +517,9 @@ hl.bind("XF86AudioRaiseVolume",  hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_
 -- At 0 % the speakers (Asahi's filter chain) still let sound through, so the step that reaches 0 also mutes.
 hl.bind("XF86AudioLowerVolume",  hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ; if wpctl get-volume @DEFAULT_AUDIO_SINK@ | grep -q 'Volume: 0.00'; then wpctl set-mute @DEFAULT_AUDIO_SINK@ 1; else wpctl set-mute @DEFAULT_AUDIO_SINK@ 0; fi ; qs ipc call osd volume"), { locked = true, repeating = true })
 hl.bind("XF86AudioMute",         hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ; qs ipc call osd volume"),     { locked = true })
-hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd(scripts .. "/brightness screen up"),   { locked = true, repeating = true })   -- F2: screen brightness in steps of ten
+hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd(scripts .. "/brightness screen up"),   { locked = true, repeating = true })   -- F2: screen brightness, 5 % steps on the eye's curve (scripts/brightness)
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd(scripts .. "/brightness screen down"), { locked = true, repeating = true })   -- F1
-hl.bind(mod .. " + XF86MonBrightnessUp",   hl.dsp.exec_cmd(scripts .. "/brightness kbd up"),   { locked = true, repeating = true })   -- ⌘F2: keyboard backlight (steps of ten)
+hl.bind(mod .. " + XF86MonBrightnessUp",   hl.dsp.exec_cmd(scripts .. "/brightness kbd up"),   { locked = true, repeating = true })   -- ⌘F2: keyboard backlight (10 % steps)
 hl.bind(mod .. " + XF86MonBrightnessDown", hl.dsp.exec_cmd(scripts .. "/brightness kbd down"), { locked = true, repeating = true })   -- ⌘F1
 hl.bind("XF86PowerOff", hl.dsp.exec_cmd("qs ipc call power toggle"))   -- power button (Touch ID key): power dialog (PowerDialog.qml) instead of an instant shutdown; logind must be set to ignore the key, see config/system/logind-power-key.conf
 hl.bind("XF86Sleep", hl.dsp.exec_cmd(scripts .. "/dnd"), { locked = true })   -- F6 (Apple keyboard sends KEY_SLEEP): do not disturb (Quickshell notifications + toast); logind must be set to ignore the key, see config/system/logind-ignore-sleep-key.conf

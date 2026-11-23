@@ -81,7 +81,7 @@
 
 ## Other
   ⌘ ⌫ / Delete in Settings › Background   Delete the selected own background (press twice; moves it to the trash)
-  Top-row keys       Volume, screen brightness (F1/F2); keyboard backlight = ⌘F1/⌘F2
+  Top-row keys       Volume, screen brightness (F1/F2, 5 % steps); keyboard backlight = ⌘F1/⌘F2
   F3                 Notification center (hamburger menu)
   F4                 Launcher (like ⌘Space)
   F5 / Fn / Insert   Dictation, held: speak, let go to type it (F5 or Fn on a Mac, Insert on a PC)

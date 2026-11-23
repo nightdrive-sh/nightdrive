@@ -4,7 +4,7 @@ import Quickshell.Io
 
 // Toast (a card in ToastStack): volume, screen or keyboard brightness, do not disturb and mic mute.
 // The keybinding runs:  qs ipc call osd volume | brightness | kbd | dnd | mic
-// (called only after wpctl / brightnessctl / the dnd toggle, so this just reads the current state).
+// (called only after wpctl / hypr/scripts/brightness / the dnd toggle, so this just reads the current state).
 // note ICON TEXT MS shows a line of text for MS ms: hypr/scripts/close-guard's "Press ⌘W again to close" (#2555).
 // A volume key also ticks (hypr/scripts/sounds event volume: off in Settings › Notifications › System sounds), at the
 // new level, so you hear how loud it is; not when it's muted.
@@ -29,12 +29,12 @@ Toast {
     IpcHandler {
         target: "osd"
         function volume(): void { osd.mode = "volume"; readProc.running = true }
-        function brightness(): void { osd.mode = "brightness"; brightProc.command = ["brightnessctl", "-m"]; brightProc.running = true }
+        function brightness(): void { osd.mode = "brightness"; brightProc.dev = "screen"; brightProc.running = true }
         function dnd(on: bool): void { osd.mode = "dnd"; osd.dnd = on; osd.show() }
         function mic(): void { osd.mode = "mic"; osd.micLabel = ""; micProc.running = true }
         function micblocked(): void { osd.mode = "mic"; osd.micMuted = true; osd.micLabel = "Unable to listen - mic muted"; osd.show() }   // F5 with the mic muted
         function note(icon: string, text: string, ms: int): void { osd.mode = "note"; osd.noteIcon = icon; osd.noteText = text; osd.show(ms) }
-        function kbd(): void { osd.mode = "kbd"; brightProc.command = ["brightnessctl", "-d", "*kbd_backlight*", "-m"]; brightProc.running = true }
+        function kbd(): void { osd.mode = "kbd"; brightProc.dev = "kbd"; brightProc.running = true }
     }
 
     Sh {
@@ -59,9 +59,11 @@ Toast {
     }
     Sh {
         id: brightProc
-        command: ["brightnessctl", "-m"]
+        // The percent on the eye's curve, as the sliders show it (hypr/scripts/brightness converts)
+        property string dev: "screen"
+        command: [Quickshell.env("HOME") + "/.config/hypr/scripts/brightness", dev]
         onResult: text => {
-            const m = text.match(/,(\d+)%/)
+            const m = text.match(/"brightness": (\d+)/)
             osd.brightness = m ? parseInt(m[1]) / 100 : 0
             osd.show()
         }

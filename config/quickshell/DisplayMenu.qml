@@ -19,6 +19,7 @@ Column {
     property var mirrorDevices: []   // [{ name, model, ip }] (doubletake-ctl devices)
     property string mirrorState: "idle"   // idle | connecting | pin_required | streaming
     property string mirrorIp: ""
+    readonly property string brightness: Quickshell.env("HOME") + "/.config/hypr/scripts/brightness"   // reads and sets the percent on the eye's curve
     readonly property string mirrorScript: Quickshell.env("HOME") + "/.local/bin/mirroring"
     signal close()
 
@@ -30,18 +31,18 @@ Column {
         id: apply; interval: 60
         onTriggered: {
             if (m.pending < 0) return
-            Quickshell.execDetached(["brightnessctl", "-c", "backlight", "-n2", "set", Math.round(m.pending * 100) + "%"])
+            Quickshell.execDetached([m.brightness, "screen", String(Math.round(m.pending * 100)), "--quiet"])
             m.pending = -1
         }
     }
     Sh {
         id: briProc
-        // -c backlight: without a backlight brightnessctl would pick the first LED (a keyboard's Compose light)
-        command: ["brightnessctl", "-m", "-c", "backlight"]
+        // The script's percent is on the eye's curve (it alone converts); it fails without a backlight (a VM)
+        command: [m.brightness, "screen"]
         onResult: text => {
             if (slider.pressed || m.pending >= 0) return
-            const f = text.trim().split(",")
-            m.screen = f.length >= 4 ? parseInt(f[3]) / 100 : -1
+            const j = text.match(/"brightness": (\d+)/)
+            m.screen = j ? parseInt(j[1]) / 100 : -1
         }
     }
     Sh {
