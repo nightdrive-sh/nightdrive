@@ -22,8 +22,12 @@ import run  # noqa: E402
 import undo  # noqa: E402
 from run import ToolError  # noqa: E402
 
-ME, OTHER = "100:1", "200:1"
-TOOLS = registry.Registry().load()[0]   # the installed tools, as undo.registered reads them   # two conversations' servers
+ME, OTHER = "100:1", "200:1"   # two conversations' servers
+# The Tasks plugin as installed and on, from this checkout's plugins/tasks/mcp.json: a test's home has no plugins of
+# its own (CI's is empty), so undo.registered is given the same list, written here, instead of the home's (#3392)
+with tempfile.TemporaryDirectory() as _tmp:
+    (Path(_tmp) / "active").write_text("tasks\t\n")
+    TOOLS = registry.all_tools(registry.CORE, Path(_tmp) / "active")[0]
 
 
 class Batches(unittest.TestCase):
@@ -33,7 +37,8 @@ class Batches(unittest.TestCase):
         patches = [mock.patch.object(changes, "FILE", Path(self.tmp.name) / "claude-changes.jsonl"),
                    mock.patch.object(run, "execute", side_effect=self.execute),
                    mock.patch.object(undo, "notify", side_effect=self.notify),
-                   mock.patch.object(undo.access, "load", side_effect=lambda *a: undo.access.Access("normal"))]
+                   mock.patch.object(undo.access, "load", side_effect=lambda *a: undo.access.Access("normal")),
+                   mock.patch.object(registry.Registry, "load", lambda reg: (TOOLS, []))]
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
