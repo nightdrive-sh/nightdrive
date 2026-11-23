@@ -36,15 +36,24 @@ def notmuch(*args):
 
 
 def detached(*args):
-    """Runs this script again outside the caller: the mail sync's service would end a waiting child with itself."""
+    """Runs this script again outside the caller: the mail sync's service would end a waiting child with itself.
+    systemd-run is waited for (it returns once the unit is there): left running as a child, it could be killed with the
+    oneshot service before it got there, and the notification was lost (#3326, as Tasks' were)."""
     cmd = [sys.executable, os.path.abspath(__file__), *args]
+    quiet = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if shutil.which("systemd-run") and os.environ.get("XDG_RUNTIME_DIR"):
         # It starts from the user manager's environment: carry over which notmuch database this is.
         env = [f"--setenv={k}={os.environ[k]}" for k in ("NOTMUCH_CONFIG", "NOTMUCH_PROFILE", "XDG_CONFIG_HOME", "XDG_CACHE_HOME")
                if k in os.environ]
-        cmd = ["systemd-run", "--user", "--quiet", "--collect", *env, "--"] + cmd
-    subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     start_new_session=True)
+        try:
+            if subprocess.run(["systemd-run", "--user", "--quiet", "--collect", *env, "--"] + cmd, timeout=20,
+                              **quiet).returncode == 0:
+                return
+        except subprocess.TimeoutExpired:
+            return   # started, probably: a second one would show it twice
+        except OSError:
+            pass
+    subprocess.Popen(cmd, start_new_session=True, **quiet)
 
 
 def name(sender):
