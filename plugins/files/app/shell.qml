@@ -80,5 +80,11 @@ ShellRoot {
             const w = shell.last || all[all.length - 1]
             if (w) w.showSettings = true
         }
+        // The window last active as a list, grid or columns, as t turns it (for tests and screenshots)
+        function setView(view: string): void {
+            const all = instances.instances
+            const w = shell.last || all[all.length - 1]
+            if (w) w.showView(view)
+        }
     }
 }

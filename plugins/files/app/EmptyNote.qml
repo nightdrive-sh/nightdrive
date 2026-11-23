@@ -2,16 +2,22 @@ import QtQuick
 import "Format.js" as Format
 
 // What the list or the grid says when it has no rows: an empty folder or trash, a filter or search that found
-// nothing, a search without fd; and under it what to do next. FileList and FileGrid centre it in their view.
+// nothing, a search without fd; and under it what to do next. FileList, FileGrid and the columns' own (FolderColumn)
+// centre it in their view; a narrow column gives it most, and its lines wrap inside that.
 Column {
     id: root
     required property QtObject c
     required property var app
-    visible: app.rows.length === 0 && (!app.loading || app.inArchive)
+    property real most: 100000
+    readonly property bool shown: app.rows.length === 0 && (!app.loading || app.inArchive)
+    visible: shown
     readonly property var arc: app.archive
     spacing: 8
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(implicitWidth, root.most)
+        wrapMode: Text.Wrap
+        horizontalAlignment: Text.AlignHCenter
         textFormat: Text.PlainText
         text: root.app.inArchive && root.arc.loading ? "Reading " + Format.base(root.arc.file) + "…" + (root.arc.done > 0 ? " " + Math.floor(100 * root.arc.done) + " %" : "")
             : root.app.inArchive && root.arc.error ? root.arc.error
@@ -24,6 +30,9 @@ Column {
     Text {
         visible: !root.app.trashShown
         anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(implicitWidth, root.most)
+        wrapMode: Text.Wrap
+        horizontalAlignment: Text.AlignHCenter
         text: root.app.inArchive && root.arc.loading ? (root.arc.done > 0 ? "A compressed tar is read from start to end, once: the next look is at once" : "")
             : root.app.inArchive && root.arc.error ? "← goes back"
             : root.app.inArchive && !root.app.filter ? "← goes back out" + (root.arc.skipped ? ", " + root.arc.skipped + " unsafe left out" : "")

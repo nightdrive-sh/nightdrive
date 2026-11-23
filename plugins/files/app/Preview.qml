@@ -9,7 +9,8 @@ import "Format.js" as Format
 // changed, a picture's size, a folder's count, a link's target) and where it is. lib/peek.py reads it, a moment after
 // the pick stops moving, so j held down a long list doesn't start a read for every row. Several marked: their count
 // and size. A sound gets a player under its facts (AudioPlayer: a click plays it); it stops when another file is
-// picked, the pane hides or the big preview opens. i hides it, and a narrow window leaves it out.
+// picked, the pane hides or the big preview opens. i hides it, and a narrow window leaves it out. In the columns
+// (ColumnView) it is the last one, and the pane stays hidden.
 Rectangle {
     id: root
     required property QtObject c
@@ -20,7 +21,9 @@ Rectangle {
     property var info: null
     property string asked: ""
     Timer { id: settle; interval: 120; onTriggered: root.read() }
-    onFileChanged: { settle.restart() }
+    // Only while it shows: the window has two (the pane, and the columns' last one), and one hidden reads nothing
+    onFileChanged: if (visible) settle.restart()
+    onVisibleChanged: if (visible) settle.restart()
     function read() {
         const p = file ? file.path : ""
         if (!p) { info = null; asked = ""; return }
@@ -32,7 +35,7 @@ Rectangle {
         peeker.running = true
     }
     // A change in the folder (the picked file written again) reads it again
-    function again() { asked = ""; settle.restart() }
+    function again() { asked = ""; if (visible) settle.restart() }
     Process {
         id: peeker
         stdout: StdioCollector {
@@ -90,7 +93,7 @@ Rectangle {
                 visible: root.file !== null
                 Layout.fillWidth: true
                 textFormat: Text.PlainText
-                wrapMode: Text.WrapAnywhere
+                wrapMode: Text.Wrap
                 text: root.file ? root.file.name : ""
                 color: root.c.title; font.family: root.c.font; font.pixelSize: 14; font.weight: Font.Medium
             }
@@ -117,7 +120,7 @@ Rectangle {
                     required property string modelData
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
-                    wrapMode: Text.WrapAnywhere
+                    wrapMode: Text.Wrap
                     text: modelData
                     color: root.c.dim; font.family: root.c.font; font.pixelSize: 12
                 }

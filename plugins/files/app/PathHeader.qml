@@ -5,7 +5,7 @@ import qs.kit
 import "Format.js" as Format
 
 // Over the list: back and forward, where the window is, as a path whose parts are clicked to go up to them (home is
-// its glyph) and take files dropped on them, level with the sidebar's title, and the buttons: Filter, New folder, the grid or the list, the preview;
+// its glyph) and take files dropped on them, level with the sidebar's title, and the buttons: Filter, New folder, the list, grid or columns, the preview;
 // in the trash, Put back and Empty. With the filter open (/ or ⌘F) the field takes the path's place: typing narrows
 // the list at once, ⏎ or ↓ go back to the rows with it kept, Esc ends it; its scope at its end turns it into a search of
 // all of home (Search). In a narrow window the buttons give up their
@@ -216,11 +216,11 @@ RowLayout {
         c: root.c; glyph: "folder-plus"; glyphSize: 17; compact: true; tip: "New folder"; keys: "⌘⇧N"
         onClicked: root.app.acts.askNew(true)
     }
-    // The grid or the list (t): it shows the one it turns to
+    // The list, the grid or the columns (t): it shows the one it turns to
     AppBarButton {
         visible: !root.app.trashShown && !root.app.inArchive
-        c: root.c; glyph: root.app.gridShown ? "list" : "layout-grid"; glyphSize: 17; compact: true
-        tip: root.app.gridShown ? "As a list" : "As a grid, with thumbnails"; keys: "t"
+        c: root.c; glyph: root.app.columnsShown ? "list" : root.app.gridShown ? "columns" : "layout-grid"; glyphSize: 17; compact: true
+        tip: root.app.columnsShown ? "As a list" : root.app.gridShown ? "In columns" : "As a grid, with thumbnails"; keys: "t"
         onClicked: root.app.toggleView()
     }
     AppBarButton {

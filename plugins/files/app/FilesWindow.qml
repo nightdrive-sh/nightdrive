@@ -39,17 +39,32 @@ FloatingWindow {
     readonly property bool compact: settings.layout === "compact"
     readonly property int rowHeight: compact ? 30 : 40     // FileRow's; normal is near Nautilus's, easy to click
 
-    // The grid (t, FileGrid): a folder's own choice (Views); the trash is always a list. tile is the thumbnails'
-    // square, + and − step it, the same in every window
+    // The grid (t, FileGrid): a folder's own choice (Views); the trash is always a list. The columns (t again,
+    // ColumnView): this window's, not kept, over every folder's own list or grid; a search's results come from many
+    // folders, so they show as the list, and so do the trash and an archive. t goes list, grid, columns, and back to
+    // the list. tile is the thumbnails' square, + and − step it, the same in every window
     Views { id: views; dir: win.manager.configDir }
-    readonly property bool gridShown: !trashShown && !inArchive && views.isGrid(path)
-    function toggleView() { if (!trashShown && !inArchive) views.set(path, !gridShown) }
+    property bool columnsOn: false
+    readonly property bool columnsShown: columnsOn && !trashShown && !inArchive && !searching
+    readonly property bool gridShown: !columnsShown && !trashShown && !inArchive && views.isGrid(path)
+    function toggleView() {
+        if (trashShown) return
+        if (columnsOn) { columnsOn = false; if (!inArchive) views.set(path, false) }
+        else if (inArchive) return
+        else if (gridShown) { columnsOn = true; views.set(path, false) }   // a search in the columns, and t after them: the list
+        else views.set(path, true)
+        Qt.callLater(() => { if (current >= 0) view.positionViewAtIndex(current, ListView.Contain) })
+    }
+    function showView(v) {           // "list", "grid", "columns" (IPC setView)
+        columnsOn = v === "columns"
+        if (!columnsOn && !trashShown && !inArchive) views.set(path, v === "grid")
+    }
     readonly property var tiles: [96, 128, 192]
     readonly property int tile: tiles.indexOf(settings.tile) >= 0 ? settings.tile : 128
     function tileStep(d) { const i = tiles.indexOf(tile) + d; if (i >= 0 && i < tiles.length) setting("tile", tiles[i]) }
     Thumbs { id: thumbs; helperDir: Quickshell.shellDir + "/../lib"; rows: win.rows; on: win.gridShown; size: win.tile > 128 ? "x-large" : "large" }
     readonly property alias thumbs: thumbs
-    readonly property var view: gridShown ? grid.view : list.view
+    readonly property var view: columnsShown ? columns.view : gridShown ? grid.view : list.view
 
     readonly property string helper: Quickshell.shellDir + "/../lib/cli.py"
     readonly property string home: Quickshell.env("HOME")
@@ -182,6 +197,7 @@ FloatingWindow {
         if (current >= 0) view.positionViewAtIndex(current, ListView.Contain)
         // Marks of files gone stay out of what the keys act on (marked only counts the rows there)
         preview.again()
+        if (columnsShown) columns.again()
     }
     function pick(p) { keep = p; settle() }
     function move(d) { moveTo((current < 0 ? 0 : current) + d) }
@@ -190,8 +206,17 @@ FloatingWindow {
         current = Math.max(0, Math.min(rows.length - 1, i))
         view.positionViewAtIndex(current, ListView.Contain)
     }
-    function page() { return gridShown ? grid.perPage : Math.max(1, Math.floor(list.view.height / (rowHeight + 1)) - 1) }
+    function page() { return gridShown ? grid.perPage : Math.max(1, Math.floor(view.height / (rowHeight + 1)) - 1) }
     function openAt(i) { current = i; openPicked() }
+    // A double click in the columns, told by its path (ColumnRow): a row clicked in another column moves to the
+    // window's own, so the second click may land on another row object, or on none if the columns moved
+    property string tappedPath: ""
+    property real tappedAt: 0
+    function columnTapped(p) {
+        const now = Date.now(), again = p === tappedPath && now - tappedAt < 400
+        tappedPath = again ? "" : p; tappedAt = now
+        return again
+    }
     // An archive extracts beside itself (Ops, lib/unpack.py) on ⏎, e and a double click; → and l (look) go into it as
     // into a folder (Archive), and ⌘O (inApp) opens it in its app. A file in an archive shows in the big preview: it
     // isn't on disk to open, and y and p take it out
@@ -316,7 +341,8 @@ FloatingWindow {
     property var sidebarChoice: null
     readonly property bool sidebarShown: sidebarChoice !== null ? sidebarChoice : width >= 640
     property var previewChoice: null
-    readonly property bool previewShown: previewChoice !== null ? previewChoice : width >= 900
+    // In the columns the preview is their last slot, wide enough in any window
+    readonly property bool previewShown: previewChoice !== null ? previewChoice : columnsShown || width >= 900
     onSidebarShownChanged: if (!sidebarShown) pane = "list"
     // The columns the list has room for (FileRow, FileList): the size, then the time, give way first
     readonly property int listWidth: list.width
@@ -366,15 +392,16 @@ FloatingWindow {
                 // The header's line, under the list's part only: the sidebar has none
                 Item { Layout.preferredHeight: win.headerPad - 1 }
                 Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: win.look.divider }
-                Item { Layout.preferredHeight: 10 }
-                FileList { id: list; visible: !win.gridShown; Layout.fillWidth: true; Layout.fillHeight: true; c: win.look; app: win }
+                Item { Layout.preferredHeight: win.columnsShown ? 0 : 10 }
+                FileList { id: list; visible: !win.gridShown && !win.columnsShown; Layout.fillWidth: true; Layout.fillHeight: true; c: win.look; app: win }
                 FileGrid { id: grid; visible: win.gridShown; Layout.fillWidth: true; Layout.fillHeight: true; c: win.look; app: win }
+                ColumnView { id: columns; visible: win.columnsShown; Layout.fillWidth: true; Layout.fillHeight: true; c: win.look; app: win }
             }
         }
 
         Preview {
             id: preview
-            visible: win.previewShown
+            visible: win.previewShown && !win.columnsShown
             Layout.preferredWidth: Math.min(340, Math.max(240, win.width * 0.26))
             Layout.fillHeight: true
             c: win.look
@@ -389,7 +416,7 @@ FloatingWindow {
         c: win.look
         groups: [
             { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l  o", "Open: into a folder, a file in its app"], ["→  l on an archive", "Look into it, read-only (⏎ extracts it)"], ["⏎ on a program", "Asks: Run, Run in Terminal (⌘⏎)"], ["O", "Open with: pick the app (⌘⏎: always)"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
-            { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["p  ←  →", "In it, a sound: play or pause, 5 s back or on"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["t", "Thumbnails in a grid, or the list (hjkl move in it)"], ["+  −", "Larger, smaller thumbnails"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
+            { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["p  ←  →", "In it, a sound: play or pause, 5 s back or on"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["t", "Thumbnails in a grid, columns, the list again"], ["+  −", "Larger, smaller thumbnails"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
             { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["Ctrl-click", "Mark one (⌘-click moves the window)"], ["⇧-click  ⌘⇧-click", "Mark up to it, add up to it"], ["Esc", "No marks"]] },
             { title: "Changing", keys: [["y  ⌘C", "Copy (pastes as the paths in a terminal)"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["m", "Mail: attached to a new message"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["y, then p", "In an archive: take files out, into a folder"], ["⌘Z", "Undo"]] },
             { title: "Places", keys: [["Tab", "Sidebar, list"], ["⌘N", "A new window, in this folder"], ["b  ⌘D", "Bookmark the picked folder, or not"], ["Drag", "Onto a folder or the sidebar: moved; from another app: copied"], ["Drag in the sidebar", "A folder to another place, or to the other group"]] },
