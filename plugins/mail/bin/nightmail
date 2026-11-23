@@ -223,7 +223,8 @@ Usage: nightmail [command]
                  updates it there), --remove takes a cancelled one out; --reply accept|maybe|decline [--calendar ID]
                  sends the answer to its organiser (--card: only what would go)
   accounts       the accounts, as JSON
-  draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body})
+  draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body},
+                 either with attachments: [paths])
   draft-show ID  a draft as it would be sent, as JSON
   discard ID     throw a draft away
   save-attachments [--into FOLDER] -- ID [NAME …]

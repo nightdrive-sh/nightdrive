@@ -3,7 +3,8 @@
 
     drafts.py draft                 a new draft in Drafts, from JSON on stdin: {to, cc, subject, body, account}, or a
                                     reply: {reply_to: message id, reply_all, body} (to, cc and subject then come from
-                                    the message, unless given). Prints the draft as `show` does
+                                    the message, unless given); either with attachments: [absolute paths] (attach.py
+                                    says which files may go). Prints the draft as `show` does
     drafts.py show ID               a draft as it would be sent: {id, account, from, to, cc, subject, body, attachments}
     drafts.py discard ID            throws a draft away (only a draft: a message in an account's Drafts folder)
     drafts.py card ID               mail_send's rows on Nightdrive's card: what goes out that Claude saw hidden
@@ -26,6 +27,7 @@ import subprocess
 import sys
 from email.utils import formataddr, getaddresses
 
+import attach
 import blocked
 import compose
 import ids
@@ -82,6 +84,7 @@ def draft(f):
     if f.get("account") and f["account"] not in accs:
         raise LookupError(f"No account {f['account']!r}: the accounts are {', '.join(accs)}")
     text = str(f.get("body", "")).rstrip()
+    files = attach.files(f.get("attachments"))   # all checked before anything is written
     if f.get("reply_to"):
         ids.one(f["reply_to"], threads=False)
         # The reply quotes it: mail Access › Mail keeps from Claude isn't answered by Claude either (blocked.py)
@@ -97,6 +100,7 @@ def draft(f):
     for key in ("to", "cc", "subject"):
         if key in f:
             fields[key] = ", ".join(addresses(f[key])) if key != "subject" else str(f[key])
+    fields["attachments"] = files
     saved = compose.draft(fields)
     if saved.get("error"):
         raise RuntimeError(saved["error"])
