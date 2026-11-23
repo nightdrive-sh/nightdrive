@@ -95,7 +95,7 @@ case ${1:-} in
     [[ $2 =~ ^[0-9]+$ && $2 -le 100 ]] || { echo "0–100" >&2; exit 2; }
     mkdir -p "$st"; echo "$2" > "$st/bar-opacity"
     apply
-    hyprctl reload >/dev/null ;;          # reloads the shader (hyprland.lua picks the copy)
+    hyprctl reload >/dev/null ;;          # reloads the shader (corners.lua picks the copy)
   icons)
     [[ -z ${2:-} ]] && { scheme; exit 0; }
     [[ $2 == light || $2 == dark ]] || { echo "light|dark" >&2; exit 2; }

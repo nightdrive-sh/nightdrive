@@ -5,10 +5,13 @@ save valid, then check:
 - Hyprland: `hyprctl configerrors` should be empty.
 - Quickshell: `qs log | tail` should show no QML errors.
 - Scripts: `bash -n` for shell, `ast.parse` for Python.
-- CI (`.github/workflows/ci.yml`) runs these on every push and pull request, with shellcheck and a secret scan:
-  `.github/ci/check.py [--secrets]` runs the same locally (`dnf install ShellCheck gitleaks`). A shellcheck warning
-  not in its baseline fails it: fix it, or add a `# shellcheck disable=SCxxxx` with the reason. A made-up key in a test
-  goes in a `_test.py` or `.gitleaks.toml`; a harmless finding's fingerprint in `.gitleaksignore`.
+- CI (`.github/workflows/ci.yml`) runs these on every push and pull request, with shellcheck, a secret scan and the
+  unit tests (every `*_test.py`, each as `python3 -I` with a throwaway home and no desktop variables):
+  `.github/ci/check.py [--secrets]` runs the same locally (`dnf install ShellCheck gitleaks`; `--tests-only`,
+  `--no-tests`). A test that needs a missing tool skips itself with the reason (`skipUnless`); one that can't pass in
+  CI goes in `SKIP` in `.github/ci/tests.py` with its reason. A new test's packages go in ci.yml's install line.
+  A shellcheck warning not in its baseline fails it: fix it, or add a `# shellcheck disable=SCxxxx` with the reason. A
+  made-up key in a test goes in a `_test.py` or `.gitleaks.toml`; a harmless finding's fingerprint in `.gitleaksignore`.
 
 Test over IPC (`qs ipc show`, e.g. `qs ipc call launcher openLevel settings`) and take screenshots with `grim`. `launcher rows`
 returns the open level's title, footer and rows as JSON: compare it before and after a change to the launcher.
@@ -16,6 +19,9 @@ The user may be typing on this same desktop, and the launcher and menus take the
 agent-warn "the launcher"` before opening one (once per burst of tests) and open it only after it returns (~5 s countdown
 with sound). Use the full path: an agent's shell may not have `~/.local/bin` in its PATH, and if the command fails, don't
 open anything.
+A window you start from your own shell (a test terminal, an app's preview) opens as a tile without the keyboard, never
+in a tab group (`config/hypr/agent-windows.lua` knows it by `CLAUDECODE=1`, so start it from your shell, not through
+`hyprctl dispatch exec`): it needs no agent-warn, but say it opened, as the user has to click it.
 Don't press Enter over IPC on rows that act on real things (Home Assistant devices, Power).
 On a machine without Hyprland, or to leave the user's desktop alone, use the headless container: `nightdrive sandbox
 check` (exit 1 with the findings) and `nightdrive sandbox shot NAME`, `ipc …` for the rest (docs/sandbox.md; no agent-warn there).
@@ -26,6 +32,8 @@ command, and ends with `--name ID down`. `nightdrive sandbox list` shows them al
 - Menu icons are invisible private-use glyphs in strings. Don't retype those lines, and compare the glyph counts with HEAD.
   (The top bar uses icon names instead: `config/topbar/scripts/icon`.)
 - `pkill -f foo` matches its own shell: use `'[f]oo'`.
+- A new file that `link.sh` links (a unit, a command) isn't on this machine until `link.sh` runs: `nightdrive update` runs
+  it for users, but a commit in this tree doesn't. Run `./link.sh` after adding one (#3313's unit missed it, #3364).
 - Hyprland's config is Lua: `hyprctl dispatch 'hl.dsp.…'`.
 - Quickshell's reload on save keeps the old version of a component in its own file (e.g. `TouchScroll.qml`, listed in
   `qmldir`), and doesn't reload a plugin's menu at all: restart it to test a change there with

@@ -16,9 +16,13 @@
 #   ask-claude --cancel               stops the running turn (the toast's ⌃C and small card, the working notification)
 #   ask-claude --current              the latest conversation: {id, running, last (ms)}, or {}
 #   ask-claude list [--json]          the conversations kept (7 days after their last turn), newest first
+#   ask-claude --dictated …           the request was dictated (Ask Claude's "say and forget", #3154): the dictation's
+#                                     prompt too (ask-claude-dictated.txt), with its unsure mark (AskClaudeUnsure.js)
 #   ask-claude --ready                exit 0 when Ask Claude's toast can run: Claude Code and the tools are there
 #                                     (hypr/scripts/dictate, which otherwise takes a dictated question to a terminal)
 #   ask-claude --run ID MODE [--name NAME] [--resume] -- PROMPT   the unit's own: one turn (ask-claude.d/run.sh)
+# claude_bin, icon (setup.sh) and the flags here (dictated) are shared with the sourced parts
+# shellcheck disable=SC2034,SC2154
 scripts=$(dirname "$(readlink -f "$0")")
 for part in setup unit run notify history; do
   # shellcheck source=/dev/null
@@ -28,11 +32,12 @@ done
 new_id() { cat /proc/sys/kernel/random/uuid; }
 ready() { [[ -x $claude_bin && -n $(server) ]]; }
 
-name=; mode=notify; resume=
+name=; mode=notify; resume=; dictated=0   # dictated: read by start_turn and claude_flags
 while (( $# )); do
   case $1 in
     --name) name=${2:-}; shift 2 ;;
     --start) mode=toast; shift ;;
+    --dictated) dictated=1; shift ;;
     --ready) ready; exit ;;
     --cancel) cancel_turn; exit 0 ;;
     --current) current_turn; exit 0 ;;
@@ -44,7 +49,10 @@ while (( $# )); do
     --run) id=${2:-}; mode=${3:-}; shift 3; resumed=0
            [[ $id =~ ^[0-9a-f-]{36}$ && $mode =~ ^(toast|notify)$ ]] || { echo "--run ID toast|notify" >&2; exit 2; }
            while (( $# )); do
-             case $1 in --name) name=${2:-}; shift 2 ;; --resume) resumed=1; shift ;; --) shift; break ;; *) break ;; esac
+             case $1 in
+               --name) name=${2:-}; shift 2 ;; --resume) resumed=1; shift ;; --dictated) dictated=1; shift ;;
+               --) shift; break ;; *) break ;;
+             esac
            done
            run_turn "$id" "$mode" "$name" "$resumed" "$*"; exit ;;
     --) shift; break ;;

@@ -8,9 +8,12 @@ if command -v eza >/dev/null 2>&1; then
   alias lt='eza --tree --level=2 --icons --group-directories-first'  # tree view (2 levels); e.g. lt -L3 or lt -a
 fi
 
-# open, as on a Mac: opens files, folders and links in their default app (xdg-open), several at once, e.g. open .
+# open, as on a Mac: opens files, folders and links in their default app, several at once, e.g. open .
+# gio open, as Files does, not xdg-open: under Hyprland xdg-open knows no desktop and asks file(1) for the type, which
+# calls a .md (or .csv, .json) plain text and opens it in text/plain's app instead of its own.
 open() {
   (( $# )) || set -- .
-  local f
-  for f in "$@"; do xdg-open "$f" >/dev/null 2>&1 & disown; done
+  local f opener=xdg-open
+  command -v gio >/dev/null 2>&1 && opener="gio open"
+  for f in "$@"; do $opener "$f" >/dev/null 2>&1 & disown; done
 }

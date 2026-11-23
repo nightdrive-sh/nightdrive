@@ -2,14 +2,18 @@
 # events.jsonl as they come (stream-json), then a nightdrive_end line says how it ended, and notify.sh tells the user
 # when nobody is looking (Dashboard #2244).
 # shellcheck shell=bash
+# The parts share their globals with ask-claude, which sources them all (shellcheck can't follow its loop)
+# shellcheck disable=SC2034,SC2154
 
 run_turn() {   # id mode name resumed prompt
   local id=$1 mode=$2 name=$3 resumed=$4 prompt=$5
   local dir ev run start pid rc cancelled=0 status message answer
   dir=$(conv_dir "$id"); ev="$dir/events.jsonl"
   run="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/ask-claude/$id"   # mcp.json and stderr, gone after the turn
+  # shellcheck disable=SC2174   # the run's own folder is what holds mcp.json; $XDG_RUNTIME_DIR is 700 already
   mkdir -p -m 700 "$run" || { seal "$id" error "No runtime folder"; return 1; }
   # Expanded now: the trap runs at the script's exit, when this function's locals are gone
+  # shellcheck disable=SC2064
   trap "rm -rf $(printf '%q %q' "$run" "$dir/pid")" EXIT
   printf '%s\n' "$$" >"$dir/pid"
   start=$(wc -l 2>/dev/null <"$ev" || echo 0)   # this turn's events come after these
@@ -49,7 +53,7 @@ run_turn() {   # id mode name resumed prompt
     status=error; [[ $failed == true ]] && message=$answer; answer=
     [[ -n ${message//[[:space:]]/} ]] || message=$(grep -v '^[[:space:]]*$' "$run/err" | tail -n1)
     [[ -z $message ]] && (( rc )) && message="Claude stopped ($rc)"
-  else status=done
+  else status="done"
   fi
   end_line "$status" "$message" >>"$ev"
   touch "$dir"   # kept KEEP_DAYS from its last turn

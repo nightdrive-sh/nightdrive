@@ -46,6 +46,8 @@ Item {
     visible: present && !tucked
 
     readonly property bool isMic: name === "microphone" && icon !== ""
+    // claude → 0, claude2 → 1: the Claude Code account it shows (topbar/scripts/claude-bar); -1 for the others
+    readonly property int claudeAccount: name === "claude" ? 0 : name === "claude2" ? 1 : -1
     MicLevel { id: micLevel; active: mod.isMic; steps: Math.round(mod.isz.size * mod.dpr) }
 
     readonly property var isz: TopBar.size(name)
@@ -58,7 +60,7 @@ Item {
                               : TopBar.c("fg")
     function snap(v) { return Math.round(v * dpr) / dpr }
 
-    height: 27
+    height: Theme.pillHeight
     width: present ? Math.max(icon && !label ? 34 : 0, pad + (icon ? isz.size : 0) + (icon && label ? gap : 0) + (label ? txt.implicitWidth : 0) + pad) : 0
 
     Rectangle {
@@ -103,11 +105,12 @@ Item {
         }
 
         // A red dot on the icon: the status asks for it ("dot": true), or for Claude while a session that finished in the
-        // background waits for you (Claude.qml)
+        // background waits for you or one asks you something (Claude.qml): on the icon of the session's account (claude, claude2)
         Rectangle {
-            visible: mod.icon !== "" && (!!(mod.st && mod.st.dot) || (mod.name === "claude" && Claude.wanting > 0))
+            visible: mod.icon !== "" && (!!(mod.st && mod.st.dot) || (mod.claudeAccount >= 0
+                     && Claude.wantingIn(mod.claudeAccount) + Claude.askingIn(mod.claudeAccount) > 0))
             width: 7; height: 7; radius: 3.5
-            x: mod.snap(img.x + img.width - 7); y: mod.snap(img.y + 1)
+            x: mod.snap(img.x + img.width - 5); y: mod.snap(img.y - 1)   // off the icon's corner, clear of the bot's head
             color: Theme.danger   // red like a critical module (the Dashboard's tasks); no ring around it: the bar's background can be see-through
         }
 

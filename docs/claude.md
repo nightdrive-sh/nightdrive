@@ -7,7 +7,8 @@ in the Launcher, `nightdrive ask`, a terminal), and you decide in Settings how f
 **Ask Claude** is the quick way: type a request in the Launcher ("Open three Finnish news sites") and press ⌘Enter, or
 Enter on the **Ask Claude** row (the first, and after the hits when what you typed looks like a request; with nothing
 typed it opens the toast to write in, Shift+Enter for a new line). The Launcher closes, and a toast in its place shows
-the conversation: each step Claude takes, then its answer as it is written, and the field to write back. ⌃C stops it,
+the conversation: each step Claude takes, then its answer as it is written (formatted: bold, lists, code, links that open
+in the browser), and the field to write back. ⌃C stops it,
 ⌘N starts a new chat (so does a request from the search, or one after 15 minutes), PgUp and PgDn scroll a long answer,
 text dragged over with the mouse is copied with ⌘C,
 and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again, in manual mode: what the
@@ -26,9 +27,14 @@ what it asks then as in any session. Without the tools on, or without Claude Cod
 terminal.
 
 To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
-let go: Ask Claude's toast opens as you start, with its recent conversation, and listens without taking the keyboard;
-what you said comes into the field to check before Enter sends it. Without the tools on, it goes to Claude Code in a
-terminal instead.
+let go: what you said is sent at once, as a new request, and you can go on with your work. The small card below the top
+bar shows Claude working and then, for a moment, its answer; a click on it opens the conversation. With Ask Claude's
+toast open, what you dictate goes into its field instead, to check before Enter sends it. While Claude is still busy with
+an earlier request, the toast opens with what you said in the field. Without the tools on, it goes to Claude Code in a
+terminal. A request sent this way tells Claude it was dictated: Claude reads past the dictation's usual mistakes
+(product names spelled the Finnish way, words split wrong), makes "remind me …" (muistuta) a reminder and "idea …" a
+task in the Tasks list Ideas (Ideat in Finnish), and when it can't tell what you meant, or a tool refused, it doesn't
+guess but asks: its answer then begins with `[?]` (defined in `quickshell/AskClaudeUnsure.js`).
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.
@@ -51,8 +57,8 @@ private asks each time), and turn it all off with its switch ([Turning it off](#
 | **Actions with consequences** | sending mail, a Home Assistant device, installing software, a screen's resolution, Do Not Disturb on | only after you allow it on Nightdrive's card |
 
 Any read, change or delete can ask on the card too: that is your choice in Access, area by area (below). On the
-Normal level, reading what is private (mail, contacts, calendar, notes, notifications, a window on screen) and every
-delete do.
+Normal level, reading what is private (mail, contacts, calendar, notes, recordings, notifications, a window on screen)
+and every delete do.
 
 **The card** shows exactly what will be done: the recipients and the text, the device and its new state, every package
 dnf would install, every path a trash takes (a folder with how many files are in it), the app and title of the window
@@ -66,7 +72,9 @@ without you seeing it first. A screen or network change also asks afterwards whe
 in 20 seconds unless you do; a screen's new scale or resolution is saved only once you keep it, so a restart in between
 brings back the one before.
 
-**Undo** is on the notification for an hour; then Redo undoes the undo. Claude keeps the last 100 changes (and a
+**Undo** is on the notification for an hour; then Redo undoes the undo. Changes a conversation makes in one area in a
+row (seven tasks; less than a minute and a half apart, for at most ten minutes) share one notification, "Added 7 tasks",
+whose Undo undoes them all. Claude keeps the last 100 changes (and a
 deletion as long as its Undo is on screen), so you can also ask it later ("undo the wallpaper"); "undo that" is the
 conversation's own last change. Undo runs only what the change's tool would: a log edited by hand runs nothing else.
 A change that couldn't be undone isn't offered as a change at all. An undo that does what only the card allows (Do Not
@@ -78,9 +86,10 @@ undo that puts the sound back on such a speaker or a light back to its brightnes
 was made with (a draft's text) only for an area it may read now without asking, masked as that area's reads are.
 
 **How much:** an area takes 20 changes a minute without asking; past that each one asks on the card, which says how
-many there were. A call you refused on the card isn't shown to you again for two minutes (Claude is told to ask you in
-the chat), and a text Claude gives a tool is at most 100 000 characters. The last 20 changes keep their Undo button;
-an older one's notification says to ask Claude, who can still undo it.
+many there were. When you asked for them (fifty tasks), **Allow all** (⇧ Enter) on that card lets the area take up
+to 100 more without a card for a minute; what Access sets to Ask still asks. A call you refused on the card isn't shown to you again for two minutes (Claude is told to ask you in
+the chat), and a text Claude gives a tool is at most 100 000 characters. The last 20 notifications keep their Undo
+button; an older one says to ask Claude, who can still undo each change.
 
 ## Settings › Claude › Access
 
@@ -89,8 +98,8 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
 - **On or off** at the top: whether Claude Code has Nightdrive's tools at all.
 - **The level** sets every area at once:
   - *Strict*: only Nightdrive's docs and status, so Claude can explain how things work.
-  - *Normal*, the default: reading your mail, contacts, calendar, notes, notifications or a window on screen asks you
-    each time; the rest is allowed. Changes run at once with Undo; deleting asks.
+  - *Normal*, the default: reading your mail, contacts, calendar, notes, recordings, notifications or a window on screen
+    asks you each time; the rest is allowed. Changes run at once with Undo; deleting asks.
   - *Open*: everything allowed.
 
   Once you change any choice below, the level shows as *Custom* (from the level you changed).
@@ -132,11 +141,11 @@ Launcher › Settings › Claude › *Access*, much like the privacy settings of
   search needs a word of two characters or more (a number three digits) and gives at most 25 people, and searches and
   cards give it at most 100 different people an hour, so the address book isn't read a letter or two at a time.
 
-  Mail, Calendar, Notes, Tasks, Ferry and Notifications have *Codes, card numbers and passwords*, off on every level:
-  what Claude reads there comes with them hidden, before it leaves your computer. One-time codes and meeting passcodes
-  (`[code hidden]`), login and password reset links (`[login link hidden]`), card numbers with their expiry and CVV
-  (`•••• 4242`), IBANs (`FI •••• 0785`), Finnish identity codes, passwords and API keys; a Ferry text that is a code or
-  a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. Invisible
+  Mail, Calendar, Notes, Recorder, Tasks, Ferry and Notifications have *Codes, card numbers and passwords*, off on
+  every level: what Claude reads there comes with them hidden, before it leaves your computer. One-time codes and
+  meeting passcodes (`[code hidden]`), login and password reset links (`[login link hidden]`), card numbers with their
+  expiry and CVV (`•••• 4242`), IBANs (`FI •••• 0785`), Finnish identity codes, passwords and API keys; a Ferry text
+  that is a code or a password is hidden whole. Order and phone numbers, dates, prices and other links stay as they are. Invisible
   characters are taken out first and digits of other forms (`４`, `⁴`) read as 0–9, so a code split by them or spaced
   out (`4 8 2 9 1 3`, `4.8.2.9.1.3`, a thin space) is hidden too, as is a number to sign in with ("Use 482913 to log
   in"). A reply Claude drafts comes back with its quote hidden the same way: the card that
@@ -248,14 +257,16 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | Calendar | **calendars, events** | add an event (the first one to each calendar asks; to a calendar marked shared: †) | **an event †** |
 | Tasks | lists and tasks | add, done, later | **to the trash** |
 | Notes | **list, search, read (`~/Notes`)** | a new note, add to the end of one | **to the trash** |
+| Recorder | **recordings, transcripts (`~/Recordings`)**, transcriptions under way | transcribe, rename | |
 | Deck | what plays, search, albums | play, queue, pause and skip, like, Pick for me | |
 | Ferry | whether it's on, devices, the box | send files or a text to a device † | |
 | Home Assistant | devices and sensors (presence and location: a choice) | switch a device, dim a light (with Undo), lock, close, run a scene or an automation † (unlock, open, an automation on or off: choices) | |
-| Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail) | send one, Do Not Disturb off; on † | |
+| Notifications | **the latest** (without the apps you list, nor Mail's of blocked mail), reminders waiting | send one, Do Not Disturb off, set a reminder (in minutes, at a time, on waking, at login, on arriving at or leaving a place) or cancel one; Do Not Disturb on † | |
+| Inbox | the messages in [Inbox](inbox.md) | leave you a message, add to one it left | |
 | Appearance | wallpaper and theme now | wallpaper, theme, colour, night light, bar style | |
-| Sound and display | volume, outputs, screens, network, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Low Power Mode, Wi-Fi or networking off † | |
+| Sound and display | volume, outputs, screens, network, places, Bluetooth, battery | volume, output (a speaker on the network: †), brightness; a screen's scale or resolution, Low Power Mode, Wi-Fi or networking off †; add a place | a place |
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
-| Apps and files | windows, newest files (in the folders it can use: a choice) | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †) | **files to the trash** |
+| Apps and files | windows, newest files (in the folders it can use: a choice), Claude Code sessions, what's scheduled | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †); schedule a command or a message to Claude for later, also on arriving at or leaving a place † (`nightdrive schedule`: it shows as by Claude), cancel one | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
 | Web (Ask Claude only) | search the web, read a page (Allow or No: nothing can ask in the background) | download a file into the conversation's own folder (audio, pictures, PDF, zip; not from your own network) | |
 

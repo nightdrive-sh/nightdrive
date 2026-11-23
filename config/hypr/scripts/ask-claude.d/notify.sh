@@ -6,6 +6,8 @@
 # Every notify-send has -- before its texts: GLib reads options after them too, so an answer (or a request) that
 # begins with --app-name= or --icon= would change who the notification says it is from.
 # shellcheck shell=bash
+# The parts share their globals with ask-claude, which sources them all (shellcheck can't follow its loop)
+# shellcheck disable=SC2034,SC2154
 
 readonly SHOWN=1500       # characters of the answer the notification gets; the rest is in the toast or the terminal
 readonly OPEN_WAIT=1800   # seconds the answer's buttons are waited on
@@ -56,7 +58,7 @@ end_notice() {   # id mode status message answer prompt
   shown=$(timeout 3 qs ipc call askClaude shown 2>/dev/null)
   [[ $shown == open ]] && return 0
   [[ $shown == closed ]] || { terminal_notice "$id" "$title" "$body"; return 0; }
-  [[ $status == done ]] && title="Claude answered"
+  [[ $status == "done" ]] && title="Claude answered"
   detach bash -c '
     action=$(timeout "$1" notify-send -a Claude -i "$2" -A default=Open -A open=Open -w -- "$3" "$4")
     [[ $action == default || $action == open ]] && exec qs ipc call askClaude open

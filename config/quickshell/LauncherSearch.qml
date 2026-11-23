@@ -49,7 +49,7 @@ Item {
         const L = launcher, lv = L.levels, level = L.level, query = L.query, statics = L.statics, prefs = L.prefs
         const settingsAliases = L.settingsAliases, rootItems = L.menus.rootItems, pluginExts = L.pluginExts
         const installAliases = L.menus.installAliases, powerAliases = L.menus.powerAliases, apps = L.appState, sc = L.shortcuts
-        const themes = lv.themes, look = lv.look, mirror = lv.mirror, sound = lv.sound, home = lv.home, calc = lv.calc, ask = lv.ask
+        const themes = lv.themes, look = lv.look, mirror = lv.mirror, sound = lv.sound, home = lv.home, calc = lv.calc, ask = lv.ask, web = lv.web
         const q = query.trim().toLowerCase()
         let all, tail = [], short = false
         if (level === "root" && Qt.md5(q.replace(/\s+/g, "").replace(/[“”„]/g, '"')) === basicKey) return [basicRow]
@@ -154,8 +154,12 @@ Item {
         // The calculator's answer ("3*8" → "= 24") first, unless a name starts with what was typed: "7-zip" stays an app
         const sum = level === "root" ? calc.row(query) : null
         if (sum) res.splice(scored.filter(o => o.s <= 0.5).length, 0, sum)
-        // A search that looks like a request: Ask Claude right after the hits, before the plugins' rows (Search Spotify)
-        if (level === "root") { const t = res.findIndex(r => r.tail); res.splice(t < 0 ? res.length : t, 0, ...ask.tailRows(query, res)) }
+        // A search that looks like a request: Ask Claude right after the hits, before the plugins' rows (Search Spotify);
+        // one that found nothing: Open in Browser under it (WebSearchLevels.qml)
+        if (level === "root") {
+            const t = res.findIndex(r => r.tail)
+            res.splice(t < 0 ? res.length : t, 0, ...ask.tailRows(query, res), ...web.tailRows(query, res))
+        }
         return level === "keys" ? sc.grouped(res) : res
     }
 }

@@ -35,7 +35,8 @@ The display and keyboard settings go to `config/hypr/local.lua` (not in the repo
 Hyprland needs NVIDIA's own driver. On a PC with an NVIDIA card the installer enables RPM Fusion, installs `akmod-nvidia`
 and builds the module for the newest kernel before the reboot. `hyprland.lua` sets the driver's environment
 (`LIBVA_DRIVER_NAME`, `__GLX_VENDOR_LIBRARY_NAME`, `NVD_BACKEND`) when the driver is loaded. `--no-nvidia` leaves the
-driver alone, for one installed by hand.
+driver alone, for one installed by hand. At boot the login screen waits for the driver (at most 30 s), which may load a
+few seconds after the rest of the system: `journalctl -b -u greetd` says how long it waited.
 
 **Secure Boot:** the module is signed with a key of this machine's own (`kmodgenca`). Before the reboot, run this and choose a
 one-time password:

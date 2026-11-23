@@ -4,6 +4,7 @@
     sources.py write             write VDIRSYNCER_CONFIG, print its pairs: the CalDAV sources (one a line)
     sources.py names [KIND]      print the sources' names (KIND: caldav or ics)
     sources.py list              the sources as JSON: name, kind, read_only
+    sources.py any               exit 0 if there is a source to sync, 1 if none (the sync timer's condition)
 
 The CalDAV accounts are Contacts' (~/.config/contacts/accounts.conf, read by Contacts' own lib/config.py): one account
 and one app password in the keyring for both apps. Calendar's own calendars.conf adds to them:
@@ -21,6 +22,7 @@ passwords do, and never goes in a file. The ICS sources are fetched by feeds.py,
 """
 
 import configparser
+import importlib.util
 import json
 import os
 import re
@@ -44,8 +46,19 @@ YES = ("yes", "true", "on", "1")
 # source here is named by contacts.pair_name, - as _)
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_]*$")
 
-sys.path.insert(0, str(REPO / "plugins/contacts/lib"))
-import config as contacts  # noqa: E402  (Contacts' accounts.conf; its files are in every checkout)
+
+def _contacts_config():
+    """Contacts' lib/config.py (its accounts.conf; its files are in every checkout), loaded from its file under a name
+    of its own. Not by putting Contacts' lib on sys.path: a module there then shadows Calendar's of the same name, as
+    Contacts' settings.py did Calendar's on 16.11. and every reminder check failed (#3309)"""
+    spec = importlib.util.spec_from_file_location("contacts_config", REPO / "plugins/contacts/lib/config.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+contacts = _contacts_config()
 
 
 def own():
@@ -172,8 +185,19 @@ def write():
     return caldav
 
 
+def any_source():
+    """0 if there is something to sync, 1 if not: the timer then skips its round instead of failing every 15 minutes
+    (#2527). A broken calendars.conf is 0 too, so the sync runs and reports it where it is seen (the unit's failure)."""
+    try:
+        return 0 if sources() else 1
+    except SystemExit:
+        return 0
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "names"
+    if what == "any":
+        sys.exit(any_source())
     if what == "write":
         found = write()
     elif what in ("names", "list"):

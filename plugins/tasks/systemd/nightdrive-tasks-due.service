@@ -2,6 +2,8 @@
 # nightdrive-tasks-due.timer; each notification waits in a unit of its own (lib/due.py).
 [Unit]
 Description=Nightdrive Tasks: notify the tasks that have come due
+# A notification when it keeps failing (config/hypr/scripts/unit_failed.py)
+OnFailure=nightdrive-unit-failed@%n.service
 
 [Service]
 Type=oneshot

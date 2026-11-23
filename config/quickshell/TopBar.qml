@@ -57,13 +57,21 @@ Singleton {
         }
         return out
     }
-    // In your order (Items: Ctrl+arrows, or ⌘+drag in the bar), then modules not in it in the files' order (a new one goes
-    // to the right end).
+    // In your order (Items: Ctrl+arrows, or ⌘+drag in the bar). A module not in it (a new one) goes right of the one
+    // before it in the files that is (claude2 beside claude, #3038), or else to the right end in the files' order.
     // A module whose optional part isn't installed ("needs") isn't listed at all. One with "first" stays at the left end
     // whatever the order: it comes and goes (the microphone and camera in use), and there it doesn't shift the others.
     readonly property var allModules: {
         const def = localModules.concat(withPlugins(publicModules)).filter(m => !m.needs || Plugins.has(m.needs))
-        const key = m => { const i = items.order.indexOf(m.name); return (m.first ? -1e6 : 0) + (i >= 0 ? i : items.order.length + def.indexOf(m)) }
+        const key = m => {
+            const base = m.first ? -1e6 : 0, at = def.indexOf(m), i = items.order.indexOf(m.name)
+            if (i >= 0) return base + i
+            for (let j = at - 1; j >= 0; j--) {
+                const k = items.order.indexOf(def[j].name)
+                if (k >= 0) return base + k + 0.5 + at / 1e4   // several new ones after the same keep the files' order
+            }
+            return base + items.order.length + at
+        }
         return def.slice().sort((a, b) => key(a) - key(b))
     }
     // The ones shown: a module turned off isn't run at all
@@ -108,7 +116,7 @@ Singleton {
         if (names.join() !== allModules.map(m => m.name).join()) saveItems({ hidden: items.hidden, order: names })
     }
     // Names and glyphs for the launcher's list; a module can give its own "label" and "glyph" in modules.jsonc
-    readonly property var moduleLabels: ({ claude: ["Claude", "gauge"], system: ["CPU and memory", "cpu"],
+    readonly property var moduleLabels: ({ claude: ["Claude", "bot"], claude2: ["Claude, second account", "bot"], system: ["CPU and memory", "cpu"],
                                            bluetooth: ["Bluetooth", "bluetooth"], wifi: ["Wi-Fi", "wifi"],
                                            volume: ["Volume", "volume-2"], headphones: ["Headphones", "headphones"], display: ["Display", "monitor"], battery: ["Battery", "battery-medium"],
                                            calendar: ["Date and time", "clock"], notifications: ["Notifications", "menu"],
@@ -216,6 +224,14 @@ Singleton {
         return col[k] || { bg: "#ff000000", fg: "#d9ffffff", dim: "#8cffffff", off: "#57ffffff", hlBg: "#4db17bcb",
                            hlFg: "#ffffff", actBg: "#40c071eb", wsBg: "#4db17bcb" }[k]
     }
+    // The bars' window colour (Bar, SessionsBar): bg, never quite opaque. Quickshell gives a window whose colour is opaque
+    // when it is made an opaque region and keeps it when the colour turns translucent, so Hyprland stops drawing what is
+    // below and the bar stays black whatever its opacity (#3046). The colour is opaque then before bar.json is read, and
+    // at 100 %. Alpha 254/255 looks the same.
+    readonly property color windowBg: {
+        const k = Qt.color(c("bg"))
+        return Qt.rgba(k.r, k.g, k.b, Math.min(k.a, 254 / 255))
+    }
 
     // --- Icons: SVG text by name ("" = not found); fetched once, then cached ---
     // A missing one is asked again after 5 s and 30 s: a branch switch removes a plugin's icon links for a moment
@@ -228,6 +244,8 @@ Singleton {
         if (svgs[ref] !== undefined) return svgs[ref]
         const g = ref.match(/^gauge@(\d+)$/)
         if (g) return gauge(Math.min(100, parseInt(g[1])))
+        const b = ref.match(/^bot-bar@(\d+)$/)
+        if (b) return botBar(Math.min(100, parseInt(b[1])))
         if (!loading[ref]) {
             loading[ref] = true
             iconProc.createObject(tb, { ref: ref }).running = true
@@ -273,6 +291,16 @@ Singleton {
         return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
              + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14 L' + x + ' ' + y + '"/>'
              + '<path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>'
+    }
+    // bot-bar@<percent>: Lucide's bot (icons/lucide/bot.svg, the sessions bar's lead) lifted over a thin bar showing the
+    // Claude module's usage, the rest of the bar faint (claude-bar's modes 2 and 3)
+    function botBar(p) {
+        const w = (16 * p / 100).toFixed(2)
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+             + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(0 -2)">'
+             + '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/>'
+             + '<path d="M15 13v2"/><path d="M9 13v2"/></g><path d="M4 22.5h16" opacity="0.3"/>'
+             + (p > 0 ? '<path d="M4 22.5h' + w + '"/>' : '') + '</svg>'
     }
     // An SVG drawn in one colour: currentColor -> the colour (opaque; the caller applies its alpha as opacity)
     function iconUrl(ref, color) {

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """The contacts in ~/.local/share/contacts as JSON, for Contacts' window (app/shell.qml).
 
-    cards.py list      {accounts: [{id, name, count}], groups: [{id, account, name, members}], contacts: [...], people: [...]}
+    cards.py list      {accounts: [{id, name, count}], groups: [{id, account, name, members}], contacts: [...], people: [...],
+                       sortBy: "first" or "last"}
     cards.py people    [{id, name, org, emails, phones, addresses}]: the people alone, lines as text, for Mail and the
                        launcher (`contacts people`; no pictures, so it is quick and writes nothing)
 
 A contact is {id, account, name, sort, org, title, nickname, initials, photo, emails, phones, addresses, urls, birthday,
 note}: emails, phones and urls are [{label, value, ref}], addresses [{label, lines, ref, street, code, city, region,
-country}]; ref is what edit.py finds the line by. id is the file's path under the folder.
+country}]; ref is what edit.py finds the line by. id is the file's path under the folder. sort is what the list is ordered by and
+its letters come from (settings.py: the name, or the family name and then the given name).
 photo is a picture to show: a file in the cache for one inside the card or one of iCloud's (photos.py), the address of
 one on the web, or "".
 people are the contacts of every account with one person's cards as one (people() says when), each with ids and accounts.
@@ -24,6 +26,7 @@ from pathlib import Path
 import vobject
 
 import photos as photos_lib
+import settings
 
 HOME = Path.home()
 DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "contacts"
@@ -132,6 +135,13 @@ def name_parts(card):
     return "", ""
 
 
+def sort_key(x, by):
+    """What a contact is ordered by: its family name first when the list goes by last name and it has one"""
+    if by == "last" and x["family"]:
+        return " ".join(n for n in (x["family"], x["given"]) if n)
+    return x["name"]
+
+
 def initials(name):
     words = [w for w in re.split(r"[\s\-]+", name) if w and w[0].isalnum()]
     return "".join(w[0] for w in words[:2]).upper()
@@ -144,8 +154,9 @@ def read(path):
         return None
 
 
-def load(photos=True):
-    """(accounts, contacts, groups, counts) from the folders; photos=False leaves the pictures out"""
+def load(photos=True, by="first"):
+    """(accounts, contacts, groups, counts) from the folders; photos=False leaves the pictures out, by orders them
+    (settings.py's sort)"""
     found = accounts()
     contacts, groups, counts = [], [], {}
     for account, _ in found:
@@ -183,6 +194,7 @@ def load(photos=True):
                 "urls": values(card, "url", grouped), "birthday": birthday(card), "note": text(card, "note").strip(),
                 "categories": [c for c in (categories[0].value if categories else []) if c],
             })
+            contacts[-1]["sort"] = sort_key(contacts[-1], by)
             counts[account] += 1
     # CATEGORIES as groups, where the account has no group cards of its own
     for account, _ in found:
@@ -193,13 +205,14 @@ def load(photos=True):
             members = [x["uid"] for x in contacts if x["account"] == account and n in x["categories"]]
             groups.append({"id": account + "/" + n, "account": account, "name": n, "members": members})
     groups.sort(key=lambda g: (g["account"], g["name"].casefold()))
-    contacts.sort(key=lambda x: x["name"].casefold())
+    contacts.sort(key=lambda x: (x["sort"].casefold(), x["name"].casefold()))
     return found, contacts, groups, counts
 
 
 def main():
-    found, contacts, groups, counts = load()
-    json.dump({"accounts": [{"id": a, "name": n, "count": counts.get(a, 0)} for a, n in found],
+    by = settings.get()["sort"]
+    found, contacts, groups, counts = load(by=by)
+    json.dump({"sortBy": by, "accounts": [{"id": a, "name": n, "count": counts.get(a, 0)} for a, n in found],
                "groups": groups, "contacts": contacts, "people": people(contacts)}, sys.stdout, ensure_ascii=False)
 
 

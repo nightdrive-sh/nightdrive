@@ -10,6 +10,8 @@ An entry: {id, time, tool, notice, arguments, before, do, stdin, undo, dir, time
     state      "done" or "undone", since `at`
     deletes    the tool removes something (files_trash): kept while its Undo is on screen (kept)
     server     the MCP server that made it (undo.server_id): undo_change without an id undoes only its own
+    batch      the id of the first change of its batch, whose notification it shares (batch.py); none without one
+    many       the tool's notice_many, the batch's line when all of it is that tool's
 """
 
 import fcntl
@@ -25,6 +27,13 @@ FILE = Path.home() / ".local/state/nightdrive/claude-changes.jsonl"
 KEEP = 100
 HOLD = 3600       # seconds a change's notification offers Undo (undo.NOTICE_FOR)
 HOLD_MAX = 400    # older deletions kept for it at most: a flood of them can't grow the log without end
+# A change joins the batch before it (one notification, one Undo: batch.py) when the same server, so the same
+# conversation, made it in the same area at most BATCH_GAP seconds after the batch's last one. Claude's calls for one
+# request come seconds apart, a card or a long thought between them stretches that to a minute at most; after a
+# longer pause it is more likely a new request, whose change the earlier ones' Undo shouldn't take along. BATCH_SPAN
+# ends a batch that keeps going (a long session, a change a minute), so one Undo never reaches back further than that.
+BATCH_GAP = 90
+BATCH_SPAN = 600
 
 
 def now():
@@ -44,8 +53,9 @@ def kept(entries):
     offers Undo (#1881). Else a run of cheap changes (a hundred notes) pushes a trashed file's way back out of the log
     while its button is on screen, and pressing it finds nothing."""
     older, recent = entries[:-KEEP], entries[-KEEP:]
+    # A batch's row is shown again with each change in it, so its first change's Undo lasts up to BATCH_SPAN longer
     held = [e for e in older if e.get("deletes") is True and e.get("state") == "done"
-            and (a := age(e)) is not None and a < HOLD]
+            and (a := age(e)) is not None and a < HOLD + BATCH_SPAN]
     return held[-HOLD_MAX:] + recent
 
 
@@ -106,13 +116,40 @@ def editing():
         write(entries)
 
 
-def add(entry):
-    """Appends an entry with the next id and the time; returns it."""
+def add(entry, batch=False):
+    """Appends an entry with the next id and the time; returns it. batch: it has a notification, which it shares with
+    the batch it joins (batch_for), chosen under the lock so two changes at once can't both start one."""
     with editing() as entries:
         entry = {"id": max((e["id"] for e in entries), default=0) + 1, "time": now(), **entry, "state": "done"}
         entry["at"] = entry["time"]
+        if batch:
+            entry["batch"] = batch_for(entries, entry)
         entries.append(entry)
     return entry
+
+
+def batch_for(entries, entry):
+    """The batch a new entry joins: that of the newest batched entry of its server and area, when that one is at most
+    BATCH_GAP old, the batch's first at most BATCH_SPAN, and all of it still in place (after an Undo its row offers
+    Redo, which a new change mustn't join); else a batch of its own, its own id."""
+    server, area = entry.get("server"), entry.get("area")
+    if not server:   # no conversation to tell apart: each its own row, as before
+        return entry["id"]
+    last = next((e for e in reversed(entries) if "batch" in e and e.get("server") == server
+                 and e.get("area") == area), None)
+    gap = age(last) if last is not None else None
+    if gap is None or gap > BATCH_GAP:
+        return entry["id"]
+    members = [e for e in entries if e.get("batch") == last["batch"]]
+    first = age(members[0]) if members else None
+    if first is None or first > BATCH_SPAN or any(e.get("state") != "done" for e in members):
+        return entry["id"]
+    return last["batch"]
+
+
+def batch(lead):
+    """The entries of a batch, oldest first, by its first one's id; an entry from before batches is one of its own."""
+    return [e for e in read() if e.get("batch", e["id"]) == lead]
 
 
 def get(entry_id):

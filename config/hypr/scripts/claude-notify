@@ -2,17 +2,27 @@
 # Claude Code's Notification and PermissionRequest hooks (link.sh puts them in ~/.claude/settings.json): when a session
 # waits for you while you're in another window, a notification from "Claude" that says which one (its topic from the
 # window title, the project) and what it wants; a click, or its Show session button, goes to its window. The bar's
-# Claude icon gets its dot (Claude.qml). Nothing while you're in that window. Claude Code's own terminal notification
-# (kitty's, all alike) is turned off by link.sh.
+# Claude icon gets its dot (Claude.qml). Nothing while you're in that window, and nothing while the sessions bar shows
+# (below). Claude Code's own terminal notification (kitty's, all alike) is turned off by link.sh.
 #   Notification: "Waiting for your input" and the like.
-#   PermissionRequest: what it wants to run or change, with Deny, and Allow when it shows all it allows. Pinned
+#   PermissionRequest: what it wants to run or change, with Allow and Deny when it shows all it allows, else Review
+#   (the terminal shows it whole). Companion gets
+#   the request's whole input (<addr>.input) and offers Allow there after showing it (companion/lib/permission.py). Pinned
 #   (x-nightdrive-pin, quickshell/Notifs.qml): it stays on screen until answered and gets through do not disturb. The hook waits
 #   for the answer (Claude Code asks in the terminal at the same time): Allow or Deny answers for you; going to the
-#   window, Show session, closing the notification or the terminal's own answer leave it to the terminal.
+#   window, Show session or closing the notification leave it to the terminal, and Companion keeps it until it is
+#   answered anywhere (the session's record, below), for up to a day.
+#   A question with choices (AskUserQuestion) comes the same way, as a permission request: its notification says what it
+#   asks, and Companion shows it whole and answers it (below).
 # Reads the hook's JSON on stdin: {hook_event_name, cwd, message | tool_name, tool_input, ...}.
 set -uo pipefail
-readonly WAIT=590   # seconds a permission notification waits; Claude Code gives a hook 600
+begun_ms=${EPOCHREALTIME//[!0-9]/}; begun_ms=${begun_ms:0:13}  # when this hook began (ms), before anything else
+readonly WAIT=590   # seconds a request waits that the session's record can't end; Claude Code's default for a hook is 600
+# One it can end waits as long as it is open in the terminal, so a question left for an hour still has its buttons on
+# Companion (#3162): up to a day, just under the timeout link.sh gives this hook (Claude Code kills it then)
+readonly WAIT_OPEN=86390
 readonly SHOWN=300  # characters of the command or path the notification shows; a longer one gets no Allow
+readonly WHOLE=200000  # characters of the input Companion gets whole, to show before its Allow; a longer one: the terminal
 # The tools whose permission notification can offer Allow: the keys of their input that it shows, or that don't change
 # what they do. Any other key set, or any other tool (Edit, Write, MCP tools: their content doesn't show), gets none.
 declare -rA SHOWN_KEYS=(
@@ -27,21 +37,84 @@ in=$(cat)
 event=$(jq -r '.hook_event_name // "Notification"' <<<"$in")
 dir=$(jq -r '.cwd // empty' <<<"$in"); project=${dir##*/}
 state="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/claude-notify"; mkdir -p "$state"
+presence="${state%/*}/presence.json"
 
 # The session's window: up the parents (claude, its shell, the terminal) to a pid Hyprland knows
 clients=$(hyprctl -j clients 2>/dev/null) || clients='[]'
-p=$PPID addr= title=
+p=$PPID addr='' title=''
 while (( p > 1 )); do
   read -r addr title < <(jq -r --argjson p "$p" 'first(.[] | select(.pid == $p) | "\(.address) \(.title)") // ""' <<<"$clients")
   [[ -n $addr ]] && break
   p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || break
 done
 active() { [[ -n $addr && $(hyprctl -j activewindow 2>/dev/null | jq -r '.address // ""') == "$addr" ]]; }
-active && exit 0
+# Claude Code's own record of the session (<its config dir>/sessions/<pid>.json, which claude-sessions reads too): its
+# status changes when the request is answered, wherever. With it a permission request no longer goes by the window
+# alone (#3146): Companion brings a session's window up to type into it, and away from the computer it stays the
+# active one, so "you're in that window, answer there" left Companion nothing to answer, only "It asks you something
+# in its terminal". Found by the session's id, the newest record first (a resumed session's old one may linger).
+sid=$(jq -r '.session_id // empty' <<<"$in")
+rec=''
+[[ $sid =~ ^[0-9a-f-]{8,64}$ ]] && rec=$(grep -lF "\"sessionId\":\"$sid\"" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/sessions/*.json \
+  2>/dev/null | xargs -r ls -t 2>/dev/null | head -n 1)
+start_ms=$(( $(date +%s%3N) - 3000 ))  # the record shows the request waiting as the hook starts: an older stamp is another's
+seen=''
+# The record has shown this request waiting (its stamp kept in seen), and now says something else: answered elsewhere.
+# Or the session is gone (its record goes, or Claude Code, this hook's parent, ended): nothing waits for the answer.
+# Read with builtins only, four times a second for as long as it waits (hours, #3162): no process each time.
+over() {
+  local j='' s
+  [[ -e $rec ]] && kill -0 "$PPID" 2>/dev/null || return 0
+  read -r -d '' j < "$rec" 2>/dev/null
+  [[ $j =~ \"status\":\"([a-z_]+)\" ]] || return 1
+  s=${BASH_REMATCH[1]}
+  [[ $j =~ \"statusUpdatedAt\":([0-9]+) ]] && s+=" ${BASH_REMATCH[1]}" || s+=" 0"
+  if [[ -z $seen ]]; then
+    if [[ $s == waiting\ * ]]; then
+      (( ${s#* } >= start_ms )) && seen=$s
+      return 1
+    fi
+    # Anything else since this hook began: answered before the hook first looked (a quick pick in the terminal takes a
+    # second, the hook's start about as long), so Companion mustn't show it for the next ten minutes
+    (( ${s#* } >= begun_ms ))
+    return
+  fi
+  [[ -n $s && $s != "$seen" ]]
+}
+# Away from the computer, as Companion's server says while a page has it open (companion/lib/presence.py: locked, idle,
+# or its Away switch; #3065): its own file, trusted only while that server runs (its pid and start time), else at the
+# computer. Builtins only, as over(): the wait below asks once a second.
+away() {
+  local j='' st
+  read -r -d '' j 2>/dev/null < "$presence"
+  [[ $j =~ \"away\":\ ?true ]] && [[ $j =~ \"pid\":\ ?([0-9]+),\ ?\"start\":\ ?([0-9]+) ]] || return 1
+  local pid=${BASH_REMATCH[1]} start=${BASH_REMATCH[2]} f
+  read -r st 2>/dev/null < "/proc/$pid/stat" || return 1
+  read -ra f <<<"${st##*) }"
+  [[ ${f[19]-} == "$start" ]]
+}
+# Away, the active window isn't you there: a request without the session's record waits for Companion too
+if [[ $event == PermissionRequest ]] && { [[ -n $rec ]] || away; }; then
+  active && here=1 || here=''          # you may be in it: no notification, but Companion still gets the request
+else
+  active && exit 0
+fi
 # A permission notification of this session is up (below): Claude Code's own "needs your permission" comes six seconds
 # later and would replace it with one without the buttons
-[[ $event == Notification && -n $addr && -e $state/$addr.perm ]] && exit 0
-[[ -n $addr ]] && qs ipc call claude want "$addr" >/dev/null 2>&1
+[[ $event == Notification && -n $addr && ( -e $state/$addr.perm || -e $state/$addr.ask ) ]] && exit 0
+[[ -n $addr && -z ${here-} ]] && qs ipc call claude want "$addr" >/dev/null 2>&1
+# While the sessions bar is there for you to see (Claude.qml's barShown: on, not covered, you at the computer), its chip
+# says it: no notification, and none in the history either (#3126). A question or a permission request too (quiet):
+# its chip has the red question mark or the shield and hops (SessionChip.qml), and Companion still gets it; nearly
+# every session ends on a question, so they came as often as before, and with five sessions the permission requests
+# were too many as well (#3182). One without the session's record (an older Claude Code) has nothing to end it but the
+# window, so it notifies as before, and so does everything when Quickshell doesn't answer.
+quiet=''
+if [[ $event == Notification || ( $event == PermissionRequest && -n $rec && -z ${here-} ) ]] \
+   && [[ $(qs ipc call claude barShown 2>/dev/null) == true ]]; then
+  [[ $event == Notification ]] && exit 0
+  quiet=1
+fi
 
 # Claude Code's title: a status glyph (✳, a spinner), then the topic
 topic=$(sed -E 's/^[^[:alnum:][:space:]]+[[:space:]]+//' <<<"$title")
@@ -66,40 +139,103 @@ if [[ $event == PermissionRequest ]]; then
   what=${full:0:SHOWN}
   what=${what/#$HOME/\~}
   body="$tool${what:+: $what}${project:+ · $project}"
+  # A question: what it asks, and no Deny (it would turn the question down, not answer it)
+  ask='' deny=(-A deny=Deny)
+  [[ $tool == AskUserQuestion ]] && { ask=1 deny=(); body="$(jq -r '.tool_input.questions[0].question // "A question"' <<<"$in")${project:+ · $project}"; }
   # Allow answers for the whole tool_input, so it's offered only when you can read all of it: for a tool whose input the
   # text above is (SHOWN_KEYS; an edit's or an MCP tool's is not), with nothing else set (a command outside the
   # sandbox), not cut and without characters that don't show (bidi overrides, zero-width, escapes). The card takes it
   # away too when the text doesn't fit (x-nightdrive-whole, NotificationCard.qml). Otherwise Show session: you read it in
-  # the terminal.
+  # the terminal: Review, its only button then (#3182), as denying what you haven't read is seldom right.
   allow=()
   if [[ -n ${SHOWN_KEYS[$tool]-} ]] && (( ${#full} <= SHOWN )) && ! printf '%s' "$full" | LC_ALL=C.UTF-8 grep -qaP '[^\P{C}\t]' &&
      jq -e --arg keys "${SHOWN_KEYS[$tool]}" '($keys | split(" ")) as $ks | .tool_input
        | all(to_entries[]; .value == null or .value == false or (.key | IN($ks[])))' <<<"$in" >/dev/null; then
     allow=(-A allow=Allow)
   fi
+  show=(-A show="Show session")
+  [[ -z $ask && ${#allow[@]} -eq 0 ]] && { deny=(); show=(-A show=Review); }
   out=$(mktemp "$state/perm.XXXXXX")
-  touch "$state/$addr.perm"
-  notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" -A deny=Deny \
-    -A show="Show session" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
-  ns=$!
-  # The terminal's answer ends this hook early (Claude Code stops it): the notification goes with it
-  cleanup() { close "$(sed -n 1p "$out" 2>/dev/null)"; kill "$ns" 2>/dev/null; rm -f "$out" "$state/$addr.perm"; }
+  # What it asks, for Companion (config/companion), which answers by writing "allow|deny REQUEST" to $addr.answer. The
+  # request's id (out's random part) ties the answer to what its page showed, not to a newer request of the session.
+  req=${out##*/perm.}
+  ans="$state/$addr.answer"
+  rm -f "$ans"
+  # A question goes to Companion whole instead (<addr>.ask: its questions, their choices and what each means), and is
+  # answered with "answer REQUEST {question: answer, ...}": a choice's label, labels joined with ", " (multiSelect), or
+  # words of your own, as the terminal gives them
+  # Anything else leaves its whole input too (<addr>.input, before .perm so it is there when the page looks): Companion
+  # shows every key of it in full and only then offers Allow, so an edit, a write or an MCP tool can be allowed from
+  # there (#3137); this notification can't show them, so its own Allow stays as above
+  whole=
+  if [[ -n $ask ]]; then
+    jq -c --arg req "$req" '{request: $req, questions: [.tool_input.questions[]? | {question, header, multiSelect: (.multiSelect == true),
+      options: [.options[]? | {label, description}]}]}' <<<"$in" > "$state/$addr.ask"
+  else
+    input=$(jq -c --arg req "$req" '{request: $req, input: .tool_input}' <<<"$in")
+    if (( ${#input} <= WHOLE )) && printf '%s\n' "$input" > "$state/$addr.input"; then whole=1; fi
+    jq -nc --arg tool "$tool" --arg what "$what" --arg project "$project" --arg req "$req" \
+      --argjson allow "$(( ${#allow[@]} > 0 ))" --argjson whole "${whole:-0}" \
+      '{tool: $tool, what: $what, project: $project, request: $req, allow: ($allow == 1), whole: ($whole == 1)}' > "$state/$addr.perm"
+  fi
+  ns=''
+  if [[ -z ${here-}${quiet} ]]; then
+    notify-send -a Claude -i "$icon" -p -h string:x-nightdrive-whole:allow -h boolean:x-nightdrive-pin:true -h string:x-nightdrive-group:sessions -A default=Open "${allow[@]}" "${deny[@]}" \
+      "${show[@]}" -w "$topic" "$body" > "$out" 2>/dev/null < /dev/null &
+    ns=$!
+  fi
+  # The terminal's answer may not end this hook (Claude Code let it run on after a question answered there): the
+  # session's record changing ends it within a second (over, above), else your going to the window (active), and the
+  # notification goes with it
+  # Only this request's files and answer: a newer request of the session (its own hook) may have put its own there
+  mine() { local j=''; read -r -d '' j < "$1" 2>/dev/null; [[ $j == *"\"request\":\"$req\""* || $j == *" $req"* ]]; }
+  cleanup() {
+    close "$(sed -n 1p "$out" 2>/dev/null)"; [[ -n $ns ]] && kill "$ns" 2>/dev/null; rm -f "$out"
+    for f in "$state/$addr".{perm,input,ask,answer}; do mine "$f" && rm -f "$f"; done
+  }
   trap cleanup EXIT
   trap 'exit 0' TERM INT HUP
-  decide() { jq -nc --arg b "$1" '{hookSpecificOutput: {hookEventName: "PermissionRequest",
-             decision: ({behavior: $b} + (if $b == "deny" then {message: "Denied from the desktop notification"} else {} end))}}'; }
-  for (( i = 0; i < WAIT * 4; i++ )); do
-    sleep 0.25
-    sed -n 1p "$out" > "$idf" 2>/dev/null
-    if ! kill -0 "$ns" 2>/dev/null; then    # answered, or closed without one
+  # The answers for the questions it asked, and no others; the terminal's question closes as if answered there
+  answered() { jq -c --argjson a "$1" '.tool_input as $t | {hookSpecificOutput: {hookEventName: "PermissionRequest",
+               decision: {behavior: "allow", updatedInput: ($t + {answers: ($a | with_entries(select((.value | type) == "string"
+               and (.key as $k | any($t.questions[]?; .question == $k)))))})}}}' <<<"$in"; }
+  decide() { jq -nc --arg b "$1" --arg from "${2:-the desktop notification}" '{hookSpecificOutput: {hookEventName: "PermissionRequest",
+             decision: ({behavior: $b} + (if $b == "deny" then {message: "Denied from \($from)"} else {} end))}}'; }
+  # A pipe nothing writes to: read -t on it is a sleep that starts no process
+  exec {nap}<> <(:)
+  id='' closed=''
+  for (( i = 0; i < (${#seen} ? WAIT_OPEN : WAIT) * 4; i++ )); do
+    read -rt 0.25 -u "$nap"
+    [[ -n $ns ]] && read -r id < "$out" 2>/dev/null && echo "$id" > "$idf"
+    if [[ -s $ans ]]; then                  # answered on Companion: Allow when the notification offers it, or the input
+                                            # went to Companion whole (its Review showed all of it)
+      read -r verdict rid answers < "$ans"
+      if [[ $rid == "$req" ]]; then
+        case $verdict in
+          allow) if (( ${#allow[@]} )) || [[ -n $whole ]]; then decide allow; exit 0; fi ;;
+          deny) [[ -z $ask ]] && { decide deny Companion; exit 0; } ;;
+          answer) [[ -n $ask ]] && answered "$answers" && exit 0 ;;
+        esac
+      fi
+      rm -f "$ans"
+    fi
+    if [[ -n $ns ]] && ! kill -0 "$ns" 2>/dev/null; then    # answered, or closed without one
       case $(sed -n 2p "$out") in
-        allow) decide allow ;;
-        deny) decide deny ;;
+        allow) decide allow; exit 0 ;;
+        deny) decide deny; exit 0 ;;
         default|show) focus ;;
       esac
+      # Gone to the window or closed: the terminal has it, and while the session's record can end it, Companion
+      # keeps it too until it's answered somewhere (#3162); else it ends below
+      closed=1 ns=''
+    fi
+    # Answered elsewhere (the terminal), as the session's record says; one that hasn't shown it waiting in three
+    # seconds (an older Claude Code) goes by the window as before: you went to it, answer there
+    if [[ -n $rec ]] && { [[ -n $seen ]] || (( i < 12 )); }; then
+      over && exit 0
+    elif [[ -n $closed ]] || { (( i % 4 == 3 )) && active && ! away; }; then
       exit 0
     fi
-    (( i % 4 == 3 )) && active && exit 0   # you went to the window: answer there
   done
   exit 0
 fi

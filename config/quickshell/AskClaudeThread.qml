@@ -1,9 +1,10 @@
 import QtQuick
+import "AskClaudeMarkdown.js" as Md
 
 // Ask Claude's conversation as it goes (AskClaudeSession): your requests in a darker box at the right, as in a chat (at
 // most youShare of the width, narrower for a short one), each step Claude takes as a row with its glyph (pulsing while
 // it runs, dim once done, red with ✕ when it failed), a robot's head while it thinks, and its answer's text as it is
-// written.
+// written, as formatted Markdown (AskClaudeMarkdown.js); your requests stay plain text.
 // It knows nothing of where it is shown (Ask Claude's toast, AskClaudePanel.qml): give it a width, maxHeight and the font.
 // The requests and answers can be selected with the mouse (#1904), one message at a time; copySelection() copies it.
 // The keyboard stays with the field: the text takes no focus, and the view's owner asks for the copy (⌘C there).
@@ -26,7 +27,8 @@ Item {
     readonly property string selectedText: selection ? selection.selectedText : ""
     function copySelection() {
         if (selectedText === "") return false
-        clip.copy(selectedText)
+        // Rich text's selection ends its paragraphs and lines with Unicode's separators, not newlines
+        clip.copy(selectedText.replace(/[\u2028\u2029]/g, "\n"))
         return true
     }
     ClipCopy { id: clip }
@@ -106,6 +108,8 @@ Item {
     // steps' text; an error (no glyph) in the same place
     component Answer: Item {
         property string text: ""
+        property bool markdown: true    // an error is plain text
+        property bool live: false       // still being written: its half-done last line is made whole (AskClaudeMarkdown.js)
         property string glyph: t.session.thinkingGlyph
         property color color: Theme.text
         width: t.width
@@ -124,9 +128,13 @@ Item {
             id: body
             topPadding: 4
             leftPadding: t.textX
-            text: parent.text
+            textFormat: parent.markdown ? TextEdit.RichText : TextEdit.PlainText
+            text: parent.markdown ? Md.html(parent.text, Theme, t.fontSize - 2, parent.live) : parent.text
             color: parent.color
             font.pixelSize: t.fontSize - 2
+            // Links open in the browser; only the web's and mail's, as Markdown.js makes no others
+            onLinkActivated: link => Qt.openUrlExternally(link)
+            HoverHandler { cursorShape: body.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.IBeamCursor }
         }
         FontMetrics { id: lineMetrics; font: body.font }
     }
@@ -202,6 +210,7 @@ Item {
                         visible: entry.kind === "text" || entry.kind === "error"
                         text: visible ? entry.modelData.text : ""
                         glyph: entry.kind === "error" ? "" : t.session.thinkingGlyph
+                        markdown: entry.kind === "text"
                         color: entry.kind === "error" ? Theme.warning : Theme.text
                     }
                 }
@@ -216,6 +225,7 @@ Item {
             Answer {
                 visible: t.session.live !== ""
                 text: t.session.live.trim()
+                live: true
             }
             // Claude's card for a short request (Enter and Esc in the field answer it): a little inside your request's
             // box's edges (its border would stand out beside the box), with room above and below

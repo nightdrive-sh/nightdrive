@@ -6,9 +6,12 @@
 # watches the result instead: a few seconds after the default output changes, appears or goes (and once at login),
 # EasyEffects must be linked to it. If it isn't, it is started again (sound stops for about a second), which makes it
 # link to the default afresh. Every restart is logged: journalctl --user -t ee-follow.
+# Only while an app plays (its sink RUNNING): idle, EasyEffects unlinks its filters from every output on purpose ("No app
+# linked to our device wants to play"), so 'linked to nothing' is normal then (#2045: a week of its --debug log showed
+# all 436 restarts were of an idle EasyEffects, set off by AirPlay speakers coming and going). So the check also runs
+# when a sink changes state, i.e. when playback starts, which is when it would be stuck on the old output.
 # It also starts EasyEffects at login, so both starts are the same. With the file $DEBUG present, EasyEffects runs with
-# --debug and logs to the journal (journalctl --user -t easyeffects, a few hundred lines a start, then a few per change):
-# to see why it stayed behind the next time.
+# --debug and logs to the journal (journalctl --user -t easyeffects): to see why, should it stay behind again.
 # Started by hyprland.lua; listens to PipeWire (pactl subscribe) in the background. One instance only (flock).
 exec 9>"${XDG_RUNTIME_DIR:-/run/user/$UID}/ee-follow.lock"
 flock -n 9 || exit 0
@@ -35,6 +38,8 @@ ee_target() {
 wanted() { local d; d=$(pactl get-default-sink 2>/dev/null); [[ -n $d && $d != easyeffects_sink ]] && echo "$d"; }
 # An output picked in EasyEffects' own window instead of the system's: leave it there
 pinned() { grep -qx 'useDefaultOutputDevice=false' "$conf" 2>/dev/null; }
+# Whether an app plays through EasyEffects: only then does it link its filters to an output
+playing() { pactl list short sinks 2>/dev/null | awk '$2 == "easyeffects_sink" { f = ($NF == "RUNNING") } END { exit !f }'; }
 follows() { want=$(wanted) || return 0; got=$(ee_target); [[ $got == "$want" ]]; }
 
 restart_ee() {
@@ -43,6 +48,9 @@ restart_ee() {
   pgrep -x easyeffects >/dev/null && { pkill -x easyeffects; sleep 0.5; }
   touch "$run/ee-follow.restarted"
   start_ee
+  # It may refuse to start while the old one's lock lingers ("Unknown lockfile error", 9.11.): then once more
+  sleep 2
+  pgrep -x easyeffects >/dev/null || { log "EasyEffects didn't start again: starting it once more"; sleep 1; start_ee; }
 }
 
 check() {
@@ -50,8 +58,9 @@ check() {
   exec 8>"$run/ee-follow.check"; flock -n 8 || return 0   # one check at a time
   pgrep -x easyeffects >/dev/null || return 0             # not running: apps play straight to the output
   pinned && return 0
+  playing || return 0                                     # idle: it is linked to nothing on purpose
   follows && return 0
-  sleep "$SETTLE"; follows && return 0                    # once more: it may still be linking
+  sleep "$SETTLE"; playing || return 0; follows && return 0   # once more: it may still be linking
   if [[ -n $(find "$run/ee-follow.restarted" -newermt "-$MIN_GAP seconds" 2>/dev/null) ]]; then
     log "EasyEffects plays to '${got:-nothing}', not to the output $want; restarted it less than ${MIN_GAP}s ago, leaving it"
     return 0
@@ -74,7 +83,7 @@ later 10   # at login: give EasyEffects time to link
 # pactl without the lock too: it outlives a killed ee-follow until its next event
 pactl subscribe 9>&- | while read -r line; do
   case $line in
-    # the default output changed (server), or an output came or went
-    "Event 'change' on server"* | "Event 'new' on sink #"* | "Event 'remove' on sink #"*) later "$SETTLE" ;;
+    # the default output changed (server), an output came or went, or a sink's state changed (playback started)
+    "Event 'change' on server"* | "Event "*" on sink #"*) later "$SETTLE" ;;
   esac
 done

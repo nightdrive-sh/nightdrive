@@ -28,6 +28,8 @@ Item {
                 launcher.levels.ask.terminal(AskClaudeSession.draft, true)
                 return "ok"
             }
+            // ⌘Enter on a level whose file has its own use for it (cmdEnter: Translate's "with Claude")
+            if (how === "key") { const ext = launcher.extOf(launcher.level); if (ext && ext.cmdEnter && ext.cmdEnter()) return "ok" }
             if (how === "key") how = (launcher.results[launcher.selIndex] || {}).kind === "askclaude" ? "terminal" : "background"
             if (["root", "apps"].indexOf(launcher.level) < 0) return ""
             if (how === "terminal") return launcher.query.trim() === "" ? "" : (launcher.levels.ask.terminal(launcher.query, false), "ok")
@@ -36,7 +38,7 @@ Item {
         // rows: the open level's title, footer, selected index and rows as JSON, primitive fields only (automated testing)
         function rows(): string {
             const plain = r => { const o = {}; for (const k in r) if (r[k] === null || typeof r[k] !== "object" && typeof r[k] !== "function") o[k] = r[k]; return o }
-            return JSON.stringify({ level: launcher.level, title: launcher.titles[launcher.level] || "", footer: launcher.footer, sel: launcher.selIndex, collapsed: launcher.collapsed,
+            return JSON.stringify({ level: launcher.level, title: launcher.titles[launcher.level] || "", footer: launcher.footer, sel: launcher.selIndex,
                                     rows: launcher.results.map(plain) })
         }
         // pick <index>: selects a row like Enter (automated testing)

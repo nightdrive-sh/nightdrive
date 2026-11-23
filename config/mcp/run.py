@@ -256,6 +256,9 @@ def environment(tool):
     env["PATH"] = os.pathsep.join(first + [p for p in path if p not in first] + ([] if local in path else [local]))
     env["NIGHTDRIVE_MCP"] = "1"
     env["NIGHTDRIVE_MCP_TOOL"] = tool.name
+    # The folder the server was started in, the session's own: the command runs in the tool's folder, and a bash in
+    # between sets PWD to that, so a tool that takes relative paths from the session (inbox_post's files) reads it here
+    env["NIGHTDRIVE_MCP_CWD"] = os.getcwd()
     # Its area's own choices in Access ({"unlock": false}), for the command to keep to: the schema already leaves out
     # what they take away, and a command that checks too can't be talked past (#1830)
     env["NIGHTDRIVE_MCP_OPTIONS"] = json.dumps(getattr(tool, "options", None) or {})

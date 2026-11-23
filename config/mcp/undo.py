@@ -25,6 +25,7 @@ An undo that refuses for now (the user is typing) leaves Try again on the row.
 The log is a file of the user's, which what they run can write (Claude Code's own Write too), so an undo or redo runs
 only what the tool the entry names, as installed now, would: its undo template word for word, its command with the
 logged arguments, in its own folder (#1881). undo_change without an id undoes only this server's own newest change.
+Changes one conversation makes in one area close together share one row, whose Undo undoes them all (batch.py, #3223).
 
     python3 undo.py recent_changes | undo_change     Claude's tools (JSON on stdin, JSON out)
     python3 undo.py undo ID | redo ID                as the notification's buttons do
@@ -41,6 +42,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import access  # noqa: E402  (after the path above)
+import batch  # noqa: E402
 import changes  # noqa: E402
 import run  # noqa: E402
 from run import ToolError  # noqa: E402
@@ -96,8 +98,9 @@ def offer(tool, arguments, answer, state=None):
     name the change later; a change that couldn't be logged says so instead of failing (it has been made)."""
     if tool.name == OWN and tool.dir == HERE:
         entry_id = (answer.get("structuredContent") or {}).get("id")
-        if isinstance(entry_id, int):
-            show(entry_id, "redo")
+        undone = changes.get(entry_id) if isinstance(entry_id, int) else None
+        if undone is not None:
+            show(undone.get("batch", entry_id), "redo")   # its batch's row, which now says what is left
         return
     try:
         argv, stdin = run.prepare(tool, arguments)
@@ -112,10 +115,16 @@ def offer(tool, arguments, answer, state=None):
         "remake": tool.spec["undo"], "dir": str(tool.dir), "timeout": run.timeout_of(tool),
         "area": tool.area, "options_from": tool.spec.get("options_from", []),
         "deletes": bool(tool.spec.get("deletes")), "server": server_id(os.getpid()),
-    })
-    show(entry["id"], "undo")
-    answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: the user can undo it from the "
-                                                      "notification, or you with undo_change.)"})
+        "many": tool.spec.get("notice_many"),
+    }, batch=tool.spec.get("notify", True))
+    # A tool whose change is plain to see where it lands, and shouldn't interrupt (inbox_post: a message is the
+    # opposite of a notification), says notify: false. It is logged all the same, for recent_changes and undo_change.
+    if tool.spec.get("notify", True):
+        show(entry.get("batch", entry["id"]), "undo")   # its batch's row (batch.py), which counts it
+        answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: the user can undo it from the "
+                                                          "notification, or you with undo_change.)"})
+    else:
+        answer["content"].append({"type": "text", "text": f"(Change {entry['id']}: you can undo it with undo_change.)"})
 
 
 def show(entry_id, action):
@@ -413,43 +422,44 @@ def notify(entry_id, summary, body="", button=None):
     return None if proc.returncode and proc.returncode < 0 else out.strip() or None
 
 
-def retire(entry_id):
-    """The entry's row gives up its button, for a newer change's (notices.ROWS_MAX): its wait ends, and the row says
+def retire(lead):
+    """The batch's row gives up its button, for a newer change's (notices.ROWS_MAX): its wait ends, and the row says
     Claude can still undo it, as the log keeps it."""
-    proc = WAITING.pop(entry_id, None)
+    proc = WAITING.pop(lead, None)
     if proc is not None:
         proc.terminate()
-    entry = changes.get(entry_id)
-    if entry is not None and entry.get("state") == "done":
-        notify(entry_id, entry["notice"], f"Many changes at once: ask Claude to undo this one (change {entry_id}).")
-    elif entry is not None:
-        notify(entry_id, f"Undid: {entry['notice']}")
+    members = changes.batch(lead)
+    if not members:
+        return
+    text, _, action = batch.row(members)
+    if action == "undo":
+        notify(lead, text, f"Many changes at once: ask Claude to undo this ({batch.ids(members)}).")
+    else:
+        notify(lead, text)
 
 
-def notice(entry_id, action):
-    """The helper process: the entry's row, and its button until the row goes. Undo turns it into "Undid: …" with
-    Redo, and Redo back."""
+def notice(lead, action=None):
+    """The helper process: a batch's row (a change alone is a batch of one), and its button until the row goes.
+    Undo turns it into "Undid: …" with Redo, and Redo back. Which one it offers is read off the changes' states
+    each time (action is the caller's guess), so a row shown again as a batch grows says what is true now."""
     while True:
-        entry = changes.get(entry_id)
-        if entry is None:
+        members = changes.batch(lead)
+        if not members:
             return
-        if action == "undo":
-            pressed = notify(entry_id, entry["notice"], button=("undo", "Undo"))
-        else:
-            pressed = notify(entry_id, f"Undid: {entry['notice']}", button=("redo", "Redo"))
+        text, body, action = batch.row(members)
+        pressed = notify(lead, text, body, button=(action, action.capitalize()))
         if pressed != action:
             return
         while True:
             try:
-                perform(entry_id, action)
+                batch.perform(lead, action, perform)
                 break
             except ToolError as e:
-                # Try again: an undo that refused for now (the user was typing, #1860) can be run once they stop
-                again = notify(entry_id, f"Couldn't {action}: {entry['notice']}", str(e),
-                               button=(action, "Try again"))
+                # Try again: an undo that refused for now (the user was typing, #1860) can be run once they stop;
+                # in a batch, those that ran stay so, and it runs the rest
+                again = notify(lead, f"Couldn't {action}: {text}", str(e), button=(action, "Try again"))
                 if again != action:
                     return
-        action = "redo" if action == "undo" else "undo"
 
 
 def recent_changes(args):
@@ -468,6 +478,7 @@ def listed(entry, rules):
     area Claude may not read now without asking, or at all, gives only the tool and its state, as the Nightdrive row
     is read even on Strict (#1884); one whose codes Claude doesn't read gets them masked, as its own reads would."""
     row = {k: entry.get(k) for k in ("id", "time", "notice", "tool", "arguments", "state", "at")}
+    row["batch"] = entry.get("batch", entry.get("id"))   # the changes one notification's Undo takes back together
     area = entry.get("area")
     if rules is None or not area or rules.decide("read", area, "read") != "allow":
         row["notice"] = f"A change made with {entry.get('tool')}"

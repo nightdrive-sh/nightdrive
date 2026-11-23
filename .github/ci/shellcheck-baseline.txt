@@ -12,8 +12,6 @@
 2 config/claude-access/claude-access SC2034
 1 config/greeter/install.sh SC1010
 1 config/greeter/switch.sh SC2088
-1 config/hypr/scripts/ask-claude SC2174
-1 config/hypr/scripts/claude-notify SC1007
 1 config/hypr/scripts/claude-send-paste SC2174
 2 config/hypr/scripts/claude-setup SC2174
 1 config/hypr/scripts/claude-write SC2174

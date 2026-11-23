@@ -47,6 +47,7 @@ ShellRoot {
         property var groups: []             // [{ id, account, name, members: [uid] }]
         property var everyone: []           // every account's cards, by name (cards.py list)
         property var people: []             // the same with one person's cards in several accounts as one (All contacts)
+        property string sortBy: "first"      // the list's order, Settings' (lib/settings.py): "first" or "last" name
         property bool loaded: false
         // The sidebar's rows: All, each account (with more than one), then the groups
         readonly property var sources: {
@@ -75,7 +76,9 @@ ShellRoot {
                     win.keepNext = ""
                     win.accounts = d.accounts
                     win.groups = d.groups
-                    const add = x => Object.assign(x, { letter: win.letter(x.name), haystack: win.haystack(x) })
+                    win.sortBy = d.sortBy || "first"
+                    // The letter from what the list is ordered by: Virtanen's V when it goes by last name
+                    const add = x => Object.assign(x, { letter: win.letter(x.sort || x.name), haystack: win.haystack(x) })
                     win.everyone = d.contacts.map(add)
                     win.people = d.people.map(add)
                     win.loaded = true

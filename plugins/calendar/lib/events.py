@@ -8,10 +8,12 @@ FROM is the first day, TO the day after the last (YYYY-MM-DD), so a week is MOND
 khal expands the recurring events (RRULE, RDATE, EXDATE, a changed occurrence) into each of their times and keeps an
 index of the .ics files in its own database, so a month is read in a moment after the first time.
 
-An event: uid, calendar (id), calendar_name, color, title, start, end, all_day, location, notes, recurring, reminder.
+An event: uid, calendar (id), calendar_name, color, title, start, end, all_day, location, notes, recurring, reminder (repeat).
 start and end are local time, YYYY-MM-DDTHH:MM, or the day, YYYY-MM-DD, for an all-day event, whose end is its last
 day. reminder: its first alarm in minutes before the start (alarms.py: 0 at the start; an all-day event's -540 is
-9:00 on the day), or null: read from the event's file, which khal doesn't tell.
+9:00 on the day), or null: read from the event's file, which khal doesn't tell. A recurring one also has repeat, its
+series' rule as repeat.read() gives it ({every, interval, days, until, count, simple, text}), or null when the file has
+only some of its times.
 """
 
 import datetime as dt
@@ -21,13 +23,15 @@ import sys
 
 import alarms
 import calendars
+import repeat
 
 LIMIT = 200         # the default: a busy month, short enough for Claude to read
 RANGE_MAX = 400     # days: a longer range is a mistake, and would only fill Claude's context
 TIMEOUT = 120       # khal's first run indexes every event
 # khal's fields (khal list --json FIELD), and the names they have here
 FIELDS = {"uid": "uid", "calendar": "calendar", "title": "title", "start": "start", "end": "end",
-          "all-day": "all_day", "location": "location", "description": "notes", "repeat-pattern": "recurring"}
+          "all-day": "all_day", "location": "location", "description": "notes", "repeat-pattern": "recurring",
+          "repeat-symbol": "recurring_symbol"}
 
 
 def day(text, name):
@@ -71,7 +75,8 @@ def khal(found, first, last):
 def event(row, names):
     e = {ours: row.get(theirs, "") for theirs, ours in FIELDS.items()}
     e["all_day"] = str(e["all_day"]).lower() in ("true", "1", "yes")
-    e["recurring"] = bool(e["recurring"])
+    # A changed time of a series has no pattern of its own in khal, only the symbol (#2009)
+    e["recurring"] = bool(e["recurring"]) or bool(str(e.pop("recurring_symbol", "")).strip())
     cal = names.get(e["calendar"], {})
     e["calendar_name"], e["color"] = cal.get("name", e["calendar"]), cal.get("color", calendars.COLOR_DEFAULT)
     return e
@@ -106,6 +111,9 @@ def events(first, after, calendar=None, search="", reminders=True):
             vevent = files.event(e["calendar"], e["uid"], alarms.local(dt.date.fromisoformat(e["start"]) if e["all_day"]
                                                                         else dt.datetime.fromisoformat(e["start"])))
             e["reminder"] = alarms.reminder(vevent) if vevent is not None else None
+            if e["recurring"]:
+                master = next((x for x in files.vevents(e["calendar"], e["uid"]) if "recurrence-id" not in x), None)
+                e["repeat"] = repeat.read(master) if master is not None else None
     # All-day ones first on their day, then by time
     out.sort(key=lambda e: (e["start"][:10], not e["all_day"], e["start"], e["title"].lower()))
     return out

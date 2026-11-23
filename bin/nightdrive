@@ -33,17 +33,24 @@ usage() {
   row "theme COMMAND"            "The theme colour, e.g. nightdrive theme color teal"
   row "wallpaper COMMAND"        "The background: list, set, add, remove"
   row "display COMMAND"          "Screens: list, json, scale OUTPUT SCALE, mode OUTPUT WxH (--keep asks)"
+  row "displays"                 "The Displays window: drag the screens where they are, pick the main one"
+  row "arrange [COMMAND]"        "Where the screens are (--json): move, step, side ID SIDE [OF], away, main, reset"
   row "sound [COMMAND]"          "Volume and output as JSON: volume [PCT] [--mute on|off], output [NAME]"
   row "brightness [PCT]"         "Screen brightness in percent (JSON), set when given"
+  row "screenshot [MODE]"        "region, window, full: saved and copied; clip, winclip, fullclip: copied; text: a region's text (OCR)"
   row "network [COMMAND]"        "Wi-Fi and network state as JSON; wifi|all on|off [--keep]"
   row "bluetooth|battery"        "Bluetooth devices or the battery as JSON"
   row "low-power [on|off|toggle]" "Low Power Mode on a laptop: status (--json); suggest on|off at 10 %"
+  row "game-mode [on|off|toggle]" "Game Mode: the CPU at full speed for games; status (--json)"
   row "bar-style COMMAND"        "The top bar's look: opacity, icons, highlight, icon-opacity"
   row "nightlight [on|off]"      "Night light's warm tint: status, on, off, toggle (--json)"
   row "appearance"               "Wallpaper, theme, night light and the top bar's look now, as JSON"
   row "notifications [COMMAND]"  "The latest notifications (--json), dnd [on|off], send SUMMARY [BODY], remove TAG"
   row "windows [COMMAND]"        "The open windows (--json); focus WINDOW, shot WINDOW, open APP|URL, close ADDRESS"
   row "files COMMAND"            "Newest in Downloads, Pictures, Documents: recent (--json); open PATH, trash PATH…, restore NAME…"
+  row "remind WHEN [MESSAGE]"    "A reminder banner in minutes (15, 1h30m), at a time (22:45), on wake, at login or on \"arrive|leave PLACE\" (--from 05:00): list, cancel ID|all (--json)"
+  row "schedule WHEN COMMAND"    "Run a command once in minutes (15, 1h30m), at a time (14:45), on wake, at login or on \"arrive|leave PLACE\" (--from 05:00), with a notification: list, run ID, cancel ID|all (--json); other text is a message to Claude (--to SESSION, --run, --claude)"
+  row "places [COMMAND]"         "Places: names for Wi-Fi networks (work, home): list, here, add NAME [SSID…], remove NAME, forget NAME SSID, check (--json)"
   row "clean [SECONDS]"          "Lock the keyboard and touchpad to clean them, 15 s or 5–60 (stop, status --json)"
   row "restart"                  "Restart the top bar, menus and notifications (Quickshell), e.g. after it crashed"
   row "topbar adjust"            "The top bar's icon and text sizes, live"
@@ -52,7 +59,12 @@ usage() {
   row "snippets [COMMAND]"       "Text snippets: list, set, remove, status, enable, disable"
   row "defaults [set KIND APP]"  "Default apps (browser, email, files…), e.g. nightdrive defaults set pdf org.gnome.Papers"
   row "terminal [-- COMMAND]"    "Open the terminal chosen in Default apps (--dir DIR, --class CLASS, --hold)"
-  row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --effort LEVEL, --background, --workspace WS)"
+  row "ask \"MESSAGE\""            "Claude Code in a new terminal, MESSAGE as its first prompt (--dir DIR, --name NAME, --model MODEL (opus), --effort LEVEL (medium), --account NAME, --background, --workspace WS)"
+  row "claude accounts"          "Your Claude Code accounts, NAME and config dir (--json); ~/.config/nightdrive/claude-accounts names them"
+  row "inbox [COMMAND]"           "Messages to look at later (docs/inbox.md): post TITLE, update, list, show, read, archive, delete, press, count (--json)"
+  row "sessions [resume ID]"     "Claude Code's sessions, running and closed, the newest first (--json, --query TEXT, --limit N)"
+  row "claude usage"             "The default account's plan limits as JSON, as the Claude menu shows them (--account NAME, --all)"
+  row "companion [on|off|url]"   "Companion: your Claude sessions and dictation on an iPad over Tailscale; status (--json)"
   row "mcp"                      "Nightdrive's MCP server for Claude (stdio: Claude Code starts it)"
   row "mcp install|remove"       "Register it in Claude Code and allow its tools, or take that away (asks first; --dry-run shows)"
   row "mcp status"               "Whether Claude Code has it, and its tools are allowed (--json)"
@@ -131,23 +143,39 @@ case ${1:-} in
   minimal) exec "$repo/config/minimal/minimal" "${@:2}" ;;             # README › Install (Installed on Fedora KDE?)
   # topbar adjust: config/topbar/adjust.conf; software-catalog: config/quickshell/data/software.json
   platform|software-catalog|snippets) exec "$scripts/$1" "${@:2}" ;;
-  theme|display|wallpaper|bar-style|notifications) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
+  theme|display|wallpaper|bar-style|notifications|arrange) exec "$scripts/$1" "${@:2}" ;;   # the desktop's own scripts (hypr/scripts)
   windows|files) exec "$scripts/$1" "${@:2}" ;;                       # also Claude's apps and files tools
   nightlight|appearance) exec "$scripts/$1" "${@:2}" ;;                # Claude's appearance tools use them too
+  screenshot) exec "$scripts/screenshot" "${@:2}" ;;                  # launcher › Tools › Screenshot, ⌘⇧S…
   sound|network) exec "$scripts/$1" "${@:2}" ;;                      # also Claude's sound and display tools
   clean) case ${2:-} in                                               # README › Little things (cleaning mode)
            stop|status) exec "$scripts/clean-input" "${@:2}" ;;
            *) exec "$scripts/clean-input" start "${@:2}" ;;
          esac ;;
+  remind) exec "$scripts/remind" "${@:2}" ;;                          # launcher › Tools › Remind
+  schedule) exec "$scripts/schedule" "${@:2}" ;;                      # commands at a time (timers.py, as remind)
+  places) exec "$scripts/places" "${@:2}" ;;                          # names for Wi-Fi networks (places.py)
   restart) exec "$scripts/desktop-shell" restart ;;                   # Quickshell, the supervised way (AGENTS.md)
   brightness) exec "$scripts/brightness" screen "${@:2}" ;;
   bluetooth|battery) exec "$scripts/devices" "$1" ;;
   low-power) exec "$scripts/low-power" "${@:2}" ;;                    # Settings › Battery, the battery menu
+  game-mode) exec "$scripts/game-mode" "${@:2}" ;;                    # Settings › Hardware
+  companion) exec "$repo/bin/companion" "${@:2}" ;;                   # Settings › Companion (docs/companion.md)
   software) exec "$scripts/software" "${@:2}" ;;                       # Install/Remove › Software without the launcher
   defaults) exec "$scripts/default-apps" "${@:2}" ;;                   # launcher › Settings › Apps › Default apps
   terminal) exec "$scripts/terminal" "${@:2}" ;;                       # the terminal chosen there
   ask) [[ -n ${2:-} ]] || { usage >&2; exit 1; }
-       exec "$scripts/terminal-or-claude" "${@:2}" ;;                   # what the launcher's ⌘⌥Enter runs
+       # Opus at medium unless asked: a session another one opens shouldn't take the user's default model (which may
+       # be a costlier one with its own limit). Later options win, so --model / --effort override these.
+       # The launcher's keys and dictation call terminal-or-claude directly and keep the user's model.
+       exec "$scripts/terminal-or-claude" --model opus --effort medium "${@:2}" ;;
+  sessions) exec "$repo/config/topbar/scripts/claude-history" "${@:2}" ;;   # launcher › Sessions
+  inbox) exec python3 "$repo/config/inbox/cli.py" "${@:2}" ;;             # docs/inbox.md, Claude's inbox_post
+  claude) case ${2:-} in                                              # the Claude menu's accounts and usage
+          accounts) exec "$repo/config/topbar/scripts/claude-accounts" "${@:3}" ;;
+          usage) exec "$repo/config/topbar/scripts/claude-usage" "${@:3}" ;;
+          *) usage >&2; exit 1 ;;
+        esac ;;
   mcp) case ${2:-} in
         "") exec python3 "$repo/config/mcp/server.py" ;;               # Dashboard #1761; Claude Code runs it
         install|remove|status) exec python3 "$repo/config/mcp/register.py" "${@:2}" ;;
@@ -156,6 +184,7 @@ case ${1:-} in
         *) usage >&2; exit 1 ;;
       esac ;;
   welcome) exec "$repo/config/welcome/welcome" "${@:2}" ;;             # Welcome to Nightdrive (launcher › System › Set up Nightdrive)
+  displays) exec "$repo/config/displays/displays" "${@:2}" ;;           # Displays (Settings › Display › Arrange displays)
   ""|help|-h|--help) usage ;;
   *) usage >&2; exit 1 ;;
 esac

@@ -5,6 +5,8 @@ the message, and Claude's mail_invitation). Putting it in a calendar is invite_w
     invite.py [FILE|-] [--json]                 what the invitation is, and where its event is already
     invite.py [FILE|-] --add CALENDAR [--json]  its event into CALENDAR, or the copy already in one brought up to date
     invite.py [FILE|-] --remove [--json]        a cancelled event (METHOD:CANCEL) out of the calendar it is in
+    invite.py [FILE|-] --as ADDRESS [--json]    with reply: whether ADDRESS can answer it (invite_reply.py: --reply
+                                                and --answered, Accept, Maybe or Decline to the organiser)
 
 FILE is the .ics, - (the default) stdin. What it prints:
     method, uid, title, start, end, all_day, location, organizer {name, address}, notes, recurring, occurrence (the
@@ -18,7 +20,8 @@ start and end are write.py's local forms (an all-day event's end is its last day
     gone       METHOD:CANCEL, and it isn't in any calendar
     reply      METHOD:REPLY, someone's answer to an invitation of yours: nothing to add
 existing: the calendar it is in {calendar, calendar_name, read_only, title, start, end, location}, or null;
-calendars: those that take events [{id, name, color}], for the card's picker.
+calendars: those that take events [{id, name, color}], for the card's picker. With --as, reply: {can, why, answer
+(ACCEPTED, TENTATIVE, DECLINED or null), to (the organiser), as}.
 
 The file comes from a stranger's mail, so it is only read as data: at most MAX_BYTES, its text cut to a length and
 without control characters, nothing in it opened or fetched (its URL, ATTACH and alarms aren't even kept).
@@ -214,6 +217,16 @@ def text(info):
 def main(argv):
     as_json = "--json" in argv
     args = [a for a in argv if a != "--json"]
+    if "--reply" in args or "--answered" in args:
+        import invite_reply   # answering the organiser (#2130): only then
+        return invite_reply.main(args, as_json)
+    address = None
+    if "--as" in args:
+        i = args.index("--as")
+        if i + 1 >= len(args):
+            sys.exit("Usage: calendar invite [FILE|-] --as ADDRESS")
+        address = args[i + 1].strip()
+        del args[i:i + 2]
     action = None
     if "--remove" in args:
         args.remove("--remove")
@@ -233,6 +246,9 @@ def main(argv):
         print(json.dumps(result, ensure_ascii=False) if as_json else result["said"])
         return
     info = describe(ics)
+    if address:
+        import invite_reply
+        info["reply"] = invite_reply.status(ics, info, address)
     print(json.dumps(info, ensure_ascii=False) if as_json else text(info))
 
 

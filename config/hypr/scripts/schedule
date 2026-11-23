@@ -1,0 +1,557 @@
+#!/usr/bin/python3 -I
+"""Commands run at a time or on an event (Dashboard #3121): `nightdrive schedule …` runs this.
+
+  schedule WHEN [--from WHEN] [--run|--claude|--to SESSION] LINE… [--json]
+                                       LINE at WHEN: minutes (15, 90m, 2h, 1h30m, up to a week), a time of day (14:45,
+                                       14.45: the next one), wake (the first unlock after the computer next wakes from
+                                       sleep), login (the next login), "arrive PLACE" or "leave PLACE" (a place of
+                                       `nightdrive places`: its Wi-Fi comes or goes); @UNIX: that moment (the undo of a
+                                       cancel). --from: an event not before then (05:00: the next one, 8h, 2026-11-23
+                                       05:00), so "arrive work --from 05:00" said in the evening waits for the morning.
+                                       An arrival or a leaving not seen in a week asks, Run or Skip.
+                                       A LINE whose first word is a program in PATH, or nightdrive, is a command (Run):
+                                       one argument is a shell line as such ("make && notify-send done"); several are
+                                       words, quoted for the shell as given. Any other is a message to Claude (Ask
+                                       Claude, schedule_claude.py): a new session in a window of its own gets it, or
+                                       with --to that session (an id or a name, as `nightdrive sessions` shows them).
+                                       --run and --claude say which instead. --json: the row, as list gives each.
+                                       --dry-run: nothing added, only how it is read (the launcher's Schedule shows Run
+                                       or Ask Claude before Enter): the row with id null, or {error} with --json; no
+                                       LINE: only WHEN is checked (kind and command null)
+                                       --card: what Claude's card shows of it (schedule_add), as JSON; adds nothing.
+                                       One Claude's tool adds (NIGHTDRIVE_MCP=1) is by Claude in the list and in its
+                                       notifications (Jari 19.11.: it was allowed on the card as it was added)
+  schedule list [--json]               the waiting ones, by time, then wake, login, arrive, leave. --json: {commands:
+                                       [{id, when, label, at, at_unix, clock, minutes_left, state, kind, to, command,
+                                       by, place, from}]}: when is time, wake, login, arrive or leave, label 14:45,
+                                       wake, login or "arrive work" (at, at_unix, clock, minutes_left are null for an
+                                       event); place is the place (or null), from the --from moment as ISO (or null);
+                                       by is user or claude; state is waiting, unlock (its time or event came under
+                                       the lock), missed (asks Run or Skip) or due; kind is run or claude, to the
+                                       session a message is for (or null), command the line or the message
+  schedule show ID --json              one of them, as list gives it
+  schedule run ID                      runs one now, whatever it waits for (a missed one, say)
+  schedule cancel ID|all [--json]      takes one (or every one) away before it runs
+  schedule uncancel ID [--json]        a cancelled one back as it was (the undo of a cancel), unless its time passed
+  schedule restore                     at login (hypr/autostart.lua): the timers again, login's rows run, missed ones
+                                       under LATE_HOURS late run and older ones ask (Run / Skip)
+  schedule woke                        after sleep (hypridle's after_sleep_cmd): wake's rows wait for the unlock
+  schedule unlocked                    at each unlock but the login's (autostart.lua): what waited for it runs
+  schedule event arrive|leave PLACE [--json]
+                                       `places check`'s call: the rows waiting for it run (under the lock: at the
+                                       unlock), each once. --json: {event, place, due: [ids], unlock: [ids]}
+  schedule expire ID                   an arrival's or a leaving's week timer: still waiting, it asks Run or Skip
+  schedule fire ID [--now]             the timer's own call: runs the command, with a notification; under the lock
+                                       it waits for the unlock instead (--now: runs it anyway)
+  schedule send [--to SESSION] MESSAGE…   a message's run (fire runs it as a command): to that session, or a new one
+
+Nothing runs unseen: what waits is in `schedule list`, and a run shows a notification with the command (Running…, then
+Done, or Failed with the end of its output, pinned). The whole output goes to the journal:
+journalctl --user -u 'nightdrive-schedule-ID*'. A command runs once, in a systemd scope of its own (a window it opens
+stays open after the run), from the home folder, with the desktop's environment and ~/.local/bin in PATH.
+
+The timers are timers.py's, as Remind's: a transient systemd user timer on the wall clock, so a time that passed while
+the computer slept comes as it wakes, and waits for the unlock (Jari 19.11.: nothing runs behind the lock). Over a
+logout or a restart the timer goes and the row stays: the next login runs it if it is under LATE_HOURS late, and asks
+about an older one.
+"""
+import argparse, datetime, json, os, secrets, shlex, subprocess, sys, tempfile, time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import timers  # noqa: E402  the timer base shared with remind (timers.py)
+import schedule_claude as claude  # noqa: E402  a message to Claude: how it is told apart and where it goes
+import events  # noqa: E402  the event WHENs shared with remind: wake, login, arrive PLACE, leave PLACE (events.py)
+import schedule_events as event_runs  # noqa: E402  restore, woke, unlocked, event, expire, ask: runs but the timer's
+
+STATE = os.path.expanduser("~/.local/state/nightdrive/schedule.json")
+CANCELLED = os.path.expanduser("~/.local/state/nightdrive/schedule-cancelled.json")   # for uncancel, the last KEEP
+KEEP_CANCELLED = 20
+UNIT = "nightdrive-schedule-"       # + the id: the timer, its service, a run now (-now) and the command's scope (-run)
+MAX_MINUTES = 7 * 24 * 60           # a week, as Remind's
+APP, ICON = "Schedule", "lucide:calendar-clock"
+TAIL_LINES = 3                      # of a failed run's output, in its notification
+SELF = os.path.realpath(__file__)   # the timer runs this checkout's script (a worktree's or the sandbox's own)
+
+
+def die(msg, code=1):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def state():
+    # STATE read at each call: the tests point it elsewhere
+    return timers.locked_rows(STATE, "commands")
+
+
+def cancelled():
+    return timers.locked_rows(CANCELLED, "commands")
+
+
+def timed(r):
+    """It has a timer: its time, or an arrival's or a leaving's week (events.deadline), after which it is asked about."""
+    return "on" not in r or events.deadline(r) is not None
+
+
+def arm(r):
+    if "on" in r:
+        return timers.arm(UNIT + r["id"], events.deadline(r), "Nightdrive schedule: still waiting for " + label(r),
+                          [SELF, "expire", r["id"]])
+    return timers.arm(UNIT + r["id"], r["at"], "Nightdrive schedule: " + r["command"][:60], [SELF, "fire", r["id"]])
+
+
+def disarm(rid):
+    timers.disarm(UNIT + rid)
+
+
+def screen_locked():
+    return events.screen_locked()   # here by name: the tests patch schedule.screen_locked
+
+
+def start_now(rid):
+    """Runs a row now as a service of its own (`fire --now`), so its output goes to the journal as a timer's would, and
+    the caller (a login's restore, an unlock) doesn't wait for it. The unit's name keeps one row from running twice."""
+    p = subprocess.run(["systemd-run", "--user", "--quiet", "--collect", "--unit", UNIT + rid + "-now",
+                        "--description", "Nightdrive schedule: run now", "--", SELF, "fire", rid, "--now"],
+                       capture_output=True, text=True)
+    return p.returncode == 0
+
+
+def command_line(words):
+    """The words after WHEN → one shell line. A single word is a line as typed (it may hold && or a pipe); several
+    are quoted one by one, so `schedule 15 notify-send "Tea is ready"` keeps its message whole."""
+    words = [w for w in words if w.strip()]
+    if len(words) == 1:
+        return words[0].strip()
+    return shlex.join(words)
+
+
+def syntax_error(line):
+    """sh's complaint about the line (an unclosed quote), or "" when it would parse: caught now, not at its time."""
+    p = subprocess.run(["sh", "-n", "-c", line], capture_output=True, text=True)
+    return "" if p.returncode == 0 else (p.stderr.strip() or "it doesn't parse")
+
+
+def public(r, now=None):
+    now = time.time() if now is None else now
+    out = {"id": r["id"], "when": r.get("on", "time"), "label": label(r), "at": None, "at_unix": None, "clock": None,
+           "minutes_left": None, "state": r.get("state", "waiting"), "kind": r.get("kind", "run"),
+           "to": r.get("to"), "command": r["command"], "by": r.get("by", "user"), **events.public(r)}
+    if "on" not in r:
+        out.update(at=timers.iso(r["at"]), at_unix=int(r["at"]), clock=timers.clock(r["at"]),
+                   minutes_left=timers.minutes_left(r["at"], now))
+    return out
+
+
+def what(r):
+    """What a row does, as the list and the notifications say it: the command, or Ask Claude [→ SESSION]: message."""
+    if r.get("kind") != "claude":
+        return r["command"]
+    return "Ask Claude" + (" → " + r["to"] if r.get("to") else "") + ": " + r["command"]
+
+
+def by_claude(r):
+    """The notifications' and the list's mark on a row Claude's tool added."""
+    return " · by Claude" if r.get("by") == "claude" else ""
+
+
+def label(r):
+    """When it runs, short: 14:45, wake, login, arrive work."""
+    return events.label(r) if "on" in r else timers.clock(r["at"])
+
+
+def order(r):
+    return (1, events.EVENTS.index(r["on"]), r.get("place", "").casefold()) if "on" in r else (0, r["at"], "")
+
+
+def notify(rid, summary, body="", pinned=False, actions=()):
+    """One notification per run: the stack tag makes Done or Failed take Running's place (Notifs.qml), without a sound.
+    With actions ([(key, label)]) it waits for the answer and returns the key, "" when it was dismissed."""
+    args = ["notify-send", "-a", APP, "-i", ICON, "-h", "string:x-dunst-stack-tag:schedule-" + rid]
+    if pinned:   # stays until dismissed (Notifs.qml's x-nightdrive-pin)
+        args += ["-h", "boolean:x-nightdrive-pin:true"]
+    if actions:
+        args += ["-w", *[f"--action={k}={v}" for k, v in actions]]
+    p = subprocess.run([*args, "--", summary, body], capture_output=True, text=True)
+    return p.stdout.strip()
+
+
+def run_command(rid, line):
+    """Runs the line to its end → (exit code, its output). In a scope of its own: the timer's service is stopped when
+    this returns, and with it whatever is left in its cgroup, such as a terminal the command opened."""
+    env = dict(os.environ)
+    local_bin = os.path.expanduser("~/.local/bin")   # `nightdrive …`: the user's PATH has it, systemd's may not
+    if local_bin not in env.get("PATH", "").split(":"):
+        env["PATH"] = local_bin + ":" + env.get("PATH", "/usr/bin:/bin")
+    # Output to a file, not a pipe: a window the command leaves running would hold a pipe open, and this would wait
+    with tempfile.TemporaryFile("w+") as out:
+        try:
+            code = subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--unit",
+                                   UNIT + rid + "-run", "--", "sh", "-c", line],
+                                  stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
+                                  cwd=os.path.expanduser("~"), env=env).returncode
+        except OSError as e:
+            return 127, str(e)
+        out.seek(0)
+        return code, out.read()
+
+
+def execute(r):
+    """The run as such, with its notifications: Running, then Done or Failed (pinned, with its output's end)."""
+    if "on" in r:
+        note = events.describe(r)
+    elif time.time() - r["at"] > 120:   # a late one says it is: the clock time alone would look wrong
+        note = "Was due at " + timers.clock(r["at"])
+    else:
+        note = "Scheduled for " + timers.clock(r["at"])
+    note += by_claude(r)
+    ask = r.get("kind") == "claude"
+    notify(r["id"], ("" if ask else "Running: ") + what(r), note)
+    line = claude.send_line(SELF, r.get("to"), r["command"]) if ask else r["command"]
+    code, output = run_command(r["id"], line)
+    if output:
+        print(output, end="" if output.endswith("\n") else "\n")   # to the journal, whole
+    if code == 0:   # a message's says where it went: its window, a resumed one, a new session
+        notify(r["id"], "Done: " + what(r), output.strip().splitlines()[-1] if ask and output.strip() else "")
+    else:
+        tail = "\n".join(output.strip().splitlines()[-TAIL_LINES:])
+        notify(r["id"], f"Failed (exit {code}): " + what(r),
+               (tail + "\n" if tail else "") + f"journalctl --user -u '{UNIT}{r['id']}*'", pinned=True)
+
+
+def cmd_add(a):
+    dry = getattr(a, "dry_run", False)
+
+    def refuse(msg):
+        if dry and a.json:   # the launcher reads stdout only: the reason there, as JSON
+            print(json.dumps({"error": msg}, ensure_ascii=False))
+            sys.exit(2)
+        die(msg, 2)
+    now = int(time.time())
+    try:
+        ev = events.parse(a.when)
+        start = events.parse_from(a.from_, now) if getattr(a, "from_", None) else None
+    except events.WhenError as e:
+        refuse(str(e))
+    on = ev["on"] if ev else None
+    at = None if on else timers.when(a.when, now, MAX_MINUTES)
+    if not on and at is None:
+        refuse("Minutes up to a week (15, 90m, 2h, 1h30m), a time of day (14:45), wake, login, arrive PLACE or "
+               "leave PLACE; a moment (@UNIX) not past and within a week")
+    if start and not on:
+        refuse("--from goes with an event (arrive work --from 05:00): a time is its own already")
+    if dry and not [w for w in a.command if w.strip()]:   # the time alone, as the launcher's first step checks it
+        r = {"id": None, "command": None, **(events.row(ev, now, start) if on else {"at": at})}
+        print(json.dumps({**public(r, now), "kind": None}, ensure_ascii=False) if a.json else label(r))
+        return
+    forced = getattr(a, "run", False) or getattr(a, "claude", False) or getattr(a, "to", None)
+    k = "claude" if getattr(a, "claude", False) or getattr(a, "to", None) else \
+        "run" if getattr(a, "run", False) else claude.kind(a.command)
+    line = command_line(a.command) if k == "run" else claude.message(a.command)
+    if not line:
+        refuse("What to run: schedule WHEN COMMAND, or a message to Claude")
+    err = syntax_error(line) if k == "run" else ""
+    if err:
+        refuse("The command doesn't parse: " + err)
+    to = None
+    if getattr(a, "to", None):
+        try:
+            to = claude.target(a.to, claude.sessions())
+        except ValueError as e:
+            refuse(str(e))
+    r = {"id": None if dry else secrets.token_hex(4), "command": line, **(events.row(ev, now, start) if on else {"at": at}),
+         **({"kind": "claude", "to": to} if k == "claude" else {})}
+    if os.environ.get("NIGHTDRIVE_MCP") == "1":   # Claude's tool (config/mcp/run.py sets it), not an argument: what
+        r["by"] = "claude"                         # Claude gives can't take the mark away
+    if getattr(a, "card", False):
+        print(json.dumps(card(r, now), ensure_ascii=False))
+        return
+    if dry:
+        print(json.dumps(public(r, now), ensure_ascii=False) if a.json else f"{label(r)}  {k}: {what(r)}")
+        return
+    with state() as rows:
+        if timed(r):
+            ok, err = arm(r)
+            if not ok:
+                die("The timer didn't start: " + (err or "systemd-run failed"))
+        rows.append(r)
+    if a.json:
+        print(json.dumps(public(r), ensure_ascii=False))
+    else:
+        print(f"{events.describe(r, now) if on else 'At ' + timers.clock(at)}: {'' if k == 'claude' else 'Run: '}{what(r)}  "
+              f"({r['id']})")
+        if not forced:   # read by its first word: how to say the other
+            print("  A message to Claude: --run runs it as a command" if k == "claude" else
+                  "  A command: --claude sends it to Claude as a message")
+
+
+def card(r, now):
+    """What Claude's card shows above the arguments (schedule_add's card): when, said in full, and how the line was
+    read, so the user allows what will happen, not only the words Claude gave."""
+    if "on" in r:
+        when = events.card_when(r, now)
+        if events.deadline(r):
+            when += f"; if not by {events.day_clock(events.deadline(r), now)}, it asks: Run or Skip"
+    else:
+        days = (datetime.date.fromtimestamp(r["at"]) - datetime.date.fromtimestamp(now)).days
+        day = {0: "today", 1: "tomorrow"}.get(days) or datetime.date.fromtimestamp(r["at"]).strftime("%a %-d.%-m.")
+        when = f"{timers.clock(r['at'])} {day}, in {timers.minutes_left(r['at'], now)} min"
+    if r.get("kind") == "claude":
+        does = ("Session " + r["to"] + " gets it as a message" if r.get("to") else
+                "A new Claude Code session gets it as a message, in a window of its own")
+    else:
+        does = "Runs it as a shell command, with a notification of how it went"
+    return {"When": when, "What happens": does}
+
+
+def cmd_list(a):
+    now = time.time()
+    with state() as rows:
+        rows.sort(key=order)
+        out = [public(r, now) for r in rows]
+        said = {r["id"]: events.describe(r, now) for r in rows if "on" in r}
+    if a.json:
+        print(json.dumps({"commands": out}, ensure_ascii=False))
+    elif not out:
+        print("No commands waiting")
+    for r in [] if a.json else out:
+        if not r["clock"]:
+            when = said[r["id"]][:1].lower() + said[r["id"]][1:]
+        elif r["at_unix"] <= time.time():   # waits for the unlock, or missed: when it was due
+            when = "was due " + r["at"][:16].replace("T", " ")
+        else:
+            when = f"{r['clock']}  in {r['minutes_left']} min"
+        st = "" if r["state"] == "waiting" else f"  [{r['state']}]"
+        by = "  by Claude" if r["by"] == "claude" else ""
+        print(f"{when}  {'' if r['kind'] == 'claude' else 'Run: '}{what(r)}{st}{by}  ({r['id']})")
+
+
+def find(rows, rid):
+    r = next((r for r in rows if r["id"] == rid), None)
+    if not r:
+        die(f"No command {rid}: it ran already, or was cancelled (schedule list)")
+    return r
+
+
+def cmd_show(a):
+    with state() as rows:
+        r = find(rows, a.id)
+    print(json.dumps(public(r), ensure_ascii=False) if a.json else f"{label(r)}  {what(r)}")
+
+
+def cmd_run(a):
+    with state() as rows:
+        find(rows, a.id)
+    disarm(a.id)   # its timer, if it has one, would run it again at its time
+    if not start_now(a.id):
+        die("It didn't start: systemd-run failed")
+    print("Running: see its notification")
+
+
+def cmd_cancel(a):
+    with state() as rows:
+        gone = [r for r in rows if a.id in ("all", r["id"])]
+        if not gone and a.id != "all":
+            die(f"No command {a.id}: it ran already, or was cancelled (schedule list)")
+        for r in gone:
+            if timed(r):
+                disarm(r["id"])
+            rows.remove(r)
+    if gone:   # kept a while, whole, so its undo gives back the same row (its by, its session), not a new one
+        with cancelled() as kept:
+            kept[:] = [k for k in kept if k["id"] not in {r["id"] for r in gone}] + gone
+            del kept[:-KEEP_CANCELLED]
+    if a.json:
+        print(json.dumps({"cancelled": [public(r) for r in gone]}, ensure_ascii=False))
+    else:
+        print("\n".join(f"Cancelled: {r['command']}" for r in gone) or "No commands waiting")
+
+
+def cmd_uncancel(a):
+    """A cancelled row back as it was, its timer armed again: the undo of a cancel (Claude's schedule_cancel). One whose
+    time has passed meanwhile stays cancelled: it would run at once, which the cancel's undo never meant."""
+    with cancelled() as kept:
+        r = next((k for k in kept if k["id"] == a.id), None)
+        if not r:
+            die(f"No cancelled command {a.id}: it is back already, or was cancelled long ago")
+        if "on" not in r and r["at"] <= time.time():
+            die(f"Its time ({timers.clock(r['at'])}) has passed: schedule it again")
+        if (events.deadline(r) or float("inf")) <= time.time():
+            die("Its week of waiting has passed: schedule it again")
+        r = {k: v for k, v in r.items() if k != "state"}   # unlock or missed was about the time it had
+        with state() as rows:
+            if any(x["id"] == r["id"] for x in rows):
+                die(f"{a.id} is waiting already (schedule list)")
+            if timed(r):
+                ok, err = arm(r)
+                if not ok:
+                    die("The timer didn't start: " + (err or "systemd-run failed"))
+            rows.append(r)
+        kept[:] = [k for k in kept if k["id"] != a.id]
+    if a.json:
+        print(json.dumps(public(r), ensure_ascii=False))
+    else:
+        print(f"Back: {label(r)}  {what(r)}  ({r['id']})")
+
+
+def cmd_fire(a):
+    # The row goes before the run: a command runs once, even if this is stopped halfway (a logout mid-run). Under the
+    # lock (its time came while the computer slept, or while away) it stays, to run at the unlock
+    with state() as rows:
+        r = next((r for r in rows if r["id"] == a.id), None)
+        if r and not getattr(a, "now", False) and screen_locked():
+            r["state"] = "unlock"
+            return
+        if r:
+            rows.remove(r)
+    if r:   # cancelled meanwhile: nothing runs
+        execute(r)
+
+
+class Host:
+    """This script as schedule_events sees it: each name looked up when used, so a test's patch of schedule.X counts."""
+    def __getattr__(self, name):
+        return globals()[name]
+
+
+def cmd_restore(a):
+    event_runs.restore(Host())
+
+
+def cmd_ask(a):
+    event_runs.ask(Host(), a.id)
+
+
+def cmd_woke(a):
+    event_runs.woke(Host())
+
+
+def cmd_unlocked(a):
+    event_runs.unlocked(Host())
+
+
+def cmd_event(a):
+    out = event_runs.event(Host(), a.kind, a.place)
+    if a.json:
+        print(json.dumps(out, ensure_ascii=False))
+    elif out["due"] or out["unlock"]:
+        print(f"Running {len(out['due'])}" + (f", {len(out['unlock'])} at the unlock" if out["unlock"] else ""))
+    else:
+        print(f"Nothing waits for {a.kind} {a.place}")
+
+
+def cmd_expire(a):
+    event_runs.expire(Host(), a.id)
+
+
+def parse_add(argv):
+    """[options] WHEN [options] [--] COMMAND…: options (--json, --dry-run, --run, --claude, --to SESSION) only before the command,
+    so `schedule 15 ls -la` keeps its -la and a command ending in --json keeps it. None when WHEN is missing, an option
+    is unknown, --to has no session, or --run comes with --claude or --to."""
+    a = argparse.Namespace(cmd="add", json=False, run=False, claude=False, to=None, when=None, command=[], dry_run=False,
+                           card=False, from_=None)
+    skip = False
+    for i, w in enumerate(argv):
+        if skip:
+            skip = False
+            continue
+        if w in ("--json", "--run", "--claude", "--dry-run", "--card"):
+            setattr(a, w[2:].replace("-", "_"), True)
+        elif w in ("--to", "--from") or w.startswith(("--to=", "--from=")):
+            name, _, value = w[2:].partition("=")
+            value = value if "=" in w else (argv[i + 1] if i + 1 < len(argv) else "")
+            if not value.strip():
+                return None
+            setattr(a, "to" if name == "to" else "from_", value)
+            skip = "=" not in w
+        elif (a.when or "").lower() in events.PLACED and not w.startswith("-"):   # arrive work, unquoted: the place is WHEN's
+            a.when += " " + w
+        elif w == "--":
+            a.command = argv[i + 1:]
+            break
+        elif a.when is None and not w.startswith("-"):
+            a.when = w
+        elif a.when is not None:
+            a.command = argv[i:]
+            break
+        else:
+            return None
+    if a.run and (a.claude or a.to):
+        return None
+    return a if a.when is not None else None
+
+
+def cmd_send(argv):
+    """[--to SESSION] [--] MESSAGE…: a message's run, or one sent now by hand. SESSION as the row keeps it (an id or a
+    name: schedule_claude.target); what happened goes to stdout, the run's notification shows its last line."""
+    to = None
+    if argv[:1] == ["--to"] and len(argv) > 1:
+        to, argv = argv[1], argv[2:]
+    if argv[:1] == ["--"]:
+        argv = argv[1:]
+    text = claude.message(argv)
+    if not text:
+        die("What to send: schedule send [--to SESSION] MESSAGE", 2)
+    found = claude.sessions()
+    if to and not claude.pick(to, found):   # typed by hand: a part of a name, as an add takes it
+        try:
+            to = claude.target(to, found)
+        except claude.Ambiguous as e:
+            die(str(e), 2)
+        except ValueError:
+            pass   # none has it: a new session of that name, as for a row whose sessions are gone
+    code, said = claude.deliver(to, text, found)
+    print(said)
+    sys.exit(code)
+
+
+def main():
+    p = argparse.ArgumentParser(prog="nightdrive schedule", description=__doc__.split("\n\n")[0],
+                                formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n\n")[1])
+    sub = p.add_subparsers(dest="cmd")
+    sub.add_parser("add")   # parsed by parse_add: the command's own options aren't argparse's
+    sub.add_parser("send")  # parsed by cmd_send: the message's words are its own
+    ls = sub.add_parser("list")
+    ls.add_argument("--json", action="store_true")
+    for name in ("show", "cancel", "uncancel"):
+        s = sub.add_parser(name)
+        s.add_argument("id")
+        s.add_argument("--json", action="store_true")
+    for name in ("run", "ask"):
+        sub.add_parser(name).add_argument("id")
+    fire = sub.add_parser("fire")
+    fire.add_argument("id")
+    fire.add_argument("--now", action="store_true")
+    for name in ("restore", "woke", "unlocked"):
+        sub.add_parser(name)
+    ev = sub.add_parser("event")
+    ev.add_argument("kind", choices=events.PLACED)
+    ev.add_argument("place")
+    ev.add_argument("--json", action="store_true")
+    sub.add_parser("expire").add_argument("id")
+    argv = sys.argv[1:]
+    first = next((w for w in argv if not w.startswith("-")), None)   # past a leading --json
+    if any(w in ("-h", "--help") for w in argv[:1]):
+        pass
+    elif first is None:
+        argv = ["list", *argv]          # `schedule` or `schedule --json`: the list
+    elif first in sub.choices:
+        argv.remove(first)
+        argv = [first, *argv]           # `schedule --json list`
+    else:
+        argv = ["add", *argv]           # `schedule 15 make`, `schedule --json wake make`
+    if argv[0] == "send":
+        return cmd_send(argv[1:])
+    if argv[0] == "add":
+        a = parse_add(argv[1:])
+        if a is None:
+            p.print_help(sys.stderr)
+            sys.exit(2)
+    else:
+        a = p.parse_args(argv)
+    {"add": cmd_add, "list": cmd_list, "show": cmd_show, "run": cmd_run, "cancel": cmd_cancel,
+     "uncancel": cmd_uncancel, "fire": cmd_fire, "restore": cmd_restore, "ask": cmd_ask, "woke": cmd_woke,
+     "unlocked": cmd_unlocked, "event": cmd_event, "expire": cmd_expire}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    main()

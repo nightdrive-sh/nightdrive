@@ -1,0 +1,51 @@
+{
+  "opus-mt": {
+    "name": "Opus-MT",
+    "type": "ct2",
+    "summary": "offline, good with sentences",
+    "size": "160 MB",
+    "homepage": "https://github.com/Helsinki-NLP/Opus-MT",
+    "license": "CC-BY 4.0",
+    "pairs": {
+      "fi-en": {
+        "url": "https://object.pouta.csc.fi/OPUS-MT-models/fi-en/opus-2020-02-13.zip",
+        "sha256": "1918c5bb67b860bbe8202bea37b6d592bddc626aa31ffbdf8f966b7c710a9bec"
+      },
+      "en-fi": {
+        "url": "https://object.pouta.csc.fi/OPUS-MT-models/en-fi/opus%2Bbt-2020-02-26.zip",
+        "sha256": "666e9d7c1f6ba881c322ded2861eab8f4a49277d83a745bf51340bbcc6ac4147"
+      }
+    }
+  },
+  "nllb-200": {
+    "name": "NLLB-200",
+    "type": "nllb",
+    "summary": "offline, 200 languages, non-commercial licence",
+    "size": "630 MB",
+    "homepage": "https://github.com/facebookresearch/fairseq/tree/nllb",
+    "license": "CC-BY-NC 4.0",
+    "base": "https://huggingface.co/JustFrederik/nllb-200-distilled-600M-ct2-int8/resolve/302d78f00e6fdb50a1064059df7c392b735e9d05/",
+    "files": {
+      "config.json": "0c2f6fa2057c7264d052fb4a62ba3476eeae70487acddfa8e779a53a00cbf44c",
+      "shared_vocabulary.txt": "a132a83330f45514c2476eb81d1d69b3c41762264d16ce0a7ea982e5d6c728e5",
+      "sentencepiece.bpe.model": "14bb8dfb35c0ffdea7bc01e56cea38b9e3d5efcdcb9c251d6b40538e1aab555a",
+      "model.bin": "ed1beaf75134de7505315a5223162f56acff397eff6b50638a500d3936fe707b"
+    }
+  },
+  "google": {
+    "name": "Google Translate",
+    "type": "trans",
+    "summary": "online, best with single words (translate-shell)",
+    "homepage": "https://github.com/soimort/translate-shell",
+    "packages": ["translate-shell"],
+    "online": true
+  },
+  "claude": {
+    "name": "Claude",
+    "type": "claude",
+    "summary": "online, slower, on Enter",
+    "model": "haiku",
+    "online": true,
+    "live": false
+  }
+}

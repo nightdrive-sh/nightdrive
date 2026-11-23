@@ -11,6 +11,9 @@ plugin_install() {
   [[ $dir == - ]] && dir=$repo
   [[ -e $off/$id ]] && plugin_switch on "$id" >/dev/null
   echo "==> $name"
+  # Its commands first, as link.sh links them: an installer that puts the app among the desktop's apps (Recorder's) would
+  # otherwise leave an entry whose Exec isn't there yet after a pull without link.sh (9.11.2026)
+  [[ -f $repo/plugins/$id/plugin.conf ]] && plugin_link "$repo/plugins/$id"
   case $inst in
     "flatpak "*)
       flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo

@@ -20,8 +20,11 @@ import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
-import keyring
+# The kit's keyring.py, through the app's link to the kit (first, so a pip `keyring` can't shadow it)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app" / "kit"))
+import keyring  # noqa: E402
 
 ISYNCRC = os.path.expanduser("~/.config/isyncrc")
 NIGHTMAIL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "nightmail")

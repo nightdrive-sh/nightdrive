@@ -12,7 +12,7 @@
 
 reply, forward and resume say which account the message came to ("account": the one whose folder under ~/Mail it is
 in), and send and draft use the account the JSON names. JSON holds account, to, cc, subject, body, attachments (file
-paths) and, for a reply, in_reply_to and references; draft_id is
+paths) and, for a reply, in_reply_to and references (calendar: an invitation's answer, an iTIP REPLY); draft_id is
 the copy saved in Drafts before, which a new save or sending removes. A forward's or a draft's attachments are copied
 out of the message into ~/.cache/nightmail/parts/ first, so a message is always built from files. Every command prints one JSON object;
 failures are {"error": "..."}, so the window can show them.
@@ -52,6 +52,7 @@ import sys
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, getaddresses, make_msgid, parseaddr, parsedate_to_datetime
 
+import blanks
 import ids
 
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "nightmail", "account.conf")
@@ -151,8 +152,9 @@ def reply(msgid, to_all):
     h, orig = data["reply-headers"], data["original"]
     when = parsedate_to_datetime(orig["headers"]["Date"]).strftime("%a %d %b %Y, %H:%M") if orig["headers"].get("Date") else ""
     name, addr = parseaddr(orig["headers"].get("From", ""))
-    # notmuch reply leaves an HTML part's text out: an HTML-only message is read from its file
-    quoted = "\n".join(">" + line if line.startswith(">") else "> " + line if line else ">" for line in (plain_text(orig.get("body", [])) or body_text(parsed(msgid))).rstrip().split("\n"))
+    # notmuch reply leaves an HTML part's text out: an HTML-only message is read from its file. Its blank lines are
+    # tidied as the read view shows them (blanks.py): no long runs of ">" lines from a newsletter's padding.
+    quoted = "\n".join(">" + line if line.startswith(">") else "> " + line if line else ">" for line in blanks.tidy(plain_text(orig.get("body", [])) or body_text(parsed(msgid))).split("\n"))
     return {
         "to": h.get("To", ""),
         "cc": h.get("Cc", ""),
@@ -243,6 +245,9 @@ def build(acc, f):
         msg["References"] = f.get("references") or f["in_reply_to"]
     msg["User-Agent"] = "Nightdrive Mail"
     msg.set_content(f.get("body", ""))
+    if f.get("calendar"):
+        # An invitation's answer (invitation_reply.py): the iTIP REPLY beside the text, as calendars look for it
+        msg.add_alternative(f["calendar"], subtype="calendar", params={"method": "REPLY"})
     for path in f.get("attachments") or []:
         kind = mimetypes.guess_type(path)[0] or "application/octet-stream"
         with open(path, "rb") as fh:

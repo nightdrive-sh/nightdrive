@@ -19,6 +19,7 @@ Item {
         { kind: "nav", name: "Apps", glyph: "layout-grid", target: "apps" },
     ], Plugins.has("1password") ? [{ kind: "nav", name: "Passwords", glyph: "key-round", target: "passwords" }] : [], [
         { kind: "nav", name: "Clipboard", glyph: "clipboard-list", target: "clipboard" },
+        lv.sessions.rootRow,   // SessionsLevels.qml: Claude Code's sessions, running and closed
     ], ...launcher.pluginExts.map(e => e.rootItems || []), lv.home.rootItems, launcher.ext ? launcher.ext.rootItems : [], [
         { kind: "nav", name: "Tools", glyph: "wrench", target: "tools" },
         { kind: "nav", name: "Keybindings", glyph: "keyboard", target: "keys" },
@@ -45,6 +46,8 @@ Item {
             { kind: "nav", name: "Screenshot", glyph: "camera", target: "screenshot" },
             { kind: "nav", name: "Emoji", glyph: "smile", target: "emoji" },
             { kind: "nav", name: "Snippets", glyph: "text-cursor-input", target: "snippets", extra: "text expansion replacement abbreviation autotext" },
+            lv.remind.toolRow,   // RemindLevels.qml: a reminder banner in N minutes
+            lv.schedule.toolRow, // ScheduleLevels.qml: a command or a message to Claude, run once later
             { kind: "action", name: "Color Picker", glyph: "pipette", cmd: ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/color-picker\""] },
             // as ⌘⌃C, once the launcher is gone: the window under it is what's gathered, and its screenshot is without the launcher
             { kind: "action", name: "Send to Claude", glyph: "bot", keyHint: true, extra: "selection files picture screenshot prompt claude code",
@@ -58,7 +61,9 @@ Item {
         screenshot: [
             { kind: "action", name: "Region", glyph: "crop", cmd: shot("region") },
             { kind: "action", name: "Window", glyph: "app-window", cmd: shot("window") },
-            { kind: "action", name: "Full screen", glyph: "monitor", cmd: shot("full") }
+            { kind: "action", name: "Full screen", glyph: "monitor", cmd: shot("full") },
+            // OCR: a region's text to the clipboard, no picture kept (hypr/scripts/screenshot-text)
+            { kind: "action", name: "Text", glyph: "scan-text", cmd: shot("text"), extra: "ocr recognise copy text" }
         ],
         install: [
             { kind: "nav", name: "Software", glyph: "package-plus", target: "software", summary: "dnf + Flatpak" },

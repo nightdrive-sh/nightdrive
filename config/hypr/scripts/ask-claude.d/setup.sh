@@ -3,6 +3,8 @@
 # decide, as in any session. The web too: Claude Code's WebSearch and WebFetch are on only when Access › Web's Read is
 # Allow (#2241).
 # shellcheck shell=bash
+# The parts share their globals with ask-claude, which sources them all (shellcheck can't follow its loop)
+# shellcheck disable=SC2034,SC2154
 
 readonly LIMIT=900        # seconds Claude gets for one turn, cards included; then it is stopped (log 4039: 15 min)
 readonly KEEP_DAYS=7      # days a conversation (its events, results and downloads) is kept after its last turn
@@ -37,6 +39,7 @@ claude_flags() {
   # The conversation's own folder for web_download (config/mcp/web/download.py), a resumed turn's the same; the
   # server gets it through env on its command line, which holds however Claude Code passes environments on
   files="$(conv_dir "$id")/files"
+  # shellcheck disable=SC2174   # its parent is the conversation's own folder, made 700 by start_turn
   mkdir -p -m 700 "$files" || return 1
   jq -n --arg s "$SERVER" --argjson v "$srv" --arg f "NIGHTDRIVE_ASK_FILES=$files" \
     '{ mcpServers: { ($s): ($v | .args = [$f, .command] + (.args // []) | .command = "/usr/bin/env") } }' >"$mcp"
@@ -63,6 +66,15 @@ will see your last message as a desktop notification. $tools \
 Do what the request asks with them, then answer in one to three short sentences of plain text (no Markdown, lists or \
 headings), in the language of the request. If it needs more than these tools can do, say so briefly: the user can go \
 on with this conversation in a terminal from the notification."
+  fi
+  # A dictated request (ask-claude's global `dictated`, #3154) gets the dictation's prompt: the speech model's usual
+  # mistakes, where "muistuta" and "idea" go, and the mark an unsure answer begins with, read from where the toast reads
+  # it too, so the two can't drift apart. Without either file it runs as a typed one.
+  if (( ${dictated:-0} )); then
+    local mark extra
+    mark=$(sed -n 's/^var MARK = "\(.*\)"$/\1/p' "$scripts/../../quickshell/AskClaudeUnsure.js" 2>/dev/null)
+    extra=$(cat "$scripts/ask-claude-dictated.txt" 2>/dev/null)
+    [[ -n $mark && -n $extra ]] && system+=$'\n\n'"${extra//@MARK@/"$mark"}"
   fi
 
   # --tools "" leaves out every built-in tool (Bash, Edit, Write, WebFetch, Task…), or all but WebSearch and WebFetch

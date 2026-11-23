@@ -55,19 +55,29 @@ AppRow {
                 id: who
                 textFormat: Text.PlainText
                 anchors.left: parent.left
-                width: Math.max(0, Math.min(implicitWidth, date.x - 16 - (count.visible ? count.implicitWidth : 0)))
+                width: Math.max(0, Math.min(implicitWidth, date.x - 16 - (count.visible ? count.width + count.anchors.leftMargin : 0)))
                 elide: Text.ElideRight
                 text: row.modelData.authors
                 font.family: c.font; font.pixelSize: 13
                 font.weight: row.unread ? Font.Medium : Font.Normal
                 color: c.title
             }
-            Text {
+            // The thread's messages, in a small pill so the number reads as the names' count and not loose text; muted,
+            // not the accent (that is unread's). Centred on the names and no taller than them: the row keeps its height.
+            Rectangle {
                 id: count
                 visible: row.modelData.total > 1
-                anchors.left: who.right; anchors.baseline: who.baseline
-                text: "  " + row.modelData.total
-                font: who.font; color: who.color
+                anchors.left: who.right; anchors.leftMargin: 7
+                anchors.verticalCenter: who.verticalCenter
+                width: num.implicitWidth + 10; height: Math.min(who.implicitHeight, num.implicitHeight + 2)
+                radius: 4
+                color: c.line
+                Text {
+                    id: num
+                    anchors.centerIn: parent
+                    text: row.modelData.total
+                    font.family: c.font; font.pixelSize: 11; color: row.unread ? c.title : c.dim
+                }
             }
             // Unread: a dot in the row's left padding, in the accent of the cursor by the name.
             Rectangle {
@@ -76,9 +86,20 @@ AppRow {
                 x: -11; anchors.verticalCenter: who.verticalCenter
                 color: c.primary
             }
+            // A file attached somewhere in the thread (Notmuch.attachments): a paperclip at the right edge, in the
+            // date's colour, and the date moves left to make room; the names elide before either.
+            Text {
+                id: clip
+                visible: row.modelData.attachments === true
+                anchors.right: parent.right; anchors.verticalCenter: date.verticalCenter
+                text: Icons.g("paperclip")
+                font.family: Icons.family; font.pixelSize: 11; color: date.color
+            }
             Text {
                 id: date
-                anchors.right: parent.right; anchors.baseline: who.baseline
+                anchors.right: clip.visible ? clip.left : parent.right
+                anchors.rightMargin: clip.visible ? 5 : 0
+                anchors.baseline: who.baseline
                 text: win.when(row.modelData.timestamp)
                 font.family: c.font; font.pixelSize: 11; color: row.unread ? c.title : c.faint
             }

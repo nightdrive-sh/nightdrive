@@ -1,0 +1,5 @@
+# `files enable` copies this to ~/.local/share/dbus-1/services with lib/fm1.py's path filled in: the session bus starts
+# it when an app asks to show a file in its folder, before the system's file manager (Nautilus) would be.
+[D-BUS Service]
+Name=org.freedesktop.FileManager1
+Exec=/usr/bin/python3 -I @FM1@

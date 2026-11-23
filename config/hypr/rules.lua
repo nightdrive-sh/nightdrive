@@ -49,6 +49,14 @@ hl.window_rule({
     size  = "460 monitor_h-57",             -- the screen's height under the bar; it scrolls
     move  = "monitor_w-470 47",
 })
+-- Displays (config/displays): a settings card over the windows, as macOS's; ⌘⇧T tiles it
+hl.window_rule({
+    name  = "float-displays",
+    match = { class = "^org\\.quickshell$", title = "^Displays$" },
+    float = true,
+    size  = "980 620",
+    center = true,
+})
 -- Welcome to Nightdrive (config/welcome): its window rules, and what it opens comes over it
 require("welcome")
 hl.window_rule({
@@ -81,11 +89,13 @@ hl.window_rule({
     size  = "760 520",
 })
 -- A Claude session opened in the background (nightdrive ask --background, scripts/terminal-or-claude): tiled on the
--- workspace as usual, but the keyboard stays where you are typing; a notification says it opened
+-- workspace as usual, but the keyboard stays where you are typing; a notification says it opened. Barred from
+-- group.auto_group, which would make it the shown tab of the group you are in (a PM's, pm-space.lua adds it there last)
 hl.window_rule({
     name  = "claude-background",
     match = { class = "^(sh\\.nightdrive\\.)?claude-background$" },
     no_initial_focus = true,
+    group = "barred",
 })
 hl.window_rule({
     name  = "float-help",

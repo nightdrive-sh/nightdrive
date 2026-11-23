@@ -37,6 +37,7 @@
       "command": ["tasks", "add", "--json", ["--due", "{due}"], ["--list", "{list}"], ["--note", "{note}"], ["--priority", "{priority}"], "--", "{title}"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Added the task {title}",
+      "notice_many": "Added {count} tasks",
       "class": "change",
       "area": "tasks"
     },
@@ -56,6 +57,7 @@
       "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Marked {title} done",
+      "notice_many": "Marked {count} tasks done",
       "class": "change",
       "area": "tasks"
     },
@@ -75,6 +77,7 @@
       "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Marked {title} not done",
+      "notice_many": "Marked {count} tasks not done",
       "class": "change",
       "area": "tasks"
     },
@@ -95,6 +98,7 @@
       "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Moved {title} to {due_label}",
+      "notice_many": "Moved {count} tasks to another day",
       "class": "change",
       "area": "tasks"
     },
@@ -120,6 +124,7 @@
       "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Changed the task {title}",
+      "notice_many": "Changed {count} tasks",
       "class": "change",
       "area": "tasks"
     },
@@ -139,6 +144,7 @@
       "mask": ["title", "note"],
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Moved the task {title} to the trash",
+      "notice_many": "Moved {count} tasks to the trash",
       "class": "change",
       "area": "tasks",
       "deletes": true

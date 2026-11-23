@@ -1,0 +1,122 @@
+import QtQuick
+import qs
+import qs.kit
+import "Format.js" as Format
+
+// A file or folder in the list: its glyph, name, size and when it changed (in the trash: the folder it came from and
+// when it went; found by a search, the folder it is in after its name). Marked (Space) it shows a tick in the accent; cut (x), it is faded until pasted. A click picks it, a
+// double click opens it; dragged, it goes out as text/uri-list with the other marked ones (the window's FileDrag), and
+// a folder's row takes a drop itself.
+AppRow {
+    id: row
+    required property var modelData
+    required property int index
+    required property var app
+    readonly property var file: modelData
+    readonly property bool isMarked: app.marks[file.path] === true
+    // The size, date and folder: faint on the window, but on the checked bar faint fell to 1.8:1, so lighter there (~5:1)
+    readonly property color quiet: checked ? Qt.lighter(c.dim, 1.3) : c.faint
+
+    implicitHeight: app.rowHeight
+    selected: index === app.current
+    active: app.listFocused
+    opacity: app.clip.cutSet[file.path] ? 0.5 : 1
+    checked: isMarked                    // the kit's bar beside the tick: the tick alone was easy to miss in a range
+    color: drop.containsDrag ? c.hover : checked ? (selected ? c.checkedPicked : c.checked) : selected ? c.sel : hovered ? c.hover : "transparent"
+    border.color: drop.containsDrag ? c.primary : selected && active ? c.frame : "transparent"
+
+    TapHandler {
+        acceptedModifiers: Qt.NoModifier
+        onTapped: { row.app.current = row.index; row.app.toList() }
+        onDoubleTapped: row.app.openAt(row.index)
+        // The picture a drag from here would carry, taken now: it isn't ready in time once the drag starts
+        onPressedChanged: if (pressed && !row.app.trashShown) row.app.drag.prepare(row.file, row.app.dragPaths(row.file.path).length)
+    }
+    // Ctrl-click marks or unmarks it, ⇧-click marks the rows from the anchor to it, ⌘⇧-click adds them (the window's
+    // markTo). Not ⌘-click, as elsewhere: ⌘ + a press is Hyprland's window drag (hypr/bindings.lua) and never reaches
+    // the app, so a click with Ctrl held is the physical Control key. One handler for every modifier: acceptedModifiers
+    // wants them exact, and ⌘⇧ comes as Meta (Hyprland turns only some ⌘ keys into Ctrl). The plain click is the
+    // handler above.
+    TapHandler {
+        acceptedModifiers: Qt.KeyboardModifierMask
+        onTapped: {
+            const m = point.modifiers
+            const cmd = (m & (Qt.ControlModifier | Qt.MetaModifier)) !== 0
+            if (m & Qt.ShiftModifier) row.app.markTo(row.index, cmd)
+            else if (m & Qt.ControlModifier) { row.app.current = row.index; row.app.toggleMarkAt(row.index) }
+            else return
+            row.app.toList()
+        }
+    }
+    DragHandler {
+        id: dragger
+        target: null
+        enabled: !row.app.trashShown
+        onActiveChanged: active ? row.app.drag.start(row, row.app.dragPaths(row.file.path)) : row.app.drag.release(row)
+    }
+    DropArea {
+        id: drop
+        anchors.fill: parent
+        enabled: row.file.dir && !row.app.trashShown
+        keys: ["text/uri-list"]
+        onDropped: e => row.app.acts.dropped(e, row.file.path, false)
+    }
+
+    Text {
+        id: glyph
+        anchors.left: parent.left; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter
+        width: 18
+        text: Icons.g(row.isMarked ? "circle-check" : Format.glyph(row.file))
+        font.family: Icons.family; font.pixelSize: row.app.compact ? 14 : 16
+        color: row.isMarked ? row.c.accent : row.file.dir ? row.c.primary : row.c.dim
+    }
+    // The name, and after it, faint, the folder a search found it in (relative to the folder searched): the name gets
+    // its full width first, and the folder at least a third of the room once both don't fit
+    readonly property real room: second.x - (glyph.x + glyph.width + 10) - 12
+    readonly property bool hasFolder: row.file.folder !== undefined && row.file.folder !== ""
+    Text {
+        id: nameText
+        textFormat: Text.PlainText
+        anchors.left: glyph.right; anchors.leftMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
+        width: row.hasFolder ? Math.min(implicitWidth, Math.max(row.room * 0.66, row.room - folderText.implicitWidth - 12)) : row.room
+        elide: Text.ElideMiddle
+        text: row.file.name
+        font.family: row.c.font; font.pixelSize: 13
+        color: row.isMarked ? row.c.accent : row.selected ? row.c.title : row.c.text
+    }
+    Text {
+        id: folderText
+        visible: row.hasFolder
+        textFormat: Text.PlainText
+        anchors.left: nameText.right; anchors.leftMargin: 12
+        anchors.right: second.left; anchors.rightMargin: 12
+        anchors.verticalCenter: parent.verticalCenter
+        elide: Text.ElideLeft          // the nearest folders matter most
+        text: row.hasFolder ? row.file.folder : ""
+        font.family: row.c.font; font.pixelSize: 12; color: row.quiet
+    }
+    // Size, or in the trash where it came from
+    Text {
+        id: second
+        textFormat: Text.PlainText
+        anchors.right: third.left; anchors.rightMargin: row.app.secondWidth ? 16 : 0
+        anchors.verticalCenter: parent.verticalCenter
+        width: row.app.secondWidth
+        visible: width > 0
+        horizontalAlignment: row.app.trashShown ? Text.AlignLeft : Text.AlignRight
+        elide: Text.ElideMiddle
+        text: row.app.trashShown ? row.app.tilde(Format.parent(row.file.origin)) : row.file.dir ? "" : Format.size(row.file.size)
+        font.family: row.c.font; font.pixelSize: 12; color: row.quiet
+    }
+    Text {
+        id: third
+        anchors.right: parent.right; anchors.rightMargin: row.app.thirdWidth ? 16 : 0
+        anchors.verticalCenter: parent.verticalCenter
+        width: row.app.thirdWidth
+        visible: width > 0
+        horizontalAlignment: Text.AlignRight
+        text: Regional.relative(row.file.modified)
+        font.family: row.c.font; font.pixelSize: 12; color: row.quiet
+    }
+}

@@ -4,7 +4,7 @@
 // One line of a conversation's events.jsonl (hypr/scripts/ask-claude.d/unit.sh) into AskClaudeSession's entries:
 // Claude Code's stream-json, and Nightdrive's own lines around each turn. `s` is the session (AskClaudeSession.qml):
 // add(), update(), flush(), live, busy, lastAt and ended(), which it gives here so the parsing stays out of the view.
-//   nightdrive_turn {prompt, at}                      a request: "you", and the turn runs
+//   nightdrive_turn {prompt, at, dictated?}           a request: "you", and the turn runs
 //   nightdrive_end {status, message, at}              how it ended: done, error, timeout, cancelled
 
 var NOTOOLS = "Claude Code or Nightdrive's tools aren't set up here: Cmd+Enter opens a terminal"
@@ -16,6 +16,8 @@ function read(s, line) {
     if (ev.type === "nightdrive_turn") {
         s.add({ kind: "you", text: String(ev.prompt || "") })
         s.busy = true
+        s.dictated = ev.dictated === true   // its answer's unsure mark is read and left out (AskClaudeSession.flush)
+        s.unsure = false
     } else if (ev.type === "nightdrive_end") end(s, ev)
     else if (ev.type === "stream_event") {
         var e = ev.event || {}

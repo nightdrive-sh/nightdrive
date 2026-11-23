@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 
 // The window's quick changes to a task (and the lists', ListActions): done (Space or its circle), back to open (the same in Done), to the trash
@@ -33,16 +34,56 @@ QtObject {
         p.running = true
     }
 
-    // Done, or back to open when it is done (Done's rows)
+    // Done, or back to open when it is done (Done's rows). The row shows it at once (ticking: the task's id → its new
+    // done), and the change runs a moment later, so the tick is seen before the row leaves the view. Pressed again in
+    // that moment, it is called off. An entry goes once a read shows the task so (settle) or the change failed.
+    property var ticking: ({})
+    readonly property int tickDelay: 2000
+    property var waits: ({})            // the task's id → its Timer, while the change hasn't been run
+    readonly property Component wait: Component { Timer { property var go: null; onTriggered: { go(); destroy() } } }
     function toggle(task) {
         if (!task) return
-        change([task.done ? "undone" : "done", "--", task.id], (task.done ? "Not done: " : "Done: ") + task.title)
+        const id = task.id
+        if (waits[id]) { waits[id].destroy(); forget(waits, id); untick(id); return }
+        if (ticking[id] !== undefined) return            // already on its way to cli.py
+        const done = !task.done
+        ticking = Object.assign({}, ticking, { [id]: done })
+        const t = wait.createObject(root, { interval: tickDelay })
+        t.go = () => {
+            forget(waits, id)
+            change([done ? "done" : "undone", "--", id], (done ? "Done: " : "Not done: ") + task.title, () => untick(id))
+        }
+        waits[id] = t
+        t.start()
+    }
+    function forget(map, id) { delete map[id] }
+    // The window is closing (Tasks quits with it): a tick still waiting is written now, detached, so it isn't lost
+    function flush() {
+        for (const id in waits) {
+            Quickshell.execDetached(["python3", app.helper, ticking[id] ? "done" : "undone", "--", id])
+            waits[id].destroy()
+        }
+        waits = ({})
+    }
+    function untick(id) {
+        if (ticking[id] === undefined) return
+        const next = Object.assign({}, ticking); delete next[id]; ticking = next
+    }
+    // A read is in: the ticks it shows done (or gone) are over; those still waiting stay
+    function settle(tasks) {
+        const left = {}
+        for (const id in ticking) {
+            const t = tasks.find(x => x.id === id)
+            if (waits[id] || (t && t.done !== ticking[id])) left[id] = ticking[id]
+        }
+        ticking = left
     }
     function trash(task) {
         if (task) change(["trash", "--", task.id], "Moved to the trash: " + task.title)
     }
-    function change(args, said) {
+    function change(args, said, failed) {
         run(args, (d, why) => {
+            if (!d && failed) failed()
             app.load()
             if (!d) { app.say(why, true); return }
             remember({ sid: d.undo, id: d.id }, said)

@@ -16,7 +16,9 @@ Your smart home on the desktop: lights, switches and scenes from the Launcher an
 
 The installer asks for your Home Assistant addresses and a long-lived access token (in Home Assistant: your profile › Security; a 1Password op:// reference works too). Run it again to change them.
 
-An `http://` address sends the token as plain text, and the addresses are tried wherever you are: on another network, whatever answers `homeassistant.local` gets it. Use an `https://` address or Tailscale where you can (the installer warns about the others).
+An `http://` address sends the token as plain text, so it is used only on your home network: anywhere else, whatever answers `homeassistant.local` would get it. Away from home Home uses Tailscale or an `https://` address (Nabu Casa), so give it one of those too. An `http://` address on your tailnet (`ha:8123`) counts as Tailscale while it really goes through it.
+
+The installer asks whether the network you're on is your home network. On a network you haven't answered for, where your local address answers, a notification asks: This is home, or Not here. A home network is known by its Wi-Fi or wired connection and its router together, so after a new router you're asked again. `home-assistant home` shows the networks you've answered for; `home add`, `home not` and `home forget` change the answer for the one you're on.
 
 ## From a terminal, and Claude
 
@@ -26,6 +28,7 @@ An `http://` address sends the token as plain text, and the addresses are tried 
 | `home-assistant set ID STATE` | Puts a device in a state, whatever it is now: `on`/`off`, `open`/`close` (covers), `lock`/`unlock`, `run` (scenes, scripts, buttons) |
 | `home-assistant toggle ID` | Switches a device the other way, as Enter in the Launcher does |
 | `home-assistant brightness ID PCT` | Sets a light's brightness, 0–100 (0 turns it off) |
+| `home-assistant home` | Your home networks, as JSON; `home add` / `home not` / `home forget` for the network you're on |
 
 Claude (Settings › Claude › Access › Home Assistant) can read the states, and switch a device only after you allow it on
 Nightdrive's confirmation card, which shows the device's name and room from Home Assistant beside its id, and the new

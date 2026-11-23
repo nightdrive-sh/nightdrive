@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell.Io
 
-// `nightmail sync` asks for a reload once new mail is indexed; `nightmail new` opens an empty message.
+// `nightmail sync` asks for a reload once new mail is indexed; `nightmail new` opens an empty message, or one with files.
 // Apart from shell.qml: what `nightmail` and the notifications ask of the open Mail, over IPC.
 // The handler takes only what it can pass over IPC, so what it acts on lives on this object around it.
 QtObject {
@@ -15,6 +15,9 @@ QtObject {
         // A fetch has started (`nightmail fetching`, from its fetch())
         function fetching(): void { root.fetchWatch.check() }
         function compose(): void { root.win.compose("new") }
+        // `nightmail new FILE…`: the files' absolute paths, one a line (qs ipc takes a JSON list's brackets for its own);
+        // answers the writing window's title
+        function composeFiles(paths: string): string { return root.writer.composeFiles(paths.split("\n").filter(p => p)) }
         // Settings › Apps › Mail (`nightmail settings`)
         function openSettings(): void { root.win.showSettings = true }
         // "shown" when the window was hidden (see visible), for `nightmail`: the kit's focus() wouldn't find it and

@@ -68,6 +68,9 @@ echo "==> Default apps: images open in Loupe (instead of the browser); Markdown 
 # A Chromium browser (Brave…) chosen as the browser: links from other apps in a new window (its own entry, rewritten as
 # its Exec may change with the browser's update)
 "$repo/config/hypr/scripts/default-apps" refresh
+# Source code (.json, .py…) with no code editor chosen: text/plain's app written down for xdg-open, which can't find it
+# through the types' parents as Files does, and opened a .json in Ferry
+"$repo/config/hypr/scripts/default-apps" follow
 
 echo "==> Webapps: the window class Chromium gives them (their notifications, the launcher and Share find the window)"
 "$repo/config/hypr/scripts/webapp-add" --fix-classes

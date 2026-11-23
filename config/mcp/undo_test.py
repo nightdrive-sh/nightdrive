@@ -214,6 +214,21 @@ class Forged(Log):
 
     WALL = ["nightdrive", "wallpaper", "set", "/x.png"]
 
+    def setUp(self):
+        super().setUp()
+        # Deck installed and on, as the tests of its queue need, from a list of its own: not the machine's
+        # ~/.local/state list, which CI and a fresh home don't have
+        active = Path(self.tmp.name) / "active"
+        active.write_text(f"deck\t{HERE.parents[1] / 'plugins/deck'}\n")
+
+        class Installed(registry.Registry):
+            def __init__(self, *a, active=str(active), **kw):
+                super().__init__(*a, active=active, **kw)
+
+        p = mock.patch.object(registry, "Registry", Installed)
+        p.start()
+        self.addCleanup(p.stop)
+
     def refused(self, e, action="undo"):
         with self.assertRaises(ToolError) as said:
             undo.perform(e["id"], action)

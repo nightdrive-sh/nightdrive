@@ -20,14 +20,23 @@ Item {
         settings: [
             { kind: "header", name: "Connections" },
             { kind: "nav", name: "Wi-Fi", glyph: "wifi", target: "wifi" },
+            // Names for Wi-Fi networks, which Remind and Schedule wait for arriving at or leaving (PlacesLevels.qml)
+            { kind: "nav", name: "Places", glyph: "map-pin", target: "places" },
             { kind: "nav", name: "Bluetooth", glyph: "bluetooth", target: "bluetooth" }
         ].concat(Plugins.has("tailscale") ? [{ kind: "nav", name: "Tailscale", glyph: "shield-check", target: "tailscale" }] : [], [
+            // Companion: the iPad's web app over Tailscale (CompanionLevels.qml)
+            { kind: "nav", name: "Companion", glyph: "tablet-smartphone", target: "companion", summary: lv.companion.state === "on" ? "on" : undefined,
+              extra: "ipad phone remote" }
+        ], [
             { kind: "header", name: "Hardware" },
             { kind: "nav", name: "Sound", glyph: "volume-2", target: "sound" },   // Headphones are a row there, while connected
             { kind: "nav", name: "Display", glyph: "monitor", target: "display" }
         ], lv.disp.hasOthers() ? [{ kind: "nav", name: "Other displays", glyph: "monitor-smartphone", target: "otherdisplays", summary: lv.disp.othersSummary() }] : [], [
             { kind: "nav", name: "Mouse", glyph: "mouse", target: "mousescroll", summary: lv.behave.mouseScroll ? lv.behave.mouseScroll + "× scroll" : undefined }
-        ], lv.disp.hasBattery ? [{ kind: "nav", name: "Battery", glyph: "battery-medium", target: "battery" }] : [], [
+        ], lv.disp.hasBattery ? [{ kind: "nav", name: "Battery", glyph: "battery-medium", target: "battery" }] : [],
+           // Low Power Mode's opposite, on every machine with power-profiles-daemon (DisplayLevels.qml, hypr/scripts/game-mode)
+           lv.disp.game && lv.disp.game.available ? [{ kind: "gamemode", name: "Game Mode", glyph: "gamepad-2", switchOn: lv.disp.game.state === "on",
+                                                       footer: "Enter: on/off  ·  the CPU at full speed, no stutter in games" }] : [], [
             { kind: "header", name: "Appearance" },
             { kind: "nav", name: "Theme", glyph: "palette", target: "theme" },
             { kind: "nav", name: "Top bar", glyph: "panel-top", target: "topbar" },   // its look and what it shows
@@ -42,6 +51,9 @@ Item {
         ], lv.behave.crashReportItems, [
             { kind: "header", name: "System" },
             { kind: "nav", name: "Launcher", glyph: "text-search", target: "launcherprefs" },
+            // Shelf.qml: off, the top edge ignores a dragged file and `shelf toggle` does nothing (#3128)
+            { kind: "lpref", key: "shelf", name: "Shelf", glyph: "inbox", switchOn: launcher.prefs.shelf,
+              footer: "Enter: on/off  ·  drag a file to the top edge to park it there" },
             { kind: "nav", name: "Region", glyph: "calendar-clock", target: "region", summary: Regional.name },   // dates and times (RegionLevels)
             { kind: "nav", name: "Computer name", glyph: "laptop", target: "compname", summary: lv.behave.compName }   // what phones see
         ], lv.behave.remoteLoginItems, [
@@ -59,12 +71,12 @@ Item {
                .map(t => Object.assign({}, t, { appName: t.name })))   // an app's own: "Mail settings" in the root search
     })
 
-    readonly property var settingsAliases: ({ "Wi-Fi": "wifi wlan network internet", "Sound": "audio volume output speakers headphones airpods noise cancelling equalizer", "Battery": "power charge charging health cycles low power mode saver saving",
-                                              "Display": "brightness keyboard backlight night light warm scale scaling resolution monitor screen retina hidpi zoom size bigger smaller",
+    readonly property var settingsAliases: ({ "Wi-Fi": "wifi wlan network internet", "Places": "place location work home arrive leave paikat", "Sound": "audio volume output speakers headphones airpods noise cancelling equalizer", "Battery": "power charge charging health cycles low power mode saver saving",
+                                              "Display": "brightness keyboard backlight night light warm scale scaling resolution monitor screen retina hidpi zoom size bigger smaller arrange arrangement position place side left right above below main primary order displays",
                                               "Other displays": "ipad iphone tablet phone android second screen extra extend sidecar vnc airplay apple tv mirror cast",
                                               "Notifications": "notification sounds alert chime beep ping tone urgent critical popup timeout seconds duration",
                                               "Crash reports": "crash crashes bug report claude app quit coredump",
-                                              "Tailscale": "vpn", "Mouse": "scroll scrolling wheel speed fast slow",
+                                              "Tailscale": "vpn", "Game Mode": "games gaming performance fps stutter cpu speed power profile tuned", "Mouse": "scroll scrolling wheel speed fast slow",
                                               "Claude writes": "ai write rewrite polish text draft reply tone instructions prompt model",
                                               "Default apps": "browser email mail files folders text editor terminal images photos video music player pdf calendar open with",
                                               "App shortcuts": "keyboard shortcuts hyper caps lock keys keybindings hotkeys open app", "Theme": "appearance style look colors",
@@ -74,6 +86,7 @@ Item {
                                               "Top bar": "waybar panel menu bar",
                                               "Firefox": "browser tabs tab bar links new window",
                                               "Launcher": "search fuzzy typos shortcuts hints spotlight",
+                                              "Shelf": "drop files here drag park top edge dropover yoink",
                                               "Region": "date format time clock 24 hour 12 hour am pm week starts monday sunday locale lc_time country",
                                               "Computer name": "hostname rename device localsend airplay ferry phone",
                                               "Remote login": "ssh sshd server remote access terminal sharing",
@@ -89,6 +102,7 @@ Item {
                                               "Keyboard backlight": "keyboard light lit illumination brightness dim",
                                               "Night light": "night shift warm yellow blue light evening",
                                               "Scale": "scaling resolution monitor screen retina hidpi zoom size bigger smaller",
+                                              "Arrange displays": "arrangement position place side left right above below main primary order monitor screen away ipad iphone",
                                               "Screen Mirroring": "airplay cast mirror apple tv share screen" })
     // Settings › Theme: sub-items (Color with its current value)
     // Settings › Display for the root search: the brightness slider row itself (←/→ work there too), the night light toggle
@@ -97,7 +111,9 @@ Item {
         return (lv.disp.bright >= 0 ? [{ kind: "brightness", key: "screen", name: "Brightness", glyph: "sun" }] : [])
             .concat(lv.disp.keys >= 0 ? [{ kind: "brightness", key: "keys", name: "Keyboard backlight", glyph: "keyboard" }] : [])
             .concat([{ kind: "nightlight", name: "Night light", glyph: "moon" },
-                     { kind: "nav", name: "Scale", glyph: "monitor", target: "display" }],
+                     { kind: "nav", name: "Scale", glyph: "monitor", target: "display" },
+                     // Opens the Displays window (DisplayLevels' activate), straight from the search too
+                     { kind: "arrange", name: "Arrange displays", glyph: "move" }],
                     lv.mirror.mirrorAvail ? [{ kind: "nav", name: "Screen Mirroring", glyph: "screen-share", target: "otherdisplays" }] : [])
     }
 }

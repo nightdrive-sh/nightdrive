@@ -71,6 +71,7 @@
       "stdin": "{text}",
       "undo": ["notes", "trash", "--json", "{id}"],
       "notice": "Wrote the note {title}",
+      "notice_many": "Wrote {count} notes",
       "class": "change",
       "area": "notes"
     },
@@ -147,6 +148,7 @@
       "command": ["notes", "trash", "--json", "{note}"],
       "undo": ["notes", "restore", "--", "{names}"],
       "notice": "Moved the note {title} to the trash",
+      "notice_many": "Moved {count} notes to the trash",
       "class": "change",
       "area": "notes",
       "deletes": true

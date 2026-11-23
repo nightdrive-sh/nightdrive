@@ -8,12 +8,19 @@ import Quickshell.Wayland
 // Files can be dragged from the shelf into another app (a successful drop removes them from the shelf). The shelf closes by itself when the cursor leaves.
 // Files are not copied, the shelf only holds paths. State is in memory (reset when Quickshell restarts).
 // Keyboard: qs ipc call shelf toggle  (keeps the shelf open until you close it)  /  qs ipc call shelf clear
+// Settings › Shelf turns it off (launcher.json's shelf)
 Scope {
     id: shelf
     property var items: []             // file:// URLs
     property bool open: false
     property bool pinned: false        // a shelf opened via IPC doesn't close by itself
-    property int dragging: 0           // outgoing drags in progress (the shelf must not close mid-drag)
+    // Settings › Shelf (launcher.json's shelf, missing = on). Off: the trigger at the top edge is gone and IPC toggle does
+    // nothing, so neither a dragged file nor a lingering cursor opens it (#3128). shell.qml binds it to the launcher's
+    // prefs, which already watch launcher.json: a FileView of its own here cost a second inotify instance (#3165)
+    property bool enabled: true
+    onEnabledChanged: if (!enabled) { pinned = false; open = false }
+    // An outgoing drag in progress (the shelf must not close mid-drag); it runs from DragOut.qml (#3020)
+    readonly property int dragging: DragOut.active && DragOut.from(card) ? 1 : 0
     // 0 = hidden above the screen, 1 = fully down; the window stays mapped until the slide-up has finished
     property real reveal: open ? 1 : 0
     Behavior on reveal { NumberAnimation { duration: 80; easing.type: shelf.open ? Easing.OutCubic : Easing.InCubic } }
@@ -43,14 +50,25 @@ Scope {
     // Short delay: moving the cursor from the top edge to the shelf doesn't close it
     Timer { id: closeTimer; interval: 120; onTriggered: if (!shelf.busy) shelf.open = false }
 
+    // Drop into another app succeeded -> remove from the shelf.
+    // The Wayland target doesn't always report the action (Ignore), so a drag that ends outside the shelf also removes.
+    Connections {
+        target: DragOut
+        function onFinished(action) {
+            if (DragOut.from(card) && (action !== Qt.IgnoreAction || !card.hovered))
+                Qt.callLater(shelf.remove, String(DragOut.mime["text/uri-list"] || "").trim())
+        }
+    }
+
     IpcHandler {
         target: "shelf"
-        function toggle(): void { shelf.pinned = !shelf.open || !shelf.pinned; shelf.open = shelf.pinned }
+        function toggle(): void { if (!shelf.enabled) return; shelf.pinned = !shelf.open || !shelf.pinned; shelf.open = shelf.pinned }
         function clear(): void { shelf.clear() }
     }
 
     // Invisible trigger at the top edge (center): a drag arriving here opens the shelf.
     PanelWindow {
+        visible: shelf.enabled
         anchors { top: true }
         // The trigger is the notch: hovering or dragging over it opens the shelf, and dropping works there already.
         // No wider: the bar's icons on either side must stay clickable.
@@ -170,21 +188,11 @@ Scope {
                         width: 64
                         height: 62
 
-                        // Drag: the file goes to another app (text/uri-list)
+                        // Drag: the file goes to another app (text/uri-list), from DragOut.qml (the MouseArea below starts it)
                         Item {
                             id: dragSource
                             anchors.fill: parent
-                            Drag.active: ma.drag.active
-                            Drag.hotSpot: Qt.point(width / 2, height / 2)
-                            Drag.dragType: Drag.Automatic
-                            Drag.supportedActions: Qt.CopyAction
-                            Drag.mimeData: ({ "text/uri-list": chip.modelData + "\r\n" })
-                            Drag.onActiveChanged: shelf.dragging += Drag.active ? 1 : -1
-                            // Drop into another app succeeded -> remove from the shelf.
-                            // The Wayland target doesn't always report the action (Ignore), so a drag that ends outside the shelf also removes.
-                            Drag.onDragFinished: dropAction => {
-                                if (dropAction !== Qt.IgnoreAction || !card.hovered) Qt.callLater(shelf.remove, chip.modelData)
-                            }
+                            property var grab: null   // the drag's picture (kept so its url stays valid)
 
                             Rectangle {
                                 anchors.fill: parent
@@ -231,7 +239,11 @@ Scope {
                                 anchors.fill: parent
                                 drag.target: dragDummy
                                 // Drag image (chip following the cursor): grabbed in advance on press
-                                onPressed: dragSource.grabToImage(res => { dragSource.Drag.imageSource = res.url })
+                                onPressed: dragSource.grabToImage(res => { dragSource.grab = res })
+                                drag.onActiveChanged: drag.active
+                                    ? DragOut.start(dragSource, { "text/uri-list": chip.modelData + "\r\n" },
+                                                    dragSource.grab ? dragSource.grab.url : "", Qt.point(dragSource.width / 2, dragSource.height / 2))
+                                    : DragOut.release(dragSource)
                             }
                         }
 

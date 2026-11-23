@@ -3,8 +3,10 @@
   pkg-search <query>
   pkg-search --list popular|<category>   a list from software.json (software-catalog) for Install › Software's Browse
 Output (JSON): { apps: [row], tools: [row] }, row = { name, summary, src: dnf|flatpak, id, icon, installed, alt, glyph? }
-- apps: what has AppStream data (a desktop app). One app is one row even when both have it, matched by its AppStream id
-  (org.gnome.Calculator): Fedora's package first (it follows the GTK theme and updates with the system), Flathub's
+- apps: what has AppStream data (a desktop app), or without it a package that has a desktop file (provides application():
+  a third-party repo's, or any of Fedora's while its catalog, appstream-data, isn't installed), named as the package.
+  One app is one row even when both have it, matched by its AppStream id or desktop file (org.gnome.Calculator), or else
+  by its name: Fedora's package first (it follows the GTK theme and updates with the system), Flathub's
   then in alt ({ src, id }). What only Flathub has comes from there.
 - tools: Fedora packages without AppStream data (command-line tools), without libraries and development packages.
 - --list: the most installed of Flathub's apps that this machine's architecture has (platform arch), in the same rows:
@@ -15,13 +17,14 @@ import xml.etree.ElementTree as ET
 
 LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 CACHE = os.path.expanduser("~/.cache/nightdrive/swcatalog.json")
-FEDORA_ICONS = "/usr/share/swcatalog/icons/fedora/64x64"
+SWCATALOG = "/usr/share/swcatalog"                # appstream-data (packages.txt)
 HERE = os.path.dirname(os.path.realpath(__file__))
 SOFTWARE = os.path.join(HERE, "../../quickshell/data/software.json")
 MAX_APPS, MAX_TOOLS = 25, 20
 DNF_TIMEOUT = 60                                  # seconds: a metadata refresh on a slow line takes a while
-# Packages nobody installs by hand: libraries, development files, language modules, debug data
-NOT_TOOLS = re.compile(r"(^lib|-(devel|libs?|doc|docs|static|debuginfo|debugsource|tests?|common|data|headers|javadoc)$"
+# Packages nobody installs by hand: libraries, development files, language modules, debug data, help and language packs.
+# A library is lib and one word (libpng, libX11): libreoffice-writer and libvirt-client are not.
+NOT_TOOLS = re.compile(r"(^lib[\w.+]*$|-(help|langpack)-[\w@-]+$|-(devel|libs?|doc|docs|static|debuginfo|debugsource|tests?|common|data|headers|javadoc)$"
                        r"|^(perl|python3|rust|golang|ghc|texlive|mingw\d*|R|php|nodejs|ocaml|lua|ruby|rubygem)-)")
 
 
@@ -31,7 +34,7 @@ def appid(i):
 
 def catalog():
     """Fedora's AppStream catalog: pkgname → [appstream id, name, summary, icon file, keywords] (cached by mtime)"""
-    files = sorted(glob.glob("/usr/share/swcatalog/xml/*.xml.gz"))
+    files = sorted(glob.glob(SWCATALOG + "/xml/*.xml.gz"))
     stamp = [os.path.getmtime(f) for f in files]
     try:
         with open(CACHE) as fh:
@@ -62,13 +65,34 @@ def catalog():
     return pkgs
 
 
+def desktop_ids(q):
+    """The search's packages that have a desktop file: package → its id (org.kde.ghostwriter), apps even when the catalog
+    doesn't know them. After the main search, not beside it: two dnf refreshing the same metadata at once trip over each
+    other, and now it's fresh (~0.4 s)."""
+    try:
+        out = subprocess.run(["dnf", "repoquery", "--available", "-q", "--latest-limit=1", "--whatprovides", "application()",
+                              "--queryformat", "%{name}|%{provides}\n", f"*{q}*"], stdin=subprocess.DEVNULL,
+                             capture_output=True, text=True, timeout=DNF_TIMEOUT).stdout
+    except subprocess.TimeoutExpired:
+        return {}
+    ids, pkg = {}, ""
+    for line in out.splitlines():                 # %{provides} is one per line: "pkg|first", then the rest
+        if "|" in line:
+            pkg, _, line = line.partition("|")
+            ids.setdefault(pkg, pkg)
+        m = re.fullmatch(r"application\((.+)\.desktop\)", line.strip())
+        if m and pkg and ids[pkg] == pkg:
+            ids[pkg] = m.group(1)
+    return ids
+
+
 def flathub_icon(fid):
     dirs = glob.glob(os.path.expanduser("~/.local/share/flatpak/appstream/flathub/*/active/icons/64x64"))
     return next((p for p in (os.path.join(d, fid + ".png") for d in dirs) if os.path.exists(p)), "")
 
 
 def fedora_icon(icon):
-    path = os.path.join(FEDORA_ICONS, icon) if icon else ""
+    path = os.path.join(SWCATALOG, "icons/fedora/64x64", icon) if icon else ""
     return path if path and os.path.exists(path) else ""
 
 
@@ -131,6 +155,7 @@ def main(q):
     except subprocess.TimeoutExpired:             # e.g. a slow mirror: Flathub's and the catalog's matches still show
         dnf.kill()
         out = ""
+    has_desktop = desktop_ids(q) if out else {}
     for line in out.splitlines():
         name, _, summary = line.partition("|")
         if name:
@@ -151,21 +176,28 @@ def main(q):
                 continue
             apps[key] = {"name": name or pkg, "summary": asum or summary, "src": "dnf", "id": pkg,
                          "icon": fedora_icon(icon), "installed": pkg in installed_rpm, "alt": None}
+        elif pkg in has_desktop:                  # named as the package until Flathub's row (below) names it
+            apps.setdefault(appid(has_desktop[pkg]), {"name": pkg, "summary": summary, "src": "dnf", "id": pkg, "icon": "",
+                                                      "installed": pkg in installed_rpm, "alt": None, "bare": True})
         elif not NOT_TOOLS.search(pkg):
             tools.append({"name": pkg, "summary": summary, "src": "dnf", "id": pkg, "icon": "",
                           "installed": pkg in installed_rpm, "alt": None})
 
     # Flathub has runtimes and extensions too; only apps are installable on their own, and their ids don't look like these
-    skip = re.compile(r"^\S*\.(Platform|Sdk|BaseApp|Extension|Plugin|Plugins|Codecs|GL|Gtk3theme)(\.|$)")
+    skip = re.compile(r"^\S*\.(Platform|Sdk|BaseApp|Extension|BundledExtension|Plugin|Plugins|Codecs|GL|Gtk3theme)(\.|$)")
     for line in fp.communicate()[0].splitlines():
         f = line.split("\t")
         if len(f) < 4 or "flathub" not in f[3].split(",") or skip.search(f[0]):
             continue
         fid, name, desc = f[0], f[1], f[2]
         key = appid(fid)
+        # The same app under another id (Fedora's focuswriter.desktop, Flathub's org.gottcode.FocusWriter): by its name
+        key = next((k for k, v in apps.items() if v["src"] == "dnf" and v["name"].lower() == name.lower()), key)
         if key in apps:                           # Fedora has it too: Flathub's is the alternative
             if apps[key]["src"] == "dnf" and not apps[key]["alt"]:
                 apps[key]["alt"] = {"src": "flatpak", "id": fid}
+            if apps[key].pop("bare", False):      # Fedora's without catalog data: Flathub's name and icon for it
+                apps[key].update(name=name, icon=flathub_icon(fid))
             continue
         apps[key] = {"name": name, "summary": desc, "src": "flatpak", "id": fid, "icon": flathub_icon(fid),
                      "installed": fid in installed_fp, "alt": None}
@@ -182,14 +214,18 @@ def main(q):
 
     def rank(r):
         n = r["name"].lower()
-        return (n != q, q not in n and q not in r["summary"].lower(), -popularity(r), not n.startswith(q), q not in n, len(n), n)
+        return (n != q, q not in n and q not in r["summary"].lower(), -popularity(r), not n.startswith(q),
+                not re.search(r"\b" + re.escape(q), n), q not in n, len(n), n)
+    for r in apps.values():
+        r.pop("bare", None)
     return {"apps": sorted(apps.values(), key=rank)[:MAX_APPS], "tools": sorted(tools, key=rank)[:MAX_TOOLS]}
 
 
-if len(sys.argv) == 3 and sys.argv[1] == "--list":
-    print(json.dumps(listing(sys.argv[2])))
-elif len(sys.argv) == 2:
-    print(json.dumps(main(sys.argv[1].strip().lower())))
-else:
-    print("\n".join(__doc__.split("\n")[1:3]), file=sys.stderr)
-    sys.exit(2)
+if __name__ == "__main__":                        # not when its test imports it
+    if len(sys.argv) == 3 and sys.argv[1] == "--list":
+        print(json.dumps(listing(sys.argv[2])))
+    elif len(sys.argv) == 2:
+        print(json.dumps(main(sys.argv[1].strip().lower())))
+    else:
+        print("\n".join(__doc__.split("\n")[1:3]), file=sys.stderr)
+        sys.exit(2)

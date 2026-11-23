@@ -38,17 +38,16 @@ Item {
     // While it's dragged out, the row stays and its picture follows the cursor: a file's row as it is, a text's start in
     // a small box (FerryTextDragImage.qml). A text goes as plain text; both types, as some apps ask only for the one
     // with the charset (GTK's) and others only for the plain one.
+    // The drag runs from DragOut.qml (rowArea starts it), which outlives the row: the list may reload mid-drag (#3020).
     Item {
         id: dragSource
         anchors.fill: parent
-        Drag.active: rowArea.drag.active
-        Drag.hotSpot: r.isFile ? Qt.point(30, height / 2) : Qt.point(12, 12)
-        Drag.dragType: Drag.Automatic
-        Drag.supportedActions: Qt.CopyAction
-        Drag.mimeData: r.isFile ? { "text/uri-list": "file://" + encodeURI(r.modelData.path || "") + "\r\n" }
-            : { "text/plain": r.modelData.text || "", "text/plain;charset=utf-8": r.modelData.text || "" }
-        Drag.onActiveChanged: r.menu.dragging += Drag.active ? 1 : -1
-        Drag.onDragFinished: r.menu.close()
+        property var grab: null   // the drag's picture (kept so its url stays valid)
+        function start() {
+            DragOut.start(dragSource, r.isFile ? { "text/uri-list": "file://" + encodeURI(r.modelData.path || "") + "\r\n" }
+                : { "text/plain": r.modelData.text || "", "text/plain;charset=utf-8": r.modelData.text || "" },
+                grab ? grab.url : "", r.isFile ? Qt.point(30, height / 2) : Qt.point(12, 12))
+        }
     }
     Item { id: dragDummy; visible: false }   // drag.target: the row stays, its image follows
     // A text's picture, drawn out of sight (left of the menu) so grabToImage has something rendered to take
@@ -127,7 +126,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         drag.target: dragDummy
-        onPressed: (r.isFile ? r : textImage.item).grabToImage(res => { dragSource.Drag.imageSource = res.url })
+        onPressed: (r.isFile ? r : textImage.item).grabToImage(res => { dragSource.grab = res })
+        drag.onActiveChanged: drag.active ? dragSource.start() : DragOut.release(dragSource)
         onClicked: r.menu.act(r.modelData)
     }
     // What a click does: copy a text, open a file

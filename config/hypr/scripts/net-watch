@@ -9,6 +9,8 @@ change of the link; when it finds trouble, it checks again every few seconds unt
 When it tells is net_watch_rules.py's: a drop that holds 10 s, none for a while after login or waking, nothing when a
 connection is turned off. Lost: "No internet" (a card that stays in the list); back: a transient that takes its
 place; a captive portal: "Sign in to …", whose click opens the portal's page.
+It also starts `places check` (#3277) when the connections change and at sleep and waking: arriving at and leaving
+places is place_check.py's, and only the call is here, as this already listens to both.
 """
 import fcntl
 import os
@@ -28,6 +30,7 @@ PREFS = Path.home() / ".local/state/nightdrive/net-watch"   # "off" turns the no
 LOCK = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "net-watch.lock"
 PORTAL_FALLBACK = "http://neverssl.com"   # a plain-HTTP page a portal can redirect, when NM has no check URI
 TAG = "net-watch"
+PLACES = os.path.join(os.path.dirname(os.path.realpath(__file__)), "places")
 NM, NM_PATH = "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager"
 
 
@@ -54,6 +57,7 @@ class Daemon:
                                       "ActionInvoked", "/org/freedesktop/Notifications", None,
                                       Gio.DBusSignalFlags.NONE, self.on_action)
         self.last_conn = None
+        self.last_links = None     # the active connections and NM's State, for `places check`
         self.read()
 
     def prop(self, name, default=None):
@@ -67,10 +71,22 @@ class Daemon:
             self.last_conn = conn
             # The bar's network icon shows limited and none: at once, not at its next 5 s round
             subprocess.Popen(["qs", "ipc", "call", "bar", "refresh"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        links = (tuple(self.prop("ActiveConnections", [])), self.prop("State", 0))
+        if links != self.last_links:
+            # A network joined, left or finished connecting: maybe a place's. Not at the first read (login runs it)
+            if self.last_links is not None:
+                self.places()
+            self.last_links = links
         self.apply(*self.watch.step(time.monotonic(), conn=conn, up=up))
 
+    def places(self, *flags):
+        subprocess.Popen([PLACES, "check", *flags], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+
     def on_sleep(self, _bus, _sender, _path, _iface, _signal, params):
-        self.apply(*self.watch.step(time.monotonic(), asleep=params.unpack()[0]))
+        asleep = params.unpack()[0]
+        self.places("--sleep" if asleep else "--wake")
+        self.apply(*self.watch.step(time.monotonic(), asleep=asleep))
 
     def tick(self):
         self.timer = 0

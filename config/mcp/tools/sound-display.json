@@ -114,6 +114,37 @@
       "area": "sound-display"
     },
     {
+      "name": "display_arrangement",
+      "title": "Where the screens are",
+      "description": "The screens as the Displays window shows them (Settings › Display › Arrange displays): each one's id (output), name, kind (builtin = the laptop's own, external, virtual = a tablet or phone over VNC Display), size (w, h) and place (x, y) in layout pixels, on (false: lid closed or not connected), away (a virtual screen out of the pointer's reach) and main (the display with workspaces 1–9).",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "arrange", "--json"],
+      "class": "read",
+      "area": "sound-display"
+    },
+    {
+      "name": "display_arrange",
+      "title": "Arrange the screens",
+      "description": "Move a screen to a side of another (side, with of) or of the whole desk (side without of); make a display the main one (main: workspaces 1–9 move there); or put a virtual screen away, out of the pointer's reach (away; side brings it back). A screen always lands beside another, edge to edge, and virtual screens give way to the displays. Ids from display_arrangement; builtin and main work too. Answers with the arrangement after.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {"type": "string", "enum": ["side", "main", "away"], "description": "side: beside another; main: the main display; away: a virtual screen out of reach"},
+          "screen": {"type": "string", "description": "The screen's id from display_arrangement (HDMI-A-1, eDP-1, HEADLESS-IPAD), or builtin or main"},
+          "side": {"type": "string", "enum": ["left", "right", "above", "below"], "description": "For side: which side"},
+          "of": {"type": "string", "description": "For side: the screen it goes beside (an id, or main); without it, the whole desk"}
+        },
+        "required": ["action", "screen"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "arrange", "{action}", "{screen}", ["{side}"], ["{of}"], "--json"],
+      "before": ["nightdrive", "arrange", "--state"],
+      "undo": ["nightdrive", "arrange", "restore", "{state}"],
+      "notice": "Arranged the screens ({action} {screen})",
+      "class": "change",
+      "area": "sound-display"
+    },
+    {
       "name": "network_status",
       "title": "Wi-Fi and network",
       "description": "Whether networking and Wi-Fi are on, whether the internet answers (connectivity, NetworkManager's last check: full, limited = connected but no internet, portal = a captive portal wants a sign-in, none, unknown = not checked), the active connections (name, type, device), the Wi-Fi network (ssid, signal %) and its link: band, Wi-Fi standard, rate, signal in dBm, IP address, router and the ping to it in ms.",
@@ -173,6 +204,25 @@
       "before": ["nightdrive", "low-power", "status", "--json"],
       "undo": ["nightdrive", "low-power", "{state}"],
       "notice": "Turned Low Power Mode {state}",
+      "class": "change",
+      "area": "sound-display"
+    },
+    {
+      "name": "game_mode",
+      "title": "Game Mode",
+      "description": "Turn Game Mode on or off (Settings › Game Mode): the CPU at full speed, so a game doesn't stutter as the CPU slows down between frames (power-profiles-daemon's performance profile). Off goes back to the profile from before. Answers with state, available and the power profile now.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {"type": "string", "enum": ["on", "off"]}
+        },
+        "required": ["state"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "game-mode", "{state}", "--json"],
+      "before": ["nightdrive", "game-mode", "status", "--json"],
+      "undo": ["nightdrive", "game-mode", "{state}"],
+      "notice": "Turned Game Mode {state}",
       "class": "change",
       "area": "sound-display"
     }

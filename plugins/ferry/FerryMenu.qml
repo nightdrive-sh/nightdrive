@@ -40,7 +40,10 @@ Column {
     property string flash: ""          // what says "copied" for a moment: an item's id or "url"
     property bool adding: false        // Add Device: the QR code in the middle of the screen
     property string qr: ""             // the QR code's SVG once made
-    property int dragging: 0           // files being dragged out: shell.qml lets the drop through to the windows below
+    // A row being dragged out: shell.qml lets the drop through to the windows below. The drag runs from DragOut.qml, so a
+    // row the list reloads mid-drag doesn't take it down (#3020); it closes the menu as it ends.
+    readonly property int dragging: DragOut.active && DragOut.from(m) ? 1 : 0
+    Connections { target: DragOut; function onFinished() { if (DragOut.from(m)) m.close() } }
     property int tileDrags: 0          // tiles with files over them
     readonly property bool dropping: outerDrop.containsDrag || tileDrags > 0 || dropHold.running
     readonly property int rowHeight: 56

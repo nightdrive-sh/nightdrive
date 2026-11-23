@@ -47,7 +47,7 @@ SHELLS = {"bash", "zsh", "fish", "sh", "dash", "nu", "xonsh", "elvish"}
 # Window class -> the browser's key that reopens its last closed window (Firefox's Ctrl+Shift+T is for tabs only)
 BROWSERS = [(r"^(chromium(-browser)?|google-chrome.*|brave-browser.*|vivaldi.*|microsoft-edge.*)$", "T"),
             (r"^(firefox.*|org\.mozilla\.firefox|librewolf|zen.*)$", "N")]
-SESSIONS = HOME + "/.claude/sessions"   # Claude Code's <pid>.json: the running session's id
+CLAUDE_DIR = HOME + "/.claude"   # Claude Code's config dir without CLAUDE_CONFIG_DIR: sessions/<pid>.json, the running session's id
 SESSION = HOME + "/.local/state/nightdrive/session.json"
 
 # default-apps reads the desktop entries (no .py: loaded by its path, no __pycache__ in the repo)
@@ -133,17 +133,30 @@ def is_claude(pid, args):
     return bool(args) and os.path.basename(args[0]) == "claude" or "/claude/versions/" in exe
 
 
+def claude_conf(pid):
+    """The Claude Code account a claude runs on: its CLAUDE_CONFIG_DIR (topbar/scripts/claude-accounts), "" for the default."""
+    try:
+        env = open(f"/proc/{pid}/environ", "rb").read().split(b"\0")
+    except OSError:
+        return ""
+    conf = next((e[18:].decode(errors="replace") for e in env if e.startswith(b"CLAUDE_CONFIG_DIR=")), "").rstrip("/")
+    return "" if conf == CLAUDE_DIR else conf
+
+
 def claude_again(pid, args):
-    """Claude Code with the same conversation: the session id from its sessions file, or the folder's latest one."""
+    """Claude Code with the same conversation: the session id from its sessions file, or the folder's latest one. On the
+    same account: the conversation is only in its config dir."""
     claude = args[0] if os.path.isabs(args[0]) and os.path.exists(args[0]) else \
         shutil.which("claude") or HOME + "/.local/bin/claude"
+    conf = claude_conf(pid)
+    on = ["env", "CLAUDE_CONFIG_DIR=" + conf] if conf else []
     try:
-        s = json.load(open(f"{SESSIONS}/{pid}.json"))
+        s = json.load(open(f"{conf or CLAUDE_DIR}/sessions/{pid}.json"))
         if s.get("pid") == pid and s.get("sessionId"):
-            return [claude, "--resume", s["sessionId"]]
+            return on + [claude, "--resume", s["sessionId"]]
     except (OSError, ValueError):
         pass
-    return [claude, "--continue"]
+    return on + [claude, "--continue"]
 
 
 def terminal(pid):

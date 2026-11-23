@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "AskClaudeTools.js" as Tools
 import "AskClaudeEvents.js" as Events
+import "AskClaudeUnsure.js" as Unsure
 
 // Ask Claude's conversation (Dashboard #1895): one at a time, kept here and shown by Ask Claude's toast
 // (AskClaudeToast.qml). Each request runs hypr/scripts/ask-claude --start, which starts the turn as a systemd user unit
@@ -25,6 +26,11 @@ Singleton {
     property string live: ""             // the answer's text as it is being written, added to entries when its block ends
     property string sessionId: ""
     property bool busy: false
+    // The running or last turn was dictated (say and forget, #3122; its nightdrive_turn says so, AskClaudeEvents.js), and
+    // its answer so far begins with Claude's unsure mark (AskClaudeUnsure.js, #3154): Claude couldn't tell what was meant
+    // or a tool refused, and asks. The mark itself is left out of the text shown.
+    property bool dictated: false
+    property bool unsure: false
     property bool unseen: false          // an answer came while the toast was closed (the launcher's row says so)
     property double lastAt: 0
     // Ask Claude's toast (AskClaudeToast.qml) shows the conversation; the launcher's row and keys (AskClaudeLevels.qml)
@@ -37,12 +43,13 @@ Singleton {
     // decides, and sets card); the toast shows it while pendingCard and answers through card.decide()
     property bool toastViewing: false
     readonly property bool viewing: toastViewing
-    property var card: null
+    property var card: null              // set by ClaudeConfirm as it is made, cleared as it is destroyed (a reload)
     readonly property bool pendingCard: !!card && card.open && card.inlined
     signal answered()                    // a request finished (its answer, an error, or stopped)
 
-    // A request: false while one runs or when there's nothing to send. A conversation idle for freshAfter starts anew
-    function ask(text) {
+    // A request: false while one runs or when there's nothing to send. A conversation idle for freshAfter starts anew.
+    // dictated: it came from a dictation without a look at it, so Claude gets the dictation's prompt (ask-claude --dictated)
+    function ask(text, dictated) {
         const q = text.trim()
         if (q === "" || busy || starter.running) return false
         if (sessionId !== "" && Date.now() - lastAt > freshAfter) reset()
@@ -51,7 +58,8 @@ Singleton {
         const line = q.split("\n")[0]
         const name = line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, "") + "…" : line
         pending = q
-        starter.command = [script, "--start"].concat(first ? ["--name", name] : ["--resume", sessionId], ["--", q])
+        starter.command = [script, "--start"].concat(dictated ? ["--dictated"] : [],
+                                                     first ? ["--name", name] : ["--resume", sessionId], ["--", q])
         busy = true
         starter.running = true
         return true
@@ -64,14 +72,21 @@ Singleton {
     function reset() {
         if (busy) stop()
         tail.running = false
-        entries = []; live = ""; sessionId = ""; unseen = false; busy = false
+        entries = []; live = ""; sessionId = ""; unseen = false; busy = false; unsure = false
     }
 
     function add(e) { entries = entries.concat([e]) }
     function update(pred, change) {
         entries = entries.map(e => pred(e) ? Object.assign({}, e, change(e)) : e)
     }
-    function flush() { if (live !== "") { add({ kind: "text", text: live.trim() }); live = "" } }
+    // An answer's block as it ends. Only a dictated request's answer is read for the mark: a typed one is shown as it is
+    function flush() {
+        if (live === "") return
+        const t = live.trim()
+        live = ""
+        if (dictated) unsure = Unsure.unsure(t)
+        add({ kind: "text", text: dictated ? Unsure.strip(t) : t })
+    }
     // A turn's end (AskClaudeEvents.js): an earlier one read again after a restart isn't news
     function ended(at) {
         lastAt = at

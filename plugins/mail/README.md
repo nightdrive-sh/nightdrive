@@ -25,11 +25,14 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 
 - The next sync makes every move on the server too, so your phone sees it.
 - In a narrow window the list and the thread take turns: `Enter` or → opens the thread, `Esc` or ← goes back. Moving in the list marks nothing read.
+- A paperclip after a thread's date: a file is attached to a message in it. An invitation's own `.ics` doesn't count, nor do pictures in the text (a signature's logo).
 - In a long thread, the read messages fold to one line each, and a quote that is all in an earlier message hides behind `•••`.
+- The text view shows a run of blank lines as one (also lines of only invisible characters, which newsletters pad with), and so does a reply's quote. The message itself stays as it came.
+- In the text view, a message sent as format=flowed shows its paragraphs whole, re-wrapped to the window; other messages keep their line breaks, as joining lines by guesswork would break lists, addresses and code. A link written as `[https://…]` shows without its brackets.
 - Remote images stay off, and so does the sender's tracking. In the browser (⇧H), Load images brings them, still without scripts.
 - With Nightdrive Contacts, a button beside the sender opens their card, or adds them.
 - A newsletter has an Unsubscribe button at the end of its header, beside the attachments: its List-Unsubscribe header's link, else the body's own unsubscribe link. A web link opens in the browser, an email one as a new message for you to send; nothing goes out without you.
-- With Nightdrive Calendar, an invitation (an `.ics` in the message: a meeting, a train ticket) shows as a card under the header: what, when, where and from whom. Add to calendar puts it in the calendar picked. When it is in one already, an updated invitation offers Update and a cancelled one Remove: nothing changes in your calendar until you press it. Replying to the organiser isn't there yet.
+- With Nightdrive Calendar, an invitation (an `.ics` in the message: a meeting, a train ticket) shows as a card under the header: what, when, where and from whom. Add to calendar puts it in the calendar picked. When it is in one already, an updated invitation offers Update and a cancelled one Remove: nothing changes in your calendar until you press it. Accept, Maybe and Decline send your answer to the organiser (a reply their calendar reads, from the account the invitation came to; the card says to whom), and Calendar keeps it with the event; Accept or Maybe also puts a new one in the calendar picked, which the card names. Nothing goes until you press one; if something fails, the card keeps the reason until the next press.
 
 ## Writing
 
@@ -43,6 +46,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | ⌘⇧A | Attach files (or drop them on the window) |
 | `Esc` | Close: saved again if it was saved before, a new one thrown away on the second `Esc` |
 
+- `nightmail new FILE…` writes a new message with the files attached, as Files' `m` does; a message being written takes them instead.
 - Sending goes on in the background. A message that can't be sent stays in Drafts, and "Not sent" in the sidebar tells why.
 - A reply goes from the account the message came to; a click on From changes it. Your signature (`signature` in `account.conf`, below) goes above the quote.
 - To and Cc suggest addresses from your mail, and from Nightdrive Contacts.
@@ -175,6 +179,8 @@ Expunge Near
 SyncState *
 ```
 
+An iCloud account (with an app-specific password) is `imap.mail.me.com` and `smtp.mail.me.com:587`, with a channel per folder: `INBOX`, `Drafts` and `Archive` as they are, and `Sent Messages`, `Junk` and `Deleted Messages` as `Sent`, `Spam` and `Trash`. Mail sends with TLS from the start on port 465 and with STARTTLS on any other port, such as 587.
+
 ## In a terminal
 
 | Command | What it does |
@@ -187,14 +193,14 @@ SyncState *
 | `nightmail show ID`, `reply ID`, `claude ID` | A message by its notmuch id, as the notifications use them |
 | `nightmail archive ID…`, `unarchive ID…`, `delete ID…` | From the inbox to Archive (and back) or Trash, as `a` and `d` do; an ID is one message's id or a thread (`thread:…`), exactly, never a query |
 | `nightmail empty Spam` (or `Trash`) `[--account ID]` | Everything in Spam or Trash deleted for good, as ⌘⇧⌫ does, without asking; `--card` shows what it would delete |
-| `nightmail unread`, `search QUERY [LIMIT]`, `thread ID`, `accounts` | Mail as JSON, without the window: unread threads, a notmuch search, a thread's messages as text |
-| `nightmail invitation ID` | A message's calendar invitation as JSON, by Calendar (`calendar invite`); `--add CALENDAR` puts it in a calendar or updates it there, `--remove` takes a cancelled one out |
-| `nightmail draft`, `draft-show ID`, `discard ID`, `send ID` | Drafts without the window: `draft` saves one from JSON on stdin (`{to, cc, subject, body, account}`, or a reply: `{reply_to, reply_all, body}`), with the signature and quote; `send` sends one |
+| `nightmail unread`, `search QUERY [LIMIT]`, `thread ID`, `accounts` | Mail as JSON, without the window: unread threads, a notmuch search (each thread's `attachments`: true when a file is attached, as the list's paperclip), a thread's messages as text |
+| `nightmail invitation ID` | A message's calendar invitation as JSON, by Calendar (`calendar invite`); `--add CALENDAR` puts it in a calendar or updates it there, `--remove` takes a cancelled one out, `--reply accept|maybe|decline` sends the answer to its organiser |
+| `nightmail draft`, `draft-show ID`, `discard ID`, `send ID` | Drafts without the window: `draft` saves one from JSON on stdin (`{to, cc, subject, body, account}`, or a reply: `{reply_to, reply_all, body}`; `attachments`: absolute paths of files in home or /tmp, nothing hidden, at most 10 and 18 MB together), with the signature and quote; `send` sends one |
 | `nightmail unsubscribe MSGID…` | The messages' unsubscribe links as JSON (`links`: url, kind web or mail, from header or body); only reads |
 | `nightmail save-attachments [--into FOLDER] -- ID [NAME…]`, `save-pdf [--into FOLDER] -- ID` | Copies a message's attachments (all, or those named), or the message as a PDF, into a folder (Downloads by default), never over a file that is there; the PDF loads no remote images or anything else from the network |
 | `nightmail enable`, `disable` | Mail among the apps, its notifications and the sync, on or off (your mail and settings stay). Run `enable` again after changing `isyncrc`. |
 | `nightmail restart`, `quit`, `log` | After a change to Mail, and its QML errors |
 
-Claude Code uses these too, with Nightdrive's tools for Claude (Settings › Claude › Access › Mail): it reads and searches your mail and the invitations in it, writes drafts, archives and saves attachments or a message as PDF (in the folders Access › Apps and files lets it use), which you can undo, and sends, deletes or empties Spam only after you allow it on Nightdrive's card, which shows exactly what goes out: a message Claude reads can't send or delete anything. Access › Mail › *Mail Claude never gets* keeps senders, domains and tags from it whole (`maija@example.com`, `bank.fi`, `tag:health`): that mail, and mail you sent them, isn't in its unread, searches or threads, nor its notifications in the latest notifications. Empty at first. These commands in a terminal give everything.
+Claude Code uses these too, with Nightdrive's tools for Claude (Settings › Claude › Access › Mail): it reads and searches your mail and the invitations in it (and answers one when you allow it on the card), writes drafts (with files attached from the folders Access › Apps and files lets it use, or /tmp), archives and saves attachments or a message as PDF (in those folders), which you can undo, and sends, deletes or empties Spam only after you allow it on Nightdrive's card, which shows exactly what goes out: a message Claude reads can't send or delete anything. Access › Mail › *Mail Claude never gets* keeps senders, domains and tags from it whole (`maija@example.com`, `bank.fi`, `tag:health`): that mail, and mail you sent them, isn't in its unread, searches or threads, nor its notifications in the latest notifications. Empty at first. These commands in a terminal give everything.
 
 Needs: notmuch, isync (mbsync), an IMAP account; Claude Code for Claude's replies

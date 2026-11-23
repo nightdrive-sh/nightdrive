@@ -4,7 +4,7 @@
     change.py edit [--json] CALENDAR UID   stdin: a JSON object of what changes, the rest stays as it is:
                                          title, start, end, location, notes ("" clears those two), move_to (a calendar
                                          id or name the event goes to), reminder (minutes before
-                                         the start, alarms.py; null: none)
+                                         the start, alarms.py; null: none), repeat, scope and occurrence (below)
     change.py restore [--json] UNDO        puts the event back as it was before the edit that printed UNDO
 
 start and end are write.py's forms (YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day, whose end is its last day). A start
@@ -14,7 +14,13 @@ The event keeps its UID and everything Calendar doesn't show (invitees, the phon
 reminder is given, which takes their place): only the fields above are written, with SEQUENCE one up, so the server
 and the phone take it as a newer version. A move is the event written into the other calendar's folder and removed
 from its own, then both synced, the old one first: iCloud refuses a UID that is in two calendars of the account at
-once. A recurring event isn't changed (write.one_event says so).
+once.
+
+A recurring event (#2009) says which of its times change: scope "this" with occurrence, the time's start as calendar
+events gives it, for that one time (a changed copy of it: series.py), or scope "all" for every time. For all, start
+and end are those of the time occurrence names (the first without one), and every time moves by as much; repeat
+(repeat.py's form, null for none) changes the rule, all of them or a single event's, which then repeats. One time
+stays in its calendar and keeps the series' rule: move_to and repeat are every time's.
 
 Each edit keeps the files as they were (STATE_DIR/undo, the last KEEP_UNDO), and restore puts them back only while
 they are still as the edit left them: an undo an hour later mustn't write over a change made since, here or on the phone.
@@ -30,34 +36,18 @@ from pathlib import Path
 
 import alarms
 import calendars
+import repeat
+import series
 import sources
 import write
 
 UNDO_DIR = sources.STATE_DIR / "undo"
 KEEP_UNDO = 100
-FIELDS = ("title", "start", "end", "location", "notes", "move_to", "reminder")
+FIELDS = ("title", "start", "end", "location", "notes", "move_to", "reminder", "repeat", "scope", "occurrence")
 
 
-def aware(value):
-    """A floating time (no zone, as some phones write) read as local time, so it can be compared with a typed one"""
-    if isinstance(value, dt.datetime) and value.tzinfo is None:
-        return value.replace(tzinfo=write.local_zone())
-    return value
-
-
-def old_span(event):
-    """The event's start and its DTEND (iCalendar's: an all-day event's day after), from DURATION when it has that"""
-    start = aware(event.decoded("dtstart"))
-    if "dtend" in event:
-        return start, aware(event.decoded("dtend"))
-    if "duration" in event:
-        return start, start + event.decoded("duration")
-    return start, start + (dt.timedelta(hours=1) if isinstance(start, dt.datetime) else dt.timedelta(days=1))
-
-
-def new_span(data, event):
-    """The start and DTEND the edit gives, checked as add() checks them"""
-    old_start, old_end = old_span(event)
+def new_span(data, old_start, old_end):
+    """The start and DTEND the edit gives, checked as add() checks them, from the time's start and DTEND before"""
     start = write.when(data["start"], "start") if "start" in data else old_start
     all_day = not isinstance(start, dt.datetime)
     if data.get("end"):
@@ -122,14 +112,28 @@ def calendar_of(path):
 def edit(calendar_id, uid, data):
     data = {k: v for k, v in data.items() if k in FIELDS}
     cal = write.writable(calendar_id)
-    path, ics, event = write.one_event(cal, uid, "change")
+    path, ics, events, main = write.event_parts(cal, uid)
+    scope = series.scope(events, data)
+    rule = repeat.spec(data["repeat"]) if "repeat" in data else None
     target = write.writable(data["move_to"].strip()) if (data.get("move_to") or "").strip() else cal
+    if scope == "this" and target["id"] != cal["id"]:
+        sys.exit("One time of a recurring event stays in its calendar: move every time (scope all).")
+    if scope == "this" and "repeat" in data:
+        sys.exit("The repeat is every time's: change it with scope all.")
+    if scope == "this":
+        event = series.override(ics, main, events, data["occurrence"])
+        start, end = new_span(data, *series.old_span(event))
+    elif scope == "all":
+        event = main
+        was = series.seen(main, events, data.get("occurrence"))
+        start, end = series.move_all(ics, main, events, was, new_span(data, *was))
+    else:
+        event = main
+        start, end = new_span(data, *series.old_span(main))
     title = data["title"].strip() if "title" in data else str(event.get("summary", ""))
     if not title.strip():
         sys.exit("An event needs a title.")
-    start, end = new_span(data, event)
-    seq = int(event.get("sequence", 0))
-    for key in ("summary", "dtstart", "dtend", "duration", "dtstamp", "last-modified", "sequence"):
+    for key in ("summary", "dtstart", "dtend", "duration"):
         event.pop(key, None)
     event.add("summary", title)
     event.add("dtstart", start)
@@ -141,11 +145,12 @@ def edit(calendar_id, uid, data):
                 event.add(field, data[key].strip())
     if "reminder" in data:
         alarms.set_reminder(event, alarms.minutes(data["reminder"]))
+    if "repeat" in data:
+        series.set_repeat(ics, main, events, rule)
+    if scope == "all" or (scope is None and rule is not None):
+        series.prune(ics, main, events)
+    series.bump(event)
     old = path.read_bytes()
-    event.add("sequence", seq + 1)
-    now = dt.datetime.now(dt.timezone.utc)
-    event.add("dtstamp", now)
-    event.add("last-modified", now)
     ics.add_missing_timezones()
     content = ics.to_ical()
     moved = target["id"] != cal["id"]
@@ -162,6 +167,8 @@ def edit(calendar_id, uid, data):
     return {"uid": uid, "calendar": target["id"], "calendar_name": target["name"], "title": title,
             "start": write.shown(start), "end": write.shown(last), "all_day": not isinstance(start, dt.datetime),
             "when": write.span(start, last), "moved": moved, "synced": synced, "undo": sid,
+            **({"scope": scope} if scope else {}),
+            **({"repeat": repeat.read(main)["text"]} if "recurrence-id" not in main and repeat.read(main) else {}),
             **({} if synced else {"note": "Saved on this computer; the next sync takes it to the server."})}
 
 

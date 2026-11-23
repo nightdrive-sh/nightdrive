@@ -5,10 +5,13 @@ stand-ins for claude, notify-send, systemd-run and the rest, in a home of its ow
 notification; the background session skips the user's settings files (hooks, plugins) but keeps the model they chose,
 and it gets Claude Code's WebSearch and WebFetch only when Access › Web's Read is Allow (#2241), and web_download's
 folder (#2242). A turn runs as a systemd user unit (setsid without a user manager) and writes its events to the
-conversation's events.jsonl, which ends with how it ended; one runs at a time, and it can be cancelled."""
+conversation's events.jsonl, which ends with how it ended; one runs at a time, and it can be cancelled. A dictated
+request (--dictated, #3154) gets the dictation's prompt with the unsure mark AskClaudeUnsure.js defines, and its turn
+says it was dictated."""
 
 import json
 import os
+import re
 import socket
 import stat
 import subprocess
@@ -19,6 +22,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SCRIPT = HERE.parent / "hypr/scripts/ask-claude"
+UNSURE_JS = HERE.parent / "quickshell/AskClaudeUnsure.js"
 
 # Each stand-in writes its arguments as one JSON line to $LOG; claude answers with $ANSWER as Claude Code's stream-json,
 # after $SLEEP seconds (so the working notification is up first)
@@ -94,8 +98,8 @@ class AskClaude(unittest.TestCase):
         calls = [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
         return [c[1:] for c in calls if c[0] == "claude"], [c[1:] for c in calls if c[0] == "notify-send"]
 
-    def ask(self, prompt, answer):
-        self.script("--", prompt, answer=answer)
+    def ask(self, prompt, answer, *flags):
+        self.script(*flags, "--", prompt, answer=answer)
         return self.calls()
 
     def events(self, id):
@@ -291,6 +295,35 @@ class AskClaude(unittest.TestCase):
         self.assertIn("KillMode=mixed", args)
         self.assertEqual(args[args.index("--") + 1:args.index("--") + 4], [str(SCRIPT), "--run", r["id"]])
         self.assertEqual(self.events(r["id"])[-1]["status"], "done")
+
+    # --- dictated requests (#3154) ---
+
+    def system(self, args):
+        return args[args.index("--append-system-prompt") + 1]
+
+    def test_dictated_request_gets_the_dictation_prompt_and_mark(self):
+        mark = re.search(r'^var MARK = "(.*)"$', UNSURE_JS.read_text(), re.M).group(1)
+        claude, _ = self.ask("muistuta huomenna", "Done.", "--dictated")
+        system = self.system(claude[0])
+        self.assertIn("This request was dictated", system)
+        self.assertIn("remind_add", system)
+        self.assertIn(f"with {mark} and a space", system)
+        self.assertNotIn("@MARK@", system)
+        self.assertEqual(claude[0][-2:], ["--", "muistuta huomenna"])
+
+    def test_typed_request_has_no_dictation_prompt(self):
+        claude, _ = self.ask("muistuta huomenna", "Done.")
+        system = self.system(claude[0])
+        self.assertNotIn("dictated", system)
+        self.assertNotIn("@MARK@", system)
+
+    def test_dictated_turn_says_so_in_its_events(self):
+        r, _ = self.start("--dictated", "--", "muistuta huomenna")
+        self.assertIs(self.events(r["id"])[0].get("dictated"), True)
+        self.assertIn("This request was dictated", self.system(self.calls()[0][0]))
+        r, _ = self.start("--resume", r["id"], "--", "typed")
+        turns = [e for e in self.events(r["id"]) if e["type"] == "nightdrive_turn"]
+        self.assertNotIn("dictated", turns[1])
 
 
 if __name__ == "__main__":

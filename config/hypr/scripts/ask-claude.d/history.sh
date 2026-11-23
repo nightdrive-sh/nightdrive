@@ -2,6 +2,8 @@
 # events.jsonl and results.json (Dashboard #2244; the launcher's history row is #2246).
 #   [{id, title, started, last, turns, status: running|done|error|timeout|cancelled, results}]   times in ms
 # shellcheck shell=bash
+# The parts share their globals with ask-claude, which sources them all (shellcheck can't follow its loop)
+# shellcheck disable=SC2034,SC2154
 
 list_turns() {   # json: 1 for JSON, else one tab-separated line each
   local json=$1 running ev dir out=()

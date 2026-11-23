@@ -50,13 +50,17 @@ Variants {
         screen: modelData
         anchors { top: true; left: true; right: true }
         implicitHeight: Theme.barHeight
-        color: TopBar.c("bg")
+        color: TopBar.windowBg   // never quite opaque: TopBar.windowBg says why
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "nightdrive-bar"
         readonly property real dpr: modelData.devicePixelRatio || 1
-        readonly property int laptopWorkspace: 10   // hyprland.lua: LAPTOP_WORKSPACE
+        readonly property int laptopWorkspace: 10   // hypr/display.lua: LAPTOP_WORKSPACE
+        // A second external display's own workspace (hypr/display.lua: SIDE_WORKSPACE, ⌘§): a monitor icon, first in the
+        // row as § is left of 1, and the only one on that display's own bar
+        readonly property int sideWorkspace: 11
+        readonly property string sideScreen: { const w = Hyprland.workspaces.values.find(w => w.id === sideWorkspace); return w && w.monitor && !w.monitor.name.startsWith("HEADLESS-") && !w.monitor.name.startsWith("eDP") ? w.monitor.name : "" }
         // A virtual screen (HEADLESS-*: a tablet or a phone over VNC, hypr/virtual-display.lua) isn't a display at the
-        // desk: it doesn't dock the laptop (hyprland.lua's isVirtual), and its workspace is the device's icon, not a number
+        // desk: it doesn't dock the laptop (hypr/display.lua's isVirtual), and its workspace is the device's icon, not a number
         readonly property bool isVirtual: modelData.name.startsWith("HEADLESS-")
         readonly property int phoneMaxWidth: 600   // logical px: a phone is narrower (an iPhone 440), a tablet not (an iPad mini 744)
         // Workspace id -> the icon of the virtual screen it is on (2–9: virtual-display.lua never gives one 1)
@@ -75,10 +79,10 @@ Variants {
         function modules() { const out = []; for (let i = 0; i < rep.count; i++) out.push(rep.itemAt(i)); return out }
 
         // Workspaces 1–5 always, others while they exist; the screen's active one highlighted, empty ones dimmed.
-        // The laptop's own workspace (hyprland.lua: LAPTOP_WORKSPACE, ⌘0) is a laptop icon after them, there while an
+        // The laptop's own workspace (hypr/display.lua: LAPTOP_WORKSPACE, ⌘0) is a laptop icon after them, there while an
         // external display is connected or while it exists; the laptop's screen then shows only it. Number size: the `workspaces` row in adjust.conf.
         // What exists is read from the windows and the screens, not Hyprland.workspaces: a workspace given a new id
-        // (⌘⌥1–0, hypr/bindings.lua) stays there under its old id with its windows, as Hyprland sends no event for it.
+        // (⌘⌥⇧1–0, hypr/bindings.lua) stays there under its old id with its windows, as Hyprland sends no event for it.
         // On a screen too narrow even with the modules tucked away, the left side gives way too (layout's squeeze), and
         // as a last resort is cut at the clock, so the two never overlap.
         Item {
@@ -95,7 +99,7 @@ Variants {
                     id: logoBox
                     readonly property bool wanted: TopBar.hidden.indexOf("logo") < 0
                     visible: wanted && win.squeeze < 1
-                    width: logo.width + 20; height: 27; radius: 8
+                    width: logo.width + 20; height: Theme.pillHeight; radius: 8
                     // Bright like the bar's text (a grey N looked disabled), highlighted while the launcher is open on this screen
                     readonly property bool open: bar.launcherOpen && win.focused
                     color: open ? TopBar.c("wsBg") : "transparent"
@@ -133,7 +137,9 @@ Variants {
                         // The laptop's screen then has only its own workspace: 1–9 are the external display's
                         if (docked && win.modelData.name.startsWith("eDP")) return [win.laptopWorkspace]
                         if (docked && ids.indexOf(win.laptopWorkspace) < 0) ids.push(win.laptopWorkspace)
-                        return ids.sort((a, b) => a - b)
+                        if (win.sideScreen === win.modelData.name) return [win.sideWorkspace]
+                        const first = w => win.sideScreen && w === win.sideWorkspace ? -1 : w
+                        return ids.sort((a, b) => first(a) - first(b))
                     }
                     Rectangle {
                         id: ws
@@ -141,7 +147,8 @@ Variants {
                         readonly property bool windows: Hyprland.toplevels.values.some(t => t.workspace && t.workspace.id === modelData)
                         readonly property bool active: { const m = Hyprland.monitorFor(win.modelData); return !!m && !!m.activeWorkspace && m.activeWorkspace.id === modelData }
                         // A device's own workspace is its icon: the laptop's screen, a virtual screen's tablet or phone
-                        readonly property string device: modelData === win.laptopWorkspace ? "laptop" : win.virtualWorkspaces[modelData] || ""
+                        readonly property string device: modelData === win.laptopWorkspace ? "laptop"
+                            : win.sideScreen && modelData === win.sideWorkspace ? "monitor" : win.virtualWorkspaces[modelData] || ""
                         // Its name, once renamed (Launcher › Rename current space): a device's workspace then shows both
                         readonly property string label: { const w = Hyprland.workspaces.values.find(w => w.id === modelData); return w && w.name ? w.name : String(modelData) }
                         readonly property bool named: label !== String(modelData)
@@ -152,7 +159,7 @@ Variants {
                         // One with windows in the bar's text colour, an empty one in its faintest: "dim" between them was
                         // too close to "off" to tell which workspaces are in use (#2066)
                         readonly property color fg: active ? TopBar.c("hlFg") : windows ? TopBar.c("fg") : TopBar.c("off")
-                        width: (device ? icon.implicitWidth : 0) + gap + (num.visible ? num.implicitWidth : 0) + 20; height: 27; radius: 8
+                        width: (device ? icon.implicitWidth : 0) + gap + (num.visible ? num.implicitWidth : 0) + 20; height: Theme.pillHeight; radius: 8
                         color: active ? TopBar.c("wsBg") : "transparent"
                         // Half while the drawer is over it, and on a screen without the focus (with more than one screen):
                         // the bright one shows where the keyboard goes
@@ -196,7 +203,7 @@ Variants {
                             if (mon === win.modelData.name) drawer.open = ws === "special:drawer"
                         }
                     }
-                    width: dot.implicitWidth + 20; height: 27; radius: 8
+                    width: dot.implicitWidth + 20; height: Theme.pillHeight; radius: 8
                     color: open ? TopBar.c("wsBg") : "transparent"
                     BarText {
                         id: dot

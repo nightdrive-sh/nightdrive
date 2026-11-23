@@ -6,12 +6,13 @@
 kind=${1:?usage: status <name>}
 
 # The machine's own battery as UPower names it (MacBook: battery_macsmc_battery). Found in /sys/class/power_supply,
-# skipping Bluetooth mice and keyboards (scope Device). Empty on a desktop: the module stays hidden.
+# skipping Bluetooth mice and keyboards (scope Device). Empty on a desktop: the module stays hidden. Prints the sysfs
+# folder; UPower's path is made from its name.
 battery() {
   local d
   for d in /sys/class/power_supply/*; do
     [[ $(cat "$d/type" 2>/dev/null) == Battery && $(cat "$d/scope" 2>/dev/null) != Device ]] || continue
-    local n=${d##*/}; echo "/org/freedesktop/UPower/devices/battery_${n//-/_}"; return
+    echo "$d"; return
   done
 }
 
@@ -60,9 +61,15 @@ case $kind in
        && [[ $(~/.local/bin/doubletake-ctl status 2>/dev/null | jq -r .state) == streaming ]]; then emit screen-share "" active
     elif [[ $(~/.config/hypr/scripts/nightlight status) == on ]]; then emit monitor-dot ""; else emit monitor ""; fi ;;
   battery)
-    dev=$(battery); [[ -z $dev ]] && { emit "" ""; exit; }
-    info=$(upower -i "$dev" 2>/dev/null)
+    sys=$(battery); [[ -z $sys ]] && { emit "" ""; exit; }
+    n=${sys##*/}; info=$(upower -i "/org/freedesktop/UPower/devices/battery_${n//-/_}" 2>/dev/null)
     pct=$(grep -oP 'percentage:\s*\K[0-9]+' <<<"$info"); st=$(grep -oP 'state:\s*\K\S+' <<<"$info")
+    # UPower's answer comes now and then empty (a D-Bus call that fails for a moment), which showed a bare "%" and a red
+    # battery: then the kernel's own figures (sysfs: capacity, status "Charging"), and a plain battery if those fail too
+    if [[ -z $pct ]]; then
+      pct=$(cat "$sys/capacity" 2>/dev/null); st=$(tr '[:upper:]' '[:lower:]' <"$sys/status" 2>/dev/null)
+      [[ $pct =~ ^[0-9]+$ ]] || { emit battery ""; exit; }
+    fi
     cls=
     if [[ $st == charging ]]; then icon=battery-charging
     else
@@ -74,6 +81,8 @@ case $kind in
     emit "$icon" "$pct%" "$cls" ;;
   claude)
     exec ~/.config/topbar/scripts/claude-bar status ;;   # its right click cycles what it shows
+  claude2)
+    exec ~/.config/topbar/scripts/claude-bar status 2 ;; # the second Claude Code account's; hidden without one
   system)
     IFS=$'\t' read -r _ _ cls < <(~/.config/topbar/scripts/sysinfo bar)
     [[ $cls == high ]] && cls=critical

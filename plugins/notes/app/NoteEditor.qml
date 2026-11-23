@@ -130,6 +130,7 @@ Item {
 
     Flickable {
         id: flick
+        TouchScroll { view: flick }
         anchors.fill: parent
         clip: true
         contentHeight: area.y + area.height + 48

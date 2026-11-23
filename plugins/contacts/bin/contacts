@@ -116,6 +116,8 @@ Usage: contacts [command]
   find QUERY     the people a search finds, without the window (--json; --limit N, 25 by default)
   card WHO       WHO's whole card, without the window: an id (as \`find\` gives it), an email address or a number (--json)
   settings       open Contacts' settings (launcher › Settings › Apps › Contacts)
+  sort [first|last]
+                 the list's order: by first name (the default) or last name; alone, the one now (--json)
   setup          set up an account with Claude, in a terminal
   sync [NAME…]   sync the contacts of every account (or these) now, both ways
                  (--force-delete first: an address book emptied here empties the server's too)
@@ -138,11 +140,12 @@ case ${1:-open} in
   people)    python3 "$APP_DIR/lib/cards.py" people ;;
   find|card) python3 "$APP_DIR/lib/lookup.py" "$@" ;;
   sync)      sync_now "${@:2}"; status=$?; running && ipc refresh; exit $status ;;
+  sort)      python3 "$APP_DIR/lib/settings.py" "$@" || exit; [[ ${2:-} == first || ${2:-} == last ]] && running && ipc refresh; exit 0 ;;
   accounts)  list_accounts ;;
   setup)     setup ;;
   enable)    enable ;;
   disable)   disable ;;
-  keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
+  keyring-locked) python3 "$APP_DIR/app/kit/keyring.py" ;;
   vdirsyncer) python3 "$APP_DIR/lib/config.py" write >/dev/null && vds "${@:2}" ;;
   help|-h|--help) usage ;;
   *)

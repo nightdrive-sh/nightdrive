@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""When an account's weekly Claude quota runs out at this pace (#3256): the Claude menu's "resets Thu · runs out Tue".
+
+  claude-usage --account NAME | claude-forecast
+      Reads one account's usage (claude-usage's {account, windows: [{key, percent, resetsAt}], error}), notes the
+      weekly percent in that account's history, and writes the usage back with runsOut (ISO time) on the weekly window
+      when the quota would run out before it resets; without it when it lasts, or when there is too little to go by.
+      claude-usage runs it on every fresh fetch (every two minutes at most), so the history fills on its own.
+
+The history is HISTORY/<account>.jsonl, a line per sample {"t": epoch, "p": percent, "r": the week's reset, epoch}:
+one when the percent changes, else one an hour, so a week is a few hundred short lines; samples older than KEEP_DAYS
+are dropped.
+
+Use is not even through a week (nights, weekends), so a straight line from this week's start swings early on. With
+earlier weeks in the history, their shape (how much of a week's use had happened by each hour of it) and their size
+carry the estimate, this week's own pace taking over as more of a usual week has gone by. Without them, only the
+straight line, and only once the week is far enough along.
+"""
+import json
+import os
+import sys
+import time
+from datetime import datetime, timezone
+
+HOME = os.path.expanduser("~")
+HISTORY = os.path.join(os.environ.get("XDG_STATE_HOME") or HOME + "/.local/state", "nightdrive", "claude-usage")
+KEEP_DAYS = 35            # five weeks of history: enough for a profile, small enough to read every two minutes
+SAMPLE_EVERY = 3600       # seconds between samples while the percent stays the same
+WEEK = 7 * 86400
+HOURS = 168
+EDGE = 12 * 3600          # a past week counts when its samples start and end within this of its start and reset
+MIN_FINAL = 5             # ...and it used at least this many percent (an idle week has no shape)
+PAST_WEEKS = 4            # the latest this many complete weeks make the profile
+MIN_SPAN = 12 * 3600      # this week's samples must span this long before any estimate
+LINEAR_MIN_ELAPSED = 2 * 86400   # without a profile: this much of the week gone...
+LINEAR_MIN_PERCENT = 5           # ...and this much used
+
+
+def week_of(reset):
+    """The week's key: its reset to the hour (the API's reset time has a varying fraction of a second)."""
+    return int(round(reset / 3600.0)) * 3600
+
+
+def parse_time(iso):
+    try:
+        return datetime.fromisoformat(str(iso).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+# ---------------------------------------------------------------- history
+
+def load(path):
+    out = []
+    try:
+        with open(path) as f:
+            for line in f:
+                try:
+                    s = json.loads(line)
+                    out.append((float(s["t"]), float(s["p"]), int(s["r"])))
+                except (ValueError, KeyError, TypeError):
+                    continue          # a torn line: the rest still counts
+    except OSError:
+        pass
+    return out
+
+
+def record(samples, now, percent, reset):
+    """samples with this one added when it says something new, and those older than KEEP_DAYS dropped."""
+    r = week_of(reset)
+    kept = [s for s in samples if s[0] >= now - KEEP_DAYS * 86400]
+    last = next((s for s in reversed(kept) if s[2] == r), None)
+    if last is None or last[1] != percent or now - last[0] >= SAMPLE_EVERY:
+        kept.append((now, float(percent), r))
+    return kept
+
+
+def save(path, samples):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        for t, p, r in samples:
+            f.write(json.dumps({"t": round(t), "p": p, "r": r}) + "\n")
+    os.replace(tmp, path)
+
+
+# ---------------------------------------------------------------- estimate
+
+def curve(points, start):
+    """A week's use at each hour 0..HOURS: straight between samples (one an hour at least), never going down."""
+    pts = sorted(points)
+    out, i, prev_t, prev_p, top = [], 0, start, 0.0, 0.0
+    for h in range(HOURS + 1):
+        x = start + h * 3600
+        while i < len(pts) and pts[i][0] <= x:
+            prev_t, prev_p = pts[i][0], pts[i][1]
+            i += 1
+        if i < len(pts) and pts[i][0] > prev_t:
+            v = prev_p + (pts[i][1] - prev_p) * (x - prev_t) / (pts[i][0] - prev_t)
+        else:
+            v = prev_p
+        top = max(top, v)
+        out.append(top)
+    return out
+
+
+def profile(samples, now):
+    """From the complete past weeks: the share of a week's use done by each hour (0..1), and a week's mean use.
+    None when there is no such week."""
+    weeks = {}
+    for t, p, r in samples:
+        if r <= now and r - WEEK <= t <= r:
+            weeks.setdefault(r, []).append((t, p))
+    shapes, finals = [], []
+    for r in sorted(weeks, reverse=True):
+        pts = sorted(weeks[r])
+        start = r - WEEK
+        if pts[0][0] > start + EDGE or pts[-1][0] < r - EDGE:
+            continue          # seen only in part: history began, or the machine was off, mid-week
+        final = max(p for _, p in pts)
+        if final < MIN_FINAL:
+            continue
+        shapes.append([v / final for v in curve(pts, start)])
+        finals.append(final)
+        if len(shapes) == PAST_WEEKS:
+            break
+    if not shapes:
+        return None
+    shape = [sum(s[h] for s in shapes) / len(shapes) for h in range(HOURS + 1)]
+    return shape, sum(finals) / len(finals)
+
+
+def at(shape, hours):
+    """shape at a fractional hour."""
+    h = max(0.0, min(float(HOURS), hours))
+    lo = int(h)
+    if lo >= HOURS:
+        return shape[HOURS]
+    return shape[lo] + (shape[lo + 1] - shape[lo]) * (h - lo)
+
+
+def forecast(samples, now, percent, reset):
+    """Epoch seconds when the quota reaches 100 % at this pace, or None: it lasts until reset, or too little data."""
+    r = week_of(reset)
+    start = r - WEEK
+    if percent >= 100 or now >= r or now < start:
+        return None
+    this = [t for t, _, wr in samples if wr == r]
+    if not this or now - min(this) < MIN_SPAN:
+        return None
+    elapsed = (now - start) / 3600.0
+    prof = profile(samples, now)
+    if prof is None:
+        # Only this week: a straight line from its start, once enough of it has gone by to mean something
+        if now - start < LINEAR_MIN_ELAPSED or percent < LINEAR_MIN_PERCENT:
+            return None
+        end = now + (100 - percent) * (now - start) / percent
+        return end if end < r else None
+    shape, usual = prof
+    done = at(shape, elapsed)                    # how much of a usual week's use has happened by now
+    pace = percent / done if done > 0 else usual
+    # The week's whole use: this week's pace and the usual week's, this week's weighing more as more of a usual
+    # week has gone by. The square root lets it take over sooner than linearly (a quarter of the way in, half)
+    # while the first hours, when pace is a few percent over a small share, still lean on the usual week.
+    w = done ** 0.5
+    total = w * pace + (1 - w) * usual
+    prev = elapsed
+    for h in range(int(elapsed) + 1, HOURS + 1):
+        here = float(h)
+        used = percent + (shape[h] - done) * total
+        if used >= 100:
+            before = percent + (at(shape, prev) - done) * total
+            frac = (100 - before) / (used - before) if used > before else 0.0
+            return start + (prev + (here - prev) * frac) * 3600
+        prev = here
+    return None
+
+
+# ---------------------------------------------------------------- main
+
+def annotate(usage, now, history_dir=HISTORY):
+    """usage with runsOut on its weekly window; the history updated on the way."""
+    if not isinstance(usage, dict) or usage.get("error") or not usage.get("account"):
+        return usage
+    weekly = next((w for w in usage.get("windows") or [] if w.get("key") == "weekly"), None)
+    reset = parse_time(weekly.get("resetsAt")) if weekly else None
+    if weekly is None or reset is None or not isinstance(weekly.get("percent"), (int, float)):
+        return usage
+    name = str(usage["account"]).replace("/", "_")
+    path = os.path.join(history_dir, name + ".jsonl")
+    samples = record(load(path), now, weekly["percent"], reset)
+    try:
+        save(path, samples)
+    except OSError:
+        pass                  # no history this time; the estimate still comes from what was there
+    end = forecast(samples, now, weekly["percent"], reset)
+    weekly.pop("runsOut", None)
+    if end is not None:
+        weekly["runsOut"] = datetime.fromtimestamp(end, timezone.utc).isoformat(timespec="seconds")
+    return usage
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        usage = json.loads(raw)
+    except ValueError:
+        sys.stdout.write(raw)  # not ours to judge: pass it on as it came
+        return
+    print(json.dumps(annotate(usage, time.time()), separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    main()

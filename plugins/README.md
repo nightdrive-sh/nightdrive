@@ -70,7 +70,7 @@ author=@jarilehtinen
 | `name` | Shown in the Launcher and `install.sh`; the README's title is the same |
 | `icon` | A [Lucide](https://lucide.dev/icons) icon name |
 | `description` | One line. Ending it in `(experimental)` marks the plugin as experimental in the Launcher and on the website (the README needn't say so) |
-| `default` | `on`: ticked in `install.sh`'s list; `off` (default): not |
+| `default` | `on`: ticked in `install.sh`'s list; `off` (default): not. Nightdrive's apps are `on` (an `app` comes anyway, unless `bundled=no`: Garage, `off`) |
 | `install` | A shell command, or a script in the folder, run in the folder in a terminal (it may ask things, and `sudo` works). Running it again must be safe. Default: nothing to install |
 | `installed` | A shell test, run in the folder: the plugin is installed while it succeeds. Make it quick: every `nightdrive plugins` runs all of them |
 | `packages` | The dnf packages the installer installs and the plugin needs, separated by spaces, e.g. `notmuch isync zenity`. Marked as installed by you once the installer has run (and by `nightdrive update`), so removing something that had pulled one in earlier, such as KDE with `nightdrive minimal`, leaves it in place. Not installed from here: the installer does that, after the repo it may need |
@@ -86,9 +86,11 @@ author=@jarilehtinen
 | `mcp` | `none`: the plugin gives Claude no tools, on purpose. Without it, a plugin with a command in `bin/` and no [`mcp.json`](#tools-for-claude-mcpjson) gets a warning from `nightdrive plugin check` |
 | `order` | A number, default 50: `install.sh` installs the plugins in this order, and the lists show them in it. Lower goes first; the same order keeps the folders' (alphabetical) order, then `plugins.txt`'s lines. Home Assistant has 90: its installer asks for addresses, so it runs last |
 
-An `app` (Mail, Contacts, Deck, Ferry) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
+An `app` (Files, Mail, Contacts, Calendar, Notes, Tasks, Deck, Ferry, Recorder, Inbox) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
 it isn't listed in System › Install while it's installed, and its settings are in Settings › Apps (Nightdrive apps
-turns one off or on). One the user removed is back in Install › Recommended, to install again from there.
+turns one off or on). It must be fine installed and never set up: one that needs an account (Mail,
+Contacts, Calendar) stays quiet without it, its timers' units skipped by a `Condition…`/`ExecCondition` rather than
+failing. One the user removed is back in Install › Recommended, to install again from there.
 `nightdrive update` installs an app that an existing install has never had (one made an app later, or a new one), once:
 the ids it has offered are kept in
 `~/.local/state/nightdrive/apps-offered` (`install.sh` writes the ones it offered, left out or not), and an app the
@@ -211,6 +213,8 @@ it (`nightdrive restart`).
 `levels`, `titles`, `parents`, `items`, `activate`, `footer`, `entered`), loaded only while the plugin is on. It may also
 have `rootItems` (rows at the Launcher's root: Deck's Music), `toolItems` (rows in Tools: Keep Awake's), `displayRows()` (rows in Settings › Other displays: VNC Display's), `rootRows()`
 (rows for the root search: Deck's albums) and `topRow`, a row above the search field (Deck's player), with `topKey(event)` for its keys and `topPress()` for Ctrl+Space.
+`tabPressed(dir)` takes Tab on its levels that have no form (true when it did something: Translate's direction).
+`cmdEnter()` takes ⌘Enter on its levels (true when it did something: Translate's "with Claude"; else the key opens a terminal as elsewhere).
 `inputs` lists its levels whose field is a value being typed, not a search: ⌘⇧V there picks from the clipboard history
 into the field.
 A row may carry `footer`, its own keys for the footer while it is selected ("Enter: search Spotify").
@@ -330,6 +334,21 @@ tests for that. Enable a unit by its path in the folder (`systemctl --user enabl
 so they can't clash: `nightdrive-<id>.service`, a command named after the plugin. A Files extension runs whether the
 plugin is on or not, so it checks that itself (LocalSend's tests its unit and `~/.local/state/nightdrive/plugins-off/<id>`).
 
+A service that a timer runs fails out of sight, so give it Nightdrive's failure notice: one line in its `[Unit]`,
+
+```ini
+OnFailure=nightdrive-unit-failed@%n.service
+```
+
+After each failure `unit-failed` ([unit_failed.py](../config/hypr/scripts/unit_failed.py) has the rules) counts it, and
+once the service has failed 3 times in a row (a successful run starts the count again) shows one notification: its
+`Description=`, the last line it wrote and **Show the log**; then at most one a day while it keeps failing. A unit with
+`After=network-online.target` counts no failure while the computer is offline and notifies only once it has failed for
+2 hours, so a sync without a network stays quiet. Exit with 0 when there is nothing to do, and skip a round that can't
+run with `ExecCondition=` (a locked keyring, no account yet), as Mail's sync does: those aren't failures.
+`nightdrive plugin check` warns about a timer's service without the line. `~/.config/hypr/scripts/unit-failed list
+[--json]` shows the services failing now.
+
 ## Tools for Claude: mcp.json
 
 `nightdrive mcp`, Nightdrive's MCP server, gives Claude the tools in the `mcp.json` of every plugin that is installed and
@@ -366,6 +385,8 @@ card, undo, timeouts).
 | `undo_asks` | Optional, for `change`: `true` when undoing it does something only the card may allow. An undo whose argv is an `act` tool's command (dnd_off's undo is dnd_on's) asks without it |
 | `before` | Optional, for `change`: argv that prints the state the tool changes as a JSON object (`{"path": "…"}`, the wallpaper set now), run first. If it fails, the tool isn't run: a change must be one the user can undo |
 | `notice` | Optional, for `change`: the notification's line, e.g. `"Changed the wallpaper to {path}"` (the output's fields, then the arguments). Default: `title` |
+| `notice_many` | Optional, for `change`: the line of one notification for several of its changes in a row, with `{count}` and no other name: `"Added {count} tasks"`. Without it, such a batch reads "3 changes in Tasks" |
+| `notify` | Optional, for `change`: `false` logs the change for `recent_changes` and `undo_change` but shows no notification, for one plain to see where it lands that mustn't interrupt (inbox_post: a message in Inbox is the opposite of a notification) |
 | `card` | Optional: argv that prints, as a JSON object of label → text, what the confirmation card shows above the arguments, from what the tool acts on (`{"Device": "Oven", "Room": "Kitchen"}` for `switch.sonoff_1000a`). Run before the card; if it fails, the call stops there with its message. `"ask": false` in it lets the call past the card: only for a tool that names the list in `unasked_by`, when that list isn't empty and the tool isn't `act` |
 | `unasked_by` | Optional, with `card`: the area's list choice whose entries need no card (`"apps"`: windows_view's apps the user ticked). Only then does the card command's `"ask": false` count |
 | `asks_if` | Optional, a `change` or `act` tool's: argv that prints `yes` when this call asks on the card though Access allows the tool, as it reaches further than its right says (`sound remote {output}`: a speaker on the network; `calendar shared`: a calendar others see), `no` otherwise, or `first KEY` (one line): it asks until the user allows a call for KEY once, and then not for KEY again (`calendar shared` for a calendar Claude hasn't added to; Nightdrive keeps them in `~/.config/nightdrive/claude-allowed.json`, `nightdrive mcp access forget TOOL [KEY]`). An `act` tool may have one too, but only `first KEY` lets its call past the card, and only while Access allows its right (`windows site {url}`: open_address once per site). `first_note`, optional: the card's line on what Allow then covers, with `{key}` in it (default: "Claude does this for KEY without asking from now on"). Anything else, or a failure, stops the call with its message. Redo runs it again with the logged arguments, and Claude's undo with the values read off its argv when it is this command (else that undo asks) |
@@ -373,14 +394,15 @@ card, undo, timeouts).
 | `options_from` | Optional: other areas whose choices the command gets too, in `NIGHTDRIVE_MCP_OPTIONS_FROM` (`{"mail": {"blocked": […]}}`), when what it gives could show what they hide: notifications_recent leaves out Mail's notifications of blocked mail. A tool that takes a path names `apps-files` and runs `nightdrive files check` on it, which keeps to the folders Claude can use (Ferry's sends, the wallpaper) |
 | `mask` | Optional, for a tool whose output has text others wrote or secrets may be in (a read, or a draft that quotes a mail): the fields of its JSON output to mask, `["messages.text", "subject"]` (a list on the way is taken item by item). One-time codes, login links, card numbers, IBANs, identity codes, passwords and keys in them are hidden before Claude gets them (`config/mcp/mask.py`), unless the area's choice `secrets` is on; in an object with `"secret": true` the field is hidden whole. Leave out ids that other tools take |
 | `image` | Optional: the field of the command's JSON output that holds a picture, `{"mimeType": "image/png", "data": "<base64>"}`. Claude gets it as an image, and the rest of the output as text (`windows_view`) |
-| `area` | The row in Settings › Claude › Access it belongs to: `mail`, `contacts`, `calendar`, `tasks`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `appearance`, `sound-display`, `screen`, `apps-files`, `software`, or the plugin's own id. A plugin from outside this repository: its own id only |
+| `area` | The row in Settings › Claude › Access it belongs to: `mail`, `contacts`, `calendar`, `tasks`, `notes`, `deck`, `ferry`, `home-assistant`, `notifications`, `inbox`, `appearance`, `sound-display`, `screen`, `apps-files`, `software`, or the plugin's own id. A plugin from outside this repository: its own id only |
 | `timeout` | Optional: seconds before it's stopped (30, at most 300) |
 | `stops_on_cancel` | Optional: `true` stops the command when Claude Code cancels the call (Esc): for one that waits before it acts, as the window tools wait for the user to stop typing. Without it a cancelled command runs to its end |
 
 A `change` tool's call shows a notification with Undo (it stays in the history for an hour) and goes in
 `~/.local/state/nightdrive/claude-changes.jsonl` (the last 100), from which Claude can undo it too when asked
 (`recent_changes`, `undo_change`). Undo runs the logged `undo` argv the way the tool ran, and Redo the command again,
-filling `undo` from that run's output (a new draft's new id).
+filling `undo` from that run's output (a new draft's new id). One conversation's changes in one area at most 90 seconds
+apart share a notification (`notice_many`), whose Undo undoes them newest first; the log keeps each one.
 
 The command runs in the plugin's folder, with its `bin/` and Nightdrive's first in `PATH`. stdout is the result Claude
 reads (a JSON object also as structured content, at most 100 000 characters); an exit status other than 0 is an error

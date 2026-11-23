@@ -6,11 +6,12 @@ come gets a notification with Done and Later, once for each due time it has (Lat
     due.py notice ID    one task's notification, waiting for its buttons (a process of its own)
 
 A task due on a day without a time comes at when.MORNING. Many at once (a computer that was off) come as one
-notification that opens the window, not a wall of them. Each notification waits in a process of its own, started by
-systemd-run: the timer's service ends at once, and would take a child of its own with it.
+notification that opens the window, not a wall of them. Each notification waits in a unit of its own (spawn): the
+timer's service ends at once, and would take a child of its own with it.
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,7 @@ SEEN = store.STATE / "notified.json"   # {uid: the due time it was notified for}
 ONE_BY_ONE = 3                         # more due at once come as one notification
 ICON = "lucide:list-checks"
 TASKS = Path(__file__).resolve().parents[1] / "bin/tasks"
+CARRY = ("NIGHTDRIVE_TASKS_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME")   # store.py's folders
 
 
 def read_seen():
@@ -60,11 +62,24 @@ def check():
 
 
 def spawn(args):
+    """The notification waits for its buttons in a unit of its own. systemd-run is waited for (it returns once the
+    unit is there): left running as a child, it was killed with the timer's oneshot service before it got there, and
+    about every other notification was lost (#3326, as unit-failed's in #3313). Without a user manager (a container, a
+    shell outside the session) a process of its own instead."""
     cmd = [sys.executable, str(Path(__file__).resolve())] + args
+    quiet = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if shutil.which("systemd-run"):
-        cmd = ["systemd-run", "--user", "--collect", "--quiet", "--"] + cmd
-    subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     start_new_session=True)
+        # The unit starts from the user manager's environment: carry over which tasks these are
+        env = [f"--setenv={k}={os.environ[k]}" for k in CARRY if k in os.environ]
+        try:
+            if subprocess.run(["systemd-run", "--user", "--collect", "--quiet", *env, "--"] + cmd, timeout=20,
+                              **quiet).returncode == 0:
+                return
+        except subprocess.TimeoutExpired:
+            return   # started, probably: a second one would show it twice
+        except OSError:
+            pass
+    subprocess.Popen(cmd, start_new_session=True, **quiet)
 
 
 def notify(tag, summary, body, actions):

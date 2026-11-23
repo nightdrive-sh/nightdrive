@@ -107,6 +107,10 @@ AREAS = {
               "modify": "writes new notes and adds to the end of one",
               "delete": "moves notes to the trash",
               "options": [SECRETS]},
+    "recorder": {"name": "Recorder", "glyph": "mic", "app": True,
+                 "read": "lists your recordings in ~/Recordings and reads their transcripts",
+                 "modify": "transcribes recordings and renames them",
+                 "options": [SECRETS]},   # what was said aloud: a code read out is in the transcript
     "deck": {"name": "Deck", "glyph": "disc-3", "app": True,
              "read": "sees what plays, searches music and albums (the search words go to Spotify)",
              "modify": "plays, queues, pauses and skips, likes songs"},
@@ -135,9 +139,15 @@ AREAS = {
                             "off": "Claude doesn't get presence, occupancy or motion sensors, nor where your phones "
                                    "are: they tell whether anyone is home."},
                        ]},
+    # Messages for the user to look at later (#3132, docs/inbox.md): mostly Claude's own sessions', so reading and
+    # leaving them is allowed on Normal (a session reads its own to add to one); apps may write there too, hence secrets
+    "inbox": {"name": "Inbox", "glyph": "mailbox",
+              "read": "lists the messages in your Inbox",
+              "modify": "leaves you a message in Inbox, with files and buttons, and adds to one it left",
+              "options": [SECRETS]},
     "notifications": {"name": "Notifications", "glyph": "bell-ring",
-                      "read": "reads the latest notifications of every app",
-                      "modify": "sends you a notification, turns Do Not Disturb on or off",
+                      "read": "reads the latest notifications of every app, and the reminders waiting",
+                      "modify": "sends you a notification or sets a reminder, turns Do Not Disturb on or off",
                       "options": [
                           SECRETS,
                           {"id": "apps", "name": "Apps whose notifications Claude doesn't see", "list": True,
@@ -152,8 +162,9 @@ AREAS = {
                    "read": "sees your wallpaper and theme",
                    "modify": "changes the wallpaper, theme, colour, night light and bar style"},
     "sound-display": {"name": "Sound and display", "glyph": "volume-2",
-                      "read": "reads the volume, outputs, screens, network, Bluetooth and battery",
-                      "modify": "sets the volume, output and brightness; a screen's scale or resolution, Low Power Mode, the network off"},
+                      "read": "reads the volume, outputs, screens, network, places, Bluetooth and battery",
+                      "modify": "sets the volume, output and brightness; a screen's scale or resolution, Low Power Mode, the network off; adds places",
+                      "delete": "removes places"},
     "screen": {"name": "What's on screen", "glyph": "scan-eye",
                "read": "takes a picture of a window on screen and looks at it",
                "options": [
@@ -166,9 +177,10 @@ AREAS = {
                     "off": "Claude asks first."},
                ]},
     "apps-files": {"name": "Apps and files", "glyph": "folder",
-                   "read": "lists your open windows and the newest files in your folders",
+                   "read": "lists your open windows, your Claude Code sessions and the newest files in your folders",
                    "modify": "opens apps, files and web addresses, brings a window forward; makes folders, moves and "
-                             "renames files (a folder, or many files, asks)",
+                             "renames files (a folder, or many files, asks); schedules a command or a message to "
+                             "Claude for later (always asks) and cancels one",
                    "delete": "moves files to the trash",
                    "options": [
                        # #1849: the one limit every tool with a path keeps (config/hypr/scripts/files › checked)

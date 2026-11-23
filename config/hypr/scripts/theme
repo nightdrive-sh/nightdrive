@@ -38,7 +38,9 @@ FONT_STATE = f"{HOME}/.local/state/nightdrive/font"              # the UI font's
 # The fonts on trial for the UI (#1839), JetBrains Mono (the default) first. Others work too with `theme font FAMILY`.
 FONTS = ["JetBrains Mono", "Inter Variable", "Geist", "Atkinson Hyperlegible Next", "DM Sans", "Rubik", "Mulish",
          "Figtree", "Work Sans", "Plus Jakarta Sans", "Source Sans 3"]
-OWN_THEMES = f"{HOME}/.config/hypr/themes"                       # Nightdrive's: the repo's config/hypr/themes
+# Nightdrive's: the repo's config/hypr/themes, found from this script (linked to ~/.config/hypr/themes too), so a
+# checkout that link.sh hasn't linked (CI, a worktree) reads its own
+OWN_THEMES = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "themes")
 MY_THEMES = f"{HOME}/.config/nightdrive/themes"                  # yours, saved from Theme Editor
 OUT = f"{HOME}/.cache/nightdrive"
 APOSTROPHE = f"{HOME}/.var/app/org.gnome.gitlab.somas.Apostrophe/config/gtk-4.0"   # a Flatpak: can't read ~/.cache
@@ -228,6 +230,28 @@ def rgba(hexcol, pct):
     return f"rgba({hexcol[1:]}{alpha(pct)})"
 
 
+def mix(a, b, t):
+    return rgb2hex(*(x * (1 - t) + y * t for x, y in zip(hex2rgb(a), hex2rgb(b))))
+
+
+def contrast(a, b):
+    """WCAG contrast ratio of two (r, g, b) in 0…1."""
+    lum = lambda c: sum(k * (x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4) for k, x in zip((0.2126, 0.7152, 0.0722), c))
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def readable(text, fill, opacity, need=4.5):
+    """text, lightened (darkened on a light fill) until it reads at need:1 on fill at opacity over any wallpaper: the
+    worst of a white and a black one behind it. The group tabs (#3195) sit on the wallpaper, which may be either.
+    When nothing reaches need, the one that reads best."""
+    def worst(t):
+        return min(contrast(hex2rgb(t), tuple(f * opacity + w * (1 - opacity) for f in hex2rgb(fill)))
+                   for w in (0, 1))
+    tries = [mix(text, towards, i / 20) for towards in ("#ffffff", "#000000") for i in range(21)]
+    return next((t for t in tries if worst(t) >= need), max(tries, key=worst))
+
+
 def write(path, text):
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
@@ -332,13 +356,27 @@ def apply_look(lk):
     inactive = rgba(lk["inactive-border-color"], lk["inactive-border-opacity"]) if lk["inactive-border"] == "on" \
         else "rgba(00000000)"
     inactive_shadow = shadow if lk["inactive-shadow"] == "on" else "rgba(00000000)"
-    write(f"{OUT}/look.lua", "-- written by theme: hyprland.lua runs it after its own look, `theme set` over IPC\n"
+    # Window groups' tabs (a project manager's sessions, pm-space.lua; #3195): the shown one the look's background tinted
+    # 45 % with the theme's colour (the border's blue stood out too much; more and Teal's white text falls under
+    # 4.5:1), its text light; the others the background, their text the theme's dim. Both nearly opaque (and blurred,
+    # appearance.lua): the border's colour at 30 % let a bright wallpaper wash the tab and its light text out.
+    # readable() keeps the text at 4.5:1 or better over any wallpaper, whatever colours the theme has; the UI font
+    border = rgba(lk["border-color"], lk["border-opacity"])
+    tab_on = mix(lk["background"], palette(current())["primary"], 0.45)
+    tab_on_text = readable("#e6e1eb", tab_on, 0.94, 7)
+    tab_off_text = readable(palette(current())["dim"], lk["background"], 0.86)
+    write(f"{OUT}/look.lua", "-- written by theme: appearance.lua runs it after its own look, `theme set` over IPC\n"
           "hl.config({\n"
-          f'    general = {{ col = {{ active_border = "{rgba(lk["border-color"], lk["border-opacity"])}", '
+          f'    general = {{ col = {{ active_border = "{border}", '
           f'inactive_border = "{inactive}" }} }},\n'
           f'    decoration = {{ shadow = {{ enabled = {"true" if lk["shadow"] == "on" else "false"}, '
           f'range = {lk["shadow-size"]}, color = "{shadow}", '
           f'color_inactive = "{inactive_shadow}" }} }},\n'
+          f'    group = {{ col = {{ border_active = "{border}", border_inactive = "{inactive}" }},\n'
+          f'              groupbar = {{ font_family = "{font() or FONTS[0]}", col = {{ active = "{rgba(tab_on, 94)}", '
+          f'inactive = "{rgba(lk["background"], 86)}" }},\n'
+          f'                           text_color = "{rgba(tab_on_text, 100)}", '
+          f'text_color_inactive = "{rgba(tab_off_text, 100)}" }} }},\n'
           "})\n"
           # layer-keys.lua: while a layer holds the keyboard the active window wears these inactive colours
           "if NightdriveLayerKeys then NightdriveLayerKeys(true) end\n")

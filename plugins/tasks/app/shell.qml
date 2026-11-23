@@ -21,7 +21,7 @@ ShellRoot {
         implicitHeight: 720
         color: c.bg
         // Closing the window (⌘W) quits Tasks, as Contacts: a process left without its window would only look open
-        onClosed: Qt.quit()
+        onClosed: { ops.flush(); Qt.quit() }
 
         AppLook { id: c }
         readonly property QtObject look: c
@@ -89,17 +89,22 @@ ShellRoot {
                     let d
                     try { d = JSON.parse(text) } catch (e) { console.warn("cli.py list: " + e); return }
                     const keep = win.keepNext || (win.shown[win.current] ? win.shown[win.current].id : "")
+                    const show = win.keepNext !== ""   // one just added or brought back: scrolled to if it is out of sight
+                    const seen = win.view.kind + ":" + (win.view.id || "")
                     win.keepNext = ""
                     const was = win.keepList || (win.view.kind === "list" ? win.view.id : "")
                     win.keepList = ""
                     win.tasks = d.tasks
+                    ops.settle(d.tasks)
                     win.lists = d.lists
                     win.today = d.now.slice(0, 10)
                     win.loaded = true
                     // The same list stays picked when one before it comes or goes; Today when it has gone itself
                     if (was) { const i = win.sources.findIndex(s => s.id === was); win.source = i >= 0 ? i : 0 }
                     win.source = Math.min(win.source, win.sources.length - 1)
-                    win.filter(keep, win.current)
+                    // The same view read again keeps its scroll (#3249); another one (its list gone) starts at the top
+                    const same = seen === win.view.kind + ":" + (win.view.id || "")
+                    win.filter(keep, win.current, same ? (show ? "show" : "hold") : "")
                 }
             }
         }
@@ -107,7 +112,7 @@ ShellRoot {
         // Today moves on with the clock, and a sync or another app may change the files: read them again each minute
         Timer { interval: 60000; running: true; repeat: true; onTriggered: win.load() }
         // Upcoming's headings are worked out with the rows: a change of region writes them again at once
-        Connections { target: Regional; function onRegionChanged() { win.filter(win.shown[win.current] ? win.shown[win.current].id : "", win.current) } }
+        Connections { target: Regional; function onRegionChanged() { win.filter(win.shown[win.current] ? win.shown[win.current].id : "", win.current, "hold") } }
 
         // When a task is due, the region's way (Settings › Region, the kit's Regional), as lib/when.py's label writes it
         // for the notifications and Claude: "Today 14:00", "Tomorrow", "Fri 6.11." this week, "20.11.", "4.1.2027";
@@ -133,13 +138,19 @@ ShellRoot {
         function viewOptions() {
             return { today: today, query: query, lists: lists, doneMax: doneMax, dayLabel: day => dueLabel(day, true) }
         }
-        // keep: the task to pick again; at: the row to stay at when it has gone (done, moved, trashed), else the first
-        function filter(keep, at) {
+        // keep: the task to pick again; at: the row to stay at when it has gone (done, moved, trashed), else the first.
+        // scroll "hold" (a read of the view on show): the rows stay where they were, see holdScroll; "show": the same,
+        // but the picked one is scrolled to when out of sight; "": a new view, from the picked row
+        function filter(keep, at, scroll) {
+            const place = scroll ? holdScroll.mark() : null
             shown = Views.rows(tasks, view, viewOptions())
             const i = keep ? shown.findIndex(t => t.id === keep) : -1
             current = i >= 0 ? i : shown.length ? Math.max(0, Math.min(at || 0, shown.length - 1)) : -1
-            if (shown.length) listView.positionViewAtIndex(current, ListView.Contain)
+            if (!shown.length) return
+            if (place) holdScroll.restore(place, scroll === "show")
+            else listView.positionViewAtIndex(current, ListView.Contain)
         }
+        ScrollHold { id: holdScroll; view: listView; app: win }
         function pickSource(i) {
             if (i < 0 || i >= sources.length) return
             if (searching) endSearch()
@@ -174,8 +185,19 @@ ShellRoot {
         function say(t, danger) { toast.show(t, { danger: !!danger }) }
         function offer(t, undo) { toast.show(t, { action: "Undo", run: undo }) }
         Actions { id: ops; app: win }
+        readonly property var ticking: ops.ticking   // the rows ticked a moment ago (Actions.toggle)
         // A task's circle, Space: done, or back to open in Done
         function toggleDone(index) { ops.toggle(shown[index === undefined ? current : index]) }
+        // c or Copy text under the picked task's note: the note to the clipboard, as it is. copied names the task for a
+        // moment, so its button says Copied
+        property string copied: ""
+        Timer { id: copiedFor; interval: 1500; onTriggered: win.copied = "" }
+        function copyNote(index) {
+            const t = shown[index === undefined ? current : index]
+            if (!t || !t.note) { say("No note to copy"); return }
+            Quickshell.execDetached(["wl-copy", "--", t.note])
+            copied = t.id; copiedFor.restart()
+        }
         function move(d) {
             if (!shown.length) return
             current = Math.max(0, Math.min(shown.length - 1, current + d))
@@ -269,6 +291,7 @@ ShellRoot {
                     else if (k === Qt.Key_Delete && !ctrl && win.pane === "sources") { if (win.view.kind === "list") listOps.remove(win.view) }
                     else if ((k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_E) && !ctrl) win.editTask()
                     else if (k === Qt.Key_Space && !ctrl) win.toggleDone()
+                    else if (k === Qt.Key_C && !ctrl) win.copyNote()
                     else if (k === Qt.Key_Delete && !ctrl) ops.trash(win.shown[win.current])
                     else return
                     e.accepted = true
@@ -357,7 +380,7 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
+                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again (again within 2 s: called off)"], ["c", "Copy its note"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "Search", keys: [["/  ⌘F", "Search every list"], ["⏎  ↓", "To the tasks found"], ["Esc", "End the search"]] },
                 { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"]] },

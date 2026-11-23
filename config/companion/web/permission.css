@@ -1,0 +1,14 @@
+/* A permission request whole, before its Allow (permission.js): each key of its input over its value, the value as it
+   is (its lines, nothing cut), in the box's own scroll; the buttons stay below. Wide on an iPad: an edit's lines. */
+.sheet.permission { width: min(880px, 100%); }
+.ptool { font-size: 15px; color: var(--title); overflow-wrap: anywhere; }
+.ptool span { color: var(--dim); }
+.pfields { display: flex; flex-direction: column; gap: 12px; }
+.pfield { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pkey { font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+/* isolate: a right-to-left letter in a value can't reorder what is around it */
+.pval { margin: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+        font: 12px/1.5 var(--font); color: var(--accent); white-space: pre-wrap; overflow-wrap: anywhere;
+        unicode-bidi: isolate; -webkit-user-select: text; user-select: text; }
+.pnone { color: var(--dim); font-style: italic; }
+.pwarn { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--caution); }

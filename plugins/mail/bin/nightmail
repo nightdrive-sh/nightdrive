@@ -170,12 +170,34 @@ claude_cancel() {
 compose_only() { NIGHTMAIL_COMPOSE_ONLY=1 start; }
 reveal() { running && [[ $(qs ipc -p "$QS_DIR" call "$APP_IPC" reveal 2>/dev/null) == shown ]]; }
 
+# new FILE…: a message with the files attached (Files' m). Only files: a folder is refused with the reason, as a mail
+# can't carry one (Files says to compress it first). A message already being written takes them (Writing.qml,
+# composeFiles), and its window comes forward.
+new_message() {
+  local f files=() title addr
+  for f in "$@"; do
+    [[ $f == -- ]] && continue
+    if [[ -d $f ]]; then echo "nightmail: $f is a folder: only files can be attached (compress it first)." >&2; return 2; fi
+    if [[ ! -f $f || ! -r $f ]]; then echo "nightmail: $f isn't a file that can be read." >&2; return 2; fi
+    # One path a line over IPC (composeFiles): a name with a line break in it can't go
+    if [[ $f == *$'\n'* ]]; then echo "nightmail: $f has a line break in its name: rename it first." >&2; return 2; fi
+    files+=("$(realpath -- "$f")")
+  done
+  running || { compose_only; ready; }
+  if ((${#files[@]} == 0)); then ipc compose; return; fi
+  title=$(qs ipc -p "$QS_DIR" call "$APP_IPC" composeFiles "$(printf '%s\n' "${files[@]}")") || return 1
+  command -v hyprctl >/dev/null || return 0
+  addr=$(hyprctl -j clients | jq -r --argjson pid "$(pid)" --arg t "$title" \
+           '[.[] | select(.pid == $pid and .title == $t)] | first | .address // empty')
+  [[ -z $addr ]] || hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+}
+
 usage() {
   cat <<USAGE
 Usage: nightmail [command]
 
   (none), open   open Mail, or bring it forward if it is open
-  new            write a new message
+  new [FILE…]    write a new message, with the files attached (to the one being written, if there is one)
   settings       open Mail's settings (launcher › Settings › Apps › Mail)
   mailto:…       write to a mailto: link's address (the desktop entry's handler for mailto links)
   setup          set up an email account with Claude, in a terminal
@@ -198,9 +220,11 @@ Usage: nightmail [command]
   thread ID      a thread's messages as JSON text (ID: thread:… or a message id)
   unsubscribe MSGID…  the messages' unsubscribe links as JSON (List-Unsubscribe, else the body's)
   invitation ID  a message's calendar invitation, by Calendar, as JSON; --add CALENDAR puts its event in one (or
-                 updates it there), --remove takes a cancelled one out
+                 updates it there), --remove takes a cancelled one out; --reply accept|maybe|decline [--calendar ID]
+                 sends the answer to its organiser (--card: only what would go)
   accounts       the accounts, as JSON
-  draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body})
+  draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body},
+                 either with attachments: [paths])
   draft-show ID  a draft as it would be sent, as JSON
   discard ID     throw a draft away
   save-attachments [--into FOLDER] -- ID [NAME …]
@@ -219,7 +243,7 @@ USAGE
 }
 
 case ${1:-open} in
-  new)     running || { compose_only; ready; }; ipc compose ;;
+  new)     new_message "${@:2}" ;;
   mailto:*) running || { compose_only; ready; }; ipc mailto "$1" ;;
   open)     reveal || open_window ;;
   settings) reveal || open_ready; ipc openSettings ;;
@@ -278,7 +302,7 @@ case ${1:-open} in
   blocked-notifications) python3 "$APP_DIR/lib/blocked.py" notifications ;;   # `nightdrive notifications` for Claude
   fetch)     fetch "${@:2}" ;;
   fetching)  running && ipc fetching ;;     # fetch()'s, for Mail's spinner
-  keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
+  keyring-locked) python3 "$APP_DIR/app/kit/keyring.py" ;;
   push)      exec python3 "$APP_DIR/lib/push.py" ;;
   ask-claude)    ask_claude "$2" "$3" ;;   # Mail's ⌘⇧C (the commands below are the card's)
   claude-draft)  claude_draft "$2" ;;

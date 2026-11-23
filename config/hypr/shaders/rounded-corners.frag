@@ -8,9 +8,9 @@ uniform sampler2D tex;
 // Rounds the desktop corners off in black (like macOS), and tints the screen warm for the night light.
 // Values are physical pixels: scale 2.0 → 24 px = 12 px logical.
 const float R   = 24.0;  // corner radius
-const float TOP = 74.0;  // top bar height (37 * 2); rounding starts at the bar's bottom edge, one per screen in the copy hyprland.lua writes
+const float TOP = 74.0;  // top bar height (37 * 2); rounding starts at the bar's bottom edge, one per screen in the copy corners.lua writes
 const float BAR = 1.0;   // top bar opacity: the top corners continue the bar at the same transparency (hypr/scripts/bar-style writes a copy)
-// hyprland.lua writes copies with these changed: no corners under a fullscreen window, and the night light's colour
+// corners.lua writes copies with these changed: no corners under a fullscreen window, and the night light's colour
 // (hypr/scripts/nightlight; Asahi's display driver has no gamma tables, so gammastep and the like can't do it)
 const float CORNERS = 1.0;
 const vec3 WARM = vec3(1.0);

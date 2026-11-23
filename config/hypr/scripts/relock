@@ -1,19 +1,61 @@
 #!/bin/bash
-# After sleep (hypridle's after_sleep_cmd): the lock that was up before it doesn't get the keyboard back. Hyprland adds
-# the keyboards again on resume, and the lock's surface keeps none: the password field shows but takes no keys until
-# it is clicked (and one started just before the sleep didn't draw at all). Seen on a PC with an NVIDIA card and a USB
-# keyboard, with hyprlock and with the login screen alike. So a new lock is started and the old one closed.
-# The order matters: Hyprland shows its "lock died" screen at once when no lock client is left, but with
-# allow_session_lock_restore (hyprland.lua) a new lock takes the lock over while the old one is still up. So the new
-# one starts first (lock --replace), and it closes the old one once it is secure: a surface on every screen. Closing it
-# as soon as the new one had loaded left a screen on the "lock died" screen when the new one never drew there (#2342).
-# Until it has drawn, the screen is black (lockdead_screen_delay = 0 there: with a delay, Hyprland draws the desktop
-# under it meanwhile).
+# The lock across a sleep (hypridle.conf):
+#   relock prepare   before it (before_sleep_cmd): notes the keyboards, and that a relock is due (scripts/lid waits for it)
+#   relock           after it (after_sleep_cmd): replaces the lock if it has to
+# On some machines the lock that was up before the sleep doesn't get the keyboard back: Hyprland adds the keyboards again
+# on resume, and the lock's surface keeps none, so the password field shows but takes no keys until it is clicked. Seen
+# on a PC with an NVIDIA card and a USB keyboard, with hyprlock and with the login screen alike. Then a new lock is
+# started (lock --replace), and it closes the old one once it is secure: a surface on every screen (#2342).
+# Only then: a replacement shows Hyprland's "lock died" screen on any frame drawn between the new lock taking the session
+# over and its first frame (~50-100 ms; lockdead_screen_delay = 0 in appearance.lua, and a longer delay shows the
+# desktop there instead). After a lid open it flashed up before the password (#3363). So the lock stays when it is the
+# only one, secure, and no keyboard has been added since the sleep began: Hyprland gives a re-added keyboard a new
+# device, with a new address in `hyprctl devices`. A keyboard that went away (Bluetooth) doesn't matter. Without the
+# note from before the sleep, it is replaced, as before.
+# The note doubles as the sign for scripts/lid that a relock is due: a reload or a screen capture of its own in the
+# middle of a replacement draws that screen too, so it waits until this is done (the file is gone).
 # Steps go to the journal (journalctl -t relock).
 lock='[q]s -p .*/greeter/lock\.qml'
 mine=(--ns $$ --nslist pid -u "$UID")   # not a container's lock (nightdrive sandbox): same user, other PID namespace
+runtime=${XDG_RUNTIME_DIR:-/run/user/$UID}
+NOTE=$runtime/nightdrive-relock
+SWAP_WAIT=15   # seconds the new lock may take to take over before scripts/lid goes ahead
+
+# "address name" of each keyboard, sorted bytewise (for comm under LC_ALL=C)
+keyboards() {
+  hyprctl devices -j 2>/dev/null | python3 -I -c 'import json, sys
+try: kbs = json.load(sys.stdin).get("keyboards", [])
+except ValueError: kbs = []
+for line in sorted("%s %s" % (k.get("address"), k.get("name")) for k in kbs): print(line)'
+}
+secure() { grep -q 'nightdrive-lock: secure' "$runtime/quickshell/by-pid/$1/log.log" 2>/dev/null; }
+
+if [[ $1 == prepare ]]; then
+  keyboards > "$NOTE.new" && mv -f "$NOTE.new" "$NOTE"
+  exit 0
+fi
+
+trap 'rm -f "$NOTE"' EXIT
 pgrep "${mine[@]}" -f "$lock" >/dev/null || exit 0
 sleep 1   # the keyboards come back a moment after the resume
-pgrep "${mine[@]}" -f "$lock" >/dev/null || { logger -t relock "unlocked meanwhile"; exit 0; }
-logger -t relock "starting a new lock"
+mapfile -t old < <(pgrep "${mine[@]}" -f "$lock")
+(( ${#old[@]} )) || { logger -t relock "unlocked meanwhile"; exit 0; }
+why=""
+if (( ${#old[@]} > 1 )); then why="${#old[@]} locks up"
+elif ! secure "${old[0]}"; then why="the lock isn't secure"
+elif [[ ! -f $NOTE ]]; then why="no note of the keyboards before the sleep"
+else
+  added=$(LC_ALL=C comm -13 "$NOTE" <(keyboards) | cut -d' ' -f2- | paste -sd, -)
+  [[ -n $added ]] && why="keyboards added: $added"
+fi
+[[ -z $why ]] && { logger -t relock "the lock stays (no keyboard added)"; exit 0; }
+logger -t relock "starting a new lock ($why)"
 setsid -f "$HOME/.config/hypr/scripts/lock" --replace >/dev/null 2>&1
+# Done once one lock is up, not one of the old ones, and it is secure
+for (( i = 0; i < SWAP_WAIT * 10; i++ )); do
+  mapfile -t now < <(pgrep "${mine[@]}" -f "$lock")
+  if (( ${#now[@]} == 1 )) && ! printf '%s\n' "${old[@]}" | grep -qxF "${now[0]}" && secure "${now[0]}"; then exit 0; fi
+  (( ${#now[@]} )) || exit 0   # unlocked meanwhile
+  sleep 0.1
+done
+logger -t relock "the new lock hasn't taken over in ${SWAP_WAIT} s"

@@ -4,6 +4,8 @@
 # old. includepkgs limits the COPR to the stack's packages, so it never replaces another Fedora package. Ghostty is there
 # too (Install › Software › Terminals): Fedora and Flathub don't have it. So is Deck (plugins/deck), not compiled here,
 # and wayvnc 0.10 for VNC Display (plugins/vnc-display): Fedora 44's 0.9.1 exits when Hyprland fails a cursor capture.
+# And Quickshell 0.3, which the bar, menus and apps run on: Fedora 44's 0.2.1 snapshot crashes on Hyprland 0.57's
+# special workspaces (they have an address there, no id). It leaves the list once Fedora's own is 0.3.2 or later.
 # It replaces the COPRs used before (OLD): arcaneon/arcos until 19.10.2026, whose aarch64 builds fell behind, and
 # jarilehtinen/nightdrive, the same packages in a personal project, until 21.10.2026. Their repos go, and the next
 # dnf upgrade moves the packages over (from arcos: hyprland obsoletes hyprland-uwsm, hyprland-guiutils the Qt
@@ -14,7 +16,7 @@
 set -euo pipefail
 COPR=@nightdrive/nightdrive
 OLD=(arcaneon/arcos jarilehtinen/nightdrive)
-INCLUDE=hypr*,aquamarine,xdg-desktop-portal-hyprland,uwsm,lua5.5,ghostty,deck,wayvnc
+INCLUDE=hypr*,aquamarine,xdg-desktop-portal-hyprland,uwsm,lua5.5,ghostty,deck,wayvnc,quickshell
 # The COPR's signing key, pinned by fingerprint as setup-rpmfusion.sh pins RPM Fusion's. dnf copr enable points gpgkey=
 # at the URL, and dnf would import whatever key it serves when the first package needs it (trust on first use): the key
 # is fetched and checked here first, kept as a file, and the repo's gpgkey= points at that file instead. The key was

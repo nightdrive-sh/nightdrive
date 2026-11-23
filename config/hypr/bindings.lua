@@ -1,6 +1,7 @@
 -- All Hyprland keybindings (⌘ = SUPER).
 -- Edit this file; Hyprland reloads changes automatically.
 -- App-specific keys live in each app's own config (e.g. ~/.config/kitty/kitty.conf).
+require("compat")   -- NIGHTDRIVE_STABLE_ID (window order) for the keys here and the plugins' (keyd)
 
 ---------------------
 ---- PROGRAMS ----
@@ -21,13 +22,11 @@ function NIGHTDRIVE_IS_TERMINAL(w)
     return w ~= nil and TERMINAL_CLASSES[(w.class:gsub("^sh%.nightdrive%.", ""))] == true
 end
 
--- A layer surface with the keyboard (the launcher, a menu): it gets the keys, not the active window behind it
-function NIGHTDRIVE_LAYER_HAS_KEYBOARD()
-    for _, l in ipairs(hl.get_layers()) do
-        if l.mapped and l.interactivity == 1 then return true end   -- 1: exclusive keyboard focus
-    end
-    return false
-end
+-- A layer surface with the keyboard (the launcher, a menu, Ask Claude's toast): it gets the keys, not the active window
+-- behind it. keyboard-layer.lua reads the field Hyprland has (keyboard_interactivity) and counts the on-demand launcher
+-- and menus too: this used to read l.interactivity, which is always nil, so ⌘Enter over the toast opened a bare
+-- terminal instead of going on with its conversation (#3270)
+NIGHTDRIVE_LAYER_HAS_KEYBOARD = require("keyboard-layer").held
 
 -- Installed optional parts (plugins.txt, plugins/): a part's keys are bound only when it is there. `nightdrive plugins
 -- installed` writes the list and reloads Hyprland when it changes (an installer from launcher › Install › Plugins).
@@ -104,7 +103,7 @@ hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate start"), { lock
 -- The releases are transparent: a mouse click while the key is held "shadows" the binds of every held key (Hyprland's
 -- shadowKeybinds), and the release would be skipped, so dictation kept recording until the key was pressed again.
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true, ignore_mods = true })    -- release -> transcribe and type
--- ⌘⇧ + the dictation key: the text goes to the launcher's Ask Claude field instead, to check and send (Dashboard #1908).
+-- ⌘⇧ + the dictation key: the text goes to Ask Claude instead, sent as you let go (Dashboard #1908, #3122).
 -- The releases above ignore modifiers, so the key's own release stops it whether ⌘⇧ is let go first or last.
 hl.bind(mod .. " + SHIFT + XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
 hl.bind(mod .. " + SHIFT + Insert", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
@@ -118,7 +117,7 @@ hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-down"), { locked = tru
 hl.bind("XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true, ignore_mods = true })
 hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-down"), { locked = true })                       -- Fn when keyd (Mac Keyboard Shortcuts) runs: keyd sends F19 for it
 hl.bind("F19",    hl.dsp.exec_cmd(scripts .. "/dictate fn-up"),   { locked = true, release = true, transparent = true, ignore_mods = true })
--- Apps open with Hyper (Caps Lock, Mod3: hyprland.lua's kb_options) + a letter: the browser, Files, Email, and the optional
+-- Apps open with Hyper (Caps Lock, Mod3: input.lua's kb_options) + a letter: the browser, Files, Email, and the optional
 -- parts' apps below and in the plugins' bindings.lua (Deck M, 1Password P). ⌘ stays for the desktop and the apps' own keys.
 -- These are defaults: your own keys (appKeys, above) replace them.
 hl.bind("MOD3 + B",              hl.dsp.exec_cmd(browser))
@@ -187,6 +186,7 @@ hl.bind("CTRL + ALT + XF86LaunchA", hl.dsp.exec_cmd(scripts .. "/lock --replace"
 hl.bind(mod .. " + SHIFT + S",   hl.dsp.exec_cmd(scripts .. "/screenshot clip"))   -- region screenshot to clipboard
 hl.bind(mod .. " + ALT + S",     hl.dsp.exec_cmd(scripts .. "/screenshot winclip"))   -- window screenshot to clipboard
 hl.bind(mod .. " + ALT + SHIFT + S", hl.dsp.exec_cmd(scripts .. "/screenshot fullclip"))   -- whole screen to clipboard
+hl.bind(mod .. " + CTRL + S",    hl.dsp.exec_cmd(scripts .. "/screenshot text"))   -- a region's text to clipboard (OCR)
 hl.bind(mod .. " + SHIFT + SPACE", hl.dsp.exec_cmd("qs ipc call menu nav"))   -- top bar via keyboard: ←/→ menu, ↑/↓ row, Enter, Esc
 hl.bind(mod .. " + SHIFT + K",     hl.dsp.exec_cmd(scripts .. "/terminal --class floating-help -- sh -c '" .. scripts .. "/shortcuts | less'"))   -- SHORTCUTS.md for the installed parts
 
@@ -285,63 +285,48 @@ hl.bind(mod .. " + ALT + left",  hl.dsp.send_shortcut({ mods = "CTRL", key = "Pr
 hl.bind(mod .. " + ALT + right", hl.dsp.send_shortcut({ mods = "CTRL", key = "Next" }))
 
 -- Windows
-hl.bind(mod .. " + W",          hl.dsp.exec_cmd(scripts .. "/close-or-hide"))   -- closes; background apps (hypr/background-apps) are hidden in the background instead
-hl.bind(mod .. " + Q",           hl.dsp.exec_cmd(scripts .. "/quit-app"))   -- quits the app for real, background apps too (Deck, WhatsApp…); ⌘W hides them
+-- ⌘W and ⌘Q go through scripts/close-guard: a fullscreen window (a game) asks for a second press within 2 s (#2555)
+hl.bind(mod .. " + W",          hl.dsp.exec_cmd(scripts .. "/close-guard ⌘W " .. scripts .. "/close-or-hide"))   -- closes; background apps (hypr/background-apps) are hidden in the background instead
+hl.bind(mod .. " + Q",           hl.dsp.exec_cmd(scripts .. "/close-guard ⌘Q " .. scripts .. "/quit-app"))   -- quits the app for real, background apps too (Deck, WhatsApp…); ⌘W hides them
 hl.bind(mod .. " + SHIFT + U",   hl.dsp.exec_cmd(scripts .. "/reopen"))   -- opens the window last closed with ⌘W again, where it was; again: the one before it
 -- The window's own keys are ⌘⇧: fullscreen, floating, split direction and the arrows that move it. ⌘F / ⌘T / ⌘J are the
 -- apps' (find, new tab, downloads: the list below the copy keys)
 hl.bind(mod .. " + SHIFT + F",   hl.dsp.window.fullscreen(), { dont_inhibit = true })   -- also over a VM window (dont_inhibit: see Workspaces)
--- ⌘⇧T: toggle floating. For Deck: tiled -> floating at its default size, centred; floating but moved/resized ->
--- back to default size, centred; floating already at default position -> tiled. (Size: DECK_SIZE, which the Deck plugin's
--- hyprland.lua sets after this file has run, so it's read at the key press)
-local function xy(t) return t.x or t[1], t.y or t[2] end
-local function deck_reset(w)
-    hl.dispatch(hl.dsp.window.resize({ x = DECK_SIZE.w, y = DECK_SIZE.h, exact = true, window = "address:" .. w.address }))
-    hl.dispatch(hl.dsp.window.center({ window = "address:" .. w.address }))
-end
-local function deck_at_default(w)
-    local sw, sh = xy(w.size)
-    local x, y = xy(w.at)
-    local m = w.monitor
-    local cx, cy = (m.width / m.scale - DECK_SIZE.w) / 2, (m.height / m.scale - DECK_SIZE.h) / 2
-    return sw == DECK_SIZE.w and sh == DECK_SIZE.h and math.abs(x - cx) <= 3 and math.abs(y - cy) <= 30   -- y: the bar shifts the centre a little
-end
--- A window floated with ⌘⇧T is always centred. A screen-sized one (e.g. a lone window: geometry stays screen-sized and
--- the border disappears off the left/top) is first shrunk to 70 % x 75 %
-local function tame_float(w)
-    if not (w and w.floating) then return end
-    local m = w.monitor
-    local mw, mh = m.width / m.scale, m.height / m.scale
-    local sw, sh = xy(w.size)
-    if sw >= mw * 0.95 and sh >= mh * 0.9 then
-        hl.dispatch(hl.dsp.window.resize({ x = math.floor(mw * 0.7), y = math.floor(mh * 0.75), exact = true, window = "address:" .. w.address }))
-    end
-    hl.dispatch(hl.dsp.window.center({ window = "address:" .. w.address }))
-end
-local function deck_toggle_float()
-    local w = hl.get_active_window()
-    if w and w.class:gsub("^sh%.nightdrive%.", "") == "deck" and DECK_SIZE then
-        if not w.floating then
-            hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
-            deck_reset(w)
-        elseif deck_at_default(w) then
-            hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
-        else
-            deck_reset(w)
-        end
-    else
-        hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
-        tame_float(hl.get_active_window())
-    end
-end
-hl.bind(mod .. " + SHIFT + T",   deck_toggle_float)
+require("float-toggle")   -- ⌘⇧T: toggle floating, at a size the window fits
 
-hl.bind(mod .. " + SHIFT + J",   hl.dsp.layout("togglesplit"))
+-- ⌘⇧J turns the split: a dwindle message. A project manager's space (pm-space.lua) has a layout of its own that rejects
+-- it with an error on screen, and its PM can't be split the other way, so there the key does nothing (#3222)
+-- (a global so it can be tried with hyprctl eval, as NIGHTDRIVE_SWAP)
+function NIGHTDRIVE_TOGGLESPLIT()
+    local w = hl.get_active_window()
+    if w and w.workspace and w.workspace.tiled_layout == "lua:pmspace" then return end
+    hl.dispatch(hl.dsp.layout("togglesplit"))
+end
+hl.bind(mod .. " + SHIFT + J", function() NIGHTDRIVE_TOGGLESPLIT() end)
 
 -- Focus with arrows, move window with Shift+arrows
+-- A window group (a project manager's sessions, pm-space.lua) is one window to ⌘ arrows: they go straight to the next
+-- window (#3164: going through the tabs first took several presses to leave a group); ⌃⌥⌘←/→ switch its tabs
+-- (window-groups.lua)
+hl.config({ binds = { movefocus_cycles_groupfirst = false } })
 for _, dir in ipairs({ "left", "right", "up", "down" }) do
     hl.bind(mod .. " + " .. dir,             hl.dsp.focus({ direction = dir }))
-    hl.bind(mod .. " + SHIFT + " .. dir,     function() NIGHTDRIVE_SWAP(dir) end)   -- slides (hyprland.lua)
+    hl.bind(mod .. " + SHIFT + " .. dir,     function() NIGHTDRIVE_SWAP(dir) end)   -- slides (appearance.lua)
+end
+require("window-groups")   -- ⌘⇧G: a group of tabs or none; ⌘⌥⇧ arrows: into the group that way, or out of its own
+require("window-width")    -- ⌘⌥− / ⌘⌥+: the window narrower or wider (window-width.lua)
+
+-- Hyper ← / →: the previous / next Claude Code session in the sessions bar's order (Claude.qml), on any workspace,
+-- round from the end to the start. Hyper + a letter stays the apps'; the arrows aren't a letter, so they're free.
+hl.bind("MOD3 + left",  hl.dsp.exec_cmd("qs ipc call claude prev"))
+hl.bind("MOD3 + right", hl.dsp.exec_cmd("qs ipc call claude next"))
+-- Hyper ↑ / ↓: the previous / next lead in the same order (a session that opened others, a project manager, say)
+hl.bind("MOD3 + up",    hl.dsp.exec_cmd("qs ipc call claude prevLead"))
+hl.bind("MOD3 + down",  hl.dsp.exec_cmd("qs ipc call claude nextLead"))
+-- Hyper 1…9: the nth session in that order (its card in the bar says which). A digit chosen in App shortcuts wins (the
+-- hl.bind wrapper above leaves this one out then).
+for i = 1, 9 do
+    hl.bind("MOD3 + " .. i, hl.dsp.exec_cmd("qs ipc call claude nth " .. i))
 end
 
 -- ⌥Tab / ⌥⇧Tab: the active app's next / previous window (same class), on any workspace (focus goes there), in the order
@@ -356,7 +341,7 @@ local function cycle_app_windows(step)
         end
     end
     if #list < 2 then return end
-    table.sort(list, function (a, b) return a.stable_id < b.stable_id end)
+    table.sort(list, function (a, b) return NIGHTDRIVE_STABLE_ID(a) < NIGHTDRIVE_STABLE_ID(b) end)   -- compat.lua
     for i, o in ipairs(list) do
         if o.address == w.address then
             local target = list[(i - 1 + step) % #list + 1]
@@ -370,14 +355,14 @@ end
 hl.bind("ALT + TAB",         function () cycle_app_windows(1) end)
 hl.bind("ALT + SHIFT + TAB", function () cycle_app_windows(-1) end)
 
--- ⌘⌥1–⌘⌥0: every window of the active workspace to workspace i (joining the ones there), and focus follows them.
+-- ⌘⌥⇧1–⌘⌥⇧0: every window of the active workspace to workspace i (joining the ones there), and focus follows them.
 -- To an empty workspace the whole workspace is renumbered, which keeps its layout as it was: moved one by one, dwindle
--- splits them anew. Not the laptop's own workspace with an external display: the laptop screen would lose it.
+-- splits them anew. Not the laptop's own workspace with an external display, nor the second display's: the screen would lose it.
 -- Otherwise one at a time with follow = false, so the source stays active until the last one has gone.
 local function move_all_windows(i)
     local ws = hl.get_active_workspace()
     if not ws or ws.id == i then return end
-    if not hl.get_workspace(i) and (ws.id ~= LAPTOP_WORKSPACE or #hl.get_monitors() == 1) then
+    if not hl.get_workspace(i) and ((ws.id ~= LAPTOP_WORKSPACE and ws.id ~= SIDE_WORKSPACE) or #hl.get_monitors() == 1) then
         hl.dispatch(hl.dsp.workspace.change_id({ workspace = ws.id, id = i }))
         hl.dispatch(hl.dsp.exec_cmd("qs ipc call bar workspaces"))   -- no event for the new id: the bar would keep the old one
         return
@@ -388,8 +373,8 @@ local function move_all_windows(i)
     hl.dispatch(hl.dsp.focus({ workspace = i }))
 end
 
--- Workspaces ⌘1–⌘0, move window ⌘⇧1–⌘⇧0, move all windows ⌘⌥1–⌘⌥0. With the drawer open ⌘1–⌘0 closes it first,
--- otherwise it stays over the new workspace. dont_inhibit: they work over a window that takes the keyboard (a VM's qemu
+-- Workspaces ⌘1–⌘0, move window ⌘⇧1–⌘⇧0 (a tab alone, out of its group: window-groups.lua), move all windows
+-- ⌘⌥⇧1–⌘⌥⇧0 (⇧ moves one, ⌥ on top of it all). With the drawer open ⌘1–⌘0 closes it first, otherwise it stays over the new workspace. dont_inhibit: they work over a window that takes the keyboard (a VM's qemu
 -- window, a remote desktop) too, so it can be left with them; the desktop inside a VM doesn't get them.
 for i = 1, 10 do
     local key = i % 10
@@ -398,26 +383,41 @@ for i = 1, 10 do
         if special and special.name == "special:drawer" then hl.dispatch(hl.dsp.workspace.toggle_special("drawer")) end
         hl.dispatch(hl.dsp.focus({ workspace = i }))
     end, { dont_inhibit = true })
-    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }), { dont_inhibit = true })
-    hl.bind(mod .. " + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + " .. key, function() NIGHTDRIVE_MOVE_TO_WORKSPACE(i) end, { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
+end
+-- ⌘§ / ⌘⇧§ / ⌘⌥⇧§: the second external display's own workspace (display.lua: SIDE_WORKSPACE), the key left of 1 as the
+-- display is usually left of the main one. By the symbol, not the keycode: Apple's and Keychron's ISO boards swap the §
+-- and < keys' codes. grave is the same key on a US layout.
+for _, key in ipairs({ "section", "grave" }) do
+    local i = SIDE_WORKSPACE
+    hl.bind(mod .. " + " .. key, function()
+        local special = hl.get_active_special_workspace()
+        if special and special.name == "special:drawer" then hl.dispatch(hl.dsp.workspace.toggle_special("drawer")) end
+        hl.dispatch(hl.dsp.focus({ workspace = i }))
+    end, { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + " .. key, function() NIGHTDRIVE_MOVE_TO_WORKSPACE(i) end, { dont_inhibit = true })
+    hl.bind(mod .. " + SHIFT + ALT + " .. key, function() move_all_windows(i) end, { dont_inhibit = true })
 end
 hl.bind(mod .. " + TAB",         hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mod .. " + SHIFT + TAB", hl.dsp.focus({ workspace = "e-1" }))
 
--- Drawer: a special workspace that slides up over the windows (look in hyprland.lua)
--- ⌘⇧D puts the active window in the drawer, or takes it back out; ⌘D shows/hides the drawer (⌘S is Save, above)
--- A window remembers where it came from (until Hyprland reloads its config): ⌘⇧D in the drawer takes it back to that
--- workspace, a floating one to its old place and size, a tiled one next to the window now at its old place
-local drawerOrigin = {}   -- window address -> { ws, floating, x, y, w, h }
+-- Drawer: a special workspace that slides up over the windows (look in appearance.lua)
+-- ⌘⇧D puts the active window in the drawer (a tab alone, out of its group), or takes it back out; ⌘D shows/hides the
+-- drawer (⌘S is Save, above). A window remembers where it came from (until Hyprland reloads its config): ⌘⇧D in the
+-- drawer takes it back to that workspace, a floating one to its old place and size, a tiled one next to the window now
+-- at its old place, a tab into its group
+local drawerOrigin = {}   -- window address -> { ws, floating, x, y, w, h, group }
+local function xy(t) return t.x or t[1], t.y or t[2] end   -- Hyprland gives positions and sizes as {x, y} or {1, 2}
 -- ⌘⇧D throws the window down off the screen before it goes into the drawer: it floats at its own place, slides down
 -- (only this move is animated, windows otherwise switch instantly) and is tiled again in the drawer
 hl.curve("throw", { type = "bezier", points = { {0.5, 0}, {0.75, 0} } })   -- ease in: speeds up as it falls
-local function drawer_throw(w)
+-- was: { x, y, w, h } before it left its group (the group's place and size); from: the group it left (window-groups.lua)
+local function drawer_throw(w, was, from)
     local win = "address:" .. w.address
-    local x, y = xy(w.at)
-    local sw, sh = xy(w.size)
+    local x, y, sw, sh = was.x, was.y, was.w, was.h
     local tiled = not w.floating
-    drawerOrigin[w.address] = { ws = w.workspace.id, floating = w.floating, x = x, y = y, w = sw, h = sh }
+    drawerOrigin[w.address] = { ws = w.workspace.id, floating = w.floating, x = x, y = y, w = sw, h = sh, group = from }
     if tiled then
         hl.dispatch(hl.dsp.window.float({ action = "enable", window = win }))
         hl.dispatch(hl.dsp.window.resize({ x = sw, y = sh, exact = true, window = win }))
@@ -481,17 +481,27 @@ local function drawer_return(w)
     local target = o and hl.get_workspace(o.ws) and o.ws or w.monitor.active_workspace.id
     hl.dispatch(hl.dsp.workspace.toggle_special("drawer"))   -- hide the drawer, the window is shown where it lands
     hl.dispatch(NIGHTDRIVE_PLACE("address:" .. w.address, o, target))
+    -- to the workspace it left: back into its group, if that is there (anywhere else it stays out of groups)
+    if o and o.group and target == o.ws then NIGHTDRIVE_TAB_BACK(w.address, o.group) end
 end
-local function drawer_send()
+function NIGHTDRIVE_DRAWER_SEND()   -- global, as NIGHTDRIVE_SWAP: group_move_test.py calls it
     local w = hl.get_active_window()
+    if not w then return end
+    -- A tab goes alone, out of its group (window-groups.lua, #3220); it falls from the group's place, and coming
+    -- back to that workspace it rejoins the group
+    local x, y = xy(w.at)
+    local sw, sh = xy(w.size)
+    local was = { x = x, y = y, w = sw, h = sh }   -- copied: a window from hl may be read live
+    local from
+    w, from = NIGHTDRIVE_TAB_ALONE(w)
     if not w then return end
     if w.workspace and w.workspace.name == "special:drawer" then
         drawer_return(w)
     else
-        drawer_throw(w)
+        drawer_throw(w, was, from)
     end
 end
-hl.bind(mod .. " + SHIFT + D", drawer_send)
+hl.bind(mod .. " + SHIFT + D", function() NIGHTDRIVE_DRAWER_SEND() end)
 hl.bind(mod .. " + D", hl.dsp.workspace.toggle_special("drawer"))   -- empty, it shows a hint (quickshell/Drawer.qml)
 
 -- Mouse: ⌘+drag moves, ⌘+right-drag resizes. Over the top bar there's no window, so the press goes on to the bar, where
@@ -507,9 +517,9 @@ hl.bind("XF86AudioRaiseVolume",  hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_
 -- At 0 % the speakers (Asahi's filter chain) still let sound through, so the step that reaches 0 also mutes.
 hl.bind("XF86AudioLowerVolume",  hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ; if wpctl get-volume @DEFAULT_AUDIO_SINK@ | grep -q 'Volume: 0.00'; then wpctl set-mute @DEFAULT_AUDIO_SINK@ 1; else wpctl set-mute @DEFAULT_AUDIO_SINK@ 0; fi ; qs ipc call osd volume"), { locked = true, repeating = true })
 hl.bind("XF86AudioMute",         hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ; qs ipc call osd volume"),     { locked = true })
-hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd(scripts .. "/brightness screen up"),   { locked = true, repeating = true })   -- F2: screen brightness in steps of ten
+hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd(scripts .. "/brightness screen up"),   { locked = true, repeating = true })   -- F2: screen brightness, 5 % steps on the eye's curve (scripts/brightness)
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd(scripts .. "/brightness screen down"), { locked = true, repeating = true })   -- F1
-hl.bind(mod .. " + XF86MonBrightnessUp",   hl.dsp.exec_cmd(scripts .. "/brightness kbd up"),   { locked = true, repeating = true })   -- ⌘F2: keyboard backlight (steps of ten)
+hl.bind(mod .. " + XF86MonBrightnessUp",   hl.dsp.exec_cmd(scripts .. "/brightness kbd up"),   { locked = true, repeating = true })   -- ⌘F2: keyboard backlight (10 % steps)
 hl.bind(mod .. " + XF86MonBrightnessDown", hl.dsp.exec_cmd(scripts .. "/brightness kbd down"), { locked = true, repeating = true })   -- ⌘F1
 hl.bind("XF86PowerOff", hl.dsp.exec_cmd("qs ipc call power toggle"))   -- power button (Touch ID key): power dialog (PowerDialog.qml) instead of an instant shutdown; logind must be set to ignore the key, see config/system/logind-power-key.conf
 hl.bind("XF86Sleep", hl.dsp.exec_cmd(scripts .. "/dnd"), { locked = true })   -- F6 (Apple keyboard sends KEY_SLEEP): do not disturb (Quickshell notifications + toast); logind must be set to ignore the key, see config/system/logind-ignore-sleep-key.conf

@@ -13,7 +13,7 @@ hl.bind(p.mod .. " + comma", function ()
     if w and is_onepassword(w.class) then
         local main, other
         for _, o in ipairs(hl.get_windows()) do
-            if o.pid == w.pid and is_onepassword(o.class) and (not main or o.stable_id < main.stable_id) then main = o end
+            if o.pid == w.pid and is_onepassword(o.class) and (not main or NIGHTDRIVE_STABLE_ID(o) < NIGHTDRIVE_STABLE_ID(main)) then main = o end
         end
         for _, o in ipairs(hl.get_windows()) do
             if o.pid == w.pid and is_onepassword(o.class) and o.address ~= main.address then other = o end

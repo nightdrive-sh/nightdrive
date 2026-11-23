@@ -3,10 +3,11 @@
 -- (Dashboard #1918). Hyprland keeps that window active and gives no event when a layer takes the keyboard, so this
 -- looks at the layers themselves: one place for every layer, whichever program draws it.
 --
--- A layer asking for the keyboard exclusively (interactivity 1) has it. On-demand ones (2) have it only once clicked,
--- which Hyprland doesn't tell, so they are left out. A layer's ask can change while it stays open (a top bar menu
--- entering key navigation, a toast that takes keys), with no event either, so besides opening and closing a layer and
--- after a key, a short timer looks again.
+-- Which layer has the keyboard is keyboard-layer.lua's held(): any mapped layer that asks for it (keyboard_interactivity
+-- 1 exclusive, as a dialog or a toast that takes keys, or 2 on demand, as the launcher and the menus, which have it as
+-- they map). This read `l.interactivity`, which Hyprland's layers don't have, so nothing ever looked inactive (#3271).
+-- A layer's ask can change while it stays open (a top bar menu entering key navigation, a toast that takes keys), with
+-- no event either, so besides opening and closing a layer and after a key, a short timer looks again.
 --
 -- The look: the active border and shadow take the inactive ones' colours, and get theirs back when the layer lets go.
 -- A Quickshell crash closes its layers, so the colours come back then too; a config reload starts from hyprland.lua
@@ -16,19 +17,13 @@
 local POLL_MS = 250      -- how soon a layer's changed ask shows; one look is a loop over a handful of layers
 local AFTER_KEY_MS = 60  -- the key's program has changed its layer by then
 
-local EXCLUSIVE = 1
+local held = require("keyboard-layer").held
+
 local ACTIVE   = { "general.col.active_border", "decoration.shadow.color" }
 local INACTIVE = { "general.col.inactive_border", "decoration.shadow.color_inactive" }
 
 -- The theme's active colours while the inactive ones stand in for them, nil otherwise
 local saved = nil
-
-local function held()
-    for _, l in ipairs(hl.get_layers()) do
-        if l.mapped and l.interactivity == EXCLUSIVE then return true end
-    end
-    return false
-end
 
 -- hl.config wants a nested table for a dotted option name
 local function set(name, value)

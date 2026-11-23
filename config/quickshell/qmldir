@@ -35,6 +35,10 @@ DictationMeter 1.0 DictationMeter.qml
 DictationIndicator 1.0 DictationIndicator.qml
 AskClaudeListening 1.0 AskClaudeListening.qml
 AskClaudeToast 1.0 AskClaudeToast.qml
+SessionsBar 1.0 SessionsBar.qml
+SessionChip 1.0 SessionChip.qml
+SessionTip 1.0 SessionTip.qml
+SessionsInbox 1.0 SessionsInbox.qml
 AskClaudePanel 1.0 AskClaudePanel.qml
 AskClaudeStatus 1.0 AskClaudeStatus.qml
 KeyFooter 1.0 KeyFooter.qml
@@ -65,11 +69,13 @@ WiredProfiles 1.0 WiredProfiles.qml
 Toggle 1.0 Toggle.qml
 TouchScroll 1.0 TouchScroll.qml
 AppIcon 1.0 AppIcon.qml
+singleton IconFiles 1.0 IconFiles.qml
 RowCopy 1.0 RowCopy.qml
 WifiLevels 1.0 WifiLevels.qml
 BluetoothLevels 1.0 BluetoothLevels.qml
 SoundLevels 1.0 SoundLevels.qml
 TailscaleLevels 1.0 TailscaleLevels.qml
+CompanionLevels 1.0 CompanionLevels.qml
 StatusLevels 1.0 StatusLevels.qml
 RegionLevels 1.0 RegionLevels.qml
 MirroringLevels 1.0 MirroringLevels.qml
@@ -80,6 +86,9 @@ singleton Home 1.0 Home.qml
 singleton Plugins 1.0 Plugins.qml
 SharePicker 1.0 SharePicker.qml
 ClaudeWrite 1.0 ClaudeWrite.qml
+ClaudeUsage 1.0 ClaudeUsage.qml
+ClaudeMenu 1.0 ClaudeMenu.qml
+ClaudeBarToggle 1.0 ClaudeBarToggle.qml
 ClaudeWriteButton 1.0 ClaudeWriteButton.qml
 ClaudeWritePlace 1.0 ClaudeWritePlace.qml
 LevelRing 1.0 LevelRing.qml
@@ -91,9 +100,16 @@ AirPodsSettings 1.0 AirPodsSettings.qml
 ThemeEditor 1.0 ThemeEditor.qml
 BehaviourLevels 1.0 BehaviourLevels.qml
 AboutLevels 1.0 AboutLevels.qml
+WebSearchLevels 1.0 WebSearchLevels.qml
 Calculator 1.0 Calculator.qml
 InstallLevels 1.0 InstallLevels.qml
 ToolsLevels 1.0 ToolsLevels.qml
+RemindLevels 1.0 RemindLevels.qml
+RemindToast 1.0 RemindToast.qml
+ScheduleLevels 1.0 ScheduleLevels.qml
+PlacesLevels 1.0 PlacesLevels.qml
+SwipeOff 1.0 SwipeOff.qml
+SessionsLevels 1.0 SessionsLevels.qml
 ClipPicker 1.0 ClipPicker.qml
 AppearanceLevels 1.0 AppearanceLevels.qml
 DisplayLevels 1.0 DisplayLevels.qml
@@ -117,3 +133,4 @@ ClaudeConfirmField 1.0 ClaudeConfirmField.qml
 Typing 1.0 Typing.qml
 FieldBox 1.0 FieldBox.qml
 singleton MenuPointer 1.0 MenuPointer.qml
+singleton DragOut 1.0 DragOut.qml

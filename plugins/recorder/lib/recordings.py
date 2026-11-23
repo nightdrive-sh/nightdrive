@@ -4,6 +4,7 @@
 
     recordings.py list [--json] [--limit N]    newest first (N: 0, the default, for all)
     recordings.py info [--json] NAME           one recording
+    recordings.py transcript [--json] NAME     its transcript's text (an error when it has none yet)
     recordings.py rename [--json] NAME NEW     a new name for the recording and every file of it
     recordings.py trash [--json] NAME          the recording and every file of it to the desktop's trash (Files puts
                                                them back; `recorder restore` is its undo)
@@ -107,7 +108,7 @@ def rename(who, new):
     path = find(who)
     new = clean_name(new)
     if new == path.stem:
-        return brief(path)
+        return dict(brief(path), was=path.stem)   # was: Claude's undo names it
     if taken(path.parent, new):
         raise RecordingError(f"There is a recording {new} already.")
     for p in files_of(path):
@@ -126,6 +127,15 @@ def trash(who):
     if done.returncode != 0:
         raise RecordingError(done.stderr.strip() or "The recording couldn't be moved to the trash.")
     return dict(json.loads(done.stdout), name=rec["name"])
+
+
+def transcript(who):
+    """The transcript's text, its paragraphs as written ([mm:ss] first), for Claude's recorder_transcript."""
+    rec = brief(find(who))
+    if not rec["transcript"]:
+        raise RecordingError(f"{rec['name']} has no transcript yet: recorder transcribe makes one.")
+    text = Path(rec["transcript"]).read_text(encoding="utf-8", errors="replace").strip()
+    return {"name": rec["name"], "duration": rec["duration"], "transcript": rec["transcript"], "text": text}
 
 
 def clock(seconds):
@@ -164,6 +174,9 @@ def main(argv):
         elif cmd == "info" and len(rest) == 1:
             out = brief(find(rest[0]))
             text = "\n".join(f"{k}: {v}" for k, v in out.items())
+        elif cmd == "transcript" and len(rest) == 1:
+            out = transcript(rest[0])
+            text = out["text"]
         elif cmd == "rename" and len(rest) == 2:
             out = rename(*rest)
             text = f"Renamed to {out['name']}."

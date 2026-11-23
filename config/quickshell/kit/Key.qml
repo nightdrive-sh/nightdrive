@@ -33,7 +33,8 @@ Rectangle {
         anchors.centerIn: parent
         text: cap.glyph !== "" ? Icons.g(cap.glyph) : cap.letter ? cap.name : cap.name === "Hyper" ? "HYPER" : cap.name.toLowerCase()
         color: cap.ink
-        font { family: cap.glyph !== "" ? Icons.family : Theme.font; pixelSize: cap.glyph !== "" ? 12 : cap.letter ? 13 : 11
+        // in proportion to the cap: 12, 13 and 11 at the usual 22
+        font { family: cap.glyph !== "" ? Icons.family : Theme.font; pixelSize: Math.round((cap.glyph !== "" ? 12 : cap.letter ? 13 : 11) * cap.size / 22)
                weight: cap.letter ? Font.Bold : Font.DemiBold }
     }
 }

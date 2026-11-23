@@ -20,7 +20,7 @@ Your contacts from iCloud, Google or another CardDAV server, kept in sync both w
 | ⌘E or `e` | Edit |
 | `Delete` | Delete, after asking |
 | ⌘R | Read the contacts again |
-| ⌘, | Settings: the accounts, Sync now (`S`), Add an account with Claude (`A`) |
+| ⌘, | Settings: sort by first or last name (`F`, `L`), the accounts, Sync now (`S`), Add an account with Claude (`A`) |
 
 - All contacts shows each person once: their cards in iCloud and Google (the same name, and a number or address in common) are one. Under it each account has its own, with its groups.
 - They are kept as vCard files in `~/.local/share/contacts`, a folder per account, and vdirsyncer syncs them every 30 minutes. A change you make here goes to the server at once.
@@ -91,7 +91,8 @@ With Nightdrive's tools for Claude on (Settings › Claude › Access › Contac
 | `contacts search TEXT` | Opens Contacts on what a search finds |
 | `contacts show WHO` | Opens the card of WHO: an email address, a number, or a card's id |
 | `contacts new [NAME] [EMAIL]` | A new contact in the editor, with these filled in |
-| `contacts settings` | Opens the settings: the accounts, Sync now, Add an account |
+| `contacts settings` | Opens the settings: the order, the accounts, Sync now, Add an account |
+| `contacts sort [first\|last]` | Sorts the list by first name (the default) or last name (Anna Virtanen under V); alone, says which (`--json`). A company without a last name goes by its name |
 | `contacts people` | Everyone as JSON (names, numbers, email and street addresses), as Mail and the Launcher read them |
 | `contacts find QUERY` | The people a search finds, without the window (`--json`; `--limit N`, 25 by default) |
 | `contacts card WHO` | WHO's whole card, without the window: a card's id (as `find` gives it), an email address or a number (`--json`) |

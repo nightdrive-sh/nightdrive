@@ -209,6 +209,12 @@ def problem(spec, plugin, external=False):
         return f"{name}: {', '.join(sorted(unknown))} in its before isn't in inputSchema"
     if not isinstance(spec.get("notice", ""), str):
         return f"{name}: notice must be a string"
+    many = spec.get("notice_many")
+    if many is not None and (spec["class"] != "change" or not isinstance(many, str)
+                             or run.placeholders(many) != {"count"}):
+        return f"{name}: notice_many is a change tool's line for several of its changes, with {{count}} and no other name"
+    if not isinstance(spec.get("notify", True), bool) or "notify" in spec and spec["class"] != "change":
+        return f"{name}: notify is a change tool's, true or false"
     paths = spec.get("mask", [])
     if not isinstance(paths, list) or not all(isinstance(p, str) and p.strip(".") for p in paths):
         return f"{name}: mask must be a list of fields of its output (\"messages.text\")"
@@ -393,6 +399,8 @@ class Registry:
             if not ok:
                 self.pace.refused(tool, arguments)
                 raise ToolError(f"The user didn't allow {name} on screen, so it wasn't run. Don't try it another way.")
+            if ok == "rest" and paced:   # Allow all: only a card the pace showed offers it (#3224)
+                self.pace.grant(tool)
             allowed_once(tool, first)
         self.pace.ran(tool)
         undoable = tool.cls == "change" and self.undo is not None

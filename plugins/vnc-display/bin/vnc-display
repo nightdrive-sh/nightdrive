@@ -279,7 +279,7 @@ cmd_list() {
   if ((json)); then echo ']'; elif ((first)); then echo "No devices: vnc-display add ipad"; fi
 }
 
-# Hyprland reloads with the state file and moves the workspaces as when a screen comes (hyprland.lua's monitor.added)
+# Hyprland reloads with the state file and moves the workspaces as when a screen comes (display.lua's monitor.added)
 rearrange() {
   hyprctl reload >/dev/null && hyprctl eval 'NightdriveArrangeWorkspaces(); NightdriveArrangeVirtual()' >/dev/null || true
 }
@@ -327,6 +327,13 @@ cmd_place() {
   line=$(state_line "$n")
   [[ -n $line ]] || die "$n has no display: vnc-display on $n"
   set_state "$n" "$(awk -v p="$p" '{ $4 = p; print }' <<<"$line")"
+  # Once the Displays window has arranged the screens, its file places this one: the new place goes there too
+  # (hypr/scripts/arrange: beside the whole desk on that side, as here, or away)
+  local arrange=$HOME/.config/hypr/scripts/arrange out
+  if [[ -f $HOME/.local/state/nightdrive/arrangement && -x $arrange ]]; then
+    out=$(awk '{ print $1 }' <<<"$line")
+    if [[ $p == away ]]; then "$arrange" away "$out" --no-reload >/dev/null; else "$arrange" side "$out" "$p" --no-reload >/dev/null; fi
+  fi
   rearrange
   case $p in
     away) echo "$n is away, out of the pointer's reach." ;;

@@ -34,7 +34,7 @@ for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,systemd/user/wireplumbe
   fi
 done
 
-for d in hypr hyprpolkitagent topbar fuzzel kitty ghostty alacritty foot quickshell screensaver greeter welcome; do   # hyprpolkitagent: the polkit password prompt's size; greeter: the lock at startup (greeter/lock.qml) and the preview; welcome: Welcome to Nightdrive
+for d in hypr hyprpolkitagent topbar fuzzel kitty ghostty alacritty foot quickshell screensaver greeter welcome displays; do   # hyprpolkitagent: the polkit password prompt's size; greeter: the lock at startup (greeter/lock.qml) and the preview; welcome: Welcome to Nightdrive; displays: the Displays window
   link "$repo/config/$d" "$HOME/.config/$d"
 done
 # foot's config includes your local.ini and won't start without one
@@ -112,10 +112,11 @@ done
 # Session target: brings up graphical-session.target, which xdg-desktop-portal needs (started by hyprland.lua)
 link "$repo/config/systemd/user/nightdrive-session.target" "$HOME/.config/systemd/user/nightdrive-session.target"
 # Update check: every 6 h a fetch, and a notification when new commits are waiting (nightdrive update check).
-# Snippets and crash reports: linked only, started when turned on (nightdrive snippets enable; launcher › Settings ›
-# Notifications). The plugin folders' units are linked below.
+# Snippets, crash reports and Companion: linked only, started when turned on (nightdrive snippets enable; launcher ›
+# Settings › Notifications; Settings › Companion). The plugin folders' units are linked below.
+# The services' failure notice: OnFailure=nightdrive-unit-failed@%n.service in a unit (hypr/scripts/unit_failed.py).
 units=(nightdrive-update-check.service nightdrive-update-check.timer nightdrive-snippets.service
-       nightdrive-crash-reports.service)
+       nightdrive-crash-reports.service nightdrive-companion.service nightdrive-unit-failed@.service)
 for u in "${units[@]}"; do link "$repo/config/systemd/user/$u" "$HOME/.config/systemd/user/$u"; done
 
 # ⌘Enter (terminal) and ⌘⌃Enter (Claude Code) open in ~/Projects, and kitty fails to start in a folder that doesn't exist
@@ -127,12 +128,20 @@ mkdir -p "$HOME/Projects"
 # same for every session) goes off, unless you picked a channel.
 cn='~/.config/hypr/scripts/claude-notify'
 cs="$HOME/.claude/settings.json"
+# A permission request or question waits in the hook for Companion's answer as long as it is open in the terminal, up
+# to a day (claude-notify's WAIT_OPEN, #3162), not Claude Code's default 600 s: its PermissionRequest hook gets this
+hook_timeout=86400
 mkdir -p "$HOME/.claude"; [[ -s $cs ]] || echo '{}' > "$cs"
 for ev in Notification PermissionRequest; do
   jq -e --arg e "$ev" --arg c "$cn" '[.hooks[$e][]?.hooks[]?.command] | index($c)' "$cs" >/dev/null 2>&1 && continue
   jq --arg e "$ev" --arg c "$cn" '.hooks[$e] += [{matcher: "", hooks: [{type: "command", command: $c}]}]' "$cs" > "$cs.tmp" \
     && mv "$cs.tmp" "$cs" || rm -f "$cs.tmp"
 done
+if jq -e --arg c "$cn" --argjson t "$hook_timeout" 'any(.hooks.PermissionRequest[]?.hooks[]?; .command == $c and .timeout != $t)' \
+     "$cs" >/dev/null 2>&1; then
+  jq --arg c "$cn" --argjson t "$hook_timeout" '.hooks.PermissionRequest[]?.hooks[]? |= (if .command == $c then .timeout = $t else . end)' \
+    "$cs" > "$cs.tmp" && mv "$cs.tmp" "$cs" || rm -f "$cs.tmp"
+fi
 cg="$HOME/.claude.json"
 if [[ -s $cg ]] && jq -e '.preferredNotifChannel == null or .preferredNotifChannel == "auto"' "$cg" >/dev/null 2>&1; then
   jq '.preferredNotifChannel = "notifications_disabled"' "$cg" > "$cg.tmp" && mv "$cg.tmp" "$cg" || rm -f "$cg.tmp"

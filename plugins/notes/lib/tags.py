@@ -4,7 +4,7 @@ begins a line or follows a space or an opening bracket, so a heading ("# Title",
 number (#2016), a link's anchor (page#part) and a colour's hex (#1e1e2e) aren't tags; neither is anything in code (a
 fenced block or `code`) or in a link's address.
 
-The window shows the same tags (Markdown.js draws them by the same pattern: keep the two alike).
+The window shows the same tags (the apps' kit/Markdown.js draws them by the same pattern: keep the two alike).
 """
 
 import re

@@ -21,7 +21,7 @@
 // A status command prints one line of JSON:  {"icon": "wifi", "text": "95%", "class": "off"}
 //   icon   a Lucide name (lucide.dev/icons), or pack:name from any Iconify set (mdi:wifi, tabler:cpu…); see scripts/icon.
 //          Several separated by | are an animation (wifi-zero|wifi-low|wifi-high|wifi); gauge@<0-100> is a gauge whose
-//          needle points at the value
+//          needle points at the value, bot-bar@<0-100> the bot over a bar filled that far (the Claude module)
 //   text   optional text after the icon (always the same font and size: the `text` row in adjust.conf)
 //   class  optional: off (dimmed), warning (orange), critical (red), active (highlighted background), stale (faded)
 // No icon and no text hides the module.
@@ -29,6 +29,7 @@
   { "name": "camera",        "interval": 2,  "first": true },
   { "name": "microphone",    "interval": 2,  "first": true },
   { "name": "claude",        "interval": 15, "right": "~/.config/topbar/scripts/claude-bar next", "middle": "xdg-open https://claude.ai/settings/usage" },
+  { "name": "claude2",       "interval": 15, "right": "~/.config/topbar/scripts/claude-bar next 2", "middle": "xdg-open https://claude.ai/settings/usage" },
   { "name": "system",        "interval": 3 },
   { "name": "bluetooth",     "interval": 5,  "right": "blueman-manager" },
   { "name": "wifi",          "interval": 5,  "right": "nm-connection-editor" },

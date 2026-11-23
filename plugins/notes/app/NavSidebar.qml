@@ -59,6 +59,7 @@ AppSidebar {
 
     Flickable {
         id: flick
+        TouchScroll { view: flick }
         Layout.fillWidth: true
         Layout.fillHeight: true
         clip: true

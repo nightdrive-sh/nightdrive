@@ -1,8 +1,8 @@
 # Dictation (Voxtype)
 
 Hold **F5** or **Fn** on a Mac, **Insert** on a PC (or another key: below), speak, and let go: the text is typed into the active window.
-With **⌘⇧** held too, it goes to [Ask Claude](claude.md) as a question instead: Ask Claude's toast opens at once and
-listens, and the text comes into its field to check and send with Enter.
+With **⌘⇧** held too, it goes to [Ask Claude](claude.md) instead and is sent when you let go: a small card shows Claude
+working and then its answer.
 
 It runs fully offline with [Voxtype](https://github.com/peteonrails/voxtype) and NVIDIA's Parakeet model, on the CPU (about 1.4 s for 6 s of speech on an M2 Max).
 
@@ -27,7 +27,8 @@ voxtype-onnx setup --download --model parakeet-tdt-0.6b-v3-int8
 
 The settings are in `config/voxtype/config.toml`, which `link.sh` links into `~/.config/voxtype/`. `hypr/scripts/dictate`
 starts the daemon with the best model installed, and handles the keys and the muted-mic check. The mic is the MacBook's
-own on a Mac, and the default one elsewhere.
+own on a Mac, and the default one elsewhere. With the lid closed it is Nightdrive's iOS app, when it is open on an iPad
+or iPhone ([Companion](companion.md)): the card names the device instead of showing the level.
 
 ## Your own corrections
 

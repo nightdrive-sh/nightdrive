@@ -1,0 +1,3 @@
+-- Inbox's key (plugins/README.md › Keys): its window, started if it isn't running, or brought forward
+local p = ...
+hl.bind("MOD3 + I", hl.dsp.exec_cmd(p.dir .. "/bin/inbox"))

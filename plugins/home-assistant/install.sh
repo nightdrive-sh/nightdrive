@@ -40,15 +40,24 @@ ask "Home network (homeassistant.local:8123)" "$local_url"
 ask "Tailscale (ha:8123)" "$ts_url" tailnet
 ask "Nabu Casa (xxxx.ui.nabu.casa)" ""
 [[ -n $urls ]] || { echo "No address given" >&2; exit 1; }
-# The addresses are tried in order wherever the laptop is, token and all: on another network, whatever answers
-# homeassistant.local gets it. Say so, and leave the choice to the user.
+# A plain http address sends the token as plain text, so bin/home-assistant uses it only on a home network
+# (lib/network.py, #1748): ask whether this is one. Elsewhere a notification asks when it answers there.
 if (( ${#plain[@]} )); then
   echo; printf '! Not encrypted: %s\n' "${plain[@]}"
   cat <<'MSG'
-  The token goes over the network as plain text there, and on
-  another network to whatever answers that address. An https
-  address or Tailscale is safer: run this again to change it.
+  The token goes there as plain text, so only on your home
+  network; elsewhere Tailscale or https (add one if you can).
 MSG
+  net=$("$ha" home list | jq -r '.current | select(.) | "\(.name)\t\(.answer)"')
+  if [[ -n $net ]]; then
+    name=${net%%$'\t'*}
+    if [[ ${net#*$'\t'} == home ]]; then
+      echo "  \"$name\" is a home network."
+    else
+      read -rp "  Is \"$name\" your home network? [y/N] " yn
+      if [[ $yn == [yY]* ]] && "$ha" home add >/dev/null; then echo "  Saved: they get the token here."; fi
+    fi
+  fi
 fi
 
 cat <<'MSG'
@@ -64,13 +73,15 @@ if [[ $tok == op://* ]]; then
   tok=$(op read "$ref") || { echo "op read failed (is 1Password unlocked?)" >&2; exit 1; }
 fi
 
-ok=()
+ok=(); later=()
 for u in $urls; do
   u=${u%/}
-  # The token on stdin: an argument is readable by any user in /proc
-  if out=$("$ha" test "$u" <<<"$tok" 2>&1); then echo "  ✓ $u  ($out)"; ok+=("$u"); else echo "  ✗ $out"; fi
+  # The token on stdin: an argument is readable by any user in /proc. Exit 5: a plain address off a home network
+  if out=$("$ha" test "$u" <<<"$tok" 2>&1); then echo "  ✓ $u  ($out)"; ok+=("$u")
+  elif (( $? == 5 )); then echo "  – $u: used at home only, not tested here"; later+=("$u")
+  else echo "  ✗ $out"; fi
 done
-(( ${#ok[@]} )) || { echo "None of the addresses worked" >&2; exit 1; }
+(( ${#ok[@]} + ${#later[@]} )) || { echo "None of the addresses worked" >&2; exit 1; }
 
 mkdir -p "${conf%/*}"
 umask 077
@@ -84,7 +95,7 @@ echo "  saved $conf"
 
 # The webapp has one address: its login is tied to it. One that works anywhere is the better choice.
 echo
-last=${ok[-1]}
+last=${ok[-1]:-${later[-1]}}
 read -erp "Address for the webapp: " -i "$last" web
 web=${web:-$last}
 icon=$(mktemp --suffix=.png); trap 'rm -f "$icon"' EXIT

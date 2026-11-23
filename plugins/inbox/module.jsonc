@@ -1,0 +1,4 @@
+// Inbox's top bar module, always shown: the mailbox with its flag up and the unread count, or its flag down once all are
+// read (./status, its icons in icons/). A click opens InboxMenu.qml: the newest messages, and Open Inbox (#3215). A
+// message never pops up or sounds (#3179, #3212).
+{ "interval": 5, "before": ["claude"], "size": 19, "label": "Inbox – Unread messages", "glyph": "mailbox" }

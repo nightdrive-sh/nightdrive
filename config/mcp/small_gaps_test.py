@@ -4,7 +4,7 @@
 - asks_if: a change tool's call asks on the card though Access allows it when its command says yes (sound to a speaker
   on the network, an event into a shared calendar), and one that fails or says anything else stops the call.
 - display … --keep: the new scale is on trial in the runtime dir until the user keeps it, so a restart finds the old
-  one; Keep saves it, anything else puts the old one back. hyprland.lua reads the trial over the saved value.
+  one; Keep saves it, anything else puts the old one back. display.lua reads the trial over the saved value.
 - The card's list rows: an entry with a line end in it stays one entry.
 - Schemas: Deck's ids and uris are Spotify's form, the bar's icons stay visible.
 - Ferry's card names the device Ferry would pick; a calendar marked shared says so.
@@ -257,7 +257,8 @@ class DisplayTrial(unittest.TestCase):
         self.state.parent.mkdir(parents=True)
         self.state.write_text("eDP-1 1.6\nbuiltin left\n")
         (self.home / ".config/hypr").mkdir(parents=True)   # as link.sh links it: the config that reads the trial
-        (self.home / ".config/hypr/hyprland.lua").symlink_to(REPO / "config/hypr/hyprland.lua")
+        for name in ("hyprland.lua", "display.lua"):   # display.lua reads the trial, required from hyprland.lua
+            (self.home / ".config/hypr" / name).symlink_to(REPO / "config/hypr" / name)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -295,6 +296,7 @@ class DisplayTrial(unittest.TestCase):
         self.assertEqual(self.state.read_text(), "builtin left\n")
 
     def test_a_config_that_doesnt_read_the_trial_saves_at_once(self):
+        (self.home / ".config/hypr/display.lua").unlink()   # an older one: no display.lua yet
         (self.home / ".config/hypr/hyprland.lua").unlink()
         (self.home / ".config/hypr/hyprland.lua").write_text("-- an older one\n")
         status, out, err = self.scale("2", "deny")
@@ -309,7 +311,7 @@ class DisplayTrial(unittest.TestCase):
         self.assertFalse((self.t / "request").exists())
 
     def test_hyprland_reads_the_trial_over_the_saved(self):
-        lua = (REPO / "config/hypr/hyprland.lua").read_text()
+        lua = (REPO / "config/hypr/display.lua").read_text()
         start = lua.index("local scales, modes, builtinSide")
         end = lua.index("trial:close()\nend\n") + len("trial:close()\nend\n")
         block = lua[start:end] + ('for k, v in pairs(scales) do print("scale", k, v) end\n'

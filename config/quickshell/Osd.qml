@@ -4,7 +4,8 @@ import Quickshell.Io
 
 // Toast (a card in ToastStack): volume, screen or keyboard brightness, do not disturb and mic mute.
 // The keybinding runs:  qs ipc call osd volume | brightness | kbd | dnd | mic
-// (called only after wpctl / brightnessctl / the dnd toggle, so this just reads the current state).
+// (called only after wpctl / hypr/scripts/brightness / the dnd toggle, so this just reads the current state).
+// note ICON TEXT MS shows a line of text for MS ms: hypr/scripts/close-guard's "Press ⌘W again to close" (#2555).
 // A volume key also ticks (hypr/scripts/sounds event volume: off in Settings › Notifications › System sounds), at the
 // new level, so you hear how loud it is; not when it's muted.
 Toast {
@@ -12,22 +13,28 @@ Toast {
     property real volume: 0
     property bool muted: false
     property real brightness: 0
-    property string mode: "volume"      // "volume" | "brightness" | "kbd" | "dnd" | "mic"
+    property string mode: "volume"      // "volume" | "brightness" | "kbd" | "dnd" | "mic" | "note"
     property bool dnd: false
     property bool micMuted: false
     property string micLabel: ""
-    readonly property bool textMode: mode === "dnd" || mode === "mic"
+    property string noteIcon: ""
+    property string noteText: ""
+    readonly property bool volumeMuted: mode === "volume" && muted
+    // Muted, the level means nothing: the card is text like the mic's ("Mic off"), no grey bar (#3048)
+    readonly property bool textMode: mode === "dnd" || mode === "mic" || mode === "note" || volumeMuted
     readonly property real level: mode === "volume" ? volume : brightness
-    cardWidth: mode === "mic" && micLabel !== "" ? 350 : 280   // the long "Unable to listen" text needs a wider card
+    // Longer texts ("Unable to listen", a note) need a wider card
+    cardWidth: mode === "note" ? 340 : mode === "mic" && micLabel !== "" ? 350 : 280
 
     IpcHandler {
         target: "osd"
         function volume(): void { osd.mode = "volume"; readProc.running = true }
-        function brightness(): void { osd.mode = "brightness"; brightProc.command = ["brightnessctl", "-m"]; brightProc.running = true }
+        function brightness(): void { osd.mode = "brightness"; brightProc.dev = "screen"; brightProc.running = true }
         function dnd(on: bool): void { osd.mode = "dnd"; osd.dnd = on; osd.show() }
         function mic(): void { osd.mode = "mic"; osd.micLabel = ""; micProc.running = true }
         function micblocked(): void { osd.mode = "mic"; osd.micMuted = true; osd.micLabel = "Unable to listen - mic muted"; osd.show() }   // F5 with the mic muted
-        function kbd(): void { osd.mode = "kbd"; brightProc.command = ["brightnessctl", "-d", "*kbd_backlight*", "-m"]; brightProc.running = true }
+        function note(icon: string, text: string, ms: int): void { osd.mode = "note"; osd.noteIcon = icon; osd.noteText = text; osd.show(ms) }
+        function kbd(): void { osd.mode = "kbd"; brightProc.dev = "kbd"; brightProc.running = true }
     }
 
     Sh {
@@ -52,22 +59,25 @@ Toast {
     }
     Sh {
         id: brightProc
-        command: ["brightnessctl", "-m"]
+        // The percent on the eye's curve, as the sliders show it (hypr/scripts/brightness converts)
+        property string dev: "screen"
+        command: [Quickshell.env("HOME") + "/.config/hypr/scripts/brightness", dev]
         onResult: text => {
-            const m = text.match(/,(\d+)%/)
+            const m = text.match(/"brightness": (\d+)/)
             osd.brightness = m ? parseInt(m[1]) / 100 : 0
             osd.show()
         }
     }
-    function show() { shown = true; hide.restart() }
+    // ms: how long it stays (a note's own time), otherwise 1.5 s
+    function show(ms) { hide.interval = ms > 0 ? ms : 1500; shown = true; hide.restart() }
     Timer { id: hide; interval: 1500; onTriggered: osd.shown = false }
 
     Text {
         id: ico
         anchors { left: parent.left; leftMargin: 16; verticalCenter: parent.verticalCenter }
-        text: Icons.g(osd.mode === "mic" ? (osd.micMuted ? "mic-off" : "mic") : osd.mode === "dnd" ? (osd.dnd ? "bell-off" : "bell") : osd.mode === "brightness" ? "sun" : osd.mode === "kbd" ? "keyboard" : osd.muted || osd.volume <= 0 ? "volume-x" : osd.volume < 0.34 ? "volume" : osd.volume < 0.67 ? "volume-1" : "volume-2")
+        text: Icons.g(osd.mode === "note" ? osd.noteIcon : osd.mode === "mic" ? (osd.micMuted ? "mic-off" : "mic") : osd.mode === "dnd" ? (osd.dnd ? "bell-off" : "bell") : osd.mode === "brightness" ? "sun" : osd.mode === "kbd" ? "keyboard" : osd.muted || osd.volume <= 0 ? "volume-x" : osd.volume < 0.34 ? "volume" : osd.volume < 0.67 ? "volume-1" : "volume-2")
         font { family: Icons.family; pixelSize: 18 }
-        color: osd.mode === "volume" && osd.muted ? Theme.dim : Theme.accent
+        color: osd.volumeMuted ? Theme.dim : Theme.accent
     }
     Rectangle {
         id: track
@@ -78,13 +88,13 @@ Toast {
         Rectangle {
             width: parent.width * Math.min(1, osd.level)
             height: parent.height; radius: 3
-            color: osd.mode === "volume" && osd.muted ? Theme.off : Theme.primary
+            color: Theme.primary
         }
     }
     Text {
         anchors { horizontalCenter: parent.horizontalCenter; verticalCenter: parent.verticalCenter }
         visible: osd.textMode
-        text: (osd.mode === "mic" ? (osd.micLabel !== "" ? osd.micLabel : (osd.micMuted ? "Mic off" : "Mic on"))
+        text: (osd.volumeMuted ? "Muted" : osd.mode === "note" ? osd.noteText : osd.mode === "mic" ? (osd.micLabel !== "" ? osd.micLabel : (osd.micMuted ? "Mic off" : "Mic on"))
                                   : (osd.dnd ? "Do not disturb on" : "Notifications on")).toUpperCase()
         color: Theme.primary
         font { family: Theme.font; pixelSize: 12; letterSpacing: 0.6 }
@@ -93,10 +103,9 @@ Toast {
         id: pct
         visible: !osd.textMode
         anchors { right: parent.right; rightMargin: 16; verticalCenter: parent.verticalCenter }
-        readonly property bool isMuted: osd.mode === "volume" && osd.muted
-        width: isMuted ? 52 : 38; horizontalAlignment: Text.AlignRight
-        text: isMuted ? "MUTED" : Math.round(osd.level * 100) + "%"
-        color: isMuted ? Theme.primary : Theme.text
-        font { family: Theme.font; pixelSize: 12; letterSpacing: isMuted ? 0.6 : 0 }
+        width: 38; horizontalAlignment: Text.AlignRight
+        text: Math.round(osd.level * 100) + "%"
+        color: Theme.text
+        font { family: Theme.font; pixelSize: 12 }
     }
 }

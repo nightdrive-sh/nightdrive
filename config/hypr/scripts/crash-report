@@ -2,7 +2,8 @@
 # Crash reports to Claude (launcher › Settings › Notifications, off by default): when one of your programs crashes
 # (systemd-coredump keeps its core), a notification with Ask Claude, which opens Claude Code to find out why
 # (coredumpctl, a backtrace with gdb), Mute (15 min), which leaves that program's crashes out for a while (a crash loop
-# while you test it), and Mute, which leaves them out from then on.
+# while you test it), and Mute, which leaves them out from then on. A crash inside a container says so: the desktop
+# itself didn't crash. Those in Nightdrive's sandbox (nightdrive sandbox) are test runs and left out.
 #   crash-report status      on | off
 #   crash-report on|off      starts or stops the watcher (nightdrive-crash-reports.service) and keeps it so
 #   crash-report watch       the watcher itself: follows the journal's coredump messages
@@ -11,6 +12,7 @@
 #                            or none for MINUTES; unmute NAME ends both
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -27,7 +29,18 @@ DEFAULT_MUTED = {"uxplay"}
 # Quickshell 0.2.1 (Fedora's git20260209 build) segfaults on `qs kill` when its config is between generations
 # (IpcKillCommand::exec on a null currentGeneration, fixed upstream on 2026-03-07): the shell and the apps' windows
 # (app.sh stop) quit that way, so it came at nearly every restart.
-HARMLESS = [({"qs", "quickshell"}, "IpcServerConnection11onReadyRead")]
+# Hyprland 0.56–0.57's --verify-config segfaults after printing its result when the Lua config made a timer at load
+# (layer-keys.lua): tearing the config down removes the timer from an event loop verify mode never made. Only with
+# --verify-config in its command line: the running desktop crashing there is no such thing.
+# Each: (process names, top frame, a part of the command line it must have or None).
+HARMLESS = [({"qs", "quickshell"}, "IpcServerConnection11onReadyRead", None),
+            ({"Hyprland"}, "CEventLoopManager11removeTimer", "--verify-config")]
+# A podman container's processes are in the cgroup libpod-<id>.scope; systemd-coredump also gives the container's
+# leader's command line (COREDUMP_CONTAINER_CMDLINE) for any container. The sandbox's containers carry this label, and
+# its programs run from the repo mounted at /home/nd/nightdrive (config/sandbox/sandbox).
+PODMAN_SCOPE = re.compile(r"/libpod-([0-9a-f]{12,64})\.scope/")
+SANDBOX_LABEL = "nightdrive.sandbox"
+SANDBOX_CMDLINE = "/nightdrive/config/sandbox/"
 QUIET_SECONDS = 60   # one notification per program in this time: a crash loop doesn't fill the screen
 FIELD_CHARS = 300    # Ask Claude: a journal field longer than this (a long command line) is cut
 HERE = os.path.dirname(os.path.realpath(__file__))
@@ -104,7 +117,31 @@ def harmless(c):
     if isinstance(message, list):   # journalctl's JSON gives a message that isn't valid UTF-8 as bytes
         message = bytes(message).decode(errors="replace")
     top = next((l for l in message.splitlines() if l.startswith("#0 ")), "")
-    return any(c.get("COREDUMP_COMM") in names and frame in top for names, frame in HARMLESS)
+    cmdline = field(c.get("COREDUMP_CMDLINE"))
+    return any(c.get("COREDUMP_COMM") in names and frame in top and (part is None or part in cmdline)
+               for names, frame, part in HARMLESS)
+
+
+def container(c):
+    """Where the crash happened when it wasn't on the desktop itself: {"name": …, "sandbox": bool}, or None. A podman
+    container is asked for its name and labels; one already removed (sandbox down right after) has its short id, and is
+    the sandbox's when its leader ran the sandbox's scripts."""
+    m = PODMAN_SCOPE.search(c.get("COREDUMP_CGROUP") or "")
+    leader = field(c.get("COREDUMP_CONTAINER_CMDLINE"))
+    if not m and not leader:
+        return None
+    name, sandbox = (m.group(1)[:12] if m else ""), SANDBOX_CMDLINE in leader
+    if m:
+        try:
+            p = subprocess.run(["podman", "inspect", "--type", "container", m.group(1), "--format",
+                                "{{.Name}}\t{{index .Config.Labels \"" + SANDBOX_LABEL + "\"}}"],
+                               capture_output=True, text=True, timeout=5)
+            if p.returncode == 0:
+                found, _, label = p.stdout.strip().partition("\t")
+                name, sandbox = found or name, sandbox or label not in ("", "<no value>")
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return {"name": name, "sandbox": sandbox}
 
 
 def crash(pid):
@@ -134,6 +171,9 @@ def ask(pid):
     data = {"program": name, "signal": field(c.get("COREDUMP_SIGNAL_NAME")), "time": when, "pid": pid,
             "executable": field(c.get("COREDUMP_EXE")), "command_line": field(c.get("COREDUMP_CMDLINE")),
             "unit": field(c.get("COREDUMP_USER_UNIT") or c.get("COREDUMP_UNIT"))}
+    where = container(c)
+    if where:
+        data["container"] = field(where["name"] or "yes")
     data = json.dumps(data, indent=1, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e")
     prompt = (
         f"A program crashed on this desktop (PID {pid}). Its details from the journal are between <crash-data> and "
@@ -151,14 +191,24 @@ def ask(pid):
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def notify(c):
+def message(c, where):
+    """The notification's title and text. In a container both say so, so that a program crashing in one (Hyprland in a
+    test) doesn't read as the desktop's own crash."""
+    name = c.get("COREDUMP_COMM", "?")
+    text = f"{c.get('COREDUMP_EXE', '')} ({c.get('COREDUMP_SIGNAL_NAME', '')})"
+    if where is None:
+        return f"{name} crashed", text
+    inside = f"container {where['name']}" if where["name"] else "a container"
+    return f"{name} crashed in a container", f"{text}, in {inside}: not the desktop"
+
+
+def notify(c, where=None):
     name = c.get("COREDUMP_COMM", "?")
     pid = c.get("COREDUMP_PID", "")
-    sig = c.get("COREDUMP_SIGNAL_NAME", "")
-    exe = c.get("COREDUMP_EXE", "")
+    title, text = message(c, where)
     p = subprocess.run(["notify-send", "-a", "Crash reports", "-i", "dialog-warning", "--wait",
                         "-A", "ask=Ask Claude", "-A", f"snooze=Mute ({SHORT_MUTE_MINUTES} min)", "-A", "mute=Mute " + name,
-                        f"{name} crashed", f"{exe} ({sig})"], capture_output=True, text=True)
+                        title, text], capture_output=True, text=True)
     action = p.stdout.strip()
     if action == "ask":
         ask(pid)
@@ -182,11 +232,16 @@ def watch():
         name = c.get("COREDUMP_COMM", "")
         if c.get("COREDUMP_UID") != me or name in muted() or harmless(c):
             continue
-        now = time.monotonic()
-        if now - last.get(name, -QUIET_SECONDS) < QUIET_SECONDS:
+        where = container(c)
+        if where and where["sandbox"]:
             continue
-        last[name] = now
-        threading.Thread(target=notify, args=(c,), daemon=True).start()
+        # a container's crashes are counted apart: one there doesn't hold back the desktop's own
+        key = (name, where is not None)
+        now = time.monotonic()
+        if now - last.get(key, -QUIET_SECONDS) < QUIET_SECONDS:
+            continue
+        last[key] = now
+        threading.Thread(target=notify, args=(c, where), daemon=True).start()
 
 
 def main():
@@ -211,8 +266,9 @@ def main():
         set_muted_until(arg, None)
     else:
         with open(__file__) as f:
-            print("".join(l[2:] for l in f.readlines()[5:11]), end="")
+            print("".join(l[2:] for l in f.readlines()[6:12]), end="")
         sys.exit(1)
 
 
-main()
+if __name__ == "__main__":   # importable, to try its functions on the journal's real entries
+    main()

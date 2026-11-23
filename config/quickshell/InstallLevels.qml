@@ -106,7 +106,8 @@ Item {
                                               : rows("recommended").concat(q !== "" ? rows("plugin", "Plugins") : []) }
         }
         if (level === "webapp") {
-            // Your own first, then the ready-made ones (plugins.txt, group webapp): added without a terminal, nothing to ask
+            // Your own first, then the ready-made ones (plugins.txt, group webapp): added without a terminal, nothing to ask.
+            // "Webapp added" carries the new webapp's icon (webapp-add --icon), else a globe: no entry is named Webapp
             const own = [
                 { kind: "nav", name: "Add your own", glyph: "plus", target: "webname" },
                 { kind: "action", name: "Add your own in a terminal", glyph: "terminal",
@@ -115,7 +116,7 @@ Item {
             const ready = (pluginList || []).filter(p => p.group === "webapp").map(p => ({
                 item: { kind: "action", ready: true, name: p.name, glyph: p.icon, installed: p.installed,
                         summary: p.installed ? "added" : undefined,
-                        cmd: ["bash", "-c", 'out=$("$HOME/.local/bin/nightdrive" plugins install "$1" 2>&1) && notify-send -a Webapp "Webapp added" "$2" || notify-send -u critical -a Webapp "Adding webapp failed" "$out"', "_", p.id, p.name] },
+                        cmd: ["bash", "-c", 'out=$("$HOME/.local/bin/nightdrive" plugins install "$1" 2>&1) && { i=$("$HOME/.config/hypr/scripts/webapp-add" --icon "$2"); notify-send -a Webapp -i "${i:-lucide:globe}" "Webapp added" "$2"; } || notify-send -u critical -a Webapp "Adding webapp failed" "$out"', "_", p.id, p.name] },
                 text: p.name, extra: p.desc }))
             return { all: own.map(r => ({ item: r, text: r.name }))
                 .concat(ready.length ? [{ item: { kind: "header", name: "Ready-made" }, text: "" }] : [], ready) }
@@ -132,7 +133,7 @@ Item {
         if (it.kind === "wadd") {
             l.open = false
             Quickshell.execDetached(["bash", "-c",
-                'out=$("$HOME/.config/hypr/scripts/webapp-add" "$1" "$2" 2>&1) && notify-send -a Webapp "Webapp added" "$1" || notify-send -u critical -a Webapp "Adding webapp failed" "$out"',
+                'out=$("$HOME/.config/hypr/scripts/webapp-add" "$1" "$2" 2>&1) && { i=$("$HOME/.config/hypr/scripts/webapp-add" --icon "$1"); notify-send -a Webapp -i "${i:-lucide:globe}" "Webapp added" "$1"; } || notify-send -u critical -a Webapp "Adding webapp failed" "$out"',
                 "_", webName, it.value])
             return true
         }

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Nightdrive">
+  <defs>
+    <linearGradient id="bg" x1="0.33" y1="0.03" x2="0.67" y2="0.97">
+      <stop offset="0" stop-color="#1d1533"/>
+      <stop offset="1" stop-color="#120c24"/>
+    </linearGradient>
+    <linearGradient id="n" gradientUnits="userSpaceOnUse" x1="35.2" y1="0" x2="107.2" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e0bff2"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.0" y="0.0" width="200" height="200" rx="0.0" fill="url(#bg)" stroke="#2c2242" stroke-width="0"/>
+  <path fill="url(#n)" d="M43.84 143.2H57.52V100.36C57.52 91.84 56.68 79.36 56.08 72.4L80.2 143.2H98.56V55.6H84.88V97.12C84.88 105.52 85.84 118.84 86.56 126.4L62.2 55.6H43.84Z"/>
+  <rect x="114.4" y="55.6" width="50.4" height="88.8" fill="#c071eb"/>
+</svg>

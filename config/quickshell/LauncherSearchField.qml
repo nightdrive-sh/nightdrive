@@ -64,8 +64,9 @@ Row {
             // Delete: removes your own wallpaper in Background, the selected snippet in Snippets (empty search). ⌘⌫
             // arrives as ⇧Home + Delete with the keyd plugin (plugins/keyd/app.conf), so it does the same
             else if (event.key === Qt.Key_Delete && root.launcher.extDelete()) event.accepted = true
-            // Tab / ⇧Tab: a form's next / previous field
+            // Tab / ⇧Tab: a form's next / previous field, else the level's own use for it (tabPressed)
             else if ((event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) && root.launcher.stepField(event.key === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier) ? 1 : -1)) event.accepted = true
+            else if ((event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) && root.launcher.extTab(event.key === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier) ? 1 : -1)) event.accepted = true
             // Backspace with an empty search goes back; Ctrl+⌫ (⌥⌫ with keyd: delete a word) doesn't. In a form's
             // field it only deletes: one Backspace too many after clearing a value mustn't leave the form
             else if (event.key === Qt.Key_Backspace && !ctrl && text === "" && root.launcher.fieldRow) event.accepted = true
@@ -102,7 +103,6 @@ Row {
                 else if (root.launcher.selApp && (event.modifiers & Qt.AltModifier)) root.launcher.appState.toggleAutostart(cur)
                 else if (root.launcher.extLevel && cur && (event.modifiers & Qt.ShiftModifier)) root.launcher.extShift(cur)
                 else if (root.launcher.extLevel && cur && ctrl && root.launcher.extCtrl(cur)) {}
-                else if (root.launcher.collapsed) root.launcher.step(1)   // the light launcher: Enter on nothing typed shows the rows
                 else if (root.launcher.results.length === 0) root.launcher.shakeNow()
                 else root.launcher.activate(cur)
                 event.accepted = true

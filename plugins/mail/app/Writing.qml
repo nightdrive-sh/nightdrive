@@ -54,6 +54,14 @@ QtObject {
             if (mode === "claude") composer.rewrite()
         })
     }
+    // Files from outside (`nightmail new FILE…`, Files' m): a new message with them attached. A message already being
+    // written takes them instead, as a drop on its window would: the writing window holds one message, and dropping the
+    // files would lose them without a word. Answers the writing window's title, for the command to bring it forward.
+    function composeFiles(paths) {
+        if (composeWin.visible) composer.attach(paths)
+        else compose("new", null, { attachments: paths })
+        return composer.heading
+    }
     // mailto:a@b?cc=…&subject=…&body=… as the writing window's fields (RFC 6068)
     function mailtoFields(url) {
         const m = url.replace(/^mailto:/i, "").split("?")

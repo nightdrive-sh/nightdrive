@@ -104,7 +104,7 @@ Item {
         const o = Object.assign({}, firefox); o[key] = value; firefox = o
         Quickshell.execDetached([scripts + "/firefox-prefs", key, value])
     }
-    // Settings › Mouse: the wheel's scroll speed, a multiplier in a state file that hyprland.lua reads when it loads (input
+    // Settings › Mouse: the wheel's scroll speed, a multiplier in a state file that input.lua reads when it loads (input
     // scroll_factor; the trackpad has its own). "" = not read yet
     readonly property string mouseScrollFile: Quickshell.env("HOME") + "/.local/state/nightdrive/mouse-scroll"
     readonly property var mouseScrolls: [0.5, 0.75, 1, 1.5, 2, 3]
@@ -240,8 +240,6 @@ Item {
                       sub: "Typos and initials also match: firefx, vsc", switchOn: launcher.prefs.fuzzy },
                     { kind: "lpref", key: "shortcuts", name: "Shortcut hints", glyph: "keyboard",
                       sub: "An app’s or menu’s keys on its row (Hyper P)", switchOn: launcher.prefs.shortcuts }]
-                .concat([{ kind: "lpref", key: "light", name: "Light launcher", glyph: "panel-top-dashed",
-                      sub: "Only the search field" + (Plugins.has("deck") ? " and Music" : "") + " until you type or press ↓", switchOn: launcher.prefs.light }])
                 .concat([{ kind: "lpref", key: "comma", name: "Decimal comma in results", glyph: "calculator",
                       sub: "The calculator answers 3,5 instead of 3.5 (type either)", switchOn: launcher.prefs.comma }])
                 .concat(Plugins.has("deck") ? [{ kind: "lpref", key: "deck", name: "Include Deck artists, albums and songs", glyph: "disc-3",
@@ -250,6 +248,8 @@ Item {
                       sub: "People by name, company, address or number; Enter shows their numbers and addresses", switchOn: launcher.prefs.contacts }] : [])
                 .concat(Plugins.has("notes") ? [{ kind: "lpref", key: "notes", name: "Include notes", glyph: "notebook-pen",
                       sub: "Notes by title, folder or #tag; Enter opens one in Notes", switchOn: launcher.prefs.notes }] : [])
+                .concat(Plugins.has("calendar") ? [{ kind: "lpref", key: "calendar", name: "Include calendar events", glyph: "calendar",
+                      sub: "The next 30 days’ events by title or place; Enter opens one in Calendar", switchOn: launcher.prefs.calendar }] : [])
         }
         if (level === "mousescroll") {
             const cur = Number(mouseScroll)

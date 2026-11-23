@@ -2,6 +2,8 @@
 # with ~/.local/share/calendar, by vdirsyncer. Run by nightdrive-calendar-sync.timer and `calendar sync`.
 [Unit]
 Description=Nightdrive Calendar: sync calendars (vdirsyncer)
+# A notification when it keeps failing (config/hypr/scripts/unit_failed.py)
+OnFailure=nightdrive-unit-failed@%n.service
 After=network-online.target
 
 [Service]
@@ -9,4 +11,7 @@ Type=oneshot
 # Skip the round while the login keyring is locked: a password-cmd's secret-tool would otherwise pop up gnome-keyring's
 # own password prompt (as Contacts' sync)
 ExecCondition=/bin/sh -c '! %h/.local/bin/calendar keyring-locked'
+# and while there is nothing to sync (no account, no ICS address yet): `calendar sync` says so with exit 1, which
+# here would leave the unit failed every 15 minutes (#2527)
+ExecCondition=%h/.local/bin/calendar has-sources
 ExecStart=%h/.local/bin/calendar sync

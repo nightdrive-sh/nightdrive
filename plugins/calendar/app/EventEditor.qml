@@ -3,12 +3,15 @@ import Quickshell.Io
 import qs
 import qs.kit
 import "Form.js" as Form
+import "Repeat.js" as Repeat
 import "kit/Dates.js" as KitDates
 
 // A new event, or one being changed, in a panel over the window: its title, first and last day with the times (or all
 // day), its reminder, the calendar it goes in, where and notes. Saved by `calendar add` (lib/write.py) or `calendar edit`
 // (lib/change.py), which write it here and sync it up at once; the panel waits for that, so what went wrong (the server,
 // a calendar gone) is said here, where it can still be fixed. ⏎ in a field or Ctrl+⏎ saves, Esc leaves it.
+// A repeat (#2009) is picked under All day, with the day it ends; a recurring event is edited one time or every time
+// (scope, picked on the event's card): one time keeps the series' repeat and calendar, so those aren't shown for it.
 AppPanel {
     id: root
     required property var app           // the window: calendars, command, today
@@ -18,6 +21,10 @@ AppPanel {
     property string lastCalendar: ""    // the one used last, picked again for the next event
     property var editing: null          // the event being changed (calendar events' JSON), null for a new one
     property string reminderWas: "none" // its reminder as it was (Form.reminderId), so an edit changes it only when asked
+    property string scope: ""           // a recurring event's: "this" time or "all"; "" for a single or a new event
+    property string repeatWas: "none"   // its repeat as it was (Repeat.id), and the day it ends, the same way
+    property string untilWas: ""
+    property var repeatRule: null       // calendar events' repeat, for the chip of a rule of its own
     readonly property int timeWidth: Regional.h24 ? 72 : 88   // "12:30 PM" needs more than "12:30"
     readonly property var writable: app.calendars.filter(x => !x.read_only)
     signal saved(var event, bool edited) // calendar add's or edit's JSON: uid, calendar_name, title, when, synced…
@@ -37,15 +44,22 @@ AppPanel {
         allDay.on = false
         location.text = ""; notes.text = ""
         reminderWas = "none"; reminder.picked = "none"
+        scope = ""; repeatRule = null; repeatWas = "none"; untilWas = ""; repeat.picked = "none"; untilDay.text = ""
         duration = 60
         picker.picked = writable.some(x => x.id === lastCalendar) ? lastCalendar : (writable.length ? writable[0].id : "")
         error = ""
         visible = true
         title.input.forceActiveFocus()
     }
-    // An event of calendar events, its fields as they are: an all-day event's end is its last day there, as here
-    function edit(e) {
+    // An event of calendar events, its fields as they are: an all-day event's end is its last day there, as here.
+    // which: a recurring event's "this" (time) or "all"; one whose series isn't in the file (repeat null) is one time
+    function edit(e, which) {
         editing = e
+        scope = !e.recurring ? "" : e.repeat ? (which || "this") : "this"
+        repeatRule = e.repeat || null
+        repeatWas = Repeat.id(e.repeat); repeat.picked = repeatWas
+        untilWas = e.repeat && e.repeat.until && repeatWas !== "own" ? e.repeat.until : ""
+        untilDay.text = showDay(untilWas)
         title.text = e.title
         allDay.on = e.all_day
         startDay.text = showDay(e.start.slice(0, 10)); startTime.text = e.all_day ? "" : showTime(e.start.slice(11, 16))
@@ -71,7 +85,9 @@ AppPanel {
     function fields() {
         return { title: title.text, startDay: readDay(startDay.text), startTime: Regional.parseTime(startTime.text),
                  endDay: readDay(endDay.text), endTime: Regional.parseTime(endTime.text), allDay: allDay.on,
-                 calendar: picker.picked, location: location.text, notes: notes.text, reminder: reminder.picked }
+                 calendar: picker.picked, location: location.text, notes: notes.text, reminder: reminder.picked,
+                 repeat: repeat.picked, until: untilDay.visible ? readDay(untilDay.text) : "",
+                 untilBad: untilDay.visible && untilDay.text.trim() !== "" && !readDay(untilDay.text) }
     }
     // A day or time field left: shown the way it was read, so "930" becomes 09:30 and "5.11." 5.11.2026 before the eyes
     function tidyDay(field) { const v = readDay(field.text); if (v) field.text = showDay(v) }
@@ -131,7 +147,9 @@ AppPanel {
         busy = true
         if (editing) {
             writer.command = [app.command, "edit", "--json", editing.calendar, editing.uid]
-            writer.input = JSON.stringify(Form.edits(f, editing.calendar, reminderWas))
+            writer.input = JSON.stringify(Form.edits(f, { calendar: editing.calendar, reminder: reminderWas, repeat: repeatWas,
+                                                          until: untilWas, scope: scope, occurrence: editing.start,
+                                                          event: editing }))
         } else {
             lastCalendar = f.calendar
             writer.command = [app.command, "add", "--json"]
@@ -175,7 +193,7 @@ AppPanel {
     }
 
     Text {
-        text: root.editing ? "Edit event" : "New event"
+        text: !root.editing ? "New event" : root.scope === "this" ? "Edit this time" : root.scope === "all" ? "Edit every time" : "Edit event"
         color: root.c.title; font.family: root.c.font; font.pixelSize: 16; font.weight: Font.Medium
     }
     AppField {
@@ -219,6 +237,27 @@ AppPanel {
         onToggled: root.allDayToggled()
         onAccepted: root.save()
     }
+    // Its repeat, and the day it ends (none: it goes on). Not for one time of a series: the rule is every time's
+    AppChips {
+        id: repeat
+        c: root.c
+        width: parent.width
+        visible: root.scope !== "this"
+        label: "Repeat"
+        options: Repeat.options(root.repeatWas, root.repeatRule)
+        onAccepted: root.save()
+        onEscaped: root.close()
+    }
+    AppDatePicker {
+        id: untilDay
+        c: root.c
+        width: 136
+        visible: repeat.visible && repeat.picked !== "none" && repeat.picked !== "own"
+        label: "Until"; hint: "empty: no end"
+        base: startDay.day || root.app.today
+        onPicked: root.tidyDay(untilDay); onAccepted: root.save(); onEscaped: root.close()
+    }
+    Connections { target: untilDay.input; function onActiveFocusChanged() { root.entered(untilDay) } function onEditingFinished() { root.tidyDay(untilDay) } }
     // Its reminder, a notification that long before (lib/remind.py); the options follow All day
     AppChips {
         id: reminder
@@ -234,6 +273,7 @@ AppPanel {
         id: picker
         c: root.c
         width: parent.width
+        visible: root.scope !== "this"     // one time stays with the others
         label: "Calendar"
         options: root.writable
         onAccepted: root.save()
