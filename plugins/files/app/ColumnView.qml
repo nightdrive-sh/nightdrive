@@ -2,13 +2,14 @@ import QtQuick
 import qs.kit
 import "Format.js" as Format
 
-// The columns (t after the grid), as Finder's column view and yazi's Miller columns: the folders from home down to the
-// window's side by side, each with the next one on the way lit, then the window's own folder (FolderColumn own: its
-// rows, pick and marks, where the keys act), then what is picked in it: a folder's files, or a file's preview
-// (Preview, as the pane at the right shows it in the list). h and l are ← and → from column to column, because the
-// window's up() and go() do the moving: the columns only show the path.
-// As many columns as fit show in full, the last ones, and the last slot gets the rest of the width; the folders further
-// up are a scroll to the left away (it stops at a column's edge), and the view goes back to the end as the path changes.
+// The columns (t after the grid), as yazi's Miller columns: the folders above the window's, each with the next one down
+// lit; the window's own folder (FolderColumn own: its rows, pick and marks, where the keys act); and what is picked in
+// it: a folder's files, or a file's preview (Preview, as the pane at the right shows it in the list). h and l are ← and
+// → from column to column, because the window's up() and go() do the moving: the columns only show where it is.
+// How many folders above show comes from the window's width alone, never from the path (the user's call: a count of
+// columns that followed the path's depth was confusing): none in a narrow window, one as yazi has it, up to three in a
+// wide one. A folder above gets one share of the width, the window's own and the last slot two each, so nothing moves
+// or changes its width as the path changes; above / a column stays empty. The rest are in the path at the top.
 Item {
     id: root
     required property QtObject c
@@ -16,42 +17,16 @@ Item {
     readonly property alias view: mine.view
     clip: true
 
-    // The folders above the window's, from the top: home inside home, else / (a USB stick's path starts there too)
-    readonly property string first: app.inHome ? app.home : "/"
-    readonly property var ancestors: {
-        const out = []
-        let q = app.path
-        while (q !== first && q !== "/") { q = Format.parent(q); out.unshift(q) }
-        return out
+    readonly property int levels: width < 600 ? 0 : width < 1500 ? 1 : width < 1900 ? 2 : 3
+    readonly property real share: width / (levels + 4)
+    readonly property real parentWidth: Math.round(share)
+    readonly property real ownWidth: Math.round(2 * share)
+    // The folder n levels above the window's, "" past /
+    function above(n) {
+        let p = app.path
+        for (let i = 0; i < n; i++) { if (p === "/" || !p) return ""; p = Format.parent(p) }
+        return p
     }
-    // Kept in a ListModel changed in place, so a step down or up adds or takes away one column and the others keep their
-    // folder read (a new array would make the Repeater read every one again)
-    ListModel { id: chain }
-    onAncestorsChanged: sync()
-    Component.onCompleted: { sync(); follow() }
-    function sync() {
-        const a = ancestors
-        while (chain.count > a.length) chain.remove(chain.count - 1)
-        for (let i = 0; i < a.length; i++) {
-            const way = i + 1 < a.length ? a[i + 1] : app.path
-            if (i >= chain.count) chain.append({ dir: a[i], way: way })
-            else {
-                if (chain.get(i).dir !== a[i]) chain.setProperty(i, "dir", a[i])
-                if (chain.get(i).way !== way) chain.setProperty(i, "way", way)
-            }
-        }
-    }
-
-    // The widths come from the window's width alone, never from how deep the path is: a step down or up then only adds
-    // or takes away a column, and nothing else moves (when they followed the count, every column changed its width at
-    // each step and the view flickered). The last slot is at least lastMin, the columns beside it as many of at least
-    // minColumn as fit (no wider than maxColumn); a shallow path leaves the room after the last slot empty, as Finder does
-    readonly property int minColumn: 170
-    readonly property int maxColumn: 280
-    readonly property real lastMin: Math.max(180, Math.min(380, width * 0.36))
-    readonly property int fit: Math.max(1, Math.floor((width - lastMin) / minColumn))
-    readonly property real columnWidth: Math.max(120, Math.min(maxColumn, (width - lastMin) / fit))
-    readonly property real lastWidth: Math.max(lastMin, width - fit * columnWidth)
 
     // Rows of folders seen lately, by path (FolderColumn): a column whose folder is being read shows them meanwhile, so
     // a step right or left doesn't blank a column or show the folder before for a moment. The folders the columns read
@@ -93,57 +68,43 @@ Item {
         target: root.app
         function onPickedChanged() { root.follow() }
         function onLoadingChanged() { root.follow() }
-        function onPathChanged() { Qt.callLater(root.toEnd) }
     }
-    onVisibleChanged: if (visible) { follow(); toEnd() }
+    Component.onCompleted: follow()
+    onVisibleChanged: if (visible) follow()
 
     // A change in the window's folder reads the file in the preview again (the window's settle)
     function again() { preview.again() }
-    function toEnd() { flick.contentX = flick.end }
 
-    Flickable {
-        id: flick
+    Row {
         anchors.fill: parent
-        contentWidth: strip.width
-        contentHeight: height
-        flickableDirection: Flickable.HorizontalFlick
-        boundsBehavior: Flickable.StopAtBounds
-        interactive: contentWidth > width + 1
-        readonly property real end: Math.max(0, contentWidth - width)
-        onEndChanged: contentX = end
-        onMovementEnded: contentX = Math.min(end, Math.round(contentX / root.columnWidth) * root.columnWidth)
-
-        Row {
-            id: strip
-            height: flick.height
-            Repeater {
-                model: chain
-                delegate: FolderColumn {
-                    required property string dir
-                    required property string way
-                    width: root.columnWidth; height: strip.height
-                    c: root.c; app: root.app; store: root
-                    path: dir; next: way
-                }
+        Repeater {
+            model: root.levels
+            delegate: FolderColumn {
+                required property int index
+                readonly property int level: root.levels - index      // the leftmost is the furthest up
+                width: root.parentWidth; height: parent.height
+                c: root.c; app: root.app; store: root
+                path: root.above(level)              // a binding: above() reads the window's path
+                next: root.above(level - 1)
             }
-            FolderColumn { id: mine; own: true; width: root.columnWidth; height: strip.height; c: root.c; app: root.app; store: root }
-            Item {
-                width: root.lastWidth; height: strip.height
-                FolderColumn {
-                    anchors.fill: parent
-                    visible: root.showFolder
-                    c: root.c; app: root.app; store: root
-                    path: root.peek
-                }
-                // Over the window column's line, so the two don't make a thicker one. Nothing picked (an empty
-                // folder) leaves the slot empty, as the empty column beside it is, without words
-                Preview {
-                    id: preview
-                    anchors.fill: parent; anchors.leftMargin: -1
-                    visible: !root.showFolder && root.app.previewShown && (root.file !== null || root.app.marked.length > 1)
-                    file: root.file
-                    c: root.c; app: root.app
-                }
+        }
+        FolderColumn { id: mine; own: true; width: root.ownWidth; height: parent.height; c: root.c; app: root.app; store: root }
+        Item {
+            width: root.width - root.levels * root.parentWidth - root.ownWidth; height: parent.height
+            FolderColumn {
+                anchors.fill: parent
+                visible: root.showFolder
+                c: root.c; app: root.app; store: root
+                path: root.peek
+            }
+            // Over the window column's line, so the two don't make a thicker one. Nothing picked (an empty folder)
+            // leaves the slot empty, as the empty column beside it is, without words
+            Preview {
+                id: preview
+                anchors.fill: parent; anchors.leftMargin: -1
+                visible: !root.showFolder && root.app.previewShown && (root.file !== null || root.app.marked.length > 1)
+                file: root.file
+                c: root.c; app: root.app
             }
         }
     }
