@@ -107,8 +107,10 @@ class OpenAndRun(unittest.TestCase):
         self.tool("bin/gio", f"printf '%s\\n' \"$@\" > {t}/opened")
         # The desktop's terminal script, standing in: its arguments, then the command itself
         self.tool(".config/hypr/scripts/terminal", f"printf '%s\\n' \"$@\" > {t}/terminal")
-        # The program: where it ran, and whether its session is its own
-        self.prog = self.tool("game/run.sh", f"pwd > {t}/ran; ps -o sid= -p $$ > {t}/sid")
+        # The program: where it ran, and whether its session is its own. The session id is field 6 of /proc/PID/stat,
+        # read by the shell itself: CI's Fedora container has no ps (procps-ng), and an empty file never came (#3482)
+        self.prog = self.tool("game/run.sh",
+                              f"pwd > {t}/ran; read -r _ _ _ _ _ sid _ < /proc/$$/stat; echo $sid > {t}/sid")
         self.env = {"HOME": str(t), "XDG_DATA_HOME": str(t / "data"), "XDG_DATA_DIRS": str(t / "data"),
                     "XDG_CONFIG_HOME": str(t / "config"), "XDG_CONFIG_DIRS": str(t / "config"),
                     "PATH": f"{t}/bin:/usr/bin:/bin"}
