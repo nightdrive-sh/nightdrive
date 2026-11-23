@@ -462,7 +462,8 @@ ShellRoot {
                                    ["⇧↑ ⇧↓  ⇧-click", "Select several"], ["Ctrl-click", "Select or leave out"], ["⌘A", "Select all"]] },
             { title: "Write", keys: [["⌘N  c", "New message"], ["r", "Reply to all"], ["⇧R", "Reply to the sender only"], ["f", "Forward"],
                                      ["⏎", "Continue a draft (in Drafts)"], ["⌘⇧C", "Claude writes the reply"], ["⌘⇧C", "…from the selected text"],
-                                     ["⌘⇧A", "Attach files"], ["Ctrl ⏎", "Send"], ["⌘S", "Save in Drafts"], ["Esc", "Close (Esc Esc: throw away)"]] },
+                                     ["⌘⇧A", "Attach files"], ["⌘V", "Paste: copied files are attached"],
+                                     ["Ctrl ⏎", "Send"], ["⌘S", "Save in Drafts"], ["Esc", "Close (Esc Esc: throw away)"]] },
             { title: "Folders", keys: [["Ctrl ↑ ↓", "Previous, next"], ["1 – 6", "Go to a folder"], ["↑ ↓", "In the folders: previous, next"], ["Tab ⇧Tab", "To the folders, and back"], ["Ctrl Tab  Ctrl ⇧Tab", "Next, previous account"], ["⌘⇧⌫", "Empty Trash (in Spam: Spam)"], ["⌘B", "Hide or show"], ["⌘,", "Settings"]] }
         ]
 

@@ -43,7 +43,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | `f` | Forward, with the attachments |
 | Ctrl+Enter | Send |
 | ⌘S | Save in Drafts |
-| ⌘⇧A | Attach files (or drop them on the window) |
+| ⌘⇧A | Attach files (or drop them on the window, or paste them: ⌘V with files copied in Files or another file browser) |
 | `Esc` | Close: saved again if it was saved before, a new one thrown away on the second `Esc` |
 
 - `nightmail new FILE…` writes a new message with the files attached, as Files' `m` does; a message being written takes them instead.
