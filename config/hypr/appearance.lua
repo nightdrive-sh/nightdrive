@@ -91,8 +91,10 @@ hl.config({
         -- died" screen, whose way out is a text console. Turning it off wouldn't guard against anything: a program of
         -- the user's own could turn it on with hyprctl, and without one at the keyboard nobody runs anything.
         allow_session_lock_restore = true,
-        -- Until a new lock has drawn on every screen, Hyprland draws the desktop under it for this long: the desktop
-        -- showed for a second after sleep (hypr/scripts/relock). At 0 it is black instead, or the "lock died" screen.
+        -- Until a new lock has drawn on a screen, Hyprland draws the desktop there for this long: the desktop showed for
+        -- a second after sleep (hypr/scripts/relock). At 0 any frame drawn before then is its "lock died" screen
+        -- instead, even with the old lock still up (Hyprland 0.57 has no black for it), so relock replaces the lock
+        -- only when it has to, and scripts/lid doesn't reload meanwhile (#3363).
         lockdead_screen_delay = 0,
     },
     -- Hyprland's own "updated to …" window after an update: Hyprland comes with `nightdrive update`, and the window
