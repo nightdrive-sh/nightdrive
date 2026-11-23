@@ -4,8 +4,9 @@ import Quickshell.Io
 import "Format.js" as Format
 
 // Nightdrive Files: its windows (FilesWindow), one at the start and another on ⌘N, all in one Quickshell. They share the
-// last cut (Clip), so files cut in one window and pasted in another move. A folder from another app (IPC: Hyper F,
-// `files DIR`, FileManager1) goes to the window last active. Closing the last one ends Files. The settings (⌘,) are
+// last cut (Clip), so files cut in one window and pasted in another move. Hyper F, the Launcher, `files DIR` and
+// FileManager1 each open a new window (IPC newWindow), which Hyprland puts on the workspace the user is on, rather than
+// bringing up one on another workspace (#3427). Closing the last one ends Files. The settings (⌘,) are
 // here too, for every window: ~/.config/nightdrive/files/settings.json.
 ShellRoot {
     id: shell
@@ -64,6 +65,11 @@ ShellRoot {
 
     IpcHandler {
         target: "files"
+        // A new window, home or the folder given (`files`, `files DIR` while Files runs)
+        function newWindow(path: string): void { shell.open(path, "") }
+        // A new window on the folder a file is in, the file picked (`files show FILE`, FileManager1's ShowItems)
+        function newWindowShowing(path: string): void { shell.open(Format.parent(path), path) }
+        // Into the window last active: for the first window, just started, which a new one would sit beside
         function openFolder(path: string): void { shell.go(path || Quickshell.env("HOME"), "") }
         // The folder a file is in, with the file picked (FileManager1's ShowItems, `files show`). Not "show" or
         // "open": qs ipc takes those for its own subcommands

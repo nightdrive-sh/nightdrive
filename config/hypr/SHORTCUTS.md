@@ -8,7 +8,7 @@
   ⌘ Space            Launcher (↑↓ select, Enter open, Esc close; on an app ⌃Enter adds/removes it in Apps, ⌥Enter starts it at login)
   ⌘ ⌥ Space          Ask Claude: opens or closes its toast in the Launcher's place, with the conversation
   Hyper B / ⌘ ⇧ Enter  Browser (the default apps: Launcher › Settings › Apps › Default apps)
-  Hyper F            Files
+  Hyper F            Files: a new window, home
   Hyper E            Email
   F8 (play)          Play/pause {!deck}
   Hyper W            WhatsApp {whatsapp}

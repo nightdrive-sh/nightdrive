@@ -3,7 +3,7 @@
 Your files and folders in a window of Nightdrive's own, run from the keyboard: yazi's letters and the Mac's ⌘ keys side
 by side, a preview of the picked file at the right and a big one on Space, and the desktop's clipboard and trash, which
 Nautilus and other apps share. It opens folders for the whole desktop: Hyper F, a folder another app opens, and a
-browser's "Show in folder". Nautilus stays installed beside it as Files (Nautilus): out of the Launcher's Apps list,
+browser's "Show in folder", each in a new window on the workspace you are on (several share one cut and the settings). Nautilus stays installed beside it as Files (Nautilus): out of the Launcher's Apps list,
 found by a search for "files" or "nautilus" after Files.
 
 ## Using it
@@ -39,7 +39,7 @@ found by a search for "files" or "nautilus" after Files.
 | ⌘Z | Undo the last change (also Undo in the message at the top) |
 | `b` or ⌘D | Bookmark the picked folder (with a file picked, the one you're in), or take it away |
 | `Tab` | Keys between the sidebar and the list |
-| ⌘N | A new window, in the same folder (a folder from another app goes to the one last used) |
+| ⌘N | A new window, in the same folder |
 | ⌘B ⌘R | Hide the sidebar, read the folder again |
 | ⌘, | Settings (also the gear on the sidebar's title): Normal rows, taller and easy to click, or Compact |
 
@@ -54,8 +54,8 @@ found by a search for "files" or "nautilus" after Files.
 
 ## In a terminal
 
-    files                        # open Files, or bring it forward
-    files ~/Projects             # a folder in it; a file shows in its folder, picked
+    files                        # a new window, home
+    files ~/Projects             # a folder in a new window; a file shows in its folder, picked
     files enable                 # Files opens folders for the desktop (the installer runs it)
     files disable                # folders open in Nautilus again, under its own name
 

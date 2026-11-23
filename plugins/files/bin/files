@@ -30,12 +30,26 @@ resolve() {
   realpath -s -- "$p"
 }
 
-# A folder opens in the window; a file shows in its folder, picked
+# Every open is a new window on the workspace the user is on, never a jump to Files open on another one (#3427): while
+# Files runs, its IPC makes one; else Quickshell starts with its first window, which the folder then goes into. Only
+# Files does this: the kit's open (Mail, Deck) still brings the one window forward.
+new_window() {   # [PATH [FILE]]: home, a folder, or a file picked in its folder
+  if running; then
+    if [[ -n ${2:-} ]]; then ipc newWindowShowing "$2"; else ipc newWindow "${1:-$HOME}"; fi
+  else
+    start
+    [[ -z ${1:-} ]] && return 0
+    ready || return 1
+    if [[ -n ${2:-} ]]; then ipc showFile "$2"; else ipc openFolder "$1"; fi
+  fi
+}
+
+# A folder opens in a new window; a file shows in its folder, picked
 open_path() {
   local p
   p=$(resolve "${1:-}")
-  if [[ -d $p ]]; then open_ready && ipc openFolder "$p"
-  elif [[ -e $p || -L $p ]]; then open_ready && ipc showFile "$p"
+  if [[ -d $p ]]; then new_window "$p"
+  elif [[ -e $p || -L $p ]]; then new_window "$(dirname "$p")" "$p"
   else echo "files: $p isn't there." >&2; return 1
   fi
 }
@@ -66,8 +80,8 @@ usage() {
   cat <<USAGE
 Usage: files [PATH | command]
 
-  (none)         open Files, or bring it forward if it is open
-  PATH, URL      a folder in Files; a file in its folder, picked
+  (none)         a new Files window, home, on this workspace
+  PATH, URL      a folder in a new window; a file in its folder, picked
   show PATH      the same, for a file
   enable         Files among the desktop's apps, as the one that opens folders (the installer)
   disable        take it away again: folders open in Nautilus
@@ -77,7 +91,7 @@ USAGE
 }
 
 case ${1:-open} in
-  open)       if [[ -n ${2:-} ]]; then open_path "$2"; else app_command open; fi ;;
+  open)       if [[ -n ${2:-} ]]; then open_path "$2"; else new_window; fi ;;
   show)       open_path "${2:-}" ;;
   enable)     enable ;;
   disable)    disable ;;
