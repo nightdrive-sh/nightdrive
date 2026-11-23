@@ -20,6 +20,7 @@
 #                                     prompt too (ask-claude-dictated.txt), with its unsure mark (AskClaudeUnsure.js)
 #   ask-claude --ready                exit 0 when Ask Claude's toast can run: Claude Code and the tools are there
 #                                     (hypr/scripts/dictate, which otherwise takes a dictated question to a terminal)
+#   ask-claude save ID FILE           a result card's Save: the conversation's download into Downloads (ask-claude.d/save.py)
 #   ask-claude --run ID MODE [--name NAME] [--resume] -- PROMPT   the unit's own: one turn (ask-claude.d/run.sh)
 # claude_bin, icon (setup.sh) and the flags here (dictated) are shared with the sourced parts
 # shellcheck disable=SC2034,SC2154
@@ -41,6 +42,7 @@ while (( $# )); do
     --ready) ready; exit ;;
     --cancel) cancel_turn; exit 0 ;;
     --current) current_turn; exit 0 ;;
+    save) exec "$scripts/ask-claude.d/save.py" "${@:2}" ;;
     list) [[ ${2:-} == --json ]]; list_turns $(( ! $? )); exit 0 ;;
     --toggle) ready && [[ "$(qs ipc call askClaude toggle 2>/dev/null)" = "ok" ]] && exit 0
               exec "$scripts/terminal-or-claude" ;;

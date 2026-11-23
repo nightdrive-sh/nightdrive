@@ -1,10 +1,12 @@
 import QtQuick
+import qs.kit as Kit
 import "AskClaudeMarkdown.js" as Md
 
 // Ask Claude's conversation as it goes (AskClaudeSession): your requests in a darker box at the right, as in a chat (at
 // most youShare of the width, narrower for a short one), each step Claude takes as a row with its glyph (pulsing while
 // it runs, dim once done, red with ✕ when it failed), a robot's head while it thinks, and its answer's text as it is
-// written, as formatted Markdown (AskClaudeMarkdown.js); your requests stay plain text.
+// written, as formatted Markdown (AskClaudeMarkdown.js); your requests stay plain text. Under a turn's answer, the
+// result cards Claude added while it ran (AskClaudeResults.qml, #2245), in line with its text.
 // It knows nothing of where it is shown (Ask Claude's toast, AskClaudePanel.qml): give it a width, maxHeight and the font.
 // The requests and answers can be selected with the mouse (#1904), one message at a time; copySelection() copies it.
 // The keyboard stays with the field: the text takes no focus, and the view's owner asks for the copy (⌘C there).
@@ -20,6 +22,9 @@ Item {
     readonly property int textX: inset + 28   // Claude's part: the steps' and answers' text, after their glyph
     readonly property int gap: 10
     readonly property real youShare: 0.7    // the most of the width your request's box takes
+    readonly property int narrowCards: 440  // a thread narrower than this (a phone's screen) gives its cards the whole width
+    readonly property int cardX: width < narrowCards ? 0 : textX
+    readonly property int cardW: width < narrowCards ? width : width - textX - inset
 
     readonly property var session: AskClaudeSession
     // The message whose text is selected: selecting in another clears it, so there is one selection to copy
@@ -32,6 +37,8 @@ Item {
         return true
     }
     ClipCopy { id: clip }
+    // The result cards' one player: a sound started on one card stops another's (AskClaudeCardSound)
+    Kit.AppAudio { id: player; app: "Ask Claude" }
     readonly property bool thinking: session.busy && session.live === "" && !session.entries.some(e => e.kind === "step" && e.state === "run")
     implicitHeight: Math.min(col.implicitHeight, maxHeight)
     clip: true
@@ -178,7 +185,8 @@ Item {
                     width: t.width
                     // A request opens a new exchange: a little room above it after the first, and below it before Claude's part
                     readonly property int above: (kind === "you" && index > 0 ? t.gap : 0) + (heard.visible ? heard.height : 0)
-                    height: above + (kind === "you" ? you.height + t.gap : kind === "step" ? t.stepHeight : said.height + 6)
+                    height: above + (kind === "you" ? you.height + t.gap : kind === "step" ? t.stepHeight
+                                     : kind === "results" ? (results.visible ? results.height + t.gap : 0) : said.height + 6)
                     // A dictated request was sent unread (#3155): say it is what was heard, so a wrong word is seen as
                         // the dictation's, not yours
                     Text {
@@ -217,6 +225,17 @@ Item {
                         text: entry.modelData.text || ""
                         phase: entry.modelData.state || "done"
                     }
+                    AskClaudeResults {
+                        id: results
+                        x: t.cardX
+                        y: 4
+                        width: t.cardW
+                        active: entry.kind === "results"
+                        from: active ? entry.modelData.from : 0
+                        to: active ? entry.modelData.to : 0
+                        player: player
+                        fontSize: t.fontSize
+                    }
                     Answer {
                         id: said
                         visible: entry.kind === "text" || entry.kind === "error"
@@ -238,6 +257,22 @@ Item {
                 visible: t.session.live !== ""
                 text: t.session.live.trim()
                 live: true
+            }
+            // The running turn's cards as Claude adds them; at its end they move under its answer (a "results" entry)
+            Item {
+                visible: liveResults.visible
+                width: t.width
+                height: liveResults.height + t.gap
+                AskClaudeResults {
+                    id: liveResults
+                    x: t.cardX
+                    y: 4
+                    width: t.cardW
+                    active: t.session.busy
+                    from: t.session.turnAt
+                    player: player
+                    fontSize: t.fontSize
+                }
             }
             // Claude's card for a short request (Enter and Esc in the field answer it): a little inside your request's
             // box's edges (its border would stand out beside the box), with room above and below

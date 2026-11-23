@@ -13,7 +13,9 @@ import "AskClaudeUnsure.js" as Unsure
 // (ask-claude --current). A request after the first goes on with the same session (--resume). The view reads
 // `entries` and `live` (AskClaudeThread.qml).
 //   entries: [{ kind: "you", text }, { kind: "step", id, glyph, text, state: run | done | error | stop },
-//             { kind: "text", text }, { kind: "error", text }]
+//             { kind: "text", text }, { kind: "error", text }, { kind: "results", from, to }]
+// A turn's result cards (#2245) are the conversation's results.json (config/mcp/results.py), read into `cards`; the
+// "results" entry after a turn's answer shows those added while it ran (AskClaudeResults.qml).
 Singleton {
     id: s
 
@@ -34,6 +36,10 @@ Singleton {
     // The finished request needs a look (AskClaudeUnsure.look, #3155): "unsure", "error" or "". Ask Claude's toast opens
     // large for it instead of the small card's "answered"
     readonly property string look: busy ? "" : Unsure.look(entries, dictated, unsure)
+    property double turnAt: 0            // the running or last turn's start (ms): its cards are those added since
+    property var cards: []               // results.json's cards
+    property var saved: ({})             // a card's Save, by its file: { name } or { error } (AskClaudeCard.qml)
+    readonly property string filesDir: sessionId !== "" ? stateDir + "/" + sessionId + "/files" : ""
     property bool unseen: false          // an answer came while the toast was closed (the launcher's row says so)
     property double lastAt: 0
     // Ask Claude's toast (AskClaudeToast.qml) shows the conversation; the launcher's row and keys (AskClaudeLevels.qml)
@@ -76,6 +82,7 @@ Singleton {
         if (busy) stop()
         tail.running = false
         entries = []; live = ""; sessionId = ""; unseen = false; busy = false; unsure = false
+        cards = []; saved = ({}); cardsText = ""
     }
 
     function add(e) { entries = entries.concat([e]) }
@@ -96,13 +103,58 @@ Singleton {
         if (at >= watchedFrom) answered()
     }
 
+    // results.json again: after a tool's result (results_add's among them) and at a turn's end (AskClaudeEvents.js), as
+    // well as on the file's change, which a file swapped in whole (results.py's save) may not report
+    function reloadCards() { if (sessionId !== "") resultsFile.reload() }
+    property string cardsText: ""        // what `cards` was read from: the same text again changes nothing on screen
+    function readCards(text) {
+        if (text === cardsText) return
+        cardsText = text
+        let list = []
+        try { const d = JSON.parse(text); if (d && Array.isArray(d.cards)) list = d.cards.filter(c => c && typeof c === "object") } catch (e) {}
+        cards = list
+    }
+    // A card's Save (ask-claude save ID FILE): into Downloads under a free name, with its source (ask-claude.d/save.py)
+    function save(file) {
+        if (sessionId === "" || !file) return
+        const p = saveProc.createObject(s, { file: file, command: [script, "save", sessionId, file] })
+        p.running = true
+    }
+    Component {
+        id: saveProc
+        Process {
+            id: sp
+            property string file: ""
+            stdout: StdioCollector { id: spOut }
+            stderr: StdioCollector { id: spErr }
+            onExited: code => {
+                let r = {}
+                try { r = JSON.parse(spOut.text) } catch (e) {}
+                const done = Object.assign({}, s.saved)
+                done[sp.file] = code === 0 && r.name ? { name: r.name }
+                              : { error: spErr.text.trim().split("\n").pop() || "Couldn't save it" }
+                s.saved = done
+                sp.destroy()
+            }
+        }
+    }
+    FileView {
+        id: resultsFile
+        path: s.sessionId !== "" ? s.stateDir + "/" + s.sessionId + "/results.json" : ""
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: s.readCards(text())
+        onLoadFailed: s.readCards("")
+    }
+
     // Reads the conversation's events from its first line: what a restart lost comes back, and the file's later turns
     // as they're written. -F waits for a file not there yet
     property double watchedFrom: 0
     function watch(id) {
         if (sessionId === id && tail.running) return
         tail.running = false
-        entries = []; live = ""
+        entries = []; live = ""; cards = []; saved = ({}); cardsText = ""
         sessionId = id
         watchedFrom = Date.now() - 2000   // a turn that ends as this starts still counts as news
         tail.command = ["tail", "-n", "+1", "-F", stateDir + "/" + id + "/events.jsonl"]

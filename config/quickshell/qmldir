@@ -126,6 +126,13 @@ AskClaudeLevels 1.0 AskClaudeLevels.qml
 AskClaudeField 1.0 AskClaudeField.qml
 AskClaudeThread 1.0 AskClaudeThread.qml
 AskClaudeConfirm 1.0 AskClaudeConfirm.qml
+AskClaudeResults 1.0 AskClaudeResults.qml
+AskClaudeCard 1.0 AskClaudeCard.qml
+AskClaudeCardButton 1.0 AskClaudeCardButton.qml
+AskClaudeCardSound 1.0 AskClaudeCardSound.qml
+AskClaudeCardImage 1.0 AskClaudeCardImage.qml
+AskClaudeCardPage 1.0 AskClaudeCardPage.qml
+AskClaudeCardFile 1.0 AskClaudeCardFile.qml
 singleton AskClaudeSession 1.0 AskClaudeSession.qml
 PolkitWatch 1.0 PolkitWatch.qml
 ClaudeConfirm 1.0 ClaudeConfirm.qml
