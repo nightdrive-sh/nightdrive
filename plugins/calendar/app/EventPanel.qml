@@ -3,11 +3,13 @@ import qs.kit
 import "Dates.js" as Dates
 import "Form.js" as Form
 import "Repeat.js" as Repeat
+import "links.js" as Links
 
 // An event, opened from a view: its title, when, where, its calendar and notes, with Edit (e), which opens it in the
 // editor, and Delete (Del, ⌫), which asks first (EventDelete). A recurring one (#2009) says its repeat, and which of
 // its times Edit and Delete are for: this one or every one, two chips (← →); one in a read-only calendar says why
-// there are no buttons instead. Esc, Enter or a click outside close it.
+// there are no buttons instead. Esc, Enter or a click outside close it. The place and notes show their web links
+// clickable and short (links.js, #3444): a click opens one in the browser.
 AppPanel {
     id: root
     required property var app           // the window: its calendars, to tell a read-only one
@@ -32,6 +34,11 @@ AppPanel {
     function close() { visible = false; closed() }
     function scope() { return !event || !event.recurring ? "" : asks ? which.picked : "this" }
     function edit() { if (event && !fixed) { const e = event, s = scope(); close(); editRequested(e, s) } }
+    // Only a web address opens: an event can come from anyone, and file: or an app's own scheme would open something
+    // on this computer at their word
+    function openLink(link) {
+        if (/^https?:\/\//i.test(link.trim())) Qt.openUrlExternally(link.trim())
+    }
     function remove() { if (event && !fixed) { const e = event, s = scope(); close(); deleteRequested(e, s) } }
     onOutsideTapped: close()
     Keys.onPressed: e => {
@@ -73,12 +80,17 @@ AppPanel {
         text: "Reminder " + said
         color: c.dim; font.family: c.font; font.pixelSize: 12
     }
+    // The place and the notes: RichText (StyledText ignores the links' colour) of escaped text and links.js's <a> only,
+    // so nothing the sender wrote is markup
     Text {
-        textFormat: Text.PlainText
+        textFormat: Text.RichText
+        linkColor: c.accent      // a Text's links take this, not the <a>'s own style
         visible: !!(root.event && root.event.location)
         width: parent.width; wrapMode: Text.Wrap
-        text: root.event ? root.event.location : ""
+        text: root.event ? Links.rich(root.event.location, c.accent, c.faint) : ""
         color: c.dim; font.family: c.font; font.pixelSize: 12
+        onLinkActivated: link => root.openLink(link)
+        HoverHandler { cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor }
     }
     Row {
         spacing: 8
@@ -93,13 +105,16 @@ AppPanel {
             color: c.dim; font.family: c.font; font.pixelSize: 12
         }
     }
+    // An invitation's notes run to 20 lines and more (Teams'): the card scrolls, so they show whole
     Text {
-        textFormat: Text.PlainText
+        textFormat: Text.RichText
+        linkColor: c.accent      // a Text's links take this, not the <a>'s own style
         visible: !!(root.event && root.event.notes)
         width: parent.width; wrapMode: Text.Wrap; lineHeight: 1.2
-        maximumLineCount: 16; elide: Text.ElideRight
-        text: root.event ? root.event.notes : ""
+        text: root.event ? Links.rich(root.event.notes, c.accent, c.faint) : ""
         color: c.body; font.family: c.font; font.pixelSize: 12
+        onLinkActivated: link => root.openLink(link)
+        HoverHandler { cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor }
     }
     // Why there is no Edit or Delete, in the hint's colour
     Text {

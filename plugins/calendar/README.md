@@ -31,6 +31,7 @@ Your iCloud calendars, and Google calendars by their private address, on your co
 - The top bar's clock menu lists today's events under the month; a click opens one in Calendar.
 - The Launcher's search (⌘Space) finds the next 30 days' events by title or place, and `Enter` opens one here; its New event row starts one. Settings › Launcher › Include calendar events leaves the events out.
 - **Invitations** in Mail (an `.ics` in a message) show as a card there, with Add to calendar; an update to one you added offers Update, a cancellation Remove (Mail's README › Reading). Only the event's own fields are kept: not the sender's alarms (your reminder, or the default in Settings, applies), attachments or links. An update keeps the reminder you gave the event, and the calendar it is in. Accept, Maybe and Decline on the card answer the organiser, and the event keeps your answer.
+- An event's place and notes show their web links clickable: a click opens one in the browser. An invitation's long addresses show short, and Outlook's and Teams' `Join the meeting<https://…>` as the words alone.
 - The day view (`d`) is the week's hours for one day, wide enough for each event's time and place beside its title.
 - The agenda (`a`) lists the 30 days from the day picked that have events, under Today, Tomorrow and the days' names.
 - Search (`/`) finds the events whose title, place or notes have every word you type, half a year back and ahead of today, in the calendar picked in the sidebar. `↓` or `Enter` goes to the results, `/` back to the words, `Esc` leaves.
