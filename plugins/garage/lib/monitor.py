@@ -88,4 +88,5 @@ def main():
     print(json.dumps(r["return"]))
 
 
-main()
+if __name__ == "__main__":
+    main()

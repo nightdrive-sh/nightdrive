@@ -53,6 +53,7 @@ function NightdriveLocked()
     hl.exec_cmd("systemctl --user restart nightdrive-session.target")
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/lid watch")   -- the lid with an external display (display.lua)
     hl.exec_cmd(HOME .. "/.config/hypr/scripts/vm-display watch")   -- in a VM, its screen follows its window (display.lua)
+    hl.exec_cmd(HOME .. "/.config/hypr/scripts/vm-clipboard watch")   -- in a Garage VM, the host's clipboard sent to it
     -- Theme colours (~/.cache/nightdrive, hypr/scripts/theme) first: Quickshell (the top bar, its menus and the notifications)
     -- reads them on startup. hypr/scripts/desktop-shell runs qs and starts it again after a crash.
     hl.exec_cmd("sh -c '\"$HOME/.config/hypr/scripts/theme\" apply; exec \"$HOME/.config/hypr/scripts/desktop-shell\" run'")

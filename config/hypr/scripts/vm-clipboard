@@ -1,0 +1,35 @@
+#!/bin/bash
+# In a Garage VM, the host's clipboard sent to it (Garage's c, its menu, or the VM's window getting the keyboard: #3117).
+# Garage's guest agent runs wl-copy itself where it may run programs; Fedora's may not (guest-exec is blocked, SELinux
+# confines it), but it may write in /run, so the text comes as CLIP_FILE (plugins/garage/lib/guestclip.py) and this puts
+# it on the desktop's clipboard.
+#   vm-clipboard watch   started with the session; quits at once on a machine without a virtual GPU (not a VM)
+# The file's first line is "nightdrive-clipboard TIME": a new time is a new send, the rest of the file is the text. A
+# send from before this watcher started (before the login) isn't taken: it was meant for a desktop that has gone.
+# Looked at every POLL seconds with bash's own read, so it costs nothing while nothing comes.
+
+CLIP_FILE=/run/nightdrive-host-clipboard
+HEADER=nightdrive-clipboard
+POLL=1
+SETTLE=0.2      # the agent writes the file in one go; a moment for a long text to be all there
+
+first_line() { local l=""; read -r l 2>/dev/null < "$CLIP_FILE" || true; echo "$l"; }
+
+case $1 in
+  watch)
+    compgen -G '/sys/class/drm/card*-Virtual-*' >/dev/null || exit 0
+    # One watcher per Hyprland, as vm-display's
+    exec 9>"$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/nightdrive-vm-clipboard.lock" || exit 0
+    flock -n 9 || exit 0
+    last=$(first_line)
+    while sleep "$POLL"; do
+      # Its Hyprland gone (the login screen's, once logged in): nothing to copy for
+      [[ -S $XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock ]] || exit 0
+      now=$(first_line)
+      [[ $now == "$HEADER "* && $now != "$last" ]] || continue
+      last=$now
+      sleep "$SETTLE"
+      tail -n +2 "$CLIP_FILE" | wl-copy 9>&- || logger -t nightdrive-vm-clipboard "wl-copy failed"
+    done ;;
+  *) echo "usage: vm-clipboard watch" >&2; exit 1 ;;
+esac

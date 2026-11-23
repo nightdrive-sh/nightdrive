@@ -1,9 +1,9 @@
 import QtQuick
 import qs.kit
 
-// A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, its ssh user, and deleting it.
-// They change while it is stopped (garage-ctl set, one call each for what changed), but for the user, which only ssh's
-// config reads; while it runs the rest show, and a click on what would change them says why it can't. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
+// A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, its ssh user, whether the clipboard goes to
+// it on focus, and deleting it. They change while it is stopped (garage-ctl set, one call each for what changed), but for
+// the user, which only ssh's config reads, and the clipboard, which the overlay asks about each time (lib/clip.sh); while it runs the rest show, and a click on what would change them says why it can't. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
 // The display has no setting: SDL gives the guest its window's size, and its scale is the guest's own (Nightdrive's:
 // Settings › Display, hypr/vm-display.lua).
 AppPanel {
@@ -25,6 +25,7 @@ AppPanel {
         mem.text = String(vm.mem / 1024); cpus.text = String(vm.cpus); disk.text = String(vm.disk)
         iso.text = vm.iso
         user.text = vm.user || ""
+        clip.on = vm.clip !== false
         problem = ""
         mem.input.forceActiveFocus(); mem.input.selectAll()
     }
@@ -39,6 +40,7 @@ AppPanel {
         const u = user.text.trim()
         if (u !== "" && !/^[a-z_][a-z0-9_-]{0,31}$/.test(u)) { problem = "User: lower-case letters, digits, - and _"; return }
         if (u !== (vm.user || "")) ctl.run(["set", vm.name, "user", u])
+        if (clip.on !== (vm.clip !== false)) ctl.run(["set", vm.name, "clip", clip.on ? "on" : "off"])
         if (!stopped) { done(); return }
         const whole = t => /^[0-9]+$/.test(t.trim())
         if (!whole(mem.text) || !whole(cpus.text) || !whole(disk.text)) { problem = "Memory, CPUs and disk are whole numbers"; return }
@@ -111,6 +113,14 @@ AppPanel {
         width: Math.min(200, parent.width)
         label: "SSH user"; hint: "ssh " + (root.vm ? root.vm.name : "NAME") + " logs in as"
         onAccepted: root.save(); onEscaped: root.done()
+    }
+
+    // The host's clipboard into it as its window gets the keyboard (#3117: overlay/ClipSync.qml); c sends it either way
+    AppCheck {
+        id: clip
+        c: root.c
+        label: "Send the clipboard when its window is focused"
+        onAccepted: root.save()
     }
 
     Text {

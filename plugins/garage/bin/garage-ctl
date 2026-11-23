@@ -25,14 +25,17 @@
 #   garage-ctl start|stop|kill|display|hide|eject|delete NAME     stop: the guest agent's shutdown, else ACPI's power
 #                                            button; hide: its window out of sight (special:bg), the VM running on
 #   garage-ctl pause|resume NAME             its CPUs stopped where they are (its memory stays taken), and going on
-#   garage-ctl set NAME mem GB | cpus N | disk GB | iso PATH | port N | user USER     while it is stopped (user: any
-#                                            time, "" for none); the disk only grows, iso "" ejects
+#   garage-ctl set NAME mem GB | cpus N | disk GB | iso PATH | port N | user USER | clip on|off     while it is
+#                                            stopped (user and clip: any time, user "" for none); the disk only grows,
+#                                            iso "" ejects; clip: the clipboard goes to it when its window is focused
 #   garage-ctl rename-vm NAME NEWNAME        while it is stopped: its folder, and its ssh name (lib/ssh.sh)
 #   garage-ctl ssh-sync                      ~/.ssh/config.d/garage written again from the VMs
 #   garage-ctl ssh-key                       JSON: the ssh key a VM from an image gets ({ from, type, name }, {} for none)
 #   garage-ctl synctime NAME                 its clock to the host's (after the host slept), through its guest agent
 #   garage-ctl type NAME [--keymap fi]       the text on stdin (--clipboard: the clipboard's) typed into it as keys,
 #                                            on a US keyboard as an installer's console has (fi: a Finnish one)
+#   garage-ctl clip NAME [--clipboard]       the text on stdin (--clipboard: the clipboard's) onto its clipboard,
+#                                            through its guest agent (lib/clip.sh)
 #   garage-ctl snapshot NAME TAG [LABEL]     take one (LABEL: the name it shows, else its tag)
 #   garage-ctl restore|unsnap NAME TAG       go back to one, delete one
 #   garage-ctl duplicate NAME TAG NEWTAG [LABEL]   a copy of one in the same disk, under NEWTAG (shown as LABEL)
@@ -108,6 +111,8 @@ read_conf() {
 . "$(dirname "$(readlink -f "$0")")/../lib/images.sh"
 # shellcheck source=../lib/ssh.sh
 . "$(dirname "$(readlink -f "$0")")/../lib/ssh.sh"
+# shellcheck source=../lib/clip.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/clip.sh"
 
 # A snapshot's name in names.json (LABEL empty: its entry goes). Written to a new file, then renamed over the old one
 label() {
@@ -153,7 +158,7 @@ duplicate() {
 
 # JSON: [{ name, mem, cpus, disk, used, iso, running (qemu is), state (lib/state.sh: stopped, booting, running,
 # stopping, paused), slow (stopping for long), acpi (stopping by the power button), shown (its window on a workspace
-# that shows), ssh (its port), user, snapshots: [{ tag, name, date (local YYYY-MM-DDTHH:MM: the app writes it the region's way), size }], newest first }]
+# that shows), ssh (its port), user, clip (the clipboard goes to it on focus: lib/clip.sh), snapshots: [{ tag, name, date (local YYYY-MM-DDTHH:MM: the app writes it the region's way), size }], newest first }]
 list() {
   local first=1 shown='{}'
   # One look at Hyprland for all the VMs, and none while none runs
@@ -174,8 +179,9 @@ list() {
     jq -nc --arg name "$name" --argjson mem "$MEM" --argjson cpus "$CPUS" --arg iso "$ISO" --argjson run "$run" \
        --argjson shown "$shown" --arg pid "$pid" --argjson info "$info" --arg ssh "$SSH_PORT" --arg user "$SSH_USER" --argjson names "$(cat "$d/names.json" 2>/dev/null || echo '{}')" \
        --argjson sizes "$(snap_sizes "${d%/}")" --arg state "$st" --argjson slow "$slow" --argjson acpi "$acpi" \
+       --argjson clip "$(clip_on "$name" && echo true || echo false)" \
        '{ name: $name, mem: $mem, cpus: $cpus, iso: $iso, running: $run, state: $state, slow: $slow, acpi: $acpi, shown: ($run and ($shown[$pid] // false)),
-         ssh: (if $ssh == "" then null else ($ssh | tonumber) end), user: $user,
+         ssh: (if $ssh == "" then null else ($ssh | tonumber) end), user: $user, clip: $clip,
          disk: ($info["virtual-size"] / 1073741824 | floor),
          used: ((($info["actual-size"] // 0) / 1073741824 * 10 | floor) / 10),
          snapshots: [($info.snapshots // []) | sort_by(-.["date-sec"])[] | { tag: .name, name: ($names[.name] // .name), date: (.["date-sec"] | strflocaltime("%Y-%m-%dT%H:%M")), size: $sizes[.name] }] }'
@@ -214,8 +220,9 @@ conf() {
 # What the window's Settings change, one at a time, while the VM is stopped. The disk grows only (qemu-img won't
 # shrink one without losing what is past its new end); the guest then sees the new space unpartitioned
 settings() {
-  [[ $# -ge 3 ]] || die "set NAME mem GB | cpus N | disk GB | iso PATH | port N | user USER"
+  [[ $# -ge 3 ]] || die "set NAME mem GB | cpus N | disk GB | iso PATH | port N | user USER | clip on|off"
   need "$1"
+  [[ $2 == clip ]] && { clip_set "$1" "$3"; return; }
   # Only ssh's config reads the user: it changes while the VM runs too
   if [[ $2 == user ]]; then
     [[ -z $3 ]] || good_user "$3" || die "User: lower-case letters, digits, - and _, starting with a letter"
@@ -244,7 +251,7 @@ settings() {
     iso)
       [[ -z $v || -f $v ]] || die "No such ISO: $v"
       if [[ -z $v ]]; then conf "$name" ISO '""'; else iso_check "$v"; v=$(iso_path "$v"); conf "$name" ISO "$v"; fi ;;
-    *) die "set: mem, cpus, disk, iso, port or user" ;;
+    *) die "set: mem, cpus, disk, iso, port, user or clip" ;;
   esac
 }
 
@@ -285,6 +292,8 @@ case ${1:-} in
   resume)   resume "$2" ;;
   synctime) synctime "$2" ;;
   type)     type_text "${@:2}" ;;
+  clip)     clip_text "${@:2}" ;;
+  clip-auto) clip_auto "${2:-}" ;;   # the overlay's: PID (lib/clip.sh)
   guest-scale) guest_scale "${2:-}" "${3:-}" ;;   # the overlay's: PID SCALE (lib/qemu.sh)
   display)  display "$2" ;;
   hide)     hide "$2" ;;

@@ -18,6 +18,7 @@ QtObject {
             ["p", "Pause, or resume"],
             ["x", "Shut down"],
             ["⇧X", "Force off: pull the plug"],
+            ["c", "Send the clipboard: paste it there with its own keys"],
             ["v", "Type the clipboard into it, as on a US keyboard"]] },
         { title: "Snapshots", keys: [
             ["t", "Take one, while it is stopped"],

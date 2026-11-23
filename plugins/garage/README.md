@@ -14,6 +14,7 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 | `p` | Pause, or resume |
 | `x` | Shut down |
 | ⇧X | Pull the plug |
+| `c` | Send the clipboard to it, to paste there |
 | `v` | Type the clipboard into it, as keys on a US keyboard |
 | `t` | Take a snapshot (VM stopped) |
 | `Enter` | Go back to the snapshot |
@@ -25,6 +26,7 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 - A ready-made image (Fedora 44 Minimal on a Mac, Cloud Base on a PC) needs no installer: its first boot makes your user, with sudo and your ssh key (~/.ssh/id_*.pub, else your ssh agent's first, as 1Password's; New VM says which). Or pick an ISO from Downloads (or ~/vm): one for another architecture (a PC's x86_64 on a Mac) is refused, as it wouldn't boot.
 - The top bar's garage icon lights up while a VM runs, and blinks while one boots or shuts down; a click lists your VMs to start or show.
 - A VM is *Booting up* until its guest agent or sshd answers (at most two minutes), and *Shutting down* until qemu has gone. A shutdown that hasn't happened in a minute offers Force off.
+- Your clipboard goes to a running VM as its window gets the keyboard: copy here, click the VM, paste there. Or send it by hand with `c`, or from the top bar's menu. Text only, at most 256 KB, and never what your password manager marks as a password. Turn it off for a VM in its Settings (⌘,). It needs qemu-guest-agent in the VM and a Wayland desktop logged in there: a guest whose agent may run programs (Arch, Omarchy) gets it at once; Fedora's agent may not, so there only Nightdrive in the VM (newer than 0.6.1) takes it, and another desktop on Fedora gets nothing (`v` types it instead). The way back, from the VM to here, isn't there yet.
 - A paused VM frees its CPUs but keeps its memory. Resume sets its clock (with qemu-guest-agent in it); snapshots and settings still need it shut down.
 - Nightdrive in a VM follows its window's size, as in UTM and Parallels, from its login screen on, and its scale is that of the screen the window is on (2 on a Mac's, 1.5 once you move it to an external screen at 1.5), until you pick one in its Settings › Display. That needs the guest agent in it and a Nightdrive newer than 0.6.1 (older ones stay at 2); Nightdrive older than 0.6 keeps the size it started with, stretched: update it. Another desktop in a VM keeps the scale it set itself: change it there (Omarchy: the `monitor` line in ~/.config/hypr/monitors.conf).
 - A VM's sound plays through your speakers, as an app of its own in the mixer; it gets no microphone. If Garage was installed before VMs had sound, add it with `sudo dnf install qemu-audio-pipewire`.
@@ -41,6 +43,8 @@ Virtual machines from a ready-made Fedora image or any ISO, fast enough to forge
 | `garage list` | The VMs, one line each |
 | `garage start`, `stop`, `kill`, `pause`, `resume`, `display`, `hide [NAME]` | A VM by its name, or the only one there is |
 | `garage ssh [NAME]` | `ssh NAME`: a shell in it, or a command after its name |
+| `garage clip [NAME]` | What you pipe in, else the clipboard, onto its clipboard |
+| `garage set NAME clip on`, `off` | Whether the clipboard goes to it when its window is focused |
 | `garage type [NAME] [--keymap fi]` | What you pipe in, else the clipboard, typed into it as keys: for an installer's console, which has no clipboard and a US keyboard whatever yours is (`fi`: a console set to Finnish) |
 | `garage rename-vm NAME NEWNAME` | A new name for a stopped VM, its ssh name too |
 | `garage set NAME user USER`, `port N` | Its ssh user, or another port (if something else has its own) |

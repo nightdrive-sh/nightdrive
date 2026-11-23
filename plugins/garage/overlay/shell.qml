@@ -11,7 +11,8 @@ import qs
 // after the last change seen. Hyprland has no event for a window's change of size, so qemu's windows are looked at
 // every POLL_MS while one shows, every IDLE_MS otherwise. Started by `garage-ctl start` (one for all VMs: flock), it
 // quits once no VM's window has been there for QUIT_MS. A window's first size, as it opens, isn't covered.
-// It also tells each guest its window's screen's scale (GuestScale.qml).
+// It also tells each guest its window's screen's scale (GuestScale.qml), and sends it the host's clipboard as its window
+// gets the keyboard (ClipSync.qml).
 ShellRoot {
     id: root
 
@@ -66,6 +67,8 @@ ShellRoot {
 
     // And the screen's scale into each VM (#1630)
     GuestScale {}
+    // And the clipboard, on focus (#3117)
+    ClipSync {}
 
     Timer {
         running: true

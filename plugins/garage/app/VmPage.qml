@@ -49,6 +49,12 @@ Item {
         if (!root.running || root.paused) root.ctl.error = "Start " + root.vm.name + " to type into it"
         else root.act(["type", root.vm.name, "--clipboard"])
     }
+    // c: the clipboard's text onto its clipboard, through its guest agent, to paste there with its own keys (#3117:
+    // garage-ctl clip). Its window getting the keyboard does the same by itself (overlay/ClipSync.qml), unless turned off
+    function sendClipboard() {
+        if (!root.running || root.paused) root.ctl.error = "Start " + root.vm.name + " to send it the clipboard"
+        else root.act(["clip", root.vm.name, "--clipboard"])
+    }
     function takeSnapshot() { snapshots.take() }
     function focusSnapshots() { snapshots.focusList() }
     readonly property bool snapshotsFocused: snapshots.focused
