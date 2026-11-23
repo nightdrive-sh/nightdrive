@@ -21,7 +21,9 @@ Claude Code works with Nightdrive's tools and nothing else (no shell, files, hoo
 when Access › Web allows it, as Normal does), so the card and Access below decide as always. On the web it searches,
 reads pages and downloads files: audio, pictures, PDF and zip of at most 25 MB (200 MB a conversation), from public
 servers only, into the conversation's own folder in `~/.local/state/nightdrive/ask/`, kept for 7 days after its last
-turn. It never opens or reads them back, so a file can't tell it what to do. A short card comes into
+turn. It never opens or reads them back, so a file can't tell it what to do. What it found comes under its answer as
+cards: a sound plays there, a picture opens wider on a click, a page has Open, and each says its source and licence
+("Licence unknown" when the page doesn't say). Save copies a download into Downloads, beside what is there. A short card comes into
 the conversation (Enter allows, Esc denies), a long one on its own, and after 15 minutes a request is stopped. What the tools read (a mail, a note) comes along, so look at
 what it asks then as in any session. Without the tools on, or without Claude Code, Ask Claude says so; ⌘⌃Enter opens a
 terminal.
