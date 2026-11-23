@@ -37,6 +37,7 @@ in=$(cat)
 event=$(jq -r '.hook_event_name // "Notification"' <<<"$in")
 dir=$(jq -r '.cwd // empty' <<<"$in"); project=${dir##*/}
 state="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/claude-notify"; mkdir -p "$state"
+presence="${state%/*}/presence.json"
 
 # The session's window: up the parents (claude, its shell, the terminal) to a pid Hyprland knows
 clients=$(hyprctl -j clients 2>/dev/null) || clients='[]'
@@ -80,7 +81,20 @@ over() {
   fi
   [[ -n $s && $s != "$seen" ]]
 }
-if [[ $event == PermissionRequest && -n $rec ]]; then
+# Away from the computer, as Companion's server says while a page has it open (companion/lib/presence.py: locked, idle,
+# or its Away switch; #3065): its own file, trusted only while that server runs (its pid and start time), else at the
+# computer. Builtins only, as over(): the wait below asks once a second.
+away() {
+  local j='' st
+  read -r -d '' j 2>/dev/null < "$presence"
+  [[ $j =~ \"away\":\ ?true ]] && [[ $j =~ \"pid\":\ ?([0-9]+),\ ?\"start\":\ ?([0-9]+) ]] || return 1
+  local pid=${BASH_REMATCH[1]} start=${BASH_REMATCH[2]} f
+  read -r st 2>/dev/null < "/proc/$pid/stat" || return 1
+  read -ra f <<<"${st##*) }"
+  [[ ${f[19]-} == "$start" ]]
+}
+# Away, the active window isn't you there: a request without the session's record waits for Companion too
+if [[ $event == PermissionRequest ]] && { [[ -n $rec ]] || away; }; then
   active && here=1 || here=''          # you may be in it: no notification, but Companion still gets the request
 else
   active && exit 0
@@ -219,7 +233,7 @@ if [[ $event == PermissionRequest ]]; then
     # seconds (an older Claude Code) goes by the window as before: you went to it, answer there
     if [[ -n $rec ]] && { [[ -n $seen ]] || (( i < 12 )); }; then
       over && exit 0
-    elif [[ -n $closed ]] || { (( i % 4 == 3 )) && active; }; then
+    elif [[ -n $closed ]] || { (( i % 4 == 3 )) && active && ! away; }; then
       exit 0
     fi
   done

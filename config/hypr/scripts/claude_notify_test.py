@@ -310,6 +310,62 @@ class CompanionAnswer(unittest.TestCase):
         self.assertIsNone(self.decision())                                             # as before #3146
         self.assertFalse(os.path.exists(os.path.join(self.state, f"{ADDR}.perm")))
 
+    # #3065: away from the computer (Companion's presence file), the active window isn't you there: a request without
+    # the session's record waits for Companion too. The file counts only while the server that wrote it runs.
+    def presence(self, away, pid=None, start=None):
+        pid = pid or os.getpid()           # this test stands in for the server: it runs
+        if start is None:
+            with open(f"/proc/{pid}/stat") as f:
+                start = int(f.read().rsplit(")", 1)[1].split()[19])
+        path = os.path.join(self.env["XDG_RUNTIME_DIR"], "nightdrive", "presence.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + ".tmp", "w") as f:
+            json.dump({"away": away, "why": "locked" if away else "", "pid": pid, "start": start}, f)
+        os.replace(path + ".tmp", path)
+
+    def test_away_the_active_window_waits_for_companion(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.presence(True)
+        p, inp = self.ask("Edit", EDIT)
+        self.assertEqual(inp, {"request": p["request"], "input": EDIT})
+        time.sleep(1.2)
+        self.assertIsNone(self.proc.poll())                                            # waits, though active
+        self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
+        self.answer(f"allow {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "allow"})
+
+    def test_back_at_the_computer_the_terminal_has_it(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.presence(True)
+        self.ask("Edit", EDIT)
+        self.presence(False)
+        self.assertIsNone(self.decision(timeout=3))                                    # ends within a second or so
+        self.assertFalse(os.path.exists(os.path.join(self.state, f"{ADDR}.perm")))
+
+    def test_at_the_computer_or_a_dead_server_is_as_before(self):
+        self.env["CN_ACTIVE"] = ADDR
+        for case in ({"away": False}, {"away": True, "start": 1}, {"away": True, "pid": 2 ** 22 + 1, "start": 1}):
+            with self.subTest(**case):
+                self.presence(**case)
+                self.start("Edit", EDIT)
+                self.assertIsNone(self.decision())
+                self.assertFalse(os.path.exists(os.path.join(self.state, f"{ADDR}.perm")))
+
+    def test_away_a_question_in_the_active_window_reaches_companion(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.presence(True)
+        self.start("AskUserQuestion", {"questions": [{"question": "Which?", "header": "H", "options": [
+            {"label": "A", "description": "a"}, {"label": "B", "description": "b"}]}]})
+        ask = os.path.join(self.state, f"{ADDR}.ask")
+        for _ in range(100):
+            if os.path.exists(ask):
+                break
+            time.sleep(0.05)
+        with open(ask) as f:
+            req = json.load(f)["request"]
+        self.answer(f'answer {req} {{"Which?": "B"}}')
+        self.assertEqual(self.decision()["updatedInput"]["answers"], {"Which?": "B"})
+
 
 if __name__ == "__main__":
     unittest.main()

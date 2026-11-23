@@ -75,12 +75,17 @@ with `", "` (`multiSelect`), or words of your own (the terminal's *Type somethin
 Code's record of the session (`<config dir>/sessions/<pid>.json`): it waits while the question or request is open in the
 terminal, up to a day (link.sh gives the hook that timeout), and stops within a second when it is answered anywhere or
 the session ends, taking `question` (or `permission`) with it. Without that record (an older Claude Code) it waits 590 s
-and stops when its window gets the keyboard: then `question` goes and `asks` stays, answered in the terminal.
+and stops when its window gets the keyboard (unless `presence` is away, below): then `question` goes and `asks` stays,
+answered in the terminal.
 
 `presence` says whether you are at the computer: away (`why`) when it is `locked`, `idle` (no input for 5 minutes,
 from logind's idle hint, which hypridle sets) or you `set` it. Away, a tap on a tile opens the session's view on the
 page instead of bringing its window up. `POST /api/presence` `{ "away": true }` sets it (`set` is true): it holds until
-the computer's own view changes (locked, idle, in use again), then that counts again (`lib/presence.py`).
+the computer's own view changes (locked, idle, in use again), then that counts again (`lib/presence.py`). While a page
+has the event stream open, the server also keeps it in `$XDG_RUNTIME_DIR/nightdrive/presence.json`
+(`{"away", "why", "pid", "start"}`, written when it changes, removed when no page watches): away, `claude-notify` waits
+for the page's answer even when the session's window has the keyboard. It trusts the file only while that process
+(`pid` with its start time from `/proc`) runs.
 
 ## Sessions
 

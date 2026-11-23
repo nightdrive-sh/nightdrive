@@ -8,7 +8,7 @@ Nightdrive on an iPad or a phone: your Claude Code sessions, a big dictation but
 - **Actions:** tap an empty slot to pick what it does (Lock, Mute mic, Do not disturb, music, a new Claude session) or write a command of your own. Hold a slot to change it.
 - **Usage:** the gauge in the top right corner: every Claude account's 5-hour and week limits.
 - **Inbox:** the mailbox beside it, with how many are unread, opens [Inbox](inbox.md)'s messages: their text and pictures, newest first; opening one marks it read. *Mark unread* and *Archive* are under it. On an iPad on its side the list and the message are side by side. Sound and video files play in the message (Ogg is converted to AAC on the computer for Safari, which needs `ffmpeg`); other files open in the browser; a message's buttons are only in the Inbox on the computer for now.
-- **Away:** when the computer is locked or has had no input for 5 minutes, the top bar's *Away* switch turns on and a tap on a tile opens the session here instead of bringing its window up there. Tap the switch to say it yourself: that holds until the computer sees you lock it, leave it or come back.
+- **Away:** when the computer is locked or has had no input for 5 minutes, the top bar's *Away* switch turns on and a tap on a tile opens the session here instead of bringing its window up there. Tap the switch to say it yourself: that holds until the computer sees you lock it, leave it or come back. While you are away, a question or a permission request reaches the page even from the window that has the keyboard (with the page open).
 - The colours follow your theme.
 
 ## Turning it on
@@ -24,7 +24,7 @@ If Tailscale refuses (*Run once: sudo tailscale set --operator=$USER*), run that
 - Several computers: each has its own address, and a web app of its own on the iPad.
 - Sending text and Stop bring the session's window to the front on the computer, as Send to Claude does.
 - A permission request for an edit, a write, an MCP tool or a long command has *Review*: it shows what it would do whole (the file, the text taken out and put in, the tool's input), with Deny and Allow under it. A character that wouldn't show is written out as ⟨U+…⟩. One over 200,000 characters is answered in the terminal.
-- A question with choices or a permission request stays here as long as it is open in the terminal, up to a day, and goes once it is answered anywhere. With an older Claude Code, which keeps no record of its sessions, it is here for about ten minutes, and not when it was asked while you were in that session's window: then answer it in its terminal (the tile says so).
+- A question with choices or a permission request stays here as long as it is open in the terminal, up to a day, and goes once it is answered anywhere. With an older Claude Code, which keeps no record of its sessions, it is here for about ten minutes, and not when it was asked while you were in that session's window (unless you were away): then answer it in its terminal (the tile says so).
 - A page that didn't load whole (a file lost on the way) loads once more by itself; when that fails too, it says so, with *Reload*.
 - Dictation uses the browser's speech recognition (Apple's). Where there is none, a tap opens a box to write in.
 - Only your own Tailscale user gets in, from their own devices (not a tagged one, not over Funnel); nothing else on the computer reaches the server. Anyone with that login's device in hand can type into your sessions, and a command in a slot runs on the computer as you: keep the iPad locked.

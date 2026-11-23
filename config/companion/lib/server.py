@@ -74,6 +74,7 @@ class State:
         self.demo = demo
         self.sessions = sessions.Demo() if demo else sessions.Sessions()
         self.presence = presence.Demo() if demo else presence.Presence()
+        self.presence_file = None if demo else presence.StateFile()   # for claude-notify (#3065); not the demo's
         self.inbox = inbox.Demo() if demo else inbox.Inbox()
         self.cond = threading.Condition()
         self.mic = mic.Mic(self.cond)     # the app as the computer's microphone (mic.py)
@@ -120,7 +121,10 @@ class State:
         while True:
             if self.watchers:
                 try:
-                    text = json.dumps(self.build(), ensure_ascii=False)
+                    built = self.build()
+                    text = json.dumps(built, ensure_ascii=False)
+                    if self.presence_file:
+                        self.presence_file.write(built["presence"])
                 except Exception as e:   # a look that failed keeps the last state; the next one tries again
                     print("companion: look failed:", e, flush=True)
                     text = self.json
@@ -129,6 +133,8 @@ class State:
                         self.json, self.version = text, self.version + 1
                     self.built = time.time()
                     self.cond.notify_all()
+            elif self.presence_file:
+                self.presence_file.remove()     # nobody looks now: the hook goes by the window, as without Companion
             # Nobody watching: no looks until a page opens the stream. A look runs claude-sessions, ~0.3 s of CPU:
             # every POLL seconds all day, a fifth of a core on a laptop's battery for a page nobody had open.
             self.wake.wait(POLL if self.watchers else None)

@@ -9,6 +9,7 @@ hyprctl dispatch, not through an input device, so they don't count as you being 
 You can also say it yourself from the page (POST /api/presence): that holds until the computer sees a change of its own
 (you lock it, leave it, or come back to it), so a choice made once can't stay wrong for the rest of the day.
 """
+import json
 import os
 import subprocess
 import time
@@ -16,6 +17,8 @@ import time
 IDLE_LIMIT = 300           # seconds without input before you count as away
 IDLE_AFTER = 60            # hypridle sets IdleHint this long after the last input (hypridle.conf's first listener)
 LOCKS = (["-f", "[q]s -p .*/greeter/lock\\.qml"], ["-x", "hyprlock"])
+# Where hypr/scripts/claude-notify reads it (#3065): away, a request waits for Companion even in the active window
+STATE_FILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}", "nightdrive", "presence.json")
 
 
 def _run(argv):
@@ -83,6 +86,51 @@ class Presence:
         self.set_at = self.detect()
         # the same as detected: nothing to hold
         self.set_to = None if away == bool(self.set_at) else away
+
+
+def start_time(pid):
+    """The process's start in clock ticks since boot (/proc/PID/stat's 22nd field), or 0: with the pid it names this
+    server's own run, so a pid reused after a crash doesn't pass for it."""
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            return int(f.read().rsplit(")", 1)[1].split()[19])
+    except (OSError, IndexError, ValueError):
+        return 0
+
+
+class StateFile:
+    """The presence for claude-notify: written (atomically) when it changes while a page watches, and gone when none
+    does, as nothing looks then and it would go stale. The hook trusts it only while this process runs (pid, start)."""
+
+    def __init__(self, path=STATE_FILE, pid=None):
+        self.path = path
+        self.pid = pid or os.getpid()
+        self.start = start_time(self.pid)
+        self.last = ""           # not None: the first remove() clears one an earlier run left behind
+
+    def write(self, look):
+        text = json.dumps({"away": bool(look.get("away")), "why": look.get("why", ""), "pid": self.pid,
+                           "start": self.start}) + "\n"
+        if text == self.last:
+            return
+        tmp = f"{self.path}.{self.pid}.tmp"
+        try:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+            with open(tmp, "w") as f:
+                f.write(text)
+            os.replace(tmp, self.path)
+            self.last = text
+        except OSError as e:     # the page works without it; the hook then goes by the window as before
+            print("companion: presence file:", e, flush=True)
+
+    def remove(self):
+        if self.last is None:
+            return
+        self.last = None
+        try:
+            os.unlink(self.path)
+        except OSError:
+            pass
 
 
 class Demo(Presence):
