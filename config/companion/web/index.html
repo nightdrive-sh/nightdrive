@@ -17,6 +17,21 @@
 <link rel="stylesheet" href="/permission.css">
 <link rel="stylesheet" href="/presence.css">
 <link rel="stylesheet" href="/inbox.css">
+<style>
+/* When the page didn't load whole (boot.js): here, not in app.css, which may be the file that failed. Shown at once by
+   boot.js after its second try, or on its own after a while when boot.js never ran (html never gets .ready). */
+.loadfail { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 14px; padding: 24px; text-align: center; background: #0b0b0d; color: #c9bdd3;
+            font: 14px/1.45 ui-monospace, monospace; visibility: hidden; animation: loadfail 0s 20s forwards; }
+.loadfail h1 { margin: 0; font-size: 17px; font-weight: 500; color: #ffffff; }
+.loadfail p { margin: 0; max-width: 34em; color: #aea3b5; }
+.loadfail .what { font-size: 12px; color: #9486a3; overflow-wrap: anywhere; }
+.loadfail a { margin-top: 6px; padding: 10px 22px; border-radius: 10px; background: #c071eb; color: #0b0b0d;
+              font-weight: 500; text-decoration: none; }
+.load-failed .loadfail { visibility: visible; animation: none; }
+.ready:not(.load-failed) .loadfail { display: none; }
+@keyframes loadfail { to { visibility: visible; } }
+</style>
 </head>
 <body>
 <div class="app">
@@ -43,6 +58,14 @@
     </aside>
   </div>
 </div>
-<script type="module" src="/app.js"></script>
+<!-- A plain link, so Reload works with no script at all (boot.js) -->
+<div class="loadfail" role="alert">
+  <h1>The page didn't load whole</h1>
+  <p>Part of it didn't come through from the computer, on a second try too: the connection dropped, or Companion is
+    starting again.</p>
+  <p class="what"></p>
+  <a href="/">Reload</a>
+</div>
+<script src="/boot.js"></script>
 </body>
 </html>
