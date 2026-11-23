@@ -153,6 +153,8 @@ Usage: calendar [command]
                  the events' reminders as notifications, or none
   reminders default none|MINUTES
                  a timed event without a reminder of its own gets one MINUTES before (0, 5, 10, 15, 30, 60)
+  reminders join on|off
+                 a notification with Join a minute before an event with a meeting link (on by default)
   remind         notify the reminders whose time has come (the timer runs it every minute)
   sync [NAME…]   sync every account's calendars (or these: an account, or a calendar as ACCOUNT/ID) now
                  (--force-delete first: a calendar emptied here empties the server's too)

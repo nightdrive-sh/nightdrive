@@ -7,6 +7,8 @@ window's Settings (⌘,) through `calendar reminders on|off|default`, so the win
 
 reminders: notifications of the events' reminders (on by default). default_reminder: minutes before a timed event's
 start for one without a reminder of its own, None for no default (Jari 4.11.: none, only the events' own).
+join_notice: a notification with Join a minute before an event with a meeting link (#3444; on by default, and only
+while reminders is on): it comes on top of the event's own reminders without being asked for, so it can be turned off.
 """
 
 import json
@@ -14,7 +16,7 @@ import json
 import sources
 
 FILE = sources.CONFIG_DIR / "settings.json"
-DEFAULTS = {"reminders": True, "default_reminder": None}
+DEFAULTS = {"reminders": True, "default_reminder": None, "join_notice": True}
 DEFAULT_CHOICES = (None, 0, 5, 10, 15, 30, 60)   # what the window offers, and what the command takes
 
 
@@ -29,6 +31,7 @@ def get():
     if out["default_reminder"] not in DEFAULT_CHOICES:   # a hand-edited value the window couldn't show
         out["default_reminder"] = None
     out["reminders"] = bool(out["reminders"])
+    out["join_notice"] = bool(out["join_notice"])
     return out
 
 

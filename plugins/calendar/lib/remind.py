@@ -6,6 +6,7 @@ each reminder whose time has come shows once (notice.py), with Open and Snooze.
     remind.py list [--json] [--days N]   the settings and the reminders of the next N days (1; at most 28)
     remind.py on | off                   the reminders' notifications on or off (Settings ⌘, in the window)
     remind.py default none|MINUTES       a timed event without a reminder of its own gets one MINUTES before
+    remind.py join on | off              the notification with Join a minute before a meeting, on or off
 
 Where they come from: each event's alarms (alarms.py), at each time of a recurring one, as khal lists the times; and,
 for a timed event without any, the default (settings.py). The plan (PLAN) of the next AHEAD days is made again only
@@ -14,6 +15,12 @@ when a calendar's folder, the settings or the day have changed, so the minute's 
 A reminder missed while the computer slept or was off shows when it wakes, if its event hasn't ended; more than
 ONE_BY_ONE at once come as one notification. With the reminders off, the check still marks what comes as seen, so
 turning them on doesn't bring back the ones of the time they were off. Snooze (notice.py) puts one in SNOOZED.
+
+A timed event with a meeting link (meeting.py: Teams, Meet, Zoom, Webex) also gets a notification JOIN_BEFORE its start,
+with Join (#3444): kind "join" in the plan, its key the event's and "|join". Not when one of its own reminders comes
+that close to the start anyway (with its Join), and not with settings' join_notice off. A reminder of such an event
+has Join too: the plan carries its meeting. It always comes on its own, not in the many-at-once notification: its
+Join is the point of it.
 """
 
 import datetime as dt
@@ -35,6 +42,9 @@ SEEN = sources.STATE_DIR / "reminded.json"      # {alarm key: its event's end}: 
 SNOOZED = sources.STATE_DIR / "snoozed.json"    # {alarm key: {"until": iso, "alarm": alarm}}
 AHEAD = 29         # days of events planned: a reminder four weeks before an event is in the plan
 ONE_BY_ONE = 3     # more due at once come as one notification
+JOIN_BEFORE = dt.timedelta(minutes=1)     # the join notification: the timer's minute, then a minute to open the call
+JOIN_NEAR = dt.timedelta(minutes=2)       # an own reminder this close to the start has Join already: no second one
+PLAN_FORM = "2"    # in the fingerprint: a plan written before meetings were in it (#3444) is made again
 NOTICE = Path(__file__).resolve().with_name("notice.py")
 
 
@@ -56,7 +66,7 @@ def store(path, data):
 def fingerprint(cals, today):
     """What the plan was made from: the day, the settings, and each calendar's folder and newest file (an event added
     or removed changes the folder's time, one written in place only its file's). A stat a file, no reading"""
-    parts = [today.isoformat(), str(settings.get())]
+    parts = [PLAN_FORM, today.isoformat(), str(settings.get())]
     for c in cals:
         try:
             folder = Path(c["path"])
@@ -75,8 +85,19 @@ def bounds(e):
     return start, alarms.local(write.when(e["end"], "end"))
 
 
+def join_at(e, start, ats, on=True):
+    """When an event's join notification comes, or None: a timed event with a meeting link, none of whose own reminders
+    comes within JOIN_NEAR of its start"""
+    if not on or e["all_day"] or not e.get("meeting"):
+        return None
+    if any(start - JOIN_NEAR <= at <= start for at in ats):
+        return None
+    return start - JOIN_BEFORE
+
+
 def make_plan(cals, today):
-    default = settings.get()["default_reminder"]
+    s = settings.get()
+    default = s["default_reminder"]
     files = alarms.Files(cals)
     out = []
     for e in events.events(today - dt.timedelta(days=1), today + dt.timedelta(days=AHEAD), reminders=False):
@@ -85,10 +106,13 @@ def make_plan(cals, today):
         ats = alarms.times(vevent, start, end) if vevent is not None else []
         if not ats and default is not None and not e["all_day"]:
             ats = [start - dt.timedelta(minutes=default)]
-        for at in ats:
-            out.append({"key": f"{e['calendar']}|{e['uid']}|{e['start']}|{at.isoformat()}", "at": at.isoformat(),
-                        "calendar": e["calendar"], "calendar_name": e["calendar_name"], "uid": e["uid"],
-                        "title": e["title"], "location": e["location"], "start": start.isoformat(),
+        base = f"{e['calendar']}|{e['uid']}|{e['start']}|"
+        join = join_at(e, start, ats, s["join_notice"])
+        for kind, key, at in [("reminder", base + at.isoformat(), at) for at in ats] + (
+                [("join", base + "join", join)] if join else []):
+            out.append({"key": key, "kind": kind, "at": at.isoformat(), "calendar": e["calendar"],
+                        "calendar_name": e["calendar_name"], "uid": e["uid"], "title": e["title"],
+                        "location": e["location"], "meeting": e.get("meeting"), "start": start.isoformat(),
                         "end": end.isoformat(), "all_day": e["all_day"], "day": e["start"][:10]})
     out.sort(key=lambda a: a["at"])
     return out
@@ -145,11 +169,13 @@ def check(now=None):
     store(SNOOZED, snoozed)
     if not settings.get()["reminders"] or not due:
         return
-    if len(due) > ONE_BY_ONE:
-        spawn(["many", json.dumps(due, ensure_ascii=False)])
-    else:
-        for a in due:
-            spawn(["one", json.dumps(a, ensure_ascii=False)])
+    joins = [a for a in due if a.get("kind") == "join"]
+    rest = [a for a in due if a.get("kind") != "join"]
+    if len(rest) > ONE_BY_ONE:
+        spawn(["many", json.dumps(rest, ensure_ascii=False)])
+        rest = []
+    for a in rest + joins:
+        spawn(["one", json.dumps(a, ensure_ascii=False)])
 
 
 def upcoming(days, now=None):
@@ -162,7 +188,7 @@ def text(result):
     s = result["settings"]
     head = ("Reminders are on" if s["reminders"] else "Reminders are off") + (
         f"; a timed event without one: {s['default_reminder']} min before" if s["default_reminder"] is not None
-        else "; only the events' own")
+        else "; only the events' own") + ("; Join a minute before a meeting" if s["join_notice"] else "")
     import notice   # here: it imports this file
     now = dt.datetime.now().astimezone()
     r = notice.region.current()
@@ -170,7 +196,8 @@ def text(result):
     def at(a):   # the region's way: "Today 9:45", "Fri 6.11. 9:45 AM"
         t = dt.datetime.fromisoformat(a["at"])
         return f"{notice.day_name(t.date(), now.date(), r)} {notice.region.fmt(t, r['time'])}"
-    rows = [f"{at(a)}  {a['title']}: {notice.when(a, now)}  [{a['calendar_name']}]" for a in result["reminders"]]
+    rows = [f"{at(a)}  {'Join: ' if a.get('kind') == 'join' else ''}{a['title']}: {notice.when(a, now)}  "
+            f"[{a['calendar_name']}]" for a in result["reminders"]]
     return "\n".join([head + "."] + (rows or [f"None in the next {result['days']} day(s)."]))
 
 
@@ -197,6 +224,8 @@ def main(argv):
             takes = ", ".join(str(x) for x in settings.DEFAULT_CHOICES if x is not None)
             sys.exit(f"default takes none or {takes}.")
         settings.put("default_reminder", m)
+    elif cmd == "join" and len(args) == 2 and args[1] in ("on", "off"):
+        settings.put("join_notice", args[1] == "on")
     elif cmd != "list":
         sys.exit(__doc__)
     result = {"settings": settings.get(), "days": days, "reminders": upcoming(days)}

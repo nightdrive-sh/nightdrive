@@ -2,7 +2,8 @@
 """A reminder's notification, waiting for its buttons in a process of its own (remind.py starts it by systemd-run).
 
     notice.py one ALARM      one event: its title, when it starts and where; Open shows it in Calendar, Snooze
-                             brings it back in SNOOZE minutes
+                             brings it back in SNOOZE minutes, and Join, for one with a meeting link, opens the call
+                             (#3444). The join notification a minute before (kind "join") has Join and Open only
     notice.py many ALARMS    several at once (a computer that was off): one notification, Open shows today's agenda
 
 ALARM is remind.py's plan entry as JSON. When the event starts is written as it is at the moment the notification
@@ -75,6 +76,25 @@ def notify(tag, summary, body, actions):
     return out.strip() or None
 
 
+def actions(a):
+    """The buttons: Join first when there is a call to join, as it is what the notification is for a minute before"""
+    out = [("default", "Open")]
+    if (a.get("meeting") or {}).get("url"):
+        out.append(("join", "Join"))
+    out.append(("open", "Open"))
+    if a.get("kind") != "join":   # a minute before the start, five more would be too late
+        out.append(("snooze", "Snooze"))
+    return out
+
+
+def join(a):
+    """The call in the browser: only a web address, as it comes from whoever sent the invitation"""
+    url = ((a.get("meeting") or {}).get("url") or "").strip()
+    if url.lower().startswith(("https://", "http://")):
+        subprocess.run(["xdg-open", url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+
+
 def snooze(a):
     until = dt.datetime.now().astimezone() + dt.timedelta(minutes=SNOOZE)
     snoozed = remind.read(remind.SNOOZED, {})
@@ -87,9 +107,10 @@ def one(a):
     place = (a.get("location") or "").split("\n")[0]
     body = "\n".join(x for x in [when(a, now), place] if x)
     # The same tag for the same reminder: a snoozed one coming back takes the place of its row
-    pressed = notify(hashlib.sha1(a["key"].encode()).hexdigest()[:12], a["title"] or "An event", body,
-                     [("default", "Open"), ("open", "Open"), ("snooze", "Snooze")])
-    if pressed == "snooze":
+    pressed = notify(hashlib.sha1(a["key"].encode()).hexdigest()[:12], a["title"] or "An event", body, actions(a))
+    if pressed == "join":
+        join(a)
+    elif pressed == "snooze":
         snooze(a)
     elif pressed in ("default", "open"):   # a click on it, or its button
         subprocess.run([str(COMMAND), "open-event", a["calendar"], a["uid"], a["day"]])

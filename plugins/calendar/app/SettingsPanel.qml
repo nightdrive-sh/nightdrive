@@ -3,22 +3,24 @@ import Quickshell.Io
 import qs
 import qs.kit
 
-// Settings (⌘,, `calendar settings`): the reminders' notifications on or off, and the reminder a timed event without one
-// of its own gets. One row per choice, as Mail's: ↑ ↓ a row, ← → or a click changes it, Esc or ⌘, closes. The settings
+// Settings (⌘,, `calendar settings`): the reminders' notifications on or off, the reminder a timed event without one
+// of its own gets, and the notification with Join a minute before a meeting (#3444). One row per choice, as Mail's: ↑ ↓ a row, ← → or a click changes it, Esc or ⌘, closes. The settings
 // are the command's (`calendar reminders`, lib/settings.py), which the reminders' timer reads too: read from it on
 // open and after each change, so the panel shows what the timer will do.
 AppPanel {
     id: root
     required property var app
-    property var settings: ({ reminders: true, default_reminder: null })
+    property var settings: ({ reminders: true, default_reminder: null, join_notice: true })
     property int row: 0
     signal closed()
     readonly property var settingRows: [
         { key: "reminders", title: "Reminders", choices: [[true, "On"], [false, "Off"]],
-          hint: "An event's reminders as notifications, with Open and Snooze, also with the window closed" },
+          hint: "An event's reminders as notifications, with Open and Snooze (and Join for a meeting), also with the window closed" },
         { key: "default_reminder", title: "An event without a reminder",
           choices: [[null, "None"], [0, "At the start"], [5, "5 min"], [10, "10 min"], [15, "15 min"], [30, "30 min"], [60, "1 hour"]],
-          hint: "Before an event with a time that has no reminder of its own (all-day ones get none)" }
+          hint: "Before an event with a time that has no reminder of its own (all-day ones get none)" },
+        { key: "join_notice", title: "A minute before a meeting", choices: [[true, "Notify, with Join"], [false, "Nothing"]],
+          hint: "An event with a Teams, Meet, Zoom or Webex link: a notification with Join, unless its own reminder comes then" }
     ]
     visible: false
     cardWidth: Math.min(520, width - 24)
@@ -30,7 +32,8 @@ AppPanel {
     function set(key, value) {
         if (writer.running) return
         writer.command = [app.command, "reminders", "--json"].concat(
-            key === "reminders" ? [value ? "on" : "off"] : ["default", value === null ? "none" : String(value)])
+            key === "reminders" ? [value ? "on" : "off"] : key === "join_notice" ? ["join", value ? "on" : "off"]
+                : ["default", value === null ? "none" : String(value)])
         writer.running = true
     }
 
@@ -73,8 +76,8 @@ AppPanel {
             required property int index
             width: parent.width
             spacing: 10
-            // The default means nothing while the reminders are off: dimmed, still changeable
-            opacity: index === 1 && !root.settings.reminders ? 0.5 : 1
+            // The others mean nothing while the reminders are off: dimmed, still changeable
+            opacity: index > 0 && !root.settings.reminders ? 0.5 : 1
             Text { text: settingRow.modelData.title; color: settingRow.index === root.row ? root.c.title : root.c.text
                    font.family: root.c.font; font.pixelSize: 13 }
             // A Flow and a wrapping hint, so a narrow card takes the choices on more lines rather than past its edge
