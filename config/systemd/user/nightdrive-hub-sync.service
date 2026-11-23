@@ -1,0 +1,11 @@
+# One sync with Nightdrive Hub (nightdrive hub sync). Started by the timer of the same name. A Hub out of reach isn't a
+# failure (the changes wait); an error is, and a streak of them is one notification (hypr/scripts/unit_failed.py).
+[Unit]
+Description=Sync apps' files with Nightdrive Hub
+After=network-online.target
+OnFailure=nightdrive-unit-failed@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/nightdrive hub sync --quiet
+Nice=10
