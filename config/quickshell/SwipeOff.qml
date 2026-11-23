@@ -11,7 +11,7 @@ WheelHandler {
     signal gone()
 
     // --- Tunables (as NotificationCard's) ---
-    property real touchScale: 0.8          // the same as TouchScroll.qml
+    property real touchScale: 0.8          // the same as kit/Scroll.js TUNING.touchScale
     property real distance: 60             // px either way
     property real fadeOver: 240            // px: fully faded this far
     property real flickSpeed: 900          // px/s on release

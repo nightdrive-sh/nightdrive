@@ -1,4 +1,5 @@
 import QtQuick
+import qs
 
 // A labelled text of a few lines in a frame, for the panels (a task's note), as AppField is one line only. ⏎ is a new
 // line here, so Ctrl+⏎ comes out as save; Tab leaves for the next field rather than typing a tab, as in the panel's
@@ -21,6 +22,7 @@ Column {
         clip: true
         Flickable {
             id: flick
+            TouchScroll { view: flick }
             anchors.fill: parent; anchors.margins: 9; anchors.leftMargin: 10; anchors.rightMargin: 10
             contentWidth: width; contentHeight: edit.implicitHeight
             boundsBehavior: Flickable.StopAtBounds

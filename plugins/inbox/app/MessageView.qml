@@ -46,6 +46,7 @@ Item {
 
     Flickable {
         id: flick
+        TouchScroll { view: flick }
         anchors.top: bar.bottom; anchors.bottom: parent.bottom
         width: parent.width
         clip: true

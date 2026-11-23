@@ -52,6 +52,7 @@ AppSidebar {
 
     ListView {
         id: list
+        TouchScroll { view: list }
         Layout.fillWidth: true
         Layout.fillHeight: true
         Layout.leftMargin: 12

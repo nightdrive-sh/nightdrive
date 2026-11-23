@@ -93,7 +93,7 @@ Rectangle {
         id: swipe
 
         // --- Tunables ---
-        property real touchScale: 0.8          // the same as TouchScroll.qml
+        property real touchScale: 0.8          // the same as kit/Scroll.js TUNING.touchScale
         property real swipeDistance: 0.17      // of the card's width
         property real flickSpeed: 900          // px/s to the right on release
         property real direction: -1            // natural_scroll = false: fingers to the right give a negative delta

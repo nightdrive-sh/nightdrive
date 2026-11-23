@@ -160,6 +160,7 @@ Item {
                 }
                 ListView {
                     id: rows
+                    TouchScroll { view: rows }
                     visible: root.shownItems.length > 0
                     width: parent.width
                     height: Math.min(contentHeight, root.maxRows * root.rowHeight + 34)     // room for one heading ("Other apps")

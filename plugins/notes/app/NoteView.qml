@@ -91,6 +91,7 @@ Item {
 
     Flickable {
         id: flick
+        TouchScroll { view: flick }
         visible: !root.editing
         anchors.top: header.bottom; anchors.bottom: parent.bottom
         width: parent.width

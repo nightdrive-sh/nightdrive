@@ -44,6 +44,8 @@ Rectangle {
     Rectangle { anchors.left: parent.left; width: 1; height: parent.height; color: root.c.divider }
 
     Flickable {
+        id: previewFlick
+        TouchScroll { view: previewFlick }
         anchors.fill: parent
         anchors.leftMargin: 20; anchors.rightMargin: 18; anchors.topMargin: 18
         contentHeight: col.implicitHeight + 24

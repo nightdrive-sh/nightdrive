@@ -31,6 +31,7 @@ Item {
 
     ListView {
         id: view
+        TouchScroll { view: view }
         anchors.fill: parent
         anchors.topMargin: 36
         anchors.leftMargin: 6; anchors.rightMargin: 6

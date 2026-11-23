@@ -132,6 +132,7 @@ ColumnLayout {
 
     ListView {
         id: list
+        TouchScroll { view: list }
         visible: root.snaps.length > 0
         Layout.fillWidth: true
         Layout.preferredHeight: Math.min(contentHeight, 260)

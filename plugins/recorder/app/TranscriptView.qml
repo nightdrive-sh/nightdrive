@@ -157,6 +157,7 @@ Item {
 
         Flickable {
             id: flick
+            TouchScroll { view: flick }
             visible: tv.hasText
             Layout.fillWidth: true
             Layout.fillHeight: true

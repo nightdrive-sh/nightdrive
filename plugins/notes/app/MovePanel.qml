@@ -66,6 +66,7 @@ AppPanel {
 
     ListView {
         id: list
+        TouchScroll { view: list }
         width: parent.width
         height: Math.min(contentHeight, 36 * 7)
         clip: true
