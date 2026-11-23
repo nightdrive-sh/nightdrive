@@ -27,6 +27,9 @@ Singleton {
     // left out of the text shown.
     property bool dictated: false
     property bool unsure: false
+    // The finished request needs a look (AskClaudeUnsure.look, #3155): "unsure", "error" or "". Ask Claude's toast opens
+    // large for it instead of the small card's "answered"
+    readonly property string look: busy ? "" : Unsure.look(entries, dictated, unsure)
     property bool unseen: false          // an answer came while the toast was closed (the launcher's row says so)
     property double lastAt: 0
     // Ask Claude's toast (AskClaudeToast.qml) shows the conversation; the launcher's row and keys (AskClaudeLevels.qml)
@@ -53,7 +56,8 @@ Singleton {
         // The session's name (claude -n) is the request's start, to find it again in the Claude menu and /resume
         const line = q.split("\n")[0]
         const name = line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, "") + "…" : line
-        add({ kind: "you", text: q })
+        // heard: dictated, so the conversation says it is what was heard (AskClaudeThread)
+        add({ kind: "you", text: q, heard: !!dictated })
         s.dictated = !!dictated
         unsure = false
         proc.command = [script, "--stream"].concat(s.dictated ? ["--dictated"] : [],

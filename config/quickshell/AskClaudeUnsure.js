@@ -15,3 +15,17 @@ function strip(text) {
     const t = String(text || "")
     return unsure(t) ? t.replace(/^\s+/, "").slice(MARK.length).replace(/^\s+/, "") : t
 }
+
+// Whether a finished request needs the user's look (Dashboard #3155): "unsure" when Claude marked its answer, "error"
+// when the last request ended in an error (Claude couldn't answer, the tools aren't there), "" otherwise. Only a
+// dictated request counts: it was sent without a look at the text, so the toast opens large to show what was heard
+// (AskClaudeToast.qml); a typed one was seen as it was written and keeps the small card. A tool's failed step alone
+// doesn't count: Claude may go on and do it another way, and says so with the mark when it can't.
+function look(entries, dictated, unsure) {
+    if (!dictated) return ""
+    if (unsure) return "unsure"
+    const list = entries || []
+    let i = list.length - 1
+    while (i >= 0 && list[i].kind !== "you") i--
+    return list.slice(i + 1).some(e => e.kind === "error") ? "error" : ""
+}

@@ -44,7 +44,8 @@ Item {
         textFormat: Text.StyledText
         // The state bright, its detail dim: what you glance at first
         readonly property string head: st.session.busy ? "Claude is working"
-                                     : st.last.kind === "error" ? "Claude couldn't answer" : "Claude answered"
+                                     : st.last.kind === "error" ? "Claude couldn't answer"
+                                     : st.session.look === "unsure" ? "Claude asks" : "Claude answered"
         readonly property string tail: st.session.busy ? st.doing : st.last.kind === "error" ? "" : st.firstLine
         text: esc(head) + (tail !== "" ? "<font color='" + Theme.dim + "'>" + (st.session.busy ? "  ·  " : ": ")
                                          + esc(tail) + "</font>" : "")

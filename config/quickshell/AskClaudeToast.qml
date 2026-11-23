@@ -16,6 +16,9 @@ import "Words.js" as Words
 // - Esc, or a click beside it, closes it without stopping Claude; what was written stays in the field for next time.
 //   While Claude works, the card stays small (AskClaudeStatus.qml), and says for a while when it has answered; a click
 //   on it, or ⌘⌥Space (hypr/scripts/ask-claude --toggle), opens it again.
+// - A dictated request that ends in an error, or that Claude marked unsure (AskClaudeSession.look, #3155), opens it large
+//   with the keys instead: what was heard and Claude's question are in the conversation, to answer by writing or by
+//   dictating into the field. Not while you dictate into a window: it waits until that's done.
 //   qs ipc call askClaude dictating     a dictation to Claude has started
 //   qs ipc call askClaude draft TEXT    its text: sent, or into the field (after what was there) when the toast is open
 //   qs ipc call askClaude cancel        it gave no text
@@ -42,7 +45,13 @@ Toast {
     property bool listenOnly: false
     property bool grown: false            // the card has its Ask Claude size
     property bool answeredShown: false    // an answer came while it was closed: the small card says so for a while
-    readonly property bool working: !asking && (AskClaudeSession.busy || answeredShown)
+    // A dictated request's answer needs a look (AskClaudeSession.look): the toast opens large as soon as no dictation
+    // is typing into a window, which would otherwise type into its field
+    property bool lookPending: false
+    readonly property bool lookNow: lookPending && !asking && !vt.shown && !listening && AskClaudeSession.look !== ""
+    // Later, not in the handler: opening changes what lookNow is bound to (a binding loop)
+    onLookNowChanged: if (lookNow) Qt.callLater(() => { if (toast.lookNow) toast.open(panel.field.text) })
+    readonly property bool working: !asking && (AskClaudeSession.busy || answeredShown || lookPending)
     // The small card's content: the dictation's indicator while you speak, else Claude's state
     readonly property bool dictationCard: vt.shown
 
@@ -68,7 +77,11 @@ Toast {
     Binding { target: AskClaudeSession; property: "draft"; value: panel.field.text }
     Connections {
         target: AskClaudeSession
-        function onAnswered() { if (!toast.asking) { toast.answeredShown = true; answeredTimer.restart() } }
+        function onAnswered() {
+            if (toast.asking) return
+            if (AskClaudeSession.look !== "") toast.lookPending = true
+            else { toast.answeredShown = true; answeredTimer.restart() }
+        }
         function onShowRequested(text, send) { toast.request(text, send) }
         function onHideRequested() { toast.close() }
         function onDeleteBackRequested(word) { if (toast.takesKeys) Words.deleteBack(panel.field.edit, word) }
@@ -82,6 +95,7 @@ Toast {
         instant = true
         asking = true
         answeredShown = false
+        lookPending = false                 // opened anyway: it needn't open again once closed
         AskClaudeSession.unseen = false
         panel.field.begin(text)
         grown = true
@@ -140,6 +154,7 @@ Toast {
     // Say and forget: a new conversation that runs behind the small card. While an earlier request still runs nothing
     // can be sent, so the toast opens with the text in its field, with the error sound (as the launcher's request does).
     function send(text) {
+        lookPending = false
         if (AskClaudeSession.busy) { open(text); panel.refuse(); return }
         AskClaudeSession.reset()
         AskClaudeSession.ask(text, true)
