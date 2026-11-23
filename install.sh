@@ -412,6 +412,10 @@ echo "==> NetworkManager: the connectivity check \"No internet\" follows (config
 sudo install -Dm644 "$repo/config/system/nm-connectivity.conf" /etc/NetworkManager/conf.d/90-nightdrive-connectivity.conf
 sudo nmcli general reload conf 2>/dev/null || true
 
+echo "==> inotify: 1024 instances per user, not 128, or programs fail to start with EMFILE (config/system/sysctl-inotify.conf)"
+sudo install -Dm644 "$repo/config/system/sysctl-inotify.conf" /etc/sysctl.d/60-nightdrive-inotify.conf
+(( $(sysctl -n fs.inotify.max_user_instances) >= 1024 )) || sudo sysctl -q -p /etc/sysctl.d/60-nightdrive-inotify.conf
+
 # Fedora Minimal's firewall is a server's (see fw_desktop above). The desktop's, as on Fedora KDE: the FedoraWorkstation
 # zone, which lets in ports 1025–65535 (LocalSend, AirPlay, mDNS; Remote login's zone copies it), and polkit's desktop
 # rule, so an admin in the session changes it without a password. Linked the way firewalld's own install does it, which

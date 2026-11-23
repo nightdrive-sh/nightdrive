@@ -669,6 +669,9 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   that repository to them. Its signing key is checked by fingerprint before dnf trusts it (`nightdrive update` asks
   for sudo once to set this up on an existing install). Ghostty comes from there too, VNC Display's wayvnc
   (Fedora 44's is too old), and Quickshell, which the top bar runs on (Fedora 44's crashes on Hyprland 0.57).
+- **More inotify instances.** The installer (and `nightdrive update`) sets `fs.inotify.max_user_instances` to 1024
+  in `/etc/sysctl.d/60-nightdrive-inotify.conf`: Fedora's 128 runs out with the top bar, a few windows and terminals,
+  and the next program then fails to start with "Too many open files". A higher value of your own still wins.
 - **The Claude menu** reads your plan's limits with Claude Code's own sign-in, so Claude Code must have been run once.
 - **Claude writes (⌘⇧C)** sends the selected text (or what you type in its card), and the window's class and title, to
   Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers

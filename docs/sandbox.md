@@ -46,10 +46,11 @@ Two sessions in one checkout share its sandbox (its keys and open launcher too);
 folder name elsewhere), and `down` removes only this checkout's: `--name ID down` removes that one whatever it runs.
 `list` marks a container whose checkout is gone, e.g. a removed worktree: remove it with `--name ID down`.
 
-A sandbox takes about 1 GB of memory and some of your inotify instances (`fs.inotify.max_user_instances`): when those run
-out, a new sandbox's Hyprland starts with no output. `up` warns when memory or instances run short and says how many
-other sandboxes are up. The image is shared: it is tagged with a hash of the Containerfile and the package lists, so
-checkouts with the same ones use one image, and a branch that changes them builds its own beside it instead of over it.
+A sandbox takes about 1 GB of memory and some of your inotify instances (`fs.inotify.max_user_instances`, 1024 after
+`nightdrive update`): when those run out, a new sandbox's Hyprland starts with no output. `up` warns when memory or
+instances run short and says how many other sandboxes are up. The image is shared: it is tagged with a hash of the
+Containerfile and the package lists, so checkouts with the same ones use one image, and a branch that changes them builds
+its own beside it instead of over it.
 `nightdrive sandbox prune` removes the images no container uses.
 
 ## Display and VNC
