@@ -51,6 +51,26 @@ class TailnetTest(unittest.TestCase):
             self.assertEqual(o.get(), OWNER)
         self.assertEqual(ask.call_count, 2)
 
+    def test_requests_in_parallel_wait_for_the_first_ask(self):
+        # Right after a restart the page reconnects with its state and its stream at once: the one that doesn't ask
+        # must not take the login not yet known for a refusal (#3081)
+        o, asked = access.Owner(), threading.Event()
+
+        def slow_owner():
+            asked.set()
+            threading.Event().wait(0.2)     # tailscale status takes a moment
+            return OWNER
+
+        got = []
+        with mock.patch.object(access, "tailscale_owner", side_effect=slow_owner) as ask:
+            first = threading.Thread(target=lambda: got.append(o.get()))
+            first.start()
+            asked.wait(2)
+            got.append(o.get())
+            first.join()
+        self.assertEqual(got, [OWNER, OWNER])
+        self.assertEqual(ask.call_count, 1)
+
 
 class DemoTest(unittest.TestCase):
     def test_own_host_only(self):

@@ -17,6 +17,7 @@ import os
 import socket
 import struct
 import subprocess
+import threading
 import time
 
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
@@ -49,12 +50,17 @@ class Owner:
 
     def __init__(self):
         self.login, self.at = None, 0.0
+        self.lock = threading.Lock()
 
     def get(self):
-        if time.time() - self.at >= (OWNER_KEEP if self.login else OWNER_RETRY):
-            self.at = time.time()
-            self.login = tailscale_owner()
-        return self.login
+        # One request asks and the others wait for its answer. When `at` was set before the answer came, a request in
+        # parallel (a page reconnecting after a restart: its state and its stream) took the login not yet known for
+        # no one's and got a 403 (#3081)
+        with self.lock:
+            if time.time() - self.at >= (OWNER_KEEP if self.login else OWNER_RETRY):
+                self.login = tailscale_owner()
+                self.at = time.time()
+            return self.login
 
 
 def allowed_tailnet(headers, owner):
