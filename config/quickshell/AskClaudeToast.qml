@@ -24,6 +24,8 @@ import "Words.js" as Words
 //   qs ipc call askClaude cancel        it gave no text
 //   qs ipc call askClaude toggle        opens it with the conversation (a new one after AskClaudeSession.freshAfter),
 //                                       or closes it: "ok"
+//   qs ipc call askClaude open          opens it, as the notification of a turn that ended does (ask-claude.d/notify.sh)
+//   qs ipc call askClaude shown         "open" or "closed": whether that notification is needed
 Toast {
     id: toast
     property bool stepAside: false        // a password prompt or Claude's full card is up: they get the keys
@@ -202,5 +204,7 @@ Toast {
         function draft(text: string): void { toast.draft(text) }
         function cancel(): void { toast.cancel() }
         function toggle(): string { toast.toggle(); return "ok" }
+        function open(): string { if (!toast.asking) toast.reopen(); return "ok" }
+        function shown(): string { return toast.asking ? "open" : "closed" }
     }
 }

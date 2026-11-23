@@ -4,7 +4,8 @@ import QtQuick
 // Claude is still at it after Esc, and when it has answered, without a notification:
 //   🤖 Claude is working · Searching Deck…        (the robot breathes)
 //   🤖 Claude answered: Jazz plays now in …       (for a while, then the card goes; the launcher's row still says so)
-// A click on the card opens the toast again (the toast handles it).
+// A click on the card opens the toast again (the toast handles it); while Claude works, the ✕ at its end cancels the
+// turn (AskClaudeSession.stop(): its unit stops, #2244).
 Item {
     id: st
     property int maxWidth: 520
@@ -20,7 +21,8 @@ Item {
     readonly property var last: session.entries.length ? session.entries[session.entries.length - 1] : ({})
     readonly property string firstLine: ((last.text || "").split("\n").find(l => l.trim() !== "") || "").trim()
 
-    implicitWidth: Math.min(maxWidth, 16 + glyph.implicitWidth + 10 + label.implicitWidth + 18)
+    readonly property int cancelWidth: session.busy ? 30 : 0   // the ✕ and its gap
+    implicitWidth: Math.min(maxWidth, 16 + glyph.implicitWidth + 10 + label.implicitWidth + 18 + cancelWidth)
     implicitHeight: 48
 
     Text {
@@ -39,7 +41,7 @@ Item {
     Text {
         id: label
         anchors { left: glyph.right; leftMargin: 10; verticalCenter: parent.verticalCenter }
-        width: Math.min(implicitWidth, st.maxWidth - 16 - glyph.implicitWidth - 10 - 18)
+        width: Math.min(implicitWidth, st.maxWidth - 16 - glyph.implicitWidth - 10 - 18 - st.cancelWidth)
         elide: Text.ElideRight
         textFormat: Text.StyledText
         // The state bright, its detail dim: what you glance at first
@@ -52,5 +54,21 @@ Item {
         function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
         color: Theme.text
         font { family: Theme.font; pixelSize: 13 }
+    }
+    // Cancel: above the toast's own click (Toast.qml's MouseArea is under its body)
+    Text {
+        id: cancel
+        visible: st.session.busy
+        anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
+        text: Icons.g("x")
+        color: cancelArea.containsMouse ? Theme.warning : Theme.dim
+        font { family: Icons.family; pixelSize: 16 }
+        MouseArea {
+            id: cancelArea
+            anchors { fill: parent; margins: -8 }
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: st.session.stop()
+        }
     }
 }

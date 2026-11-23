@@ -13,11 +13,16 @@ in the browser), and the field to write back. ⌃C stops it,
 text dragged over with the mouse is copied with ⌘C,
 and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again, in manual mode: what the
 tools read came along, so each tool asks first until you change the mode (⇧Tab). Esc, or a click beside the
-toast, closes it without stopping Claude: a small card says it is working, then for a moment that it answered (the
-row says so too), and a click on it, or ⌘⌥Space, opens the toast again (⌘⌥Space anywhere opens it to write in).
-Claude Code works with Nightdrive's tools and nothing else (no shell, files, web pages, hooks or plugins of its own), so
-the card and Access below decide as always: a short card comes into the conversation (Enter allows, Esc denies), a long
-one on its own, and after 5 minutes a request is stopped. What the tools read (a mail, a note) comes along, so look at
+toast, closes it without stopping Claude: a small card says it is working (its ✕ cancels), then for a moment that it
+answered (the row says so too), and a click on it, or ⌘⌥Space, opens the toast again (⌘⌥Space anywhere opens it to write
+in). When Claude finishes with the toast closed, a notification says so, and its Open brings the conversation back. A
+request runs on its own, so it carries on through a restart of the desktop, which picks it up again.
+Claude Code works with Nightdrive's tools and nothing else (no shell, files, hooks or plugins of its own; the web only
+when Access › Web allows it, as Normal does), so the card and Access below decide as always. On the web it searches,
+reads pages and downloads files: audio, pictures, PDF and zip of at most 25 MB (200 MB a conversation), from public
+servers only, into the conversation's own folder in `~/.local/state/nightdrive/ask/`, kept for 7 days after its last
+turn. It never opens or reads them back, so a file can't tell it what to do. A short card comes into
+the conversation (Enter allows, Esc denies), a long one on its own, and after 15 minutes a request is stopped. What the tools read (a mail, a note) comes along, so look at
 what it asks then as in any session. Without the tools on, or without Claude Code, Ask Claude says so; ⌘⌃Enter opens a
 terminal.
 
@@ -212,7 +217,7 @@ Sending, devices, installing and turning Do Not Disturb on (it hides alerts) **a
 your choice: where all of an area's Modify or Delete is such, the choice is only *Ask* or *No*. Turning it off is a
 change with Undo. What Claude reads goes to Anthropic with its answer.
 
-**These choices cover only Nightdrive's tools.** What Claude Code may do with its own, running commands and editing
+**These choices cover only Nightdrive's tools** (and Web, Ask Claude's). What Claude Code may do with its own, running commands and editing
 files, is set in Claude Code, and a command can do what a tool here can't without asking: `nightmail` sends mail, `nightdrive
 mcp access level open` changes these choices. Keep Claude Code asking before commands: if your `~/.claude/settings.json`
 or `settings.local.json` allows any command (`Bash`, `Bash(*)`, or any arguments to a shell, an interpreter,
@@ -265,6 +270,7 @@ calendar_add "Family (icloud/family)"` one calendar, `forget open_address github
 | What's on screen | **a picture of a window** (the apps you tick: without asking) | | |
 | Apps and files | windows, newest files (in the folders it can use: a choice), Claude Code sessions, what's scheduled | open an app or a file, bring a window forward; make a folder, move or rename files (a folder, over 50 files or from one of its folders into another asks); open a web address (the first on each site asks; a redirect, a long query or `mailto:`: †); schedule a command or a message to Claude for later, also on arriving at or leaving a place † (`nightdrive schedule`: it shows as by Claude), cancel one | **files to the trash** |
 | Software | search, details, what an install would change | install a package, Flatpak or plugin † (from other repositories, unverified Flathub apps, others' plugins: choices) | **remove a package or Flatpak †** (what Nightdrive needs: a choice) |
+| Web (Ask Claude only) | search the web, read a page (Allow or No: nothing can ask in the background) | download a file into the conversation's own folder (audio, pictures, PDF, zip; not from your own network) | |
 
 Claude doesn't bring a window forward while you type, nor open an app, a file or an address: it waits until you pause
 for a second (half a minute at most, then Claude tries again later), so what you type doesn't land in another window.

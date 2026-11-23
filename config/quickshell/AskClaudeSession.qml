@@ -3,13 +3,19 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "AskClaudeTools.js" as Tools
+import "AskClaudeEvents.js" as Events
 import "AskClaudeUnsure.js" as Unsure
 
 // Ask Claude's conversation (Dashboard #1895): one at a time, kept here and shown by Ask Claude's toast
-// (AskClaudeToast.qml). Each request runs hypr/scripts/ask-claude --stream, which sets up Claude Code with Nightdrive's
-// tools only and passes its events on as they come; a request after the first goes on with the same session (--resume). The view reads `entries` and `live` (AskClaudeThread.qml).
+// (AskClaudeToast.qml). Each request runs hypr/scripts/ask-claude --start, which starts the turn as a systemd user unit
+// with Nightdrive's tools only (#2244) and returns; the turn's events come through the conversation's events.jsonl,
+// read here as it grows (AskClaudeEvents.js), so a turn goes on through Quickshell's restart and is picked up again
+// (ask-claude --current). A request after the first goes on with the same session (--resume). The view reads
+// `entries` and `live` (AskClaudeThread.qml).
 //   entries: [{ kind: "you", text }, { kind: "step", id, glyph, text, state: run | done | error | stop },
-//             { kind: "text", text }, { kind: "error", text }]
+//             { kind: "text", text }, { kind: "error", text }, { kind: "results", from, to }]
+// A turn's result cards (#2245) are the conversation's results.json (config/mcp/results.py), read into `cards`; the
+// "results" entry after a turn's answer shows those added while it ran (AskClaudeResults.qml).
 Singleton {
     id: s
 
@@ -22,14 +28,18 @@ Singleton {
     property string live: ""             // the answer's text as it is being written, added to entries when its block ends
     property string sessionId: ""
     property bool busy: false
-    // The last request was dictated (say and forget, #3122), and its answer so far begins with Claude's unsure mark
-    // (AskClaudeUnsure.js, #3154): Claude couldn't tell what was meant or a tool refused, and asks. The mark itself is
-    // left out of the text shown.
+    // The running or last turn was dictated (say and forget, #3122; its nightdrive_turn says so, AskClaudeEvents.js), and
+    // its answer so far begins with Claude's unsure mark (AskClaudeUnsure.js, #3154): Claude couldn't tell what was meant
+    // or a tool refused, and asks. The mark itself is left out of the text shown.
     property bool dictated: false
     property bool unsure: false
     // The finished request needs a look (AskClaudeUnsure.look, #3155): "unsure", "error" or "". Ask Claude's toast opens
     // large for it instead of the small card's "answered"
     readonly property string look: busy ? "" : Unsure.look(entries, dictated, unsure)
+    property double turnAt: 0            // the running or last turn's start (ms): its cards are those added since
+    property var cards: []               // results.json's cards
+    property var saved: ({})             // a card's Save, by its file: { name } or { error } (AskClaudeCard.qml)
+    readonly property string filesDir: sessionId !== "" ? stateDir + "/" + sessionId + "/files" : ""
     property bool unseen: false          // an answer came while the toast was closed (the launcher's row says so)
     property double lastAt: 0
     // Ask Claude's toast (AskClaudeToast.qml) shows the conversation; the launcher's row and keys (AskClaudeLevels.qml)
@@ -50,30 +60,29 @@ Singleton {
     // dictated: it came from a dictation without a look at it, so Claude gets the dictation's prompt (ask-claude --dictated)
     function ask(text, dictated) {
         const q = text.trim()
-        if (q === "" || busy) return false
+        if (q === "" || busy || starter.running) return false
         if (sessionId !== "" && Date.now() - lastAt > freshAfter) reset()
         const first = sessionId === ""
         // The session's name (claude -n) is the request's start, to find it again in the Claude menu and /resume
         const line = q.split("\n")[0]
         const name = line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, "") + "…" : line
-        // heard: dictated, so the conversation says it is what was heard (AskClaudeThread)
-        add({ kind: "you", text: q, heard: !!dictated })
-        s.dictated = !!dictated
-        unsure = false
-        proc.command = [script, "--stream"].concat(s.dictated ? ["--dictated"] : [],
-                                                   first ? ["--name", name] : ["--resume", sessionId], ["--", q])
+        pending = q
+        starter.command = [script, "--start"].concat(dictated ? ["--dictated"] : [],
+                                                     first ? ["--name", name] : ["--resume", sessionId], ["--", q])
         busy = true
-        proc.running = true
+        starter.running = true
         return true
     }
+    // ⌃C, the small card's Cancel: the unit stops, and its end comes through the events (or now, when it never started)
     function stop() {
         if (!busy) return
-        proc.running = false
-        add({ kind: "error", text: "Stopped" })
+        Quickshell.execDetached([script, "--cancel"])
     }
     function reset() {
-        if (busy) proc.running = false
-        entries = []; live = ""; sessionId = ""; unseen = false; unsure = false
+        if (busy) stop()
+        tail.running = false
+        entries = []; live = ""; sessionId = ""; unseen = false; busy = false; unsure = false
+        cards = []; saved = ({}); cardsText = ""
     }
 
     function add(e) { entries = entries.concat([e]) }
@@ -88,41 +97,106 @@ Singleton {
         if (dictated) unsure = Unsure.unsure(t)
         add({ kind: "text", text: dictated ? Unsure.strip(t) : t })
     }
-
-    // One line of claude's stream-json, or the script's own nightdrive_error
-    function read(line) {
-        let ev
-        try { ev = JSON.parse(line) } catch (e) { return }
-        if (ev.type === "system" && ev.subtype === "init" && ev.session_id) sessionId = ev.session_id
-        else if (ev.type === "stream_event") {
-            const e = ev.event || {}
-            const b = e.content_block || {}
-            if (e.type === "content_block_start" && b.type === "tool_use")
-                add(Object.assign({ kind: "step", id: b.id, name: b.name, state: "run" }, Tools.step(b.name, null)))
-            else if (e.type === "content_block_delta" && e.delta && e.delta.type === "text_delta") live += e.delta.text
-            else if (e.type === "content_block_stop") flush()
-        } else if (ev.type === "assistant") {
-            // The whole message once it's done: a step's arguments are known now, to say what it is done on
-            for (const c of (ev.message && ev.message.content) || [])
-                if (c.type === "tool_use") update(e => e.kind === "step" && e.id === c.id, e => Tools.step(e.name, c.input))
-        } else if (ev.type === "user") {
-            for (const c of (ev.message && ev.message.content) || [])
-                if (c.type === "tool_result") update(e => e.kind === "step" && e.id === c.tool_use_id, e => ({ state: c.is_error ? "error" : "done" }))
-        } else if (ev.type === "result" && ev.is_error) add({ kind: "error", text: ev.result || "Claude couldn't answer" })
-        else if (ev.type === "nightdrive_error")
-            add({ kind: "error", text: ev.message === "notools" ? "Claude Code or Nightdrive's tools aren't set up here: Cmd+Enter opens a terminal"
-                                                                : ev.message })
+    // A turn's end (AskClaudeEvents.js): an earlier one read again after a restart isn't news
+    function ended(at) {
+        lastAt = at
+        if (at >= watchedFrom) answered()
     }
 
+    // results.json again: after a tool's result (results_add's among them) and at a turn's end (AskClaudeEvents.js), as
+    // well as on the file's change, which a file swapped in whole (results.py's save) may not report
+    function reloadCards() { if (sessionId !== "") resultsFile.reload() }
+    property string cardsText: ""        // what `cards` was read from: the same text again changes nothing on screen
+    function readCards(text) {
+        if (text === cardsText) return
+        cardsText = text
+        let list = []
+        try { const d = JSON.parse(text); if (d && Array.isArray(d.cards)) list = d.cards.filter(c => c && typeof c === "object") } catch (e) {}
+        cards = list
+    }
+    // A card's Save (ask-claude save ID FILE): into Downloads under a free name, with its source (ask-claude.d/save.py)
+    function save(file) {
+        if (sessionId === "" || !file) return
+        const p = saveProc.createObject(s, { file: file, command: [script, "save", sessionId, file] })
+        p.running = true
+    }
+    Component {
+        id: saveProc
+        Process {
+            id: sp
+            property string file: ""
+            stdout: StdioCollector { id: spOut }
+            stderr: StdioCollector { id: spErr }
+            onExited: code => {
+                let r = {}
+                try { r = JSON.parse(spOut.text) } catch (e) {}
+                const done = Object.assign({}, s.saved)
+                done[sp.file] = code === 0 && r.name ? { name: r.name }
+                              : { error: spErr.text.trim().split("\n").pop() || "Couldn't save it" }
+                s.saved = done
+                sp.destroy()
+            }
+        }
+    }
+    FileView {
+        id: resultsFile
+        path: s.sessionId !== "" ? s.stateDir + "/" + s.sessionId + "/results.json" : ""
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: s.readCards(text())
+        onLoadFailed: s.readCards("")
+    }
+
+    // Reads the conversation's events from its first line: what a restart lost comes back, and the file's later turns
+    // as they're written. -F waits for a file not there yet
+    property double watchedFrom: 0
+    function watch(id) {
+        if (sessionId === id && tail.running) return
+        tail.running = false
+        entries = []; live = ""; cards = []; saved = ({}); cardsText = ""
+        sessionId = id
+        watchedFrom = Date.now() - 2000   // a turn that ends as this starts still counts as news
+        tail.command = ["tail", "-n", "+1", "-F", stateDir + "/" + id + "/events.jsonl"]
+        tail.running = true
+    }
+
+    readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/nightdrive/ask"
+    property string pending: ""          // the request being started, shown with the error when it can't start
+
+    // --start: {"id"} once the turn runs, or {"error"}
     Process {
-        id: proc
-        stdout: SplitParser { onRead: line => s.read(line) }
-        onExited: {
-            s.flush()
-            s.update(e => e.kind === "step" && e.state === "run", e => ({ state: "stop" }))
-            s.busy = false
-            s.lastAt = Date.now()
-            s.answered()
+        id: starter
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let r = {}
+                try { r = JSON.parse(text) } catch (e) {}
+                if (r.id) { s.watch(r.id); return }
+                s.busy = false
+                s.add({ kind: "you", text: s.pending })
+                s.add({ kind: "error", text: r.error === "notools" ? Events.NOTOOLS
+                                           : r.error === "busy" ? "Claude is still working on another request"
+                                           : r.error || "Claude couldn't start" })
+                s.answered()
+            }
+        }
+    }
+    Process {
+        id: tail
+        stdout: SplitParser { onRead: line => Events.read(s, line) }
+    }
+    // After Quickshell's restart: the conversation that runs, or a recent one, comes back as it was
+    Process {
+        id: current
+        command: [s.script, "--current"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let r = {}
+                try { r = JSON.parse(text) } catch (e) {}
+                if (!r.id || s.sessionId !== "") return
+                if (r.running || Date.now() - r.last < s.freshAfter) { s.watch(r.id); s.lastAt = r.last }
+            }
         }
     }
 }

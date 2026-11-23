@@ -26,6 +26,7 @@ the private areas); change → the level's; act is gone, the card's Ask is built
     access.py                                  what applies, as JSON (the Access window and the launcher read it)
     access.py level strict|normal|open         a level: your own values go back to it
     access.py set AREA read|modify|delete allow|ask|no
+    access.py value AREA read|modify|delete    what applies to one right: allow, ask or no (ask-claude: the web)
     access.py option AREA OPTION on|off
     access.py option AREA OPTION add|remove VALUE      a list choice
     access.py allowed                          what the user allowed once for good, a tool and its key a line (#1929)
@@ -38,6 +39,7 @@ import re
 import sys
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -85,8 +87,10 @@ class Access:
         return preset(self.level, area, right)
 
     def value(self, area, right):
-        """The right's value as set: the user's own, else the level's."""
-        return self.own.get(area, {}).get(right) or self.preset(area, right)
+        """The right's value as set: the user's own, else the level's. One the right can't have (Ask for the web's
+        Read, written by hand) is No: nothing could ask, and what can't be done mustn't open more."""
+        value = self.own.get(area, {}).get(right) or self.preset(area, right)
+        return value if value in areas.choices(area, right) else "no"
 
     def decide(self, cls, area, right):
         """allow, ask or no for a call of a tool of this class and right in this area. A tool with consequences
@@ -112,7 +116,7 @@ class Access:
         """What applies now, for the Access window and the launcher: every area that has tools, with its rights, and
         each right's tools; a right without tools isn't there. tools: registry's Tool objects (the installed ones)."""
         by_area = {}
-        for t in tools:
+        for t in list(tools) + builtin_tools():
             by_area.setdefault(t.area, {}).setdefault(t.right, []).append(t)
         names = [a for a in AREAS if a in by_area] + sorted(a for a in by_area if a not in AREAS)
         rows = []
@@ -129,7 +133,7 @@ class Access:
                     "value": shown(self.value(a, r)), "preset": shown(self.preset(a, r)),
                     "own": shown(self.value(a, r)) != shown(self.preset(a, r)),
                     # Allow isn't offered where every tool asks anyway: it would say something that isn't so
-                    "choices": ["ask", "no"] if consequential else list(VALUES),
+                    "choices": ["ask", "no"] if consequential else list(areas.choices(a, r)),
                     "words": areas.words(a, r),
                     "tools": [{"name": t.name, "title": t.spec.get("title") or t.name,
                                "asks": t.cls == "act", "undo": t.cls == "change"} for t in found],
@@ -143,6 +147,13 @@ class Access:
         # custom: a level the user has changed shows as Custom, not as that level (#1902); level stays the one it's from
         return {"file": str(FILE), "chosen": FILE.exists(), "level": self.level, "levels": list(LEVELS),
                 "own": own, "custom": own > 0, "areas": rows, **({"problem": self.problem} if self.problem else {})}
+
+
+def builtin_tools():
+    """Claude Code's own tools an area's right turns on (the web's WebSearch and WebFetch), shaped as registry's
+    Tool objects for the summary: they read, and neither ask nor undo."""
+    return [SimpleNamespace(area=a, right=r, cls="read", name=t["name"], spec={"title": t["title"]})
+            for a in AREAS for r in RIGHTS for t in areas.builtin(a, r)]
 
 
 def from_v1(data, path):
@@ -295,6 +306,9 @@ def set_value(area, right, value, path=FILE):
         raise ValueError(f"unknown right {right!r}: {', '.join(RIGHTS)}")
     if value not in VALUES:
         raise ValueError(f"unknown value {value!r}: {', '.join(VALUES)}")
+    if value not in areas.choices(area, right):
+        raise ValueError(f"{area} {right} is {' or '.join(areas.choices(area, right))}: Claude Code can't ask about "
+                         "its own tools in the background")
     now = load(path)
     now.own.setdefault(area, {})[right] = value
     write(now, path)
@@ -332,7 +346,8 @@ def installed_tools():
 
 def main(argv):
     usage = ("usage: access.py [level strict|normal|open | set AREA read|modify|delete allow|ask|no | "
-             "option AREA OPTION on|off | option AREA LIST add|remove VALUE | allowed | forget TOOL [KEY]]")
+             "value AREA read|modify|delete | option AREA OPTION on|off | option AREA LIST add|remove VALUE | "
+             "allowed | forget TOOL [KEY]]")
     try:
         if not argv:
             json.dump(load().summary(installed_tools()), sys.stdout, ensure_ascii=False, indent=2)
@@ -341,6 +356,8 @@ def main(argv):
             set_level(argv[1])
         elif argv[0] == "set" and len(argv) == 4:
             set_value(*argv[1:])
+        elif argv[0] == "value" and len(argv) == 3 and argv[2] in RIGHTS:
+            print(load().value(*argv[1:]))
         elif argv[0] == "option" and len(argv) in (4, 5):
             set_option(*argv[1:])
         elif argv[0] == "allowed" and len(argv) == 1:

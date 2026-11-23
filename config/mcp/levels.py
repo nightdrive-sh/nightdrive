@@ -4,7 +4,8 @@ apart (plan: Dashboard #1761, the model #1831; Normal is the security review's d
 
     strict   only Nightdrive's docs and status: Claude explains how things work
     normal   the default. Reading what is private (mail, people, calendar, notes, notifications, the picture of a
-             window) asks each time; the rest is allowed. Changes run at once with Undo, deleting asks everywhere
+             window) asks each time; the rest is allowed. Changes run at once with Undo, deleting asks everywhere.
+             The web (Ask Claude's search and pages, its downloads) is allowed, as in a terminal (log 4035)
     open     everything allowed
 Whatever the level, a tool with consequences (sending, devices, installing: class act) is at most Ask: Allow for its
 right still shows the card, since that card is all that stands between a mail Claude read and one it sends.
@@ -14,7 +15,7 @@ secrets, #1789) are on or off by level too: OPTIONS. A list choice is empty at e
 its entries (the folders Claude can use, #1849).
 """
 
-from areas import RIGHTS
+from areas import AREAS, RIGHTS, choices
 
 VALUES = ("allow", "ask", "no")
 
@@ -98,3 +99,5 @@ def option_preset(level, area, option):
 
 assert all(set(LEVELS[l]["default"]) == set(RIGHTS) for l in LEVELS)
 assert all(set(v) == set(LEVELS) for o in OPTIONS.values() for v in o.values())
+# A right with fewer values (the web's Read: Allow or No) gets one of them from every level
+assert all(preset(l, a, r) in choices(a, r) for l in LEVELS for a in AREAS for r in RIGHTS)
