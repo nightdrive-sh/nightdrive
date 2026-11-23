@@ -23,10 +23,13 @@ nightdrive hub leave                             # stop syncing; the files stay
   the other value goes at the end of the task's notes; a field cleared on one side and changed on the other keeps the
   change. The client keeps that agreed version itself (`~/.local/state/nightdrive/hub/base/`), as the Hub serves only
   the newest.
-- With no agreed version (a first sync, a new Hub) both are kept: the Hub's stays in place and this computer's becomes a
-  task of its own, its title followed by the computer's name.
-- A new Hub (another server id) or a first sync: files with the same content match, differing ones are both kept, and
-  nothing is deleted on either side.
+- With no agreed version (a first sync) both are kept: the Hub's stays in place and this computer's becomes a task of
+  its own, its title followed by the computer's name.
+- A new Hub (another server id), a Hub restored from a copy, or one put back by hand (its newest version older than
+  one this computer has seen): a fresh start. Files with the same content match, nothing is deleted on either side, and
+  the manifest from before tells which side of a difference is newer (`lib/fresh.py`: it keeps a few earlier contents
+  of each file), so an older copy on the Hub doesn't roll an edit back and a newer one is taken. Only two that both
+  changed are merged or kept both.
 - Many files gone at once (over 20 and over half) are held back: `sync --allow-deletes` sends them. A folder gone
   altogether (a disk not mounted) stops its sync until it is back.
 - A Hub out of reach isn't an error: the changes wait and go with the next sync.
@@ -38,11 +41,13 @@ nightdrive hub leave                             # stop syncing; the files stay
 | `lib/cli.py` | the command, status, timer |
 | `lib/sync.py` | one sync of one collection: first from the Hub, then to it |
 | `lib/manifest.py` | what this computer and the Hub last agreed on (`~/.local/state/nightdrive/hub/<collection>.json`) |
+| `lib/fresh.py` | a fresh start's choice: which side of a difference is newer |
 | `lib/bases.py` | the content of that agreement, kept for a merge (`…/hub/base/<collection>/`) |
 | `lib/client.py` | the Hub's requests |
 | `lib/apps.py`, `lib/tasks_rule.py` | each app's folder and its answer to a conflict or a deletion |
 | `lib/settings.py` | `~/.config/nightdrive/hub.json` (the Hub joined), the state folder, the lock |
 | `lib/testhub.py`, `lib/devices.py` | for the tests: a Hub in memory, devices with homes of their own |
+| `lib/newhub_test.py` | a Hub replaced or restored, against the Hub in memory and the real one |
 
 `e2e_test.py` runs the sync scenarios against the real Hub when its checkout is in `~/Projects/nightdrive-hub` (or
 `NIGHTDRIVE_HUB_SRC`), as `merge_sync_test.py` does its merges; the other tests need nothing.
