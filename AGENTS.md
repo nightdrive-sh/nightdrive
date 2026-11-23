@@ -32,6 +32,8 @@ command, and ends with `--name ID down`. `nightdrive sandbox list` shows them al
 - Menu icons are invisible private-use glyphs in strings. Don't retype those lines, and compare the glyph counts with HEAD.
   (The top bar uses icon names instead: `config/topbar/scripts/icon`.)
 - `pkill -f foo` matches its own shell: use `'[f]oo'`.
+- A new file that `link.sh` links (a unit, a command) isn't on this machine until `link.sh` runs: `nightdrive update` runs
+  it for users, but a commit in this tree doesn't. Run `./link.sh` after adding one (#3313's unit missed it, #3364).
 - Hyprland's config is Lua: `hyprctl dispatch 'hl.dsp.…'`.
 - Quickshell's reload on save keeps the old version of a component in its own file (e.g. `TouchScroll.qml`, listed in
   `qmldir`), and doesn't reload a plugin's menu at all: restart it to test a change there with

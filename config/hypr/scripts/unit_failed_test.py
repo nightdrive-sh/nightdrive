@@ -5,6 +5,7 @@ nmcli, systemd-run and notify-send stubbed: a throwaway home, no notification sh
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -181,6 +182,57 @@ class Command(unittest.TestCase):
         p = subprocess.run([sys.executable, "-I", CMD], env=self.env, capture_output=True, text=True)
         self.assertNotEqual(p.returncode, 0)
         self.assertIn("unit-failed UNIT", p.stderr)
+
+
+class InstallTest(unittest.TestCase):
+    """The notice only works once its template is in ~/.config/systemd/user: without it systemd logs "Failed to enqueue
+    OnFailure=… not found" and nothing shows (#3364). link.sh installs it, and `nightdrive update` runs link.sh."""
+
+    REPO = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
+    UNITS = os.path.join(REPO, "config", "systemd", "user")
+    TEMPLATE = "nightdrive-unit-failed@.service"
+
+    def read(self, *path):
+        with open(os.path.join(self.REPO, *path)) as f:
+            return f.read()
+
+    def linked(self):
+        """The config/systemd/user files link.sh links: its units=( … ) list and its own link lines."""
+        text = self.read("link.sh")
+        names = set(re.search(r"^units=\(([^)]*)\)", text, re.M).group(1).split())
+        names |= set(re.findall(r'^link "\$repo/config/systemd/user/([^/"]+)"', text, re.M))
+        return names
+
+    def test_link_sh_installs_every_unit_of_the_repo(self):
+        # A new unit there that link.sh leaves out reaches nobody's ~/.config/systemd/user
+        here = {f for f in os.listdir(self.UNITS) if os.path.isfile(os.path.join(self.UNITS, f))}
+        self.assertIn(self.TEMPLATE, here)
+        self.assertEqual(here - self.linked(), set())
+
+    def test_link_sh_reloads_systemd_after_linking(self):
+        # A unit linked after the daemon-reload would be "not found" until the next login
+        text = self.read("link.sh")
+        self.assertLess(text.index('for u in "${units[@]}"; do link'), text.index("systemctl --user daemon-reload"))
+
+    def test_update_runs_link_sh(self):
+        self.assertIn('"$r/link.sh"', self.read("bin", "nightdrive.d", "update.sh"))
+
+    def test_every_on_failure_names_the_whole_unit(self):
+        # %n is the failed unit's whole name (nightdrive-mail-sync.service): the template's %i passes it on as such, and
+        # unit-failed gives it to journalctl -u and systemctl show. A doubled .service.service is that, not a mistake.
+        self.assertIn("unit-failed %i", self.read("config", "systemd", "user", self.TEMPLATE))
+        units = [os.path.join(self.UNITS, f) for f in os.listdir(self.UNITS)]
+        plugins = os.path.join(self.REPO, "plugins")
+        for p in os.listdir(plugins):
+            d = os.path.join(plugins, p, "systemd")
+            units += [os.path.join(d, f) for f in os.listdir(d)] if os.path.isdir(d) else []
+        lines = []
+        for u in units:
+            if os.path.isfile(u):
+                with open(u) as f:
+                    lines += [ln.strip() for ln in f if ln.startswith("OnFailure=nightdrive-unit-failed@")]
+        self.assertTrue(lines)
+        self.assertEqual(set(lines), {"OnFailure=nightdrive-unit-failed@%n.service"})
 
 
 if __name__ == "__main__":
