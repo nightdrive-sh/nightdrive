@@ -3,11 +3,12 @@ import Quickshell
 import Quickshell.Io
 import "Format.js" as Format
 
-// Files on the desktop's clipboard, shared with other apps: y / ⌘C and x / ⌘X put them there as text/uri-list, the
-// type browsers, chats and Nautilus paste files from (wl-copy offers one type, and a text/ one comes with text/plain,
-// so a terminal pastes the URLs). A cut is the same on the clipboard, and Files remembers it: pasted while those are
-// still what the clipboard holds, they move, and the clipboard is cleared. p / ⌘V reads what is there: Nautilus's
-// x-special/gnome-copied-files first (it says copy or cut), else text/uri-list.
+// Files on the desktop's clipboard, shared with other apps: y / ⌘C and x / ⌘X offer them as files and as text at once
+// (lib/clipboard.py, #3304), and the one who pastes picks: Files and Nautilus take x-special/gnome-copied-files (it says
+// copy or cut), other file browsers and chats text/uri-list, a terminal or a text field the paths (text/plain), and
+// Mail's message attaches them. Files remembers a cut too: pasted while those are still what the clipboard holds, they
+// move, and the clipboard is cleared. p / ⌘V reads what is there: an archive's members, else
+// x-special/gnome-copied-files, else text/uri-list.
 QtObject {
     id: root
     required property var app              // the window: say(), ops
@@ -15,11 +16,9 @@ QtObject {
     readonly property var cut: shared.cut   // the paths of the last cut, while the clipboard still holds them
     readonly property var cutSet: { const s = {}; for (const p of cut) s[p] = true; return s }
 
-    function uris(paths) { return paths.map(Format.url).join("\r\n") + "\r\n" }
-
     function copy(paths, isCut) {
         if (!paths.length) return
-        Quickshell.execDetached(["wl-copy", "--type", "text/uri-list", "--", uris(paths)])
+        Quickshell.execDetached(["python3", Quickshell.shellDir + "/../lib/clipboard.py", isCut ? "cut" : "copy", "--"].concat(paths))
         shared.cut = isCut ? paths.slice() : []
         app.say((isCut ? "Cut " : "Copied ") + (paths.length === 1 ? Format.base(paths[0]) : paths.length + " items"))
     }

@@ -38,9 +38,11 @@ QtObject {
             return true
         }
 
+        // ⌘C and ⌘V come as Ctrl+Insert and Shift+Insert (bindings.lua: copy and paste in every app, terminals too)
+        if (k === Qt.Key_Insert && shift && !ctrl) { a.acts.paste(); return true }
         // With ⌘ (Ctrl)
         if (ctrl) {
-            if (k === Qt.Key_C) a.acts.copy(false)
+            if (k === Qt.Key_C || k === Qt.Key_Insert) a.acts.copy(false)
             else if (k === Qt.Key_X) a.acts.copy(true)
             else if (k === Qt.Key_V) a.acts.paste()
             else if (k === Qt.Key_O) a.openPicked(true)

@@ -30,7 +30,7 @@ found by a search for "files" or "nautilus" after Files.
 | `.` | Hidden files (⌘⇧. too) |
 | `s` `S` | Sort by name, time, size or type; the other way round (a click on a column's title too) |
 | `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, Esc unmarks. With the mouse Ctrl-click (the Control key: ⌘-click moves the window) marks one, ⇧-click the files from the one last clicked or picked to it (in place of the marks before), ⌘⇧-click adds them; in a filter or a search only the files shown |
-| `y` `x` `p` or ⌘C ⌘X ⌘V | Copy, cut, paste here: the marked files, else the picked one |
+| `y` `x` `p` or ⌘C ⌘X ⌘V | Copy, cut, paste here: the marked files, else the picked one. A copy pastes as the files in a file browser, as their paths (one a line) in a terminal or a text field, and as attachments in Mail |
 | `d` or ⌘⌫ | To the trash |
 | `r` or F2 | Rename (the name without its ending is picked) |
 | `a` | A new file; a name ending in `/` makes a folder (⌘⇧N: a folder) |
