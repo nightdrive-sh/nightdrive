@@ -26,7 +26,10 @@ let go: what you said is sent at once, as a new request, and you can go on with 
 bar shows Claude working and then, for a moment, its answer; a click on it opens the conversation. With Ask Claude's
 toast open, what you dictate goes into its field instead, to check before Enter sends it. While Claude is still busy with
 an earlier request, the toast opens with what you said in the field. Without the tools on, it goes to Claude Code in a
-terminal.
+terminal. A request sent this way tells Claude it was dictated: Claude reads past the dictation's usual mistakes
+(product names spelled the Finnish way, words split wrong), makes "remind me …" (muistuta) a reminder and "idea …" a
+task in the Tasks list Ideas (Ideat in Finnish), and when it can't tell what you meant, or a tool refused, it doesn't
+guess but asks: its answer then begins with `[?]` (defined in `quickshell/AskClaudeUnsure.js`).
 
 The tools come from `nightdrive mcp`, an MCP server on your own computer. Each tool runs a command an app already has
 (`nightmail`, `contacts`, `deck`, `tasks`…), so nothing is there only for Claude, and everything works without Claude too.

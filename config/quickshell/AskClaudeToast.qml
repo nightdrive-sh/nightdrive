@@ -142,7 +142,7 @@ Toast {
     function send(text) {
         if (AskClaudeSession.busy) { open(text); panel.refuse(); return }
         AskClaudeSession.reset()
-        AskClaudeSession.ask(text)
+        AskClaudeSession.ask(text, true)
     }
 
     // Voxtype is done (or never started) but the text hasn't come (dictate gave up, or its cancel was lost): don't

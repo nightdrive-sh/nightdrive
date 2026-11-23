@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Ask Claude's background run (#1886): `python3 config/mcp/ask_claude_test.py`. The script runs against stand-ins for
 claude, notify-send and the rest, in a home of its own: every notification's texts come after --, so an answer or a
-request that begins with --app-name= or --icon= is shown as text instead of changing the notification, and the
-background session skips the user's settings files (hooks, plugins) but keeps the model they chose."""
+request that begins with --app-name= or --icon= is shown as text instead of changing the notification, the
+background session skips the user's settings files (hooks, plugins) but keeps the model they chose, and a dictated
+request (--dictated, #3154) gets the dictation's prompt with the unsure mark AskClaudeUnsure.js defines."""
 
 import json
 import os
+import re
 import stat
 import subprocess
 import tempfile
@@ -14,6 +16,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SCRIPT = HERE.parent / "hypr/scripts/ask-claude"
+UNSURE_JS = HERE.parent / "quickshell/AskClaudeUnsure.js"
 
 # Each stand-in writes its arguments as one JSON line to $LOG; claude answers with $ANSWER as Claude Code's JSON
 STUB = """#!/usr/bin/env python3
@@ -53,10 +56,10 @@ class AskClaude(unittest.TestCase):
     def settings(self, value):
         (self.home / ".claude/settings.json").write_text(json.dumps(value))
 
-    def ask(self, prompt, answer):
+    def ask(self, prompt, answer, *flags):
         env = {"HOME": str(self.home), "PATH": f"{self.bin}:{os.environ['PATH']}", "LOG": str(self.log),
                "ANSWER": answer, "XDG_RUNTIME_DIR": str(self.tmp / "run")}
-        subprocess.run([str(SCRIPT), "--", prompt], env=env, check=True, timeout=30)
+        subprocess.run([str(SCRIPT), *flags, "--", prompt], env=env, check=True, timeout=30)
         calls = [json.loads(line) for line in self.log.read_text().splitlines()]
         return [c[1:] for c in calls if c[0] == "claude"], [c[1:] for c in calls if c[0] == "notify-send"]
 
@@ -100,6 +103,25 @@ class AskClaude(unittest.TestCase):
         (self.home / ".claude/settings.json").write_text("{ not json")
         claude, _ = self.ask("hello", "Hi.")
         self.assertNotIn("--model", claude[0])
+
+    def system(self, args):
+        return args[args.index("--append-system-prompt") + 1]
+
+    def test_dictated_request_gets_the_dictation_prompt_and_mark(self):
+        mark = re.search(r'^var MARK = "(.*)"$', UNSURE_JS.read_text(), re.M).group(1)
+        claude, _ = self.ask("muistuta huomenna", "Done.", "--dictated")
+        system = self.system(claude[0])
+        self.assertIn("This request was dictated", system)
+        self.assertIn("remind_add", system)
+        self.assertIn(f"with {mark} and a space", system)
+        self.assertNotIn("@MARK@", system)
+        self.assertEqual(claude[0][-2:], ["--", "muistuta huomenna"])
+
+    def test_typed_request_has_no_dictation_prompt(self):
+        claude, _ = self.ask("muistuta huomenna", "Done.")
+        system = self.system(claude[0])
+        self.assertNotIn("dictated", system)
+        self.assertNotIn("@MARK@", system)
 
 
 if __name__ == "__main__":

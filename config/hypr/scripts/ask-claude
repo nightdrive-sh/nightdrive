@@ -12,6 +12,8 @@
 #       for Ask Claude's toast (quickshell/AskClaudeSession.qml): Claude's events as they come, one JSON
 #       object a line (claude's stream-json), no notifications; --resume ID goes on with that conversation. A failure
 #       ends with {"type":"nightdrive_error","message":…}; "notools" when Claude Code or the tools are missing.
+#   ask-claude --dictated …           the request was dictated (Ask Claude's "say and forget", #3154): the dictation's
+#                                     prompt too (ask-claude-dictated.txt), with its unsure mark (AskClaudeUnsure.js)
 #   ask-claude --ready                exit 0 when Ask Claude's toast can run: Claude Code and the tools are there
 #                                     (hypr/scripts/dictate, which otherwise takes a dictated question to a terminal)
 readonly LIMIT=300        # seconds Claude gets for one request, cards included; then it is stopped
@@ -29,11 +31,12 @@ server() {
          | { type: "stdio", command, args }' "$HOME/.claude.json" 2>/dev/null
 }
 
-name=; stream=0; resume=
+name=; stream=0; resume=; dictated=0
 while (( $# )); do
   case $1 in
     --name) name=${2:-}; shift 2 ;;
     --stream) stream=1; shift ;;
+    --dictated) dictated=1; shift ;;
     --ready) [[ -x $claude_bin && -n $(server) ]]; exit ;;
     --toggle) [[ -x $claude_bin && -n $(server) && "$(qs ipc call askClaude toggle 2>/dev/null)" = "ok" ]] && exit 0
               exec "$scripts/terminal-or-claude" ;;
@@ -77,6 +80,14 @@ you take and your messages as they come, in a small panel below the top bar, and
 shell, no files, no web pages. Do what the request asks with them, then answer briefly in plain text (no Markdown, \
 tables or headings), in the language of the request. If it needs more than these tools can do, say so briefly: the \
 user can go on with this conversation in a terminal (Cmd+Enter)."
+# A dictated request gets the dictation's prompt: the speech model's usual mistakes, where "muistuta" and "idea" go, and
+# the mark an unsure answer begins with, read from where the toast reads it too, so the two can't drift apart. Without
+# either file it runs as a typed one.
+if (( dictated )); then
+  mark=$(sed -n 's/^var MARK = "\(.*\)"$/\1/p' "$scripts/../../quickshell/AskClaudeUnsure.js" 2>/dev/null)
+  extra=$(cat "$scripts/ask-claude-dictated.txt" 2>/dev/null)
+  [[ -n $mark && -n $extra ]] && system+=$'\n\n'"${extra//@MARK@/"$mark"}"
+fi
 # --tools "" leaves out every built-in tool (Bash, Edit, Write, WebFetch, Task…), --strict-mcp-config every MCP server
 # but ours (the user's own, claude.ai's connectors), and dontAsk refuses whatever isn't allowed instead of asking, as
 # nobody could answer here. --restricted skips the user's and the project's settings files too, so no hook or plugin of
