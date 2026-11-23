@@ -91,6 +91,7 @@ QtObject {
         else if (t === "r" || k === Qt.Key_F2) a.acts.askRename()
         else if (t === "a") a.acts.askNew(false)
         else if (t === "c") a.compress.ask()
+        else if (t === "m") a.mailFiles.send()
         else if (t === "e") a.extractPicked()
         else if (t === "/") a.startFilter()
         else if (t === "f" || t === "F") a.startFilter(true)

@@ -33,6 +33,7 @@ found by a search for "files" or "nautilus" after Files.
 | `r` or F2 | Rename (the name without its ending is picked) |
 | `a` | A new file; a name ending in `/` makes a folder (⌘⇧N: a folder) |
 | `c` | Compress the marked files, else the picked one, into an archive here: its name and format (zip, tar.gz, tar.xz, tar; ↑ ↓ change it) |
+| `m` | Mail the marked files, else the picked one: a new message in Mail with them attached (or the message being written takes them). Folders can't go: compress them first |
 | `e` or ⏎ | Extract the picked archive (zip, tar, tar.gz, tar.bz2, tar.xz) beside it |
 | ⌘Z | Undo the last change (also Undo in the message at the top) |
 | `b` or ⌘D | Bookmark the picked folder (with a file picked, the one you're in), or take it away |

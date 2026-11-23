@@ -46,6 +46,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | ⌘⇧A | Attach files (or drop them on the window) |
 | `Esc` | Close: saved again if it was saved before, a new one thrown away on the second `Esc` |
 
+- `nightmail new FILE…` writes a new message with the files attached, as Files' `m` does; a message being written takes them instead.
 - Sending goes on in the background. A message that can't be sent stays in Drafts, and "Not sent" in the sidebar tells why.
 - A reply goes from the account the message came to; a click on From changes it. Your signature (`signature` in `account.conf`, below) goes above the quote.
 - To and Cc suggest addresses from your mail, and from Nightdrive Contacts.
