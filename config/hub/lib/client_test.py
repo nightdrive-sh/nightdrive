@@ -1,11 +1,13 @@
 """The Hub's requests (client.py) against the in-memory Hub (testhub.py): 409 with the Hub's state, tombstones,
-paging, names in URLs, another Hub at the address, and a Hub out of reach.
+paging, names in URLs, another Hub at the address, and a Hub out of reach or stopped behind its proxy.
 
     python3 config/hub/lib/client_test.py
 """
+import http.server
 import os
 import socket
 import sys
+import threading
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -76,6 +78,31 @@ class ClientTest(unittest.TestCase):
         s.close()       # a port nobody listens on: refused
         with self.assertRaises(hc.Offline):
             hc.Client("http://127.0.0.1:%d" % port).info()
+
+    def test_hub_stopped_behind_its_proxy(self):
+        # tailscale serve answers 502 while the Hub behind it is stopped: out of reach, not an error to report
+        class Proxy(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(502)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *a):
+                pass
+
+        proxy = http.server.HTTPServer(("127.0.0.1", 0), Proxy)
+        threading.Thread(target=proxy.serve_forever, daemon=True).start()
+        try:
+            with self.assertRaises(hc.Offline):
+                hc.Client("http://127.0.0.1:%d" % proxy.server_address[1]).info()
+        finally:
+            proxy.shutdown()
+            proxy.server_close()
+
+    def test_hubs_own_error_stays_an_error(self):
+        # An error that carries Hub-Server is the Hub's own answer, never taken for "down"
+        with self.assertRaises(hc.HubError):
+            self.c._json("GET", "/v1/nothing-here")
 
     def test_bad_address(self):
         with self.assertRaises(ValueError):

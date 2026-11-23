@@ -3,7 +3,8 @@
 One connection is kept for a whole sync (the Hub speaks HTTP/1.1): over Tailscale each new one is a TLS handshake.
 A connection the Hub or a proxy closed meanwhile is opened again once. Errors come in three kinds the sync treats
 differently:
-- Offline: the Hub can't be reached (no network, the Hub machine asleep). Normal for a laptop: the changes wait.
+- Offline: the Hub can't be reached (no network, the Hub machine asleep, the Hub stopped behind tailscale serve).
+  Normal for a laptop: the changes wait.
 - ServerChanged: another Hub answers at the URL than the one this computer joined (protocol.md › Info).
 - HubError: the Hub answered with an error; `code` is the protocol's (`bad_name`, `path_clash`…).
 """
@@ -14,6 +15,8 @@ from urllib.parse import quote, urlsplit
 
 TIMEOUT = 30        # seconds: a file of 64 MiB over a slow link takes longer, but Tasks' are a few kB (Hub 7)
 PROTOCOL = 1
+# A proxy's answers when the server behind it is down: tailscale serve answers 502 while the Hub is stopped
+GATEWAY_DOWN = (502, 503, 504)
 
 
 class Offline(Exception):
@@ -99,6 +102,9 @@ class Client:
                 self.close()
                 raise Offline("Can't reach the Hub at %s: %s" % (self.host, e))
         server = hdrs.get("Hub-Server")
+        if resp.status in GATEWAY_DOWN and not server:
+            # Every answer of a Hub's has Hub-Server, so this one is the proxy's: the Hub is down, not broken
+            raise Offline("The Hub at %s isn't running (%d from the proxy in front of it)" % (self.host, resp.status))
         if self.server and server and server != self.server:
             raise ServerChanged("Another Hub answers at this address (%s, not %s)" % (server, self.server))
         return resp.status, hdrs, data
