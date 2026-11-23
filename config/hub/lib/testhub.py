@@ -56,6 +56,13 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(u.query)
         if u.path == "/v1/info":
             return self.send(200, {"name": "Nightdrive Hub", "protocol": 1, "server": self.mem.server_id})
+        if u.path == "/v1/collections":
+            with self.mem.lock:
+                names = sorted({k[0] for k in self.mem.files})
+                return self.send(200, {"collections": [
+                    {"name": n, "version": max(f["version"] for k, f in self.mem.files.items() if k[0] == n),
+                     "files": sum(1 for k, f in self.mem.files.items() if k[0] == n and not f["deleted"])}
+                    for n in names]})
         coll, _, rest = u.path[len("/v1/c/"):].partition("/")
         with self.mem.lock:
             if rest == "changes":
@@ -112,11 +119,29 @@ class TestHub:
 
     def __init__(self):
         self.mem = Memory()
-        handler = type("H", (Handler,), {"mem": self.mem})
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        self.handler = type("H", (Handler,), {"mem": self.mem})
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), self.handler)
         self.server.daemon_threads = True
         self.url = "http://127.0.0.1:%d" % self.server.server_address[1]
         threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+
+    def replace(self):
+        """Another Hub at the same address, empty, with an id of its own: the old one lost and set up again."""
+        self.mem = self.handler.mem = Memory()
+
+    def snapshot(self):
+        """The Hub's content now, as a backup holds it (restore() puts it back)."""
+        with self.mem.lock:
+            return self.mem.server_id, self.mem.version, {k: dict(f) for k, f in self.mem.files.items()}
+
+    def restore(self, snap, same_id=False):
+        """The Hub put back from a backup: by `hub restore`, which gives it a new id, or by hand (same_id)."""
+        mem = Memory()
+        sid, mem.version, files = snap
+        if same_id:
+            mem.server_id = sid
+        mem.files = {k: dict(f) for k, f in files.items()}
+        self.mem = self.handler.mem = mem
 
     def live(self, coll="tasks"):
         """{path: body} of the live files."""

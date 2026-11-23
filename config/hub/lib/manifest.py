@@ -5,8 +5,12 @@ content this computer had then (null for a deletion), with the Hub's id and the 
 files on disk tells a sync what to send: a hash that differs is an edit made here, a path that is gone is a deletion
 made here. It never decides anything about files it has no entry for: those are new here, or new to this computer.
 
-A manifest made with another Hub (another server id) is no guide to this one, so it starts empty: a "fresh" sync,
-which only adds and merges and deletes nothing (sync.py; protocol.md › Info).
+Each entry also keeps a few of the contents agreed on before ("p", newest first): what the file was on its way here.
+
+A manifest made with another Hub (another server id), or with this Hub before it went back in time (put back from a
+copy by hand: its newest version is older than one this computer has seen), is no guide to it, so it starts empty: a
+"fresh" sync, which only adds and merges and deletes nothing (sync.py, fresh.py; protocol.md › Info). The entries it
+had are kept as `before` until that sync is done, to tell which side of a difference is the newer one.
 """
 import hashlib
 import os
@@ -15,6 +19,7 @@ from pathlib import Path
 import settings
 
 CHUNK = 1 << 20
+PAST = 8        # earlier contents remembered per file: enough to know an old copy, small for thousands of files
 
 
 def file_hash(path):
@@ -57,7 +62,7 @@ def scan(root, accept):
 
 
 class Manifest:
-    """One collection's manifest. entries: {path: {"v": version, "h": hash or None}}."""
+    """One collection's manifest. entries: {path: {"v": version, "h": hash or None, "p": [earlier hashes]}}."""
 
     def __init__(self, collection):
         self.collection = collection
@@ -66,20 +71,44 @@ class Manifest:
         self.server = data.get("server")
         self.cursor = int(data.get("cursor") or 0)
         self.entries = data.get("files") or {}
+        self.before = data.get("before") or {}      # the entries of the Hub before a fresh start (fresh.py)
 
-    def start(self, server):
-        """Make this manifest the one for `server`. Returns True when it was made with another Hub (or none): then it
-        starts over, empty and from cursor 0, so nothing is taken for a deletion."""
-        if self.server == server:
+    def start(self, server, newest=None):
+        """Make this manifest the one for `server`, whose newest version in the collection is `newest` (None: not
+        known). Returns True when it was made with another Hub (or none), or this Hub has gone back to before the
+        cursor: then it starts over, empty and from cursor 0, so nothing is taken for a deletion. The entries it had
+        stay as `before` until finish()."""
+        # Every version this computer has from the Hub (the cursor, its own writes' answers) is at most the Hub's
+        # newest, unless the Hub went back
+        seen = max([self.cursor] + [e["v"] for e in self.entries.values()])
+        went_back = newest is not None and seen > newest
+        if self.server == server and not went_back:
             return False
+        # A fresh start broken off and started again keeps the entries of the one before it too
+        self.before.update(self.entries)
         self.server, self.cursor, self.entries = server, 0, {}
         return True
+
+    def ancestor(self, path):
+        """The content this computer last agreed on for `path` before a fresh start (a hash), or None."""
+        return (self.before.get(path) or {}).get("h")
+
+    def finish(self):
+        """A sync went through: the fresh start, if there was one, is done and `before` is no longer needed."""
+        self.before = {}
 
     def get(self, path):
         return self.entries.get(path)
 
     def set(self, path, version, hash_):
-        self.entries[path] = {"v": int(version), "h": hash_}
+        old = self.entries.get(path) or self.before.get(path) or {}
+        past = old.get("p") or []
+        if old.get("h") and old["h"] != hash_:
+            past = [old["h"]] + [h for h in past if h != old["h"]]
+        e = {"v": int(version), "h": hash_}
+        if past:
+            e["p"] = past[:PAST]
+        self.entries[path] = e
 
     def drop(self, path):
         self.entries.pop(path, None)
@@ -89,7 +118,10 @@ class Manifest:
         return {p: e["h"] for p, e in self.entries.items() if e.get("h")}
 
     def save(self):
-        settings.write_json(self.path, {"server": self.server, "cursor": self.cursor, "files": self.entries})
+        data = {"server": self.server, "cursor": self.cursor, "files": self.entries}
+        if self.before:
+            data["before"] = self.before
+        settings.write_json(self.path, data)
 
     def pending(self, local):
         """(edited or new here, deleted here) against `local` ({path: hash} from scan): what the next sync sends."""

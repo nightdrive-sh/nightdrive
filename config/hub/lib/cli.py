@@ -63,9 +63,11 @@ def run_sync(allow_deletes=False):
                 settings.save_config(cfg["url"], info["server"])
                 status["new_server"] = now()
             hub.server = info["server"]
+            newest = hub.collections()
             reports = {}
             for name, rule in apps.rules().items():
-                reports[name] = sync.Sync(hub, rule, allow_deletes).run(info["server"]).as_json()
+                # A collection the Hub hasn't got is at version 0: a cursor past that is a Hub restored from a backup
+                reports[name] = sync.Sync(hub, rule, allow_deletes).run(info["server"], newest.get(name, 0)).as_json()
             status.update(state="ok", server=info["server"], last_ok=now(), collections=reports)
     except hubclient.Offline as e:
         status.update(state="offline", error=str(e))

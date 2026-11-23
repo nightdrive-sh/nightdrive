@@ -131,6 +131,10 @@ class Client:
             raise HubError(200, "protocol", "Not a Nightdrive Hub of protocol %d" % PROTOCOL)
         return d
 
+    def collections(self):
+        """{collection: its newest version} of the collections the Hub has."""
+        return {c["name"]: c["version"] for c in self._json("GET", "/v1/collections")["collections"]}
+
     def changes(self, collection, since):
         """Every change after `since`, page by page: yields (changes, cursor) per page."""
         while True:

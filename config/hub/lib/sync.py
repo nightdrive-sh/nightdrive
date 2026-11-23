@@ -9,8 +9,9 @@ last agreed on, manifest.py). The rules, in short:
 - A deletion never wins over an edit: an edited file comes back over a tombstone (written with the tombstone's version
   as base), and a deletion the Hub refuses because of an edit fetches the edit.
 - Both sides edited: the app's rule keeps both (apps.py).
-- A fresh start (the first sync, or another Hub, manifest.start) has no agreement to go by, so it only adds and
-  merges: identical files match by hash, differing ones keep both, nothing is deleted on either side.
+- A fresh start (the first sync, another Hub, or this Hub restored from a backup: manifest.start) has no agreement with
+  the Hub to go by, so it only adds and merges: identical files match by hash, nothing is deleted on either side, and
+  what this computer agreed on before tells which side is newer (fresh.py); only when it can't, both are kept.
 - Many files gone here at once (emptied by mistake) aren't sent as deletions unless asked: `--allow-deletes`. A folder
   gone altogether (a disk not mounted) stops the collection's sync until it is back.
 
@@ -20,6 +21,7 @@ but not yet in the manifest matches by hash next time.
 import os
 
 import client as hubclient
+import fresh
 import manifest as mf
 import settings
 
@@ -112,10 +114,18 @@ class Sync:
         if here == c["hash"]:
             self.man.set(path, c["version"], here)
             return
+        way = None
+        if here is not None and not m:
+            # No agreement with this Hub (a fresh start): which side is newer, if the entry from before can tell
+            way = fresh.choose(self.man.before.get(path), here, c["hash"])
+            if way == fresh.OURS:
+                # The Hub's copy is old: agreed at its version, so the push sends this computer's with it as base
+                self.man.set(path, c["version"], c["hash"])
+                return
         st = self.hub.get(self.name, path)
         if st.deleted or st.version == 0:
             return      # deleted since the list was made: its tombstone is in a later page
-        if here is not None and not (m and m["h"] == here):
+        if here is not None and not (m and m["h"] == here) and way != fresh.HUBS:
             # Both sides changed (or a fresh start found two different files): the Hub's goes in place, ours beside
             self.keep_both(path, self.read(path))
         self.write(path, st.body, here)
@@ -197,9 +207,11 @@ class Sync:
         if r.get("changed", True):
             self.report.deleted_there += 1
 
-    def run(self, server):
-        self.report.fresh = self.man.start(server)
-        live = self.man.live()
+    def run(self, server, newest=None):
+        """One sync. `newest` is the Hub's newest version in the collection (protocol.md › Collections): one older
+        than a version this computer has seen means the Hub went back (put back from a copy), and it starts fresh."""
+        self.report.fresh = self.man.start(server, newest)
+        live = self.man.live() or self.man.before
         if live and not os.path.isdir(self.rule.root()):
             # The folder is gone while this computer has synced files in it: a disk not mounted, a folder moved or
             # deleted by mistake. Its deletions aren't sent, and nothing is fetched either, which would make the folder
@@ -210,6 +222,7 @@ class Sync:
         try:
             self.pull()
             self.push()
+            self.man.finish()
         finally:
             self.man.save()
         return self.report
