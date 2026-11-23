@@ -93,10 +93,10 @@ Singleton {
     }
     Timer { interval: 5000; repeat: true; running: c.barVisible; triggeredOnStart: true; onTriggered: presence.running = true }
 
-    // Project managers (SessionGroups.isPm) get a workspace of their own, their sessions as tabs beside them: Hyprland
-    // does it (hypr/pm-space.lua), told here which windows are PMs, as only the sessions' records have their names. Sent
-    // when the PMs change, and after a config reload, which starts its Lua afresh.
-    readonly property string pmKey: found.filter(f => Groups.isPm(f.name))
+    // Project managers (claude-sessions' pm: a name ending "… Project Manager" or "… PM") get a workspace of their own,
+    // their sessions as tabs beside them: Hyprland does it (hypr/pm-space.lua), told here which windows are PMs, as only
+    // the sessions' records have their names. Sent when the PMs change, and after a config reload, which starts its Lua afresh.
+    readonly property string pmKey: found.filter(f => f.pm)
         .map(f => "0x" + addr(f.address) + "\t" + String(f.name).replace(/[\x00-\x1f]/g, "")).sort().join("\n")
     onPmKeyChanged: sendPms()
     function sendPms() {

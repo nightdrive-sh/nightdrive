@@ -40,17 +40,25 @@ class WindowTest(unittest.TestCase):
 class OrderTest(unittest.TestCase):
     def test_pms_first_in_the_bars_order(self):
         def pm(addr, started):
-            return {"id": addr, "name": "Project Manager", "started": started}
+            return {"id": addr, "name": "Nightdrive Project Manager", "pm": True, "started": started}
         found = [{"id": "0xc3", "name": "work", "started": 1}, pm("0xa1", 2), pm("0xb2", 3)]
         ids = [s["id"] for s in sessions._ordered(found, ["0xc3", "0xb2", "0xa1"])]
         self.assertEqual(ids, ["0xb2", "0xa1", "0xc3"])
 
     def test_without_the_bar_as_started(self):
-        found = [{"id": "0xb2", "name": "B PM", "started": 3}, {"id": "0xa1", "name": "A PM", "started": 2}]
+        found = [{"id": "0xb2", "name": "B PM", "pm": True, "started": 3},
+                 {"id": "0xa1", "name": "A PM", "pm": True, "started": 2}]
         self.assertEqual([s["id"] for s in sessions._ordered(found, [])], ["0xa1", "0xb2"])
         # one the bar doesn't list (it was just opened) after those it does
         self.assertEqual([s["id"] for s in sessions._ordered(found, ["0xb2"])], ["0xb2", "0xa1"])
 
+
+    def test_pm_is_claude_sessions_word(self):
+        # #3079: a topic or project that mentions PM isn't a project manager; claude-sessions' pm (by the name) decides
+        found = [{"id": "0xa1", "name": "#3078 Companion PM-järjestys", "project": "nightdrive-pm", "started": 1},
+                 {"id": "0xb2", "name": "Cold Start PM", "pm": True, "started": 2}]
+        out = sessions._ordered(found, [])
+        self.assertEqual([(s["id"], s["pm"]) for s in out], [("0xb2", True), ("0xa1", False)])
 
 class PermissionTest(unittest.TestCase):
     def setUp(self):

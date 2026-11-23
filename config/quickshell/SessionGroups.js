@@ -80,10 +80,9 @@ function row(sessions, kept) {
     return out
 }
 
-// A session named "… Project Manager" or "… PM" (ndpm, cspm): a project manager, with a workspace of its own
-// (Claude.qml tells hypr/pm-space.lua)
+// A project manager's name ends "… Project Manager" or "… PM" (ndpm, cspm): claude-sessions decides which sessions are
+// one (its pm, PM_NAME there, read by Claude.qml and Companion); here only the ending is taken off a chip's name
 const PM_NAME = /\s+(project\s+manager|pm)\s*$/i
-function isPm(name) { return PM_NAME.test(String(name || "")) }
 
 // A lead's chip leaves out a trailing "Project Manager" or "PM": the bot icon and the border already say it (the
 // hover card keeps the whole name)

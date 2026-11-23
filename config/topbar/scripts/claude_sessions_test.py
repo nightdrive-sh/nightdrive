@@ -125,6 +125,17 @@ class Continued(unittest.TestCase):
         self.assertEqual(shown[-1]["text"], "the very latest")
         self.assertEqual(self.sessions()["last"], "the very latest")
 
+    def test_a_project_manager_by_its_name_alone(self):
+        """pm, which the PM space and Companion's pinned tiles both read (#3079): the name ends "… Project Manager" or
+        "… PM"; a topic that only mentions PM isn't one."""
+        record = os.path.join(self.conf, "sessions", f"{self.proc.pid}.json")
+        for name, pm in (("Nightdrive Project Manager", True), ("Cold Start PM", True), ("cold start pm ", True),
+                         ("#3078 Companion PM-järjestys", False), ("PM order", False), ("Project Manager", False),
+                         ("Npm upgrade", False), ("", False)):
+            with open(record, "w") as f:
+                json.dump({"pid": self.proc.pid, "sessionId": FIRST, "name": name, "status": "idle"}, f)
+            self.assertIs(self.sessions()["pm"], pm, name)
+
     def test_a_continuation_that_is_missing_or_loops(self):
         first = self.write(FIRST, chatter(FIRST, 2, "only") +
                            [line(type="continued-in", sessionId=FIRST, continuedInSessionId=SECOND)])

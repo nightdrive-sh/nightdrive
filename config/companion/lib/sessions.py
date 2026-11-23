@@ -156,6 +156,8 @@ class Sessions:
                 "id": addr, "dir": d, "project": d.rstrip("/").split("/")[-1] or "/", "topic": topic,
                 # its own name (/rename; Claude Code's record, via claude-sessions), else the window title's topic
                 "name": f.get("name") or topic,
+                # a project manager's: claude-sessions decides it by the name alone, as the PM space does (#3079)
+                "pm": bool(f.get("pm")),
                 "state": state, "wants": addr in self.wants or state == "permission",
                 # when its status last changed (claude-sessions): how long this turn has worked, or it has waited
                 "since": f.get("since") or f.get("started", 0),
@@ -175,7 +177,7 @@ class Sessions:
         self.active = _active(win, out) if active else {}
         self.wants &= set(seen)
         # The PMs' order among themselves is the sessions bar's: asked only when there are two to put in order
-        return _ordered(out, _bar_order() if sum(_is_pm(s) for s in out) > 1 else [])
+        return _ordered(out, _bar_order() if sum(s["pm"] for s in out) > 1 else [])
 
     def window(self, addr):
         """addr, when it is a session's window: the page sends and stops only there, never into another window."""
@@ -232,15 +234,6 @@ def _active(win, found):
     return {"session": "", "name": win.get("class", "") or "a window", "detail": win.get("title", "")}
 
 
-PM = re.compile(r"project manager|\bpm\b", re.I)
-
-
-def _is_pm(s):
-    """A project manager's session (nightdrive-pm, "Cold Start Project Manager"): it runs the others, so it goes first."""
-    return bool(PM.search(s.get("name", "")) or PM.search(s.get("topic", ""))
-                or PM.search(s.get("project", "").replace("-", " ")))
-
-
 def _bar_order():
     """The window addresses in the sessions bar's order (Claude.qml's order over IPC: by workspace, then the window's
     place there, SessionGroups.place), or [] without the bar's Quickshell. Asked, not copied, so the two can't drift."""
@@ -259,7 +252,7 @@ def _ordered(sessions, bar=()):
     for s in sessions:
         s.setdefault("name", s.get("topic", ""))
         s.setdefault("since", s.get("started", 0))
-        s["pm"] = _is_pm(s)
+        s["pm"] = bool(s.get("pm"))
         s["done"] = s.get("done", False) and not s["pm"]
     rank = {a: i for i, a in enumerate(bar)}
     return sorted(sessions, key=lambda s: (not s["pm"], rank.get(s["id"], len(rank)) if s["pm"] else 0,

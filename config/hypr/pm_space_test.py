@@ -25,7 +25,6 @@ It opens real windows (kitty), so it runs only inside the sandbox's container, n
 
 import json
 import os
-import re
 import signal
 import subprocess
 import tempfile
@@ -39,7 +38,6 @@ AGENTS_WS = 3                     # a `claude agents` window opens here beside a
 AGENT_WS, AGENT_OTHER_WS = 2, 9   # a space a session opens windows on, and another workspace (#3168); empty too
 TERMINAL_OR_CLAUDE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "terminal-or-claude")
 CLAUDE_SESSIONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "topbar", "scripts", "claude-sessions")
-PM_NAME = re.compile(r"\s+(project\s+manager|pm)\s*$", re.I)   # SessionGroups.js isPm
 PREFIX = "pmtest_"                # the test windows' titles
 SESSION_CLASS = "claude-background"   # terminal-or-claude's --background class (rules.lua, pm-space.lua)
 SETTLE = 1.0                      # pm-space.lua arranges 120 ms after events settle; a window takes a moment to map
@@ -447,8 +445,8 @@ class AgentsWindow(unittest.TestCase):
         found = next((s for s in json.loads(out) if s["address"] == pm), None)
         self.assertIsNotNone(found, f"claude-sessions didn't list the window: {out}")
         self.assertEqual((found["name"], found["pid"], found["dir"]), (self.NAME, self.bg, self.tmp))
-        # Claude.qml's pmKey: the PMs among them, by name
-        pms = [s for s in json.loads(out) if PM_NAME.search(s["name"])]
+        # Claude.qml's pmKey: the PMs among them, as claude-sessions marks them (by the name)
+        pms = [s for s in json.loads(out) if s["pm"]]
         self.assertIn(pm, [s["address"] for s in pms], "not a PM by its name")
         hyprctl("eval", "NightdrivePmSpaces({ " + ", ".join(f'{{ a = "{s["address"]}", n = "{s["name"]}" }}' for s in pms) + " })")
         time.sleep(SETTLE)

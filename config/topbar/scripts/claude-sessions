@@ -8,6 +8,7 @@
 # name (the session's name, /rename), status (busy, idle, waiting: it asks you something) and waitingFor (what), and
 # last, the last line of its last reply (its transcript), for the sessions bar's hover (SessionsBar.qml); since, when its
 # status last changed (epoch seconds, 0 if unknown): the bar's time, how long a turn has run or it has waited for you.
+# pm: true for a project manager's session (PM_NAME).
 # openerPid and openerName: the session that opened it with `nightdrive ask` (terminal-or-claude puts them in its
 # environment), 0 and "" for one you opened; the bar groups a session's openings beside it (SessionGroups.js).
 # transcript: the path of its conversation (<its config dir>/projects/<dir>/<sessionId>.jsonl), "" when not found; Companion
@@ -19,6 +20,10 @@ set -uo pipefail
 readonly TAIL=300    # transcript lines read from the end for the last reply: a long tool run has no text in between
 readonly LAST=300    # characters of the last line kept
 readonly HOPS=20     # continued-in links followed at most, so a loop of them can't hang the bar
+# A project manager's session: its name ends "… Project Manager" or "… PM" (ndpm's "Nightdrive Project Manager", "Cold
+# Start PM"). Decided here, once, as pm: the PM space (Claude.qml → hypr/pm-space.lua) and Companion's pinned tiles
+# (companion/lib/sessions.py) both read it. Only the name: a topic such as "#3078 Companion PM order" isn't one (#3079).
+readonly PM_NAME='\s+(project\s+manager|pm)\s*$'
 
 # The transcript being written now. Claude Code may carry a conversation on in a new transcript (a new sessionId) and
 # end the old one with {"type":"continued-in","continuedInSessionId":…}, while the session's record keeps the first id:
@@ -108,8 +113,8 @@ for pid in $(pgrep -x claude); do
   oname=$(sed -n 's/^NIGHTDRIVE_OPENER_NAME=//p' <<<"$env")
   jq -nc --arg acc "$account" --argjson accdef "$([[ $conf == "$default_dir" ]] && echo true || echo false)" \
      --argjson op "$opid" --arg on "$oname" --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" --argjson i "$info" \
-     --argjson l "$last" --argjson n "$LAST" --arg tp "$tpath" \
-     '{address: $a, pid: $pid, dir: $d, started: $s} + ($i | del(.sid))
+     --argjson l "$last" --argjson n "$LAST" --arg tp "$tpath" --arg pm "$PM_NAME" \
+     '{address: $a, pid: $pid, dir: $d, started: $s} + ($i | del(.sid)) + {pm: ($i.name | test($pm; "i"))}
       + {openerPid: $op, openerName: $on, account: $acc, accountDefault: $accdef, transcript: $tp}
       + {last: ($l | gsub("^\\s+|\\s+$"; "") | split("\n") | map(select(test("\\S"))) | last // "" | .[0:$n])}'
 done | jq -sc 'unique_by(.address)'
