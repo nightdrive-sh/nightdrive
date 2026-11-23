@@ -23,6 +23,12 @@ const KINDS = [
     [["json"], "file-json"],
     [["py", "js", "ts", "qml", "sh", "lua", "c", "h", "cpp", "rs", "go", "php", "rb", "java", "css", "html", "xml", "yml", "yaml", "toml"], "file-code"]
 ]
+// A sound's or video's length, or a place in it: 3:07, 1:02:05
+function length(seconds) {
+    const s = Math.max(0, Math.floor(seconds || 0))
+    const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = String(s % 60).padStart(2, "0")
+    return h ? h + ":" + String(m).padStart(2, "0") + ":" + sec : m + ":" + sec
+}
 function suffix(name) {
     const i = name.lastIndexOf(".")
     return i > 0 ? name.slice(i + 1).toLowerCase() : ""

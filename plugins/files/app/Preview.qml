@@ -8,7 +8,8 @@ import "Format.js" as Format
 // The pane at the right: the picked file's picture, or the start of its text, then what it is (type, size, when it
 // changed, a picture's size, a folder's count, a link's target) and where it is. lib/peek.py reads it, a moment after
 // the pick stops moving, so j held down a long list doesn't start a read for every row. Several marked: their count
-// and size. i hides it, and a narrow window leaves it out.
+// and size. A sound gets a player under its facts (AudioPlayer: a click plays it); it stops when another file is
+// picked, the pane hides or the big preview opens. i hides it, and a narrow window leaves it out.
 Rectangle {
     id: root
     required property QtObject c
@@ -103,6 +104,7 @@ Rectangle {
                         out.push(i.items === 0 ? "Empty" : i.items + (i.items === 1 ? " item" : " items") + (i.hidden ? " and " + i.hidden + " hidden" : ""))
                     if (!f.dir) out.push(Format.size(f.size))
                     if (i && i.pixels) out.push(i.pixels[0] + " × " + i.pixels[1])
+                    if (i && i.duration && !i.audio) out.push(Format.length(i.duration))
                     if (root.app.trashShown) {
                         out.push("From " + root.app.tilde(Format.parent(f.origin)))
                         out.push("Deleted " + Regional.format(f.modified, "medium") + " " + Regional.time(String(f.modified).slice(11, 16)))
@@ -118,6 +120,16 @@ Rectangle {
                     text: modelData
                     color: root.c.dim; font.family: root.c.font; font.pixelSize: 12
                 }
+            }
+            // A sound: play it here. Not while the big preview is open, which plays it itself
+            AudioPlayer {
+                visible: root.fresh && root.info.audio === true
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                c: root.c
+                path: visible && root.visible && !root.app.quick.open ? root.info.path : ""
+                duration: visible && root.info.duration ? root.info.duration : 0
+                title: root.file ? root.file.name : ""
             }
             // The start of a text, as it is
             Rectangle {

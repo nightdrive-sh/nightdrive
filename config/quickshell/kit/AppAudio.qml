@@ -42,7 +42,7 @@ Item {
         if (position >= duration - 0.05) position = 0
         startPos = position
         // Another file while one still plays (Inbox's next sound): the one before ends first, and its end starts this
-        if (proc.running) { restart = true; playing = true; proc.running = false; return }
+        if (proc.running) { restart = true; playing = true; halt(); return }
         proc.command = command(path, startPos)
         startedAt = Date.now()
         playing = true
@@ -53,22 +53,23 @@ Item {
         tick()
         playing = false
         restart = false
-        proc.running = false
+        halt()
     }
     function toggle() { if (playing) pause(); else play() }
     function seek(t) {
         position = Math.max(0, Math.min(duration, t))
         if (!playing) return
-        if (proc.running) { restart = true; proc.running = false }
+        if (proc.running) { restart = true; halt() }
         else play()
     }
     function skip(d) { seek((playing ? now() : position) + d) }
     function stop() { pause(); position = 0 }
     function now() { return Math.min(duration, startPos + (Date.now() - startedAt) / 1000) }
     function tick() { if (playing) position = now() }
+    function halt() { if (proc.running) proc.signal(9) }
 
     onPathChanged: stop()
-    Component.onDestruction: proc.running = false
+    Component.onDestruction: { halt(); proc.running = false }
 
     Timer { interval: 100; repeat: true; running: pl.playing && !pl.restart; onTriggered: pl.tick() }
 

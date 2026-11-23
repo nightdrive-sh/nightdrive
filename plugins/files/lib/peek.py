@@ -1,5 +1,6 @@
 """What the preview pane shows of the picked file: its type in words, size, times, a folder's count, a link's target,
-the start of a text, a picture's size, and a PDF's first page or a video's frame drawn as a picture. Reads at most TEXT_BYTES of a file, so a large one costs no more than a
+the start of a text, a picture's size, a sound's or video's length, and a PDF's first page, a video's frame or a sound's
+cover drawn as a picture. Reads at most TEXT_BYTES of a file, so a large one costs no more than a
 small one (long: more, for the big preview). The picture itself the window draws (Qt's Image); this only gives its size.
 """
 import datetime, hashlib, mimetypes, os, shutil, stat, subprocess
@@ -14,6 +15,7 @@ TEXTY = ("application/json", "application/xml", "application/javascript", "appli
          "application/x-yaml", "application/yaml", "application/sql", "application/x-desktop")
 RENDER_WIDTH = 1200          # px of a PDF's first page or a video's frame, drawn once into the cache
 VIDEOS = (".mp4", ".mkv", ".webm", ".mov", ".avi", ".mpeg", ".ogv", ".m4v")
+AUDIO = (".mp3", ".m4a", ".ogg", ".oga", ".flac", ".wav", ".opus", ".aac", ".wma")
 IMAGES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".avif", ".heic", ".tif", ".tiff", ".ico")
 
 
@@ -68,20 +70,24 @@ def cache_dir():
 
 
 def rendered(p, st, kind):
-    """A PDF's first page (pdftoppm) or a video's frame a second in (ffmpeg) as a PNG in the cache, named by the path,
-    size and time, so a changed file is drawn again; None without the tool or when it fails."""
+    """A PDF's first page (pdftoppm), a video's frame a second in or a sound's cover (ffmpeg) as a PNG in the cache,
+    named by the path, size and time, so a changed file is drawn again; None without the tool or when it fails. A sound
+    without a cover leaves an empty file there, so its next peek doesn't run ffmpeg again for nothing."""
     tool = "pdftoppm" if kind == "pdf" else "ffmpeg"
     if not shutil.which(tool):
         return None
     key = hashlib.sha1(f"{p}\0{st.st_size}\0{st.st_mtime_ns}".encode()).hexdigest()
     out = cache_dir() / f"{key}.png"
     if out.exists():
-        return str(out)
+        return str(out) if out.stat().st_size else None
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".part.png")
     if kind == "pdf":
         cmd = ["pdftoppm", "-png", "-f", "1", "-l", "1", "-singlefile", "-scale-to-x", str(RENDER_WIDTH),
                "-scale-to-y", "-1", str(p), str(tmp)[:-4]]
+    elif kind == "cover":
+        cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(p), "-an", "-frames:v", "1",
+               "-vf", f"scale='min({RENDER_WIDTH},iw)':-2", str(tmp)]
     else:
         cmd = ["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", str(p), "-frames:v", "1",
                "-vf", f"scale='min({RENDER_WIDTH},iw)':-2", str(tmp)]
@@ -90,8 +96,23 @@ def rendered(p, st, kind):
         os.replace(tmp, out)
     except (OSError, subprocess.SubprocessError):
         tmp.unlink(missing_ok=True)
+        if kind == "cover":
+            out.touch()
         return None
     return str(out)
+
+
+def duration(p):
+    """A sound's or video's length in seconds (ffprobe), None without it or when it can't tell"""
+    if not shutil.which("ffprobe"):
+        return None
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(p)],
+                           capture_output=True, text=True, timeout=10)
+        s = float(r.stdout.strip())
+        return s if s > 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
 
 
 def peek(path, long=False):
@@ -126,6 +147,12 @@ def peek(path, long=False):
         out["picture"] = rendered(p, st, "pdf")
     elif t.startswith("video/") or p.suffix.lower() in VIDEOS:
         out["picture"] = rendered(p, st, "video")
+        out["duration"] = duration(p)
+    elif t.startswith("audio/") or p.suffix.lower() in AUDIO:
+        # Played in the preview (AudioPlayer.qml), which needs its length for the clock and the bar
+        out["audio"] = True
+        out["duration"] = duration(p)
+        out["picture"] = rendered(p, st, "cover")
     elif t.startswith("text/") or t in TEXTY or t.endswith(("+xml", "+json")) or not t or t == "application/octet-stream":
         text = _text(p, long)
         if text is not None:

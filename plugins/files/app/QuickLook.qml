@@ -11,7 +11,8 @@ import "Format.js" as Format
 // about 90 % of it in the middle (QuickLookBody: the picked file as large as it fits, a text, or what it is). A layer
 // and not a window of its own: no Hyprland rule for it, it takes the keyboard for as long as it is open (↑ ↓ j k go
 // through the files, ⏎ opens one, Space or Esc closes it, so does a click beside the card), and the window under it
-// gets the keys back when it goes. Its window's list or grid (#3303) only has to give `app` what is read here: picked,
+// gets the keys back when it goes. A sound plays as it shows (p pauses, ← → skip 5 s) and stops when it goes or the next
+// file comes (QuickLookBody's AudioPlayer, #3416). Its window's list or grid (#3303) only has to give `app` what is read here: picked,
 // current, rows, move(d), openPicked(), toList(), helper, look and the window's screen.
 PanelWindow {
     id: root
@@ -64,6 +65,9 @@ PanelWindow {
             else if (k === Qt.Key_Up || t === "k") root.app.move(-1)
             else if (k === Qt.Key_PageDown) body.page(1)
             else if (k === Qt.Key_PageUp) body.page(-1)
+            else if ((t === "p" || k === Qt.Key_P) && body.isAudio) body.toggleSound()
+            else if (k === Qt.Key_Left && body.isAudio) body.skipSound(-5)
+            else if (k === Qt.Key_Right && body.isAudio) body.skipSound(5)
             else if (k === Qt.Key_Return || k === Qt.Key_Enter || t === "l") { root.close(); root.app.openPicked() }
             else return
             e.accepted = true
@@ -100,7 +104,8 @@ PanelWindow {
                 Text {
                     textFormat: Text.PlainText
                     text: !root.info ? "" : [root.info.kind, root.info.dir ? "" : Format.size(root.info.size),
-                                             root.info.pixels ? root.info.pixels[0] + " × " + root.info.pixels[1] : ""].filter(x => x).join("  ·  ")
+                                             root.info.pixels ? root.info.pixels[0] + " × " + root.info.pixels[1] : "",
+                                             root.info.duration ? Format.length(root.info.duration) : ""].filter(x => x).join("  ·  ")
                     color: root.c.faint; font.family: root.c.font; font.pixelSize: 12
                 }
                 Text {
@@ -118,6 +123,7 @@ PanelWindow {
                 c: root.c
                 file: root.file
                 info: root.info
+                active: root.open
             }
         }
     }

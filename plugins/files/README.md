@@ -19,8 +19,8 @@ found by a search for "files" or "nautilus" after Files.
 | ⌥← ⌥→ (⌃⌘← ⌃⌘→) | Back, forward |
 | `~` `gh` `gd` | Home, home, Downloads |
 | ⌘L | Go to a folder by its path |
-| Space | The big preview, over the whole screen Files is on: a picture (never larger than its own size; the wheel zooms in where the pointer is, a drag moves it, a double click fits it again), a PDF's first page, a video's frame or a text; ↑ ↓ go through the files, Space, Esc or a click beside it closes it |
-| `i` | The preview at the right (a narrow window leaves it out) |
+| Space | The big preview, over the whole screen Files is on: a picture (never larger than its own size; the wheel zooms in where the pointer is, a drag moves it, a double click fits it again), a PDF's first page, a video's frame or a text, and a sound plays at once (`p` pauses, ← → 5 s back or on, a click or drag on its bar goes there); ↑ ↓ go through the files, Space, Esc or a click beside it closes it, and the sound stops with it |
+| `i` | The preview at the right (a narrow window leaves it out); a sound has a player there, its play button plays it |
 | `/` or ⌘F | Filter by name as you type: ⏎ back to the list with it kept, Esc shows all again |
 | `f`, or Tab in the filter | Search all of home by name, and Tab back to this folder; ⌘F again or a click on the scope at the field's end does the same. Outside home (a USB stick) it searches the folder and every one below it. Each file shows the folder it is in, ← goes there |
 | `t` | Thumbnails in a grid, or the list again (also the button in the header). Each folder keeps its own; a new one is a list. In the grid `h` `j` `k` `l` and the arrows move in all four ways, ⏎ opens and ⌫ goes up |
