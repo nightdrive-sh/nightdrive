@@ -61,7 +61,8 @@ Files can be the apps' Open and Save window, in place of GTK's: `files picker on
 says which). It is Files as it is, keys, sidebar and preview, with a bar at the foot: Save's name (picked without its
 ending; a name that is there asks before replacing it, a folder's name goes into it), the app's file types (⌘T, or the
 button; a new type changes the name's ending), Cancel (Esc) and the app's button (⏎). Open takes the marked files, else
-the picked one, or a folder when the app asks for one. It floats over the app that asked.
+the picked one, or a folder when the app asks for one. It floats over the app that asked and keeps the keyboard until
+it closes (the launcher and the bar's menus still take it).
 
 - Apps that ask the desktop's portal get it: Brave and Chromium, Flatpak apps. While it is on, apps started from then on
   ask it too: GTK 4 (zenity: Nightdrive's own pickers, Ferry) through `GDK_DEBUG=portals`, GTK 3 and Firefox through

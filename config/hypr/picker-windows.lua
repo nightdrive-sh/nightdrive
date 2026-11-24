@@ -25,6 +25,16 @@ if on then
     hl.env("GTK_USE_PORTAL", "1")
 end
 
+-- The picker keeps the keyboard while it is open, as a dialog does. With follow_mouse, a drag that selects the name and
+-- ends past the picker's edge gave the keyboard to the window under the pointer on the next move after the release, and
+-- the selection was gone (#3534); a click elsewhere took it too, though the app behind waits for the answer. Layers (the
+-- launcher, the bar's menus) still get the keyboard.
+hl.window_rule({
+    name  = "picker-stays-focused",
+    match = { class = "^" .. CLASS .. "$" },
+    stay_focused = true,
+})
+
 local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
 -- The window that had the keyboard before w: the lowest focus history id but w's own
