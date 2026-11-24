@@ -14,6 +14,10 @@ $HOME/.local/share/containers
 $HOME/.local/share/Steam
 $HOME/.steam
 
+# Downloaded speech and language models: many GB, fetched again as docs/dictation.md and Ollama do
+$HOME/.local/share/voxtype/models
+$HOME/.ollama/models
+
 # Garage's virtual machines: disk images of many GB, changed whole by every boot. Back one up by hand if you need it
 $HOME/.local/share/nightdrive/garage
 

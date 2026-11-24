@@ -29,6 +29,7 @@ import conf  # noqa: E402
 import restic  # noqa: E402
 
 DUE_HOURS = 20          # a backup a day, a little early so it doesn't drift later each day
+FIRST_WAIT_HOURS = 1    # the timer's first backup waits this long after setup (a run by hand starts at once)
 STALE_DAYS = 3          # out of reach for this long: the run fails, and the unit's failure notice says so
 PRUNE_DAYS = 7          # forget --prune weekly: it rewrites packs, too slow for every run
 CHECK_DAYS = 30         # check --read-data-subset monthly
@@ -84,6 +85,10 @@ def keyring_locked(cfg):
 
 def due(st, hours=DUE_HOURS):
     age = conf.age_hours(st.get("last_ok"))
+    if age is None and st.get("setup"):
+        # Never backed up: setup turns the timer on, and its first hour would start hundreds of GB at once, before
+        # backup-excludes.txt could be looked over (restic reads it only as it starts)
+        return conf.age_hours(st["setup"]) >= FIRST_WAIT_HOURS
     return age is None or age >= hours
 
 
@@ -251,7 +256,10 @@ def cmd_setup(a):
         except RuntimeError as e:
             if stored:
                 keyring_clear(a.repository)
-            print("%s\nA repository already there? setup --existing asks for its password." % e, file=sys.stderr)
+            # Only a repository already there takes --existing: a folder that can't be made (a Storage Box's / rather
+            # than its /home) needs another path
+            hint = "\nA repository already there? setup --existing asks for its password."
+            print("%s%s" % (e, hint if "already" in str(e) else ""), file=sys.stderr)
             return 1
         print("Made a new repository at %s." % a.repository)
     conf.save(text)
@@ -265,7 +273,8 @@ def cmd_setup(a):
               "nothing in the backup can be read, on this computer or another.\n\n    %s\n" % generated)
     print("Settings: %s; what is left out: %s" % (conf.CONF, excludes))
     if not a.no_timer:
-        print("Backup every day (checked hourly): " + timer(True))
+        print("Backup every day (checked hourly): %s. The first starts in %d hour%s: look over what is left out "
+              "first." % (timer(True), FIRST_WAIT_HOURS, "" if FIRST_WAIT_HOURS == 1 else "s"))
     print("nightdrive backup run starts the first one now; the first takes long, the next only the changes.")
     return 0
 
@@ -331,7 +340,8 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="nightdrive backup", description="This machine backed up with restic.")
     sub = p.add_subparsers(dest="command", required=True)
     s = sub.add_parser("setup", help="the repository, its password in the keyring, and the daily timer")
-    s.add_argument("repository", help="e.g. sftp:storage-backup:/%s, or a folder on another disk" % socket.gethostname())
+    s.add_argument("repository",
+                   help="e.g. sftp:storage-backup:/home/%s, or a folder on another disk" % socket.gethostname())
     s.add_argument("--path", action="append", help="what to back up (again for more); the home folder if none")
     s.add_argument("--password-cmd", help="a command that prints the password, instead of the keyring (op read …)")
     s.add_argument("--existing", action="store_true", help="a repository made before: ask for its password")

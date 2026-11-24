@@ -82,6 +82,12 @@ class Timing(unittest.TestCase):
         self.assertFalse(cli.due({"last_ok": stamp(2)}))
         self.assertTrue(cli.due({"last_ok": stamp(cli.DUE_HOURS + 1)}))
 
+    def test_first_waits_after_setup(self):
+        # The timer is on as setup ends: its first run waits, so the excludes can be looked over before it starts
+        self.assertFalse(cli.due({"setup": stamp(0.1)}))
+        self.assertTrue(cli.due({"setup": stamp(cli.FIRST_WAIT_HOURS + 0.1)}))
+        self.assertFalse(cli.due({"setup": stamp(500), "last_ok": stamp(1)}))
+
     def test_stale_counts_from_setup(self):
         self.assertFalse(cli.stale({"setup": stamp(1)}))
         self.assertTrue(cli.stale({"setup": stamp(cli.STALE_DAYS * 24 + 1)}))
@@ -151,6 +157,18 @@ class Whole(unittest.TestCase):
         self.assertEqual(self.setup()[0], 0)
         code, out = quiet(cli.main, ["setup", self.repo, "--password-cmd", "echo wrong", "--existing"])
         self.assertEqual(code, 1, out)
+
+    @unittest.skipIf(os.geteuid() == 0, "root writes into a read-only folder")
+    def test_folder_not_made_is_not_an_existing_repository(self):
+        # A Storage Box sub-account can't write to / (only /home): restic's error, without the --existing hint
+        parent = os.path.dirname(self.repo)
+        os.chmod(parent, 0o555)
+        try:
+            code, out = self.setup()
+        finally:
+            os.chmod(parent, 0o755)
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("--existing", out)
 
     def test_out_of_reach_is_quiet_until_stale(self):
         self.assertEqual(self.setup()[0], 0)

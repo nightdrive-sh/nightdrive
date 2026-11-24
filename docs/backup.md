@@ -17,15 +17,18 @@ nightdrive backup run                               # the first backup now (long
 ```
 
 Setup makes the repository, puts a new password in the keyring and prints it once: **save it in your password
-manager**, as nothing in the backup can be read without it. It turns on the daily backup, too.
+manager**, as nothing in the backup can be read without it. It turns on the daily backup, too: the first starts an
+hour later unless you run it sooner, so look over what it leaves out (below) before then.
 
 - **A repository made before** (a new computer, a reinstall): `setup REPO --existing` asks for its password.
 - **The password from your password manager** instead of the keyring: `--password-cmd "op read op://Private/Backup/password"`.
 - **Other folders than your home**: `--path /srv/data` (again for more), or `path =` lines in the settings.
 
 A [Hetzner Storage Box](https://www.hetzner.com/storage/storage-box/) suits it: turn SSH on, make a sub-account for
-backups only (so nothing that mounts your files can delete them), add your key with `ssh-copy-id -p 23 -s
-USER@HOST` and a host for it in `~/.ssh/config` (`Port 23`).
+backups only (so nothing that mounts your files can delete them), give it a host in `~/.ssh/config` (`Port 23`) and
+add your key with `ssh-copy-id -s -i KEY.pub HOST`. A sub-account writes only under `/home`:
+`sftp:backup-box:/home/laptop`. The timer backs up with no one at the screen, so its key can't ask for a passphrase or
+an agent's approval (1Password's): give the host a key of its own without one (`IdentityFile`, `IdentitiesOnly yes`).
 
 ## What it does
 
@@ -34,7 +37,7 @@ USER@HOST` and a host for it in `~/.ssh/config` (`Port 23`).
 - **Out of reach isn't an error** (a laptop on a train, a disk not plugged in) until no backup has gone through in 3
   days: then you get a notification.
 - **What it leaves out** is in `~/.config/nightdrive/backup-excludes.txt` (caches, the trash, Flatpak and Steam,
-  Garage's VMs; yours to edit), and other disks and network mounts always.
+  Garage's VMs, downloaded speech and language models; yours to edit), and other disks and network mounts always.
 - **What it keeps**: 7 daily, 8 weekly, 24 monthly and 10 yearly snapshots, pruned weekly (`keep-daily =` … in the
   settings). Monthly, 5 % of the data is read back to check it.
 - **The Hub's machine** backs up `~/nightdrive-hub-backup`, the Hub's own nightly copy, rather than its live data

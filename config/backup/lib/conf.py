@@ -4,8 +4,8 @@
 
 ~/.config/nightdrive/backup.conf, `key = value` lines as the apps' .conf files have them:
 
-    repository = sftp:storage-backup:/feature-dev      restic's repository (sftp:, s3:, b2:, rclone:, rest: or a path)
-    password-cmd = secret-tool lookup service nightdrive-backup repository sftp:storage-backup:/feature-dev
+    repository = sftp:storage-backup:/home/feature-dev restic's repository (sftp:, s3:, b2:, rclone:, rest: or a path)
+    password-cmd = secret-tool lookup service nightdrive-backup repository sftp:storage-backup:/home/feature-dev
     path = ~                                           what to back up; a line each, ~ for the home folder
     keep-daily = 7                                     the snapshots kept (keep-weekly, keep-monthly, keep-yearly)
 
