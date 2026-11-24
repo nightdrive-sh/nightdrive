@@ -359,7 +359,7 @@ ShellRoot {
                         highlightMoveDuration: 0
                         TouchScroll { view: listView }
                         spacing: 2
-                        topMargin: 10        // room for the drop line above the first row (Reorder)
+                        topMargin: 12        // as the left margin, and room for the drop line above the first row (Reorder)
                         bottomMargin: 12
                         section.property: "section"
                         section.delegate: Text {
