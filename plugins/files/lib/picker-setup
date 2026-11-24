@@ -1,0 +1,122 @@
+#!/bin/bash
+# picker-setup on|off|status [--json]: Files as the desktop's Open and Save window (`files picker`, README.md › Open and
+# Save), or GTK's again. No root needed and nothing in /usr changes:
+#
+# xdg-desktop-portal reads its backends (*.portal) from one folder, /usr/share/xdg-desktop-portal/portals, unless
+# XDG_DESKTOP_PORTAL_DIR names another, and then it reads its choice of backends (hyprland-portals.conf) from that folder
+# too, not ~/.config. So `on` makes such a folder of the user's: links to the system's .portal files, Files' own
+# nightdrive.portal, and the choice the desktop had with FileChooser=nightdrive;gtk on top. A drop-in of the user's
+# xdg-desktop-portal.service sets the variable, and the portal starts again with it. The backend itself (portal.py)
+# starts on D-Bus activation, from the user's dbus-1/services.
+#
+# A portal that doesn't come back with a FileChooser after `on` is put back as it was at once. `off` takes all of it away
+# and starts the portal again. A portal package installed later needs `on` again for its .portal to be linked.
+set -euo pipefail
+
+LIB=$(dirname "$(readlink -f "$0")")
+SYSTEM_PORTALS=${PICKER_SYSTEM_PORTALS:-/usr/share/xdg-desktop-portal}   # the tests point it at a folder of their own
+data=${XDG_DATA_HOME:-$HOME/.local/share}
+config=${XDG_CONFIG_HOME:-$HOME/.config}
+PORTALS=$data/nightdrive/portals
+DROPIN=$config/systemd/user/xdg-desktop-portal.service.d/nightdrive-picker.conf
+NAME=org.freedesktop.impl.portal.desktop.nightdrive
+SERVICE=$data/dbus-1/services/$NAME.service
+UNIT=xdg-desktop-portal.service
+
+is_on() { [[ -f $DROPIN ]]; }
+
+# The desktop's own choice of backends, as the portal would read it without our folder: the user's, else the system's
+base_conf() {
+  local f
+  for f in "$config/xdg-desktop-portal/hyprland-portals.conf" "$config/xdg-desktop-portal/portals.conf" \
+           /etc/xdg-desktop-portal/hyprland-portals.conf "$SYSTEM_PORTALS/hyprland-portals.conf"; do
+    [[ -f $f ]] && { cat "$f"; return; }
+  done
+  printf '[preferred]\ndefault=hyprland;gtk\n'
+}
+
+# That choice with FileChooser ours: gtk after it, should nightdrive.portal be gone
+conf() {
+  base_conf | awk '
+    /^org\.freedesktop\.impl\.portal\.FileChooser[ \t]*=/ { next }
+    { print }
+    /^\[preferred\]/ && !done { print "org.freedesktop.impl.portal.FileChooser=nightdrive;gtk"; done = 1 }
+    END { if (!done) { print "[preferred]"; print "org.freedesktop.impl.portal.FileChooser=nightdrive;gtk" } }'
+}
+
+restart_portal() {
+  systemctl --user daemon-reload
+  systemctl --user restart "$UNIT"
+}
+
+# Whether the portal on the session bus offers FileChooser (it does only with a backend for it)
+has_chooser() {
+  local _
+  for _ in $(seq 30); do
+    gdbus introspect --session -d org.freedesktop.portal.Desktop -o /org/freedesktop/portal/desktop 2>/dev/null \
+      | grep -q 'interface org.freedesktop.portal.FileChooser' && return 0
+    sleep 0.2
+  done
+  return 1
+}
+
+remove() { rm -rf "$PORTALS" "$DROPIN" "$SERVICE"; rmdir "$(dirname "$DROPIN")" 2>/dev/null || true; }
+
+on() {
+  [[ -d $SYSTEM_PORTALS/portals ]] || { echo "files picker: xdg-desktop-portal isn't installed." >&2; exit 1; }
+  rm -rf "$PORTALS"
+  mkdir -p "$PORTALS" "$(dirname "$DROPIN")" "$(dirname "$SERVICE")"
+  local p
+  for p in "$SYSTEM_PORTALS"/portals/*.portal; do
+    [[ -e $p ]] && ln -s "$p" "$PORTALS/"
+  done
+  printf '[portal]\nDBusName=%s\nInterfaces=org.freedesktop.impl.portal.FileChooser;\n' "$NAME" > "$PORTALS/nightdrive.portal"
+  conf > "$PORTALS/hyprland-portals.conf"
+  cp "$PORTALS/hyprland-portals.conf" "$PORTALS/portals.conf"      # a desktop named otherwise reads this one
+  printf '[D-BUS Service]\nName=%s\nExec=/usr/bin/python3 %s/portal.py\n' "$NAME" "$LIB" > "$SERVICE"
+  printf '# Files as the Open and Save window (files picker on; off takes this away)\n[Service]\nEnvironment=XDG_DESKTOP_PORTAL_DIR=%s\n' \
+    "$PORTALS" > "$DROPIN"
+  restart_portal
+  if ! has_chooser; then
+    echo "files picker: the portal didn't come back with a FileChooser; put back as it was." >&2
+    remove
+    restart_portal
+    exit 1
+  fi
+  echo "Apps' Open and Save windows are Files' now (GTK's when Files can't). files picker off: GTK's again."
+}
+
+off() {
+  local was=0
+  is_on && was=1
+  remove
+  (( was )) && restart_portal
+  echo "Apps' Open and Save windows are GTK's again."
+}
+
+status() {
+  local state=off
+  is_on && state=on
+  # The portal as it runs, not its unit: the drop-in counts only once it has started again
+  local pid running=false
+  pid=$(systemctl --user show "$UNIT" -p MainPID --value 2>/dev/null || echo 0)
+  if [[ ${pid:-0} != 0 ]] && tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -qx "XDG_DESKTOP_PORTAL_DIR=$PORTALS"; then
+    running=true
+  fi
+  if [[ ${1:-} == --json ]]; then
+    printf '{"picker": "%s", "running": %s, "portals": "%s", "backend": "%s"}\n' "$state" "$running" "$PORTALS" "$LIB/portal.py"
+  elif [[ $state == on && $running == false ]]; then
+    echo "On, but the portal running doesn't have it yet: files picker on starts it again."
+  elif [[ $state == on ]]; then
+    echo "On: Files is the Open and Save window ($LIB/portal.py)."
+  else
+    echo "Off: the Open and Save window is GTK's."
+  fi
+}
+
+case ${1:-status} in
+  on) on ;;
+  off) off ;;
+  status) status "${2:-}" ;;
+  *) echo "Usage: files picker [on|off|status [--json]]" >&2; exit 2 ;;
+esac
