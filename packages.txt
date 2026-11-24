@@ -58,6 +58,8 @@ blueman
 # hypr/scripts/headphones-ctl (Sony and AirPods: listening mode, ear detection over Bluetooth)
 python3-dbus
 python3-gobject
+# hypr/scripts/gamepad-home: the controller's Xbox button opens Games
+python3-evdev
 papirus-icon-theme
 jetbrains-mono-fonts-all
 eza

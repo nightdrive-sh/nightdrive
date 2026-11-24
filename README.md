@@ -63,7 +63,7 @@ copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal 
 
 ### Apps of its own
 
-Files, Mail, Contacts, Deck, Ferry, Notes, Tasks and Calendar come with every install; Garage waits in Launcher › System ›
+Files, Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar and Games come with every install; Garage waits in Launcher › System ›
 Install › Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the
 sidebar steps aside; narrower still, the list and the message take turns.
 
@@ -80,6 +80,8 @@ sidebar steps aside; narrower still, the list and the message take turns.
   with reminders as notifications, invitations from Mail and repeating events; the Launcher finds what's coming
 - **[Tasks](plugins/tasks/README.md)**: new, and simple for now. Its window shows your tasks (a notification when one
   comes due), and you add and change them with its command or by asking Claude ([Claude and your desktop](docs/claude.md))
+- **[Games](plugins/games/README.md)**: your games with their covers, Steam's too; the controller's Xbox button opens it,
+  and the d-pad and A play one
 
 ![Mail four ways: folders, list and message; list and message; and in a narrow window the list, then the message](docs/releases/0.6.0-mail-sizes.jpg)
 
@@ -272,6 +274,9 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 - **Game Mode**: the CPU at full speed for a game, in Launcher › Settings › Game Mode (or `nightdrive game-mode on`).
   Without it the CPU slows down between frames to save power, and a game stutters (a long frame every second); off goes
   back to the profile from before. It is power-profiles-daemon's performance profile (tuned's throughput-performance).
+- **Games**: the controller's Xbox button opens [Games](plugins/games/README.md) (without that app, Launcher › Games),
+  and the d-pad, A and B work there; while a Steam game runs, the button is Steam's. Launcher › Games lists the same
+  games, and searching finds Steam's (`nightdrive games` too).
 - **Region**: how dates and times are written, apart from the language: Finland 3.11.2026, the US 11/3/2026 and 2:30 PM
   with weeks from Sunday, ISO 2026-11-03 and a few more, in Launcher › Settings › Region (or `nightdrive region set fi`).
   Nightdrive's apps follow at once; it is `LC_TIME` in `~/.config/locale.conf`, so other programs started after follow
@@ -539,6 +544,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
 | `nightdrive low-power on` | Low Power Mode on a laptop, `off` or `toggle`; `status` (`--json`). `suggest off` stops the 10 % warning offering it |
 | `nightdrive game-mode on` | Game Mode: the CPU at full speed for games, `off` (back to the profile from before) or `toggle`; `status` (`--json`) |
+| `nightdrive games` | The games here, from their `.desktop` files and Steam's library (`--json`); `launch ID` starts one |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
 | `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |

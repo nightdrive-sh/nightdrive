@@ -112,12 +112,14 @@ done
 # Session target: brings up graphical-session.target, which xdg-desktop-portal needs (started by hyprland.lua)
 link "$repo/config/systemd/user/nightdrive-session.target" "$HOME/.config/systemd/user/nightdrive-session.target"
 # Update check: every 6 h a fetch, and a notification when new commits are waiting (nightdrive update check).
+# The controller's Xbox button (nightdrive-gamepad.service) is enabled below, with the update check.
 # Snippets, crash reports, Companion, the Hub's sync and backup: linked only, started when turned on (nightdrive snippets enable; launcher ›
 # Settings › Notifications; Settings › Companion; nightdrive backup setup). The plugin folders' units are linked below.
 # The services' failure notice: OnFailure=nightdrive-unit-failed@%n.service in a unit (hypr/scripts/unit_failed.py).
 units=(nightdrive-update-check.service nightdrive-update-check.timer nightdrive-snippets.service
        nightdrive-crash-reports.service nightdrive-companion.service nightdrive-unit-failed@.service
-       nightdrive-hub-sync.service nightdrive-hub-sync.timer nightdrive-backup.service nightdrive-backup.timer)
+       nightdrive-hub-sync.service nightdrive-hub-sync.timer nightdrive-backup.service nightdrive-backup.timer
+       nightdrive-gamepad.service)
 for u in "${units[@]}"; do link "$repo/config/systemd/user/$u" "$HOME/.config/systemd/user/$u"; done
 
 # ⌘Enter (terminal) and ⌘⌃Enter (Claude Code) open in ~/Projects, and kitty fails to start in a folder that doesn't exist
@@ -188,6 +190,8 @@ for d in "$repo"/plugins/*/ "$external"/*/; do
 done
 systemctl --user daemon-reload 2>/dev/null || true
 systemctl --user enable --now nightdrive-update-check.timer 2>/dev/null || true
+# The controller's Xbox button opens Games (hypr/scripts/gamepad-home): on for everyone, idle without a controller
+systemctl --user enable --now nightdrive-gamepad.service 2>/dev/null || true
 for u in "${reenable[@]}"; do
   [[ -e $HOME/.config/systemd/user/$u ]] && systemctl --user enable "$u" 2>/dev/null && echo "enabled     $u (again)"
 done

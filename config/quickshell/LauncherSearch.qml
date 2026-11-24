@@ -101,6 +101,8 @@ Item {
                 apps.appEntries(q).map(a => Object.assign({}, a, { item: Object.assign({}, a.item, { from: "Apps" }) })),
                 // Home Assistant's devices ("olohuone" → its lights): Enter turns one on/off right from the search
                 home.rootRows(),
+                // Steam's games ("tape" → Tape to Tape): Enter plays it
+                lv.games.rootRows(),
                 // The plugins' own rows (rootRows: Deck's albums, "fm-84" → Atlas)
                 ...pluginExts.map(e => e.rootRows ? e.rootRows() : [])
             ]) all = all.concat(src)

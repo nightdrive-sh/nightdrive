@@ -42,6 +42,7 @@ usage() {
   row "bluetooth|battery"        "Bluetooth devices or the battery as JSON"
   row "low-power [on|off|toggle]" "Low Power Mode on a laptop: status (--json); suggest on|off at 10 %"
   row "game-mode [on|off|toggle]" "Game Mode: the CPU at full speed for games; status (--json)"
+  row "games [list|launch ID]" "The games here (.desktop and Steam), as the Launcher's Games lists them (--json)"
   row "bar-style COMMAND"        "The top bar's look: opacity, icons, highlight, icon-opacity"
   row "nightlight [on|off]"      "Night light's warm tint: status, on, off, toggle (--json)"
   row "appearance"               "Wallpaper, theme, night light and the top bar's look now, as JSON"
@@ -162,6 +163,7 @@ case ${1:-} in
   bluetooth|battery) exec "$scripts/devices" "$1" ;;
   low-power) exec "$scripts/low-power" "${@:2}" ;;                    # Settings › Battery, the battery menu
   game-mode) exec "$scripts/game-mode" "${@:2}" ;;                    # Settings › Hardware
+  games) exec "$scripts/games" "${@:2}" ;;                            # Launcher › Games, the Xbox button
   companion) exec "$repo/bin/companion" "${@:2}" ;;                   # Settings › Companion (docs/companion.md)
   hub) exec python3 "$repo/config/hub/lib/cli.py" "${@:2}" ;;           # Nightdrive Hub's client (config/hub/README.md)
   backup) exec python3 "$repo/config/backup/lib/cli.py" "${@:2}" ;;     # restic, daily (docs/backup.md)

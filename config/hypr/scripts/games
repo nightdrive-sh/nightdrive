@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""The games on this computer (#3530): the Launcher's Games page and Claude's games tools read them here.
+  games list [--json]          every game: .desktop files with Categories=Game, and Steam's library
+  games launch ID [--json]     start one (ID from list: desktop:<file id> or steam:<appid>)
+  games steam-running          the appid of the Steam game running now, or nothing
+games_library.py finds them; gamepad-home (the Xbox button) opens the Launcher's Games page."""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import games_library  # noqa: E402
+
+
+def detach(argv):
+    """Starts a game apart from this command, so it outlives it and its output goes nowhere."""
+    subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+
+
+def notify(title, body):
+    if shutil.which("notify-send"):
+        detach(["notify-send", "-a", "Games", "-i", "gamepad-2", "-t", "8000", title, body])
+
+
+def launch(game):
+    if game["source"] == "desktop":
+        detach(["gio", "launch", game["path"]])
+        return
+    steam = shutil.which("steam")
+    if not steam:
+        raise RuntimeError("Steam isn't installed")
+    # Steam takes the address whether it is running or not (then it starts first). On an ARM Mac Steam and the game run
+    # under FEX, and the window may take a minute: the notification says it is on its way, so a wait isn't taken for an
+    # error. A game still downloading opens in Steam, which goes on with the download.
+    detach([steam, "steam://rungameid/" + game["id"].split(":", 1)[1]])
+    notify("Starting " + game["name"], "Steam starts it; it may take a moment" if game["installed"]
+           else "It is still downloading: Steam shows how far")
+
+
+def usage():
+    print(__doc__.split("\n", 1)[1].rsplit("games_library", 1)[0].rstrip(), file=sys.stderr)
+    return 2
+
+
+def main(argv):
+    as_json = "--json" in argv
+    args = [a for a in argv if a != "--json"]
+    cmd = args[0] if args else "list"
+    if cmd == "list":
+        games = games_library.all_games()
+        if as_json:
+            print(json.dumps({"games": games}, ensure_ascii=False))
+        else:
+            for g in games:
+                state = "" if g["installed"] else f"  (downloading {g['progress']} %)"
+                print(f"{g['id']:<32} {g['name']}{state}")
+        return 0
+    if cmd == "launch" and len(args) == 2:
+        game = games_library.find(args[1])
+        if not game:
+            print(f"No such game: {args[1]} (games list shows them)", file=sys.stderr)
+            return 1
+        try:
+            launch(game)
+        except (OSError, RuntimeError) as e:
+            print(f"Couldn't start {game['name']}: {e}", file=sys.stderr)
+            return 1
+        if as_json:
+            print(json.dumps({"started": game["id"], "name": game["name"]}, ensure_ascii=False))
+        return 0
+    if cmd == "steam-running":
+        appid = games_library.steam_game_running()
+        if appid:
+            print(appid)
+        return 0
+    return usage()
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,6 +1,29 @@
 {
   "tools": [
     {
+      "name": "games_list",
+      "title": "Games",
+      "description": "The games on this computer, as the Launcher's Games lists them (the controller's Xbox button opens it): .desktop apps whose category is Game, and the games in Steam's library. Each has id (for games_launch), name, source (desktop or steam), installed (false while Steam is still downloading it) and progress (percent while downloading).",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "games", "list", "--json"],
+      "class": "read",
+      "area": "apps-files"
+    },
+    {
+      "name": "games_launch",
+      "title": "Start a game",
+      "description": "Start a game by its id from games_list. It takes the screen, so the user allows it first. A Steam game starts through Steam, which may take a minute (on an ARM Mac Steam runs emulated); one still downloading opens in Steam, which goes on downloading.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"id": {"type": "string", "pattern": "^(desktop|steam):.+$", "description": "The game's id from games_list"}},
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "games", "launch", "{id}", "--json"],
+      "class": "act",
+      "area": "apps-files"
+    },
+    {
       "name": "windows_list",
       "title": "Open windows",
       "description": "The windows open on this desktop, the most recently used first: address, app, title, workspace (\"background\" for an app hidden in the background), whether it has the focus and whether it is on screen now, its size in logical pixels, whether it floats and whether it is an X11 (Xwayland) app. A window Send to Claude leaves out (a password manager, a private browser window, an app the user listed) is there as private, without its title. Use the address to name the window to the other window tools.",
