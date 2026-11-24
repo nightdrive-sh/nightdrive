@@ -1,0 +1,4 @@
+#!/bin/bash
+# Network Drives' command (plugins/netdrive/lib/cli.py has its help): linked to ~/.local/bin by link.sh
+here=$(dirname "$(dirname "$(readlink -f "$0")")")
+exec python3 "$here/lib/cli.py" "$@"

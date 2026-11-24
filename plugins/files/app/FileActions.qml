@@ -103,7 +103,7 @@ QtObject {
     }
     function unmount(entry) {
         app.ops.run(["unmount", entry.path], (d, why) => {
-            app.say(d ? entry.name + " can be taken out" : why, !d)
+            app.say(d ? (d.said || entry.name + " can be taken out") : why, !d)   // a network drive says its own
             if (d && (app.path === entry.path || app.path.startsWith(entry.path + "/"))) app.go(app.home, "")
             app.places.refresh()
         })

@@ -1,0 +1,13 @@
+{
+  "tools": [
+    {
+      "name": "netdrive_status",
+      "title": "Network drives",
+      "description": "The user's network drives (rclone mounts as folders in home, e.g. a Storage Box at ~/Storage/Files): each one's name, source (ssh HOST or an rclone remote), path, read_only, enabled (mounts at login), state (mounted; connecting: waiting for its host, e.g. offline; failed; off; stale: a leftover mount), detail (the service's own line), uploads (files saved but not uploaded yet) and failed_uploads. line says it in a sentence. Use it before reading or writing files under a drive's path: a drive that isn't mounted is an empty read-only folder, and without a network a file not opened before fails to open after up to ~40 s.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["netdrive", "list", "--json"],
+      "class": "read",
+      "area": "netdrive"
+    }
+  ]
+}

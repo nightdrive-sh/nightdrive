@@ -1,0 +1,22 @@
+# A network drive as a folder (plugins/netdrive, netdrive add NAME): rclone mount, an instance per drive.
+# netdrive run waits for the host before mounting, so a computer started offline waits quietly (activating, with its
+# status line) instead of failing; meanwhile the folder is an empty local one, and nothing hangs on it.
+[Unit]
+Description=Nightdrive network drive %i
+PartOf=nightdrive-session.target
+After=nightdrive-session.target
+OnFailure=nightdrive-unit-failed@%n.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+ExecStart=%h/.local/bin/netdrive run %i
+# rclone unmounts on SIGTERM; a program still in the folder can keep it from that, so the release takes it lazily
+ExecStopPost=-%h/.local/bin/netdrive release %i
+TimeoutStartSec=infinity
+TimeoutStopSec=20
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=nightdrive-session.target

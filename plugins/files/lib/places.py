@@ -6,12 +6,14 @@ app's Open dialog show, so one added here is there too and theirs are here. Only
 anything else (sftp://, a network share) is kept in the file as it is.
 
 The disks come from Gio's volume monitor (udisks2 through gvfs): a mounted one with its folder, one that can be
-mounted without it. Without Gio (python3-gobject) there are none, and the rest still works.
+mounted without it. Without Gio (python3-gobject) there are none, and the rest still works. Network Drives' drives
+come after them, from netdrives.py, which mounts and unmounts them too.
 """
 import os, re, subprocess
 from pathlib import Path
 from urllib.parse import quote, unquote, urlparse
 
+import netdrives
 import trash
 
 # Home's own folders in the sidebar's order, by xdg-user-dirs' names, and each one's glyph
@@ -119,7 +121,12 @@ def bookmark(path, on):
 
 
 def devices():
-    """[{name, path (its folder, "" unmounted), device, glyph, unmount}]: the disks the user can use"""
+    """[{name, path (its folder, "" unmounted), device, glyph, unmount}]: the disks the user can use, then the network
+    drives"""
+    return local_devices() + netdrives.rows()
+
+
+def local_devices():
     try:
         import gi
         gi.require_version("Gio", "2.0")
@@ -128,11 +135,12 @@ def devices():
         return []
     mon = Gio.VolumeMonitor.get()
     rows, seen = [], set()
+    network = netdrives.mounted()     # Gio sees them too, as disks: netdrives.rows() lists them its own way
     for m in mon.get_mounts():
         if m.is_shadowed():
             continue
         root = m.get_root().get_path()
-        if not root or root == "/":
+        if not root or root == "/" or root in network:
             continue
         seen.add(root)
         vol = m.get_volume()
@@ -151,7 +159,9 @@ def devices():
 
 
 def mount(device):
-    """Mounts a disk by its device (/dev/sdb1) with gio; {path} where it went"""
+    """Mounts a disk by its device (/dev/sdb1) with gio, or a network drive (netdrive:NAME); {path} where it went"""
+    if device.startswith(netdrives.PREFIX):
+        return netdrives.mount(device)
     r = subprocess.run(["gio", "mount", "-d", device], capture_output=True, text=True, timeout=60)
     if r.returncode != 0:
         raise trash.Refused(r.stderr.strip().split("\n")[-1] or f"{device} couldn't be mounted.")
@@ -161,7 +171,9 @@ def mount(device):
 
 
 def unmount(path):
-    """Unmounts (and, for a stick, ejects) the disk at path; {unmounted: path}"""
+    """Unmounts (and, for a stick, ejects) the disk at path, or stops the network drive there; {unmounted: path}"""
+    if path in netdrives.mounted():
+        return netdrives.unmount(path)
     r = subprocess.run(["gio", "mount", "-e", path], capture_output=True, text=True, timeout=60)
     if r.returncode != 0:
         r = subprocess.run(["gio", "mount", "-u", path], capture_output=True, text=True, timeout=60)
