@@ -88,11 +88,17 @@ Item {
         pointerY = view.mapFromItem(null, scenePos.x, scenePos.y).y
         aim()
     }
-    // The gap nearest the pointer: above a row's middle, the gap before it
+    // The gap nearest the pointer: above a row's middle, the gap before it. Between two rows (the list's spacing) no
+    // row is under it: that is the gap before the row just below, not the list's end, where the line jumped to as a
+    // row was carried across the first gap
     function aim() {
         const y = pointerY + view.contentY
-        let i = view.indexAt(view.width / 2, y)
-        if (i < 0) { slot = y < view.originY + 4 ? 0 : app.shown.length; return }
+        const i = view.indexAt(view.width / 2, y)
+        if (i < 0) {
+            const below = view.indexAt(view.width / 2, y + view.spacing + 1)
+            slot = below >= 0 ? below : y < view.originY ? 0 : app.shown.length
+            return
+        }
         const item = view.itemAtIndex(i)
         slot = item && y > item.y + item.height / 2 ? i + 1 : i
     }
