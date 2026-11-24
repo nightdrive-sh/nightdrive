@@ -8,7 +8,8 @@ import "Views.js" as Views
 // alone). The moves run one at a time, in the order made, so ⌥↓ held down ends where the rows show it; the window's
 // reads wait until the last is written (shell.qml's load), so a read half-way doesn't put a row back for a moment.
 // Each move is one step of ⌘Z (Actions.undos), with no toast: the move itself is what the user sees.
-// Declared inside the ListView, so it lives in its content: the drop line is placed in content coordinates.
+// It goes in the ListView's content (parent), so the drop line is placed in the rows' own coordinates and scrolls with
+// them: declared inside a ListView an item is the view's child, where a scrolled list put the line off by the scroll.
 Item {
     id: root
     required property ListView view
@@ -19,6 +20,7 @@ Item {
     readonly property bool busy: queue.length > 0 || runner.running
     property var queue: []              // [argv] still to run
 
+    parent: view.contentItem
     width: view.width
     height: 0
     z: 2
@@ -133,9 +135,11 @@ Item {
     Rectangle {
         visible: root.dragging && root.slot >= 0 && root.slot !== root.from && root.slot !== root.from + 1
         readonly property var below: root.view.itemAtIndex(Math.min(root.slot, root.app.shown.length - 1))
-        x: 12; width: root.view.width - 24
+        x: 4; width: root.view.width - 8
         height: 2; radius: 1
-        y: !below ? 0 : root.slot < root.app.shown.length ? below.y - 2 : below.y + below.height
+        // Above the first row: in the middle of the list's top margin, where it is seen
+        y: !below ? 0 : root.slot === 0 ? below.y - root.view.topMargin / 2 - 1
+           : root.slot < root.app.shown.length ? below.y - 2 : below.y + below.height
         color: root.c.accent
     }
 }
