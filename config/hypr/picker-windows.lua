@@ -25,10 +25,9 @@ if on then
     hl.env("GTK_USE_PORTAL", "1")
 end
 
--- The picker keeps the keyboard while it is open, as a dialog does. With follow_mouse, a drag that selects the name and
--- ends past the picker's edge gave the keyboard to the window under the pointer on the next move after the release, and
--- the selection was gone (#3534); a click elsewhere took it too, though the app behind waits for the answer. Layers (the
--- launcher, the bar's menus) still get the keyboard.
+-- The picker keeps the keyboard while it is open, as a dialog does: a click elsewhere doesn't take it, as the app behind
+-- waits for the answer. A drag that selects the name past its edge keeps it everywhere now (drag-focus.lua, #3540); this
+-- rule was its first fix (#3534) and stays for the click. Layers (the launcher, the bar's menus) still get the keyboard.
 hl.window_rule({
     name  = "picker-stays-focused",
     match = { class = "^" .. CLASS .. "$" },

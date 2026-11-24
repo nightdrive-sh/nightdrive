@@ -63,6 +63,7 @@ require("layer-keys")   -- the window under a layer that holds the keyboard look
 require("pm-space")     -- a project manager's own workspace, its sessions as tabs beside it: pm-space.lua
 require("agent-windows") -- a window a Claude session opens leaves the keyboard where it is: agent-windows.lua
 require("picker-windows") -- Files' Open and Save window floats over the app that asked: picker-windows.lua
+require("drag-focus")    -- a drag let go over another window leaves the keyboard where it was: drag-focus.lua
 
 -----------------------
 ---- WINDOW RULES ----

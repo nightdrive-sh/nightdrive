@@ -271,6 +271,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   stop working for 15 s, with a countdown, and come back by themselves (also if you close the lid). A mouse still works:
   click the countdown to end it sooner.
 - **Mouse**: the wheel's scroll speed, from 0.5× to 3×, in Launcher › Settings › Mouse. The trackpad keeps its own.
+  The keyboard goes to the window the mouse moves into. A drag let go over another window (text selected
+  past a window's edge) leaves the keyboard where it was, until the mouse goes on into a window or you click.
 - **Game Mode**: the CPU at full speed for a game, in Launcher › Settings › Game Mode (or `nightdrive game-mode on`).
   Without it the CPU slows down between frames to save power, and a game stutters (a long frame every second); off goes
   back to the profile from before. It is power-profiles-daemon's performance profile (tuned's throughput-performance).
