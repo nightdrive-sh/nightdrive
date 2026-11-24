@@ -300,6 +300,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Music | [Deck](plugins/deck/README.md) (Nightdrive's own Spotify player, needs Premium) | bar icon, music menu, player row in the Launcher, media keys |
 | Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own) | a mailbox both ways with your phone and other computers, over Tailscale |
 | Sync | [Hub](docs/hub.md) (Nightdrive's own) | Tasks the same on all your computers through a small server of your own, over Tailscale (Settings › Hub) |
+| Backup | [restic](docs/backup.md) (`nightdrive backup`) | this computer once a day, encrypted, to an SSH server, a bucket or another disk; snapshots to restore from |
 | iPad | [Companion](docs/companion.md) (Nightdrive's own) | your Claude Code sessions, dictation and six buttons of your own on an iPad or a phone, over Tailscale (Settings › Companion) |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
 | Passwords (optional) | [1Password](plugins/1password/README.md) and its `op` CLI | Passwords level in the Launcher, SSH agent |

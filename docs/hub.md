@@ -58,7 +58,8 @@ merged or kept twice, as above.
 The Hub keeps every version of every file. Each night it lets go of versions replaced over 90 days ago, copies its
 data to `~/nightdrive-hub-backup` on the same machine, and checks the data (`install-server.sh` sets this up; a run
 that finds a problem shows in `systemctl --user --failed` there). That copy is a guard against mistakes, not against
-losing the machine: take it elsewhere with your own backup if you want one. The commands, on the Hub's machine:
+losing the machine: [`nightdrive backup`](backup.md) on the Hub's machine takes it elsewhere every day. The commands, on
+the Hub's machine:
 
 ```sh
 cd ~/.local/share/nightdrive-hub
