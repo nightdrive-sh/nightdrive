@@ -27,14 +27,14 @@ jobs:
     steps:
       # The tests' own needs besides: the Python libraries the plugins import, and the commands the scripts under
       # test run (jq, lua for Hyprland's config, gio with the MIME database, xdg-mime with mimetype, xdg-user-dir,
-      # notmuch, khal, fd, restic), as a Nightdrive desktop has them. Quickshell and Chromium aren't in Fedora's repos or are too big: the tests
+      # notmuch, khal, fd, restic, dbus-run-session), as a Nightdrive desktop has them. Quickshell and Chromium aren't in Fedora's repos or are too big: the tests
       # that need them skip themselves, and the log names each skip's reason.
       - name: Install the tools
         run: >-
           dnf -y -q install git-core python3 ShellCheck gitleaks
           tzdata jq lua glib2 shared-mime-info xdg-user-dirs notmuch khal ffmpeg-free fd-find restic
           python3-icalendar python3-dateutil python3-vobject python3-cryptography
-          python3-gobject gdk-pixbuf2 poppler-utils xdg-utils perl-File-MimeInfo
+          python3-gobject gdk-pixbuf2 poppler-utils xdg-utils perl-File-MimeInfo dbus-daemon
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # gitleaks reads every commit

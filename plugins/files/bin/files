@@ -85,6 +85,7 @@ Usage: files [PATH | command]
   show PATH      the same, for a file
   enable         Files among the desktop's apps, as the one that opens folders (the installer)
   disable        take it away again: folders open in Nautilus
+  picker on|off  Files as the apps' Open and Save window, or GTK's again; picker status [--json]
   restart, quit, log
   help           this text
 USAGE
@@ -95,6 +96,7 @@ case ${1:-open} in
   show)       open_path "${2:-}" ;;
   enable)     enable ;;
   disable)    disable ;;
+  picker)     shift; exec "$APP_DIR/lib/picker-setup" "$@" ;;
   help|-h|--help) usage ;;
   restart|quit|log|settings) app_command "$@" ;;
   -*)         usage >&2; exit 2 ;;

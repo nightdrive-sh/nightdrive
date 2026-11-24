@@ -1,0 +1,52 @@
+#!/bin/bash
+# portal-try [COMMAND…]: runs COMMAND (zenity's Save window by default) against a portal of its own, whose FileChooser is
+# Files' (portal.py), on a D-Bus session of its own: the desktop's portal and the apps on it don't change, so Files'
+# Open and Save window can be tried before `files picker on` (README.md › Open and Save). Only this checkout's
+# portal.py answers, and only the portal's FileChooser is there.
+#
+# The session's services are only portal.py and GTK's backend: nothing else of the desktop's (the document portal, gvfs) starts a second time.
+# GTK 4 asks the portal only when told to (GDK_DEBUG=portals), so the default command says so.
+set -euo pipefail
+
+LIB=$(dirname "$(readlink -f "$0")")
+PORTAL=/usr/libexec/xdg-desktop-portal
+[[ -x $PORTAL ]] || { echo "portal-try: xdg-desktop-portal isn't installed." >&2; exit 1; }
+(( $# )) || set -- env GDK_DEBUG=portals GTK_A11Y=none zenity --file-selection --save --filename="$HOME/Untitled.txt"
+
+dir=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/portal-try.XXXXXX")
+trap 'rm -rf "$dir"' EXIT
+mkdir -p "$dir/services" "$dir/portals"
+cat > "$dir/services/nightdrive.service" <<EOF
+[D-BUS Service]
+Name=org.freedesktop.impl.portal.desktop.nightdrive
+Exec=/usr/bin/python3 $LIB/portal.py
+EOF
+# GTK's backend too, for when Files' picker fails (pickgtk.py: FILES_PICK_READY_S=0.01 portal-try shows it)
+gtk=/usr/share/dbus-1/services/org.freedesktop.impl.portal.desktop.gtk.service
+[[ -f $gtk ]] && cp "$gtk" "$dir/services/"
+printf '[portal]\nDBusName=org.freedesktop.impl.portal.desktop.nightdrive\nInterfaces=org.freedesktop.impl.portal.FileChooser;\n' \
+  > "$dir/portals/nightdrive.portal"
+# With XDG_DESKTOP_PORTAL_DIR set, the portal reads its choice of backends from that folder too
+printf '[preferred]\ndefault=none\norg.freedesktop.impl.portal.FileChooser=nightdrive\n' > "$dir/portals/hyprland-portals.conf"
+cat > "$dir/bus.conf" <<EOF
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>session</type>
+  <listen>unix:dir=$dir</listen>
+  <auth>EXTERNAL</auth>
+  <servicedir>$dir/services</servicedir>
+  <policy context="default"><allow send_destination="*" eavesdrop="true"/><allow eavesdrop="true"/><allow own="*"/></policy>
+</busconfig>
+EOF
+
+# shellcheck disable=SC2016  # expanded by the inner shell, on the session's bus
+dbus-run-session --config-file="$dir/bus.conf" -- bash -c '
+  dir=$1 portal=$2; shift 2
+  XDG_DESKTOP_PORTAL_DIR=$dir/portals "$portal" -r >"$dir/portal.log" 2>&1 &
+  for _ in $(seq 50); do
+    gdbus introspect --session -d org.freedesktop.portal.Desktop -o /org/freedesktop/portal/desktop 2>/dev/null \
+      | grep -q portal.FileChooser && break
+    sleep 0.1
+  done
+  "$@"' - "$dir" "$PORTAL" "$@"

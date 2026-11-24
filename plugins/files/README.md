@@ -55,11 +55,30 @@ found by a search for "files" or "nautilus" after Files.
 - The grid's thumbnails (pictures, a PDF's first page, a video's frame) are kept where Nautilus and the other apps keep theirs (`~/.cache/thumbnails`), so each is drawn once and shared with them. Video frames need ffmpeg.
 - The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). `d` moves to it at once (Undo brings it back), but asks first about home's own folders (Documents…), the sidebar's and home's hidden ones (`.config`…); home itself, the folders above it and the trash never go. In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
 
+## Open and Save
+
+Files can be the apps' Open and Save window, in place of GTK's: `files picker on` (`off` gives GTK's back, `status`
+says which). It is Files as it is, keys, sidebar and preview, with a bar at the foot: Save's name (picked without its
+ending; a name that is there asks before replacing it, a folder's name goes into it), the app's file types (⌘T, or the
+button; a new type changes the name's ending), Cancel (Esc) and the app's button (⏎). Open takes the marked files, else
+the picked one, or a folder when the app asks for one. It floats over the app that asked.
+
+- Apps that ask the desktop's portal get it: Brave and Chromium, Flatpak apps. While it is on, apps started from then on
+  ask it too: GTK 4 (zenity: Nightdrive's own pickers, Ferry) through `GDK_DEBUG=portals`, GTK 3 and Firefox through
+  `GTK_USE_PORTAL=1`; apps already open keep GTK's until they start again, the launcher's until a new login. Qt apps
+  and LibreOffice draw their own.
+- When Files' window doesn't come up in 5 s, or closes without an answer, GTK's opens with the same request, so a save
+  never hangs.
+- No root needed: it is a folder of the user's (`~/.local/share/nightdrive/portals`), named to xdg-desktop-portal by a
+  drop-in of its unit, which `on` starts again. Off, they are gone. `lib/portal-try` tries it first on a portal of its
+  own, leaving the desktop's as it is.
+
 ## In a terminal
 
     files                        # a new window, home
     files ~/Projects             # a folder in a new window; a file shows in its folder, picked
     files enable                 # Files opens folders for the desktop (the installer runs it)
     files disable                # folders open in Nautilus again, under its own name
+    files picker on              # Files as the apps' Open and Save window (off: GTK's again; status [--json])
 
 Needs: nothing to set up (Python, GObject, GdkPixbuf, wl-clipboard, poppler-utils and fd-find, which its installer adds)
