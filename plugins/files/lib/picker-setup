@@ -60,6 +60,18 @@ has_chooser() {
   return 1
 }
 
+# The apps started from now on ask the portal (or don't): the running Hyprland's environment, as
+# config/hypr/picker-windows.lua sets it at the next start. Not systemd's or D-Bus's: xdg-desktop-portal-gtk, GTK's
+# fallback, is a GTK app itself and must draw its own window
+tell_hyprland() {
+  [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && command -v hyprctl >/dev/null || return 0
+  if [[ $1 == on ]]; then
+    hyprctl eval 'hl.env("GDK_DEBUG", "portals") hl.env("GTK_USE_PORTAL", "1")' >/dev/null 2>&1 || true
+  else
+    hyprctl eval 'hl.env("GDK_DEBUG", "") hl.env("GTK_USE_PORTAL", "")' >/dev/null 2>&1 || true
+  fi
+}
+
 remove() { rm -rf "$PORTALS" "$DROPIN" "$SERVICE"; rmdir "$(dirname "$DROPIN")" 2>/dev/null || true; }
 
 on() {
@@ -83,7 +95,9 @@ on() {
     restart_portal
     exit 1
   fi
-  echo "Apps' Open and Save windows are Files' now (GTK's when Files can't). files picker off: GTK's again."
+  tell_hyprland on
+  echo "Apps' Open and Save windows are Files' now (GTK's when Files can't), in the apps started from now on."
+  echo "files picker off: GTK's again."
 }
 
 off() {
@@ -91,6 +105,7 @@ off() {
   is_on && was=1
   remove
   (( was )) && restart_portal
+  tell_hyprland off
   echo "Apps' Open and Save windows are GTK's again."
 }
 

@@ -63,9 +63,10 @@ ending; a name that is there asks before replacing it, a folder's name goes into
 button; a new type changes the name's ending), Cancel (Esc) and the app's button (⏎). Open takes the marked files, else
 the picked one, or a folder when the app asks for one. It floats over the app that asked.
 
-- Apps that ask the desktop's portal for the window get it (Flatpak apps; others are being checked one by one). GTK 4
-  apps, zenity among them, ask it only with `GDK_DEBUG=portals`, GTK 3 apps with `GTK_USE_PORTAL=1`, Firefox with
-  `widget.use-xdg-desktop-portal.file-picker` at 1 in `about:config`; the others, and LibreOffice, draw their own.
+- Apps that ask the desktop's portal get it: Brave and Chromium, Flatpak apps. While it is on, apps started from then on
+  ask it too: GTK 4 (zenity: Nightdrive's own pickers, Ferry) through `GDK_DEBUG=portals`, GTK 3 and Firefox through
+  `GTK_USE_PORTAL=1`; apps already open keep GTK's until they start again, the launcher's until a new login. Qt apps
+  and LibreOffice draw their own.
 - When Files' window doesn't come up in 5 s, or closes without an answer, GTK's opens with the same request, so a save
   never hangs.
 - No root needed: it is a folder of the user's (`~/.local/share/nightdrive/portals`), named to xdg-desktop-portal by a

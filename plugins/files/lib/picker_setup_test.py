@@ -22,9 +22,12 @@ class PickerSetup(unittest.TestCase):
         self.bin.mkdir()
         self.log = self.tmp / "systemctl.log"
         self.fake("systemctl", f'echo "$*" >> {self.log}; [ "$3" = MainPID ] && echo 0; true')
+        self.hypr = self.tmp / "hyprctl.log"
+        self.fake("hyprctl", f'echo "$*" >> {self.hypr}')
         self.chooser(True)
         self.env = dict(os.environ, HOME=str(self.tmp), XDG_DATA_HOME=str(self.data), XDG_CONFIG_HOME=str(self.config),
-                        PATH=f"{self.bin}:{os.environ['PATH']}", PICKER_SYSTEM_PORTALS=str(system))
+                        PATH=f"{self.bin}:{os.environ['PATH']}", PICKER_SYSTEM_PORTALS=str(system),
+                        HYPRLAND_INSTANCE_SIGNATURE="test")
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -57,11 +60,13 @@ class PickerSetup(unittest.TestCase):
         self.assertIn(str(SETUP.parent / "portal.py"), service.read_text())
         self.assertIn("--user restart xdg-desktop-portal.service", self.log.read_text())
         self.assertEqual(json.loads(self.run_setup("status", "--json").stdout)["picker"], "on")
+        self.assertIn('hl.env("GDK_DEBUG", "portals") hl.env("GTK_USE_PORTAL", "1")', self.hypr.read_text())
 
         self.log.unlink()
         self.run_setup("off")
         self.assertFalse(portals.exists() or dropin.exists() or service.exists())
         self.assertIn("restart", self.log.read_text())
+        self.assertIn('hl.env("GDK_DEBUG", "")', self.hypr.read_text().splitlines()[-1])
         self.assertIn("Off", self.run_setup("status").stdout)
 
     def test_off_when_off_leaves_the_portal_be(self):
