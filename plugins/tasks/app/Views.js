@@ -23,6 +23,16 @@ function lateFirst(rows) {
     return rows.filter(function (t) { return t.overdue }).concat(rows.filter(function (t) { return !t.overdue }))
 }
 
+// A list's own view: in the user's order (lib/order.py's key, lowest first), ties as cli.py breaks them
+function byOrder(rows) {
+    return rows.slice().sort(function (a, b) {
+        return (a.order - b.order) || (a.created || "").localeCompare(b.created || "") || a.id.localeCompare(b.id)
+    })
+}
+
+// Whether a task can be moved in the view: only in a list's own, the one view whose order is the user's
+function orderable(view) { return view.kind === "list" }
+
 function newestDone(tasks, max) {
     return tasks.filter(function (t) { return t.done })
         .sort(function (a, b) { return (b.completed || "").localeCompare(a.completed || "") }).slice(0, max)
@@ -56,7 +66,7 @@ function rows(tasks, view, o) {
         out = tasks.filter(function (t) { return !t.done })
         if (kind === "today") out = lateFirst(out.filter(function (t) { return dueToday(t, o.today) }))
         else if (kind === "upcoming") out = lateFirst(out.filter(function (t) { return !!t.due }))
-        else out = out.filter(function (t) { return t.list_id === view.id })
+        else out = byOrder(out.filter(function (t) { return t.list_id === view.id }))
     }
     return out.map(function (t) { return Object.assign({}, t, { section: section(t, kind, o) }) })
 }

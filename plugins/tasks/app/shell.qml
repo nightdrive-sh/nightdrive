@@ -80,7 +80,8 @@ ShellRoot {
 
         property string keepNext: ""        // a task to pick once the next read is in (the one just added)
         property string keepList: ""        // a list's id to show then (one just made, renamed or brought back)
-        function load() { loader.running = true }
+        // Not while moves are still being written (Reorder): the last one reads the files once it is done
+        function load() { if (!reorder.busy) loader.running = true }
         Process {
             id: loader
             command: ["python3", win.helper, "list", "--json", "--view", "all"]
@@ -160,6 +161,14 @@ ShellRoot {
             else listView.positionViewAtIndex(current, ListView.Contain)
         }
         ScrollHold { id: holdScroll; view: listView; app: win }
+        // The rows in a new order (a task moved, Reorder) before the files say so: the view stays where it was
+        function reshow(rows, index) {
+            const y = listView.contentY
+            shown = rows; current = index
+            listView.forceLayout()
+            listView.contentY = y
+            listView.positionViewAtIndex(index, ListView.Contain)
+        }
         function pickSource(i) {
             if (i < 0 || i >= sources.length) return
             if (searching) endSearch()
@@ -194,6 +203,7 @@ ShellRoot {
         function say(t, danger) { toast.show(t, { danger: !!danger }) }
         function offer(t, undo) { toast.show(t, { action: "Undo", run: undo }) }
         Actions { id: ops; app: win }
+        readonly property Item mover: reorder         // a row dragged to another place (TaskRow)
         readonly property var ticking: ops.ticking   // the rows ticked a moment ago (Actions.toggle)
         // A task's circle, Space: done, or back to open in Done
         function toggleDone(index) { ops.toggle(shown[index === undefined ? current : index]) }
@@ -275,11 +285,12 @@ ShellRoot {
                 Layout.fillHeight: true
                 focus: true
                 Keys.onPressed: e => {
-                    const k = e.key, ctrl = e.modifiers & Qt.ControlModifier
+                    const k = e.key, ctrl = e.modifiers & Qt.ControlModifier, alt = e.modifiers & Qt.AltModifier
                     win.look.moved(e)
                     sheet.pressed(e)
                     if (e.accepted) return
-                    if (k === Qt.Key_Tab || k === Qt.Key_Backtab) win.pane = win.pane === "list" && win.sidebarShown ? "sources" : "list"
+                    if (alt && win.pane === "list" && (k === Qt.Key_Up || k === Qt.Key_Down)) reorder.step(k === Qt.Key_Up ? -1 : 1)
+                    else if (k === Qt.Key_Tab || k === Qt.Key_Backtab) win.pane = win.pane === "list" && win.sidebarShown ? "sources" : "list"
                     else if (win.pane === "sources" && (k === Qt.Key_Down || k === Qt.Key_J)) win.pickSource(win.source + 1)
                     else if (win.pane === "sources" && (k === Qt.Key_Up || k === Qt.Key_K)) win.pickSource(win.source - 1)
                     else if (win.pane === "sources" && (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Right || k === Qt.Key_Escape)) win.pane = "list"
@@ -362,6 +373,7 @@ ShellRoot {
                             font.family: c.font; font.pixelSize: 11; font.weight: Font.Medium
                         }
                         delegate: TaskRow { c: win.look; app: win }
+                        Reorder { id: reorder; view: listView; app: win; ops: ops; c: win.look }
                         Column {
                             visible: win.loaded && win.shown.length === 0
                             anchors.centerIn: parent
@@ -389,7 +401,7 @@ ShellRoot {
             id: sheet
             c: win.look
             groups: [
-                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again (again within 2 s: called off)"], ["c", "Copy its note"], ["Delete", "To the trash"], ["⌘Z", "Undo the last change"]] },
+                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again (again within 2 s: called off)"], ["c", "Copy its note"], ["Delete", "To the trash"], ["⌥↑ ⌥↓", "Move it up, down in its list (or drag it)"], ["⌘Z", "Undo the last change"]] },
                 { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
                 { title: "Search", keys: [["/  ⌘F", "Search every list"], ["⏎  ↓", "To the tasks found"], ["Esc", "End the search"]] },
                 { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"]] },

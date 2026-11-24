@@ -4,7 +4,8 @@ import qs.kit
 
 // A task in the list: its circle (ticked when done), the title, and a line with when it's due (red once late), its list
 // (in the views that mix lists) and the note's first line. The picked row shows the whole note: there is no other pane,
-// so Copy text (c) sits under it, to paste the note as such into another app or a Claude session.
+// so Copy text (c) sits under it, to paste the note as such into another app or a Claude session. In a list's own view a
+// row is dragged up or down to another place (Reorder).
 AppRow {
     id: row
     required property var modelData
@@ -19,6 +20,22 @@ AppRow {
     TapHandler {
         onTapped: { row.app.current = row.index; row.app.toList() }
         onDoubleTapped: row.app.editTask(row.index)
+    }
+    // Up or down only, with the mouse or touchpad: a touch screen's drag scrolls the list. The list mustn't take the
+    // drag over once it has started (as Notes' rows)
+    DragHandler {
+        target: null
+        enabled: row.app.mover.can
+        xAxis.enabled: false
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        grabPermissions: PointerHandler.TakeOverForbidden
+        cursorShape: Qt.ClosedHandCursor
+        // Dimmed while it is carried (set, not bound: the tick's fade sets opacity too)
+        onActiveChanged: {
+            row.opacity = active ? 0.45 : 1
+            if (active) row.app.mover.start(row.index); else row.app.mover.end()
+        }
+        onCentroidChanged: if (active) row.app.mover.over(centroid.scenePosition)
     }
 
     // Ticked a moment ago (Actions.ticking): the row shows the new state at once and fades just before it leaves
