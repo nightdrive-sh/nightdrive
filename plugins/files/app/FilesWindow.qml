@@ -18,7 +18,9 @@ FloatingWindow {
     required property int key            // this window's in manager.windows
     property string startPath: ""         // where it opens (home when empty), and the file picked there
     property string startSelect: ""
-    title: "Files"
+    // Another app's Open or Save window (picker.qml, lib/portal.py): the request, and PickBar under the window
+    property var pick: null
+    title: pick ? pick.title : "Files"
     implicitWidth: 1100
     implicitHeight: 720
     color: c.bg
@@ -230,6 +232,7 @@ FloatingWindow {
     function openRow(f, inApp, look) {
         if (!f || trashShown) return
         if (f.dir) go(f.path, "")
+        else if (pick) pickBar.take(f)
         else if (f.member !== undefined) { if (!quick.open) quick.toggle() }
         else if (look && Format.isArchive(f.name)) { archive.look(f.path); go(f.path, "") }
         else if (!inApp && Format.isArchive(f.name)) ops.extract(f.path)
@@ -274,6 +277,7 @@ FloatingWindow {
         if (filter || filtering) endFilter()
         else if (marked.length) marks = ({})
         else if (clip.cut.length) manager.cut = []
+        else if (pick) pickBar.cancel()
     }
 
     // The filter (/, ⌘F): the field in the header narrows the rows as it is typed into. Its scope is this folder, or with
@@ -313,6 +317,7 @@ FloatingWindow {
     readonly property alias acts: acts
     readonly property alias drag: dragger
     readonly property alias quick: quick
+    readonly property alias pickBar: pickBar
     readonly property alias grid: grid
     readonly property alias toast: toast
     readonly property alias compress: compressPanel
@@ -328,7 +333,8 @@ FloatingWindow {
     // (and the next letters would filter by themselves)
     function toList() { pane = "list"; header.field.focus = false; listScope.forceActiveFocus() }
     function switchPane() {
-        if (pane === "list" && sidebarShown) {
+        if ((pane === "side" || !sidebarShown) && pickBar.focusName()) pane = "list"   // Save's name, then the list again
+        else if (pane === "list" && sidebarShown) {
             const i = places.entries.findIndex(e => trashShown ? e.kind === "trash" : e.path === path)
             sideIndex = Math.max(0, i); pane = "side"
         } else pane = "list"
@@ -358,6 +364,7 @@ FloatingWindow {
     RowLayout {
         id: content
         anchors.fill: parent
+        anchors.bottomMargin: pickBar.implicitHeight
         spacing: 0
         AppPointer { c: win.look }
 
@@ -414,6 +421,8 @@ FloatingWindow {
             app: win
         }
     }
+
+    PickBar { id: pickBar; c: win.look; app: win; behind: content; anchors.bottom: parent.bottom; width: parent.width; height: implicitHeight }
 
     QuickLook { id: quick; c: win.look; app: win }       // a layer over the screen, not in the window
 
