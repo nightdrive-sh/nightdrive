@@ -269,14 +269,16 @@ end
 -- ⌘O with the Mac Keyboard Shortcuts plugin, whose Nautilus extension makes Enter rename. ⌥↑ goes to the parent folder
 -- (Alt+Up). With a Mac layout ⌥ is often the third level (Mod5) that types characters, not
 -- Alt, so Nautilus never sees Alt: these send what it needs. Other apps get the keys as they were pressed. The raw
--- bind: each modifier is bound here, and passed on as itself
+-- bind: each modifier is bound here, and passed on as itself. Nightdrive's own apps (Quickshell windows: Tasks' ⌥↑ ⌥↓
+-- moves a task, Mail's goes through the list) read ⌥ as Alt, and Qt reads Mod5 as no modifier at all: they get Alt (#3507)
 local FILES_OPTION_KEYS = { up = { mods = "ALT", key = "up" }, down = plugins.keyd and { mods = "SUPER", key = "o" } or { mods = "", key = "Return" } }
 for key, files_key in pairs(FILES_OPTION_KEYS) do
     for _, m in ipairs({ "ALT", "MOD5" }) do
         bind(m .. " + " .. key, function ()
             local w = hl.get_active_window()
             local files = w and (w.class == "org.gnome.Nautilus" or w.class == "nautilus")
-            hl.dispatch(hl.dsp.send_shortcut(files and files_key or { mods = m, key = key }))
+            local own = w and w.class == "org.quickshell"
+            hl.dispatch(hl.dsp.send_shortcut(files and files_key or { mods = own and "ALT" or m, key = key }))
         end)
     end
 end
