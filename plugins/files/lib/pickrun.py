@@ -4,8 +4,8 @@ Its own process, not a window of the Files the user has open: a picker that fail
 and its end is plain to see (the process exits). The request goes to it as request.json in a folder of its own under
 $XDG_RUNTIME_DIR, and the answer comes back as answer.json there before it quits; a process that ends without one
 failed. It writes ready there once its window is made: without that in READY_S the picker counts as failed too, and is
-stopped (portal.py then gives the request to GTK's window). Once its window is up it floats over the app that asked,
-as a dialog does (place()).
+stopped (portal.py then gives the request to GTK's window). Its window floats over the app that asked, as a dialog
+does: config/hypr/picker-windows.lua puts it there as it maps, and place() does it afterwards where that isn't loaded.
 """
 import json
 import os
@@ -102,7 +102,10 @@ class Picker:
         if self.hypr and not self.placed:
             for c in hyprctl_json("clients") or []:
                 if c.get("pid") == self.pid and c.get("mapped", True):
-                    self.place(c["address"])
+                    # Floating already: Hyprland's picker-windows.lua placed it as it mapped. Else (a desktop without
+                    # that file) it is placed now, after its first frame as a tile
+                    if not c.get("floating"):
+                        self.place(c["address"])
                     self.placed = True
                     self.ready = self.ready or now
         if self.ready and (self.placed or not self.hypr or now - self.ready > PLACE_S):

@@ -1,3 +1,4 @@
+//@ pragma AppId nightdrive-picker
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -8,7 +9,8 @@ import Quickshell.Io
 // window is made (without it in a few seconds pickrun.py stops this and GTK's window answers), answer.json out,
 // {"paths": […], "filter": i} or {"cancel": true}; no answer means it failed.
 //
-// It stands in for shell.qml as the window's manager: the same settings, no other windows (⌘N does nothing here), and
+// Its app id is its own (the pragma above), so Hyprland floats it over the app from its first frame
+// (config/hypr/picker-windows.lua). It stands in for shell.qml as the window's manager: the same settings, no other windows (⌘N does nothing here), and
 // a cut that stays in this process.
 ShellRoot {
     id: shell

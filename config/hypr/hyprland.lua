@@ -62,6 +62,7 @@ require("last-key")     -- when the last key was pressed: Claude doesn't move th
 require("layer-keys")   -- the window under a layer that holds the keyboard looks inactive
 require("pm-space")     -- a project manager's own workspace, its sessions as tabs beside it: pm-space.lua
 require("agent-windows") -- a window a Claude session opens leaves the keyboard where it is: agent-windows.lua
+require("picker-windows") -- Files' Open and Save window floats over the app that asked: picker-windows.lua
 
 -----------------------
 ---- WINDOW RULES ----
