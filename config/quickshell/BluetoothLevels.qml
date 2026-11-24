@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "BluetoothDevices.js" as Bt
 
 // The launcher's Settings › Bluetooth: the top bar's BluetoothMenu as launcher rows, so the launcher doesn't hand over to
 // the menu. Launcher.qml asks it like its other Levels files (levels, titles, parents, items, activate, footer, entered).
@@ -51,34 +52,30 @@ Item {
     // ================= Bluetooth (bluetoothctl; as in BluetoothMenu) =================
     property bool powered: LastState.bluetooth
     onPoweredChanged: LastState.bluetooth = powered
-    property var devices: []         // [{ mac, connected, paired, battery, name, named }]
+    property var devices: []         // [{ mac, connected, paired, battery, named, near, icon, name }] (BluetoothDevices.js)
+    property var seen: ({})          // the devices found near the computer, which go first (Bt.parse)
     property bool showHidden: false
     property bool scanning: false
     property string btBusy: ""
     property string btMessage: ""
     function btRefresh() { powerProc.running = true; btListProc.running = true }
-    function btScan() { if (!scanning && powered) { scanning = true; scanProc.running = true } }
+    function btScan() { if (!scanning && powered) { scanning = true; seen = {}; scanProc.running = true } }
     function btActivate(d) {
         if (btBusy !== "") return
         btBusy = d.mac; btMessage = ""
         actProc.environment = { "MAC": d.mac, "MODE": d.connected ? "disconnect" : (d.paired ? "connect" : "pair") }
         actProc.running = true
     }
-    function btIcon(name) {
-        return /head|buds|airpods|wh-|wf-|sony/i.test(name) ? "headphones" : /mouse|mx |trackpad/i.test(name) ? "mouse"
-             : /keyboard|keys/i.test(name) ? "keyboard" : /phone|iphone|pixel|galaxy/i.test(name) ? "smartphone"
-             : /watch/i.test(name) ? "watch" : /speaker|boom|jbl|soundbar/i.test(name) ? "speaker" : "bluetooth"
-    }
     function btRows() {
         const r = [{ kind: "systoggle", key: "bluetooth", name: "Bluetooth", glyph: powered ? "bluetooth" : "bluetooth-off", switchOn: powered }]
         if (!powered) return r
-        // Nameless devices (only an address: nearby phones, Macs and AirTags) are hidden unless paired, as in the menu
-        const hidden = devices.filter(d => !d.named && !d.paired && !d.connected)
+        // Nameless devices are hidden unless paired, as in the menu
+        const hidden = devices.filter(Bt.isHidden)
         const list = showHidden ? devices : devices.filter(d => hidden.indexOf(d) < 0)
         r.push({ kind: "header", name: "Devices" })
         if (list.length === 0) r.push({ kind: "hint", name: "No devices: Scan for devices below" })
         for (const d of list)
-            r.push({ kind: "btdev", name: d.name, glyph: btIcon(d.name), dev: d, connected: d.connected, paired: d.paired,
+            r.push({ kind: "btdev", name: d.name, glyph: Bt.iconFor(d), dev: d, connected: d.connected, paired: d.paired,
                      summary: btBusy === d.mac ? "…" : d.battery !== "" ? d.battery + "%" : !d.paired ? "not paired" : undefined,
                      trailGlyph: d.connected && btBusy !== d.mac ? "check" : undefined })
         if (btMessage !== "") r.push({ kind: "hint", name: btMessage })
@@ -99,29 +96,17 @@ Item {
     }
     Sh {
         id: btListProc
-        script: 'systemctl is-active -q bluetooth 2>/dev/null || exit 0\n' +
-                'bluetoothctl devices | sed "s/\\x1b\\[[0-9;]*m//g" | while read -r _ mac name; do\n' +
-                '  info=$(bluetoothctl info "$mac")\n' +
-                '  c=$(grep -c "Connected: yes" <<<"$info"); p=$(grep -c "Paired: yes" <<<"$info"); n=$(grep -c "^\\s*Name:" <<<"$info")\n' +
-                '  b=$(grep -oP "Battery Percentage: 0x\\w+ \\(\\K[0-9]+" <<<"$info")\n' +
-                '  echo "$mac|$c|$p|$b|$n|$name"\n' +
-                'done'
+        script: Bt.LIST_SCRIPT
         onResult: text => {
-            const arr = []
-            for (const line of text.split("\n")) {
-                const f = line.split("|")
-                if (f.length < 6) continue
-                arr.push({ mac: f[0], connected: f[1] !== "0", paired: f[2] !== "0", battery: f[3], named: f[4] !== "0", name: f.slice(5).join("|") })
-            }
-            arr.sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name))
+            const arr = Bt.parse(text, s.seen)
             if (JSON.stringify(arr) === JSON.stringify(s.devices)) return
             s.sel()
             s.devices = arr
         }
     }
     Sh {
-        id: scanProc   // 20 s: headphones' names can take a while to arrive; the list fills in as they do
-        command: ["bluetoothctl", "--timeout", "20", "scan", "on"]
+        id: scanProc   // as long as the menu's: Bt.SCAN_SECONDS
+        command: ["bluetoothctl", "--timeout", String(Bt.SCAN_SECONDS), "scan", "on"]
         onResult: text => { s.sel(); s.scanning = false; s.btRefresh() }
     }
     Sh {

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "BluetoothDevices.js" as Bt
 
 // Bluetooth: on/off, devices, connecting, scanning for devices. Uses bluetoothctl.
 Column {
@@ -10,11 +11,11 @@ Column {
 
     property bool powered: LastState.bluetooth
     onPoweredChanged: LastState.bluetooth = powered
-    property var devices: []         // [{ mac, connected, paired, battery, name, named }]
-    // Nameless devices (only an address: mostly nearby phones, Macs and AirTags with a changing random address) are
-    // hidden unless paired; "Show hidden devices" lists them too
+    property var devices: []         // [{ mac, connected, paired, battery, named, near, icon, name }] (BluetoothDevices.js)
+    property var seen: ({})          // the devices found near the computer, which go first (Bt.parse)
+    // Nameless devices (Bt.isHidden) are listed only with "Show hidden devices"
     property bool showHidden: false
-    readonly property var hidden: devices.filter(d => !d.named && !d.paired && !d.connected)
+    readonly property var hidden: devices.filter(Bt.isHidden)
     readonly property var shown: showHidden ? devices : devices.filter(d => hidden.indexOf(d) < 0)
     property bool scanning: false
     property string busy: ""
@@ -27,6 +28,7 @@ Column {
     function scan() {
         if (m.scanning || !m.powered) return
         m.scanning = true
+        m.seen = {}
         scanProc.running = true
     }
     function activate(d) {
@@ -45,14 +47,6 @@ Column {
         if (!ok) m.message = lastLine
         m.refresh()
     }
-    function iconFor(name) {
-        return /head|buds|airpods|wh-|wf-|sony/i.test(name) ? "headphones"
-             : /mouse|mx |trackpad/i.test(name) ? "mouse"
-             : /keyboard|keys/i.test(name) ? "keyboard"
-             : /phone|iphone|pixel|galaxy/i.test(name) ? "smartphone"
-             : /watch/i.test(name) ? "watch"
-             : /speaker|boom|jbl|soundbar/i.test(name) ? "speaker" : "bluetooth"
-    }
     Component.onCompleted: refresh()
 
     Timer { interval: 2500; repeat: true; running: true; onTriggered: m.refresh() }
@@ -65,22 +59,9 @@ Column {
     }
     Sh {
         id: listProc
-        script: 'systemctl is-active -q bluetooth 2>/dev/null || exit 0\n' +
-                'bluetoothctl devices | sed "s/\\x1b\\[[0-9;]*m//g" | while read -r _ mac name; do\n' +
-                '  info=$(bluetoothctl info "$mac")\n' +
-                '  c=$(grep -c "Connected: yes" <<<"$info"); p=$(grep -c "Paired: yes" <<<"$info"); n=$(grep -c "^\\s*Name:" <<<"$info")\n' +
-                '  b=$(grep -oP "Battery Percentage: 0x\\w+ \\(\\K[0-9]+" <<<"$info")\n' +
-                '  echo "$mac|$c|$p|$b|$n|$name"\n' +
-                'done'
+        script: Bt.LIST_SCRIPT
         onResult: text => {
-            const arr = []
-            for (const line of text.split("\n")) {
-                const f = line.split("|")
-                if (f.length < 6) continue
-                arr.push({ mac: f[0], connected: f[1] !== "0", paired: f[2] !== "0", battery: f[3], named: f[4] !== "0",
-                           name: f.slice(5).join("|") })
-            }
-            arr.sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name))
+            const arr = Bt.parse(text, m.seen)
             m.devices = arr
             // e.g. connecting failed while the headphones were off, and they connected by themselves once switched on
             if (m.message !== "" && arr.some(d => d.mac === m.messageMac && d.connected)) m.message = ""
@@ -88,8 +69,9 @@ Column {
     }
     Sh {
         id: scanProc
-        // 20 s: headphones' names (e.g. AirPods) can take a while to arrive; the list fills in as they do (refresh timer)
-        command: ["bluetoothctl", "--timeout", "20", "scan", "on"]
+        // Headphones' names (e.g. AirPods) can take a while to arrive, a controller is put in pairing mode after
+        // pressing Scan: the list fills in as they do (refresh timer). Bt.SCAN_SECONDS says why it is a minute
+        command: ["bluetoothctl", "--timeout", String(Bt.SCAN_SECONDS), "scan", "on"]
         onResult: text => { m.scanning = false; m.refresh() }
     }
     Sh {
@@ -163,7 +145,7 @@ Column {
                 delegate: MenuRow {
                     required property var modelData
                     width: parent.width
-                    icon: m.iconFor(modelData.name)
+                    icon: Bt.iconFor(modelData)
                     label: modelData.name
                     active: modelData.connected
                     checkIcon: modelData.connected ? "check" : ""
