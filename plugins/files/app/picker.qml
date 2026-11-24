@@ -4,7 +4,8 @@ import Quickshell.Io
 
 // Files as an Open or Save window for other apps (lib/portal.py, the portal's FileChooser): one FilesWindow in its pick
 // mode (PickBar under the list), in a Quickshell process of its own that lib/pickrun.py starts for each request and
-// that ends with the answer. $FILES_PICK is its folder: request.json in (lib/portal.py request_of), answer.json out,
+// that ends with the answer. $FILES_PICK is its folder: request.json in (lib/portal.py request_of), ready out once the
+// window is made (without it in a few seconds pickrun.py stops this and GTK's window answers), answer.json out,
 // {"paths": […], "filter": i} or {"cancel": true}; no answer means it failed.
 //
 // It stands in for shell.qml as the window's manager: the same settings, no other windows (⌘N does nothing here), and
@@ -30,6 +31,7 @@ ShellRoot {
 
     FileView { id: requestFile; path: shell.dir ? shell.dir + "/request.json" : ""; blockLoading: true; printErrors: false }
     readonly property var request: { try { return JSON.parse(requestFile.text()) } catch (e) { return null } }
+    FileView { id: readyFile; path: shell.dir ? shell.dir + "/ready" : ""; blockWrites: true; printErrors: false }
     FileView { id: answerFile; path: shell.dir ? shell.dir + "/answer.json" : ""; blockWrites: true; atomicWrites: true; printErrors: false }
 
     // The answer, once: the window's close after it says nothing more
@@ -53,6 +55,7 @@ ShellRoot {
             key: 1
             pick: shell.request
             startPath: shell.request.folder || ""
+            Component.onCompleted: readyFile.setText("1")
         }
     }
 

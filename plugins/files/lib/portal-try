@@ -4,7 +4,7 @@
 # Open and Save window can be tried before `files picker on` (README.md › Open and Save). Only this checkout's
 # portal.py answers, and only the portal's FileChooser is there.
 #
-# The session's services are only portal.py: nothing of the desktop's (the document portal, gvfs) starts a second time.
+# The session's services are only portal.py and GTK's backend: nothing else of the desktop's (the document portal, gvfs) starts a second time.
 # GTK 4 asks the portal only when told to (GDK_DEBUG=portals), so the default command says so.
 set -euo pipefail
 
@@ -21,6 +21,9 @@ cat > "$dir/services/nightdrive.service" <<EOF
 Name=org.freedesktop.impl.portal.desktop.nightdrive
 Exec=/usr/bin/python3 $LIB/portal.py
 EOF
+# GTK's backend too, for when Files' picker fails (pickgtk.py: FILES_PICK_READY_S=0.01 portal-try shows it)
+gtk=/usr/share/dbus-1/services/org.freedesktop.impl.portal.desktop.gtk.service
+[[ -f $gtk ]] && cp "$gtk" "$dir/services/"
 printf '[portal]\nDBusName=org.freedesktop.impl.portal.desktop.nightdrive\nInterfaces=org.freedesktop.impl.portal.FileChooser;\n' \
   > "$dir/portals/nightdrive.portal"
 # With XDG_DESKTOP_PORTAL_DIR set, the portal reads its choice of backends from that folder too

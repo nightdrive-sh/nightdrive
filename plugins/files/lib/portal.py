@@ -18,6 +18,7 @@ from gi.repository import Gio, GLib  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pickfilters  # noqa: E402
+import pickgtk  # noqa: E402
 import pickrun  # noqa: E402
 
 BUS_NAME = "org.freedesktop.impl.portal.desktop.nightdrive"
@@ -98,10 +99,18 @@ def results_of(answer, req):
     return res
 
 
+class Request:
+    """One app's request while it is open: the call to answer, and Files' picker or GTK's window that is answering it."""
+    def __init__(self, invocation, method, params, req, reg):
+        self.invocation, self.method, self.params, self.req, self.reg = invocation, method, params, req, reg
+        self.picker = None
+        self.gtk = False              # GTK's window has it now (pickgtk), not Files'
+
+
 class Backend:
     def __init__(self, conn):
         self.conn = conn
-        self.open = {}                # handle → (invocation, picker, registration id)
+        self.open = {}                # handle → Request
         self.idle = None
         register(conn, OBJECT_PATH, CHOOSER, self._call)
         self._arm_idle()
@@ -121,34 +130,47 @@ class Backend:
         handle, app_id, parent, title, options = params.unpack()
         req = request_of(method, title, options)
         req["app"] = app_id
-        reg = register(conn, handle, REQUEST, self._close)
-        picker = pickrun.Picker(req, lambda answer: self._answer(handle, answer))
-        self.open[handle] = (invocation, picker, reg, req)
+        r = Request(invocation, method, params, req, register(conn, handle, REQUEST, self._close))
+        r.picker = pickrun.Picker(req, lambda answer: self._picked(handle, answer))
+        self.open[handle] = r
         self._arm_idle()
-        picker.start()
+        r.picker.start()
 
     def _close(self, conn, sender, path, iface, method, params, invocation):
-        """The app or the portal gave up on the request (Request.Close): the picker goes, no answer."""
+        """The app or the portal gave up on the request (Request.Close): the window goes, without an answer."""
         invocation.return_value(None)
-        entry = self.open.get(path)
-        if entry:
-            entry[1].stop()
-            self._answer(path, None)
-
-    def _answer(self, handle, answer):
-        """The picker ended: answer is {"paths": […], "filter": i}, {"cancel": true}, or None when it failed."""
-        entry = self.open.pop(handle, None)
-        if not entry:
+        r = self.open.get(path)
+        if not r:
             return
-        invocation, _picker, reg, req = entry
-        self.conn.unregister_object(reg)
+        if r.gtk:
+            pickgtk.close(self.conn, path)
+        else:
+            r.picker.stop()
+        self._reply(path, GLib.Variant("(ua{sv})", (OTHER, {})))
+
+    def _picked(self, handle, answer):
+        """Files' picker ended: answer is {"paths": […], "filter": i}, {"cancel": true}, or None when it failed (it
+        didn't come up in time, or died), and then GTK's window takes the request."""
+        r = self.open.get(handle)
+        if not r or r.gtk:
+            return
         if answer is None:
-            out = (OTHER, {})
-        elif answer.get("cancel") or not answer.get("paths"):
+            print(f"portal: Files' picker failed; GTK's window takes {r.method}.", flush=True)
+            r.gtk = True
+            pickgtk.forward(self.conn, r.method, r.params, lambda out: self._reply(handle, out))
+            return
+        if answer.get("cancel") or not answer.get("paths"):
             out = (CANCELLED, {})
         else:
-            out = (OK, results_of(answer, req))
-        invocation.return_value(GLib.Variant("(ua{sv})", out))
+            out = (OK, results_of(answer, r.req))
+        self._reply(handle, GLib.Variant("(ua{sv})", out))
+
+    def _reply(self, handle, out):
+        r = self.open.pop(handle, None)
+        if not r:
+            return
+        self.conn.unregister_object(r.reg)
+        r.invocation.return_value(out)
         self._arm_idle()
 
 

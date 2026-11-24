@@ -3,7 +3,9 @@
 Its own process, not a window of the Files the user has open: a picker that fails takes none of their windows with it,
 and its end is plain to see (the process exits). The request goes to it as request.json in a folder of its own under
 $XDG_RUNTIME_DIR, and the answer comes back as answer.json there before it quits; a process that ends without one
-failed. Once its window is up it floats over the app that asked, as a dialog does (place()).
+failed. It writes ready there once its window is made: without that in READY_S the picker counts as failed too, and is
+stopped (portal.py then gives the request to GTK's window). Once its window is up it floats over the app that asked,
+as a dialog does (place()).
 """
 import json
 import os
@@ -16,6 +18,9 @@ from gi.repository import GLib
 APP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
 PICKER_QML = os.path.join(APP_DIR, "picker.qml")
 POLL_MS = 120                 # how often to look for the window while it comes up
+READY_S = float(os.environ.get("FILES_PICK_READY_S", 5))   # the picker's window comes in this time, or GTK's takes
+                                                            # the request (a test makes it shorter)
+PLACE_S = 3                   # after ready, how long Hyprland may take to map the window before it isn't placed
 SIZE = (1000, 680)            # the picker's size at most; less over a smaller app, never under MIN
 MIN = (420, 360)
 MARGIN = 40                   # the app shows this much around the picker, where it has room
@@ -48,7 +53,11 @@ class Picker:
         self.done = done              # done(answer): a dict, or None when the picker failed
         self.pid = 0
         self.poll = None
+        self.late = None
+        self.ready = 0                # when it said it was ready (monotonic seconds), 0 before
+        self.placed = False
         self.finished = False
+        self.hypr = bool(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")) and shutil.which("hyprctl") is not None
         base = os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()
         os.makedirs(os.path.join(base, "nightdrive"), exist_ok=True)
         self.dir = tempfile.mkdtemp(prefix="picker-", dir=os.path.join(base, "nightdrive"))
@@ -56,6 +65,8 @@ class Picker:
         self.caller = self._active()
 
     def _active(self):
+        if not self.hypr:
+            return None
         w = hyprctl_json("activewindow")
         if not w or not w.get("address"):
             return None
@@ -73,26 +84,47 @@ class Picker:
             return
         GLib.child_watch_add(GLib.PRIORITY_DEFAULT, self.pid, self._exited)
         self.poll = GLib.timeout_add(POLL_MS, self._look)
+        self.late = GLib.timeout_add(int(READY_S * 1000), self._too_late)
 
     def stop(self):
         """The request is over before the picker answered (Request.Close): it goes, and says nothing."""
         self.finished = True
+        self._kill()
+
+    def _look(self):
+        """Whether the picker is ready, and its window, once Hyprland has mapped it: placed over the app that asked."""
+        if self.finished:
+            self.poll = None
+            return False
+        now = GLib.get_monotonic_time() / 1e6
+        if not self.ready and os.path.exists(os.path.join(self.dir, "ready")):
+            self.ready = now
+        if self.hypr and not self.placed:
+            for c in hyprctl_json("clients") or []:
+                if c.get("pid") == self.pid and c.get("mapped", True):
+                    self.place(c["address"])
+                    self.placed = True
+                    self.ready = self.ready or now
+        if self.ready and (self.placed or not self.hypr or now - self.ready > PLACE_S):
+            self.poll = None
+            return False
+        return True
+
+    def _too_late(self):
+        """No window in READY_S: the picker is stopped and counts as failed."""
+        self.late = None
+        if not self.ready and not self.finished:
+            print(f"portal: Files' picker didn't come up in {READY_S:g} s.", flush=True)
+            self._finish(None)
+            self._kill()
+        return False
+
+    def _kill(self):
         if self.pid:
             try:
                 os.kill(self.pid, 15)
             except ProcessLookupError:
                 pass
-
-    def _look(self):
-        """The picker's window, once it is mapped: placed over the app that asked."""
-        if self.finished:
-            return False
-        for c in hyprctl_json("clients") or []:
-            if c.get("pid") == self.pid and c.get("mapped", True):
-                self.place(c["address"])
-                self.poll = None
-                return False
-        return True
 
     def place(self, address):
         mon = None
@@ -112,9 +144,11 @@ class Picker:
 
     def _exited(self, pid, _status):
         GLib.spawn_close_pid(pid)
-        if self.poll:
-            GLib.source_remove(self.poll)
-            self.poll = None
+        self.pid = 0
+        for source in (self.poll, self.late):
+            if source:
+                GLib.source_remove(source)
+        self.poll = self.late = None
         answer = None
         try:
             with open(os.path.join(self.dir, "answer.json")) as f:
