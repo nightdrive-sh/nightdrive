@@ -64,12 +64,14 @@ ShellRoot {
         }
         Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
 
-        // The picked game's wide picture behind everything, faint, fading into the window's colour at the foot
+        // The picked game's wide picture behind everything, faint, fading into the window's colour at the foot; a game
+        // without one (a game of your own with only X-Nightdrive-Cover) has its cover there, cropped to the width
         Image {
             id: hero
             anchors { left: parent.left; right: parent.right; top: parent.top }
             height: parent.height * 0.7
-            source: win.picked && win.picked.hero ? "file://" + win.picked.hero : ""
+            readonly property string path: win.picked ? win.picked.hero || win.picked.cover || "" : ""
+            source: path ? "file://" + path : ""
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             opacity: status === Image.Ready ? 0.22 : 0
