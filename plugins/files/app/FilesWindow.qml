@@ -100,7 +100,8 @@ FloatingWindow {
     readonly property alias search: search
     property string placeDrag: ""         // the sidebar folder being dragged to another place in it
     readonly property bool loading: !trashShown && (inArchive ? archive.loading : searching ? search.running : folder.loading)
-    readonly property var rows: trashShown ? trashRows : inArchive ? archive.rows : searching ? search.rows : folder.rows
+    // A picker's file type (PickBar's filter) leaves out the files of other types, never a folder
+    readonly property var rows: pickBar.narrow(trashShown ? trashRows : inArchive ? archive.rows : searching ? search.rows : folder.rows)
     // The rows are the folder's on show: false for a moment after a step to another one, while it is read (ColumnView)
     readonly property bool fresh: trashShown || inArchive || searching || folder.readPath === path
 

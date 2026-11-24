@@ -29,7 +29,8 @@ class Requests(unittest.TestCase):
             "filters": [("PNG", [(0, "*.png")]), ("Images", [(1, "image/*")])], "current_filter": ("PNG", [(0, "*.png")])})
         self.assertEqual(req["mode"], "save")
         self.assertEqual((req["name"], req["folder"], req["accept"]), ("cat.png", "/home/u/Pictures", "_Save"))
-        self.assertEqual(req["filters"][1], {"name": "Images", "rules": [[1, "image/*"]]})
+        self.assertEqual((req["filters"][1]["name"], req["filters"][1]["rules"]), ("Images", [[1, "image/*"]]))
+        self.assertEqual(req["filters"][0]["regex"], r"^(?:.*\.png)$")     # pickfilters_test.py has the rest
         self.assertEqual(req["filter"], "PNG")
         self.assertFalse(req["multiple"])
 

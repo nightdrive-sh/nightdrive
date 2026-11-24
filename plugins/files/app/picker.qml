@@ -62,6 +62,8 @@ ShellRoot {
         function setName(name: string): void { const w = win.item; if (w) { w.pickBar.field.text = name } }
         function go(path: string): void { if (win.item) win.item.go(path, "") }
         function accept(): void { if (win.item) win.item.pickBar.accept() }
+        function setFilter(i: int): void { if (win.item) win.item.pickBar.setFilter(i) }
+        function chooseFilter(): void { if (win.item) win.item.pickBar.chooseFilter() }
         function cancel(): void { shell.answer({ cancel: true }) }
     }
 }

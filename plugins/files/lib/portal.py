@@ -17,6 +17,7 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pickfilters  # noqa: E402
 import pickrun  # noqa: E402
 
 BUS_NAME = "org.freedesktop.impl.portal.desktop.nightdrive"
@@ -68,7 +69,8 @@ def request_of(method, title, options):
         "folder": _path_bytes(o.get("current_folder")),
         "file": _path_bytes(o.get("current_file")),
         # [(name, [(kind, pattern)])]: kind 0 a glob, 1 a MIME type
-        "filters": [{"name": n, "rules": [[k, p] for k, p in rules]} for n, rules in o.get("filters", [])],
+        "filters": pickfilters.expand([{"name": n, "rules": [[k, p] for k, p in rules]}
+                                       for n, rules in o.get("filters", [])]),
         "files": [_path_bytes(f) for f in o.get("files", [])],
     }
     cur = o.get("current_filter")
