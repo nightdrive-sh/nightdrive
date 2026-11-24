@@ -350,7 +350,7 @@ def main(argv=None):
     sn.add_argument("--json", action="store_true")
     sn.set_defaults(fn=cmd_snapshots)
     c = sub.add_parser("check", help="verify the repository, reading back part of its data")
-    c.add_argument("--read-data", default=CHECK_SUBSET, help="how much to read back (default %s)" % CHECK_SUBSET)
+    c.add_argument("--read-data", default=CHECK_SUBSET, help="how much to read back (default %(default)s)")
     c.set_defaults(fn=cmd_check)
     rs = sub.add_parser("restore", help="a snapshot's files into an empty folder")
     rs.add_argument("snapshot", nargs="?", default="latest")

@@ -66,6 +66,16 @@ class Settings(unittest.TestCase):
                          ("/mnt/disk/repo", "op read op://x", ["~", "/srv"]))
 
 
+class Commands(unittest.TestCase):
+    def test_every_help_prints(self):
+        # A bare % in a help ("default 5%") is a format error to argparse: Python 3.14 raises it as the parser is built,
+        # so every command failed, and only Whole (skipped without restic, as in CI) went through main()
+        for cmd in ([], ["setup"], ["run"], ["status"], ["snapshots"], ["check"], ["restore"], ["timer"]):
+            with self.subTest(cmd=cmd), self.assertRaises(SystemExit) as e:
+                quiet(cli.main, cmd + ["--help"])
+            self.assertEqual(e.exception.code, 0)
+
+
 class Timing(unittest.TestCase):
     def test_due(self):
         self.assertTrue(cli.due({}))
