@@ -58,6 +58,7 @@ Usage: tasks [command]
   done ID        mark a task done (ID: from list, or the start of one)
   undone ID      back among the open ones (a task done)
   snooze ID      move a task on: an hour, or a day without a time (--until WHEN for another time)
+  move ID        another place in its list (--to up|down|top|bottom, or --before ID, --after ID)
   trash ID       move a task to the trash
   restore UNDO   undo a change: UNDO is the id a change's --json gives
   list-new NAME          a new list
@@ -78,7 +79,7 @@ case ${1:-open} in
   new)        open_ready; ipc newTask "${2:-}" ;;
   search)     open_ready; shift; ipc search "$*" ;;
   lists|list|when) cli "$@" ;;
-  add|edit|done|undone|snooze|trash|restore|list-new|list-rename|list-remove) change "$@" ;;
+  add|edit|done|undone|snooze|move|trash|restore|list-new|list-rename|list-remove) change "$@" ;;
   due)        python3 "$APP_DIR/lib/due.py" check ;;
   enable)     enable ;;
   disable)    disable ;;

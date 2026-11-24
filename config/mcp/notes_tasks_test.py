@@ -144,7 +144,7 @@ class TasksMasked(Home):
                          [("Door: PIN [code hidden]", "Card •••• 4242, CVV [CVV hidden]")])
         done = mask.apply(run("done", "--json", "--", made["id"]), tools["tasks_done"]["mask"])
         self.assertEqual((done["title"], done["note"]), ("Door: PIN [code hidden]", "Card •••• 4242, CVV [CVV hidden]"))
-        for name in ("tasks_snooze", "tasks_trash"):
+        for name in ("tasks_snooze", "tasks_move", "tasks_trash"):
             self.assertEqual(tools[name]["mask"], ["title", "note"])
 
 

@@ -10,6 +10,7 @@
     cli.py edit --json --stdin      the same as JSON: {id, and what changes of title, day, time, list, note, priority}
     cli.py done [--json] ID         cli.py undone [--json] ID       cli.py snooze [--json] [--until WHEN] ID
     cli.py trash [--json] ID        cli.py restore [--json] UNDO
+    cli.py move [--json] (--to up|down|top|bottom | --before ID | --after ID) ID      the list's order (order.py)
     cli.py list-new [--json] NAME   cli.py list-rename [--json] LIST NAME
     cli.py list-remove [--json] [--with-tasks] LIST       (lists.py)
 
@@ -24,6 +25,7 @@ from datetime import datetime
 
 import ics
 import lists
+import order
 import store
 import when
 
@@ -55,10 +57,10 @@ def row(lst, task, now):
             "list": lst["name"], "list_id": lst["id"], "due": ics.as_text(due), "due_label": when.label(due, now),
             "overdue": overdue(due, now) and not done,
             "priority": priority(task), "done": done, "completed": ics.as_text(task.time("COMPLETED")),
-            "created": ics.as_text(task.time("CREATED"))}
+            "created": ics.as_text(task.time("CREATED")), "order": order.key(task)}
 
 
-def order(r):
+def by_due(r):
     rank = {"high": 0, "": 1, "low": 2}[r["priority"]]
     return (r["due"] is None, (r["due"] or "") + ("" if "T" in (r["due"] or "") else "T00:00"), rank, r["created"] or "")
 
@@ -73,7 +75,7 @@ def view(rows, name, now):
         rows = [r for r in rows if r["due"] and r["due"][:10] <= today]
     elif name in ("upcoming", "scheduled"):
         rows = [r for r in rows if r["due"]]
-    return sorted(rows, key=order)
+    return sorted(rows, key=by_due)
 
 
 def lists_json():
@@ -96,6 +98,9 @@ def cmd_list(a):
     words = (a.query or "").lower().split()
     rows = [r for r in rows if all(w in (r["title"] + "\n" + r["note"]).lower() for w in words)]
     rows = view(rows, a.view, now)
+    if lst and a.view in ("open", "all"):
+        # One list's own: in the user's order, as the window shows it (order.py), the done ones after
+        rows.sort(key=lambda r: (r["done"], r["order"], r["created"] or "", r["id"]))
     if a.json:
         return {"now": now.strftime("%Y-%m-%dT%H:%M"), "view": a.view, "list": lst["name"] if lst else None,
                 "lists": lists_json(), "count": len(rows), "tasks": rows}
@@ -255,6 +260,29 @@ def cmd_trash(a):
     return changed(lst, task, sid, a, "Moved to the trash")
 
 
+def cmd_move(a):
+    """Another place in its list's order: only the moved task's file is written, unless there is no room (order.py)"""
+    lst, path, task = store.find(a.id)
+    if is_done(task):
+        raise ValueError(f"{task.get('SUMMARY')!r} is done: only open tasks have a place in the list.")
+    rows = order.ordered([t for _, _, t in store.load(lst) if not is_done(t)])
+    uid = task.get("UID")
+    at = order.target(rows, uid, **{a.to: True} if a.to else {},
+                      before=a.before and store.find(a.before)[2].get("UID"),
+                      after=a.after and store.find(a.after)[2].get("UID"))
+    if at is None:
+        return changed(lst, task, store.snapshot([]), a, "Stays")
+    others = [t for t in rows if t.get("UID") != uid]
+    values = order.place(others, at)
+    files = {t.get("UID"): p for _, p, t in store.load(lst)}
+    writes = [(path if t is None else files[t.get("UID")], task if t is None else t, v) for t, v in values.items()]
+    sid = store.snapshot([p for p, _, _ in writes])
+    for p, t, v in writes:
+        order.write(t, v)
+        store.save(p, t)
+    return changed(lst, task, sid, a, "Moved")
+
+
 def cmd_restore(a):
     paths = store.restore(a.undo)
     out = {"restored": [str(p.relative_to(store.DATA)) for p in paths]}
@@ -303,6 +331,12 @@ def parser():
     c.add_argument("id")
     command("trash", cmd_trash).add_argument("id")
     command("restore", cmd_restore).add_argument("undo")
+    c = command("move", cmd_move)
+    where = c.add_mutually_exclusive_group(required=True)
+    where.add_argument("--to", choices=("up", "down", "top", "bottom"))
+    where.add_argument("--before")
+    where.add_argument("--after")
+    c.add_argument("id")
     lists.add_commands(command)
     return p
 

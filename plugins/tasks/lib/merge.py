@@ -13,6 +13,9 @@ sense together: done is STATUS, COMPLETED and PERCENT-COMPLETE, so a task is nev
 time. Nested components (a VALARM) are one field. What the sync sets itself (DTSTAMP, LAST-MODIFIED, SEQUENCE) is
 not merged but written new, and the calendar's own lines around the VTODO (a VTIMEZONE) are the Hub's file's.
 
+A task's place in its list (X-APPLE-SORT-ORDER, order.py) is merged as a field, but a place that lost isn't written
+in the notes: a number there would say nothing, and the task is still in the list where the newer move put it (#3507).
+
 No base (a first sync, a new Hub) or two files that aren't the same task: None, and the caller keeps both.
 """
 
@@ -27,6 +30,8 @@ META = {"DTSTAMP", "LAST-MODIFIED", "SEQUENCE"}
 COMPONENTS = "BEGIN"       # the key nested components are merged under
 LABELS = {"SUMMARY": "Title", "DESCRIPTION": "Notes", "STATUS": "Done", "DUE": "Due", "PRIORITY": "Priority",
           "DTSTART": "Starts", "CATEGORIES": "Tags", COMPONENTS: "Reminders"}
+# Fields whose losing value isn't worth a line in the notes: the newer side's wins without a trace
+QUIET = {"X-APPLE-SORT-ORDER"}
 OTHER = "another computer"  # the Hub doesn't say which device wrote its version
 
 
@@ -152,7 +157,7 @@ def merge(base, mine, theirs, here="this computer"):
         value, gone, side = pick(key, bf.get(key), mf.get(key), tf.get(key), mine_newer)
         if value is not None:
             chosen[key] = value
-        if side:
+        if side and key not in QUIET:
             lost.append({"field": LABELS.get(key, key.title()), "value": shown(key, gone),
                          "from": here if side == "mine" else OTHER, "side": side})
     if chosen == tf and not lost:

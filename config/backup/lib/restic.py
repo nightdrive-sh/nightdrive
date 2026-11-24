@@ -86,10 +86,19 @@ def backup(cfg, excludes, tag):
     return summary
 
 
+def unlock_stale(cfg):
+    """Takes away the locks of restic runs that are gone (killed by systemctl stop, a power cut, a laptop shut
+    mid-run): prune and check need the repository to themselves, and one such lock failed them every week after.
+    Plain `restic unlock` takes only stale locks (this machine's with no process, or 30 minutes without a refresh),
+    never a live run's."""
+    run(cfg, ["unlock"], check=False)
+
+
 def forget(cfg, tag):
     """Lets go of the snapshots the keep-* settings don't keep, and frees their space. Only this machine's (its host
     name, as restic records it) and only Nightdrive's (the tag), so two machines sharing a repository, or snapshots
     made by hand, are never pruned by it."""
+    unlock_stale(cfg)
     keep = []
     for key in ("keep-daily", "keep-weekly", "keep-monthly", "keep-yearly"):
         keep += ["--" + key, str(cfg[key])]
@@ -98,6 +107,7 @@ def forget(cfg, tag):
 
 def check(cfg, subset):
     """The repository's structure, and SUBSET (e.g. "5%") of its data read back and verified."""
+    unlock_stale(cfg)
     run(cfg, ["check", "--read-data-subset", subset])
 
 

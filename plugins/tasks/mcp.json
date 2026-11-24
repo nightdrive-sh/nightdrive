@@ -3,7 +3,7 @@
     {
       "name": "tasks_list",
       "title": "List tasks",
-      "description": "The user's tasks in Nightdrive Tasks (kept on this computer, a list per folder): each task's id, title, note, list, due (YYYY-MM-DD, or YYYY-MM-DDTHH:MM local time), due_label, overdue, priority (high, low or empty) and done. view: open (default: every task not done, soonest due first, those without a due last), today (due today or earlier, overdue included), upcoming (every open task with a due), done (the 50 done most recently), all. Also gives now (the local time, to work out dates from) and the lists with their open counts. Use the ids with tasks_edit, tasks_done, tasks_undone, tasks_snooze and tasks_trash.",
+      "description": "The user's tasks in Nightdrive Tasks (kept on this computer, a list per folder): each task's id, title, note, list, due (YYYY-MM-DD, or YYYY-MM-DDTHH:MM local time), due_label, overdue, priority (high, low or empty) and done. view: open (default: every task not done, soonest due first, those without a due last; with list, in the list's own order, as the user sees it), today (due today or earlier, overdue included), upcoming (every open task with a due), done (the 50 done most recently), all. Also gives now (the local time, to work out dates from) and the lists with their open counts. Use the ids with tasks_edit, tasks_done, tasks_undone, tasks_snooze, tasks_move and tasks_trash.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -125,6 +125,29 @@
       "undo": ["tasks", "restore", "{undo}"],
       "notice": "Changed the task {title}",
       "notice_many": "Changed {count} tasks",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_move",
+      "title": "Move a task in its list",
+      "description": "Changes a task's place in its list's own order (the order the user sees in the list, and tasks_list with list gives): to up or down one place, top or bottom, or just before or after another open task of the same list (its id). Only open tasks have a place. Today and Upcoming stay by date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"},
+          "to": {"type": "string", "enum": ["up", "down", "top", "bottom"], "title": "Where"},
+          "before": {"type": "string", "title": "Before", "description": "The id of the task it goes just before"},
+          "after": {"type": "string", "title": "After", "description": "The id of the task it goes just after"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "move", "--json", ["--to", "{to}"], ["--before", "{before}"], ["--after", "{after}"], "--", "{id}"],
+      "mask": ["title", "note"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Moved the task {title} in its list",
+      "notice_many": "Moved {count} tasks in their lists",
       "class": "change",
       "area": "tasks"
     },

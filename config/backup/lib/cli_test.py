@@ -6,6 +6,7 @@ import io
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import time
@@ -169,6 +170,24 @@ class Whole(unittest.TestCase):
             os.chmod(parent, 0o755)
         self.assertEqual(code, 1, out)
         self.assertNotIn("--existing", out)
+
+    def test_prune_after_a_killed_run(self):
+        # A run killed half-way leaves its lock in the repository; prune needs the repository to itself and failed on
+        # that lock every week after (found on a Storage Box, after systemctl stop)
+        self.assertEqual(self.setup()[0], 0)
+        cfg = conf.load()
+        held = subprocess.Popen(["restic", "backup", "--stdin", "--stdin-filename", "held"], env=restic.env(cfg),
+                                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        locks = os.path.join(self.repo, "locks")
+        for _ in range(100):                           # restic takes its lock as it starts
+            if os.listdir(locks):
+                break
+            time.sleep(0.1)
+        held.kill()
+        held.wait()
+        self.assertTrue(os.listdir(locks), "the killed run left its lock")
+        restic.forget(cfg, cli.TAG)
+        restic.check(cfg, "1%")
 
     def test_out_of_reach_is_quiet_until_stale(self):
         self.assertEqual(self.setup()[0], 0)
