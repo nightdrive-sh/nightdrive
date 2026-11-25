@@ -19,9 +19,8 @@ The rules, for Claude and the terminal alike, but where they say Claude:
 - Into a folder in home, which must exist (default: Downloads): files_rules.destination, as Claude's files_move keeps
   it: not hidden, not ~/Mail, ~/Notes, ~/Projects, a mail folder or a git repository, and for Claude only in the
   folders Settings › Claude › Access › Apps and files lets it use (options_from), wherever a link leads.
-- Clean names (clean_name): a stranger names an attachment, and the subject a PDF is named by. Only the last part of
-  a path, no control or invisible characters (a right-to-left override makes "txt.exe" read as "exe.txt"), nothing
-  hidden or option-like at the start, at most NAME_BYTES. Files are written 0644: nothing saved can be run.
+- Clean names (newfile.clean_name, as Mail's own Save makes them): a stranger names an attachment, and the subject a
+  PDF is named by. Files are written 0644: nothing saved can be run.
 - For Claude, the mail Access › Mail keeps from it (blocked.py) is as if it weren't there.
 """
 
@@ -31,65 +30,18 @@ import email.policy
 import hashlib
 import json
 import os
-import re
 import subprocess
 import sys
-import unicodedata
 from pathlib import Path
 
 import blocked
 import ids
 import parts
+from newfile import NAME_BYTES, clean_name, write_all as write_new  # noqa: F401 (NAME_BYTES: save_test)
 
 # Claude's file rules are the core's (config/hypr/scripts/files_rules.py): the same folders, the same no-go places
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "config/hypr/scripts"))
 from files_rules import checked, destination, die, inside_home, shown, size_text  # noqa: E402
-
-NAME_BYTES = 200        # of a name we make: under the file system's 255, with room for " (99)"
-EXT_BYTES = 16          # an extension longer than this isn't one worth keeping whole when a name is cut
-TRIES = 100             # names tried for a free one: "name (2)" … "name (100)"
-FALLBACK = "attachment"
-
-
-def clean_name(name, fallback=FALLBACK, title=False):
-    """A file name a stranger gave, made safe to save under. title: a subject, whose slashes are words' ("Invoice /
-    November"), not a path's: they become dashes."""
-    name = unicodedata.normalize("NFC", str(name or ""))
-    if title:
-        name = re.sub(r"\s*[/\\]+\s*", " - ", name)
-    name = re.split(r"[/\\]", name)[-1]        # a path's last part: no ../ out of the folder
-    # Whitespace as one space; other control, format (bidi overrides, zero-width), private and unassigned characters out
-    name = "".join(" " if c.isspace() else c for c in name if c.isspace() or unicodedata.category(c)[0] != "C")
-    name = re.sub(r" {2,}", " ", name)
-    # Not hidden (a leading dot), not read as an option (-) or home (~); no trailing dots, spaces or dashes
-    name = re.sub(r"^[\s.\-~]+|[\s.\-]+$", "", name)
-    if not name:
-        return fallback
-    stem, ext = os.path.splitext(name)
-    if len(ext.encode()) > EXT_BYTES:
-        stem, ext = name, ""
-    while len((stem + ext).encode()) > NAME_BYTES:
-        stem = stem[:-1]
-    return (stem.rstrip(" .") or fallback) + ext
-
-
-def create(folder, name, data):
-    """Writes data as a new file in folder under name, or the first free "name (N)"; returns its path."""
-    stem, ext = os.path.splitext(name)
-    for n in range(1, TRIES + 1):
-        path = folder / (name if n == 1 else f"{stem} ({n}){ext}")
-        try:
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o644)
-        except FileExistsError:
-            continue
-        try:
-            with os.fdopen(fd, "wb") as fh:
-                fh.write(data)
-        except OSError:
-            path.unlink(missing_ok=True)
-            raise
-        return path
-    raise OSError(f"{shown(folder / name)} and {TRIES - 1} numbered names after it are taken")
 
 
 def message(ident):
@@ -159,16 +111,11 @@ def saved(paths, what, folder):
 
 
 def write_all(folder, files):
-    """Each (name, data) as a new file: all or none."""
-    done = []
+    """Each (name, data) as a new file (newfile.write_all): all or none."""
     try:
-        for name, data in files:
-            done.append(create(folder, name, data))
+        return write_new(folder, files)
     except OSError as e:
-        for p in done:
-            p.unlink(missing_ok=True)
         die(f"Nothing was saved: {getattr(e, 'strerror', None) or e}.")
-    return done
 
 
 def cmd_attachments(a):

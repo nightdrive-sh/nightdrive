@@ -38,7 +38,7 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppChips` | One of a few as chips in a row (the list a task goes in): `options` `[{ id, name, color? }]`, `picked`; ← → move it |
 | `AppCheck` | A box to tick and its word (Important): `on`, Space or a click turns it (`toggled`), ⏎ `accepted` |
 | `AppNote` | What went wrong, at the foot of the page, in the danger colour, until ✕; two lines at most |
-| `AppToast` | What just happened, in a rounded card at the top of the window: `show(text, { sticky, danger, duration, action, run })`, gone after 4 s (a failure 8 s, one with an action such as Undo 7 s), sticky until the next; a click dismisses it, `act()` runs the action for a key (⌘Z) |
+| `AppToast` | What just happened, in a rounded card at the top of the window: `show(text, { sticky, danger, duration, action, run })`, or several buttons with `actions: [{ label, run }]` (Open, Show in folder), gone after 4 s (a failure 8 s, one with an action such as Undo 7 s), sticky until the next; a click dismisses it, `act()` runs the first action for a key (⌘Z) |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |
 | `AppAudio` | Plays a sound file through ffmpeg into PipeWire, no visuals: `path`, `duration` (the caller knows it), `app` and `title` (its names in the Sound menu); `play()`, `pause()`, `toggle()`, `seek(t)`, `skip(d)`, `stop()`, `command(file, from)` (its ffmpeg arguments), `position`, `progress`, `playing`, `failed(text)`; pause, a seek and a new path stop ffmpeg at once (SIGKILL). Recorder's player, Inbox's sound files, Files' previews |
 | `Tip` | A button's tip: what it does and its key; shown, it draws over the whole window and stays inside it |

@@ -156,7 +156,7 @@ QtObject {
     }
 
     // An attachment of a message being read (lib/parts.py): "open" copies it where it can be opened from, "save" to
-    // the downloads folder. done gets { path } or { error }.
+    // the downloads folder (never over a file there: "name (2).pdf"). done gets { path } or { error }.
     readonly property string parter: composer.replace(/compose\.py$/, "parts.py")
     function part(cmd, msgid, part, name, done) {
         proc.createObject(nm, { command: ["python3", parter, cmd, msgid, String(part), name], done: t => {
@@ -185,6 +185,9 @@ QtObject {
             done(r)
         } })
     }
+
+    // Show in folder: the folder the saved files are in, with them picked, in the file manager (parts.py show)
+    function showSaved(paths) { proc.createObject(nm, { command: ["python3", parter, "show"].concat(paths), done: t => {} }) }
 
     // Files to attach, from the desktop's file picker; done gets their paths (none when cancelled).
     function pick(done) {

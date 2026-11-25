@@ -269,15 +269,19 @@ ShellRoot {
                 Qt.openUrlExternally("file://" + r.path)
             })
         }
-        function savePart(msg, f) {
-            nm.part("save", msg.id, f.part, f.name, r => say(r.error || "Saved to " + r.path.replace(Quickshell.env("HOME"), "~")))
-        }
-        function saveAll(msg) {
-            nm.saveAll(msg.id, msg.files, r => {
-                if (r.error) { say(r.error); return }
-                const dir = r.paths.length ? r.paths[0].replace(/\/[^\/]*$/, "").replace(Quickshell.env("HOME"), "~") : ""
-                say("Saved " + r.paths.length + " attachments to " + dir)
-            })
+        // Saving goes straight to the downloads folder, without asking (#3627); the toast says where, with Open and Show
+        // in folder, and no folder opens by itself
+        function savePart(msg, f) { nm.part("save", msg.id, f.part, f.name, r => saved(r.error, r.path ? [r.path] : [])) }
+        function saveAll(msg) { nm.saveAll(msg.id, msg.files, r => saved(r.error, r.paths || [])) }
+        function saved(error, paths) {
+            if (error || !paths.length) { say(error || "Nothing was saved", { danger: true }); return }
+            const home = Quickshell.env("HOME")
+            const dir = paths[0].replace(/\/[^\/]*$/, "").replace(home, "~")
+            const show = { label: "Show in folder", run: () => nm.showSaved(paths) }
+            if (paths.length === 1)
+                say("Saved " + paths[0].replace(/^.*\//, "") + " to " + dir,
+                    { actions: [{ label: "Open", run: () => Qt.openUrlExternally("file://" + paths[0].split("/").map(encodeURIComponent).join("/")) }, show] })
+            else say("Saved " + paths.length + " attachments to " + dir, { actions: [show] })
         }
         function size(n) {
             if (n < 0) return ""
