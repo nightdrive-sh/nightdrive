@@ -1,6 +1,7 @@
 import QtQuick
 import qs
 import qs.kit
+import "order.js" as Order
 
 // The open thread: its subject, then each message, its attachments in its header (Attachments.qml). Mail's reading pane, and a message window's.
 Flickable {
@@ -69,8 +70,11 @@ Flickable {
             if (r.links) unsubscribes = Object.assign({}, unsubscribes, r.links)
         })
     }
+    // The newest message received or sent stays open, also when a draft written later comes after it
+    readonly property int newest: Order.newest(messages)
     function folded(m, i) {
-        return messages.length >= foldFrom && i < messages.length - 1 && !m.draft && m.tags.indexOf("unread") < 0 && !unfolded[m.id]
+        return messages.length >= foldFrom && i < messages.length - 1 && i !== newest && !m.draft
+               && m.tags.indexOf("unread") < 0 && !unfolded[m.id]
     }
     // A link in a message opens on the web, or as a new message (mailto:). Any other kind (file:, smb:, an app's own)
     // would open something on this computer at a stranger's word, so it doesn't open at all.

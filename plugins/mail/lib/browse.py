@@ -16,6 +16,7 @@ Failures go to stderr with exit status 1.
 """
 
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -113,6 +114,20 @@ def walk(nodes, out):
     return out
 
 
+def deleted_draft(m):
+    """A draft deleted in Mail: it keeps its draft tag in Trash. It was never sent, so it isn't in the thread (#3622)."""
+    names = m.get("filename") or []
+    names = [names] if isinstance(names, str) else names
+    return "draft" in m.get("tags", []) and bool(names) and all(re.search(r"/Trash/(cur|new|tmp)/", f) for f in names)
+
+
+def by_date(msgs):
+    """The thread as Mail shows it (app/order.js): by date, the newest last, without deleted drafts unless nothing else
+    is left. notmuch's tree order put a late reply to an early message in the middle."""
+    kept = [m for m in msgs if not deleted_draft(m)] or msgs
+    return sorted(kept, key=lambda m: m.get("timestamp", 0))
+
+
 def files(parts, out):
     """The attachments' names, types and sizes (their contents stay out)."""
     for part in parts:
@@ -129,7 +144,7 @@ def thread(ident):
     query = ids.one(ident)
     out = notmuch("show", "--format=json", "--entire-thread=true", "--include-html", "--exclude=false", "--query=sexp",
                   query)
-    msgs = walk(json.loads(out or "[]"), [])
+    msgs = by_date(walk(json.loads(out or "[]"), []))
     block = blocked.query(blocked.entries())
     gone = blocked.among([m["id"] for m in msgs], block)
     if gone:

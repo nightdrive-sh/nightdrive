@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "blanks.js" as Blanks
 import "flowed.js" as Flowed
+import "order.js" as Order
 
 // The only part that talks to notmuch, and the only Quickshell import besides the window:
 // a later native host replaces this file and keeps the same functions.
@@ -90,10 +91,11 @@ QtObject {
         return (s || "").replace(/\s+/g, " ").trim()
     }
 
-    // The thread's messages in order, each { from, to, date, subject, tags, body } with the body as plain text.
+    // The thread's messages by date, oldest first and without deleted drafts (order.js), each { from, to, date,
+    // subject, tags, body } with the body as plain text.
     function show(thread, done) {
         json(["show", "--format=json", "--include-html", "--entire-thread=true", "thread:" + thread],
-             t => { const out = []; flatten(JSON.parse(t), out); return out }, [], list => unflow(list, done))
+             t => { const out = []; flatten(JSON.parse(t), out); return Order.order(out) }, [], list => unflow(list, done))
     }
 
     // A format=flowed text's paragraphs joined (flowed.js, #3321). notmuch's JSON leaves Content-Type's parameters
@@ -205,7 +207,7 @@ QtObject {
         run(["tag"].concat(changes, ["--", query]), () => { if (done) done() })
     }
 
-    // notmuch nests a thread as [[message, [replies]]]; walk it in reading order.
+    // notmuch nests a thread as [[message, [replies]]]; walk it in the tree's order (show() then sorts it by date).
     function flatten(node, out) {
         if (!Array.isArray(node)) return
         for (const n of node) {
@@ -231,6 +233,7 @@ QtObject {
             timestamp: m.timestamp,
             tags: m.tags || [],
             draft: (m.filename || []).some(f => /\/Drafts\/(cur|new)\//.test(f)),
+            gone: Order.deletedDraft(m.tags, m.filename),   // for order(), which leaves it out and takes this off
             // Blank lines tidied for reading (blanks.js): a newsletter's runs of empty and NBSP lines become one
             body: Blanks.tidy(parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)),
             html: parts.html !== "" ? safeHtml(parts.html) : "",
