@@ -6,6 +6,7 @@ import qs
 import qs.kit
 import "sender.js" as Sender
 import "links.js" as Links
+import "fresh.js" as Fresh
 
 // Nightdrive Mail: folders, thread list and the open thread, over notmuch.
 // This file holds the window's state (account, folder, threads, the open and picked ones), reading them over notmuch
@@ -164,7 +165,8 @@ ShellRoot {
 
         // keep: the open thread stays open; at: where to open one when it has gone (the one after a moved thread)
         function reload(keep, at) {
-            const id = keep && current >= 0 && threads[current] ? threads[current].thread : ""
+            const was = keep && current >= 0 ? threads[current] : undefined
+            const id = was ? was.thread : ""
             nm.search(query(), list => {
                 setThreads(list, keep || at !== undefined)
                 let i = list.findIndex(t => t.thread === id)
@@ -176,6 +178,7 @@ ShellRoot {
                     open(i); return
                 }
                 if (!keep || i !== current) open(i)
+                else if (Fresh.changed(was, list[i])) refresh(i)
             })
             for (let f = 0; f < folders.length; f++) {
                 const n = f
@@ -225,6 +228,14 @@ ShellRoot {
                 nm.tag(["-unread"], "thread:" + t.thread, () => reload(true))
         }
 
+
+        // The open thread's messages read again where it stays open (a reply sent, a message a sync brought: fresh.js),
+        // without open()'s marking read and view reset.
+        function refresh(i) {
+            if (listOnly || i < 0) return
+            const id = threads[i].thread
+            nm.show(id, m => { if (m.length && threads[current] && threads[current].thread === id) messages = m })
+        }
 
         // Writing (Writing.qml) and its window (ComposeWindow.qml). compose and mailtoFields stay callable here: the
         // keys, IPC and Thread.qml's links (app.compose) ask for them on the window.

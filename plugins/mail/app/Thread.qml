@@ -47,7 +47,14 @@ Flickable {
     readonly property int foldFrom: 3
     property var unfolded: ({})         // message ids opened by a click
     property var quotesShown: ({})      // message ids whose quote "…" shows
-    onMessagesChanged: { unfolded = ({}); quotesShown = ({}); loadUnsubscribes() }
+    // The same thread read again (a reply in it sent: shell.qml's refresh) keeps the messages opened; another starts anew
+    property string shownThread: ""
+    onMessagesChanged: {
+        const first = messages.length ? messages[0].id : ""
+        if (first !== shownThread) { unfolded = ({}); quotesShown = ({}) }
+        shownThread = first
+        loadUnsubscribes()
+    }
     // A newsletter's unsubscribe link, by message id (lib/unsubscribe.py, #2393): read for the whole thread in one go
     // when it opens, as notmuch's JSON hasn't the List-Unsubscribe header. A late answer for an earlier thread only
     // adds ids this one hasn't.
