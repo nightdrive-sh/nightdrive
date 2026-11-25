@@ -15,7 +15,9 @@ FloatingWindow {
     onOpeningChanged: if (opening && !win.settings.composeFloats) opening = false
     visible: false
     minimumSize: opening ? Qt.size(implicitWidth, implicitHeight) : Qt.size(360, 400)
-    maximumSize: opening ? Qt.size(implicitWidth, implicitHeight) : Qt.size(0, 0)
+    // Freed, the maximum is Qt's own "none" (QWINDOWSIZE_MAX): a 0×0 maximum isn't taken as none but leaves the
+    // opening size as the maximum, so Hyprland couldn't resize the window from its edges or with ⌘-drag (#3592).
+    maximumSize: opening ? Qt.size(implicitWidth, implicitHeight) : Qt.size(16777215, 16777215)
     Timer { id: release; interval: 400; onTriggered: composeWin.opening = false }
     title: composer.heading
     implicitWidth: 760
