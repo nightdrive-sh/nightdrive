@@ -50,10 +50,11 @@ import ssl
 import subprocess
 import sys
 from email.message import EmailMessage
-from email.utils import formataddr, formatdate, getaddresses, make_msgid, parseaddr, parsedate_to_datetime
+from email.utils import formataddr, formatdate, make_msgid, parseaddr, parsedate_to_datetime
 
 import blanks
 import ids
+import recipients
 
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "nightmail", "account.conf")
 PARTS = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "nightmail", "parts")
@@ -263,7 +264,7 @@ def file_in(folder, msg, tags):
 def send(f):
     acc = account(f.get("account"))
     msg = build(acc, f)
-    rcpts = [a for _, a in getaddresses([f.get("to", ""), f.get("cc", "")]) if a]
+    rcpts = recipients.addresses([f.get("to", ""), f.get("cc", "")])
     if not rcpts:
         return {"error": "No recipient"}
     host, _, port = acc["smtp"].partition(":")

@@ -25,12 +25,12 @@ import smtplib
 import ssl
 import subprocess
 import sys
-from email.utils import formataddr, getaddresses
 
 import attach
 import blocked
 import compose
 import ids
+import recipients
 import unseen
 
 
@@ -40,8 +40,7 @@ def notmuch(*args):
 
 def addresses(value):
     """To or Cc as a list of "Name <address>", from a list or a comma-separated string."""
-    text = ", ".join(value) if isinstance(value, list) else str(value or "")
-    return [formataddr(p) for p in getaddresses([text]) if p[1]]
+    return recipients.listed(value)
 
 
 def is_draft(msgid):
@@ -73,7 +72,7 @@ def read(msgid):
     acc = compose.account(aid)
     return {"id": msgid, "account": aid,
             # What sending puts in From: the account's name and address (compose.build), whatever the file says
-            "from": formataddr((acc.get("name", ""), acc["address"])),
+            "from": recipients.shown(acc.get("name", ""), acc["address"]),
             "to": addresses(str(msg.get("To", ""))), "cc": addresses(str(msg.get("Cc", ""))),
             "subject": str(msg.get("Subject", "")), "body": compose.body_text(msg),
             "attachments": [os.path.basename(p.get_filename() or "") for p in msg.iter_attachments()]}, msg
@@ -135,7 +134,7 @@ def lines(text):
 def differences(have, shown):
     """The fields where the draft isn't what the user was shown."""
     def pairs(v):
-        return [(n.strip(), a.lower()) for n, a in getaddresses([", ".join(v) if isinstance(v, list) else str(v or "")]) if a]
+        return [(n, a.lower()) for n, a in recipients.pairs(v)]
     out = []
     for key in ("from", "to", "cc"):
         if pairs(have[key]) != pairs(shown.get(key, [] if key != "from" else "")):

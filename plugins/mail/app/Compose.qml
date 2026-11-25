@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs
 import qs.kit
+import "recipients.js" as Recipients
 
 // Writing a message, in the reading pane's place: To, Cc, Subject and the text, nothing else.
 Item {
@@ -140,6 +141,9 @@ Item {
         draftId = f.draft_id || ""; forwardId = ""; attachments = f.attachments || []
         status = ""; failed = false; busy = false; armed = false
         showCc = cc.text !== ""
+        // Set text leaves the cursor at its end, which scrolls a long To or Cc to its last address and hides the
+        // first ones, as if a name had lost its start (#3593): each shows from the start.
+        to.cursorPosition = 0; cc.cursorPosition = 0; subject.cursorPosition = 0
         if (to.text === "") to.forceActiveFocus()
         else { body.cursorPosition = 0; body.forceActiveFocus() }
         scroller.contentY = 0
@@ -165,8 +169,8 @@ Item {
         Layout.fillWidth: true
         spacing: 0
 
-        // The address being typed: what follows the last comma.
-        function token() { return inp.text.slice(inp.text.lastIndexOf(",") + 1).trim().toLowerCase() }
+        // The address being typed: what follows the last comma outside a quoted name ("Virtanen, Aino", #3593).
+        function token() { return Recipients.typed(inp.text) }
         function complete() {
             const t = token()
             const have = inp.text.toLowerCase()
@@ -176,7 +180,7 @@ Item {
             pick = 0
         }
         function accept(i) {
-            const head = inp.text.slice(0, inp.text.lastIndexOf(",") + 1)
+            const head = Recipients.before(inp.text)
             inp.text = (head ? head + " " : "") + matches[i].nameAddr + ", "
             inp.cursorPosition = inp.text.length
             matches = []
@@ -195,7 +199,10 @@ Item {
                 activeFocusOnTab: true
                 clip: true
                 onTextEdited: f.complete()
-                onActiveFocusChanged: if (!activeFocus) f.matches = []
+                // Left, a long line shows from its start again, not scrolled to where the cursor was; and so when
+                // it gets its width, as a hidden Cc row filled while 0 wide stayed scrolled to its end (#3593)
+                onActiveFocusChanged: if (!activeFocus) { f.matches = []; ensureVisible(0) }
+                onWidthChanged: if (!activeFocus) ensureVisible(0)
                 // With completions open, Esc closes them instead of the window, and Tab or Enter takes the chosen one.
                 Keys.onShortcutOverride: e => { if (f.matches.length && e.key === Qt.Key_Escape) e.accepted = true }
                 Keys.onPressed: e => {
