@@ -21,7 +21,8 @@ Item {
     function footer(level, query) {
         const cur = launcher.results[launcher.selIndex] || {}
         if (cur.kind === "systoggle") return "Enter: on/off"
-        if (cur.kind === "btdev") return "Enter: " + (cur.connected ? "disconnect" : cur.paired ? "connect" : "pair and connect")
+        if (cur.kind === "btdev") return "Enter: " + (Bt.needsRepair(cur.dev) ? "pair again" : cur.connected ? "disconnect"
+                                                     : cur.paired ? "connect" : "pair and connect")
         return ""
     }
     function opened() {}
@@ -52,18 +53,22 @@ Item {
     // ================= Bluetooth (bluetoothctl; as in BluetoothMenu) =================
     property bool powered: LastState.bluetooth
     onPoweredChanged: LastState.bluetooth = powered
-    property var devices: []         // [{ mac, connected, paired, battery, named, near, icon, name }] (BluetoothDevices.js)
+    property var devices: []         // [{ mac, connected, paired, bonded, battery, named, near, icon, name }] (BluetoothDevices.js)
     property var seen: ({})          // the devices found near the computer, which go first (Bt.parse)
     property bool showHidden: false
     property bool scanning: false
     property string btBusy: ""
     property string btMessage: ""
+    readonly property string pairScript: Quickshell.env("HOME") + "/.config/hypr/scripts/bt-pair"
     function btRefresh() { powerProc.running = true; btListProc.running = true }
     function btScan() { if (!scanning && powered) { scanning = true; seen = {}; scanProc.running = true } }
     function btActivate(d) {
         if (btBusy !== "") return
-        btBusy = d.mac; btMessage = ""
-        actProc.environment = { "MAC": d.mac, "MODE": d.connected ? "disconnect" : (d.paired ? "connect" : "pair") }
+        // A device paired without bonding is paired anew (bt-pair --again), as in the menu; meanwhile the hint says how
+        const again = Bt.needsRepair(d)
+        btBusy = d.mac; btMessage = again ? Bt.repairHint(d) : ""
+        actProc.environment = { "MAC": d.mac, "PAIR": pairScript,
+                                "MODE": again ? "again" : d.connected ? "disconnect" : (d.paired ? "connect" : "pair") }
         actProc.running = true
     }
     function btRows() {
@@ -74,10 +79,16 @@ Item {
         const list = showHidden ? devices : devices.filter(d => hidden.indexOf(d) < 0)
         r.push({ kind: "header", name: "Devices" })
         if (list.length === 0) r.push({ kind: "hint", name: "No devices: Scan for devices below" })
-        for (const d of list)
+        for (const d of list) {
+            const broken = Bt.needsRepair(d)   // connected but without its key: not shown as working
             r.push({ kind: "btdev", name: d.name, glyph: Bt.iconFor(d), dev: d, connected: d.connected, paired: d.paired,
-                     summary: btBusy === d.mac ? "…" : d.battery !== "" ? d.battery + "%" : !d.paired ? "not paired" : undefined,
-                     trailGlyph: d.connected && btBusy !== d.mac ? "check" : undefined })
+                     summary: btBusy === d.mac ? "…" : broken ? "pair again" : d.battery !== "" ? d.battery + "%"
+                            : !d.paired ? "not paired" : undefined,
+                     trailGlyph: d.connected && !broken && btBusy !== d.mac ? "check" : undefined })
+        }
+        const repair = list.filter(Bt.needsRepair)
+        if (repair.length > 0 && btBusy === "" && btMessage === "")
+            r.push({ kind: "hint", name: repair[0].name + " is paired, but its key wasn't saved, so it can't connect: Enter pairs it again" })
         if (btMessage !== "") r.push({ kind: "hint", name: btMessage })
         r.push({ kind: "header", name: "More" })
         if (hidden.length > 0)
@@ -114,12 +125,14 @@ Item {
         script: 'case "$MODE" in\n' +
                 '  disconnect) bluetoothctl disconnect "$MAC" ;;\n' +
                 '  connect) bluetoothctl connect "$MAC" ;;\n' +
-                '  pair) bluetoothctl pair "$MAC" && bluetoothctl trust "$MAC" && bluetoothctl connect "$MAC" ;;\n' +
+                '  pair) "$PAIR" "$MAC" ;;\n' +
+                '  again) "$PAIR" "$MAC" --again ;;\n' +
                 'esac'
         onResult: text => {
             s.sel()
             s.btBusy = ""
-            if (actProc.exitCode !== 0) { const lines = text.trim().split("\n"); s.btMessage = lines[lines.length - 1] }
+            const lines = text.trim().split("\n")
+            s.btMessage = actProc.exitCode !== 0 ? lines[lines.length - 1] : ""   // the pairing-mode hint goes too
             s.btRefresh()
         }
     }

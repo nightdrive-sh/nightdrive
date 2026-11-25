@@ -173,7 +173,7 @@
     {
       "name": "bluetooth_status",
       "title": "Bluetooth",
-      "description": "Whether Bluetooth is available and on, the devices connected now (name, mac, battery % when the device reports it: headphones, a mouse) and the paired ones.",
+      "description": "Whether Bluetooth is available and on, the devices connected now (name, mac, battery % when the device reports it: headphones, a mouse) and the paired ones (bonded false: paired without its key kept, so it can't connect: the user pairs it again from the Bluetooth menu, with the device in pairing mode).",
       "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
       "command": ["nightdrive", "bluetooth"],
       "class": "read",

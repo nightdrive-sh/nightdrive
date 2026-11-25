@@ -18,5 +18,6 @@ screen and the controller.
 - **A cover of your own** for a game that isn't Steam's: in its `.desktop` file (`~/.local/share/applications`), `X-Nightdrive-Cover=/path/cover.png`, a 2:3 picture such as 600×900, and if you like `X-Nightdrive-Hero=/path/backdrop.png`, a wide one shown behind the covers (without it, the cover is). Without them the card shows the game's icon.
 - The Launcher has the same games without the covers: Launcher › Games, and searching finds Steam's games by name. Without this app, the Xbox button opens that page instead.
 - `nightdrive games` lists the games (`--json`) and `nightdrive games launch ID` starts one. Claude can list them and, once you allow it, start one. `games` opens the window, `games quit` closes it.
+- **A controller that does nothing** though Bluetooth shows it connected was paired without its key kept, often after moving it from another computer: the Bluetooth menu says **pair again** on it; click it with the controller in pairing mode (its pair button held until the light flashes fast).
 
 Needs: nothing to set up; a controller for the Xbox button

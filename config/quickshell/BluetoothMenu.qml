@@ -11,7 +11,7 @@ Column {
 
     property bool powered: LastState.bluetooth
     onPoweredChanged: LastState.bluetooth = powered
-    property var devices: []         // [{ mac, connected, paired, battery, named, near, icon, name }] (BluetoothDevices.js)
+    property var devices: []         // [{ mac, connected, paired, bonded, battery, named, near, icon, name }] (BluetoothDevices.js)
     property var seen: ({})          // the devices found near the computer, which go first (Bt.parse)
     // Nameless devices (Bt.isHidden) are listed only with "Show hidden devices"
     property bool showHidden: false
@@ -22,6 +22,10 @@ Column {
     property string message: ""
     property string messageMac: ""   // the device the error is about: it clears once that device is connected
     property string passkey: ""      // shown while pairing a keyboard that asks for it to be typed
+    property string pairHint: ""     // what to do while pairing waits for the device (pairing mode)
+    // The input devices paired without bonding, which do nothing until paired again (Bt.needsRepair)
+    readonly property var broken: shown.filter(Bt.needsRepair)
+    readonly property string pairScript: Quickshell.env("HOME") + "/.config/hypr/scripts/bt-pair"
     signal close()
 
     function refresh() { powerProc.running = true; listProc.running = true }
@@ -34,8 +38,11 @@ Column {
     function activate(d) {
         if (m.busy !== "") return
         m.busy = d.mac; m.message = ""; m.messageMac = d.mac
-        if (!d.connected && !d.paired) {
-            pairProc.environment = { "MAC": d.mac }
+        // A device paired without bonding is paired anew whatever its state: connected, it still does nothing
+        const again = Bt.needsRepair(d)
+        if (again || (!d.connected && !d.paired)) {
+            m.pairHint = again ? Bt.repairHint(d) : ""
+            pairProc.command = again ? [m.pairScript, d.mac, "--again"] : [m.pairScript, d.mac]
             pairProc.running = true
             return
         }
@@ -47,7 +54,12 @@ Column {
         if (!ok) m.message = lastLine
         m.refresh()
     }
-    Component.onCompleted: refresh()
+    Component.onCompleted: {
+        refresh()
+        // A pairing goes on when the menu closes (bt-pair runs on its own): opened again, the menu follows it
+        pairProc.command = [m.pairScript, "--follow"]
+        pairProc.running = true
+    }
 
     Timer { interval: 2500; repeat: true; running: true; onTriggered: m.refresh() }
 
@@ -85,23 +97,22 @@ Column {
             m.done(actProc.exitCode === 0, lines[lines.length - 1])
         }
     }
-    // Pairing reads the output as it comes: a keyboard may show a passkey to type on it (the agent prints it), and
-    // that has to be on the screen while bluetoothctl waits, not after it
+    // Pairing (hypr/scripts/bt-pair: pair, check the bond, trust, connect) reads the output as it comes: a keyboard may
+    // show a passkey to type on it, and that has to be on the screen while bluetoothctl waits, not after it
     Process {
         id: pairProc
         property string last: ""
-        command: ["bash", "-c", 'exec 2>&1; bluetoothctl --agent KeyboardDisplay --timeout 60 pair "$MAC" && ' +
-                  'bluetoothctl trust "$MAC" && bluetoothctl connect "$MAC"']
         stdout: SplitParser {
             onRead: line => {
                 const l = line.replace(/\x1b\[[0-9;]*m/g, "").trim()
                 if (l === "") return
+                if (l.startsWith("__mac ")) { m.busy = m.messageMac = l.slice(6); return }
                 pairProc.last = l
                 const k = l.match(/(?:passkey|pin code)\D*(\d{4,6})/i)
                 if (k) m.passkey = k[1]
             }
         }
-        onExited: code => { m.passkey = ""; m.done(code === 0, pairProc.last) }
+        onExited: code => { m.passkey = ""; m.pairHint = ""; m.done(code === 0, pairProc.last) }
     }
 
     MenuHeader {
@@ -144,14 +155,18 @@ Column {
                 model: m.powered ? m.shown : []
                 delegate: MenuRow {
                     required property var modelData
+                    // Connected but without its key: not shown as working, and a click pairs it again
+                    readonly property bool broken: Bt.needsRepair(modelData)
+                    readonly property bool working: modelData.connected && !broken
                     width: parent.width
                     icon: Bt.iconFor(modelData)
                     label: modelData.name
-                    active: modelData.connected
-                    checkIcon: modelData.connected ? "check" : ""
-                    hoverCheckIcon: modelData.connected ? "unplug" : ""   // a click disconnects
+                    active: working
+                    checkIcon: working ? "check" : ""
+                    hoverCheckIcon: working ? "unplug" : ""   // a click disconnects
                     busy: m.busy === modelData.mac
-                    detail: modelData.battery !== "" ? modelData.battery + "%"
+                    detail: broken ? "pair again"
+                          : modelData.battery !== "" ? modelData.battery + "%"
                           : (!modelData.paired ? "not paired" : "")
                     onClicked: m.activate(modelData)
                 }
@@ -167,6 +182,17 @@ Column {
         onClicked: m.showHidden = !m.showHidden
     }
 
+    MenuNote {
+        visible: m.broken.length > 0 && m.busy === "" && m.message === ""
+        variant: "warning"
+        text: m.broken.length > 0 ? m.broken[0].name + " is paired, but its key wasn't saved, so it can't connect. " +
+                                    "Click it to pair it again." : ""
+    }
+    MenuNote {
+        visible: m.pairHint !== ""
+        variant: "warning"
+        text: m.pairHint
+    }
     MenuNote {
         visible: m.passkey !== ""
         variant: "warning"
