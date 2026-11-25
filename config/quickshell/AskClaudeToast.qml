@@ -115,7 +115,7 @@ Toast {
     // Back to the conversation, or a new one when it's been quiet for a while (AskClaudeSession.freshAfter)
     function reopen() {
         const s = AskClaudeSession
-        if (!s.busy && s.sessionId !== "" && Date.now() - s.lastAt > s.freshAfter) { s.reset(); panel.field.begin("") }
+        if (s.stale()) { s.reset(); panel.field.begin("") }
         open(panel.field.text)
     }
     function toggle() { if (asking) close(); else reopen() }

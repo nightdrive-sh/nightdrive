@@ -61,7 +61,7 @@ Singleton {
     function ask(text, dictated) {
         const q = text.trim()
         if (q === "" || busy || starter.running) return false
-        if (sessionId !== "" && Date.now() - lastAt > freshAfter) reset()
+        if (stale()) reset()
         const first = sessionId === ""
         // The session's name (claude -n) is the request's start, to find it again in the Claude menu and /resume
         const line = q.split("\n")[0]
@@ -73,6 +73,19 @@ Singleton {
         starter.running = true
         return true
     }
+    // Whether the next request starts anew: the conversation has been idle for freshAfter, unless it was brought back
+    // from the history on purpose (reopened), when a request goes on with it however old it is
+    property bool reopened: false
+    function stale() { return sessionId !== "" && !busy && !reopened && Date.now() - lastAt > freshAfter }
+    // The launcher's history (AskClaudeHistoryLevels.qml, #2246): an earlier conversation back in the toast, as it was,
+    // its cards too. False while another one runs: there is one conversation at a time, and the running one stays
+    function open(id) {
+        if (!/^[0-9a-f-]{36}$/.test(id) || ((busy || starter.running) && id !== sessionId)) return false
+        watch(id)                        // the one already shown stays as it is
+        reopened = true
+        unseen = false
+        return true
+    }
     // ⌃C, the small card's Cancel: the unit stops, and its end comes through the events (or now, when it never started)
     function stop() {
         if (!busy) return
@@ -81,7 +94,7 @@ Singleton {
     function reset() {
         if (busy) stop()
         tail.running = false
-        entries = []; live = ""; sessionId = ""; unseen = false; busy = false; unsure = false
+        entries = []; live = ""; sessionId = ""; unseen = false; busy = false; unsure = false; reopened = false
         cards = []; saved = ({}); cardsText = ""
     }
 
@@ -154,7 +167,7 @@ Singleton {
     function watch(id) {
         if (sessionId === id && tail.running) return
         tail.running = false
-        entries = []; live = ""; cards = []; saved = ({}); cardsText = ""
+        entries = []; live = ""; cards = []; saved = ({}); cardsText = ""; reopened = false
         sessionId = id
         watchedFrom = Date.now() - 2000   // a turn that ends as this starts still counts as news
         tail.command = ["tail", "-n", "+1", "-F", stateDir + "/" + id + "/events.jsonl"]

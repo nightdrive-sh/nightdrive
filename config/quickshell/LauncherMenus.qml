@@ -15,7 +15,7 @@ Item {
 
     function shot(mode) { return ["bash", "-c", "sleep 0.4; \"$HOME/.config/hypr/scripts/screenshot\" \"$1\"", "_", mode] }
     // Passwords only with 1Password; the plugins' level files add their own (rootItems: Deck's Music)
-    readonly property var rootItems: lv.ask.rootRows().concat([
+    readonly property var rootItems: lv.ask.rootRows().concat(lv.askHistory.rootRows(), [
         { kind: "nav", name: "Apps", glyph: "layout-grid", target: "apps" },
     ], Plugins.has("1password") ? [{ kind: "nav", name: "Passwords", glyph: "key-round", target: "passwords" }] : [], [
         { kind: "nav", name: "Clipboard", glyph: "clipboard-list", target: "clipboard" },
