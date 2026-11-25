@@ -85,7 +85,8 @@ ShellRoot {
         readonly property var folders: [
             { name: "Inbox", dir: "INBOX", glyph: "inbox", query: "@INBOX and tag:inbox" },
             { name: "Sent", dir: "Sent", glyph: "send", query: "@Sent" },
-            { name: "Drafts", dir: "Drafts", glyph: "file-pen", query: "@Drafts" },
+            // Drafts are read: the sidebar counts them all, as Apple Mail does, where the others count the unread (all)
+            { name: "Drafts", dir: "Drafts", glyph: "file-pen", query: "@Drafts", all: true },
             // Archived before archive moved mail to the Archive folder: in the inbox's folder without the inbox tag. Gmail's
             // Archive (All Mail) holds the inbox's messages too, and Trash and Spam lose theirs only at the next sync.
             { name: "Archive", dir: "Archive", glyph: "archive", query: "(@Archive and not @INBOX and not @Trash and not @Spam) or (@INBOX and not tag:inbox)" },
@@ -142,6 +143,7 @@ ShellRoot {
         property int current: -1
         property var messages: []
         property var unreadCounts: ({})
+        property var allCounts: ({})        // the messages in the folders marked all (Drafts), by index
 
         function query() {
             const q = search.text.trim()
@@ -180,6 +182,11 @@ ShellRoot {
                 nm.run(["count", "--output=threads", "(" + folderQuery(f) + ") and tag:unread"], t => {
                     const u = Object.assign({}, unreadCounts); u[n] = parseInt(t) || 0; unreadCounts = u
                 })
+                // Messages, not threads: a draft is one message, and two replies drafted in one thread are two
+                if (folders[f].all)
+                    nm.run(["count", "--output=messages", folderQuery(f)], t => {
+                        const u = Object.assign({}, allCounts); u[n] = parseInt(t) || 0; allCounts = u
+                    })
             }
             for (const a of accounts) {
                 nm.run(["count", "--output=threads", "(" + folderQuery(0, a) + ") and tag:unread"], t => {

@@ -2,9 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import qs.kit
 
-// The folders, with each one's unread count (✓ under the pointer marks them all read, and in Spam and Trash a bin beside
-// it empties them), the accounts at the foot and the fetch and outbox signs by the title. Apart from shell.qml, which
-// places it first in the window's row.
+// The folders, with each one's unread count (in Drafts, every draft: they are read), ✓ under the pointer marking them all
+// read, and in Spam and Trash a bin beside it emptying them; the accounts at the foot and the fetch and outbox signs by
+// the title. Apart from shell.qml, which places it first in the window's row.
 //
 // The title's line and the search's are as high (headerHeight) and as far from the top, so the first
 // folder and the first message line up.
@@ -37,7 +37,8 @@ AppSidebar {
             label: modelData.name
             selected: index === win.folder
             dropTarget: index === ops.dropFolder
-            count: !readButton.visible && win.unreadCounts[index] > 0 ? win.unreadCounts[index] : ""
+            readonly property int shown: modelData.all ? win.allCounts[index] || 0 : win.unreadCounts[index] || 0
+            count: !readButton.visible && shown > 0 ? shown : ""
             countColor: c.dim
             active: panes.at === "folders"     // Tab's (Panes.qml)
             onClicked: win.pickFolder(index)
