@@ -1,0 +1,14 @@
+[Desktop Entry]
+# `disk-usage install` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH
+# may not have ~/.local/bin), and the icon to ~/.local/share/icons/hicolor/scalable/apps. Keywords: the launcher's
+# search finds it by what it is, too.
+Type=Application
+Name=Disk Usage
+GenericName=Disk space
+Comment=What takes up the space on your disk, folder by folder
+Keywords=disk;space;storage;usage;du;clean;cache;trash;free;
+Icon=nightdrive-disk-usage
+Exec=disk-usage
+Terminal=false
+Categories=System;Utility;Filesystem;
+StartupNotify=false

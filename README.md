@@ -30,7 +30,7 @@ Nightdrive puts all of that together into one opinionated desktop.
   dictation, and sleep is tuned for Asahi.
 - **Everything is a keystroke away.** One launcher handles apps, passwords, clipboard history, emoji, screenshots, settings,
   installing packages and power. You rarely need a terminal for everyday things.
-- **Apps of its own.** Mail, Contacts, Deck, Garage and Ferry come with it, made for the keyboard and in the desktop's colours.
+- **Apps of its own.** Mail, Contacts, Deck, Garage, Disk Usage and Ferry come with it, made for the keyboard and in the desktop's colours.
 - **Simple and readable.** Plain config files, a few small scripts, and comments that explain *why*.
 
 ## Highlights
@@ -57,14 +57,15 @@ copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal 
 
 ### Apps of its own
 
-Mail, Contacts, Deck and Ferry come with every install; Garage waits in Launcher › System › Install › Recommended. They're
-made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the sidebar steps aside; narrower
-still, the list and the message take turns.
+Mail, Contacts, Deck and Ferry come with every install; Garage and Disk Usage wait in Launcher › System › Install ›
+Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the sidebar
+steps aside; narrower still, the list and the message take turns.
 
 - **[Mail](plugins/mail/README.md)**: any IMAP account, quiet reading, notifications you can answer from
 - **[Contacts](plugins/contacts/README.md)**: iCloud, Google or CardDAV, in sync both ways; Mail and the Launcher find them
 - **[Deck](plugins/deck/README.md)**: Spotify (Premium) with your albums on a shelf, in the bar, the Launcher and the media keys
 - **[Garage](plugins/garage/README.md)**: virtual machines from a ready-made Fedora or an ISO, with snapshots to go back to
+- **[Disk Usage](plugins/disk-usage/README.md)**: what takes up the space, folder by folder, and the caches and Trash to clean up
 - **[Ferry](plugins/ferry/README.md)**: a mailbox over Tailscale between your computers and your phone
 
 ![Mail four ways: folders, list and message; list and message; and in a narrow window the list, then the message](docs/releases/0.6.0-mail-sizes.jpg)
@@ -128,7 +129,7 @@ details before installing (Tab there takes Flathub's when both have it). Browse 
 categories. System › Remove takes software and web apps away.
 
 Nightdrive's own apps (Mail, Contacts, Deck, Ferry) and Tailscale come with every install; Garage, Nightdrive's app for
-virtual machines, waits in System › Install › Recommended. The rest are optional parts, under System › Install:
+virtual machines, and Disk Usage wait in System › Install › Recommended. The rest are optional parts, under System › Install:
 
 - **Recommended**: apps Nightdrive sets up for you (1Password, Home Assistant…)
 - **Webapp**: ready-made web apps with a key, or any site of your own
@@ -198,6 +199,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Music | [Deck](plugins/deck/README.md) (Nightdrive's own Spotify player, needs Premium) | bar icon, music menu, player row in the Launcher, media keys |
 | Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own) | a mailbox both ways with your phone and other computers, over Tailscale |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
+| Disk space (optional) | [Disk Usage](plugins/disk-usage/README.md) (Nightdrive's own) | what takes up the space, folder by folder; Clean up empties the Trash and caches |
 | Passwords (optional) | [1Password](plugins/1password/README.md) and its `op` CLI | Passwords level in the Launcher, SSH agent |
 | AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘⌥Enter, ask from the Launcher, Claude writes (⌘⇧C), sessions and usage limits in the bar |
 | Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet, offline) | hold F5 or Fn (Mac), Insert (PC) to talk |
@@ -421,7 +423,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
 | `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also Launcher › Settings › Top bar › Date format |
-| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
+| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage, Disk Usage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
 | `nightdrive plugins` | Optional parts and whether each is installed and on; `nightdrive plugins install home-assistant` runs one's installer |
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the Launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
