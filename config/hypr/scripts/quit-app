@@ -17,20 +17,23 @@ stat_field() { sed 's/.*) //' "/proc/$1/stat" 2>/dev/null | awk -v f="$2" '{prin
 
 # quit-app --class <regex>: quits an app by its window class instead of the active window (the launcher's ⌘Q: Apps list).
 # Every process with a matching window is quit the same way, each in the background (--window <address>).
-# The title last: it may hold spaces
-fields='"\(.address // "") \(.class // "") \(.pid // 0) \(.xwayland // false) \(.title // "")"'
+# Joined with the unit separator, not spaces: a class may hold spaces too ("Cold Start '74"), and a space-split read
+# shifted the fields, passed a word as the pid to jq --argjson and left the app running. Non-whitespace IFS also
+# keeps empty fields in place.
+fields='[.address // "", .class // "", (.pid // 0 | tostring), (.xwayland // false | tostring), .title // ""] | join("\u001f")'
 case $1 in
   --class)
     hyprctl -j clients | jq -r --arg re "$2" '[.[] | select(.class | test($re; "i"))] | unique_by(.pid) | .[].address' \
       | while read -r a; do "$0" --window "$a" & done
     exit 0 ;;
-  --window) read -r addr class pid xw title < <(hyprctl -j clients | jq -r --arg a "$2" ".[] | select(.address == \$a) | $fields") ;;
+  --window) IFS=$'\x1f' read -r addr class pid xw title < <(hyprctl -j clients | jq -r --arg a "$2" ".[] | select(.address == \$a) | $fields") ;;
   *)
     # The launcher open: ⌘Q is its own (the selected app in the list, or nothing), never the window under it
     [[ $(qs ipc call launcher quitSelected 2>/dev/null) == ok ]] && exit 0
-    read -r addr class pid xw title < <(hyprctl -j activewindow | jq -r "$fields") ;;
+    IFS=$'\x1f' read -r addr class pid xw title < <(hyprctl -j activewindow | jq -r "$fields") ;;
 esac
 [[ -n $addr ]] || exit 0
+[[ $pid =~ ^-?[0-9]+$ ]] || pid=0   # jq --argjson needs a number
 
 # 1. Own quit command: "class regex = command", or "class regex @ title regex = command" for apps that share a class
 # (Quickshell's windows: Deck, Mail). The core's, yours (.local) and those of the plugins that are on.
