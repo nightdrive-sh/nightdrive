@@ -24,6 +24,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | ⌘⇧⌫ | Empty Trash, or in Spam empty Spam: asks first, and can't be undone (`d` in Trash deletes one for good) |
 
 - The next sync makes every move on the server too, so your phone sees it.
+- A thread dragged out of the window (or a message by its header) goes as a line of text: its subject, sender, date and id. Dropped in a Claude Code terminal, it tells Claude which mail you mean, and Claude reads it with its mail tools, as Access allows. Picked threads go a line each.
 - In a narrow window the list and the thread take turns: `Enter` or → opens the thread, `Esc` or ← goes back. Moving in the list marks nothing read.
 - A paperclip after a thread's date: a file is attached to a message in it. An invitation's own `.ics` doesn't count, nor do pictures in the text (a signature's logo).
 - In a long thread, the read messages fold to one line each, and a quote that is all in an earlier message hides behind `•••`.

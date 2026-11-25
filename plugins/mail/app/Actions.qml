@@ -7,6 +7,7 @@ QtObject {
     id: ops
     required property var win
     required property Item sidebar      // FolderSidebar: which folder lies under a dragged thread
+    required property Item outDrag      // OutDrag.qml: the threads as text, once the drag leaves the window
     readonly property var nm: win.mailer
     readonly property var folders: win.folders
 
@@ -101,12 +102,28 @@ QtObject {
     property int dropFolder: -1         // the folder under it, if it takes it
     function takesDrop(i) { return ["INBOX", "Archive", "Spam", "Trash"].indexOf(folders[i].dir) >= 0 && i !== win.folder }
     property point dragPos              // where the pointer is: the ghost follows it (DragGhost.qml)
+    property Item dragFrom: null        // the row dragged from: the drag out is released with it
+    // Out of the window, the drag goes on as the desktop's (OutDrag.qml): the threads as a line each, into a
+    // terminal or another app. It starts only there, so the drag to a folder stays Mail's own, with its ghost; the
+    // pointer held down still reaches the window outside its edges, and Wayland lets the drag start then.
     function dragOver(pos) {
         dragPos = pos
+        if (dragged && (pos.x < 0 || pos.y < 0 || pos.x >= win.width || pos.y >= win.height)) {
+            const t = dragged
+            dragged = null; dropFolder = -1
+            outDrag.threads(dragFrom, t)
+            return
+        }
         dropFolder = sidebar.dropAt(pos, takesDrop)
     }
-    function startDrag(t) { dragged = win.isPicked(t) ? win.targets() : [t] }
+    function startDrag(t, row) {
+        dragged = win.isPicked(t) ? win.targets() : [t]
+        dragFrom = row
+        outDrag.prepare(dragged.length > 1 ? dragged.length + " threads" : dragged[0].subject, dragged.length > 1)
+    }
     function drop() {
+        outDrag.release(dragFrom)
+        dragFrom = null
         const t = dragged, i = dropFolder
         dragged = null; dropFolder = -1
         if (!t || i < 0) return

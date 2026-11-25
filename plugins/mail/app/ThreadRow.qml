@@ -22,12 +22,13 @@ AppRow {
     active: panes.at === "list" && !win.picked.length
     // With threads picked, the keyboard's place among them
     border.color: index === win.current && win.picked.length ? c.line : selected && active ? c.frame : "transparent"
-    // Dragged sideways (towards the folders) it moves; up and down the list scrolls as before.
+    // Dragged sideways (towards the folders) it moves; up and down the list scrolls as before. Dragged out of the
+    // window, it goes as a line of text, for Claude in a terminal (Actions.dragOver, OutDrag.qml).
     DragHandler {
         target: null
         grabPermissions: PointerHandler.TakeOverForbidden
         cursorShape: Qt.ClosedHandCursor
-        onActiveChanged: if (active) ops.startDrag(row.modelData); else ops.drop()
+        onActiveChanged: if (active) ops.startDrag(row.modelData, row); else ops.drop()
         onCentroidChanged: if (active) ops.dragOver(centroid.scenePosition)
     }
     TapHandler {

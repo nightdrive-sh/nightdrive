@@ -309,7 +309,7 @@ ShellRoot {
         }
 
         // Moving, deleting, read and unread, ⌘Z and dragging to a folder (Actions.qml)
-        Actions { id: ops; win: win; sidebar: sidebar }
+        Actions { id: ops; win: win; sidebar: sidebar; outDrag: outDrag }
         // Deleting for good asks first (ConfirmPanel.qml): { title, detail, action, run }
         property var confirm: null
         onConfirmChanged: if (confirm) confirmPanel.forceActiveFocus(); else list.forceActiveFocus()
@@ -451,6 +451,8 @@ ShellRoot {
         }
 
         DragGhost { ops: ops; c: win.look }
+        // Threads dragged out of the window, as a line Claude reads them by (OutDrag.qml, #3611)
+        OutDrag { id: outDrag; c: win.look }
 
         // Settings (SettingsPanel.qml), confirming a delete for good (ConfirmPanel.qml) and the first start (SetupPanel.qml)
         property bool showSettings: false

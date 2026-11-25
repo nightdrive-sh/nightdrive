@@ -108,6 +108,7 @@ Flickable {
     // A mouse drag selects a message's text instead of dragging the page; the wheel and the touchpad still scroll
     acceptedButtons: Qt.NoButton
     TouchScroll { view: root }
+    OutDrag { id: outDrag; c: root.c }
     // The buttons measured with their names and short names, to see which fit left of the view button
     Row {
         id: fullBar
@@ -232,17 +233,24 @@ Flickable {
         // The gaps are the messages' own, so folded ones lie close together
         spacing: 0
         // The headers are plain text: with a tag in them Qt would read them as HTML and load an <img> past the body's
-        // blocked images (the body alone is HTML, from app.rich and safeHtml)
-        Text {
-            textFormat: Text.PlainText
+        // blocked images (the body alone is HTML, from app.rich and safeHtml). The subject is selected and copied as
+        // the text is (#3611).
+        TextEdit {
+            textFormat: TextEdit.PlainText
             width: parent.width
             bottomPadding: 12
             visible: root.messages.length > 0
             text: root.messages.length ? root.messages[0].subject : ""
-            wrapMode: Text.Wrap
+            wrapMode: TextEdit.Wrap
+            readOnly: true
+            selectByMouse: true
+            activeFocusOnPress: false
+            persistentSelection: true
+            onSelectedTextChanged: root.selected(this)
+            selectionColor: c.sel
             font.family: c.font; font.pixelSize: 22; font.weight: Font.Medium; font.letterSpacing: -0.2
-            lineHeight: 1.1
             color: c.title
+            HoverHandler { cursorShape: Qt.IBeamCursor }
         }
         Repeater {
             model: root.messages
@@ -291,6 +299,16 @@ Flickable {
                     // In a narrow pane the date goes under the address instead of beside the name.
                     readonly property bool wide: width >= 520
                     width: parent.width; height: hdr.implicitHeight + 28
+                    // Dragged, the message goes out as a line Claude reads it by (OutDrag.qml, #3611): into a
+                    // terminal, or any app that takes text. The chip is made as it is pressed, ready for the drag.
+                    PointHandler { onActiveChanged: if (active) outDrag.prepare(msgCol.modelData.subject, false) }
+                    DragHandler {
+                        target: null
+                        grabPermissions: PointerHandler.TakeOverForbidden
+                        cursorShape: Qt.ClosedHandCursor
+                        onActiveChanged: active ? outDrag.message(head, msgCol.modelData, app.name(msgCol.modelData.from))
+                                                : outDrag.release(head)
+                    }
                     Column {
                         id: hdr
                         width: parent.width
