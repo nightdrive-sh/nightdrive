@@ -3,7 +3,7 @@ the start of a text, a picture's size, a sound's or video's length, and a PDF's 
 cover drawn as a picture. Reads at most TEXT_BYTES of a file, so a large one costs no more than a
 small one (long: more, for the big preview). The picture itself the window draws (Qt's Image); this only gives its size.
 """
-import datetime, hashlib, mimetypes, os, shutil, stat, subprocess
+import contextlib, datetime, fcntl, hashlib, mimetypes, os, shutil, stat, subprocess, tempfile, time
 from pathlib import Path
 
 TEXT_BYTES = 8192            # the start of a text that the pane shows
@@ -72,7 +72,10 @@ def cache_dir():
 def rendered(p, st, kind):
     """A PDF's first page (pdftoppm), a video's frame a second in or a sound's cover (ffmpeg) as a PNG in the cache,
     named by the path, size and time, so a changed file is drawn again; None without the tool or when it fails. A sound
-    without a cover leaves an empty file there, so its next peek doesn't run ffmpeg again for nothing."""
+    without a cover leaves an empty file there, so its next peek doesn't run ffmpeg again for nothing.
+    The pane and the big preview peek the picked file at once (#3614): drawing is one at a time under a lock on the
+    cache, so the second waits and takes the first one's picture, each into a part of its own, as a peek stopped for
+    the next file leaves its tool drawing on."""
     tool = "pdftoppm" if kind == "pdf" else "ffmpeg"
     if not shutil.which(tool):
         return None
@@ -81,25 +84,58 @@ def rendered(p, st, kind):
     if out.exists():
         return str(out) if out.stat().st_size else None
     out.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out.with_suffix(".part.png")
-    if kind == "pdf":
-        cmd = ["pdftoppm", "-png", "-f", "1", "-l", "1", "-singlefile", "-scale-to-x", str(RENDER_WIDTH),
-               "-scale-to-y", "-1", str(p), str(tmp)[:-4]]
-    elif kind == "cover":
-        cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(p), "-an", "-frames:v", "1",
-               "-vf", f"scale='min({RENDER_WIDTH},iw)':-2", str(tmp)]
-    else:
-        cmd = ["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", str(p), "-frames:v", "1",
-               "-vf", f"scale='min({RENDER_WIDTH},iw)':-2", str(tmp)]
-    try:
-        subprocess.run(cmd, capture_output=True, timeout=15, check=True)
-        os.replace(tmp, out)
-    except (OSError, subprocess.SubprocessError):
-        tmp.unlink(missing_ok=True)
-        if kind == "cover":
-            out.touch()
-        return None
+    with _drawing(out.parent):
+        if out.exists():                      # drawn while this one waited
+            return str(out) if out.stat().st_size else None
+        _sweep(out.parent)
+        fd, tmp = tempfile.mkstemp(dir=out.parent, prefix=f"{key}.", suffix=PART)
+        os.close(fd)
+        if kind == "pdf":
+            # -singlefile adds .png to the name it is given
+            cmd = ["pdftoppm", "-png", "-f", "1", "-l", "1", "-singlefile", "-scale-to-x", str(RENDER_WIDTH),
+                   "-scale-to-y", "-1", str(p), tmp[:-4]]
+        elif kind == "cover":
+            cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(p), "-an", "-frames:v", "1",
+                   "-vf", f"scale='min({RENDER_WIDTH},iw)':-2", tmp]
+        else:
+            cmd = ["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", str(p), "-frames:v", "1",
+                   "-vf", f"scale='min({RENDER_WIDTH},iw)':-2", tmp]
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=15, check=True)
+            if not os.path.getsize(tmp):
+                raise OSError("nothing drawn")
+            os.replace(tmp, out)
+        except (OSError, subprocess.SubprocessError):
+            Path(tmp).unlink(missing_ok=True)
+            if kind == "cover":
+                out.touch()
+            return None
     return str(out)
+
+
+PART = ".part.png"
+PART_AGE = 60                # s: a part this old was left by a peek stopped mid-draw
+
+
+@contextlib.contextmanager
+def _drawing(folder):
+    """The cache's lock, held while drawing; let go when the process ends, even killed"""
+    fd = os.open(folder, os.O_RDONLY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
+
+
+def _sweep(folder):
+    now = time.time()
+    for part in folder.glob("*" + PART):
+        try:
+            if now - part.stat().st_mtime > PART_AGE:
+                part.unlink()
+        except OSError:
+            pass
 
 
 def duration(p):
