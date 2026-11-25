@@ -5,13 +5,21 @@
 // Wikipedia address's own parentheses (…/Heat_(1995_film)) stay in it. A Markdown link [text](url), as Claude and
 // GitHub's mails write them, shows its text as the link. An address alone in square brackets, as newsletters' text made
 // from HTML writes a link ("Docs: Variants → [https://…]"), shows as the link without its brackets (#3321).
+// Outlook writes a link as "words<https://…>" and a picture as its address in brackets, so a shared file reads
+// "[https://…/xlsx.png]Report.xlsx<https://…sharepoint…>": the picture goes, and the words show as the link (#3626).
 // Tested by links_test.py (runs this file in Quickshell).
 
-// One pattern for both, in one literal (Qt's engine doubles the escapes of a RegExp's .source, so they can't be
-// joined from two): a Markdown link, its text in 1 and its URL in 2, which may hold balanced parentheses one level
-// deep; an address alone in brackets, in 3 (after the Markdown link, so [https://a](https://b) stays one); or a bare
-// URL, up to a space or a character that can't be in one unescaped.
-const LINK = /\[([^\[\]\n]+)\]\((https?:\/\/[^\s()<>"]*(?:\([^\s()<>"]*\)[^\s()<>"]*)*)\)|\[(https?:\/\/[^\s\[\]<>"]+)\]|https?:\/\/[^\s<>"]+/g
+// One pattern for all, in one literal (Qt's engine doubles the escapes of a RegExp's .source, so they can't be
+// joined from parts): a Markdown link, its text in 1 and its URL in 2, which may hold balanced parentheses one level
+// deep; a picture's address alone in brackets, in 3; Outlook's "words<URL>", the words in 4 (none may be "<URL>" alone;
+// no brackets or zero-width space in them, so they start after a picture) and the URL in 5; an address alone in
+// brackets, in 6 (after the Markdown link, so [https://a](https://b) stays one); or a bare URL, up to a space or a
+// character that can't be in one unescaped.
+const LINK = /\[([^\[\]\n]+)\]\((https?:\/\/[^\s()<>"]*(?:\([^\s()<>"]*\)[^\s()<>"]*)*)\)|\[(https?:\/\/[^\s\[\]<>"]+\.(?:png|jpe?g|gif|svg|webp)(?:\?[^\s\[\]<>"]*)?)\]|((?:(?!https?:\/\/)[^<>|\[\]\n\u200b])*)<(https?:\/\/[^\s<>"]+)>|\[(https?:\/\/[^\s\[\]<>"]+)\]|https?:\/\/[^\s<>"]+/gi
+
+// The words of "words<URL>" that are the link: those after the sentence or clause before them ("Hi, the file is
+// here<…>" links "the file is here"), as Outlook gives no mark where the link's own words begin.
+const LEAD = /^(.*(?:[.!?:;,]\s|\s-\s|\s–\s))/
 
 function esc(s) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
@@ -45,9 +53,21 @@ function line(l, accent) {
             out += anchor(m[2], m[1], accent)
             at = m.index + m[0].length
         } else if (m[3] !== undefined) {
+            // A picture Outlook left as its address (a file type's icon, a logo): nothing to read or open
+            at = m.index + m[0].length
+        } else if (m[5] !== undefined) {
+            // "Report.xlsx<https://…>": the words are the link, without the sentence before them. Outlook writes no
+            // space before "<": with one ("See <https://…>"), or no words, the address is the link, without its brackets.
+            const lead = /\s$/.test(m[4]) ? m[4] : (m[4].match(LEAD) || ["", ""])[1]
+            const rest = m[4].slice(lead.length)
+            const words = rest.trim()
+            out += esc(lead + rest.match(/^\s*/)[0])     // not trimStart(): Qt's engine has none
+            out += anchor(m[5], words || m[5], accent)
+            at = m.index + m[0].length
+        } else if (m[6] !== undefined) {
             // [https://…]: the brackets only marked the address, so they go. Its own trailing "." stays in it: the
             // brackets already say where it ends.
-            out += anchor(m[3], m[3], accent)
+            out += anchor(m[6], m[6], accent)
             at = m.index + m[0].length
         } else {
             const url = trim(m[0])

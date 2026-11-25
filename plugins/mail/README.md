@@ -30,7 +30,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 - A thread reads by date, oldest first, with the newest message open at the end, even when it answers an earlier one. A draft you deleted isn't in it.
 - In a long thread, the read messages fold to one line each, and a quote that is all in an earlier message hides behind `•••`.
 - The text view shows a run of blank lines as one (also lines of only invisible characters, which newsletters pad with), and so does a reply's quote. The message itself stays as it came.
-- In the text view, a message sent as format=flowed shows its paragraphs whole, re-wrapped to the window; other messages keep their line breaks, as joining lines by guesswork would break lists, addresses and code. A link written as `[https://…]` shows without its brackets.
+- In the text view, a message sent as format=flowed shows its paragraphs whole, re-wrapped to the window; other messages keep their line breaks, as joining lines by guesswork would break lists, addresses and code. A link written as `[https://…]` shows without its brackets, and Outlook's `name<https://…>` (a shared file) as the name, linked, without the file icon's address before it.
 - Remote images stay off, and so does the sender's tracking. In the browser (⇧H), Load images brings them, still without scripts.
 - With Nightdrive Contacts, a button beside the sender opens their card, or adds them.
 - A newsletter has an Unsubscribe button at the end of its header, beside the attachments: its List-Unsubscribe header's link, else the body's own unsubscribe link. A web link opens in the browser, an email one as a new message for you to send; nothing goes out without you.

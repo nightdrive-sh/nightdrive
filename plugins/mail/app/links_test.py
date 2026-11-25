@@ -60,6 +60,13 @@ CASES = {
     "bracketed_markdown": "[https://shown.example](https://real.example)",
     "bracketed_quoted": "> Discord [https://discord.gg/abc] if",
     "bracketed_open": "[https://example.com/a](https://example.com/open",
+    # Outlook's shared file (#3626): the file type's icon as its address in brackets, then "name<URL>"
+    "outlook_file": "linkki joulu tiedostoon \u200b[https://res.public.onecdn.static.microsoft/assets/item-types/24_1.5x/"
+                    "xlsx.png]2026 Lukijailmoitukset.xlsx<https://x-my.sharepoint.com/:x:/g/p/IQ?email=a%40b.fi&e=V>\u200b",
+    "outlook_words": "Hi, the agenda is here<https://example.com/agenda>. Thanks",
+    "outlook_alone": "See <https://example.com/a> now",
+    "outlook_line": "Download Teams<https://aka.ms/getteams> | Join on the web<https://example.com/join>",
+    "picture_query": "Logo [https://cdn.example/logo.PNG?w=40] and [https://example.com/page.png.html]",
 }
 
 
@@ -152,6 +159,28 @@ class Links(unittest.TestCase):
 
     def test_bracketed_before_an_unclosed_markdown_url(self):
         self.assertEqual(links(self.out["bracketed_open"])[0][0], "https://example.com/a")
+
+    def test_outlook_file_link_shows_its_name(self):
+        self.assertEqual(links(self.out["outlook_file"]),
+                         [("https://x-my.sharepoint.com/:x:/g/p/IQ?email=a%40b.fi&e=V", "2026 Lukijailmoitukset.xlsx")])
+        self.assertEqual(text(self.out["outlook_file"]).replace("\u200b", ""),
+                         "linkki joulu tiedostoon 2026 Lukijailmoitukset.xlsx")
+
+    def test_outlook_words_after_the_clause(self):
+        self.assertEqual(links(self.out["outlook_words"]), [("https://example.com/agenda", "the agenda is here")])
+        self.assertEqual(text(self.out["outlook_words"]), "Hi, the agenda is here. Thanks")
+
+    def test_angle_brackets_alone_go(self):
+        self.assertEqual(links(self.out["outlook_alone"]), [("https://example.com/a", "https://example.com/a")])
+        self.assertEqual(text(self.out["outlook_alone"]), "See https://example.com/a now")
+
+    def test_two_outlook_links_on_a_line(self):
+        self.assertEqual(links(self.out["outlook_line"]), [("https://aka.ms/getteams", "Download Teams"),
+                                                           ("https://example.com/join", "Join on the web")])
+
+    def test_only_a_picture_in_brackets_goes(self):
+        self.assertEqual(links(self.out["picture_query"]), [("https://example.com/page.png.html", "https://example.com/page.png.html")])
+        self.assertEqual(text(self.out["picture_query"]), "Logo  and https://example.com/page.png.html")
 
 
 if __name__ == "__main__":
