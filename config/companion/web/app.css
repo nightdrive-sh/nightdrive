@@ -141,12 +141,16 @@ body.offline .sessions, body.offline .actions { opacity: .45; transition: opacit
 .actions .head span:last-child { margin-left: auto; font-size: 12px; color: var(--dim); }
 .actions .slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .slot { height: 62px; border-radius: 14px; border: 1.5px dashed var(--border); color: var(--dim); display: flex; align-items: center;
-        gap: 10px; padding: 0 12px; width: 100%; min-width: 0; text-align: left; touch-action: none; }
+        gap: 8px; padding: 0 10px; width: 100%; min-width: 0; text-align: left; touch-action: none; }
 .slot .what { display: flex; align-items: center; gap: 6px; min-width: 0; }   /* the icon close to its label */
+/* The icon at the text's size, as the buttons' elsewhere, in a box of its own: inline, an SVG sits on the baseline and
+   stood above the label. The room this and the smaller key leave lets "Play / pause" fit a landscape iPad's column. */
+.slot .ic { display: flex; flex: none; }
+.slot.set .ic { color: var(--accent); }
 .slot .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot.set { border: 1px solid var(--line); background: var(--card); color: var(--text); }
 .slot.done { border-color: var(--ok); }
-.key { width: 26px; height: 26px; border-radius: 7px; background: var(--hover); border: 1px solid var(--border); color: var(--dim);
+.key { width: 22px; height: 22px; border-radius: 7px; background: var(--hover); border: 1px solid var(--border); color: var(--dim);
        font-size: 12px; display: flex; align-items: center; justify-content: center; flex: none; }
 
 /* A session's own view (detail.js): the whole screen, under the sheets (Answer opens one over it) */
@@ -285,6 +289,7 @@ html.kb .detail { padding-bottom: 8px; }
   .actions .slots { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .slot { height: 56px; padding: 0; justify-content: center; }
   .slot .label, .slot .key { display: none; }
+  .slot .ic svg { width: 20px; height: 20px; }   /* an icon alone, no text to match: the size it had */
 }
 @media (max-width: 600px) {
   .sessions { grid-template-columns: minmax(0, 1fr); }

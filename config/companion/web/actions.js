@@ -14,9 +14,9 @@ function render(state) {
   list.dataset.sig = sig;
   list.innerHTML = slots.map((a, n) => a
     ? `<button class="slot set" data-n="${n}" aria-label="${esc(a.label)}"><span class="key">${n + 1}</span>
-         <span class="what"><span style="color:var(--accent)">${icon(a.icon, 20)}</span><span class="label">${esc(a.label)}</span></span></button>`
+         <span class="what"><span class="ic">${icon(a.icon, 16)}</span><span class="label">${esc(a.label)}</span></span></button>`
     : `<button class="slot" data-n="${n}" aria-label="Add an action"><span class="key">${n + 1}</span>
-         <span class="what">${icon("plus")}<span class="label">Add action</span></span></button>`
+         <span class="what"><span class="ic">${icon("plus", 16)}</span><span class="label">Add action</span></span></button>`
   ).join("");
   for (const el of list.querySelectorAll(".slot")) {
     const n = Number(el.dataset.n);
