@@ -224,7 +224,8 @@ Usage: nightmail [command]
                  sends the answer to its organiser (--card: only what would go)
   accounts       the accounts, as JSON
   draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body},
-                 either with attachments: [paths])
+                 either with attachments: [paths]); {draft: ID, body} writes a new version of a draft in its place
+  draft-undo ID  throw a draft away, and bring back the version it replaced (mail_draft's undo)
   draft-show ID  a draft as it would be sent, as JSON
   discard ID     throw a draft away
   save-attachments [--into FOLDER] -- ID [NAME …]
@@ -284,9 +285,9 @@ case ${1:-open} in
     python3 "$APP_DIR/lib/compose.py" accounts ;;
   invitation) python3 "$APP_DIR/lib/invitation.py" "${@:2}" ;;
   unsubscribe) python3 "$APP_DIR/lib/unsubscribe.py" "${@:2}" ;;
-  draft|discard|send)
+  draft|discard|send|draft-undo)
     # The window shows a new draft, and a draft gone, at once
-    python3 "$APP_DIR/lib/drafts.py" "$@"; status=$?
+    python3 "$APP_DIR/lib/drafts.py" "${1#draft-}" "${@:2}"; status=$?
     running && ipc refresh
     exit $status
     ;;

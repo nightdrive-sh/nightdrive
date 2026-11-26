@@ -4,9 +4,14 @@
     drafts.py draft                 a new draft in Drafts, from JSON on stdin: {to, cc, subject, body, account}, or a
                                     reply: {reply_to: message id, reply_all, body} (to, cc and subject then come from
                                     the message, unless given); either with attachments: [absolute paths] (attach.py
-                                    says which files may go). Prints the draft as `show` does
+                                    says which files may go). Prints the draft as `show` does. With draft: ID, a
+                                    new version of that draft: body is the text above its signature and quote, which
+                                    stay; to, cc, subject and attachments stay unless given (redraft.py). A reply to
+                                    a message that already has a draft is refused, naming it
     drafts.py show ID               a draft as it would be sent: {id, account, from, to, cc, subject, body, attachments}
     drafts.py discard ID            throws a draft away (only a draft: a message in an account's Drafts folder)
+    drafts.py undo ID               mail_draft's undo: throws the draft away, and if it was a new version of
+                                    another, brings that one back from Trash
     drafts.py card ID               mail_send's rows on Nightdrive's card: what goes out that Claude saw hidden
                                     (unseen.py), or an error when it mustn't go from Claude's tools at all
     drafts.py send ID [--check]     sends a draft through the account's SMTP server (compose.py), files it in Sent and
@@ -31,6 +36,7 @@ import blocked
 import compose
 import ids
 import recipients
+import redraft
 import unseen
 
 
@@ -84,11 +90,19 @@ def draft(f):
         raise LookupError(f"No account {f['account']!r}: the accounts are {', '.join(accs)}")
     text = str(f.get("body", "")).rstrip()
     files = attach.files(f.get("attachments"))   # all checked before anything is written
+    if f.get("draft"):
+        return again(f, text, files, accs)
     if f.get("reply_to"):
         ids.one(f["reply_to"], threads=False)
         # The reply quotes it: mail Access › Mail keeps from Claude isn't answered by Claude either (blocked.py)
         if blocked.among([f["reply_to"]], blocked.query(blocked.entries())):
             raise LookupError(f"No message {f['reply_to']} (it may have been deleted, or not synced yet)")
+        # One reply, one draft (#3624): a second one looked like the user's own unfinished reply and went out too
+        there = redraft.answering(f["reply_to"])
+        if there:
+            raise LookupError(f"Not written: a draft already answers this message ({', '.join(there)}). Write a new "
+                              f"version of it with draft: its id. Read it first (mail_thread, or nightmail draft-show "
+                              f"ID): the user may have changed it, and the new version keeps their changes.")
         r = compose.reply(f["reply_to"], bool(f.get("reply_all")))
         fields = {k: r[k] for k in ("to", "cc", "subject", "in_reply_to", "references")}
         fields["account"] = f.get("account") or r["account"]
@@ -106,10 +120,42 @@ def draft(f):
     return show(saved["id"])
 
 
+def again(f, text, files, accs):
+    """A new version of the draft f["draft"], in its place: the one replaced goes to Trash (redraft.py)."""
+    old_id = f["draft"]
+    old, msg = read(old_id)
+    if f.get("reply_to"):
+        answers = str(msg.get("In-Reply-To", "")).strip().strip("<>")
+        if answers and answers != f["reply_to"]:
+            raise LookupError(f"Not written: draft {old_id} answers another message ({answers}), not {f['reply_to']}")
+    fields = compose.resume(old_id, msg)                  # its In-Reply-To, References and attachments
+    fields["account"] = f.get("account") or old["account"]
+    fields["body"] = redraft.rewritten(text, old["body"], compose.signature(compose.account(old["account"])))
+    for key in ("to", "cc", "subject"):
+        if key in f:
+            fields[key] = ", ".join(addresses(f[key])) if key != "subject" else str(f[key])
+    if "attachments" in f:
+        fields["attachments"] = files
+    fields.pop("draft_id")                                # kept in Trash below, not deleted
+    saved = compose.draft(fields)
+    if saved.get("error"):
+        raise RuntimeError(saved["error"])
+    redraft.trash(old_id, compose.account(old["account"])["drafts"])
+    redraft.remember(saved["id"], old_id)
+    return dict(show(saved["id"]), replaced=old_id)
+
+
 def discard(msgid):
     is_draft(msgid)
     compose.drop(msgid)
     return {"discarded": msgid}
+
+
+def undo(msgid):
+    """mail_draft undone: a new version (draft: ID) gives way to the one it replaced, a new draft just goes."""
+    out = discard(msgid)
+    back = redraft.restore(msgid)
+    return dict(out, restored=back) if back else out
 
 
 # Claude gets a draft with its secrets hidden (config/mcp/mask.py: a code or a login link in the mail a reply quotes,
@@ -181,13 +227,13 @@ def main():
     cmd, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
     if cmd == "draft" and not args:
         result = draft(json.loads(sys.stdin.read() or "{}"))
-    elif cmd in ("show", "discard", "card") and len(args) == 1:
-        result = {"show": show, "discard": discard, "card": card}[cmd](args[0])
+    elif cmd in ("show", "discard", "undo", "card") and len(args) == 1:
+        result = {"show": show, "discard": discard, "undo": undo, "card": card}[cmd](args[0])
     elif cmd == "send" and len([a for a in args if a != "--check"]) == 1:
         check = "--check" in args
         result = send(next(a for a in args if a != "--check"), json.loads(sys.stdin.read() or "{}") if check else None)
     else:
-        sys.exit("usage: drafts.py draft < JSON | show ID | discard ID | card ID | send ID [--check < JSON]")
+        sys.exit("usage: drafts.py draft < JSON | show ID | discard ID | undo ID | card ID | send ID [--check < JSON]")
     print(json.dumps(result, ensure_ascii=False))
 
 

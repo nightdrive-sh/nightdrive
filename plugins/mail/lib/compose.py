@@ -306,12 +306,22 @@ def drop(msgid):
     subprocess.run(["notmuch", "new", "--quiet", "--no-hooks"], check=True)
 
 
+def drafted(paths):
+    return [p for p in paths if re.search(r"/Drafts/(cur|new|tmp)/", p)]
+
+
 def draft(f):
     """Files the message in Drafts, in place of the copy saved before (draft_id)."""
     # A save while writing (autosave, #3660) whose copy has left Drafts elsewhere (sent, thrown away, or replaced by
     # Claude's mail_draft) is refused: it would bring the message back as a second draft. The window says so, and ⌘S
     # still saves it as a new one.
-    if f.get("autosave") and f.get("draft_id") and not files_of(f["draft_id"]) and not reindexed(f["draft_id"]):
+    # Only a copy in Drafts counts: one thrown away in Mail, or replaced by Claude (redraft.py), waits in Trash.
+    if f.get("autosave") and f.get("draft_id") and not drafted(files_of(f["draft_id"])) \
+            and not drafted(reindexed(f["draft_id"])):
+        import redraft   # only here: compose.py is the window's, redraft.py Claude's
+        if redraft.replaced_by(f["draft_id"]):
+            return {"error": "Not saved: Claude wrote a new version of this draft, in Drafts. ⌘S keeps this one too",
+                    "gone": True}
         return {"error": "Not saved: its draft was sent or changed elsewhere. ⌘S saves it again",
                 "gone": True}
     acc = account(f.get("account"))

@@ -39,6 +39,12 @@ class Autosave(unittest.TestCase):
         r, filed, _ = self.save({"draft_id": "old@x.y", "autosave": True}, [], after_sync=["/m/a/Drafts/cur/1,S"])
         self.assertEqual((r.get("id"), filed), ("new@x.y", ["a/Drafts"]))
 
+    def test_copy_in_trash(self):
+        """Thrown away in Mail, or replaced by Claude's new version (#3624): it waits in Trash, and stays there."""
+        r, filed, dropped = self.save({"draft_id": "old@x.y", "autosave": True}, ["/m/a/Trash/cur/1"])
+        self.assertTrue(r.get("gone"))
+        self.assertEqual((filed, dropped), ([], []))
+
     def test_first_copy(self):
         r, filed, _ = self.save({"draft_id": "", "autosave": True}, [])
         self.assertEqual((r.get("id"), filed), ("new@x.y", ["a/Drafts"]))
