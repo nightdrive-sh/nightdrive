@@ -222,8 +222,10 @@ ShellRoot {
     // The "…" menu lists the modules that didn't fit on its screen's bar
     Binding { target: TopBar; property: "overflow"; value: bar.tuckedOf(root.menuScreen) }
 
-    // Toasts below the bar (ToastStack.qml), stacked in this order: dictation (and Ask Claude, which grows out of it)
-    // stays put while a volume toast comes and goes below it
+    // Toasts below the bar (ToastStack.qml), stacked in this order: Ask Claude's open conversation stays put while a
+    // volume toast comes and goes below it
+    // Ask Claude's and dictation's small card, at the bottom centre (#3428): AskClaudeToast's state
+    AskClaudeIsland { toast: askToast }
     ToastStack {
         AskClaudeToast {
             id: askToast

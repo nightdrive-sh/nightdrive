@@ -14,8 +14,11 @@ import "Words.js" as Words
 //   open (and its keys) the dictation is a reply: a listening wave stands in for the field (AskClaudeListening.qml,
 //   #1997) and the text goes into it to check before Enter sends it.
 // - Esc, or a click beside it, closes it without stopping Claude; what was written stays in the field for next time.
-//   While Claude works, the card stays small (AskClaudeStatus.qml), and says for a while when it has answered; a click
+//   While Claude works the small card says so (AskClaudeStatus.qml), and for a while that it has answered; a click
 //   on it, or ⌘⌥Space (hypr/scripts/ask-claude --toggle), opens it again.
+// - The small card, the dictation's and Claude's, isn't in this toast but in the island at the bottom centre
+//   (AskClaudeIsland.qml, #3428): up here it covered the windows' top lines for as long as you dictated or Claude
+//   worked. This toast is only the open conversation; the island shows smallShown, with this toast's dictation.
 // - A dictated request that ends in an error, or that Claude marked unsure (AskClaudeSession.look, #3155), opens it large
 //   with the keys instead: what was heard and Claude's question are in the conversation, to answer by writing or by
 //   dictating into the field. Not while you dictate into a window: it waits until that's done.
@@ -58,11 +61,14 @@ Toast {
     // The small card's content: the dictation's indicator while you speak, else Claude's state
     readonly property bool dictationCard: vt.shown
 
-    shown: vt.shown || asking || working
+    // The island's (AskClaudeIsland.qml): the dictation's card while you speak, else Claude's state
+    readonly property bool smallShown: !asking && (vt.shown || working)
+    property alias dictation: vt
+    property bool statusHolding: false    // the pointer on the island's Undo: the answered card waits for the click
+    shown: asking
     takesKeys: asking && !stepAside && !listenOnly
     sitsLow: grown                        // in the launcher's place whether it has the keys or not
-    clickable: working && !dictationCard
-    cardWidth: grown ? askWidth : dictationCard ? indicator.implicitWidth : status.implicitWidth
+    cardWidth: askWidth
     cardHeight: grown ? panel.implicitHeight : 48
     // In Ask Claude's size it looks like the launcher and sits where the launcher's card does (Theme.cardTop), as it
     // takes over from it (#1895): its background, corners and border. The small cards stay black and borderless (#1910),
@@ -73,7 +79,7 @@ Toast {
     radius: grown ? 12 : 10
     lowered: Math.max(0, Math.round((Screen.height || 900) * Theme.cardTop) - Theme.barHeight - 8)
     onOutsideClicked: close()
-    onTapped: open(panel.field.text)
+    function tap() { open(panel.field.text) }   // the island clicked
 
     Binding { target: AskClaudeSession; property: "toastViewing"; value: toast.takesKeys }
     onTakesKeysChanged: if (takesKeys) panel.field.edit.forceActiveFocus()   // back from a card that had the keys
@@ -94,7 +100,7 @@ Toast {
     Timer {
         id: answeredTimer
         interval: toast.answeredFor
-        onTriggered: if (status.holding) restart(); else toast.answeredShown = false
+        onTriggered: if (toast.statusHolding) restart(); else toast.answeredShown = false
     }
 
     Dictation { id: vt }
@@ -177,23 +183,6 @@ Toast {
         onTriggered: toast.cancel()
     }
 
-    Item {
-        id: small
-        visible: !toast.grown
-        width: toast.cardWidth
-        height: 48
-        DictationIndicator {
-            id: indicator
-            visible: toast.dictationCard
-            dictation: vt
-            toClaude: toast.listenOnly
-            running: toast.shown && !toast.grown && visible
-        }
-        AskClaudeStatus {
-            id: status
-            visible: !toast.dictationCard
-        }
-    }
     AskClaudePanel {
         id: panel
         visible: toast.grown

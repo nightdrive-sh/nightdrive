@@ -13,8 +13,8 @@ in the browser), and the field to write back. ⌃C stops it,
 text dragged over with the mouse is copied with ⌘C,
 and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again, in manual mode: what the
 tools read came along, so each tool asks first until you change the mode (⇧Tab). Esc, or a click beside the
-toast, closes it without stopping Claude: a small card says it is working (its ✕ cancels), then for a moment that it
-answered (the row says so too), and a click on it, or ⌘⌥Space, opens the toast again (⌘⌥Space anywhere opens it to write
+toast, closes it without stopping Claude: a small bar at the bottom centre of the screen (just above the sessions bar
+when it shows) says it is working (its ✕ cancels), then for a moment that it answered (the row says so too), and a click on it, or ⌘⌥Space, opens the toast again (⌘⌥Space anywhere opens it to write
 in). When Claude finishes with the toast closed, a notification says so, and its Open brings the conversation back. A
 request runs on its own, so it carries on through a restart of the desktop, which picks it up again.
 **Ask Claude History**, under its row in the Launcher, lists the conversations of the last 7 days, newest first (typing
@@ -31,9 +31,9 @@ what it asks then as in any session. Without the tools on, or without Claude Cod
 terminal.
 
 To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
-let go: what you said is sent at once, as a new request, and you can go on with your work. The small card below the top
-bar shows Claude working and then, for a moment, its answer; a click on it opens the conversation. When the request
-changed something (a task added, the volume set), the card has **Undo**, which takes back all of that request's changes
+let go: what you said is sent at once, as a new request, and you can go on with your work. The small bar at the bottom
+centre shows Claude working and then, for a moment, its answer; a click on it opens the conversation. When the request
+changed something (a task added, the volume set), the bar has **Undo**, which takes back all of that request's changes
 at once. With Ask Claude's
 toast open, what you dictate goes into its field instead, to check before Enter sends it. While Claude is still busy with
 an earlier request, the toast opens with what you said in the field. Without the tools on, it goes to Claude Code in a

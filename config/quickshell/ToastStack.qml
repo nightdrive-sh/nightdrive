@@ -5,10 +5,11 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 
 // The toasts' place: one surface at the top centre, just below the bar, with the shown cards (Toast.qml) stacked
-// downwards in the order they're declared in shell.qml. A long-lived card (dictation, later Ask Claude) goes first, so
-// a volume toast meanwhile appears below it instead of covering it.
+// downwards in the order they're declared in shell.qml. A long-lived card (Ask Claude's open conversation) goes first,
+// so a volume toast meanwhile appears below it instead of covering it. Dictation's and Claude's small card while it
+// works are at the bottom centre instead (AskClaudeIsland.qml, #3428).
 // Toasts don't take input, so the surface lets clicks through and has no keyboard; a clickable card takes the clicks
-// on itself (Ask Claude's closed one). A card that is written in (Ask Claude, Dashboard #1895) sets takesKeys: then the
+// on itself (clickable). A card that is written in (Ask Claude, Dashboard #1895) sets takesKeys: then the
 // surface takes the keyboard as the launcher does, and the whole screen's clicks, so a click beside the card closes it
 // (its outsideClicked) instead of leaving the keys with a card that no longer seems to be in use.
 PanelWindow {
