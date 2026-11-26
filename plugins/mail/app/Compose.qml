@@ -84,6 +84,9 @@ Item {
     }
     function detach(i) { attachments = attachments.filter((p, j) => j !== i) }
     property string draftId: ""         // the copy in Drafts, replaced by each save
+    // The copy is only one saved while writing (AutoSave.qml), not with ⌘S or taken up from Drafts: Esc still asks,
+    // and throwing the message away takes it out of Drafts too.
+    property bool autoSaved: false
 
     // The quote a reply starts with, and what was written above it (without the signature, which stays where it is).
     function quoteRe() { return /\n*On .* wrote:\n(>.*(\n|$))*\s*$/ }
@@ -116,11 +119,12 @@ Item {
         body.text = t.slice(0, at) + (signature ? "\n\n" + signature : "") + t.slice(at + len)
     }
 
-    // Esc: a saved draft is saved again and closed. Unsaved writing asks once more, as Esc drops it.
+    // Esc: a saved draft is saved again and closed. Unsaved writing asks once more, as Esc drops it (with the copy
+    // saved while writing).
     property bool armed: false
     Timer { id: disarm; interval: 3000; onTriggered: { root.armed = false; if (!root.failed) root.status = "" } }
     function escPressed() {
-        if (draftId !== "") { save(fields(), true); return }
+        if (draftId !== "" && !autoSaved) { save(fields(), true); return }
         if (untouched() || armed) { armed = false; dismiss(); return }
         armed = true; failed = false
         status = "Esc again to throw it away, ⌘S saves it"

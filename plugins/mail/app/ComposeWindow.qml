@@ -10,6 +10,7 @@ FloatingWindow {
     required property var win
     required property var writer        // Writing.qml
     readonly property alias composer: composer
+    readonly property alias autosave: autosave
     property bool done: false
     property bool opening: false
     onOpeningChanged: if (opening && !win.settings.composeFloats) opening = false
@@ -24,10 +25,21 @@ FloatingWindow {
     implicitHeight: 720
     color: win.look.bg
     onVisibleChanged: {
-        if (visible) { done = false; release.restart() }
-        // Closed by the compositor (⌘W): nothing written is lost, so anything written goes to Drafts.
-        else if (!done && (composer.draftId !== "" || !composer.untouched())) writer.saveDraft(composer.fields(), true)
-        else if (!done) writer.composeEnded()
+        if (visible) { done = false; release.restart(); autosave.begin() }
+        else autosave.end()
+        // Closed by the compositor (⌘W): nothing written is lost, so anything written goes to Drafts. Emptied of all
+        // that was written, its copy saved while writing goes too.
+        if (visible || done) return
+        if (!composer.untouched() || composer.draftId !== "" && !composer.autoSaved) writer.saveDraft(composer.fields(), true)
+        else writer.dismissCompose()
+    }
+    // Saved while writing: a crash or a reload of Quickshell loses only the last few seconds.
+    AutoSave {
+        id: autosave
+        composer: composer
+        mailer: composeWin.win.mailer
+        onFirst: composeWin.win.reload(true)
+        onFailed: error => { composer.failed = true; composer.status = error }
     }
     Compose {
         id: composer

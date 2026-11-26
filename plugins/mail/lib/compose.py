@@ -285,20 +285,35 @@ def send(f):
     return {"ok": True, "id": msg["Message-ID"].strip("<>")}
 
 
+def files_of(msgid):
+    out = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", "--query=sexp", ids.message(msgid)],
+                         capture_output=True, text=True, check=True).stdout.split("\n")
+    return [p for p in out if p and os.path.exists(p)]
+
+
+def reindexed(msgid):
+    """The message's files after notmuch has looked again: a sync may have renamed them (mbsync's flags)."""
+    subprocess.run(["notmuch", "new", "--quiet", "--no-hooks"], check=True)
+    return files_of(msgid)
+
+
 def drop(msgid):
     """Removes an earlier saved draft (replaced by a newer save, or sent)."""
     if not msgid:
         return
-    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", "--query=sexp", ids.message(msgid)],
-                           capture_output=True, text=True, check=True).stdout.split("\n")
-    for path in filter(None, files):
-        if os.path.exists(path):
-            os.remove(path)
+    for path in files_of(msgid):
+        os.remove(path)
     subprocess.run(["notmuch", "new", "--quiet", "--no-hooks"], check=True)
 
 
 def draft(f):
     """Files the message in Drafts, in place of the copy saved before (draft_id)."""
+    # A save while writing (autosave, #3660) whose copy has left Drafts elsewhere (sent, thrown away, or replaced by
+    # Claude's mail_draft) is refused: it would bring the message back as a second draft. The window says so, and ⌘S
+    # still saves it as a new one.
+    if f.get("autosave") and f.get("draft_id") and not files_of(f["draft_id"]) and not reindexed(f["draft_id"]):
+        return {"error": "Not saved: its draft was sent or changed elsewhere. ⌘S saves it again",
+                "gone": True}
     acc = account(f.get("account"))
     msg = build(acc, f)
     file_in(acc["drafts"], msg, ["+draft"])

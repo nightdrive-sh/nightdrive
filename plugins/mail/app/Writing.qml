@@ -8,6 +8,7 @@ QtObject {
     required property var composeWin
     required property var outbox
     readonly property var composer: composeWin.composer
+    readonly property var autosave: composeWin.autosave
     readonly property var nm: win.mailer
 
     // Writing: mode "new", "reply" (to the sender), "all", "claude" (a reply Claude drafts) or "forward", all on the
@@ -93,23 +94,37 @@ QtObject {
                      t => { if (t.trim()) { try { composer.failed = true; composer.status = JSON.parse(t).error } catch (e) {} } })
     }
 
-    // Send closes the writing window at once; the message goes in the background (Outbox.qml).
+    // Send closes the writing window at once; the message goes in the background (Outbox.qml), once a save under way
+    // has answered: sending drops the newest copy in Drafts, not the one before it.
     function sendMail(f) {
-        outbox.send(f, composer.heading, composer.replyId, composer.forwardId)
+        const heading = composer.heading, replyId = composer.replyId, forwardId = composer.forwardId
         composeWin.done = true; composeWin.visible = false
+        autosave.after(id => { if (id) f.draft_id = id; outbox.send(f, heading, replyId, forwardId) })
     }
 
-    // ⌘S, or closing a message saved before: the copy in Drafts is replaced with this one.
+    // ⌘S, or closing a message saved before: the copy in Drafts is replaced with this one (AutoSave.qml keeps the
+    // saves in order, so it is the newest copy).
     function saveDraft(f, close) {
         if (close) { composeWin.done = true; composeWin.visible = false }
-        nm.compose(["draft", JSON.stringify(f)], r => {
+        autosave.write(f, r => {
             if (r.error) { composer.failed = true; composer.status = r.error; if (close) composeWin.visible = true; return }
             if (!close) { composer.draftId = r.id; composer.failed = false; composer.status = "Saved in Drafts" }
             win.reload(true)
             if (close) composeEnded()
         })
     }
-    function dismissCompose() { composeWin.done = true; composeWin.visible = false; composeEnded() }
+    // Esc twice, or closing with nothing written: what was written goes, with its copy saved while writing.
+    function dismissCompose() {
+        const d = composer.autoSaved ? composer.draftId : ""
+        const first = composer.draftId === ""
+        composeWin.done = true; composeWin.visible = false
+        autosave.after((id, auto) => {
+            // A save under way answers with the copy to take away: this message's first, or a newer one of it.
+            const gone = id && auto && (first || d) ? id : d
+            if (!gone) { composeEnded(); return }
+            nm.nightmail(["discard", gone], () => { win.reload(true); composeEnded() })
+        })
+    }
     // The writing window is closed, and its draft saved: Mail started for it alone quits with it, once what it
     // sends has gone (or failed and waits in Drafts).
     function composeEnded() { if (!win.visible && !composeWin.visible && !outbox.jobs.length) Qt.quit() }
