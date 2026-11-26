@@ -35,11 +35,25 @@ else
   else echo "ok  Deck $deck_tag"; fi
 fi
 
-# Ferry: GitHub's latest release, as plugins/ferry/pin asks for it
+# Is version tag $1 newer than $2 (vX.Y.Z or vX.Y.Z-beta.N)? sort -V alone puts 1.0.0 before 1.0.0-beta.2, but a full
+# release is newer than its betas
+newer() {
+  local a=${1#v} b=${2#v}
+  if [[ ${a%%-*} != "${b%%-*}" ]]; then
+    [[ $(printf '%s\n' "${a%%-*}" "${b%%-*}" | sort -V | tail -1) == "${a%%-*}" ]]; return
+  fi
+  [[ $a != "$b" ]] || return 1
+  [[ $a == *-* ]] || return 0
+  [[ $b == *-* && $(printf '%s\n' "$a" "$b" | sort -V | tail -1) == "$a" ]]
+}
+
+# Ferry: GitHub's latest release, as plugins/ferry/pin asks for it. A pin ahead of it is a pre-release Nightdrive took
+# on purpose (`pin TAG`: Ferry for Linux's betas, while the Mac's .dmg stays on the latest release's page): not behind.
 ferry_tag=$(sed -nE 's/^tag=//p' "$repo/plugins/ferry/release.conf")
 latest=$(https -I -o /dev/null -w '%{redirect_url}' "$FERRY_REPO/releases/latest" 2>/dev/null | sed -nE 's|.*/tag/||p') || true
 if [[ -z $latest ]]; then unknown "Ferry: couldn't ask GitHub for its latest release (pinned $ferry_tag)"
-elif [[ $ferry_tag != "$latest" ]]; then warn "Ferry: pinned $ferry_tag, released $latest: run plugins/ferry/pin, try it, commit release.conf"
-else echo "ok  Ferry $ferry_tag"; fi
+elif [[ $ferry_tag == "$latest" ]]; then echo "ok  Ferry $ferry_tag"
+elif newer "$ferry_tag" "$latest"; then echo "ok  Ferry $ferry_tag (a pre-release, ahead of the latest, $latest)"
+else warn "Ferry: pinned $ferry_tag, released $latest: run plugins/ferry/pin, try it, commit release.conf"; fi
 
 exit $rc

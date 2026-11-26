@@ -13,6 +13,8 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 repo=nightdrive-sh/ferry
 from=${FERRY_FROM:-}
+# Ferry's flag that Nightdrive updates it, so Ferry doesn't offer its own update past the pinned release
+managed=${XDG_CONFIG_HOME:-$HOME/.config}/ferry/managed
 
 # The pinned release: release.conf's tag, install_sha256 and tarball_sha256
 pinned() { sed -nE "s/^$1=//p" "$here/release.conf" 2>/dev/null || true; }
@@ -24,7 +26,12 @@ if [[ ${1:-} == --update && -z $from ]]; then
   have=$(readlink -f "$HOME/.local/bin/ferry" 2>/dev/null) || have=""
   # Ferry's own install is in ~/.local/lib/ferry; anything else there is this plugin's old server
   if [[ $have == "$HOME/.local/lib/ferry/"* ]]; then
-    [[ $("$have" version 2>/dev/null) == "${tag#v}" ]] && { echo "    up to date"; exit 0; }
+    if [[ $("$have" version 2>/dev/null) == "${tag#v}" ]]; then
+      # A Ferry that updated itself to this release before Nightdrive pinned it has no managed flag yet: write it,
+      # so it stops offering its own update (install.sh --managed-by would write the same)
+      [[ -f $managed ]] || printf 'Nightdrive\n' >"$managed"
+      echo "    up to date"; exit 0
+    fi
   fi
 fi
 
@@ -49,6 +56,9 @@ fi
 [[ -f $script ]] || { echo "No Ferry install script in $from" >&2; exit 1; }
 # The tray icon stays off on Nightdrive: an install script from before Ferry had one has no such option, and needs none
 grep -q -- '--no-tray' "$script" && args+=(--no-tray)
+# Nightdrive updates Ferry to the release it pinned (`nightdrive update`): Ferry from 1.0.0-beta.2 on then doesn't offer
+# its own update, which would go past the pin
+grep -q -- '--managed-by' "$script" && args+=(--managed-by Nightdrive)
 # The plugin's old server holds Ferry's port. Ferry turns it off for good itself, but after an update its unit file is gone
 # (link.sh removed the dead link), and then `systemctl disable --now` fails before it stops it.
 systemctl --user stop nightdrive-ferry.service 2>/dev/null || true
