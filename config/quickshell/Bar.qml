@@ -228,10 +228,10 @@ Variants {
         // The modules from the right edge leftwards. On a MacBook with a notch (appledrm.show_notch=1) a module that would
         // reach under it goes, with the rest, to the notch's left side. The notch's width: the `notch` row in adjust.conf
         // (px, 0 = none), otherwise found from the internal screen's resolution.
-        // The gap kept on each side of the notch (logical px), beyond the module's own padding (~9 px around its icon,
-        // which is already enough not to look cut). Small on purpose: the icons come close to the notch, and the space
-        // beside it is room for the bar's own marks (#3428).
-        readonly property int notchMargin: 0
+        // The gap kept on each side of the notch (logical px), beyond the module's own padding (~9 px around its icon).
+        // On a black bar the padding alone looks enough, but on a see-through one (opacity 50 %) the icon then sits
+        // too close to the notch's black (#3701). The space beside the notch is room for the bar's own marks (#3428).
+        readonly property int notchMargin: 5
         readonly property real notchWidth: {
             const row = TopBar.sizesLocal.notch || TopBar.sizesPublic.notch
             if (row) return row.size
