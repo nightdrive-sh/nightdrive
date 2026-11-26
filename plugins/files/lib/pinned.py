@@ -40,8 +40,9 @@ def rows():
         if key in dirs:
             glyphs[str(dirs[key])] = glyph
     out = []
+    drives = places.netdrives.mounted()   # a folder in one isn't looked at (places.missing)
     for p in paths():
-        missing = not Path(p).is_dir()
+        missing = places.missing(p, drives)
         out.append({"name": "Home" if p == home else Path(p).name or p, "path": p,
                     "glyph": "folder-x" if missing else glyphs.get(p, "folder"), "missing": missing})
     return out

@@ -5,16 +5,18 @@ The bookmarks are GTK's (~/.config/gtk-3.0/bookmarks: "file:///path Optional nam
 app's Open dialog show, so one added here is there too and theirs are here. Only local folders are listed; a line for
 anything else (sftp://, a network share) is kept in the file as it is.
 
-The disks come from Gio's volume monitor (udisks2 through gvfs): a mounted one with its folder, one that can be
-mounted without it. Without Gio (python3-gobject) there are none, and the rest still works. Network Drives' drives
-come after them, from netdrives.py, which mounts and unmounts them too.
+The disks come from UDisks2 (udisks.py, not Gio's volume monitor: that touches network drives, #3707): a mounted one
+with its folder, one that can be mounted without it. Network Drives' drives come after them, from netdrives.py, which
+mounts and unmounts them too. A folder in a mounted network drive isn't looked at (missing stays false): finding it
+would make the drive connect, and ask for its key, before the user goes there.
 """
-import os, re, subprocess
+import os, re
 from pathlib import Path
 from urllib.parse import quote, unquote, urlparse
 
 import netdrives
 import trash
+import udisks
 
 # Home's own folders in the sidebar's order, by xdg-user-dirs' names, and each one's glyph
 XDG = [("DOCUMENTS", "file-text"), ("DOWNLOAD", "download"), ("PICTURES", "image"), ("MUSIC", "music"),
@@ -75,7 +77,7 @@ def bookmarks():
         if u.scheme != "file":
             continue
         path = unquote(u.path)
-        rows.append({"name": label.strip() or Path(path).name or path, "path": path, "missing": not Path(path).is_dir()})
+        rows.append({"name": label.strip() or Path(path).name or path, "path": path, "missing": missing(path)})
     return rows
 
 
@@ -127,59 +129,29 @@ def devices():
 
 
 def local_devices():
-    try:
-        import gi
-        gi.require_version("Gio", "2.0")
-        from gi.repository import Gio
-    except (ImportError, ValueError):
-        return []
-    mon = Gio.VolumeMonitor.get()
-    rows, seen = [], set()
-    network = netdrives.mounted()     # Gio sees them too, as disks: netdrives.rows() lists them its own way
-    for m in mon.get_mounts():
-        if m.is_shadowed():
-            continue
-        root = m.get_root().get_path()
-        if not root or root == "/" or root in network:
-            continue
-        seen.add(root)
-        vol = m.get_volume()
-        rows.append({"name": m.get_name(), "path": root,
-                     "device": vol.get_identifier("unix-device") or "" if vol else "",
-                     "glyph": "usb" if m.can_eject() else "hard-drive", "unmount": bool(m.can_unmount())})
-    for v in mon.get_volumes():
-        if v.get_mount() is not None or not v.can_mount():
-            continue
-        dev = v.get_identifier("unix-device") or ""
-        if not dev:
-            continue
-        rows.append({"name": v.get_name(), "path": "", "device": dev,
-                     "glyph": "usb" if v.can_eject() else "hard-drive", "unmount": False})
-    return rows
+    return udisks.devices()
+
+
+def missing(path, drives=None):
+    """True when a folder of the sidebar isn't there; one in a mounted network drive is taken to be (above)"""
+    drives = netdrives.mounted() if drives is None else drives
+    if any(path == m or path.startswith(m.rstrip("/") + "/") for m in drives):
+        return False
+    return not Path(path).is_dir()
 
 
 def mount(device):
-    """Mounts a disk by its device (/dev/sdb1) with gio, or a network drive (netdrive:NAME); {path} where it went"""
+    """Mounts a disk by its device (/dev/sdb1), or a network drive (netdrive:NAME); {path} where it went"""
     if device.startswith(netdrives.PREFIX):
         return netdrives.mount(device)
-    r = subprocess.run(["gio", "mount", "-d", device], capture_output=True, text=True, timeout=60)
-    if r.returncode != 0:
-        raise trash.Refused(r.stderr.strip().split("\n")[-1] or f"{device} couldn't be mounted.")
-    m = re.search(r"at (/\S.*?)\s*$", r.stdout.strip())
-    path = m.group(1) if m else next((d["path"] for d in devices() if d["device"] == device), "")
-    return {"path": path}
+    return udisks.mount(device)
 
 
 def unmount(path):
-    """Unmounts (and, for a stick, ejects) the disk at path, or stops the network drive there; {unmounted: path}"""
+    """Unmounts (and, for a stick, powers off) the disk at path, or stops the network drive there; {unmounted: path}"""
     if path in netdrives.mounted():
         return netdrives.unmount(path)
-    r = subprocess.run(["gio", "mount", "-e", path], capture_output=True, text=True, timeout=60)
-    if r.returncode != 0:
-        r = subprocess.run(["gio", "mount", "-u", path], capture_output=True, text=True, timeout=60)
-    if r.returncode != 0:
-        raise trash.Refused(r.stderr.strip().split("\n")[-1] or f"{path} couldn't be unmounted: something uses it.")
-    return {"unmounted": path}
+    return udisks.unmount(path)
 
 
 def all_places():

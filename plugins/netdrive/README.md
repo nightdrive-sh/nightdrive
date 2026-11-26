@@ -7,6 +7,7 @@ A Storage Box, an SFTP server or any rclone remote as a folder in your home, the
 - Any other remote (S3, WebDAV, Jottacloud, Google Drive …) is first made with `rclone config`, which keeps what it needs to log in.
 - `--read-only` mounts a drive that nothing can change through, e.g. a photo library.
 - The top bar shows an icon only when a drive needs a look: orange while one waits for its host (offline), red when one failed, and a count while files upload. Its menu lists the drives and has Connect again.
+- Files connects a drive only when you open it, so with 1Password locked it asks to unlock then, not when Files opens. Nautilus and GTK apps' own Open dialogs start GNOME's disk monitor, which connects every drive at once.
 - While a drive isn't mounted, its folder is an empty local folder. Something saved there keeps the drive from mounting, and the menu says so, rather than vanishing under the drive: move it away and Connect again.
 
 ## Without a network

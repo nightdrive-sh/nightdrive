@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Network Drives in Files' sidebar: `python3 plugins/files/lib/netdrives_test.py`. A drive is known by its mount's
-device (netdrive:NAME), each one the plugin has is a row (a cloud while mounted, one to mount while not), Gio's own row
-for it is left out, and mounting or ejecting one runs the plugin's command. Without the command there are none."""
+device (netdrive:NAME), each one the plugin has is a row (a cloud while mounted, one to mount while not), and mounting
+or ejecting one runs the plugin's command. Without the command there are none."""
 import json
 import os
 import sys
