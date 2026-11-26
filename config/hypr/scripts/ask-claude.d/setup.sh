@@ -37,12 +37,13 @@ claude_flags() {
   srv=$(server) || return 1
   [[ -n $srv ]] || return 1
   # The conversation's own folder for web_download (config/mcp/web/download.py), a resumed turn's the same; the
-  # server gets it through env on its command line, which holds however Claude Code passes environments on
+  # server gets it through env on its command line, which holds however Claude Code passes environments on. Its id
+  # too: the change log marks the changes made here with it, for the small card's Undo (mcp/undo_turn.py, #3157)
   files="$(conv_dir "$id")/files"
   # shellcheck disable=SC2174   # its parent is the conversation's own folder, made 700 by start_turn
   mkdir -p -m 700 "$files" || return 1
-  jq -n --arg s "$SERVER" --argjson v "$srv" --arg f "NIGHTDRIVE_ASK_FILES=$files" \
-    '{ mcpServers: { ($s): ($v | .args = [$f, .command] + (.args // []) | .command = "/usr/bin/env") } }' >"$mcp"
+  jq -n --arg s "$SERVER" --argjson v "$srv" --arg f "NIGHTDRIVE_ASK_FILES=$files" --arg a "NIGHTDRIVE_ASK_ID=$id" \
+    '{ mcpServers: { ($s): ($v | .args = [$f, $a, .command] + (.args // []) | .command = "/usr/bin/env") } }' >"$mcp"
 
   # The web when Access allows it (#2241, logs 4033-4035): Claude Code's own search and page reading, whose WebFetch
   # gives the model a small model's summary of a page rather than the page. Anything but a clear allow (a broken file:

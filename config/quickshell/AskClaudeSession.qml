@@ -56,6 +56,61 @@ Singleton {
     readonly property bool pendingCard: !!card && card.open && card.inlined
     signal answered()                    // a request finished (its answer, an error, or stopped)
 
+    // The changes the last turn made (#3157): its conversation's, since the turn's start, from Claude's change log
+    // (ask-claude undo list: config/mcp/undo_turn.py), asked at the turn's end. The small card offers Undo while any
+    // is still in place. undoState: "" (not pressed), "run", "done" or "error"; undoNote what it undid, or why not
+    property int changesInPlace: 0
+    property string undoState: ""
+    property string undoNote: ""
+    readonly property bool undoable: !busy && changesInPlace > 0 && undoState !== "done"
+    signal undoFinished()
+    function newTurn() { changesInPlace = 0; undoState = ""; undoNote = ""; checkAgain = checker.running }
+    function turnArgs() { return [sessionId, String(Math.floor(turnAt))] }
+    // A conversation read again from its start (a restart) ends each of its turns in a row: the last one's asks
+    property bool checkAgain: false
+    function checkChanges() {
+        if (sessionId === "" || !turnAt) return
+        if (checker.running) { checkAgain = true; return }
+        checker.command = [script, "undo", "list"].concat(turnArgs())
+        checker.running = true
+    }
+    // ask-claude undo undo …: newest first, those still in place, as the user's own Undo
+    function undoTurn() {
+        if (!undoable || undoer.running) return
+        undoState = "run"
+        undoer.command = [script, "undo", "undo"].concat(turnArgs())
+        undoer.running = true
+    }
+    Process {
+        id: checker
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (s.checkAgain) { s.checkAgain = false; Qt.callLater(s.checkChanges); return }
+                let r = {}
+                try { r = JSON.parse(text) } catch (e) {}
+                s.changesInPlace = Array.isArray(r.changes) ? r.changes.filter(c => c && c.state === "done").length : 0
+            }
+        }
+    }
+    Process {
+        id: undoer
+        stdout: StdioCollector { id: undoOut }
+        stderr: StdioCollector { id: undoErr }
+        onExited: code => {
+            let r = {}
+            try { r = JSON.parse(undoOut.text) } catch (e) {}
+            if (code === 0 && Array.isArray(r.undone)) {
+                s.undoState = "done"
+                const n = r.undone.length
+                s.undoNote = n === 0 ? "it was undone already" : n === 1 ? r.undone[0] : n + " changes"
+            } else {
+                s.undoState = "error"
+                s.undoNote = undoErr.text.trim().split("\n").pop() || "Couldn't undo it"
+            }
+            s.undoFinished()
+        }
+    }
+
     // A request: false while one runs or when there's nothing to send. A conversation idle for freshAfter starts anew.
     // dictated: it came from a dictation without a look at it, so Claude gets the dictation's prompt (ask-claude --dictated)
     function ask(text, dictated) {
@@ -96,6 +151,7 @@ Singleton {
         tail.running = false
         entries = []; live = ""; sessionId = ""; unseen = false; busy = false; unsure = false; reopened = false
         cards = []; saved = ({}); cardsText = ""
+        newTurn()
     }
 
     function add(e) { entries = entries.concat([e]) }
@@ -168,6 +224,7 @@ Singleton {
         if (sessionId === id && tail.running) return
         tail.running = false
         entries = []; live = ""; cards = []; saved = ({}); cardsText = ""; reopened = false
+        newTurn()
         sessionId = id
         watchedFrom = Date.now() - 2000   // a turn that ends as this starts still counts as news
         tail.command = ["tail", "-n", "+1", "-F", stateDir + "/" + id + "/events.jsonl"]

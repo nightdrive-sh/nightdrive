@@ -21,6 +21,7 @@ function read(s, line) {
         s.turnAt = Number(ev.at) || Date.now()
         s.dictated = ev.dictated === true   // its answer's unsure mark is read and left out (AskClaudeSession.flush)
         s.unsure = false
+        s.newTurn()                         // the last turn's changes, and its card's Undo, go
     } else if (ev.type === "nightdrive_end") end(s, ev)
     else if (ev.type === "stream_event") {
         var e = ev.event || {}
@@ -58,5 +59,6 @@ function end(s, ev) {
              : ""
     if (text !== "") s.add({ kind: "error", text: String(text) })
     s.busy = false
+    s.checkChanges()   // what the turn changed, for the small card's Undo (#3157)
     s.ended(at)
 }

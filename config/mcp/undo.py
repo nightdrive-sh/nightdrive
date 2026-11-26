@@ -116,6 +116,8 @@ def offer(tool, arguments, answer, state=None):
         "area": tool.area, "options_from": tool.spec.get("options_from", []),
         "deletes": bool(tool.spec.get("deletes")), "server": server_id(os.getpid()),
         "many": tool.spec.get("notice_many"),
+        # Ask Claude's conversation it was made in (its server's env, ask-claude.d/setup.sh): its card's Undo (#3157)
+        **({"ask": ask} if (ask := os.environ.get("NIGHTDRIVE_ASK_ID")) else {}),
     }, batch=tool.spec.get("notify", True))
     # A tool whose change is plain to see where it lands, and shouldn't interrupt (inbox_post: a message is the
     # opposite of a notification), says notify: false. It is logged all the same, for recent_changes and undo_change.

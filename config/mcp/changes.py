@@ -12,6 +12,7 @@ An entry: {id, time, tool, notice, arguments, before, do, stdin, undo, dir, time
     server     the MCP server that made it (undo.server_id): undo_change without an id undoes only its own
     batch      the id of the first change of its batch, whose notification it shares (batch.py); none without one
     many       the tool's notice_many, the batch's line when all of it is that tool's
+    ask        the Ask Claude conversation that made it (undo_turn.py: the small card's Undo); none elsewhere
 """
 
 import fcntl

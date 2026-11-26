@@ -32,7 +32,9 @@ terminal.
 
 To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
 let go: what you said is sent at once, as a new request, and you can go on with your work. The small card below the top
-bar shows Claude working and then, for a moment, its answer; a click on it opens the conversation. With Ask Claude's
+bar shows Claude working and then, for a moment, its answer; a click on it opens the conversation. When the request
+changed something (a task added, the volume set), the card has **Undo**, which takes back all of that request's changes
+at once. With Ask Claude's
 toast open, what you dictate goes into its field instead, to check before Enter sends it. While Claude is still busy with
 an earlier request, the toast opens with what you said in the field. Without the tools on, it goes to Claude Code in a
 terminal. A request sent this way tells Claude it was dictated: Claude reads past the dictation's usual mistakes

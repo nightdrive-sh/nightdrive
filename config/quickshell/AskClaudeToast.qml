@@ -53,7 +53,8 @@ Toast {
     readonly property bool lookNow: lookPending && !asking && !vt.shown && !listening && AskClaudeSession.look !== ""
     // Later, not in the handler: opening changes what lookNow is bound to (a binding loop)
     onLookNowChanged: if (lookNow) Qt.callLater(() => { if (toast.lookNow) toast.open(panel.field.text) })
-    readonly property bool working: !asking && (AskClaudeSession.busy || answeredShown || lookPending)
+    readonly property bool working: !asking && (AskClaudeSession.busy || answeredShown || lookPending
+                                                || AskClaudeSession.undoState === "run")
     // The small card's content: the dictation's indicator while you speak, else Claude's state
     readonly property bool dictationCard: vt.shown
 
@@ -84,11 +85,17 @@ Toast {
             if (AskClaudeSession.look !== "") toast.lookPending = true
             else { toast.answeredShown = true; answeredTimer.restart() }
         }
+        // The small card's Undo (#3157): what it undid stays for a while, as the answer did
+        function onUndoFinished() { if (!toast.asking) { toast.answeredShown = true; answeredTimer.restart() } }
         function onShowRequested(text, send) { toast.request(text, send) }
         function onHideRequested() { toast.close() }
         function onDeleteBackRequested(word) { if (toast.takesKeys) Words.deleteBack(panel.field.edit, word) }
     }
-    Timer { id: answeredTimer; interval: toast.answeredFor; onTriggered: toast.answeredShown = false }
+    Timer {
+        id: answeredTimer
+        interval: toast.answeredFor
+        onTriggered: if (status.holding) restart(); else toast.answeredShown = false
+    }
 
     Dictation { id: vt }
 
@@ -206,5 +213,11 @@ Toast {
         function toggle(): string { toast.toggle(); return "ok" }
         function open(): string { if (!toast.asking) toast.reopen(); return "ok" }
         function shown(): string { return toast.asking ? "open" : "closed" }
+        // The small card's Undo (#3157), for a key or a test: "ok", or "nothing" when the last turn left nothing to undo
+        function undo(): string {
+            if (!AskClaudeSession.undoable) return "nothing"
+            AskClaudeSession.undoTurn()
+            return "ok"
+        }
     }
 }
