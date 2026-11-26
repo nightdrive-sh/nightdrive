@@ -164,14 +164,14 @@ Item {
             }
         }
 
-        // When it was scanned, and what was left out; what just happened, for a while, in its place
+        // When it was scanned, and what was left out (what just happened is the window's toast)
         Text {
             textFormat: Text.PlainText
             Layout.fillWidth: true
             Layout.leftMargin: 28; Layout.rightMargin: 28; Layout.bottomMargin: 18; Layout.topMargin: 6
             elide: Text.ElideRight
-            text: root.app.note || root.app.scanNote
-            color: root.app.note ? root.c.text : root.c.faint
+            text: root.app.scanNote
+            color: root.c.faint
             font.family: root.c.font; font.pixelSize: 11
         }
     }

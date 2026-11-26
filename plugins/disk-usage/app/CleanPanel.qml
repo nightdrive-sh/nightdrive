@@ -148,11 +148,11 @@ AppPanel {
 
     Row {
         spacing: 8
-        PanelButton {
+        AppPanelButton {
             c: root.c; strong: root.tickedSize > 0; keys: ["Enter"]
             label: root.tickedSize > 0 ? "Free " + Fmt.bytes(root.tickedSize) : "Nothing to free"
             onClicked: root.clean()
         }
-        PanelButton { c: root.c; label: "Close"; keys: ["Esc"]; onClicked: if (!root.working) root.close() }
+        AppPanelButton { c: root.c; label: "Close"; keys: ["Esc"]; onClicked: if (!root.working) root.close() }
     }
 }

@@ -16,6 +16,9 @@ AppRow {
     property bool hot: false             // its segment of the split bar is under the pointer
     readonly property bool folder: item.k === "d"
     readonly property bool fold: item.k === "o"
+    // A narrow window (a third of the screen) gives the bar's room to the name: the glyph keeps the entry's colour,
+    // and the size and share say the rest
+    readonly property bool narrow: width < 480
     signal open()
     implicitHeight: 40
     color: selected ? c.sel : marked || hovered || hot ? c.hover : "transparent"
@@ -32,7 +35,7 @@ AppRow {
     Text {
         textFormat: Text.PlainText
         anchors.left: glyph.right; anchors.leftMargin: 12
-        anchors.right: bar.left; anchors.rightMargin: 16
+        anchors.right: bar.left; anchors.rightMargin: root.narrow ? 8 : 16
         anchors.verticalCenter: parent.verticalCenter
         elide: Text.ElideMiddle
         text: root.fold ? Fmt.plural(root.item.i, "smaller item", "smaller items") : root.item.n
@@ -42,9 +45,10 @@ AppRow {
     // The bar: a hairline track, the entry's part over it
     Item {
         id: bar
-        anchors.right: size.left; anchors.rightMargin: 16
+        anchors.right: size.left; anchors.rightMargin: root.narrow ? 0 : 16
         anchors.verticalCenter: parent.verticalCenter
-        width: Math.max(60, Math.min(260, root.width * 0.3)); height: 6
+        visible: !root.narrow
+        width: root.narrow ? 0 : Math.max(60, Math.min(260, root.width * 0.3)); height: 6
         Rectangle { anchors.verticalCenter: parent.verticalCenter; width: parent.width; height: 2; radius: 1; color: root.c.line }
         Rectangle {
             width: root.biggest > 0 ? Math.max(3, parent.width * root.item.s / root.biggest) : 0

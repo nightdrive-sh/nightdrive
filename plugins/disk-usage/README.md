@@ -34,10 +34,18 @@ What takes up the space on your disk, folder by folder, biggest first: a bar sho
 | `disk-usage` | Opens Disk Usage, or brings it forward |
 | `disk-usage FOLDER` | Opens it on FOLDER |
 | `disk-usage top [FOLDER] [N]` | The N biggest entries of FOLDER (your home folder, 20) |
-| `disk-usage clean` | What Clean up can free, a line each |
+| `disk-usage places [--json]` | The sidebar's places, with each disk's size and free space |
+| `disk-usage clean [--json]` | What Clean up can free, a line each |
 | `disk-usage clean ID…` | Empties these (`clean` names them), or `all` |
 | `disk-usage cleanup` | Opens Clean up in the window |
 | `disk-usage install`, `uninstall` | Disk Usage among your apps, or out of them |
 | `disk-usage restart`, `quit`, `log` | After a change to Disk Usage, and its QML errors |
+
+## Claude
+
+Claude can tell how full your disks are, what takes the space in a folder and what Clean up could free
+(Settings › Claude › Access › Disk usage). It looks only in the folders you let it use there (Apps and files), and
+sees hidden folders such as `.cache` as one row. Clean up from Claude always asks on screen first, with each kind and
+its size.
 
 Needs: Python 3

@@ -48,14 +48,16 @@ ShellRoot {
         readonly property bool scanning: scanner.busy && (scanner.graft || scanner.path === placePath)
 
         // The five biggest entries take the palette's colours (the folded smaller items never do), the rest the quiet one
-        readonly property var tints: {
+        readonly property var tints: tintsOf(rows)
+        function tintsOf(list) {
             let n = 0
-            return rows.map(r => r.k === "o" || n >= colours.length ? rest : colours[n++])
+            return list.map(r => r.k === "o" || n >= colours.length ? rest : colours[n++])
         }
+        // From rows alone, not from tints: read in the same change, tints may still be the last folder's
         readonly property var parts: {
-            const p = []
+            const p = [], t = tintsOf(rows)
             let shown = 0
-            rows.forEach((r, i) => { if (tints[i] !== rest) { p.push({ s: r.s, color: tints[i], index: i }); shown += r.s } })
+            rows.forEach((r, i) => { if (t[i] !== rest) { p.push({ s: r.s, color: t[i], index: i }); shown += r.s } })
             if (hereSize - shown > 0) p.push({ s: hereSize - shown, color: rest, index: -1 })
             return p
         }
@@ -76,10 +78,8 @@ ShellRoot {
                 + (scan.unreadable ? "  ·  " + Fmt.plural(scan.unreadable, "folder", "folders") + " couldn't be read (not yours)" : "")
         }
 
-        // A quiet line under the list for what just happened
-        property string note: ""
-        function say(t) { note = t; noteTimer.restart() }
-        Timer { id: noteTimer; interval: 5000; onTriggered: win.note = "" }
+        // What just happened, in the kit's toast at the top (a failure in the danger colour)
+        function say(t, failed) { toast.show(t, { danger: !!failed }) }
 
         // The path of the folder at depth d of the trail, or of an entry of the folder on show
         function pathAt(d) {
@@ -204,7 +204,7 @@ ShellRoot {
             const node = here, path = pathOf(i)
             confirm.ask("Move " + r.n + " to the Trash?",
                         "It takes " + Fmt.bytes(r.s) + ". The space comes free once the Trash is emptied (Clean up), and until then it can come back from the Trash in Files.",
-                        "Move to Trash", () => {
+                        () => {
                             trashProc.node = node; trashProc.item = r
                             trashProc.command = ["gio", "trash", "--", path]
                             trashProc.running = true
@@ -216,7 +216,7 @@ ShellRoot {
             property var item: null
             stderr: StdioCollector { id: trashErr }
             onExited: code => {
-                if (code !== 0) { win.say(trashErr.text.trim() || "It couldn't be moved to the Trash"); return }
+                if (code !== 0) { win.say(trashErr.text.trim() || "It couldn't be moved to the Trash", true); return }
                 const r = item, at = node.c.indexOf(r)
                 if (at >= 0) node.c.splice(at, 1)
                 // The folders it was in are that much smaller, up to the place
@@ -324,12 +324,25 @@ ShellRoot {
             onCleaned: freed => win.say("Freed " + Fmt.bytes(freed) + ". ⌘R scans " + win.placeName + " again.")
             onClosed: folder.list.forceActiveFocus()
         }
-        ConfirmPanel {
+        // The kit's question before Delete; ask() keeps what a yes does until the answer
+        AppConfirm {
             id: confirm
             behind: content
             c: win.look
-            onClosed: folder.list.forceActiveFocus()
+            visible: false
+            action: "Move to Trash"
+            property var onYes: null
+            function ask(q, d, yes) { question = q; detail = d; onYes = yes; visible = true }
+            onAnswered: ok => {
+                visible = false
+                const f = onYes
+                onYes = null
+                folder.list.forceActiveFocus()
+                if (ok && f) f()
+            }
         }
+
+        AppToast { id: toast; c: win.look; z: 10 }
 
         KeySheet {
             id: sheet

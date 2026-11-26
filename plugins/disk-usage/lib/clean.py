@@ -48,12 +48,20 @@ KINDS = [
 ]
 
 
+def too_wide(path):
+    """A folder that holds home, or home itself: what a cache path comes to when XDG_CACHE_HOME is set wrong (to ~ or
+    /). Emptying it would take everything, so it is never one of a kind's folders."""
+    real, home = os.path.realpath(path), os.path.realpath(HOME)
+    return real == home or home.startswith(real.rstrip("/") + "/")
+
+
 def folders(globs):
-    """The folders a kind's globs find, but not one that is a link: ~/.cache/pip pointing at a folder of yours"""
+    """The folders a kind's globs find, but not one that is a link (~/.cache/pip pointing at a folder of yours), nor
+    one too wide"""
     found = []
     for g in globs:
         for p in sorted(glob.glob(g)):
-            if os.path.isdir(p) and not os.path.islink(p):
+            if os.path.isdir(p) and not os.path.islink(p) and not too_wide(p):
                 found.append(p)
     return found
 
