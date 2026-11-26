@@ -184,6 +184,19 @@ QtObject {
         else moveThread("Spam", "Marked as spam")
     }
 
+    // A draft left beside its twin (DraftBar.qml, #3625) to Trash, as a thrown-away draft goes: the thread leaves it
+    // out (order.js), the next sync takes it off the server, and ⌘Z brings it back to Drafts. after(): the window's
+    // own update (a message window's thread is its own copy).
+    function trashDraft(draftId, after) {
+        const q = "id:\"" + draftId.replace(/"/g, "\"\"") + "\""
+        nm.move("Trash", q, [], r => {
+            if (r.error) { win.say(r.error); return }
+            done({ text: "Draft moved to Trash", undo: () => nm.move("Drafts", q, ["Trash"], () => win.reload(true)) })
+            win.reload(true)
+            if (after) after()
+        })
+    }
+
     // ⌘Z (Ctrl+Z) takes back archive, delete and spam, newest first.
     property var undoStack: []
     function done(step) { undoStack = undoStack.concat([step]).slice(-win.undoDepth); win.say(step.text + "   ⌘Z undoes") }

@@ -53,6 +53,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 
 - `nightmail new FILE…` writes a new message with the files attached, as Files' `m` does; a message being written takes them instead.
 - What you write is saved in Drafts as you go (a few seconds after you stop typing, and every half minute), over the same draft, so a crash or a restart loses little: the message is in Drafts. Thrown away with `Esc`, it leaves Drafts too. If its draft was sent or changed elsewhere meanwhile (Claude wrote a new version of it), saving stops and says so: ⌘S saves it again.
+- A reply has one draft. When a message has two drafts answering it, or a draft and a reply you already sent, the thread says so in red under the draft, with Move to Trash (⌘Z brings it back), and so does the writing window before it goes. Continue writing opens the draft it is under.
 - Sending goes on in the background. A message that can't be sent stays in Drafts, and "Not sent" in the sidebar tells why.
 - A reply goes from the account the message came to; a click on From changes it. Your signature (`signature` in `account.conf`, below) goes above the quote.
 - To and Cc suggest addresses from your mail, and from Nightdrive Contacts.

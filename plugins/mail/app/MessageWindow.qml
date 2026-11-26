@@ -32,7 +32,8 @@ FloatingWindow {
         htmlMode: mw.htmlMode
         onCycleHtml: mw.htmlMode = (mw.htmlMode + 1) % 3
         onOpenBrowser: win.openBrowser(mw.msgs)
-        onResumeDraft: win.compose("resume", mw.msgs)
+        onResumeDraft: draftId => win.compose("resume", mw.msgs, { id: draftId })
+        onTrashDraft: draftId => ops.trashDraft(draftId, () => mw.msgs = mw.msgs.filter(m => m.id !== draftId))
         actions: ops.windowActions
         onAct: id => ops.act(id, mw.msgs)
         focus: true

@@ -1,4 +1,5 @@
 import QtQuick
+import "twins.js" as Twins
 
 // Writing: a new message, a reply (or one Claude drafts), a forward or a draft taken up again, in the writing window
 // (ComposeWindow.qml), then sending it (Outbox.qml) or saving it in Drafts. Apart from shell.qml, which holds the main
@@ -24,7 +25,7 @@ QtObject {
             composer.start("New message", f); showCompose(); return
         }
         if (mode === "resume") {
-            const d = draft(all)
+            const d = draft(all, fields && fields.id)
             if (!d) return
             nm.compose(["resume", d.id], r => {
                 if (r.error) { win.say(r.error); return }
@@ -33,6 +34,7 @@ QtObject {
                 const answers = r.in_reply_to.replace(/[<>\s]/g, "")
                 if (answers && all.some(m => m.id === answers)) composer.replyId = answers
                 showCompose()
+                warnTwins(all, answers, d.id)
             })
             return
         }
@@ -52,8 +54,15 @@ QtObject {
             composer.start(mode === "reply" ? "Reply to sender" : "Reply", r)
             composer.replyId = last.id
             showCompose()
+            warnTwins(all, last.id, "")
             if (mode === "claude") composer.rewrite()
         })
+    }
+    // A reply whose message has another draft answering it, or a reply already sent, says so in the writing window
+    // before it goes (twins.js, #3625): two versions once reached the sender that way.
+    function warnTwins(all, answers, self) {
+        const w = Twins.warning(Twins.twins(all, answers, self), ts => win.fullDate(ts))
+        if (w) { composer.failed = true; composer.status = w }
     }
     // Files from outside (`nightmail new FILE…`, Files' m): a new message with them attached. A message already being
     // written takes them instead, as a drop on its window would: the writing window holds one message, and dropping the
@@ -82,8 +91,11 @@ QtObject {
         win.book.load()
         nm.addresses(list => composer.book = win.book.merge(list.filter(a => !win.accounts.some(x => x.address === a.address))))
     }
-    // The open thread's draft, newest first, if it has one.
-    function draft(msgs) { return (msgs || win.messages).filter(m => m.draft).pop() }
+    // The open thread's draft (the one with id, else the newest), if it has one.
+    function draft(msgs, id) {
+        const ds = (msgs || win.messages).filter(m => m.draft)
+        return ds.find(m => m.id === id) || ds.pop()
+    }
 
 
     // Claude writes the reply (Compose.qml asks): the desktop's Claude writes card opens in the middle of the writing

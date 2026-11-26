@@ -475,7 +475,8 @@ ShellRoot {
                     htmlMode: win.htmlMode
                     onCycleHtml: win.htmlMode = (win.htmlMode + 1) % 3
                     onOpenBrowser: win.openBrowser()
-                    onResumeDraft: win.compose("resume")
+                    onResumeDraft: draftId => win.compose("resume", null, { id: draftId })
+                    onTrashDraft: draftId => ops.trashDraft(draftId)
                     actions: ops.readerActions
                     onAct: id => ops.act(id)
                 }

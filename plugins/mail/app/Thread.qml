@@ -14,7 +14,8 @@ Flickable {
     property int htmlMode: 0            // 0 text, 1 HTML on the dark page, 2 HTML on light paper
     signal cycleHtml()
     signal openBrowser()
-    signal resumeDraft()
+    signal resumeDraft(string draftId)
+    signal trashDraft(string draftId)
     // Buttons above the thread, for the mouse (the kit's AppBarButton, as Notes'): [{ id, icon, text, short, tip, keys, strong }];
     // a click sends act(id), strong lights the one Enter presses. Where they
     // don't all fit beside the view button, the short names show, and where those don't either, only the icons. Held
@@ -440,23 +441,12 @@ Flickable {
                         HoverHandler { cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor }
                     }
                 }
-                // A draft is written on in the writing window.
-                Rectangle {
+                // A draft is written on in the writing window; one with a twin says so (#3625)
+                DraftBar {
                     visible: !msgCol.isFolded && modelData.draft
-                    implicitWidth: draftRow.implicitWidth + 28
-                    implicitHeight: 34
-                    radius: 8
-                    color: draftHover.hovered ? c.hover : "transparent"
-                    border.color: c.line
-                    HoverHandler { id: draftHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: root.resumeDraft() }
-                    Row {
-                        id: draftRow
-                        anchors.centerIn: parent
-                        spacing: 8
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "⏎" }
-                        Text { anchors.verticalCenter: parent.verticalCenter; text: "Continue writing"; color: c.accent; font.family: c.font; font.pixelSize: 12 }
-                    }
+                    c: root.c; app: root.app; msg: modelData; messages: root.messages
+                    onResume: root.resumeDraft(modelData.id)
+                    onTrash: root.trashDraft(modelData.id)
                 }
                 Item { visible: !msgCol.isFolded; width: 1; height: 56 }
             }

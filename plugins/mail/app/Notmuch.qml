@@ -211,19 +211,20 @@ QtObject {
     }
 
     // notmuch nests a thread as [[message, [replies]]]; walk it in the tree's order (show() then sorts it by date).
-    function flatten(node, out) {
+    // parent: the message a reply answers (its In-Reply-To), for twins.js
+    function flatten(node, out, parent) {
         if (!Array.isArray(node)) return
         for (const n of node) {
             if (Array.isArray(n) && n.length === 2 && n[0] && n[0].headers) {
-                out.push(message(n[0]))
-                flatten(n[1], out)
+                out.push(message(n[0], parent || ""))
+                flatten(n[1], out, n[0].id)
             } else {
-                flatten(n, out)
+                flatten(n, out, parent)
             }
         }
     }
 
-    function message(m) {
+    function message(m, parent) {
         const parts = { plain: "", html: "", files: [], invite: false }
         collect(m.body || [], parts, "")
         const file = Array.isArray(m.filename) ? m.filename[0] : m.filename
@@ -235,7 +236,9 @@ QtObject {
             subject: oneLine(m.headers.Subject),
             timestamp: m.timestamp,
             tags: m.tags || [],
+            parent: parent || "",
             draft: (m.filename || []).some(f => /\/Drafts\/(cur|new)\//.test(f)),
+            sent: (m.filename || []).some(f => /\/Sent\/(cur|new)\//.test(f)),
             gone: Order.deletedDraft(m.tags, m.filename),   // for order(), which leaves it out and takes this off
             // Blank lines tidied for reading (blanks.js): a newsletter's runs of empty and NBSP lines become one
             body: Blanks.tidy(parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)),
