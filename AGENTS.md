@@ -99,7 +99,10 @@ command, and ends with `--name ID down`. `nightdrive sandbox list` shows them al
 - its documentation (above), and `--json` output where a script or tool would read it;
 - a tool for Claude where one fits: the plugin's `mcp.json` or the core's `config/mcp/tools/` (plugins/README.md › Tools
   for Claude: its class, its area in Access). A plugin that has none on purpose says `mcp=none`, else `plugin check` warns;
-- a line in the next release's notes (Dashboard note 86) when users will see it.
+- a line for the next release's notes when users will see it: one item on the release's Dashboard task (now #3706,
+  "Nightdrive 0.7.0: julkaisu"), added with `todo_items` (English, at most 250 characters, its task number and commit
+  at the end). Only add it: don't read that task or its items, to save context; only the release-notes work reads them
+  all. After a release the task is closed and a new "Nightdrive X.Y.Z: julkaisu" takes its place, with its number here.
 
 **Recipes**
 - *App* (one of Nightdrive's own, a window: Mail, Deck): a plugin folder whose `app/shell.qml` is a Quickshell config of
