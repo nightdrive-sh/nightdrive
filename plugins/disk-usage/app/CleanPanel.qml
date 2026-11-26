@@ -100,22 +100,25 @@ AppPanel {
                 TapHandler { onTapped: { root.row = kind.index; root.toggle(kind.index) } }
                 Text {
                     id: tick
-                    x: 12; anchors.verticalCenter: parent.verticalCenter
+                    // On the title's line, not the row's middle: the row has two lines, and the icons belong to its name
+                    x: 12; y: texts.y + nameText.y + (nameText.height - height) / 2
                     text: Icons.g(kind.on ? "square-check" : "square"); font.family: Icons.family; font.pixelSize: 15
                     color: kind.on ? root.c.primary : root.c.faint
                 }
                 Text {
                     id: glyph
-                    anchors.left: tick.right; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: tick.right; anchors.leftMargin: 14; y: tick.y
                     text: Icons.g(kind.modelData.glyph); font.family: Icons.family; font.pixelSize: 15
                     color: kind.empty ? root.c.faint : root.c.dim
                 }
                 Column {
+                    id: texts
                     anchors.left: glyph.right; anchors.leftMargin: 14
                     anchors.right: size.left; anchors.rightMargin: 12
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 3
                     Text {
+                        id: nameText
                         text: kind.modelData.name
                         color: kind.empty ? root.c.dim : root.c.title; font.family: root.c.font; font.pixelSize: 13
                     }
