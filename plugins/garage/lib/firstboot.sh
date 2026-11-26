@@ -6,7 +6,10 @@
 #                         keymap and timezone, and the host's ssh key (a key file's, else the ssh agent's: lib/ssh.sh,
 #                         host_key), so `ssh NAME` just works
 #   nightdrive-vm-agent   once the network is up: sshd and qemu-guest-agent (Shut down, the clock), with dnf
-# and Fedora's initial-setup is skipped, as the user is made already (it would ask for one in the VM's window).
+# and Fedora's initial-setup is skipped, as the user is made already (it would ask for one in the VM's window): at the
+# first boot by a drop-in that comes as a credential too, and for good by the user script, which disables it. The
+# drop-in alone went with the credentials, and initial-setup came back at the second boot, holding graphical.target
+# so that a desktop installed by then (Nightdrive's greetd) never showed its login (#2011).
 # They are written to the VM's folder (firstboot/, a file each, the password only as a hash) and passed at each start
 # until the guest agent has shut the VM down once, i.e. both scripts have run (lib/qemu.sh: stop). qemu reads each from
 # its file (-smbios path=): given as a value they were in its command line, which any process on the host can read.
@@ -47,6 +50,9 @@ chmod 600 $q_home/.ssh/authorized_keys"
   [[ -n $keymap ]] && user_script+=$'\n'"localectl set-keymap $(printf %q "$keymap") || true"
   [[ -n $tz ]] && user_script+=$'\n'"timedatectl set-timezone $(printf %q "$tz") || true"
   user_script+=$'\n'"$GROW_ROOT"
+  # initial-setup off for good (see above): its unit disabled, and its own switch for one that enables it again
+  user_script+=$'\nsystemctl disable initial-setup.service 2>/dev/null || true'
+  user_script+=$'\nprintf \'RUN_INITIAL_SETUP=NO\\n\' > /etc/sysconfig/initial-setup || true'
   user_script+=$'\nmkdir -p /var/lib/nightdrive-vm\ntouch /var/lib/nightdrive-vm/user'
   local agent_script='set -e
 dnf install -y openssh-server qemu-guest-agent
