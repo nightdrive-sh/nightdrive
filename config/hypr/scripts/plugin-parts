@@ -16,7 +16,7 @@ so their module, menu, icons, keys and shortcut lines don't show anywhere.
 State, not cache: what is listed here runs (Hyprland loads each folder's Lua, the bar its commands and menus, the MCP
 server its tools), so a cache cleaner or a rule that lets Claude write in ~/.cache mustn't change it (#1950). Until
 11.2026 it was ~/.cache/nightdrive/plugins.d: the first run here removes that one."""
-import glob, json, os, shlex, shutil, sys
+import contextlib, glob, json, os, shlex, shutil, sys
 
 OUT = os.path.expanduser("~/.local/state/nightdrive/plugins.d")
 OLD = os.path.expanduser("~/.cache/nightdrive/plugins.d")    # before #1950
@@ -36,9 +36,12 @@ def write(name, text):
             return
     except OSError:
         pass
-    with open(path + ".tmp", "w") as f:
+    # A temporary file of this process's own: two runs at once (an update's app install and the dnf hook) shared
+    # one .tmp, and the slower one's replace found it gone (FileNotFoundError, #3483)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
         f.write(text)
-    os.replace(path + ".tmp", path)
+    os.replace(tmp, path)
 
 
 def icons(folders):
@@ -49,13 +52,16 @@ def icons(folders):
         for f in sorted(glob.glob(os.path.join(d, "icons", "*.svg"))):
             want.setdefault(os.path.basename(f), f)
     os.makedirs(out, exist_ok=True)
+    # Another run at the same time (see write) may remove or make the same link first: it's then as wanted already
     for name in os.listdir(out):
         path = os.path.join(out, name)
         if not (os.path.islink(path) and os.readlink(path) == want.get(name)):
-            os.remove(path)
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(path)
     for name, f in want.items():
         if not os.path.lexists(os.path.join(out, name)):
-            os.symlink(f, os.path.join(out, name))
+            with contextlib.suppress(FileExistsError):
+                os.symlink(f, os.path.join(out, name))
 
 
 def main():
