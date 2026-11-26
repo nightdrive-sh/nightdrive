@@ -11,33 +11,55 @@ QtObject {
     readonly property var nm: win.mailer
     readonly property var folders: win.folders
 
+    // The folder a thread is in: the one picked, or in a search of all folders the one it was found in (Search.qml).
+    // What the keys and buttons do follows it: a thread found in Archive has no Archive button.
+    function dirOf(t) { return folders[win.homeOf(t)].dir }
+    // The open thread's (or the first picked one's), for the buttons and d ! in Trash and Spam
+    function hereDir() { const ts = win.targets(); return ts.length ? dirOf(ts[0]) : folders[win.folder].dir }
+
     // Delete, archive and spam move the open thread (or the picked ones) to the account's Trash, Archive or Spam
     // folder (on the server too, at the next sync, so a phone sees it the same way and the server's spam filter
-    // learns from it) and open the next one. Not spam moves it back to the inbox.
+    // learns from it) and open the next one. Not spam moves it back to the inbox. Threads a search found in several
+    // folders move a folder at a time, and one ⌘Z takes them all back.
     function moveThread(to, text, which) {
-        const ts = which || win.targets()
-        if (!ts.length || folders[win.folder].dir === to) return
+        const ts = (which || win.targets()).filter(t => dirOf(t) !== to)
+        if (!ts.length) return
         // Other threads than the open one (dragged to a folder): the open one stays open
         const openId = win.threads[win.current] ? win.threads[win.current].thread : ""
         const keep = !ts.some(t => t.thread === openId)
         const at = Math.min.apply(null, ts.map(t => win.threads.findIndex(x => x.thread === t.thread)))
         if (ts.length > 1) text += ": " + ts.length + " threads"
-        const tq = ts.map(t => "thread:" + t.thread).join(" or ")
-        // Only the messages in the folder being looked at: your own replies stay in Sent.
-        const q = "(" + tq + ") and (" + win.folderQuery(win.folder) + ")"
-        const back = folders[win.folder].dir
-        // In the inbox's folder a message shows in Inbox by its inbox tag; anywhere else it loses the tag.
-        const inbox = dir => [dir === "INBOX" ? "+inbox" : "-inbox"]
-        const from = win.sources(win.folder), there = [win.account.maildir ? win.account.maildir + "/" + to : to]
+        const groups = []
+        for (const t of ts) {
+            const h = win.homeOf(t), g = groups.find(x => x.home === h)
+            if (g) g.threads.push(t); else groups.push({ home: h, threads: [t] })
+        }
+        const undos = []
+        let left = groups.length
+        const moved = () => {
+            if (--left) return
+            if (undos.length) done({ text: text, undo: () => undos.forEach(u => u()) })
+            win.reload(keep, at)
+        }
+        for (const g of groups) moveGroup(to, g, undos, moved)
+    }
+    // In the inbox's folder a message shows in Inbox by its inbox tag; anywhere else it loses the tag.
+    function inboxTag(dir) { return [dir === "INBOX" ? "+inbox" : "-inbox"] }
+    function moveGroup(to, g, undos, moved) {
+        const tq = g.threads.map(t => "thread:" + t.thread).join(" or ")
+        // Only the messages in the thread's folder: your own replies stay in Sent.
+        const q = "(" + tq + ") and (" + win.folderQuery(g.home) + ")"
+        const back = folders[g.home].dir
+        const from = win.sources(g.home), there = [win.account.maildir ? win.account.maildir + "/" + to : to]
         nm.move(to, q, from, r => {
-            if (r.error) { win.say(r.error); return }
+            if (r.error) { win.say(r.error); moved(); return }
             const ids = (r.ids || []).map(i => "id:\"" + i + "\"").join(" or ")
-            if (ids) done({ text: text, undo: () => nm.move(back, ids, there, () => nm.tag(inbox(back), ids, () => win.reload(keep, at))) })
-            nm.tag(inbox(to), to === "INBOX" && ids ? ids : tq, () => win.reload(keep, at))
+            if (ids) undos.push(() => nm.move(back, ids, there, () => nm.tag(inboxTag(back), ids, () => win.reload(true))))
+            nm.tag(inboxTag(to), to === "INBOX" && ids ? ids : tq, moved)
         })
     }
     // d: to Trash, and in Trash deleted for good (after asking)
-    function trash() { if (folders[win.folder].dir === "Trash") eraseThreads(); else moveThread("Trash", "Moved to Trash") }
+    function trash() { if (hereDir() === "Trash") eraseThreads(); else moveThread("Trash", "Moved to Trash") }
 
     // Deleting for good, in Trash (or Spam, emptied): the files go, and the next sync deletes them on the server. There
     // is no ⌘Z, so it asks first (the confirm panel: Enter deletes, Esc doesn't).
@@ -78,12 +100,12 @@ QtObject {
         nm.tag([read ? "-unread" : "+unread"], ts.map(t => "thread:" + t.thread).join(" or "), () => win.reload(true))
     }
 
-    // ⇧U, or ✓ on a folder: every unread message in it read (with a search on, the results only), in the next sync on
-    // the server too. ⌘Z makes the same ones unread again: they carry a tag of their own until then (undoTag), so the
+    // ⇧U (here), or ✓ on a folder: every unread message in it read (⇧U with a search on: what it found, in all folders
+    // or the one picked; ✓ always the whole folder), in the next sync on the server too. ⌘Z makes the same ones unread again: they carry a tag of their own until then (undoTag), so the
     // step doesn't keep thousands of ids.
     readonly property string undoTag: "nightmail-read-"
-    function markAllRead(i) {
-        const q = "(" + (i === win.folder ? win.query() : win.folderQuery(i)) + ") and tag:unread"
+    function markAllRead(i, here) {
+        const q = "(" + (here ? win.query() : win.folderQuery(i)) + ") and tag:unread"
         nm.run(["count", "--output=threads", q], t => {
             const n = parseInt(t) || 0
             if (!n) { win.say("Nothing unread here"); return }
@@ -100,7 +122,7 @@ QtObject {
     // and Trash take them; Sent and Drafts hold what you wrote, and the folder being looked at is where they are.
     property var dragged: null          // the threads being dragged (a picked one drags all the picked)
     property int dropFolder: -1         // the folder under it, if it takes it
-    function takesDrop(i) { return ["INBOX", "Archive", "Spam", "Trash"].indexOf(folders[i].dir) >= 0 && i !== win.folder }
+    function takesDrop(i) { return ["INBOX", "Archive", "Spam", "Trash"].indexOf(folders[i].dir) >= 0 && (win.searcher.wide || i !== win.folder) }
     property point dragPos              // where the pointer is: the ghost follows it (DragGhost.qml)
     property Item dragFrom: null        // the row dragged from: the drag out is released with it
     // Out of the window, the drag goes on as the desktop's (OutDrag.qml): the threads as a line each, into a
@@ -129,12 +151,13 @@ QtObject {
         if (!t || i < 0) return
         const to = folders[i].dir
         moveThread(to, to === "Trash" ? "Moved to Trash" : to === "Archive" ? "Archived" : to === "Spam" ? "Marked as spam"
-                       : folders[win.folder].dir === "Spam" ? "Not spam: moved to Inbox" : "Moved to Inbox", t)
+                       : dirOf(t[0]) === "Spam" ? "Not spam: moved to Inbox" : "Moved to Inbox", t)
     }
     function archive() { moveThread("Archive", "Archived") }
     // The reading pane's buttons, for the mouse: what the keys do (a archive, d delete, ! spam, r reply …)
     readonly property var readerActions: {
-        const dir = folders[win.folder].dir
+        // (win.current and win.threads read here, so the buttons follow the thread opened in a search of all folders)
+        const dir = win.current >= 0 && win.threads[win.current] ? dirOf(win.threads[win.current]) : folders[win.folder].dir
         return [{ id: "reply", icon: "reply", text: "Reply", tip: "Reply to all", keys: "r" },
                 { id: "claude", icon: "sparkles", text: "Reply with Claude", short: "Claude", tip: "Claude writes the reply", keys: "⌘⇧C" },
                 { id: "forward", icon: "forward", text: "Forward", tip: "Forward with the attachments", keys: "f" }]
@@ -157,7 +180,7 @@ QtObject {
     }
     // ! marks the thread as spam, or in Spam as not spam.
     function spam() {
-        if (folders[win.folder].dir === "Spam") moveThread("INBOX", "Not spam: moved to Inbox")
+        if (hereDir() === "Spam") moveThread("INBOX", "Not spam: moved to Inbox")
         else moveThread("Spam", "Marked as spam")
     }
 

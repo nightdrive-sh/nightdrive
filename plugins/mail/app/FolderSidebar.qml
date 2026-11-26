@@ -35,7 +35,8 @@ AppSidebar {
             c: win.look
             glyph: modelData.glyph
             label: modelData.name
-            selected: index === win.folder
+            // In a search of all folders none is picked: the list shows each thread's own (Search.qml)
+            selected: index === win.folder && !win.searcher.wide
             dropTarget: index === ops.dropFolder
             readonly property int shown: modelData.all ? win.allCounts[index] || 0 : win.unreadCounts[index] || 0
             count: !readButton.visible && shown > 0 ? shown : ""

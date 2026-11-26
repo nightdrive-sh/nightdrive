@@ -146,10 +146,11 @@ ShellRoot {
         property var unreadCounts: ({})
         property var allCounts: ({})        // the messages in the folders marked all (Drafts), by index
 
-        function query() {
-            const q = search.text.trim()
-            return q === "" ? folderQuery(folder) : "(" + folderQuery(folder) + ") and (" + q + ")"
-        }
+        // The search: all the account's folders but Spam and Trash, or only the one picked (Search.qml, #3655)
+        Search { id: finder; win: win }
+        readonly property QtObject searcher: finder     // for the parts in their own files
+        function query() { return finder.query() }
+        function homeOf(t) { return finder.homeOf(t) }
 
         // A new array is a new model: the ListView starts again at the top with its currentIndex at 0, and current, often
         // unchanged (the thread after an archived one has its index), doesn't set it back. stay: the same folder read
@@ -167,7 +168,7 @@ ShellRoot {
         function reload(keep, at) {
             const was = keep && current >= 0 ? threads[current] : undefined
             const id = was ? was.thread : ""
-            nm.search(query(), list => {
+            finder.threads(list => {
                 setThreads(list, keep || at !== undefined)
                 let i = list.findIndex(t => t.thread === id)
                 if (i < 0) i = list.length > 0 ? Math.min(at || 0, list.length - 1) : -1
@@ -214,7 +215,7 @@ ShellRoot {
                 // Nothing in it: indexing a sync has joined the thread to another one under a new id since the list was
                 // read. The list is read again, and the thread with the same subject and date opens.
                 if (m.length === 0 && !again) {
-                    nm.search(query(), list => {
+                    finder.threads(list => {
                         setThreads(list, true)
                         const j =list.findIndex(x => x.subject === t.subject && x.timestamp === t.timestamp)
                         open(j >= 0 ? j : Math.min(i, list.length - 1), then, true)
@@ -349,15 +350,17 @@ ShellRoot {
                     const thread = t.trim().replace(/^thread:/, "")
                     folder = 0
                     search.text = ""
-                    nm.search(query(), list => {
+                    finder.threads(list => {
                         let i = list.findIndex(x => x.thread === thread)
                         if (i < 0) {
                             // Not in the inbox any more: its thread, searched for in the folder the message is in now
                             // (the inbox's folder without the inbox tag is Archive).
                             const f = folders.findIndex((x, n) => n > 0 && x.dir === (m[2] === "INBOX" ? "Archive" : m[2]))
                             folder = f >= 0 ? f : folders.findIndex(x => x.name === "Archive")
+                            // in that folder alone, as Spam and Trash aren't in a search of all folders
                             search.text = "thread:" + thread
-                            nm.search(query(), l2 => { threads = l2; open(l2.length ? 0 : -1, then) })
+                            finder.all = false
+                            finder.threads(l2 => { threads = l2; open(l2.length ? 0 : -1, then) })
                             return
                         }
                         threads = list
@@ -415,6 +418,8 @@ ShellRoot {
         // Mac Mail's keys, with ⌘⇧C (Ctrl+Shift+C) for Claude's reply. Nightdrive sends ⌘Z ⌘R ⌘F to apps as Ctrl+…, which are also the PC mail apps' keys;
         // ⌘N, ⌘B and ⌘⇧C arrive as Super (Meta) + the key. ⌘⏎ opens a terminal, so sending stays Ctrl+⏎.
         Shortcut { sequences: ["/", "Ctrl+F"]; onActivated: win.search.forceActiveFocus() }
+        // ⌥F: the search in all folders, or only the one picked (Search.qml)
+        Shortcut { sequence: "Alt+F"; enabled: finder.on; onActivated: finder.toggle() }
         Shortcut { sequences: ["Meta+Shift+C", "Ctrl+Shift+C"]; onActivated: win.compose("claude") }
         // ⌘R fetches new mail now (`nightmail sync`, which shows it once indexed), as Mac Mail's Get New Mail
         Shortcut { sequence: "Ctrl+R"; onActivated: { win.reload(true); nm.nightmail(["sync"]) } }
@@ -481,7 +486,7 @@ ShellRoot {
 
         readonly property var keyHelp: [
             { title: "Read", keys: [["↑ ↓  j k", "Previous, next"], ["⏎", "Open in a window"], ["Esc  ←", "Back to the list (narrow window)"], ["PgUp PgDn", "In the list alone: a page in it"], ["↑ ↓", "In the thread alone: scroll it"], ["Space ⇧Space  PgDn PgUp", "Page down, up"], ["h", "HTML or text"], ["⇧H", "HTML in the browser"],
-                                    ["⌘F  /", "Search"], ["Esc", "Clear the search"]] },
+                                    ["⌘F  /", "Search all folders but Spam, Trash"], ["⌥F", "Search only this folder, or all"], ["Esc", "Clear the search"]] },
             { title: "Act", keys: [["a", "Archive"], ["d  ⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Fetch new mail"],
                                    ["⇧↑ ⇧↓  ⇧-click", "Select several"], ["Ctrl-click", "Select or leave out"], ["⌘A", "Select all"]] },
             { title: "Write", keys: [["⌘N  c", "New message"], ["r", "Reply to all"], ["⇧R", "Reply to the sender only"], ["f", "Forward"],

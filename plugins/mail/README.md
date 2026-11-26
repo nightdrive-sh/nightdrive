@@ -9,7 +9,8 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | `?` | Mail's keys. The ⌘ keys follow Mac Mail; on a PC keyboard they are Ctrl |
 | ↑ ↓ or `j` `k` | Move in the list |
 | `Space` ⇧Space | Page through the message |
-| `/` or ⌘F | Search (notmuch's query syntax); `Esc` clears it |
+| `/` or ⌘F | Search the account's folders but Spam and Trash (notmuch's query syntax); each thread shows the folder it is in. `Esc` clears it |
+| ⌥F | While searching: only the folder picked (also how Spam and Trash are searched), or all again |
 | `1`–`6` or Ctrl+↑ Ctrl+↓ | Inbox, Sent, Drafts, Archive, Spam, Trash |
 | ⌘B | Hide or show the folders |
 | `Tab` ⇧Tab | Keys to the folders and back |

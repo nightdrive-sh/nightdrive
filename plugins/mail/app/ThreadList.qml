@@ -50,6 +50,18 @@ Rectangle {
             Layout.preferredHeight: 1
             color: c.divider
         }
+        // With a search on: in all folders but Spam and Trash, or only the one picked (⌥F; Search.qml). Its parts are
+        // short, so it fits the narrowest list (250 px) as it is.
+        AppSegments {
+            visible: win.searcher.on
+            Layout.leftMargin: 28
+            Layout.topMargin: 14
+            c: win.look
+            options: [{ label: "All folders", tip: "Every folder but Spam and Trash", keys: "⌥F" },
+                      { label: win.folders[win.folder].name, tip: "Only " + win.folders[win.folder].name, keys: "⌥F" }]
+            current: win.searcher.all ? 0 : 1
+            onPicked: i => { if ((i === 0) !== win.searcher.all) win.searcher.toggle(); list.forceActiveFocus() }
+        }
         ListView {
             id: list
             Layout.fillWidth: true
@@ -82,7 +94,8 @@ Rectangle {
             Layout.leftMargin: 28
             Layout.topMargin: 8
             Layout.bottomMargin: 24
-            visible: (dir === "Trash" || dir === "Spam") && win.threads.length > 0
+            // (not over a search of all folders: what it found isn't in Trash or Spam)
+            visible: (dir === "Trash" || dir === "Spam") && win.threads.length > 0 && !win.searcher.wide
             c: win.look
             keys: "⌘⇧⌫"; label: "Empty " + dir; hoverColor: c.danger
             onClicked: ops.emptyFolder()

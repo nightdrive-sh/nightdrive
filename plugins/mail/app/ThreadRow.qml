@@ -105,12 +105,36 @@ AppRow {
                 font.family: c.font; font.pixelSize: 11; color: row.unread ? c.title : c.faint
             }
         }
-        Text {
-            textFormat: Text.PlainText
-            width: parent.width; elide: Text.ElideRight
-            text: row.modelData.subject || "(no subject)"
-            font.family: c.font; font.pixelSize: 12
-            color: row.unread ? c.title : c.dim
+        Item {
+            width: parent.width; height: subject.implicitHeight
+            Text {
+                id: subject
+                textFormat: Text.PlainText
+                width: Math.max(0, (place.visible ? place.x - 12 : parent.width))
+                elide: Text.ElideRight
+                text: row.modelData.subject || "(no subject)"
+                font.family: c.font; font.pixelSize: 12
+                color: row.unread ? c.title : c.dim
+            }
+            // In a search of all folders, the folder the thread was found in (Search.qml), in the date's quiet colour
+            // under it, with the sidebar's glyph; the subject elides before it, so it shows in the narrowest list too.
+            Row {
+                id: place
+                readonly property var folder: win.searcher.wide ? win.folders[win.homeOf(row.modelData)] : null
+                visible: folder !== null
+                anchors.right: parent.right; anchors.verticalCenter: subject.verticalCenter
+                spacing: 5
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: place.folder ? Icons.g(place.folder.glyph) : ""
+                    font.family: Icons.family; font.pixelSize: 11; color: c.faint
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: place.folder ? place.folder.name : ""
+                    font.family: c.font; font.pixelSize: 11; color: c.faint
+                }
+            }
         }
     }
 }

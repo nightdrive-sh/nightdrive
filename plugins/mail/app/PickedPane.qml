@@ -20,8 +20,8 @@ Column {
         spacing: 2
         Repeater {
             // A click does what the key does
-            model: [["a", "Archive", "archive"], ["d", win.folders[win.folder].dir === "Trash" ? "Delete for good" : "Move to Trash", "trash"],
-                    ["!", win.folders[win.folder].dir === "Spam" ? "Not spam" : "Spam", "spam"],
+            model: [["a", "Archive", "archive"], ["d", ops.hereDir() === "Trash" ? "Delete for good" : "Move to Trash", "trash"],
+                    ["!", ops.hereDir() === "Spam" ? "Not spam" : "Spam", "spam"],
                     ["u", "Read or unread", "unread"], ["Esc", "Select only one", "single"]]
             delegate: Rectangle {
                 required property var modelData
