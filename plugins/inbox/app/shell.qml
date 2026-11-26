@@ -25,9 +25,9 @@ ShellRoot {
         KeyHelp { id: keyHelp }
         readonly property QtObject look: c
 
-        // Narrow windows, as Notes': below navMin the sidebar hides (f or the list's button shows it), and below
+        // Narrow windows, as Notes': below navMin the sidebar hides (Tab or the list's button shows it), and below
         // onePaneMax the list and the message take turns: Esc on the message shows the list, a click or Enter on a
-        // message the message; there f shows the sidebar in the list's place. ⌘B shows and hides the sidebars.
+        // message the message; there Tab shows the sidebar in the list's place. ⌘B shows and hides the sidebars.
         readonly property int navMin: 960
         readonly property int onePaneMax: 720
         // Mail's measures, so the two windows line up: the sidebar's title and the list's search are headerHeight
@@ -67,6 +67,12 @@ ShellRoot {
         function searchDone(clear) {
             if (clear) { list.field.text = ""; store.setSearch("") }
             view.forceActiveFocus()
+        }
+        // 1–3 and Ctrl+↑ Ctrl+↓: the sidebar's first rows (NavSidebar.views), as Mail's folders
+        readonly property var views: ["inbox", "unread", "archive"]
+        function stepView(d) {
+            const i = views.indexOf(store.view) + d
+            if (i >= 0 && i < views.length) store.pickView(views[i])
         }
         function fromPicked(key, label) { if (key) { store.pickFrom(key, label); if (onePane) listOpen = true } }
 
@@ -186,22 +192,37 @@ ShellRoot {
             sheet.pressed(e)
             if (e.accepted) return
             const cmd = e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
+            const alt = e.modifiers & Qt.AltModifier
+            // Mail's keys where they mean the same (#3672): 1–3 the views as Mail's 1–6 its folders, Tab the sidebar,
+            // v selects and goes on, o l open; the message's buttons moved to ⌥1 … ⌥8 for them
+            const narrowList = win.onePane && win.listOpen && !win.navOpen
+            const narrowMessage = win.onePane && !win.listOpen
             // ⇧↓ ⇧↑ (⇧J ⇧K) select from the open message on, ⌘A (Ctrl+A) every one, Esc none (Selection.qml)
             if (shift && (k === Qt.Key_Down || k === Qt.Key_J)) sel.range(store.index + 1)
             else if (shift && (k === Qt.Key_Up || k === Qt.Key_K)) sel.range(store.index - 1)
             else if (cmd && k === Qt.Key_A) sel.all()
             else if (k === Qt.Key_Escape && sel.any) sel.clear()
-            // Moving on from a selection leaves it, as Mail's arrows do
+            else if (cmd && (k === Qt.Key_Up || k === Qt.Key_Down)) win.stepView(k === Qt.Key_Down ? 1 : -1)
+            else if (k === Qt.Key_Tab || k === Qt.Key_Backtab) win.toFolders()
+            else if (alt && k >= Qt.Key_1 && k <= Qt.Key_8) win.ask(k - Qt.Key_1)
+            else if (!cmd && !alt && k >= Qt.Key_1 && k <= Qt.Key_3) store.pickView(win.views[k - Qt.Key_1])
+            // Files' v: select and go on; j k then keep what is selected. Moving on otherwise leaves it, as Mail's arrows do
+            else if (e.text === "v" && !narrowMessage) sel.markNext()
+            else if (sel.marking && (k === Qt.Key_Down || k === Qt.Key_J)) sel.moveMarking(1)
+            else if (sel.marking && (k === Qt.Key_Up || k === Qt.Key_K)) sel.moveMarking(-1)
             else if (k === Qt.Key_Down || k === Qt.Key_J) { sel.clear(); store.step(1) }
             else if (k === Qt.Key_Up || k === Qt.Key_K) { sel.clear(); store.step(-1) }
-            else if (k === Qt.Key_Up || k === Qt.Key_K) store.step(-1)
             else if (k === Qt.Key_Home) { sel.clear(); store.pickAt(0) }
             else if (k === Qt.Key_End) { sel.clear(); store.pickAt(store.messages.length - 1) }
+            // Narrow: Enter, o, l or → open the message in the list's place (Mail's and Files' open), Esc or ← back;
+            // ← → stay the sounds' while a message with sounds is on show
+            else if (narrowList && (enter || e.text === "o" || e.text === "l" || k === Qt.Key_Right)) { if (store.message) win.listOpen = false }
+            else if (narrowMessage && k === Qt.Key_Left && !view.sounds.any) win.listOpen = true
             else if (e.text === "/") win.find()
             else if (e.text === "a") win.archive()
+            else if (e.text === "U" || shift && k === Qt.Key_U) ops.allRead()
             else if (e.text === "u") win.toggleRead()
-            else if (e.text === "d" || k === Qt.Key_Delete) win.askDelete()
-            else if (e.text >= "1" && e.text <= "8") win.ask(+e.text - 1)
+            else if (e.text === "d" || k === Qt.Key_Delete || k === Qt.Key_Backspace) win.askDelete()
             else if (e.text === "s" && store.message && store.message.from.kind === "claude") win.press("session")
             else if (e.text === "t" && store.message && store.message.task) win.press("task")
             else if (e.text === "i") win.firstImage()
@@ -209,12 +230,10 @@ ShellRoot {
             else if (e.text === "p" && view.sounds.any) view.sounds.toggle()
             else if (k === Qt.Key_Left && view.sounds.any) view.sounds.step(-1)
             else if (k === Qt.Key_Right && view.sounds.any) view.sounds.step(1)
-            else if (e.text === "f") win.toFolders()
             else if (k === Qt.Key_Space) view.scroll((shift ? -1 : 1) * (view.height - 120))
             else if (k === Qt.Key_PageDown) view.scroll(view.height - 120)
             else if (k === Qt.Key_PageUp) view.scroll(-(view.height - 120))
-            else if (win.onePane && win.listOpen && enter && store.message) win.listOpen = false
-            else if (win.onePane && !win.listOpen && k === Qt.Key_Escape) win.listOpen = true
+            else if (narrowMessage && k === Qt.Key_Escape) win.listOpen = true
             else if (k === Qt.Key_Escape && store.search) win.searchDone(true)
             else if (k === Qt.Key_Escape && store.from) store.pickView(store.view)
             else return

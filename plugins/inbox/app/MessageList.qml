@@ -28,7 +28,7 @@ AppSidebar {
     headerLine: true                     // the line under the message's bar runs on under the search
     titleItems: AppIconButton {
         visible: !root.navShown
-        c: root.c; glyph: "folder-tree"; tip: "Inbox, archive and senders"; keys: "f"; tipAlign: "right"
+        c: root.c; glyph: "folder-tree"; tip: "Inbox, archive and senders"; keys: "Tab"; tipAlign: "right"
         onClicked: root.showNav()
     }
 

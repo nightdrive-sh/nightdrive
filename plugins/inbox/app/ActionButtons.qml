@@ -31,6 +31,7 @@ Flow {
             z: hovered ? 1 : 0
             c: root.c; glyph: root.glyphs[modelData.kind] || "circle"; label: modelData.label
             tip: root.tipOf(modelData); tipAlign: "left"
+            keys: index < 8 ? "⌥" + (index + 1) : ""      // shell.qml presses the first eight from the keyboard
             onClicked: run ? root.ask(index) : root.press(index)
 
             // The command, from the button's left edge, as wide as the buttons' row at most (a long one wraps)

@@ -15,7 +15,7 @@ Column {
     spacing: 28
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: root.sel.count + " messages selected"
+        text: root.sel.count + (root.sel.count === 1 ? " message selected" : " messages selected")
         color: root.c.title; font.family: root.c.font; font.pixelSize: 22; font.weight: Font.Medium
     }
     Column {

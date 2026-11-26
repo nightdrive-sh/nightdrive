@@ -46,6 +46,16 @@ QtObject {
             if (sel.any) toast.show(named(ms) + (read ? " marked read" : " marked unread"))
         }, failed)
     }
+    // ⇧U: every message shown read (the view, sender or search), as Mail's ⇧U does a folder
+    function allRead() {
+        const ms = store.messages.filter(m => !m.read)
+        if (!ms.length) return toast.show("Nothing unread here")
+        actions.read(ids(ms), true, () => {
+            store.raw = ""
+            store.refresh()
+            toast.show(named(ms) + " marked read")
+        }, failed)
+    }
     function remove(ms) {
         actions.remove(ids(ms), () => { store.forget(ids(ms)); toast.show("Deleted " + named(ms)) }, failed)
     }

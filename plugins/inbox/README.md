@@ -9,18 +9,20 @@ session can leave one whether this window is installed or not.
 
 | Keys | |
 | --- | --- |
-| `?` | Inbox's keys |
+| `?` | Inbox's keys. Mail's where they mean the same, so one hand works both |
 | ↑ ↓ or `j` `k` | Move in the list (`Home` `End`: the newest, the oldest) |
 | `/` or ⌘F | Search the titles, text and senders. `Enter` or ↓ to the messages, `Esc` back to every one |
+| `v` | Select the message and go on to the next, as in Files and Mail; `j` `k` then keep what is selected. `Esc` lets go |
 | ⌘A, ⇧↑ ⇧↓ | Select every message shown; select from the open one up or down. ⇧-click selects a range, Ctrl-click one more or one less, `Esc` only one again |
 | `a` | Archive: out of the way, kept in Archive (there: back to the inbox). ⌘Z in the notice undoes it |
-| `u` | Mark read or unread |
-| `d` or `Delete` | Delete the message and its files for good, after asking |
-| `1` … `8` | Press the message's buttons in order |
+| `u` ⇧U | Mark read or unread; mark every message shown read |
+| `d` (⌘⌫) | Delete the message and its files for good, after asking |
+| ⌥1 … ⌥8 | Press the message's buttons in order |
 | `s`, `t` | Go to the session that left it; open its task |
 | `i` | Its first picture over the whole window: ← → the others, `Esc` back, `o` in the image viewer |
 | `p`, ← → | Play or pause its sound file; play the one before or after, to compare a few |
-| `f` | Inbox, Unread, Archive and the senders: ↑ ↓ pick, `Enter` back to the messages |
+| `1`–`3` or Ctrl+↑ Ctrl+↓ | Inbox, Unread, Archive |
+| `Tab` ⇧Tab | Keys to the sidebar (the senders too: ↑ ↓ pick) and back |
 | `Space` ⇧Space | Scroll the message |
 | ⌘B | Hide or show the sidebars |
 
@@ -31,7 +33,7 @@ session can leave one whether this window is installed or not.
 - A button that runs a command shows the whole command while the pointer is on it. Pressing it only shows a card with the command and the folder it runs in; `Enter` there runs it, in the background, its output in `~/.local/state/nightdrive/inbox-runs/`. Nothing runs by itself.
 - A message from neither a Claude session nor an app (a terminal, a script) has its sender in red: nothing says who left it, so look at its buttons first.
 - The task button opens the task at the address in `~/.config/nightdrive/inbox.json` (`{"task_url": "https://…/tasks/{n}"}`); without one, it copies the task's number.
-- Below 960 px the sidebar hides (`f` or the button by the list's title shows it); below 720 px the list and the message take turns, `Esc` back to the list.
+- Below 960 px the sidebar hides (`Tab` or the button by the list's title shows it); below 720 px the list and the message take turns: `Enter`, `o` `l` or → opens the message, `Esc` or ← goes back to the list (← → play the sounds while a message with sounds is open).
 
 ## In a terminal
 

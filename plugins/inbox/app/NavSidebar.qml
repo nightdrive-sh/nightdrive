@@ -5,7 +5,7 @@ import qs.kit
 // The sidebar: Inbox, Unread and Archive, then who the messages are from, as `nightdrive inbox list` groups them
 // (config/inbox/query.py): each project Claude's sessions worked in, each app, and Other (a terminal, a script). A click
 // narrows the list to that sender; one session's messages are reached from a message (its sender line), and show here
-// as a row of their own while picked. From the keyboard (f, shell.qml): ↑ ↓ pick, ⏎ Esc or Tab back to the messages.
+// as a row of their own while picked. From the keyboard (Tab, shell.qml): ↑ ↓ pick, ⏎ Esc or Tab back to the messages.
 AppSidebar {
     id: root
     required property QtObject store
@@ -36,7 +36,7 @@ AppSidebar {
         else if (k === Qt.Key_Up || k === Qt.Key_K) step(-1)
         else if (k === Qt.Key_Home) step(-entries.length)
         else if (k === Qt.Key_End) step(entries.length)
-        else if ([Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape, Qt.Key_Tab, Qt.Key_Right, Qt.Key_F].indexOf(k) >= 0) root.done()
+        else if ([Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape, Qt.Key_Tab, Qt.Key_Backtab, Qt.Key_Right].indexOf(k) >= 0) root.done()
         else return
         e.accepted = true
     }
