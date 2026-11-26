@@ -1,0 +1,166 @@
+#!/usr/bin/python3 -I
+"""Notifications from the command line, over Quickshell's notification server (quickshell/Notifs.qml, its IPC target
+`notifications`). `nightdrive notifications …` runs it; Claude's tools are config/mcp/tools/notifications.json.
+
+  notifications [list] [--limit N] [--json]   the latest in the history, newest first (default 10). --json:
+                                               {dnd, notifications: [{app, summary, body, time}]}, time ISO 8601
+  notifications dnd [on|off|toggle] [--json]  Do Not Disturb: without a state, prints it (on/off); with one, sets it
+                                               and shows it on screen, as F6 does. --json: {"state": "on"}
+  notifications send [--app NAME] [--icon ICON] [--tag TAG] [--json] SUMMARY [BODY]
+                                               a notification (notify-send). Its stack tag (default: from the app and
+                                               the text) lets `remove` take it away again; --json prints {tag, app,
+                                               summary}
+  notifications remove [--app NAME] TAG        takes away what that app sent with that stack tag: its popup and its row
+
+For Claude's tools (NIGHTDRIVE_MCP=1) the list leaves out what Access hides (Dashboard #1789): the apps on Access ›
+Notifications' list, and Mail's notifications of the mail Access › Mail blocks, which would tell Claude its sender
+and subject (`nightmail blocked-notifications` knows them; when it can't say, Mail's go). left_out counts them.
+"""
+import argparse, datetime, hashlib, json, os, subprocess, sys
+
+APP = "Nightdrive"   # send's and remove's app name when none is given
+
+
+def die(msg, code=1):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def ipc(*args):
+    """One call to Notifs.qml's IPC; its answer as text. Without Quickshell there is no notification server at all."""
+    try:
+        p = subprocess.run(["qs", "ipc", "call", "notifications", *args], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        die("Quickshell doesn't answer: the notification server isn't running")
+    if p.returncode != 0:
+        die((p.stderr.strip() or p.stdout.strip() or "qs ipc failed") + " (is Quickshell running?)")
+    return p.stdout.strip()
+
+
+MAIL_APP = "mail"    # Nightdrive Mail's notifications (plugins/mail/lib/notify.py's APP), in lower case
+# This checkout's Mail, as the server runs this checkout's tools (a worktree's); else the one in PATH
+NIGHTMAIL = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../plugins/mail/bin/nightmail")
+
+
+def latest():
+    out = []
+    for r in json.loads(ipc("rows") or "[]"):
+        # time is ms since the epoch; an older Notifs.qml's rows have none
+        t = r.get("time")
+        when = datetime.datetime.fromtimestamp(t / 1000).astimezone().isoformat(timespec="seconds") if t else ""
+        out.append({"app": r.get("app", ""), "summary": r.get("summary", ""), "body": r.get("body", ""), "time": when})
+    return out
+
+
+def env_json(key):
+    try:
+        value = json.loads(os.environ.get(key) or "{}")
+    except ValueError:
+        value = None
+    return value if isinstance(value, dict) else None
+
+
+def for_claude(rows):
+    """The rows Access lets Claude see. What can't be read hides: a list the server passes wrong hides everything."""
+    own, others = env_json("NIGHTDRIVE_MCP_OPTIONS"), env_json("NIGHTDRIVE_MCP_OPTIONS_FROM")
+    if own is None or others is None:
+        return []
+    hidden = {str(a).lower() for a in own.get("apps") or []}
+    rows = [r for r in rows if r["app"].lower() not in hidden]
+    mail = others.get("mail") or {}
+    mails = [r for r in rows if r["app"].lower() == MAIL_APP]
+    if not mail.get("blocked") or not mails:
+        return rows
+    try:
+        cmd = [NIGHTMAIL if os.path.exists(NIGHTMAIL) else "nightmail", "blocked-notifications"]
+        p = subprocess.run(cmd, input=json.dumps(mails, ensure_ascii=False), capture_output=True, text=True, timeout=20,
+                           env={**os.environ, "NIGHTDRIVE_MCP": "1", "NIGHTDRIVE_MCP_OPTIONS": json.dumps(mail)})
+        verdicts = json.loads(p.stdout) if p.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        verdicts = None
+    if not isinstance(verdicts, list) or len(verdicts) != len(mails):
+        verdicts = [True] * len(mails)   # Mail can't say which are blocked: none of its notifications go
+    gone = {id(r) for r, v in zip(mails, verdicts) if v is not False}
+    return [r for r in rows if id(r) not in gone]
+
+
+def cmd_list(a):
+    rows = latest()
+    total = len(rows)
+    if os.environ.get("NIGHTDRIVE_MCP") == "1":
+        rows = for_claude(rows)
+    left_out = total - len(rows)
+    rows = rows[:a.limit]
+    if a.json:
+        print(json.dumps({"dnd": ipc("getDnd") == "true", "notifications": rows,
+                          **({"left_out": left_out} if left_out else {})}, ensure_ascii=False))
+        return
+    for r in rows:
+        when = r["time"][11:16] if r["time"] else "     "
+        body = " – " + r["body"].replace("\n", " ") if r["body"] else ""
+        print(f"{when}  {r['app']}: {r['summary']}{body}")
+
+
+def cmd_dnd(a):
+    if a.state:
+        on = ipc("getDnd") != "true" if a.state == "toggle" else a.state == "on"
+        ipc("setDnd", "true" if on else "false")
+        # The same on-screen sign as F6 (hypr/scripts/dnd); not having it doesn't undo the change
+        subprocess.run(["qs", "ipc", "call", "osd", "dnd", "true" if on else "false"], capture_output=True)
+    state = "on" if ipc("getDnd") == "true" else "off"
+    print(json.dumps({"state": state}) if a.json else state)
+
+
+def cmd_send(a):
+    # A tag from the text: sending the same again replaces it, and a redo (undo.py) sends the one its undo removes
+    tag = a.tag or "sent-" + hashlib.sha1(f"{a.app}\n{a.summary}\n{a.body}".encode()).hexdigest()[:12]
+    cmd = ["notify-send", "-a", a.app, "-h", f"string:x-dunst-stack-tag:{tag}"]
+    if a.icon:
+        cmd += ["-i", a.icon]
+    try:
+        p = subprocess.run(cmd + ["--", a.summary, a.body], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        die(f"notify-send didn't run: {e}")
+    if p.returncode != 0:
+        die(p.stderr.strip() or "notify-send failed")
+    print(json.dumps({"tag": tag, "app": a.app, "summary": a.summary}, ensure_ascii=False) if a.json else tag)
+
+
+def cmd_remove(a):
+    n = ipc("removeTag", a.app, a.tag)
+    if n == "0":
+        die(f"No notification from {a.app} with the tag {a.tag}: it's gone already")
+    print(f"Removed {n}")
+
+
+def main():
+    p = argparse.ArgumentParser(prog="nightdrive notifications", description=__doc__.split("\n\n")[0],
+                                formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n\n")[1])
+    sub = p.add_subparsers(dest="cmd")
+    ls = sub.add_parser("list")
+    ls.add_argument("--limit", type=int, default=10)
+    ls.add_argument("--json", action="store_true")
+    dnd = sub.add_parser("dnd")
+    dnd.add_argument("state", nargs="?", choices=["on", "off", "toggle"])
+    dnd.add_argument("--json", action="store_true")
+    send = sub.add_parser("send")
+    send.add_argument("--app", default=APP)
+    send.add_argument("--icon", default="")
+    send.add_argument("--tag", default="")
+    send.add_argument("--json", action="store_true")
+    send.add_argument("summary")
+    send.add_argument("body", nargs="?", default="")
+    rm = sub.add_parser("remove")
+    rm.add_argument("--app", default=APP)
+    rm.add_argument("tag")
+    argv = sys.argv[1:]
+    if not argv or argv[0] not in sub.choices and argv[0] not in ("-h", "--help"):
+        argv = ["list", *argv]   # options only (`notifications --json`): the list
+    a = p.parse_args(argv)
+    if a.cmd == "list" and a.limit < 1:
+        die("--limit is at least 1", 2)
+    {"list": cmd_list, "dnd": cmd_dnd, "send": cmd_send, "remove": cmd_remove}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    main()

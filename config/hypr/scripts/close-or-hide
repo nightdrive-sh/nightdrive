@@ -7,7 +7,10 @@
 d=$HOME/.config/hypr
 keep=$(cat "$d/background-apps" "$d/background-apps.local" 2>/dev/null | grep -vE '^\s*(#|$)' | sed 's/^[^=]*= *//' | paste -sd'|')
 
-read -r class addr ws pid < <(hyprctl -j activewindow | jq -r '"\(.class // "") \(.address // "") \(.workspace.name // "") \(.pid // "")"')
+# Joined with the unit separator, not spaces: a class may hold spaces ("Cold Start '74"), which shifted the fields
+IFS=$'\x1f' read -r class addr ws pid < <(hyprctl -j activewindow \
+  | jq -r '[.class // "", .address // "", .workspace.name // "", (.pid // "" | tostring)] | join("\u001f")')
+[[ $pid =~ ^-?[0-9]+$ ]] || pid=0   # jq --argjson needs a number
 main=
 if [[ -n $addr && -n $keep && $class =~ ($keep) ]]; then
   # The same class and process: Chromium's web apps share one process, and each of them has its own main window.
@@ -20,7 +23,8 @@ if [[ -n $main && $addr == "$main" ]]; then
     # The window is on the background workspace, which has become visible (the app asked for focus): hide the whole workspace
     hyprctl dispatch 'hl.dsp.workspace.toggle_special("bg")' >/dev/null
   else
-    hyprctl dispatch "hl.dsp.window.move({ workspace = \"special:bg\", follow = false, window = \"address:$addr\" })" >/dev/null
+    # A tab alone, out of its group (window-groups.lua, #3220): the rest of the group stays
+    hyprctl eval 'NIGHTDRIVE_MOVE_TO_WORKSPACE("special:bg", false)' >/dev/null
   fi
 else
   "$d/scripts/reopen" save 2>/dev/null   # ⌘⇧U opens it again

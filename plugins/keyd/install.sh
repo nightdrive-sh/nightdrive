@@ -17,8 +17,10 @@ sudo install -Dm644 "$here/default.conf" /etc/keyd/default.conf
 cat "$repo/config/system/libinput-apple-mtp.quirks" "$here/local-overrides.quirks" |
   sudo install -Dm644 /dev/stdin /etc/libinput/local-overrides.quirks
 sudo usermod -aG keyd "$USER"   # keyd-application-mapper talks to keyd's socket
-sudo systemctl enable --now keyd
-sudo keyd reload
+# Started again, not `keyd reload`: keyd 2.6.0 segfaulted on the next key event after a reload (the Enter that ran this,
+# still held) and stayed down (config/system/sync)
+sudo systemctl enable keyd
+sudo systemctl restart keyd
 mkdir -p ~/.config/keyd && ln -sfn "$here/app.conf" ~/.config/keyd/app.conf
 mkdir -p ~/.local/share/nautilus-python/extensions
 ln -sfn "$here/nautilus-python/mac-keys.py" ~/.local/share/nautilus-python/extensions/mac-keys.py

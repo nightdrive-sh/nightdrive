@@ -8,13 +8,16 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Wayland
+import qs.kit as Kit
 
 ShellRoot {
     id: root
     property string current: ""
     property real anchorX: -1          // icon's horizontal coordinate (logical px); -1 = right edge
 
-    // --- Keyboard navigation (⌘⇧Space): ←/→ switch menu (in the bar's order), ↑/↓ select a row, Enter activates, Esc closes ---
+    // --- Keyboard navigation: ←/→ switch menu (in the bar's order), ↑/↓ select a row, Enter activates, Esc closes ---
+    // An open menu has the whole keyboard (below: keyboardFocus), never a few keys: a Hyprland submap that took
+    // only these six left the window being typed in with its letters but not its Enter (#2039)
     property bool navMode: false
     // Menus: <Name>Menu.qml here, a private overlay's in local/ (not in the repo; its bar modules come from
     // ~/.config/topbar/local.modules.jsonc) and the installed plugin folders' (TopBar.plugin.menus: name → path).
@@ -40,23 +43,40 @@ ShellRoot {
         const f = Hyprland.focusedMonitor
         return (f && Quickshell.screens.find(s => s.name === f.name)) || Quickshell.screens[0]
     }
-    property bool viaSubmap: false     // opened by click/shortcut: ←/→/↑/↓/Enter/Esc come from a Hyprland submap (hypr/bindings.lua: qsmenu), no keyboard focus
     property var navItem: null         // selected row / toggle
 
-    function submap(name) { Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.submap("' + name + '")']) }
-    Component.onCompleted: submap("reset")      // safety net: in case the previous session was left in the submap
+    // Quickshell (0.3.2) gives each workspace switch (workspacev2) to the screen it takes as focused, and takes that both
+    // from focusedmon and from the focused flag in each j/monitors reply. A reply asked for before a focusedmon (on a
+    // monitoradded, as screens come up at login or on docking) but read after it set the screen focused before it again:
+    // every switch after that went to the laptop's screen, and the external one's bar kept its old number (#3289). So the
+    // screens are read again once such events settle, and the fresh reply is the last word.
+    Timer { id: monitorsAgain; interval: 400; onTriggered: Hyprland.refreshMonitors() }
+    Connections {
+        target: Hyprland
+        function onRawEvent(ev) {
+            if (ev.name === "focusedmon" || ev.name === "monitoraddedv2" || ev.name === "monitorremoved"
+                || ev.name === "configreloaded") monitorsAgain.restart()
+        }
+    }
+
+    // Safety net: before #2039 an open menu put Hyprland in a submap (qsmenu); one left in it after an update has no keys
+    Component.onCompleted: Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.submap("reset")'])
 
     // A reload on save or a restart only shows as the bar redrawing (an open menu closes), easy to miss: a short silent
     // popup says it happened. Not at login: qs's PID (the parent of this Process, not of an execDetached one) kept in the
     // runtime dir tells a reload (same PID) from a restart (another) from the session's first start (none). The sleep gives
-    // a restarted qs time to own the notification service again.
+    // a restarted qs time to own the notification service again. NIGHTDRIVE_QS_CRASHED: hypr/scripts/desktop-shell started
+    // this qs after a crash, and this is its one notice of it (it can't notify while qs, the service, is down).
     Sh {
         running: true
         command: ["bash", "-c", `
             prev=$(cat "$1" 2>/dev/null); echo "$PPID" > "$1"
             [ -n "$prev" ] || exit 0
-            [ "$prev" = "$PPID" ] && msg="The top bar reloaded" || msg="The top bar restarted"
-            sleep 1; notify-send -e -u low -a Quickshell "$msg"`, "_", Quickshell.env("XDG_RUNTIME_DIR") + "/nightdrive-qs.pid"]
+            urgency=low
+            if [ "$prev" = "$PPID" ]; then msg="The top bar reloaded"
+            elif [ -n "$NIGHTDRIVE_QS_CRASHED" ]; then msg="The top bar crashed and started again"; urgency=normal
+            else msg="The top bar restarted"; fi
+            sleep 1; notify-send -e -u $urgency -a Quickshell "$msg"`, "_", Quickshell.env("XDG_RUNTIME_DIR") + "/nightdrive-qs.pid"]
     }
     Connections {
         target: Quickshell
@@ -67,8 +87,8 @@ ShellRoot {
 
     onCurrentChanged: {
         navItem = null
-        if (current === "") { navMode = false; viaSubmap = false }
-        submap(current !== "" && viaSubmap ? "qsmenu" : "reset")
+        if (current === "") { navMode = false; MenuPointer.pointerAway = false }   // the next menu starts with the mouse's hover
+        else if (navMode) keyItem.forceActiveFocus()
     }
     function openNav(i) {
         const order = bar.navOrder()
@@ -81,7 +101,6 @@ ShellRoot {
     }
     function navToggle() {
         if (navMode) { current = ""; return }
-        viaSubmap = false
         navMode = true
         openNav(Math.max(0, bar.navIndex(current)))
         keyItem.forceActiveFocus()
@@ -99,26 +118,32 @@ ShellRoot {
         out.sort((a, b) => navY(a) - navY(b))
         return out
     }
-    // The scrolling list (Flickable, ListView) a row is in, or null
+    // The scrolling list (Flickable, ListView) a row is in, or null. Stops at the card's own scroller (menuFlick):
+    // that one holds every row.
     function flickOf(it) {
-        for (let p = it.parent; p; p = p.parent)
+        for (let p = it.parent; p && p !== menuFlick; p = p.parent)
             if (p.contentItem !== undefined && p.contentY !== undefined) return p
         return null
     }
-    // A row's place in the menu, top to bottom. A row in a scrolling list counts within the list's own box, so a row
-    // scrolled out of sight still comes before the rows under the list
+    // A row's place in the menu, top to bottom, in the whole menu's (menuFlick's content) coordinates. A row in a
+    // scrolling list of the menu's own counts within the list's box, so a row scrolled out of sight still comes before
+    // the rows under the list
     function navY(it) {
         const f = flickOf(it)
-        if (!f) return it.mapToItem(card, 0, 0).y
+        if (!f) return it.mapToItem(menuFlick.contentItem, 0, 0).y
         const y = it.mapToItem(f.contentItem, 0, 0).y
-        return f.mapToItem(card, 0, 0).y + y / Math.max(1, f.contentHeight) * f.height
+        return f.mapToItem(menuFlick.contentItem, 0, 0).y + y / Math.max(1, f.contentHeight) * f.height
     }
+    // Scrolls the row into sight: in the menu's own list first, then the card (a menu taller than the screen)
     function navShow(it) {
+        const scroll = f => {
+            const y = it.mapToItem(f.contentItem, 0, 0).y
+            if (y < f.contentY) f.contentY = y
+            else if (y + it.height > f.contentY + f.height) f.contentY = y + it.height - f.height
+        }
         const f = flickOf(it)
-        if (!f) return
-        const y = it.mapToItem(f.contentItem, 0, 0).y
-        if (y < f.contentY) f.contentY = y
-        else if (y + it.height > f.contentY + f.height) f.contentY = y + it.height - f.height
+        if (f) scroll(f)
+        if (menuFlick.interactive) scroll(menuFlick)
     }
     function navMove(d) {
         const rows = navRows()
@@ -129,6 +154,7 @@ ShellRoot {
         navItem = rows[i]
         navItem.navSelected = true
         navShow(navItem)
+        if (i === 0) menuFlick.contentY = 0   // back at the first row: the header shows again
     }
     function navAct(a) {     // a: left | right | up | down | enter
         if (!navMode) return false
@@ -156,7 +182,6 @@ ShellRoot {
             root.menuScreen = root.focusedScreen()
             root.anchorX = bar.xOf(name, root.menuScreen)      // below its bar icon; -1 (no icon in the bar) = the right edge
             const opening = root.current !== name
-            root.viaSubmap = opening
             root.navMode = opening
             root.current = opening ? name : ""
         }
@@ -169,19 +194,18 @@ ShellRoot {
         target: "bar"
         function refresh(): void { TopBar.refresh("") }
         function refreshModule(name: string): void { TopBar.refresh(name) }
-        // Hyprland sends no event when a workspace gets a new id (⌘⌥1–0, hypr/bindings.lua): read them again, and the
+        // Hyprland sends no event when a workspace gets a new id (⌘⌥⇧1–0, hypr/bindings.lua): read them again, and the
         // windows too, which still point at the old workspace (the bar's numbers would show it empty)
         function workspaces(): void { Hyprland.refreshWorkspaces(); Hyprland.refreshMonitors(); Hyprland.refreshToplevels() }
     }
 
-    // A click on a bar module. The menu also enters keyboard mode (Esc closes, arrows/Enter work as with ⌘⇧Space).
+    // A click on a bar module. The menu also takes the keyboard (Esc closes, arrows/Enter work as with ⌘⇧Space).
     function clickMenu(name, x, screen) {
         anchorX = x
         menuScreen = screen
         const opening = current !== name
-        // The Wifi menu has a password field that needs real keyboard focus: no arrow-key navigation
-        viaSubmap = opening && name !== "wifi"
-        navMode = viaSubmap
+        // The Wifi menu has a password field: the keys are its own, no arrow-key navigation
+        navMode = opening && name !== "wifi"
         current = opening ? name : ""
     }
 
@@ -193,10 +217,30 @@ ShellRoot {
         onMenuClicked: (name, x, screen) => root.clickMenu(name, x, screen)
         onMoveStarted: root.current = ""
     }
+    // Every Claude session in a row at the bottom of the main screen, while it's on (Claude menu › Sessions bar)
+    SessionsBar {}
     // The "…" menu lists the modules that didn't fit on its screen's bar
     Binding { target: TopBar; property: "overflow"; value: bar.tuckedOf(root.menuScreen) }
 
-    Osd {}
+    // Toasts below the bar (ToastStack.qml), stacked in this order: dictation (and Ask Claude, which grows out of it)
+    // stays put while a volume toast comes and goes below it
+    ToastStack {
+        AskClaudeToast {
+            id: askToast
+            // a password prompt or Claude's long card goes over it and takes the keys (a short card comes into it)
+            stepAside: polkit.asking || (confirm.open && !confirm.inlined)
+            // Both would want the keyboard, so the launcher closes, but only once the toast, in its place and looking like
+            // it, is on screen over it (drawn): closing it first left a frame or two with neither, a flash (#1895).
+            // handOff closes it anyway if that frame doesn't come (the toast stepped aside for a password prompt).
+            onAskingChanged: if (asking && launcher.open) handOff.restart()
+            onDrawn: if (handOff.running) { handOff.stop(); launcher.open = false }
+        }
+        Osd {}
+        CleanToast {}   // cleaning mode's countdown (hypr/scripts/clean-input)
+        RemindToast {}  // a quick reminder that came due (hypr/scripts/remind, launcher › Tools › Remind)
+    }
+
+    Timer { id: handOff; interval: 250; onTriggered: launcher.open = false }
 
     NotificationPopups {}
 
@@ -217,17 +261,42 @@ ShellRoot {
 
     ClaudeWrite {}
 
+    ClaudeConfirm { id: confirm }
+
     Drawer {}
 
-    Shelf {}
+    Shelf { enabled: launcher.prefs.shelf }
 
     PolkitWatch { id: polkit }
 
     Launcher {
         id: launcher
-        stepAside: polkit.asking
+        // a password prompt or Claude's card goes over it
+        stepAside: polkit.asking || (confirm.open && !confirm.inlined)
         extSource: root.localLauncher ? "local/LauncherExtension.qml" : ""
-        onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.current = name }   // below its bar icon (-1 = none: right edge)
+        onOpenMenu: name => { root.menuScreen = root.focusedScreen(); root.anchorX = bar.xOf(name, root.menuScreen); root.navMode = name !== "wifi"; root.current = name }   // below its bar icon (-1 = none: right edge)
+    }
+    // An open bar menu (the core's or a plugin's) and Ask Claude's toast close when the launcher opens: their keyboard
+    // focus would otherwise keep the keys from the launcher. A Connections: an
+    // onOpenChanged on the Launcher instance above didn't run (Launcher has its own).
+    Connections {
+        target: launcher
+        function onOpenChanged() { if (launcher.open) { root.launcherScreen = root.focusedScreen().name; root.current = ""; askToast.close() } }
+    }
+    // A click on another screen closes the launcher too. It has no screen of its own: Hyprland puts it on the focused one.
+    property string launcherScreen: ""
+    OutsideClick {
+        active: launcher.visible
+        exceptScreen: root.launcherScreen
+        onClicked: launcher.open = false
+    }
+
+    // A click on another screen closes the menu too; their bars stay clickable (a module there opens its menu at once)
+    OutsideClick {
+        active: root.current !== "" && !polkit.asking
+        exceptScreen: (root.menuScreen || Quickshell.screens[0]).name
+        topMargin: Theme.barHeight
+        onClicked: root.current = ""
     }
 
     PanelWindow {
@@ -239,11 +308,10 @@ ShellRoot {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "nightdrive-menu"   // hyprland.lua blurs behind a bare menu's translucent cards
-        // Keyboard focus only for a text field: the wifi menu's password, or a menu that asks for it while it shows one
-        // (wantsKeyboard: Ferry's text). With OnDemand all the time a second click on the top bar was lost until the
-        // mouse was moved.
-        WlrLayershell.keyboardFocus: root.navMode && !root.viaSubmap ? WlrKeyboardFocus.Exclusive
-            : (root.current === "wifi" || (loader.item && loader.item.wantsKeyboard === true) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+        // The whole keyboard while it is open: Hyprland gives an OnDemand layer the keyboard as it maps (a click on another
+        // window, which would take it back, closes the menu first: OutsideClick). Not Exclusive: Hyprland then sends every
+        // click, on every screen, to the menu, and neither the bar nor another screen could close it (#2039).
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
         // A menu dragging a file out (FerryMenu, NotificationsMenu: dragging > 0) takes input only on its card meanwhile, so the drop reaches
         // the windows below
@@ -252,7 +320,7 @@ ShellRoot {
 
         // Clicking outside the menu closes it
         MouseArea { anchors.fill: parent; onClicked: root.current = "" }
-        Item { id: keyItem; anchors.fill: parent; focus: true; Keys.onEscapePressed: root.current = ""; Keys.onPressed: event => root.navKey(event) }
+        Item { id: keyItem; anchors.fill: parent; focus: true; Keys.onEscapePressed: root.current = ""; Keys.onPressed: event => { MenuPointer.moved(event); root.navKey(event) } }
 
         Rectangle {
             id: card
@@ -264,21 +332,40 @@ ShellRoot {
             // Center below the icon, but keep a 10 px margin from the screen edges
             x: root.anchorX < 0 ? parent.width - width - 10
                                 : Math.max(10, Math.min(parent.width - width - 10, root.anchorX - width / 2))
-            height: loader.item ? loader.item.implicitHeight + (bare ? 0 : 26) : 0   // 10 px top and 16 px bottom margin
+            // 10 px top and 16 px bottom margin. Never taller than the screen below the bar (a low display, a long System or
+            // Display menu): the menu then scrolls in menuFlick, so every menu gets it without a scroller of its own.
+            readonly property real fullHeight: loader.item ? loader.item.implicitHeight + (bare ? 0 : 26) : 0
+            height: Math.min(fullHeight, parent.height - anchors.topMargin - 10)
             radius: 10
             color: bare ? "transparent" : Theme.bg
             border.width: 0   // no border (the dividers inside the menu stay)
             Keys.onEscapePressed: root.current = ""
 
             MouseArea { anchors.fill: parent }   // a click inside the card doesn't close the menu
+            // A real move of the mouse over the menu brings back its hover colour a key put away (MenuPointer.qml)
+            Kit.AppPointer { c: MenuPointer }
 
-            Loader {
-                id: loader
-                anchors { top: parent.top; left: parent.left; right: parent.right; leftMargin: card.bare ? 0 : 16; rightMargin: card.bare ? 0 : 16
-                          topMargin: card.bare ? 0 : 10 }
-                source: root.current === "" ? ""
-                      : TopBar.plugin.menus[root.current] ? "file://" + TopBar.plugin.menus[root.current]
-                      : (root.localMenus.indexOf(root.current) >= 0 ? "local/" : "") + root.current.charAt(0).toUpperCase() + root.current.slice(1) + "Menu.qml"
+            // Interactive only when the menu doesn't fit: otherwise a drag or wheel stays the menu's own (sliders, its lists)
+            Flickable {
+                id: menuFlick
+                anchors.fill: parent
+                contentHeight: card.fullHeight
+                interactive: card.fullHeight > card.height + 0.5
+                clip: interactive
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.VerticalFlick
+                TouchScroll { view: menuFlick; enabled: menuFlick.interactive }
+                // A new menu starts at its top
+                Connections { target: root; function onCurrentChanged() { menuFlick.contentY = 0 } }
+
+                Loader {
+                    id: loader
+                    anchors { top: parent.top; left: parent.left; right: parent.right; leftMargin: card.bare ? 0 : 16; rightMargin: card.bare ? 0 : 16
+                              topMargin: card.bare ? 0 : 10 }
+                    source: root.current === "" ? ""
+                          : TopBar.plugin.menus[root.current] ? "file://" + TopBar.plugin.menus[root.current]
+                          : (root.localMenus.indexOf(root.current) >= 0 ? "local/" : "") + root.current.charAt(0).toUpperCase() + root.current.slice(1) + "Menu.qml"
+                }
             }
             Connections {
                 target: loader.item

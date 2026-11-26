@@ -3,9 +3,13 @@
 # systemd (256+) makes two units of them (systemd-debug-generator), which run two scripts that come the same way
 # (ImportCredential):
 #   nightdrive-vm-user    before the login prompt: the user (wheel, so sudo), the VM's name as its hostname, the host's
-#                         keymap and timezone, and the host's ssh key, so `ssh NAME` just works (lib/ssh.sh)
+#                         keymap and timezone, and the host's ssh key (a key file's, else the ssh agent's: lib/ssh.sh,
+#                         host_key), so `ssh NAME` just works
 #   nightdrive-vm-agent   once the network is up: sshd and qemu-guest-agent (Shut down, the clock), with dnf
-# and Fedora's initial-setup is skipped, as the user is made already (it would ask for one in the VM's window).
+# and Fedora's initial-setup is skipped, as the user is made already (it would ask for one in the VM's window): at the
+# first boot by a drop-in that comes as a credential too, and for good by the user script, which disables it. The
+# drop-in alone went with the credentials, and initial-setup came back at the second boot, holding graphical.target
+# so that a desktop installed by then (Nightdrive's greetd) never showed its login (#2011).
 # They are written to the VM's folder (firstboot/, a file each, the password only as a hash) and passed at each start
 # until the guest agent has shut the VM down once, i.e. both scripts have run (lib/qemu.sh: stop). qemu reads each from
 # its file (-smbios path=): given as a value they were in its command line, which any process on the host can read.
@@ -25,14 +29,12 @@ firstboot_creds() {
   local name=$1 user=$2 pass=$3 d; d=$(dir "$1")
   good_user "$user" || die "User: lower-case letters, digits, - and _, starting with a letter"
   [[ -n $pass ]] || die "A password for $user"
-  local hash keymap tz key="" k
+  local hash keymap tz key
   hash=$(printf '%s' "$pass" | openssl passwd -6 -stdin) || die "openssl couldn't hash the password"
   keymap=$(localectl status 2>/dev/null | awk -F': ' '/VC Keymap/ { print $2 }')
   [[ $keymap == "(unset)" ]] && keymap=""
   tz=$(timedatectl show -p Timezone --value 2>/dev/null || true)
-  for k in "$HOME"/.ssh/id_ed25519.pub "$HOME"/.ssh/id_ecdsa.pub "$HOME"/.ssh/id_rsa.pub; do
-    [[ -f $k ]] && { key=$(cat "$k"); break; }
-  done
+  key=$(host_key | cut -f2)     # lib/ssh.sh: a key file's, else the ssh agent's (1Password)
 
   # The scripts, their values quoted for bash (printf %q)
   local q_user q_home; q_user=$(printf %q "$user"); q_home=$(printf %q "/home/$user")
@@ -48,6 +50,9 @@ chmod 600 $q_home/.ssh/authorized_keys"
   [[ -n $keymap ]] && user_script+=$'\n'"localectl set-keymap $(printf %q "$keymap") || true"
   [[ -n $tz ]] && user_script+=$'\n'"timedatectl set-timezone $(printf %q "$tz") || true"
   user_script+=$'\n'"$GROW_ROOT"
+  # initial-setup off for good (see above): its unit disabled, and its own switch for one that enables it again
+  user_script+=$'\nsystemctl disable initial-setup.service 2>/dev/null || true'
+  user_script+=$'\nprintf \'RUN_INITIAL_SETUP=NO\\n\' > /etc/sysconfig/initial-setup || true'
   user_script+=$'\nmkdir -p /var/lib/nightdrive-vm\ntouch /var/lib/nightdrive-vm/user'
   local agent_script='set -e
 dnf install -y openssh-server qemu-guest-agent

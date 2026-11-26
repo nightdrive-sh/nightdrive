@@ -18,7 +18,7 @@ Flickable {
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
     readonly property string footer: item === null ? ""
-        : (item.remove ? "Enter: remove" : item.rerun ? (info && info.installed ? "Enter: run the installer again" : "Enter: install in a terminal")
+        : (item.remove ? "Enter: remove" + (item.yesCmd ? "  ·  Ctrl+Enter: remove without asking" : "") : item.rerun ? (info && info.installed ? "Enter: run the installer again" : "Enter: install in a terminal")
                                                       : info && info.installed ? "Already installed" : "Enter: install")
           + (item.alt ? "  ·  Tab: get it from " + (item.alt.src === "flatpak" ? "Flathub" : "Fedora") : "")
           + (item.src === "plugin" && info && info.installed ? "  ·  Tab: turn " + (info.off ? "on" : "off") : "")
@@ -45,11 +45,12 @@ Flickable {
         detailProc.command = item.src === "plugin" ? [scripts + "/plugin-info", item.id] : [scripts + "/pkg-info", item.src, item.id]
         detailProc.running = true
     }
-    // Enter: installs / removes in a terminal (an installed package can't be installed again, a plugin's installer can run again)
-    function confirm() {
+    // Enter: installs / removes in a terminal (an installed package can't be installed again, a plugin's installer can run again);
+    // Ctrl+Enter (now) removes without the terminal's question (yesCmd, RemoveLevels.qml)
+    function confirm(now) {
         if (!item.remove && !item.rerun && info && info.installed) { launcher.shakeNow(); return }
         launcher.open = false
-        Quickshell.execDetached(item.cmd)
+        Quickshell.execDetached(now && item.yesCmd ? item.yesCmd : item.cmd)
     }
     // C: plugin.conf's setup, run in the plugin's folder (it opens Claude Code in a terminal)
     function setup() {

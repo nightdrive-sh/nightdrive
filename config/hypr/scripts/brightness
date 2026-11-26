@@ -1,19 +1,71 @@
 #!/bin/bash
-# brightness <screen|kbd> <up|down>: adjusts brightness in even steps (screen 5 %, keyboard backlight 10 %) and shows an OSD toast.
-# Lower limit 0 % (the screen may go black). The current value is rounded to the nearest percent before stepping.
-dev=$1 dir=$2
-args=()
-min=0
-step=5                                   # screen: 5 % step
-if [[ $dev == kbd ]]; then args=(-d "*kbd_backlight*"); step=10; fi   # backlight: 10 %; the name differs by machine (MacBook: kbd_backlight, ThinkPad: tpacpi::kbd_backlight)
-IFS=, read -r _ _ cur _ max < <(brightnessctl "${args[@]}" -m)
-new=$(awk -v c="$cur" -v m="$max" -v d="$dir" -v lo="$min" -v s="$step" 'BEGIN {
-  p = int(c * 100 / m + 0.5)
-  if (d == "up") n = (int(p / s) + 1) * s
-  else n = (p % s == 0) ? p - s : int(p / s) * s
-  if (n > 100) n = 100
-  if (n < lo) n = lo
-  print n
-}')
-brightnessctl "${args[@]}" set "${new}%" >/dev/null
-qs ipc call osd "$([[ $dev == kbd ]] && echo kbd || echo brightness)"
+# brightness <screen|kbd> <up|down> [--quiet]: one step to the next even percent (screen 5 %, keyboard
+#   backlight 10 %) and an OSD toast.
+#   Low on the screen several percents land on the same device value: a step then goes on to the next percent that
+#   really changes it. Lower limit 0 % (the screen may go black).
+#   (1 % steps were tried: too slow across the range, #3365.)
+# brightness <screen|kbd> [PCT] [--quiet]: prints {brightness} (percent) as JSON, after setting it to PCT when given
+#   (the sliders in DisplayMenu.qml and Settings › Display, Osd.qml, `nightdrive brightness`, Claude's display_brightness
+#   in config/mcp/tools/sound-display.json). The screen never goes below 1 % this way.
+# brightness screen dim PCT: hypridle's dimming: saves the value (`brightnessctl -c backlight -r` restores it) and
+#   lowers it to PCT, never raises it; no toast.
+# --quiet: no toast (a slider shows the value itself). up and down print the JSON too.
+#
+# The percent everyone sees is perceptual: the eye sees brightness roughly logarithmically, so a panel whose kernel
+# scale is "linear" (MacBook's apple-panel-bl) gets device = max * (pct/100)^GAMMA. Without it the top half of the
+# range barely changed the picture. Other panels (scale non-linear or unknown) and the keyboard stay straight.
+# This file is the only place that converts: everything else reads and sets the percent through it.
+GAMMA=2
+SCREEN_STEP=5
+KBD_STEP=10
+SYSFS=${BRIGHTNESS_SYSFS:-/sys/class/backlight}   # the tests point it at a fake one
+
+dev=$1; shift
+quiet=0 args=()
+for a in "$@"; do [[ $a == --quiet ]] && quiet=1 || args+=("$a"); done
+set -- "${args[@]}"
+case $dev in
+  screen) sel=(-c backlight); step=$SCREEN_STEP; osd=brightness ;;   # -c backlight: not the first LED (a Compose light)
+  kbd)    sel=(-d "*kbd_backlight*"); step=$KBD_STEP; osd=kbd ;;   # MacBook: kbd_backlight, ThinkPad: tpacpi::kbd_backlight
+  *) echo "usage: brightness screen|kbd [up|down|PCT|dim PCT] [--quiet]" >&2; exit 1 ;;
+esac
+if ! IFS=, read -r name _ cur _ max < <(brightnessctl "${sel[@]}" -m 2>/dev/null) || [[ -z $max ]]; then
+  echo "This machine has no $([[ $dev == kbd ]] && echo "keyboard backlight" || echo "screen brightness") to set (an external screen sets its own)." >&2
+  exit 1
+fi
+g=1
+[[ $dev == screen && $(cat "$SYSFS/$name/scale" 2>/dev/null) == linear ]] && g=$GAMMA
+
+# curve OP [ARG]: pct (the device value now as a percent), raw PCT (a percent as a device value),
+# step up|down (the percent one step away that changes the device value, or the end of the range)
+curve() {
+  awk -v g="$g" -v max="$max" -v cur="$cur" -v s="$step" -v op="$1" -v a="$2" '
+    function raw(p,  r) { if (p <= 0) return 0; r = int(max * (p / 100) ^ g + 0.5); return r < 1 ? 1 : r }
+    function pct(r) { return int(100 * (r / max) ^ (1 / g) + 0.5) }
+    BEGIN {
+      if (op == "pct") { print pct(cur); exit }
+      if (op == "raw") { print raw(a); exit }
+      p = pct(cur)
+      if (a == "up") { n = (int(p / s) + 1) * s; while (n < 100 && raw(n) <= cur) n += s; if (n > 100) n = 100 }
+      else { n = (p % s == 0) ? p - s : int(p / s) * s; while (n > 0 && raw(n) >= cur) n -= s; if (n < 0) n = 0 }
+      print n
+    }'
+}
+set_pct() { cur=$(curve raw "$1"); brightnessctl "${sel[@]}" set "$cur" >/dev/null; }
+toast() { (( quiet )) || qs ipc call osd "$osd" >/dev/null 2>&1; }
+
+case $1 in
+  "") ;;
+  up|down) set_pct "$(curve step "$1")"; toast ;;
+  dim)
+    if ! [[ $2 =~ ^[0-9]{1,3}$ ]] || (( 10#$2 > 100 )); then echo "usage: brightness screen dim PCT" >&2; exit 1; fi
+    to=$(curve raw "$((10#$2))"); (( to < cur )) || to=$cur
+    brightnessctl "${sel[@]}" -s set "$to" >/dev/null; cur=$to ;;
+  *)
+    if ! [[ $1 =~ ^[0-9]{1,3}$ ]] || (( 10#$1 > 100 )); then echo "Brightness is a percent, 0 to 100 (not $1)." >&2; exit 1; fi
+    p=$((10#$1))
+    # 0 % turns the panel off, which a typed number shouldn't do; the keys may
+    [[ $dev == screen ]] && (( p < 1 )) && p=1
+    set_pct "$p"; toast ;;
+esac
+echo "{\"brightness\": $(curve pct)}"

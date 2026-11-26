@@ -13,7 +13,7 @@ Item {
     function snap(v) { return Math.round(v * dpr) / dpr }
 
     width: Math.max(34, 8 + isz.size + 8)
-    height: 27
+    height: Theme.pillHeight
 
     Rectangle {
         anchors.fill: parent

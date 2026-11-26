@@ -25,16 +25,29 @@ FocusScope {
         urls: ["homepage", "home", "work", "other"]
     })
 
-    // The birthday as people write it here: 3.5.1980, or 3.5. without the year (cards.py has 1980-05-03 or --05-03)
+    // The birthday as people write it here, the region's way (Settings › Region): 3.5.1980, or 3.5. without the year;
+    // 5/3/1980 and 5/3 in the US. cards.py has 1980-05-03 or --05-03, and save hands edit.py the same back
     function day(b) {
         const m = (b || "").match(/^(\d{4}|-)-(\d{2})-(\d{2})$/)
-        return !m ? b || "" : parseInt(m[3]) + "." + parseInt(m[2]) + "." + (m[1] === "-" ? "" : m[1])
+        if (!m) return b || ""
+        return m[1] === "-" ? Regional.format("2000-" + m[2] + "-" + m[3], "day") : Regional.format(b, "short")
     }
+    // The typed birthday → "1980-05-03" or "--05-03", null when it isn't a day. A day typed without its year is read
+    // into whichever year is given as the base, so two leap years tell it apart (29.2. stays a day)
+    function birthdayIso(t) {
+        if (!t.trim()) return ""
+        const a = Regional.parse(t, "2000-01-01"), b = Regional.parse(t, "2004-01-01")
+        if (!a || !b) return null
+        return a === b ? a : "--" + a.slice(5)
+    }
+    readonly property string birthdayHint: Regional.example + ", or " + Regional.format("2026-11-05", "day") + " without the year"
     function line(x) { return Object.assign({}, x, { orig: Object.assign({}, x) }) }
     function fromCard(x) {
         return {
             id: x.id, account: x.account, given: x.given, family: x.family, company: x.company || "",
-            title: x.title, nickname: x.nickname, birthday: day(x.birthday), note: x.note, photo: x.photo || "", newPhoto: null,
+            title: x.title, nickname: x.nickname, birthday: day(x.birthday), note: x.note,
+            photo: x.photo || "", newPhoto: null,
+            birthdayWas: [day(x.birthday), x.birthday || ""],   // as shown and as stored: see save
             phones: x.phones.map(line), emails: x.emails.map(line), urls: x.urls.map(line), addresses: x.addresses.map(line)
         }
     }
@@ -69,7 +82,17 @@ FocusScope {
         if (isNew) draft = Object.assign({}, draft, { account: app.accounts[i].id })
         else if (!dirty()) start(fromCard(choices[i]))
     }
-    function save() { if (draft) { error = ""; app.store.save(draft) } }
+    function save() {
+        if (!draft) return
+        // Left as it opened, the stored day goes back as it is: the region may have changed since (3.5. → 5/3)
+        const was = draft.birthdayWas || ["", ""]
+        const b = draft.birthday === was[0] && was[1] ? was[1] : birthdayIso(draft.birthday || "")
+        if (b === null) { error = "A birthday is a date: " + birthdayHint; return }
+        error = ""
+        const out = Object.assign({}, draft, { birthday: b })
+        delete out.birthdayWas
+        app.store.save(out)
+    }
     function cancel() {
         if (!dirty()) { done(""); return }
         app.confirm.ask("Leave without saving?", "What you changed here is lost.", "Leave", () => ed.done(""))
@@ -190,7 +213,7 @@ FocusScope {
             Section { text: "Web" }
             EditLines { Layout.fillWidth: true; c: ed.c; draft: ed.draft; key: "urls"; options: ed.labels.urls; placeholder: "https://…"; addText: "Add a link" }
             Section { text: "Birthday" }
-            EditField { Layout.fillWidth: true; c: ed.c; target: ed.draft; key: "birthday"; placeholder: "3.5.1980, or 3.5. without the year" }
+            EditField { Layout.fillWidth: true; c: ed.c; target: ed.draft; key: "birthday"; placeholder: ed.birthdayHint }
             Section { text: "Note" }
             EditField { Layout.fillWidth: true; c: ed.c; target: ed.draft; key: "note"; multiline: true; placeholder: "Anything to remember" }
 

@@ -1,0 +1,13 @@
+[Desktop Entry]
+# `inbox install` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH
+# may not have ~/.local/bin), and the icon to ~/.local/share/icons/hicolor/scalable/apps.
+Type=Application
+Name=Inbox
+GenericName=Nightdrive Inbox
+Comment=Messages from Claude's sessions and apps, to look at when you have time
+Keywords=inbox;messages;claude;reports;
+Icon=nightdrive-inbox
+Exec=inbox
+Terminal=false
+Categories=Utility;
+StartupNotify=false

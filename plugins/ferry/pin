@@ -9,13 +9,13 @@ here=$(cd "$(dirname "$0")" && pwd)
 repo=nightdrive-sh/ferry
 conf=$here/release.conf
 
-tag=${1:-$(curl -fsSI -o /dev/null -w '%{redirect_url}' "https://github.com/$repo/releases/latest" | sed -nE 's|.*/tag/||p')}
+tag=${1:-$(curl --proto '=https' --tlsv1.2 -fsSI -o /dev/null -w '%{redirect_url}' "https://github.com/$repo/releases/latest" | sed -nE 's|.*/tag/||p')}
 [[ -n $tag ]] || { echo "Couldn't ask GitHub for Ferry's latest release" >&2; exit 1; }
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 for f in install.sh ferry-linux.tar.gz; do
-  curl -fsSL -o "$tmp/$f" "https://github.com/$repo/releases/download/$tag/$f" \
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/$f" "https://github.com/$repo/releases/download/$tag/$f" \
     || { echo "Couldn't download $f of Ferry $tag" >&2; exit 1; }
 done
 sum() { sha256sum "$tmp/$1" | cut -d' ' -f1; }

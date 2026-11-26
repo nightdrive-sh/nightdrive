@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Services.Pam
 
 // The lock at startup, and later the session's lock too (hypr/scripts/lock: idle, sleep, ⌃⌘L). With greetd's autologin
@@ -11,6 +11,8 @@ import Quickshell.Services.Pam
 // (NightdriveUnlocked: they may ask the keyring, which the password opens). Both run once per login.
 // If this process dies while locked, Hyprland keeps the session locked (the "lockdead" screen) and hypr/scripts/lock,
 // which runs it, starts it again: it quits with 0 only after the unlock.
+// After the screensaver's idle time (Settings › Screensaver) the lock shows the screensaver of the style chosen there over
+// the login view (LockSaver.qml); a key or the mouse brings the prompt back.
 // Preview without locking: `nightdrive preview login` (checks the password, Esc closes).
 ShellRoot {
     id: root
@@ -25,11 +27,69 @@ ShellRoot {
     // unlock for one that started in between (screensaver/start also won't start under the lock)
     readonly property string saverStop: Quickshell.env("HOME") + "/.config/screensaver/stop"
 
+    // The screensaver under the lock: a face on every screen once nothing has been typed or moved for the screensaver's
+    // time (hypr/scripts/idle saver: minutes, 0 = never), of the style chosen (idle style: saver, rain, clock or random,
+    // picked anew each time). hypr/scripts/lock passes NIGHTDRIVE_LOCK_SAVING=<style> when a screensaver was running as
+    // the lock came (the idle lock), so the same one goes on without the prompt flashing up.
+    // Inhibitors don't keep it away: a video playing behind the lock is nothing to look at.
+    property int saverMinutes: 10
+    property bool saverRead: false
+    property string saverChoice: "random"
+    readonly property var saverStyles: ["saver", "rain", "clock"]
+    readonly property string savingEnv: Quickshell.env("NIGHTDRIVE_LOCK_SAVING") || ""
+    // "" until the setting is read: nothing shows rather than a style that is then replaced
+    property string saverStyle: saverStyles.includes(savingEnv) ? savingEnv : ""
+    function settingRead() {
+        // A lock that starts saving with no saver to go on from (nightdrive preview lock-saver): the chosen style
+        if (!saverStyles.includes(savingEnv)) pickStyle()
+        saverRead = true
+    }
+    function pickStyle() {
+        saverStyle = saverStyles.includes(saverChoice) ? saverChoice
+                   : saverStyles[Math.floor(Math.random() * saverStyles.length)]
+    }
+    FileView {
+        path: Quickshell.env("HOME") + "/.local/state/nightdrive/idle"
+        printErrors: false                      // none until the times are first changed
+        onLoaded: {
+            const m = text().match(/^saver (\d+)$/m)
+            if (m) root.saverMinutes = parseInt(m[1])
+            const st = text().match(/^style (\w+)$/m)
+            if (st) root.saverChoice = st[1]
+            root.settingRead()
+        }
+        onLoadFailed: root.settingRead()        // none yet: the defaults
+    }
+    property bool saving: savingEnv !== "" && savingEnv !== "0"
+    // Not while the password is being checked: the prompt would vanish under its own answer
+    function sleep() { if (!busy && saverMinutes > 0 && !saving) { pickStyle(); saving = true } }
+    function wake() { saving = false }
+    // The pointer goes while the saver shows, as over the screensaver (screensaver/start). Qt's blank cursor shape didn't
+    // hide it on the lock surface until the pointer moved, which wakes it. Set again once the lock is up (after the
+    // screensaver it ended has brought the pointer back), and at the start, for a lock restarted while it was hidden.
+    function pointer(hidden) { Quickshell.execDetached(["hyprctl", "eval", `hl.config({ cursor = { invisible = ${hidden} } })`]) }
+    onSavingChanged: pointer(saving)
+    Timer { id: pointerAgain; interval: 1000; onTriggered: root.pointer(root.saving) }
+    onBusyChanged: if (!busy && idle.item && idle.item.isIdle) sleep()
+    // Made once the time is read: an IdleMonitor keeps the timeout it was made with (Quickshell 0.2.1), so one made
+    // before the file was read waited the default 10 minutes whatever the setting
+    LazyLoader {
+        id: idle
+        active: root.saverRead && root.saverMinutes > 0
+        IdleMonitor {
+            timeout: root.saverMinutes * 60     // seconds
+            respectInhibitors: false
+            onIsIdleChanged: if (isIdle) root.sleep()
+        }
+    }
+
     // The screen with the prompt: the focused monitor, where the keyboard goes; the first screen before Hyprland's state has
     // arrived or if it names none of them, so there's always one. By name: monitorFor() gave another object than
-    // focusedMonitor, and no screen had the prompt.
+    // focusedMonitor, and no screen had the prompt. Not through Quickshell.Hyprland, whose IPC client crashed the lock
+    // under Hyprland 0.57 (FocusedScreen.qml).
+    FocusedScreen { id: focused }
     readonly property string promptScreen: {
-        const f = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : ""
+        const f = focused.name
         if (Quickshell.screens.some(s => s.name === f)) return f
         return Quickshell.screens.length > 0 ? Quickshell.screens[0].name : ""
     }
@@ -46,6 +106,7 @@ ShellRoot {
     function unlock() {
         if (preview) { root.endPreview(); return }
         lock.locked = false
+        pointer(false)
         Quickshell.execDetached([root.saverStop])
         Quickshell.execDetached(["hyprctl", "eval", "NightdriveCornersHidden(false)"])
         Quickshell.execDetached(["hyprctl", "eval", "NightdriveUnlocked()"])
@@ -71,7 +132,11 @@ ShellRoot {
         locked: !root.preview
         // NightdriveLocked starts the session once, at boot; a later lock only hides the corners
         onSecureChanged: if (secure) {
+            // hypr/scripts/lock --replace waits for this line (in this process's log) before it closes the lock it
+            // replaces: secure means Hyprland has a surface from this one on every screen
+            console.info("nightdrive-lock: secure")
             Quickshell.execDetached([root.saverStop])
+            pointerAgain.start()
             Quickshell.execDetached(["hyprctl", "eval", "NightdriveCornersHidden(true)"])
             Quickshell.execDetached(["hyprctl", "eval", "NightdriveLocked()"])
         }
@@ -81,6 +146,7 @@ ShellRoot {
             color: "#1a1b26"
             LoginView {
                 anchors.fill: parent
+                visible: !root.saving
                 main: surface.screen !== null && surface.screen.name === root.promptScreen
                 intro: !root.quick
                 busy: root.busy
@@ -89,6 +155,7 @@ ShellRoot {
                 onTyping: root.message = ""
                 onSubmitted: password => root.submit(password)
             }
+            LockSaver { anchors.fill: parent; visible: root.saving; style: root.saverStyle; onWoke: root.wake() }
         }
     }
 
@@ -96,9 +163,13 @@ ShellRoot {
     // under the real lock (hyprland.lua)
     function endPreview() {
         Quickshell.execDetached(["hyprctl", "eval", "NightdriveCornersHidden(false)"])
+        pointer(false)
         Qt.quit()
     }
-    Component.onCompleted: if (preview) Quickshell.execDetached(["hyprctl", "eval", "NightdriveCornersHidden(true)"])
+    Component.onCompleted: {
+        pointer(saving)
+        if (preview) Quickshell.execDetached(["hyprctl", "eval", "NightdriveCornersHidden(true)"])
+    }
     LazyLoader {
         active: root.preview
         PanelWindow {
@@ -109,12 +180,14 @@ ShellRoot {
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
             LoginView {
                 anchors.fill: parent
+                visible: !root.saving
                 busy: root.busy
                 message: root.message
                 onTyping: root.message = ""
                 onSubmitted: password => root.submit(password)
                 onEscapePressed: root.endPreview()
             }
+            LockSaver { anchors.fill: parent; visible: root.saving; style: root.saverStyle; onWoke: root.wake() }
         }
     }
 }

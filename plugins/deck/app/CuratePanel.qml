@@ -2,7 +2,7 @@ import QtQuick
 import qs.kit
 
 // Curated's New list asks first, as it costs a few minutes of the Claude plan: the question over the window, where its
-// line has room to wrap (on the header row beside the title it was cut short). The answers as Garage's (PanelButton): Enter
+// line has room to wrap (on the header row beside the title it was cut short). The answers as Garage's (AppPanelButton): Enter
 // or "Make it" makes the list, Esc, "Cancel" or a click outside doesn't. The window shows it (visible) and takes the
 // keys back on answered().
 AppPanel {
@@ -23,7 +23,7 @@ AppPanel {
     }
     Row {
         spacing: 8
-        PanelButton { c: root.c; label: "Make it"; strong: true; keys: ["Enter"]; onClicked: root.answered(true) }
-        PanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.answered(false) }
+        AppPanelButton { c: root.c; label: "Make it"; strong: true; keys: ["Enter"]; onClicked: root.answered(true) }
+        AppPanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.answered(false) }
     }
 }

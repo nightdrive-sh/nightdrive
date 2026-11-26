@@ -1,8 +1,9 @@
 import QtQuick
 import Quickshell
 
-// The launcher's Settings › Display (brightness, night light, Screen Mirroring's rows from SystemLevels.qml, where the
-// laptop's screen is next to an external one, the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, then the details, as in the top bar's battery menu).
+// The launcher's Settings › Display (brightness, night light, Screen Mirroring's rows from MirroringLevels.qml, the
+// Arrangement row that opens the Displays window (config/displays: where the screens are, the main one), the keyboard's backlight, and each output's scales and refresh rates) and Battery (charge and state, Low Power Mode, then the details, as in the top bar's battery menu), and Game Mode's
+// switch on Settings' own page (LauncherSettings.qml), beside Battery: the power profile's other end.
 // The brightness rows (screen, keyboard: the row's key) are sliders that Launcher.qml draws (bright, keys, setBright) and
 // ←/→ steps (stepBright), also in the root search; Launcher.qml's displayItems() puts them there.
 // Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered).
@@ -12,8 +13,7 @@ Item {
 
     property var displays: null               // [{ name, desc, scale, opts: [{ value, size }] }] (hypr/scripts/display list)
     property var rates: ({})                  // { output: { current, chosen: hz or "auto", hz: [...] } } (display rates)
-    property string side: ""                  // the laptop's screen: left | right | above | below | auto (display side)
-    property real bright: -1                  // Brightness: 0..1 (brightnessctl), -1 = no backlight (a VM) or not read yet
+    property real bright: -1                  // Brightness: 0..1 (hypr/scripts/brightness), -1 = no backlight (a VM) or not read yet
     property real pendingBright: -1           // the slider's value waiting to be applied (throttled)
     property real keys: -1                    // Keyboard backlight: 0..1, -1 = none (a desktop) or not read yet
     property real pendingKeys: -1
@@ -21,20 +21,38 @@ Item {
     property var batt: null                   // Battery: { percent, state, timeText } (upower)
     property var battDetail: null             // and its details (topbar/scripts/sysinfo battery), null on a desktop
     property bool hasBattery: false           // the machine has its own battery: Settings lists Battery only then
-    readonly property int brightStep: 5       // ←/→ on the brightness row, the same step as the brightness keys (hypr/scripts/brightness)
+    property var low: null                    // Low Power Mode (hypr/scripts/low-power status --json), null until read
+    property var game: null                   // Game Mode (hypr/scripts/game-mode status --json), null until read
+    readonly property string brightness: Quickshell.env("HOME") + "/.config/hypr/scripts/brightness"   // reads, sets and steps on the eye's curve
 
     readonly property string scripts: Quickshell.env("HOME") + "/.config/hypr/scripts"
-    readonly property var levels: ["display", "battery"]
-    readonly property var titles: ({ display: "Settings › Display", battery: "Settings › Battery" })
-    readonly property var parents: ({ display: "settings", battery: "settings" })
+    readonly property var levels: ["display", "otherdisplays", "battery"]
+    readonly property var titles: ({ display: "Settings › Display", otherdisplays: "Settings › Other displays", battery: "Settings › Battery" })
+    readonly property var parents: ({ display: "settings", otherdisplays: "settings", battery: "settings" })
+
+    // Settings › Other displays: the screens beyond this computer's, by device, however they connect: AirPlay's
+    // (Screen Mirroring, MirroringLevels.qml's mirrorRows, empty without doubletake) and a plugin's (displayRows: VNC
+    // Display's iPads), as macOS's "Mirror or extend to". Display is this computer's own screens only.
+    function others() {
+        const l = launcher
+        if (!l) return []
+        return [...l.mirrorRows(), ...[].concat(...l.pluginExts.map(e => e.displayRows ? e.displayRows() : []))].filter(r => r.kind !== "header")
+    }
+    function hasOthers() { return launcher !== null && (launcher.mirrorRows().length > 0 || launcher.pluginExts.some(e => e.displayRows)) }
+    // On Settings' row: what is in use now ("iPad, iPhone on"), else nothing
+    function othersSummary() {
+        const on = others().filter(r => r.active === true).map(r => r.name)
+        return on.length > 0 ? on.join(", ") + " on" : undefined
+    }
 
     // The brightness and night light rows' footers are Launcher.qml's: the root search has them too
     function footer(level, query) { return "" }
     // On every open: the root search has the brightness and night light rows too
-    function opened() { brightProc.running = true; keysProc.running = true; nightProc.running = true }
+    // and Game Mode's row (Settings, the root search), which Low Power Mode may have turned off since
+    function opened() { brightProc.running = true; keysProc.running = true; nightProc.running = true; gameProc.running = true }
     function entered(level) {
-        if (level === "display") { displayProc.running = true; ratesProc.running = true; sideProc.running = true; brightProc.running = true; keysProc.running = true; nightProc.running = true }
-        if (level === "battery") { battProc.running = true; battDetailProc.running = true }
+        if (level === "display") { displayProc.running = true; ratesProc.running = true; brightProc.running = true; keysProc.running = true; nightProc.running = true }
+        if (level === "battery") { battProc.running = true; battDetailProc.running = true; lowProc.running = true }
     }
     function shiftActivate(it) {}
 
@@ -43,26 +61,21 @@ Item {
         if (level === "display") {
             // Brightness (slider rows for the screen and the keyboard, when they have a backlight, and night light), then Scale
             if (displays === null) return l.hint("Loading…")
+            // The desk's own: a virtual screen (HEADLESS-*, an iPad over VNC) has its size and place from its plugin
+            const desk = displays.filter(d => !/^HEADLESS-/.test(d.name))
             const out = bright < 0 ? [] : [{ kind: "brightness", key: "screen", name: "Screen", glyph: "sun", summary: Math.round(bright * 100) + "%" }]
             if (keys >= 0) out.push({ kind: "brightness", key: "keys", name: "Keyboard", glyph: "keyboard", summary: Math.round(keys * 100) + "%" })
             if (night !== "") out.push({ kind: "nightlight", name: "Night light", glyph: "moon", switchOn: night === "on" })
             if (out.length > 0) out.unshift({ kind: "header", name: "Brightness" })
+            // Where the screens are and which is the main one: the Displays window, a picture to drag them in. Always
+            // there, also with one screen on (a closed lid hid the laptop's old side rows, #1800), as a virtual screen or
+            // a display plugged in later is placed there too
+            out.push({ kind: "header", name: "Arrangement" },
+                     { kind: "arrange", name: "Arrange displays", glyph: "move", summary: desk.length > 1 ? desk.length + " displays" : undefined,
+                       footer: "Enter: open Displays  ·  drag the screens where they are on your desk" })
             // Scales the panel divides evenly, shown as the resulting desktop size ("looks like" in macOS); current one marked
-            out.push(...l.mirrorRows())   // Screen Mirroring (AirPlay; SystemLevels.qml), empty without doubletake
-            // Where the laptop's own screen is, so the pointer crosses where the screens meet: only with both on.
-            // eDP is the connector of a laptop's panel (BUILTIN_DISPLAY in hyprland.lua)
-            if (side !== "" && displays.length > 1 && displays.some(d => /^eDP-/.test(d.name))) {
-                out.push({ kind: "header", name: "Laptop screen" })
-                for (const [v, label, glyph] of [["below", "Below the display", "arrow-down"], ["above", "Above the display", "arrow-up"],
-                                                 ["left", "Left of the display", "arrow-left"], ["right", "Right of the display", "arrow-right"],
-                                                 ["auto", "Automatic", "monitor"]]) {
-                    const cur = side === v
-                    out.push({ kind: "side", value: v, name: label, glyph: cur ? "check" : glyph,
-                               summary: cur ? "current" : v === "auto" ? "side by side" : undefined })
-                }
-            }
-            for (const d of displays) {
-                out.push({ kind: "header", name: "Scale" + (displays.length > 1 ? " · " + d.name + (d.desc !== "-" ? "  " + d.desc : "") : "") })
+            for (const d of desk) {
+                out.push({ kind: "header", name: "Scale" + (desk.length > 1 ? " · " + d.name + (d.desc !== "-" ? "  " + d.desc : "") : "") })
                 for (const o of d.opts) {
                     const cur = Math.abs(o.value - d.scale) < 0.01
                     out.push({ kind: "scale", output: d.name, value: o.value, name: o.size, glyph: cur ? "check" : "monitor",
@@ -71,7 +84,7 @@ Item {
                 // Refresh rates at its resolution, only with a choice: Automatic is the display's preferred mode
                 const r = rates[d.name]
                 if (r && r.hz.length > 1) {
-                    out.push({ kind: "header", name: "Refresh rate" + (displays.length > 1 ? " · " + d.name : "") })
+                    out.push({ kind: "header", name: "Refresh rate" + (desk.length > 1 ? " · " + d.name : "") })
                     for (const hz of r.hz) {
                         const cur = r.chosen !== "auto" && Math.abs(hz - r.chosen) < 0.01
                         out.push({ kind: "rate", output: d.name, value: String(hz), name: Math.round(hz) + " Hz", glyph: cur ? "check" : "monitor",
@@ -84,6 +97,12 @@ Item {
             }
             return out
         }
+        if (level === "otherdisplays") {
+            // Hints (still looking for AirPlay devices) last
+            const o = others()
+            if (o.length === 0) return l.hint("Screen Mirroring and VNC Display add them: Install › Plugins")
+            return [...o.filter(r => r.kind !== "hint"), ...o.filter(r => r.kind === "hint")]
+        }
         if (level === "battery") {
             // The same as the top bar's battery menu: charge and state, then the details
             if (batt === null) return l.hint(p.hasBattery ? "Loading…" : "No battery in this computer")
@@ -92,6 +111,12 @@ Item {
             const rows = [{ kind: "stat", name: batt.percent + "%  " + stateText,
                             glyph: batt.state === "charging" ? "battery-charging" : batt.percent < 40 ? "battery-low" : batt.percent < 60 ? "battery-medium" : "battery-full",
                             summary: batt.timeText !== "" ? batt.timeText + (batt.state === "charging" ? " until full" : " remaining") : undefined }]
+            // Low Power Mode, and whether the 10 % warning offers it (without power-profiles-daemon: neither)
+            if (low && low.available)
+                rows.push({ kind: "lowpower", name: "Low Power Mode", glyph: "leaf", switchOn: low.state === "on",
+                            footer: "Enter: on/off  ·  tuned's power-saver until the charger goes in" },
+                          { kind: "lowsuggest", name: "Suggest at 10 %", glyph: "battery-warning", switchOn: low.suggest,
+                            footer: "Enter: on/off  ·  the low battery warning offers Low Power Mode" })
             if (b) {
                 rows.push({ kind: "header", name: "Details" })
                 for (const r of [["zap", "Power", b.watts > 0 ? b.watts + " W" : ""],
@@ -117,10 +142,24 @@ Item {
             Quickshell.execDetached([scripts + "/nightlight", night])
             return true
         }
-        if (it.kind === "side") {         // stays open like the scale rows; Hyprland reloads with the new arrangement
+        if (it.kind === "lowpower" || it.kind === "lowsuggest") {   // Settings › Battery
             l.keepSelection()
-            side = it.value
-            Quickshell.execDetached([scripts + "/display", "side", it.value])
+            const on = it.kind === "lowpower" ? low.state !== "on" : !low.suggest
+            low = Object.assign({}, low, it.kind === "lowpower" ? { state: on ? "on" : "off" } : { suggest: on })
+            Quickshell.execDetached(it.kind === "lowpower" ? [scripts + "/low-power", on ? "on" : "off"]
+                                                           : [scripts + "/low-power", "suggest", on ? "on" : "off"])
+            return true
+        }
+        if (it.kind === "gamemode") {     // Settings › Hardware, beside Battery
+            l.keepSelection()
+            const on = game.state !== "on"
+            game = Object.assign({}, game, { state: on ? "on" : "off" })
+            Quickshell.execDetached([scripts + "/game-mode", on ? "on" : "off"])
+            return true
+        }
+        if (it.kind === "arrange") {      // the Displays window comes next
+            l.open = false
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.config/displays/displays"])
             return true
         }
         if (it.kind === "rate") {         // stays open like the scale rows; Hyprland reloads with the new mode
@@ -147,17 +186,28 @@ Item {
         if (key === "keys") { keys = v; pendingKeys = v } else { bright = v; pendingBright = v }
         if (!brightApply.running) brightApply.start()
     }
-    // ←/→: to the next even step, like the brightness keys
+    // ←/→: the brightness keys' own step (the script knows which percent really changes the panel), then the new value
     function stepBright(dir, key) {
-        const pc = Math.round((key === "keys" ? keys : bright) * 100)
-        const n = dir > 0 ? (Math.floor(pc / brightStep) + 1) * brightStep : (pc % brightStep === 0 ? pc - brightStep : Math.floor(pc / brightStep) * brightStep)
-        setBright(Math.max(0, Math.min(100, n)) / 100, key)
+        if (stepProc.running) return   // a held key: the next repeat takes it from the new value
+        stepProc.key = key
+        stepProc.command = [brightness, key === "keys" ? "kbd" : "screen", dir > 0 ? "up" : "down", "--quiet"]
+        stepProc.running = true
+    }
+    Sh {
+        id: stepProc
+        property string key: ""
+        onResult: text => {
+            const j = text.match(/"brightness": (\d+)/)
+            if (!j) return
+            p.launcher.keepSelection()
+            if (key === "keys") p.keys = parseInt(j[1]) / 100; else p.bright = parseInt(j[1]) / 100
+        }
     }
     Timer {
         id: brightApply; interval: 60
         onTriggered: {
-            if (p.pendingBright >= 0) Quickshell.execDetached(["brightnessctl", "-c", "backlight", "-n2", "set", Math.round(p.pendingBright * 100) + "%"])
-            if (p.pendingKeys >= 0) Quickshell.execDetached(["brightnessctl", "-d", "*kbd_backlight*", "set", Math.round(p.pendingKeys * 100) + "%"])
+            if (p.pendingBright >= 0) Quickshell.execDetached([p.brightness, "screen", String(Math.round(p.pendingBright * 100)), "--quiet"])
+            if (p.pendingKeys >= 0) Quickshell.execDetached([p.brightness, "kbd", String(Math.round(p.pendingKeys * 100)), "--quiet"])
             p.pendingBright = -1; p.pendingKeys = -1
         }
     }
@@ -185,23 +235,18 @@ Item {
             p.rates = r
         }
     }
-    Sh {
-        id: sideProc
-        script: '"$HOME/.config/hypr/scripts/display" side'
-        onResult: text => { p.launcher.keepSelection(); p.side = text.trim() }
-    }
     // Brightness: read on entering and every 2 s while there (the brightness keys also work then),
     // not while the slider is held or a value is waiting to be applied
     Sh {
         id: brightProc
-        // -c backlight: without a backlight brightnessctl would pick the first LED (a keyboard's Compose light)
-        command: ["brightnessctl", "-m", "-c", "backlight"]
+        // The script's percent is on the eye's curve; it fails without a backlight (a VM)
+        command: [p.brightness, "screen"]
         onResult: text => {
             if (p.pendingBright >= 0) return
             const l = p.launcher
             const first = p.bright < 0
-            const f = text.trim().split(",")
-            const v = f.length >= 4 ? parseInt(f[3]) / 100 : -1
+            const j = text.match(/"brightness": (\d+)/)
+            const v = j ? parseInt(j[1]) / 100 : -1
             if (v !== p.bright && !first) l.keepSelection()   // changed elsewhere (the brightness keys)
             p.bright = v
             // The rows above the scales appear only now: select the first one (the brightness row)
@@ -210,11 +255,11 @@ Item {
     }
     Sh {
         id: keysProc
-        command: ["brightnessctl", "-m", "-d", "*kbd_backlight*"]
+        command: [p.brightness, "kbd"]
         onResult: text => {
             if (p.pendingKeys >= 0) return
-            const f = text.trim().split(",")
-            const v = f.length >= 4 ? parseInt(f[3]) / 100 : -1
+            const j = text.match(/"brightness": (\d+)/)
+            const v = j ? parseInt(j[1]) / 100 : -1
             if (v !== p.keys && p.keys >= 0) p.launcher.keepSelection()   // changed elsewhere (⌘F1/⌘F2)
             p.keys = v
         }
@@ -257,5 +302,15 @@ Item {
         command: ["bash", "-c", "~/.config/topbar/scripts/sysinfo battery"]
         onResult: text => { try { p.battDetail = JSON.parse(text) } catch (e) { p.battDetail = null } }
     }
-    Timer { interval: 5000; repeat: true; running: p.launcher !== null && p.launcher.open && p.launcher.level === "battery"; onTriggered: { battProc.running = true; battDetailProc.running = true } }
+    Sh {
+        id: lowProc
+        script: '"$HOME/.config/hypr/scripts/low-power" status --json'
+        onResult: text => { try { p.low = JSON.parse(text) } catch (e) { p.low = null } }
+    }
+    Sh {
+        id: gameProc
+        script: '"$HOME/.config/hypr/scripts/game-mode" status --json'
+        onResult: text => { try { p.game = JSON.parse(text) } catch (e) { p.game = null } }
+    }
+    Timer { interval: 5000; repeat: true; running: p.launcher !== null && p.launcher.open && p.launcher.level === "battery"; onTriggered: { battProc.running = true; battDetailProc.running = true; lowProc.running = true } }
 }

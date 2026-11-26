@@ -32,7 +32,7 @@ A fast, clean Spotify player for whole albums. Keep the ones you love on a shelf
 | `o` | Where the sound plays |
 | ⌘B | Hide or show the sidebar |
 
-- **Curated** is a list of albums for you, made by Claude Code from your listening (`deck curate`, a few minutes on your Claude plan). New list makes a new one when you want; Not for me teaches the next. It shows which you have listened to, and how far.
+- **Curated** is a list of albums for you, made by Claude Code from your listening (`deck curate`, a few minutes on your Claude plan). New list makes a new one when you want; Not for me teaches the next. It shows each album's rough genre, and which you have listened to and how far.
 - **Pick for me** starts an album from your shelf or Curated that you haven't played in a while, drawn as from a hat: one comes again only once the others have played.
 - **Radio** plays Deck's genres, your favourites first, and your own (`deck genre add`).
 - **History** lists the albums you played in the last 30 days.
@@ -40,11 +40,15 @@ A fast, clean Spotify player for whole albums. Keep the ones you love on a shelf
 
 ## Setting up
 
-Deck comes as the `deck` package from Nightdrive's COPR (aarch64 and x86_64), and `nightdrive update` updates it; where there is no package, it is built from source. It needs the Client ID of your own free Spotify developer app: Deck's README shows how.
+Deck comes as the `deck` package from Nightdrive's COPR (aarch64 and x86_64), and `nightdrive update` updates it; where there is no package (another architecture, the COPR unreachable), the Deck release pinned in `install.sh` is built from source, after a warning. It needs the Client ID of your own free Spotify developer app: Deck's README shows how.
 
 Curated needs that Spotify app too, and something to go on: your Last.fm listening history (an account that records your Spotify listening, and its API key in Deck's config), or a few lines about your taste in `~/.config/deck/taste.md` (Deck's README › Setting up Curated).
 
 Deck's first start offers Set up with Claude: Claude Code goes through what is missing with you a step at a time, and without Last.fm, talks with you about the music you like and writes it down. `deck-window setup`, Curated's button and Welcome to Nightdrive (Launcher › System › Set up Nightdrive) do the same. Sign-ins happen only in your browser.
+
+## Claude
+
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Deck), Claude can tell what plays, search Spotify, play or queue an album or a song, play a genre radio, pause and skip, like a track and Pick for me. Each change shows a notification with Undo, which goes back to what played before. The tools need Deck 0.1.2 or newer: an older one asks you to update.
 
 ## In a terminal
 
@@ -54,6 +58,7 @@ Deck's first start offers Set up with Claude: Claude Code goes through what is m
 | `deck tui` | Deck's own screen in the terminal, when no other Deck runs |
 | `deck ctl pick` | Pick for me |
 | `deck curate` | A new Curated list |
+| `deck status --json` | What plays, the queue and the like, as JSON |
 | `deck-window quit` | Closes the window and stops the music |
 | `deck-window restart`, `log` | After a change to the window (`app/`), and its errors |
 

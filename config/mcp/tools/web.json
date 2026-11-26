@@ -1,0 +1,26 @@
+{
+  "tools": [
+    {
+      "name": "web_download",
+      "title": "Download a file",
+      "description": "Downloads one file from a public web address into this Ask Claude conversation's own folder, where the user sees, plays and saves what they want. Only audio (ogg, mp3, wav, flac), pictures (png, jpeg, webp, gif), PDF and zip, at most 25 MB each and 200 MB in a conversation; the type is read from the file itself, so give the address of the file, not of a page about it. Returns only its id, type and size: you can't open or read the file afterwards, so judge it by the page you found it on (its licence too). Not from this computer or the user's own network. Only in Ask Claude, not in a terminal.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string", "title": "Address", "description": "The file's own http:// or https:// address", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://", "maxLength": 2048},
+          "name": {"type": "string", "title": "Name", "description": "A short name for it, without extension (default: the address's)", "maxLength": 80}
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "web/download.py", "get", "{url}", ["--name", "{name}"]],
+      "before": ["python3", "web/download.py", "folder"],
+      "undo": ["python3", "web/download.py", "remove", "--folder", "{folder}", "{id}"],
+      "notice": "Downloaded {id}",
+      "timeout": 120,
+      "stops_on_cancel": true,
+      "class": "change",
+      "area": "web"
+    }
+  ]
+}

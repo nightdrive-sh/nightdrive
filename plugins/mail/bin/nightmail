@@ -97,11 +97,14 @@ same way by \"More accounts\", and ask again after each."
 }
 
 # The timer's full round and push's inbox-only one wait here for each other: two mbsyncs on the same folders would
-# fail on its locks, and notmuch on its database's.
+# fail on its locks, and notmuch on its database's. Mail's spinner watches the same lock (app/FetchWatch.qml): once it
+# is taken, `nightmail fetching` tells an open Mail, in the background so the fetch doesn't wait for it. -o: only flock
+# holds the lock, not the commands, so that call can't keep it after the fetch.
 fetch() {
   mkdir -p "$(dirname "$FETCH_LOCK")"
   (($#)) || set -- -a
-  flock "$FETCH_LOCK" sh -c 'mbsync -q "$@" && notmuch new --quiet' sh "$@"
+  flock -o "$FETCH_LOCK" sh -c '"$0" fetching >/dev/null 2>&1 & mbsync -q "$@" && notmuch new --quiet' \
+    "$APP_DIR/bin/nightmail" "$@"
 }
 
 # Claude's reply shows in the desktop's Claude writes card (quickshell/ClaudeWrite.qml, `qs ipc call write ask`), which
@@ -167,12 +170,34 @@ claude_cancel() {
 compose_only() { NIGHTMAIL_COMPOSE_ONLY=1 start; }
 reveal() { running && [[ $(qs ipc -p "$QS_DIR" call "$APP_IPC" reveal 2>/dev/null) == shown ]]; }
 
+# new FILE…: a message with the files attached (Files' m). Only files: a folder is refused with the reason, as a mail
+# can't carry one (Files says to compress it first). A message already being written takes them (Writing.qml,
+# composeFiles), and its window comes forward.
+new_message() {
+  local f files=() title addr
+  for f in "$@"; do
+    [[ $f == -- ]] && continue
+    if [[ -d $f ]]; then echo "nightmail: $f is a folder: only files can be attached (compress it first)." >&2; return 2; fi
+    if [[ ! -f $f || ! -r $f ]]; then echo "nightmail: $f isn't a file that can be read." >&2; return 2; fi
+    # One path a line over IPC (composeFiles): a name with a line break in it can't go
+    if [[ $f == *$'\n'* ]]; then echo "nightmail: $f has a line break in its name: rename it first." >&2; return 2; fi
+    files+=("$(realpath -- "$f")")
+  done
+  running || { compose_only; ready; }
+  if ((${#files[@]} == 0)); then ipc compose; return; fi
+  title=$(qs ipc -p "$QS_DIR" call "$APP_IPC" composeFiles "$(printf '%s\n' "${files[@]}")") || return 1
+  command -v hyprctl >/dev/null || return 0
+  addr=$(hyprctl -j clients | jq -r --argjson pid "$(pid)" --arg t "$title" \
+           '[.[] | select(.pid == $pid and .title == $t)] | first | .address // empty')
+  [[ -z $addr ]] || hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+}
+
 usage() {
   cat <<USAGE
 Usage: nightmail [command]
 
   (none), open   open Mail, or bring it forward if it is open
-  new            write a new message
+  new [FILE…]    write a new message, with the files attached (to the one being written, if there is one)
   settings       open Mail's settings (launcher › Settings › Apps › Mail)
   mailto:…       write to a mailto: link's address (the desktop entry's handler for mailto links)
   setup          set up an email account with Claude, in a terminal
@@ -185,9 +210,31 @@ Usage: nightmail [command]
   show ID        open Mail on a message (notmuch message id)
   reply ID       open Mail on a message and reply to it
   claude ID      the same, with Claude writing the reply
-  archive ID     archive a message, as Mail's a does
-  delete ID      move a message to Trash
+  archive ID…    archive from the inbox, as Mail's a does (ID: a message id, or thread:… for a thread)
+  unarchive ID…  back to the inbox
+  delete ID…     move from the inbox to Trash, as Mail's d does
+  empty Spam|Trash [--account ID|ADDRESS]  delete everything in Spam or Trash for good, as Mail's ⌘⇧⌫ does (no
+                 undo; --card only shows what it would delete)
+  search QUERY [LIMIT]  threads a notmuch query finds, as JSON (newest first, 20 by default)
+  unread [LIMIT] the unread threads in the inboxes, as JSON
+  thread ID      a thread's messages as JSON text (ID: thread:… or a message id)
+  unsubscribe MSGID…  the messages' unsubscribe links as JSON (List-Unsubscribe, else the body's)
+  invitation ID  a message's calendar invitation, by Calendar, as JSON; --add CALENDAR puts its event in one (or
+                 updates it there), --remove takes a cancelled one out; --reply accept|maybe|decline [--calendar ID]
+                 sends the answer to its organiser (--card: only what would go)
+  accounts       the accounts, as JSON
+  draft          save a draft from JSON on stdin ({to, cc, subject, body, account} or {reply_to, reply_all, body},
+                 either with attachments: [paths]); {draft: ID, body} writes a new version of a draft in its place
+  draft-undo ID  throw a draft away, and bring back the version it replaced (mail_draft's undo)
+  draft-show ID  a draft as it would be sent, as JSON
+  discard ID     throw a draft away
+  save-attachments [--into FOLDER] -- ID [NAME …]
+                 copy a message's attachments (or those named) into FOLDER (default Downloads), as JSON
+  save-pdf [--into FOLDER] -- ID
+                 the message as a PDF there; nothing remote is loaded (lib/save.py, pdf.py)
+  send ID        send a draft, through the account's SMTP server
   notify         notify of new mail (notmuch's post-new hook runs it)
+  blocked-notifications  which of Mail's notifications (JSON on stdin) are of mail Access › Mail keeps from Claude
   keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
   push           sync as soon as new mail comes to an inbox (IMAP IDLE; its service runs it)
   enable         Mail among the desktop's apps, its notifications and the sync every 5 minutes (the installer)
@@ -197,7 +244,7 @@ USAGE
 }
 
 case ${1:-open} in
-  new)     running || { compose_only; ready; }; ipc compose ;;
+  new)     new_message "${@:2}" ;;
   mailto:*) running || { compose_only; ready; }; ipc mailto "$1" ;;
   open)     reveal || open_window ;;
   settings) reveal || open_ready; ipc openSettings ;;
@@ -219,16 +266,44 @@ case ${1:-open} in
     case $1 in show) fn=openMessage ;; reply) fn=replyTo ;; claude) fn=claudeReply ;; esac
     ipc "$fn" "$2"
     ;;
-  archive|delete)
-    # The same move as Mail's a and d: from the inbox to Archive or Trash (move.py keeps Gmail's All Mail as it is)
+  archive|unarchive|delete)
+    # The same moves as Mail's a and d: from the inbox to Archive or Trash (lib/inbox.py, move.py's)
     [[ -n ${2:-} ]] || { usage >&2; exit 2; }
-    [[ $1 == archive ]] && to=Archive || to=Trash
-    python3 "$APP_DIR/lib/move.py" "$to" "id:\"$2\"" INBOX >/dev/null && notmuch tag -inbox -- "id:\"$2\""
+    python3 "$APP_DIR/lib/inbox.py" "$@"; status=$?
     running && ipc refresh
+    exit $status
     ;;
+  empty)
+    # Mail's ⌘⇧⌫ without the window (lib/empty.py): the list shows the folder emptied at once
+    python3 "$APP_DIR/lib/empty.py" "${@:2}"; status=$?
+    running && ipc refresh
+    exit $status
+    ;;
+  search|unread|thread)
+    python3 "$APP_DIR/lib/browse.py" "$@" ;;
+  accounts)
+    python3 "$APP_DIR/lib/compose.py" accounts ;;
+  invitation) python3 "$APP_DIR/lib/invitation.py" "${@:2}" ;;
+  unsubscribe) python3 "$APP_DIR/lib/unsubscribe.py" "${@:2}" ;;
+  draft|discard|send|draft-undo)
+    # The window shows a new draft, and a draft gone, at once
+    python3 "$APP_DIR/lib/drafts.py" "${1#draft-}" "${@:2}"; status=$?
+    running && ipc refresh
+    exit $status
+    ;;
+  save-attachments|save-pdf|unsave)
+    # Claude's mail_save_attachments and mail_save_pdf, and unsave their undo (lib/save.py): copies, the mail stays
+    sub=${1#save-}; [[ $1 == unsave ]] && sub=unsave
+    python3 "$APP_DIR/lib/save.py" "$sub" "${@:2}" ;;
+  draft-show)
+    python3 "$APP_DIR/lib/drafts.py" show "${@:2}" ;;
+  draft-card)   # mail_send's card: what goes out that Claude saw hidden
+    python3 "$APP_DIR/lib/drafts.py" card "${@:2}" ;;
   notify)    python3 "$APP_DIR/lib/notify.py" ;;
+  blocked-notifications) python3 "$APP_DIR/lib/blocked.py" notifications ;;   # `nightdrive notifications` for Claude
   fetch)     fetch "${@:2}" ;;
-  keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
+  fetching)  running && ipc fetching ;;     # fetch()'s, for Mail's spinner
+  keyring-locked) python3 "$APP_DIR/app/kit/keyring.py" ;;
   push)      exec python3 "$APP_DIR/lib/push.py" ;;
   ask-claude)    ask_claude "$2" "$3" ;;   # Mail's ⌘⇧C (the commands below are the card's)
   claude-draft)  claude_draft "$2" ;;

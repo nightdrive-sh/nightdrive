@@ -1,0 +1,27 @@
+{
+  "tools": [
+    {
+      "name": "results_add",
+      "title": "Show a result",
+      "description": "Adds a result card under your answer in Ask Claude's panel, where the user plays a sound, looks at a picture, opens a page or saves a file with one click. Use cards when you found things for the user to choose from or keep (several sounds or pictures, files you downloaded, the pages you drew on): one card for each, and your answer then says briefly what they are, not their addresses again. Types: sound and image (a file you downloaded: the user plays or sees it), file (any other download, a PDF or zip), page (a web page, by its address). Always give url, the page you found it on, and licence as that page states it (CC0, CC BY 4.0, Pixabay Content License…; leave it out if the page doesn't say: the card then says unknown) with the author when the licence asks for credit: the user decides from them whether they may use it. Only in Ask Claude, not in a terminal.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {"type": "string", "title": "Type", "enum": ["sound", "image", "page", "file"], "description": "sound, image or file for a download, page for a web page"},
+          "title": {"type": "string", "title": "Title", "description": "What it is, in a few words, in the user's language", "maxLength": 120},
+          "url": {"type": "string", "title": "Source", "description": "The http:// or https:// address of the page it is on (for a download, the page about it, not the file's own address)", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://", "maxLength": 2048},
+          "file": {"type": "string", "title": "File", "description": "The id the download returned; not for a page", "maxLength": 255},
+          "licence": {"type": "string", "title": "Licence", "description": "As the source states it; leave out if it doesn't", "maxLength": 80},
+          "author": {"type": "string", "title": "Author", "description": "Whom the licence asks to credit", "maxLength": 120},
+          "note": {"type": "string", "title": "Note", "description": "One short line worth knowing (length, size, how it differs from the others)", "maxLength": 400}
+        },
+        "required": ["type", "title", "url"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "results.py", "add"],
+      "stdin": "json",
+      "class": "read",
+      "area": "nightdrive"
+    }
+  ]
+}

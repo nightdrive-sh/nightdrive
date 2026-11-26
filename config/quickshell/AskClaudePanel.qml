@@ -1,0 +1,97 @@
+import QtQuick
+import Quickshell
+
+// Ask Claude's toast once it is written in (AskClaudeToast.qml, Dashboard #1895): the field (AskClaudeField), the conversation (AskClaudeThread, from AskClaudeSession) and its keys (KeyFooter). As in a chat,
+// the field is under the conversation, so the newest message is always just above it, where you wrote (the user's
+// choice, #1895); a new conversation is the field alone, so dictated text still appears where the wave was.
+// fieldOnTop puts it above instead. While you dictate, a wave across the field (AskClaudeListening) stands in its place.
+// A long conversation scrolls inside it: the toast stays within maxHeight.
+Item {
+    id: p
+    property int maxHeight: 600
+    property bool fieldOnTop: false
+    property bool dictating: false
+    property bool listenOnly: false       // opened to listen (#1996): no keys yet, so no footer either
+    property var dictation: null          // Dictation, for the listening wave
+    readonly property alias field: field
+    signal close()
+
+    function refuse() { Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/sounds", "event", "error"]) }
+
+    // --- Tunables ---
+    readonly property int fontSize: 17      // as the launcher's
+    readonly property int pad: 18           // the card's edge to its content: the launcher's
+    readonly property int gap: 8            // between the field, the conversation and the footer
+
+    readonly property var session: AskClaudeSession
+    // A card from another Claude (a terminal's) can come with no conversation here: it is shown all the same, as Enter in
+    // the field answers it (Dashboard #1921)
+    readonly property bool hasThread: session.entries.length > 0 || session.busy || session.pendingCard
+    readonly property real fieldH: field.height
+    readonly property real threadH: hasThread ? thread.height + gap : 0
+    readonly property real footerH: footer.visible ? footer.height + gap : 0
+    implicitHeight: 2 * pad + fieldH + threadH + footerH
+
+    // Shift+Enter (a new line) and Esc (close) aren't listed: what text fields and toasts do. Claude's card has its keys on
+    // its buttons. ⌘Enter is Hyprland's key, not the field's (so it never sends or adds a line): over the toast it comes
+    // over IPC (askClaude key in Launcher.qml) and goes on with the conversation in a terminal (AskClaudeLevels.terminal),
+    // as ⌘Enter on the launcher's Ask Claude row does (#1980); without one yet, what was written is a new session's prompt.
+    readonly property string terminalKey: "Cmd+Enter: open in terminal"
+    // A selection in the conversation (#1904): ⌘C copies it, and the footer says so for a moment once it has. Last in the
+    // footer, so the main key stays at its right edge
+    property bool copied: false
+    Timer { id: copiedTimer; interval: 1500; onTriggered: p.copied = false }
+    readonly property string copyKey: copied ? "Cmd+C: copied" : thread.selectedText !== "" ? "Cmd+C: copy" : ""
+    readonly property string keys: listenOnly ? "" : [session.pendingCard ? ""
+        : session.busy ? "Ctrl+C: stop  ·  " + terminalKey
+        : session.entries.length ? "Enter: send  ·  " + terminalKey + "  ·  Cmd+N: new chat"
+        : "Enter: ask Claude  ·  " + terminalKey, copyKey].filter(k => k !== "").join("  ·  ")
+
+    Item {
+        id: fieldRow
+        x: p.pad
+        y: p.fieldOnTop ? p.pad : p.pad + p.threadH
+        width: p.width - 2 * p.pad
+        height: field.height
+
+        AskClaudeField {
+            id: field
+            width: parent.width
+            baseSize: p.fontSize
+            // Claude asks about a dictation (#3155): write or dictate the answer
+            placeholder: p.session.look !== "" ? "Answer, or dictate…" : p.session.entries.length ? "Write back…" : "Ask Claude…"
+            opacity: p.dictating ? 0 : 1
+            // One still running: the text waits in the field
+            onSent: text => { if (p.session.ask(text)) field.begin(""); else p.refuse() }
+            onNewChat: { p.session.reset(); field.begin("") }
+            onLeaving: p.close()
+            onRefused: p.refuse()
+            onPaged: dir => thread.page(dir)
+            copyElsewhere: () => { if (!thread.copySelection()) return false; p.copied = true; copiedTimer.restart(); return true }
+        }
+        AskClaudeListening {
+            visible: p.dictating && p.dictation !== null
+            width: parent.width
+            dictation: p.dictation
+            running: visible
+            anchors.verticalCenter: field.verticalCenter
+        }
+    }
+
+    AskClaudeThread {
+        id: thread
+        visible: p.hasThread
+        x: p.pad
+        y: p.fieldOnTop ? p.pad + p.fieldH + p.gap : p.pad
+        width: p.width - 2 * p.pad
+        maxHeight: Math.max(120, p.maxHeight - 2 * p.pad - p.fieldH - p.gap - p.footerH)
+        fontSize: p.fontSize
+    }
+
+    KeyFooter {
+        id: footer
+        anchors { right: parent.right; rightMargin: p.pad; bottom: parent.bottom; bottomMargin: p.pad }
+        maxWidth: p.width - 2 * p.pad
+        text: p.keys
+    }
+}

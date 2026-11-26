@@ -36,9 +36,12 @@ sync_now() {
   [[ -n $out ]] || names=()
   (($#)) && names=("$@")
   ((${#names[@]})) || { echo "No accounts in $ACCOUNTS." >&2; return 1; }
+  # vdirsyncer knows an account by its pair, whose name has _ for the account name's - (config.py pair_name)
+  local -a pairs
+  mapfile -t pairs < <(python3 "$APP_DIR/lib/config.py" pairs "${names[@]}")
   # discover finds an account's address books (and new ones later); it asks before making their folders, so say yes
-  yes | vds discover "${names[@]}" >/dev/null || return 1
-  vds sync "${force[@]}" "${names[@]}" || return 1
+  yes | vds discover "${pairs[@]}" >/dev/null || return 1
+  vds sync "${force[@]}" "${pairs[@]}" || return 1
   # iCloud's photos are apart from the cards, behind the sign-in: the new ones into the cache (a failure is only a photo)
   python3 "$APP_DIR/lib/photos.py" fetch "${names[@]}" || echo "Some photos didn't come: they show at the next sync." >&2
   # The edits are on the server now: what they were made over is no longer needed to merge
@@ -110,7 +113,11 @@ Usage: contacts [command]
   new [NAME] [EMAIL]
                  a new contact in the editor, with these filled in (Mail's Add to contacts)
   people         everyone as JSON (name, emails, numbers, addresses), for Mail and the launcher
+  find QUERY     the people a search finds, without the window (--json; --limit N, 25 by default)
+  card WHO       WHO's whole card, without the window: an id (as \`find\` gives it), an email address or a number (--json)
   settings       open Contacts' settings (launcher › Settings › Apps › Contacts)
+  sort [first|last]
+                 the list's order: by first name (the default) or last name; alone, the one now (--json)
   setup          set up an account with Claude, in a terminal
   sync [NAME…]   sync the contacts of every account (or these) now, both ways
                  (--force-delete first: an address book emptied here empties the server's too)
@@ -131,12 +138,14 @@ case ${1:-open} in
   show)      open_ready; ipc card "${2:-}" ;;   # not "show": qs ipc takes that for its own command
   new)       open_ready; ipc createWith "${2:-}" "${3:-}" ;;
   people)    python3 "$APP_DIR/lib/cards.py" people ;;
+  find|card) python3 "$APP_DIR/lib/lookup.py" "$@" ;;
   sync)      sync_now "${@:2}"; status=$?; running && ipc refresh; exit $status ;;
+  sort)      python3 "$APP_DIR/lib/settings.py" "$@" || exit; [[ ${2:-} == first || ${2:-} == last ]] && running && ipc refresh; exit 0 ;;
   accounts)  list_accounts ;;
   setup)     setup ;;
   enable)    enable ;;
   disable)   disable ;;
-  keyring-locked) python3 "$APP_DIR/lib/keyring.py" ;;
+  keyring-locked) python3 "$APP_DIR/app/kit/keyring.py" ;;
   vdirsyncer) python3 "$APP_DIR/lib/config.py" write >/dev/null && vds "${@:2}" ;;
   help|-h|--help) usage ;;
   *)

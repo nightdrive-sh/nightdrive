@@ -7,6 +7,7 @@ Text {
     width: parent ? parent.width : 0
     visible: text !== ""   // an empty note takes no room (a menu's own visible: replaces this)
     wrapMode: Text.Wrap
+    textFormat: Text.PlainText   // often a command's error or another device's words: never markup
     color: variant === "danger" ? Theme.danger : variant === "warning" ? Theme.warning : Theme.dim
     font { family: Theme.font; pixelSize: 12 }
 }

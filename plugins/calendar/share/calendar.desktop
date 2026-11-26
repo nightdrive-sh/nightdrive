@@ -1,0 +1,13 @@
+[Desktop Entry]
+# `calendar enable` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH
+# may not have ~/.local/bin), and the icon to ~/.local/share/icons/hicolor/scalable/apps.
+Type=Application
+Name=Calendar
+GenericName=Nightdrive Calendar
+Comment=Your calendars from iCloud and Google
+Keywords=calendar;events;agenda;schedule;
+Icon=nightdrive-calendar
+Exec=calendar
+Terminal=false
+Categories=Office;Calendar;
+StartupNotify=false

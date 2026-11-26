@@ -1,9 +1,9 @@
 import QtQuick
 import qs.kit
 
-// A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, its ssh user, and deleting it.
-// They change while it is stopped (garage-ctl set, one call each for what changed), but for the user, which only ssh's
-// config reads; while it runs the rest show, and a click on what would change them says why it can't. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
+// A VM's settings (⌘,): its memory, CPUs and disk, the ISO in its drive, its ssh user, whether the clipboard goes to
+// it on focus, and deleting it. They change while it is stopped (garage-ctl set, one call each for what changed), but for
+// the user, which only ssh's config reads, and the clipboard, which the overlay asks about each time (lib/clip.sh); while it runs the rest show, and a click on what would change them says why it can't. The disk only grows, and the guest then sees the new space unpartitioned: the line under the fields says so.
 // The display has no setting: SDL gives the guest its window's size, and its scale is the guest's own (Nightdrive's:
 // Settings › Display, hypr/vm-display.lua).
 AppPanel {
@@ -15,6 +15,9 @@ AppPanel {
     signal done()
     signal deleteVm()
     cardWidth: 540
+    // The panel is the window's size: below this the card is narrow (#2030), the fields share its width instead of
+    // keeping their fixed ones, and Choose…, Eject and Delete machine… become their glyphs
+    readonly property bool narrow: width < 520
     onOutsideTapped: done()
 
     function load() {
@@ -22,6 +25,7 @@ AppPanel {
         mem.text = String(vm.mem / 1024); cpus.text = String(vm.cpus); disk.text = String(vm.disk)
         iso.text = vm.iso
         user.text = vm.user || ""
+        clip.on = vm.clip !== false
         problem = ""
         mem.input.forceActiveFocus(); mem.input.selectAll()
     }
@@ -36,6 +40,7 @@ AppPanel {
         const u = user.text.trim()
         if (u !== "" && !/^[a-z_][a-z0-9_-]{0,31}$/.test(u)) { problem = "User: lower-case letters, digits, - and _"; return }
         if (u !== (vm.user || "")) ctl.run(["set", vm.name, "user", u])
+        if (clip.on !== (vm.clip !== false)) ctl.run(["set", vm.name, "clip", clip.on ? "on" : "off"])
         if (!stopped) { done(); return }
         const whole = t => /^[0-9]+$/.test(t.trim())
         if (!whole(mem.text) || !whole(cpus.text) || !whole(disk.text)) { problem = "Memory, CPUs and disk are whole numbers"; return }
@@ -57,10 +62,12 @@ AppPanel {
     }
 
     Row {
+        id: sizes
         spacing: 16
-        Field { id: mem; c: root.c; width: 130; label: "Memory"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
-        Field { id: cpus; c: root.c; width: 130; label: "CPUs"; hint: "1 to 8"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
-        Field { id: disk; c: root.c; width: 130; label: "Disk"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
+        readonly property real fieldWidth: Math.min(130, (parent.width - 2 * spacing) / 3)
+        AppField { id: mem; c: root.c; width: sizes.fieldWidth; label: "Memory"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
+        AppField { id: cpus; c: root.c; width: sizes.fieldWidth; label: "CPUs"; hint: "1 to 8"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
+        AppField { id: disk; c: root.c; width: sizes.fieldWidth; label: "Disk"; hint: "GB"; input.readOnly: !root.stopped; onRefused: root.whenStopped("change these"); onAccepted: root.save(); onEscaped: root.done() }
     }
     Text {
         width: parent.width
@@ -73,12 +80,13 @@ AppPanel {
     // The ISO: a path, chosen in a dialog or typed, and out with Eject. It boots after the disk, so an installed VM
     // boots its disk with one in.
     Row {
+        width: parent.width
         spacing: 8
-        Field {
+        AppField {
             id: iso
             c: root.c
-            width: root.cardWidth - 80 - choose.width - eject.width - 16
-            label: "ISO in its drive"; hint: "boots when the disk has nothing to boot"
+            width: parent.width - choose.width - 8 - (eject.visible ? eject.width + 8 : 0)
+            label: "ISO in its drive"; hint: root.narrow ? "boots after the disk" : "boots when the disk has nothing to boot"
             input.readOnly: !root.stopped
             onRefused: root.whenStopped("change the ISO")
             onAccepted: root.save(); onEscaped: root.done()
@@ -86,25 +94,33 @@ AppPanel {
         AppButton {
             id: choose
             anchors.bottom: parent.bottom; anchors.bottomMargin: 2
-            c: root.c; glyph: "folder-open"; label: "Choose…"
+            c: root.c; glyph: "folder-open"; label: root.narrow ? "" : "Choose…"; tip: root.narrow ? "Choose an ISO" : ""
             onClicked: if (root.whenStopped("change the ISO")) picker.pick(iso.text, p => iso.text = p)
         }
         AppButton {
             id: eject
             anchors.bottom: parent.bottom; anchors.bottomMargin: 2
-            c: root.c; glyph: "eject"; label: "Eject"
+            c: root.c; glyph: "eject"; label: root.narrow ? "" : "Eject"; tip: root.narrow ? "Eject the ISO" : ""
             visible: iso.text !== ""
             onClicked: if (root.whenStopped("eject the ISO")) iso.text = ""
         }
     }
 
     // Who `ssh NAME` logs in as: an image's VM has its first boot's, an installed one the user typed in its installer
-    Field {
+    AppField {
         id: user
         c: root.c
-        width: 200
+        width: Math.min(200, parent.width)
         label: "SSH user"; hint: "ssh " + (root.vm ? root.vm.name : "NAME") + " logs in as"
         onAccepted: root.save(); onEscaped: root.done()
+    }
+
+    // The host's clipboard into it as its window gets the keyboard (#3117: overlay/ClipSync.qml); c sends it either way
+    AppCheck {
+        id: clip
+        c: root.c
+        label: "Send the clipboard when its window is focused"
+        onAccepted: root.save()
     }
 
     Text {
@@ -122,12 +138,13 @@ AppPanel {
         Row {
             id: answers
             spacing: 8
-            PanelButton { c: root.c; label: "Save"; strong: true; keys: ["Enter"]; onClicked: root.save() }
-            PanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.done() }
+            AppPanelButton { c: root.c; label: "Save"; strong: true; keys: ["Enter"]; onClicked: root.save() }
+            AppPanelButton { c: root.c; label: "Cancel"; keys: ["Esc"]; onClicked: root.done() }
         }
         AppButton {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-            c: root.c; glyph: "trash-2"; label: "Delete machine…"; keys: "⌘⌫"
+            c: root.c; glyph: "trash-2"; label: root.narrow ? "" : "Delete machine…"; keys: "⌘⌫"
+            tip: root.narrow ? "Delete machine…" : ""
             onClicked: if (root.whenStopped("delete it")) root.deleteVm()
         }
     }

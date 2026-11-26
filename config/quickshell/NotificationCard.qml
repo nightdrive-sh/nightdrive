@@ -21,6 +21,7 @@ Rectangle {
 
     property var row: ({})
     property var n: null
+    property alias footer: footerSlot.data
     // Actions the sender offers only while its whole text shows (hint x-nightdrive-whole: their ids, comma-separated):
     // Claude's Allow answers for the whole command (hypr/scripts/claude-notify), so it goes when the text is cut here.
     // Such a text is shown as it is, without the <…> taken out below, which could hide part of a command.
@@ -41,8 +42,8 @@ Rectangle {
     readonly property var buttons: (temporary ? [{ text: "Save", done: "Saved", save: true }] : [])
         .concat(filePath ? [{ text: "Copy image", copy: "image" }, { text: "Copy path", copy: "path" }] : [])
         .concat(actions.map(a => ({ text: a.text, action: a })))
-    readonly property bool hovered: hover.hovered || shotDrag.active   // a drag of the preview keeps a popup up too
-    readonly property bool dragging: shot.Drag.active   // the preview is being dragged out (the menu lets the drop through)
+    readonly property bool hovered: hover.hovered || shotDrag.active || dragging   // a drag of the preview keeps a popup up too
+    readonly property bool dragging: DragOut.active && DragOut.from(shot)   // the preview is being dragged out (the menu lets the drop through)
     signal activated()                         // click: open
     signal dropped()                           // the dragged preview landed somewhere
     signal viewed()                            // the preview was opened in the image viewer (double click)
@@ -56,7 +57,7 @@ Rectangle {
 
     width: 300
     height: body.implicitHeight + 28
-    radius: 4                                  // the same as the windows' corners (decoration.rounding in hyprland.lua)
+    radius: 4                                  // the same as the windows' corners (decoration.rounding in hypr/appearance.lua)
     opacity: appear * (1 - swipeFade)
     transform: Translate { x: card.enterX + card.swipeX }
 
@@ -92,7 +93,7 @@ Rectangle {
         id: swipe
 
         // --- Tunables ---
-        property real touchScale: 0.8          // the same as TouchScroll.qml
+        property real touchScale: 0.8          // the same as kit/Scroll.js TUNING.touchScale
         property real swipeDistance: 0.17      // of the card's width
         property real flickSpeed: 900          // px/s to the right on release
         property real direction: -1            // natural_scroll = false: fingers to the right give a negative delta
@@ -290,12 +291,18 @@ Rectangle {
             height: visible ? Math.min(card.previewHeight, width * ar) : 0
             // Draggable as a file (text/uri-list): dropped on a terminal it's the file's path (Claude Code attaches
             // it as a picture), on a file manager or a browser the file. A click still opens the notification.
-            Drag.dragType: Drag.Automatic
-            Drag.supportedActions: Qt.CopyAction
-            Drag.mimeData: ({ "text/uri-list": card.fileUri, "text/plain": card.filePath })
-            Drag.active: shotDrag.active
-            Drag.onDragFinished: action => { if (action !== Qt.IgnoreAction) card.dropped() }
-            DragHandler { id: shotDrag; target: null; enabled: card.fileUri !== "" }
+            // The drag runs from DragOut.qml, which outlives this card (#3020).
+            property var icon: null   // the picture under the pointer (grabIcon's result, kept so its url stays valid)
+            DragHandler {
+                id: shotDrag; target: null; enabled: card.fileUri !== ""
+                onActiveChanged: active
+                    ? DragOut.start(shot, { "text/uri-list": card.fileUri, "text/plain": card.filePath }, shot.icon ? shot.icon.url : "")
+                    : DragOut.release(shot)
+            }
+            Connections {
+                target: DragOut
+                function onFinished(action) { if (DragOut.from(shot) && action !== Qt.IgnoreAction) card.dropped() }
+            }
             // A double click opens the file in the image viewer (xdg-open: Loupe). The press doesn't reach the card's
             // MouseArea here, so a single click opens the notification from here, once the double click's time is over.
             TapHandler {
@@ -313,7 +320,7 @@ Rectangle {
             function grabIcon() {
                 if (shotImg.status !== Image.Ready || shotClip.width <= 0) return
                 const sc = Math.min(1, 160 / shotClip.width)
-                shotClip.grabToImage(r => shot.Drag.imageSource = r.url, Qt.size(shotClip.width * sc, shotClip.height * sc))
+                shotClip.grabToImage(r => shot.icon = r, Qt.size(shotClip.width * sc, shotClip.height * sc))
             }
             ClippingRectangle {
                 id: shotClip
@@ -396,5 +403,9 @@ Rectangle {
                 }
             }
         }
+
+        // A line of the stack's own under the card (NotificationStack.qml: "+3 more")
+        Item { width: 1; height: footerSlot.childrenRect.height > 0 ? 10 : 0 }
+        Item { id: footerSlot; width: parent.width; height: childrenRect.height }
     }
 }

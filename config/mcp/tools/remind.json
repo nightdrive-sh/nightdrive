@@ -1,0 +1,55 @@
+{
+  "tools": [
+    {
+      "name": "remind_add",
+      "title": "Set a reminder",
+      "description": "A quick reminder: the message as a banner at the top of this desktop's screen, with a sound, in so many minutes (up to a week), at a time of day, or on an event, as the launcher's Tools › Remind sets one: when the computer next wakes (wake), at the next login, or on arriving at or leaving a place (arrive work, leave home). A place is a name the user gave Wi-Fi networks: for \"when I get to work\" or \"when I leave home\", look it up among the user's places and use its name; one that isn't there, ask once which network it is (offer the one this computer is on now) and add it as a place first, then the reminder. An arrival or a leaving not seen in a week comes anyway. With from, an event counts only after then: \"when I get to work in the morning\" said in the evening is arrive work, from 05:00. It stays until dismissed, also under Do Not Disturb. It waits over a logout or a restart; one that came due meanwhile is told at the next login. For a thing to do with a date, a task is better, and for a time with others a calendar event.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "when": {"type": "string", "maxLength": 60, "pattern": "^([0-9hmin:. ]+|wake|login|(arrive|leave) [^ -].*)$", "title": "When",
+                   "description": "Minutes from now (15, 90m, 1h30m; up to a week), a time of day (22:45: the next one, tomorrow's once today's has passed), wake (the first unlock after the computer next wakes from sleep), login (the next login), or arrive PLACE / leave PLACE (PLACE: the name of one of the user's places)"},
+          "from": {"type": "string", "maxLength": 25, "pattern": "^[0-9hmin:. T-]+$", "title": "Not before",
+                   "description": "With an event only: it counts only after then. A time of day (05:00: the next one), minutes from now (8h) or a date and time (2026-11-23 05:00); within a week"},
+          "message": {"type": "string", "maxLength": 500, "title": "Message", "description": "What the notification says, short. Without it: Reminder"}
+        },
+        "required": ["when"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "remind", "add", "{when}", ["--from", "{from}"], "--json", "--", ["{message}"]],
+      "class": "change",
+      "undo": ["nightdrive", "remind", "cancel", "{id}"],
+      "notice": "Reminder ({label}): {message}",
+      "area": "notifications"
+    },
+    {
+      "name": "remind_list",
+      "title": "Reminders waiting",
+      "description": "The quick reminders still to come (remind_add's and the launcher's Tools › Remind), times soonest first, then events: {reminders: [{id, when (time, wake, login, arrive or leave), label (22:45, wake, arrive work), at (ISO 8601), at_unix, clock (HH:MM), minutes_left (these four null for an event), place (or null), from (ISO 8601, or null), state (waiting; unlock: its event came under the lock), message}]}.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "remind", "list", "--json"],
+      "mask": ["reminders.message"],
+      "class": "read",
+      "area": "notifications"
+    },
+    {
+      "name": "remind_cancel",
+      "title": "Cancel a reminder",
+      "description": "Takes a waiting reminder away before it's due, by its id from remind_list. Undo gives it back as it was, unless its time has passed meanwhile.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "maxLength": 32, "title": "Reminder", "description": "Its id from remind_list"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "remind", "cancel", "{id}", "--json"],
+      "before": ["nightdrive", "remind", "show", "{id}", "--json"],
+      "undo": ["nightdrive", "remind", "uncancel", "{id}", "--json"],
+      "notice": "Cancelled the reminder ({label}): {message}",
+      "class": "change",
+      "area": "notifications"
+    }
+  ]
+}

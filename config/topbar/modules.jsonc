@@ -7,6 +7,7 @@
 //   status    optional: another command printing the state (default ~/.config/topbar/scripts/status <name>)
 //   menu      optional: the menu to open on a left click, if not <Name>Menu.qml ("" = none)
 //   right, middle  optional: shell commands for a right / middle click (the module updates right after)
+//   click     optional: a shell command for a left click, in place of a menu (Recorder's pause and go on)
 //   spacing   optional: letter spacing of its text in px (- = tighter)
 //   needs     optional: an optional part's id (plugins.txt); without it installed the module isn't run or listed
 //             (a plugin folder's module, plugins/<id>/module.jsonc, has its own id as needs, and these keys too:
@@ -20,7 +21,7 @@
 // A status command prints one line of JSON:  {"icon": "wifi", "text": "95%", "class": "off"}
 //   icon   a Lucide name (lucide.dev/icons), or pack:name from any Iconify set (mdi:wifi, tabler:cpu…); see scripts/icon.
 //          Several separated by | are an animation (wifi-zero|wifi-low|wifi-high|wifi); gauge@<0-100> is a gauge whose
-//          needle points at the value
+//          needle points at the value, bot-bar@<0-100> the bot over a bar filled that far (the Claude module)
 //   text   optional text after the icon (always the same font and size: the `text` row in adjust.conf)
 //   class  optional: off (dimmed), warning (orange), critical (red), active (highlighted background), stale (faded)
 // No icon and no text hides the module.
@@ -28,6 +29,7 @@
   { "name": "camera",        "interval": 2,  "first": true },
   { "name": "microphone",    "interval": 2,  "first": true },
   { "name": "claude",        "interval": 15, "right": "~/.config/topbar/scripts/claude-bar next", "middle": "xdg-open https://claude.ai/settings/usage" },
+  { "name": "claude2",       "interval": 15, "right": "~/.config/topbar/scripts/claude-bar next 2", "middle": "xdg-open https://claude.ai/settings/usage" },
   { "name": "system",        "interval": 3 },
   { "name": "bluetooth",     "interval": 5,  "right": "blueman-manager" },
   { "name": "wifi",          "interval": 5,  "right": "nm-connection-editor" },

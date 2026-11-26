@@ -13,9 +13,9 @@ case $(uname -m) in
 esac
 if [[ ! -x /opt/1Password/1password ]]; then
   url=https://downloads.1password.com/linux/tar/stable/$arch/1password-latest.tar.gz
-  curl -fsSL -o "$tmp/1p.tar.gz" "$url"
-  curl -fsSL -o "$tmp/1p.tar.gz.sig" "$url.sig"
-  curl -fsSL -o "$tmp/key.asc" https://downloads.1password.com/linux/keys/1password.asc
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/1p.tar.gz" "$url"
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/1p.tar.gz.sig" "$url.sig"
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/key.asc" https://downloads.1password.com/linux/keys/1password.asc
   export GNUPGHOME="$tmp/gnupg"; mkdir -m700 "$GNUPGHOME"
   gpg -q --import "$tmp/key.asc"
   gpg --fingerprint 2>/dev/null | grep -q '3FEF 9748 469A DBE1 5DA7  CA80 AC2D 6274 2012 EA22' \

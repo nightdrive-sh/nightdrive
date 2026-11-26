@@ -240,7 +240,7 @@ done; true'
         width: line.width + 12
         height: line.height + 4
         radius: 4
-        color: area.containsMouse && value !== "" ? Theme.hover : "transparent"
+        color: area.containsMouse && !MenuPointer.pointerAway && value !== "" ? Theme.hover : "transparent"
         Row {
             id: line
             x: 6

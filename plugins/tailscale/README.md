@@ -5,7 +5,7 @@ A private network between your own devices: reach your home server, NAS or Home 
 ![Tailscale's menu in the top bar](tailscale.jpg)
 
 - The icon in the top bar shows whether you're connected, and a right click turns Tailscale on or off.
-- Its menu lists your devices: a click copies a device's address. Launcher › Settings › Tailscale has the same.
+- Its menu lists your devices: a click on a computer opens a terminal with `ssh` to it (by its Tailscale name, with your own user name or the `User` in `~/.ssh/config`), and the copy button beside it copies its address. Phones, tablets and offline devices copy on a click; offline ones wait behind a closed row (*6 offline devices*). On a shared tailnet, other people's devices wait under their owner's name; a click there copies too. Launcher › Settings › Tailscale has the same.
 
 ## Setting up
 

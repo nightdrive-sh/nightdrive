@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""The controller's Xbox button opens Games (#3530), and the controller moves in it: the Games app (plugins/games,
+`games home`) while it is installed, else the Launcher's Games page.
+Run by nightdrive-gamepad.service. Reads every game controller's evdev device (an Xbox controller over Bluetooth or
+USB, a PlayStation one: whatever has a home button and A), picking up one that connects later or again.
+
+Why it only listens: the controller is the game's. Nothing is sent anywhere while a game plays: the d-pad, A and B go
+to Games (`games pad`, or the Launcher's `qs ipc call games …`: GamesLevels.qml) only after the Xbox button opened it,
+and then the controllers are grabbed (EVIOCGRAB), so a game behind it doesn't see them either. They are let go as soon
+as Games closes or loses the focus, by B, a game starting, Esc or a click: while grabbed, it is asked twice a second.
+While a Steam game runs the button is the Steam overlay's (games_library.steam_game_running), so nothing happens here.
+  gamepad-home            run (the service)
+  gamepad-home devices    the controllers it would read"""
+
+import os
+import select
+import shutil
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import games_library  # noqa: E402
+
+try:
+    import evdev
+    from evdev import ecodes as E
+except ImportError:   # python3-evdev (packages.txt) not installed yet: nothing to do, and no restart loop
+    print("gamepad-home: python3-evdev isn't installed", file=sys.stderr)
+    sys.exit(0)
+
+RESCAN = 2.0          # s between looks for a controller that connected
+POLL_ARMED = 0.5      # s between asks whether Games is still open, while the controllers are grabbed
+REPEAT_DELAY = 0.40   # s a direction is held before it repeats, then every REPEAT_EVERY
+REPEAT_EVERY = 0.12
+STICK_AT = 0.55       # how far the left stick goes (of its half range) to count as up or down
+HOME_DEBOUNCE = 0.35  # s: one press may come as both BTN_MODE and KEY_HOMEPAGE, or from Steam's virtual pad too
+HOME_KEYS = {E.BTN_MODE, E.KEY_HOMEPAGE}
+# A d-pad that comes as buttons (some controllers' drivers) rather than the hat's axes: its (x, y)
+DPAD_KEYS = {E.BTN_DPAD_UP: (0, -1), E.BTN_DPAD_DOWN: (0, 1), E.BTN_DPAD_LEFT: (-1, 0), E.BTN_DPAD_RIGHT: (1, 0)}
+
+
+def is_pad(dev):
+    keys = dev.capabilities().get(E.EV_KEY, [])
+    return E.BTN_SOUTH in keys and any(k in keys for k in HOME_KEYS)
+
+
+# The Games app's command (plugins/games), and its entry among the apps while it is installed
+GAMES_APP = os.path.expanduser("~/.local/bin/games")
+GAMES_DESKTOP = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"),
+                             "applications", "nightdrive-games.desktop")
+
+
+def run(argv):
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def front_argv(app):
+    """Where the button and the moves go: the Games app's command (home, pad, state), or without the app the
+    Launcher's Games page over Quickshell's IPC (GamesLevels.qml: the same three calls)."""
+    if app:
+        return [GAMES_APP]
+    qs = shutil.which("qs")
+    return [qs, "ipc", "call", "games"] if qs else None
+
+
+def ipc(app, *args):
+    """The answer of the app or the Launcher, or "" when it isn't there."""
+    argv = front_argv(app)
+    return run(argv + list(args)) if argv else ""
+
+
+class Pads:
+    def __init__(self):
+        self.devs = {}        # path → InputDevice
+        self.armed = False    # Games is open by our button, and the controllers are grabbed
+        self.app = False      # ... in the Games app (else the Launcher's Games page)
+        self.held = None      # "up" | "down" while a direction is held, with when it next repeats
+        self.next_repeat = 0.0
+        self.hat = (0, 0)     # the d-pad's and the stick's own directions (x, y: -1, 0, 1), each apart
+        self.stick = (0, 0)
+        self.last_home = 0.0
+        self.next_poll = 0.0
+
+    def rescan(self):
+        for path in evdev.list_devices():
+            if path in self.devs:
+                continue
+            try:
+                dev = evdev.InputDevice(path)
+            except OSError:
+                continue
+            if is_pad(dev):
+                self.devs[path] = dev
+                if self.armed:
+                    self.grab(dev)
+            else:
+                dev.close()
+
+    def drop(self, path):
+        dev = self.devs.pop(path, None)
+        if dev:
+            try:
+                dev.close()
+            except OSError:
+                pass
+
+    def grab(self, dev):
+        try:
+            dev.grab()
+        except OSError:   # already grabbed (by Steam, by us): its events then go there
+            pass
+
+    def arm(self, on):
+        if on == self.armed:
+            return
+        self.armed = on
+        self.held, self.hat, self.stick = None, (0, 0), (0, 0)
+        for dev in list(self.devs.values()):
+            try:
+                dev.grab() if on else dev.ungrab()
+            except OSError:
+                pass
+        self.next_poll = time.monotonic() + POLL_ARMED
+
+    def send(self, button):
+        if self.armed and ipc(self.app, "pad", button) != "ok":
+            self.arm(False)
+
+    def home(self):
+        now = time.monotonic()
+        if now - self.last_home < HOME_DEBOUNCE:
+            return
+        self.last_home = now
+        if not self.armed and games_library.steam_game_running():
+            return
+        if not self.armed:   # the app while it is installed, else the Launcher's page
+            self.app = os.path.isfile(GAMES_DESKTOP) and os.access(GAMES_APP, os.X_OK)
+        self.arm(ipc(self.app, "home") == "open")
+
+    def direction(self):
+        x, y = self.hat if self.hat != (0, 0) else self.stick
+        want = "up" if y < 0 else "down" if y > 0 else "left" if x < 0 else "right" if x > 0 else None
+        if want != self.held:
+            self.held = want
+            if want:
+                self.send(want)
+                self.next_repeat = time.monotonic() + REPEAT_DELAY
+
+    def stick_dir(self, dev, axis, value):
+        info = dev.absinfo(axis)
+        half = (info.max - info.min) / 2 or 1
+        pos = (value - info.min - half) / half
+        return -1 if pos < -STICK_AT else 1 if pos > STICK_AT else 0
+
+    def event(self, dev, ev):
+        if ev.type == E.EV_KEY and ev.value == 1:
+            if ev.code in HOME_KEYS:
+                self.home()
+            elif self.armed and ev.code == E.BTN_SOUTH:
+                self.send("a")
+            elif self.armed and ev.code == E.BTN_EAST:
+                self.send("b")
+            elif self.armed and ev.code in DPAD_KEYS:
+                self.hat = DPAD_KEYS[ev.code]
+                self.direction()
+        elif ev.type == E.EV_KEY and ev.value == 0 and ev.code in DPAD_KEYS and self.armed:
+            self.hat = (0, 0)
+            self.direction()
+        elif ev.type == E.EV_ABS and self.armed:
+            clamp = lambda v: max(-1, min(1, v))  # noqa: E731
+            if ev.code == E.ABS_HAT0X:
+                self.hat = (clamp(ev.value), self.hat[1])
+            elif ev.code == E.ABS_HAT0Y:
+                self.hat = (self.hat[0], clamp(ev.value))
+            elif ev.code == E.ABS_X:
+                self.stick = (self.stick_dir(dev, E.ABS_X, ev.value), self.stick[1])
+            elif ev.code == E.ABS_Y:
+                self.stick = (self.stick[0], self.stick_dir(dev, E.ABS_Y, ev.value))
+            else:
+                return
+            self.direction()
+
+    def tick(self):
+        """Repeats a held direction, and lets the controllers go once Games has closed some other way."""
+        now = time.monotonic()
+        if self.armed and self.held and now >= self.next_repeat:
+            self.send(self.held)
+            self.next_repeat = now + REPEAT_EVERY
+        if self.armed and now >= self.next_poll:
+            self.next_poll = now + POLL_ARMED
+            if ipc(self.app, "state") != "open":
+                self.arm(False)
+
+    def timeout(self):
+        if not self.armed:
+            return RESCAN
+        now = time.monotonic()
+        nxt = min(self.next_poll, self.next_repeat if self.held else self.next_poll)
+        return max(0.01, nxt - now)
+
+    def run(self):
+        last_scan = 0.0
+        while True:
+            if time.monotonic() - last_scan >= RESCAN:
+                self.rescan()
+                last_scan = time.monotonic()
+            by_fd = {d.fd: (p, d) for p, d in self.devs.items()}
+            ready, _, _ = select.select(list(by_fd), [], [], min(self.timeout(), RESCAN))
+            for fd in ready:
+                path, dev = by_fd[fd]
+                try:
+                    for ev in dev.read():
+                        self.event(dev, ev)
+                except OSError:   # disconnected (Bluetooth off, out of range): found again when it returns
+                    self.drop(path)
+            self.tick()
+
+
+def main(argv):
+    if argv[:1] == ["devices"]:
+        for path in evdev.list_devices():
+            try:
+                dev = evdev.InputDevice(path)
+            except OSError:
+                continue
+            if is_pad(dev):
+                print(f"{path}  {dev.name}  {dev.uniq or dev.phys}")
+        return 0
+    if argv:
+        print("usage: gamepad-home [devices]", file=sys.stderr)
+        return 2
+    try:
+        Pads().run()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

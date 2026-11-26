@@ -1,0 +1,32 @@
+{
+  "tools": [
+    {
+      "name": "nightdrive_status",
+      "title": "Nightdrive status",
+      "description": "What this desktop is and runs: Nightdrive's version and update channel, Fedora's version, the theme and wallpaper, the region (how the user writes dates and times: write them so), the displays (resolution, scale), and which of Nightdrive's apps and plugins are installed, turned off or available. Use it before answering about this machine's setup.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["python3", "status.py", "nightdrive_status"],
+      "stdin": "json",
+      "class": "read",
+      "area": "nightdrive"
+    },
+    {
+      "name": "hub_status",
+      "title": "Hub sync status",
+      "description": "Nightdrive Hub, which syncs Tasks between the user's computers: the Hub's address, when the last sync went through and the last try's state (ok, offline: the changes wait, error), and per app what the last sync did (fetched, sent, merged: a task edited on two computers, the older edit's values put in its notes; kept_both) and what waits to be sent from this computer. joined is false when this computer syncs with no Hub.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "hub", "status", "--json"],
+      "class": "read",
+      "area": "nightdrive"
+    },
+    {
+      "name": "backup_status",
+      "title": "Backup status",
+      "description": "This computer's backup with restic (nightdrive backup): whether it is set up (configured), the repository and paths, when the last backup went through and the last try's state (ok; offline: the repository out of reach, not an error until stale, no backup in 3 days; waiting: the keyring locked; error), what the last one added (summary), and the last prune and check. line says it in a sentence.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "backup", "status", "--json"],
+      "class": "read",
+      "area": "nightdrive"
+    }
+  ]
+}

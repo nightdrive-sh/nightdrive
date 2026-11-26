@@ -1,0 +1,71 @@
+.pragma library
+// The device list shared by the top bar's BluetoothMenu and the launcher's BluetoothLevels: the bluetoothctl script
+// that lists them, its parsing, their order and their icons. Split from both (#3527).
+
+// How long Scan for devices looks. 20 s was too short: an Xbox controller put in pairing mode after pressing Scan showed
+// up a few seconds before the scan ended, and BlueZ drops a device nobody paired as soon as the scan stops (#3527)
+var SCAN_SECONDS = 60
+// A device this strong (dBm) is near the computer, most likely the one in the user's hand: it goes first among the
+// devices not paired, ahead of a busy street's TVs and laptops, which otherwise pushed it past the menu's 8 rows
+var NEAR_RSSI = -65
+
+// One line per device: mac|connected|paired|bonded|battery|named|rssi|icon|name (the name last: it may hold a "|").
+// bonded is paired's value where BlueZ has no Bonded property (before 5.7x): pairing implied it there. Both are the
+// device's own lines, not BREDR.Paired: that one is yes a moment before Bonded while pairing, which showed "pair again"
+var LIST_SCRIPT =
+    'systemctl is-active -q bluetooth 2>/dev/null || exit 0\n' +
+    'bluetoothctl devices | sed "s/\\x1b\\[[0-9;]*m//g" | while read -r _ mac name; do\n' +
+    '  info=$(bluetoothctl info "$mac")\n' +
+    '  c=$(grep -c "Connected: yes" <<<"$info"); p=$(grep -c "^\\s*Paired: yes" <<<"$info"); n=$(grep -c "^\\s*Name:" <<<"$info")\n' +
+    '  o=$(grep -c "^\\s*Bonded: yes" <<<"$info"); grep -q "^\\s*Bonded:" <<<"$info" || o=$p\n' +
+    '  b=$(grep -oP "Battery Percentage: 0x\\w+ \\(\\K[0-9]+" <<<"$info")\n' +
+    '  r=$(grep -oP "RSSI: 0x\\w+ \\(\\K-?[0-9]+" <<<"$info"); i=$(grep -oP "^\\s*Icon: \\K\\S+" <<<"$info")\n' +
+    '  echo "$mac|$c|$p|$o|$b|$n|$r|$i|$name"\n' +
+    'done'
+
+// The script's output → [{ mac, connected, paired, bonded, battery, named, near, icon, name }], in the menu's order.
+// seen: { mac: true } of the devices found near during this scan, kept by the caller, so a device stays near once its
+// signal was strong: BlueZ reports RSSI only while the device advertises, and a list that reorders itself every
+// refresh would move the row under the pointer
+function parse(text, seen) {
+    const arr = []
+    for (const line of text.split("\n")) {
+        const f = line.split("|")
+        if (f.length < 9) continue
+        const rssi = f[6] !== "" ? parseInt(f[6]) : NaN
+        if (rssi >= NEAR_RSSI) seen[f[0]] = true
+        arr.push({ mac: f[0], connected: f[1] !== "0", paired: f[2] !== "0", bonded: f[3] !== "0", battery: f[4],
+                   named: f[5] !== "0", near: seen[f[0]] === true, icon: f[7], name: f.slice(8).join("|") })
+    }
+    arr.sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || (b.near - a.near) || a.name.localeCompare(b.name))
+    return arr
+}
+
+// Nameless devices (only an address: mostly nearby phones, Macs and AirTags with a changing random address) are hidden
+// unless paired; "Show hidden devices" lists them too
+function isHidden(d) { return !d.named && !d.paired && !d.connected }
+
+// An input device (a controller, keyboard, mouse) paired without bonding: BlueZ didn't keep its key and refuses its
+// connection, so it shows as connected but does nothing. Only pairing it anew in pairing mode helps (bt-pair --again, #3629)
+function needsRepair(d) { return d.paired && !d.bonded && /^input-/.test(d.icon) }
+// What the menu says while bt-pair --again waits for the device
+function repairHint(d) { return "Put " + d.name + " in pairing mode: hold its pair button until its light flashes fast" }
+
+// BlueZ's Icon (from the device's class or appearance) when it has one, else a guess from the name
+var ICONS = {
+    "input-gaming": "gamepad-2", "input-mouse": "mouse", "input-tablet": "pen-tool", "input-keyboard": "keyboard",
+    "audio-headphones": "headphones", "audio-headset": "headphones", "audio-card": "speaker",
+    "phone": "smartphone", "computer": "laptop", "video-display": "tv", "camera-video": "video", "camera-photo": "camera",
+    "printer": "printer", "multimedia-player": "music"
+}
+function iconFor(d) {
+    if (ICONS[d.icon]) return ICONS[d.icon]
+    const name = d.name
+    return /head|buds|airpods|wh-|wf-|sony/i.test(name) ? "headphones"
+         : /mouse|mx |trackpad/i.test(name) ? "mouse"
+         : /keyboard|keys/i.test(name) ? "keyboard"
+         : /controller|gamepad|xbox|dualsense|dualshock|joy-con/i.test(name) ? "gamepad-2"
+         : /phone|iphone|pixel|galaxy/i.test(name) ? "smartphone"
+         : /watch/i.test(name) ? "watch"
+         : /speaker|boom|jbl|soundbar/i.test(name) ? "speaker" : "bluetooth"
+}

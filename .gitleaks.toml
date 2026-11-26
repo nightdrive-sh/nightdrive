@@ -1,0 +1,8 @@
+# Secret scan settings (CI: .github/ci/check.py --secrets). Gitleaks' own rules, and two places that hold made-up
+# keys on purpose: the masking samples Claude's tools are tested against, and the Python tests' sample mail.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Made-up keys in tests and masking samples"
+paths = ['''config/mcp/mask_samples\.json$''', '''_test\.py$''']

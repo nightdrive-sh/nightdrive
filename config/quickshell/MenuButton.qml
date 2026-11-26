@@ -31,7 +31,7 @@ Item {
         width: parent.width
         height: 36
         radius: 18
-        color: area.containsMouse && b.usable ? Qt.lighter(Theme.sel, 1.3) : Theme.sel   // under the mouse just brighter
+        color: area.containsMouse && !MenuPointer.pointerAway && b.usable ? Qt.lighter(Theme.sel, 1.3) : Theme.sel   // under the mouse just brighter
         border { width: 1; color: b.navSelected ? Theme.primary : b.danger ? Theme.danger : Theme.border }
         opacity: b.usable ? 1 : 0.4
         Row {
@@ -47,6 +47,7 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: b.label
+                textFormat: Text.PlainText   // may hold a device's name (Ferry's "Sent to …"): never markup
                 color: b.fg
                 font { family: Theme.font; pixelSize: 13; weight: Font.Medium }
             }

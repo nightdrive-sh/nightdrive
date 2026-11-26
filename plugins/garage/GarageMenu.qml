@@ -7,7 +7,8 @@ import qs
 // A click on a stopped VM starts it, on a running or booting one brings its display forward; a running VM's row ends in
 // three icons, its display shown or hidden (garage-ctl hide: the VM runs on), Pause (Resume once paused, beside the word)
 // and Shut down. One booting up or shutting down says so beside pulsing dots, and a shutdown that doesn't happen (slow)
-// gets Force off. Open Garage opens the window, for the rest (new VMs, snapshots, settings).
+// gets Force off. Under them, Send the clipboard to each running VM (garage-ctl clip: onto its clipboard, to paste there;
+// #3117). Open Garage opens the window, for the rest (new VMs, snapshots, settings).
 Column {
     id: m
     width: parent ? parent.width : 320
@@ -47,13 +48,15 @@ Column {
     }
     // garage-ctl's error, if it fails, shows under the header. Its arguments as such, no shell between: a VM's name is a
     // folder's, which garage-ctl checks, but only once it runs
-    function act(action, name) {
+    // done: after it went well (the clipboard's row closes the menu then)
+    function act(action, name, extra, done) {
         const what = { start: "booting", stop: "stopping", pause: "paused", resume: "running" }[action]
         if (what) setPending(name, what)
         m.error = ""
-        const job = runner.createObject(m, { command: [m.ctl, action, name] })
+        const job = runner.createObject(m, { command: [m.ctl, action, name].concat(extra || []) })
         job.exited.connect(code => {
             if (code !== 0) { m.error = job.stderr.text.trim() || (action + " failed"); m.setPending(name, "") }
+            else if (done) done()
             m.refresh()
             job.destroy()
         })
@@ -65,7 +68,7 @@ Column {
         property string glyph
         signal clicked()
         width: 26; height: 26; radius: 5
-        color: hit.containsMouse ? Theme.hover : "transparent"
+        color: hit.containsMouse && !MenuPointer.pointerAway ? Theme.hover : "transparent"
         Text {
             anchors.centerIn: parent
             text: Icons.g(parent.glyph)
@@ -186,6 +189,26 @@ Column {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // The host's clipboard onto a running VM's, to paste there with its own keys (its window getting the keyboard does
+    // the same by itself, unless turned off in its Settings)
+    Column {
+        width: parent.width
+        spacing: 2
+        topPadding: 6
+        visible: sends.count > 0
+        Repeater {
+            id: sends
+            model: m.vms.filter(v => m.stateOf(v) === "running")
+            delegate: MenuRow {
+                required property var modelData
+                width: m.width
+                icon: "clipboard-paste"
+                label: "Send the clipboard to " + modelData.name
+                onClicked: m.act("clip", modelData.name, ["--clipboard"], () => m.close())
             }
         }
     }

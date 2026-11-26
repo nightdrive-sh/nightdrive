@@ -1,0 +1,100 @@
+#!/usr/bin/python3 -I
+"""A notification when a Nightdrive service keeps failing (#3313; the rules are in unit_failed.py).
+
+  unit-failed UNIT              after UNIT failed: counts it, and notifies when it has failed again and again
+                                (nightdrive-unit-failed@UNIT.service runs it, from the unit's OnFailure=)
+  unit-failed list [--json]     the units failing now: --json {units: [{unit, count, since, last, notified}]}
+  unit-failed notice UNIT SUMMARY BODY
+                                the notification, waiting for its button (a process of its own)
+
+A unit gets this with `OnFailure=nightdrive-unit-failed@%n.service` in its [Unit] (plugins/README.md › Services).
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import unit_failed as uf  # noqa: E402
+
+SELF = os.path.realpath(__file__)
+TERMINAL = os.path.join(os.path.dirname(SELF), "terminal")
+ICON = "lucide:alert-triangle"
+
+
+def handle(unit):
+    now = time.time()
+    network = uf.needs_network(unit)
+    counted = uf.online() if network else True
+    with uf.locked():
+        state = uf.prune(uf.load(), now)
+        entry = uf.record(state.get(unit), now, uf.last_success(unit), counted)
+        notify = counted and uf.due(entry, now, network)
+        if notify:
+            entry["notified"] = now
+        state[unit] = entry
+        uf.save(state)
+    if notify:
+        summary, body = uf.message(unit, entry, now, uf.show(unit, "Description"), uf.last_error(unit))
+        spawn(["notice", unit, summary, body])
+    print(f"{unit}: {entry.get('count', 0)} in a row" + ("" if counted else " (offline: not counted)")
+          + (", notified" if notify else ""))
+
+
+def spawn(args):
+    """The notification waits for its button in a unit of its own: this oneshot service ends at once, and would take
+    a child of its own with it. So wait for systemd-run (it returns once the unit is there): left running, it was
+    killed with the service before it got there (seen in the test container)."""
+    cmd = [sys.executable, "-I", SELF] + args
+    quiet = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if shutil.which("systemd-run"):
+        try:
+            if subprocess.run(["systemd-run", "--user", "--collect", "--quiet", "--"] + cmd, timeout=20,
+                              **quiet).returncode == 0:
+                return
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    subprocess.Popen(cmd, start_new_session=True, **quiet)
+
+
+def notice(unit, summary, body):
+    cmd = ["notify-send", "-a", "Nightdrive", "-i", ICON, "-h", f"string:x-dunst-stack-tag:unit-failed-{unit}",
+           "-w", "-A", "default=Show the log", "--", summary, body]
+    try:
+        pressed = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True).stdout.strip()
+    except OSError:
+        return
+    if pressed == "default":
+        subprocess.Popen([TERMINAL, "--class", "floating-tui", "--", "journalctl", "--user", "-e", "-n", "500",
+                          "-u", unit], start_new_session=True)
+
+
+def listing(as_json):
+    state = uf.load()
+    rows = [dict(unit=u, **{k: e.get(k) for k in ("count", "since", "last", "notified")})
+            for u, e in sorted(state.items()) if e.get("count")]
+    if as_json:
+        print(json.dumps({"units": rows}))
+        return
+    now = time.time()
+    for r in rows:
+        print(f"{r['unit']}: failed {r['count']} times in a row since {uf.when(r['since'], now)}")
+    if not rows:
+        print("No Nightdrive service is failing.")
+
+
+def main(argv):
+    if argv[:1] == ["list"] and set(argv[1:]) <= {"--json"}:
+        listing("--json" in argv)
+    elif argv[:1] == ["notice"] and len(argv) == 4:
+        notice(*argv[1:])
+    elif len(argv) == 1 and not argv[0].startswith("-") and argv[0] not in ("list", "notice"):
+        handle(argv[0])
+    else:
+        sys.exit(__doc__.split("\n\n")[1])
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

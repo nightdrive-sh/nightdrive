@@ -39,8 +39,9 @@ set -euo pipefail
 repo=$(cd "$(dirname "$0")" && pwd)
 # Part of Nightdrive like Claude Code, so not asked: Tailscale is quiet until it's logged in, Apostrophe opens the .md
 # files (Welcome's do-it-yourself path shows the apps' READMEs in it). Nightdrive's own apps (group app in plugin.conf:
-# Mail, Contacts, Deck, Ferry) are too, Mail and Contacts quiet until their accounts are set up, Ferry until Tailscale
-# is (its server listens on 127.0.0.1 only). Folders in plugins/, so their packages and services stay out of the core.
+# Mail, Contacts, Deck, Ferry, Notes, Tasks, Calendar) are too, Mail, Contacts and Calendar quiet until their accounts
+# are set up, Ferry until Tailscale is (its server listens on 127.0.0.1 only). Folders in plugins/, so their packages
+# and services stay out of the core.
 ALWAYS=(tailscale apostrophe)
 machine=""; nvidia=1; secureboot=0; greeter=1; autologin=1; splash=1; dry=0; choose=0; remove=1   # machine: "" = detected
 base=""; with=""; without=""; keyboard=""   # base: all | none | defaults, "" = the defaults
@@ -130,6 +131,10 @@ case $machine in
 esac
 # The machine's own packages (packages-pc.txt, packages-asahi.txt; a VM has none)
 own_pkgs=$repo/packages-$machine.txt; [[ -f $own_pkgs ]] || own_pkgs=""
+# Under QEMU/KVM (Garage, GNOME Boxes, virt-manager, UTM) its guest agent, which Fedora Minimal lacks: without it the host
+# can't shut the VM down (the power button it falls back to is Nightdrive's to ignore) or set its clock (#1577)
+guest_agent=0
+[[ $(systemd-detect-virt --vm 2>/dev/null) == @(qemu|kvm) ]] && ! rpm -q qemu-guest-agent >/dev/null 2>&1 && guest_agent=1
 
 # --- What Fedora Minimal leaves as a server's (Fedora KDE has the desktop's): done after the packages ---
 # It starts to a text console (multi-user.target), where no login screen starts
@@ -236,6 +241,7 @@ if (( dry )); then
   (( kb_ask )) && echo "Would ask for the keyboard layout (still Asahi Minimal's us)"
   [[ -z $kb_set ]] || echo "Would set the keyboard layout: $kb_set"
   (( to_graphical )) && echo "Would boot to the login screen: systemctl set-default graphical.target"
+  (( guest_agent )) && echo "Would install qemu-guest-agent (a QEMU/KVM virtual machine: the host's shutdown and clock)"
   (( greeter || other_dm )) || echo "Would make greetd's text login the login screen (--no-greeter, no other login screen here)"
   (( fw_desktop )) && echo "Would give the firewall the desktop's settings: the FedoraWorkstation zone, firewalld's desktop polkit rule"
   (( ssh_preset )) && echo "Would turn SSH off (on by Fedora Minimal's preset) unless Remote login looks after it already"
@@ -286,6 +292,12 @@ if [[ -n $own_pkgs ]]; then
   sudo dnf install -y --skip-unavailable $(pkgs "$own_pkgs")
   keep=$(installed $(pkgs "$own_pkgs" | tr ' ' '\n' | grep -v '^@'))
   [[ -z $keep ]] || sudo dnf mark user -y $keep >/dev/null
+fi
+if (( guest_agent )); then
+  echo "==> QEMU guest agent (a virtual machine: the host shuts it down and sets its clock through it)"
+  sudo dnf install -y qemu-guest-agent
+  # udev starts it when the host's channel (virtio-port org.qemu.guest_agent.0) is there; started now for this boot
+  sudo systemctl start qemu-guest-agent.service 2>/dev/null || true
 fi
 # The system locale's languages (localectl: LANG and the LC_ ones, e.g. fi_FI's times with en_US's messages). The
 # netinstall installs only the language picked there; Asahi's image has them all (glibc-all-langpacks)
@@ -395,6 +407,14 @@ echo "==> logind: F6 (KEY_SLEEP) is do not disturb, the power button opens the p
 sudo install -Dm644 "$repo/config/system/logind-ignore-sleep-key.conf" /etc/systemd/logind.conf.d/50-ignore-sleep-key.conf
 sudo install -Dm644 "$repo/config/system/logind-power-key.conf" /etc/systemd/logind.conf.d/50-power-key.conf
 sudo systemctl kill -s HUP systemd-logind
+
+echo "==> NetworkManager: the connectivity check \"No internet\" follows (config/system/nm-connectivity.conf)"
+sudo install -Dm644 "$repo/config/system/nm-connectivity.conf" /etc/NetworkManager/conf.d/90-nightdrive-connectivity.conf
+sudo nmcli general reload conf 2>/dev/null || true
+
+echo "==> inotify: 1024 instances per user, not 128, or programs fail to start with EMFILE (config/system/sysctl-inotify.conf)"
+sudo install -Dm644 "$repo/config/system/sysctl-inotify.conf" /etc/sysctl.d/60-nightdrive-inotify.conf
+(( $(sysctl -n fs.inotify.max_user_instances) >= 1024 )) || sudo sysctl -q -p /etc/sysctl.d/60-nightdrive-inotify.conf
 
 # Fedora Minimal's firewall is a server's (see fw_desktop above). The desktop's, as on Fedora KDE: the FedoraWorkstation
 # zone, which lets in ports 1025–65535 (LocalSend, AirPlay, mDNS; Remote login's zone copies it), and polkit's desktop

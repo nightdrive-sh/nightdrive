@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Tasks' app icon: Lucide's list-checks as a neon sign, made like Mail's and Contacts' (near black, a glow under the
+       line) in pink and violet, apart from Contacts' green and Mail's cool colours -->
+  <defs>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ad9"/><stop offset=".5" stop-color="#c47bff"/><stop offset="1" stop-color="#7b8cff"/></linearGradient>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="#16141f"/>
+  <g transform="translate(76 76) scale(15)" fill="none" stroke="url(#neon)" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="2.2" filter="url(#glow)">
+      <path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8"/>
+    </g>
+    <g stroke-width="1.5">
+      <path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8"/>
+    </g>
+  </g>
+</svg>

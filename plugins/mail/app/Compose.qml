@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs
 import qs.kit
+import "recipients.js" as Recipients
 
 // Writing a message, in the reading pane's place: To, Cc, Subject and the text, nothing else.
 Item {
@@ -83,6 +84,9 @@ Item {
     }
     function detach(i) { attachments = attachments.filter((p, j) => j !== i) }
     property string draftId: ""         // the copy in Drafts, replaced by each save
+    // The copy is only one saved while writing (AutoSave.qml), not with ⌘S or taken up from Drafts: Esc still asks,
+    // and throwing the message away takes it out of Drafts too.
+    property bool autoSaved: false
 
     // The quote a reply starts with, and what was written above it (without the signature, which stays where it is).
     function quoteRe() { return /\n*On .* wrote:\n(>.*(\n|$))*\s*$/ }
@@ -115,11 +119,12 @@ Item {
         body.text = t.slice(0, at) + (signature ? "\n\n" + signature : "") + t.slice(at + len)
     }
 
-    // Esc: a saved draft is saved again and closed. Unsaved writing asks once more, as Esc drops it.
+    // Esc: a saved draft is saved again and closed. Unsaved writing asks once more, as Esc drops it (with the copy
+    // saved while writing).
     property bool armed: false
     Timer { id: disarm; interval: 3000; onTriggered: { root.armed = false; if (!root.failed) root.status = "" } }
     function escPressed() {
-        if (draftId !== "") { save(fields(), true); return }
+        if (draftId !== "" && !autoSaved) { save(fields(), true); return }
         if (untouched() || armed) { armed = false; dismiss(); return }
         armed = true; failed = false
         status = "Esc again to throw it away, ⌘S saves it"
@@ -140,6 +145,9 @@ Item {
         draftId = f.draft_id || ""; forwardId = ""; attachments = f.attachments || []
         status = ""; failed = false; busy = false; armed = false
         showCc = cc.text !== ""
+        // Set text leaves the cursor at its end, which scrolls a long To or Cc to its last address and hides the
+        // first ones, as if a name had lost its start (#3593): each shows from the start.
+        to.cursorPosition = 0; cc.cursorPosition = 0; subject.cursorPosition = 0
         if (to.text === "") to.forceActiveFocus()
         else { body.cursorPosition = 0; body.forceActiveFocus() }
         scroller.contentY = 0
@@ -165,8 +173,8 @@ Item {
         Layout.fillWidth: true
         spacing: 0
 
-        // The address being typed: what follows the last comma.
-        function token() { return inp.text.slice(inp.text.lastIndexOf(",") + 1).trim().toLowerCase() }
+        // The address being typed: what follows the last comma outside a quoted name ("Virtanen, Aino", #3593).
+        function token() { return Recipients.typed(inp.text) }
         function complete() {
             const t = token()
             const have = inp.text.toLowerCase()
@@ -176,7 +184,7 @@ Item {
             pick = 0
         }
         function accept(i) {
-            const head = inp.text.slice(0, inp.text.lastIndexOf(",") + 1)
+            const head = Recipients.before(inp.text)
             inp.text = (head ? head + " " : "") + matches[i].nameAddr + ", "
             inp.cursorPosition = inp.text.length
             matches = []
@@ -195,10 +203,14 @@ Item {
                 activeFocusOnTab: true
                 clip: true
                 onTextEdited: f.complete()
-                onActiveFocusChanged: if (!activeFocus) f.matches = []
+                // Left, a long line shows from its start again, not scrolled to where the cursor was; and so when
+                // it gets its width, as a hidden Cc row filled while 0 wide stayed scrolled to its end (#3593)
+                onActiveFocusChanged: if (!activeFocus) { f.matches = []; ensureVisible(0) }
+                onWidthChanged: if (!activeFocus) ensureVisible(0)
                 // With completions open, Esc closes them instead of the window, and Tab or Enter takes the chosen one.
                 Keys.onShortcutOverride: e => { if (f.matches.length && e.key === Qt.Key_Escape) e.accepted = true }
                 Keys.onPressed: e => {
+                    if (pasteFiles.key(e, inp)) return
                     if (!f.matches.length) return
                     if (e.key === Qt.Key_Down) f.pick = (f.pick + 1) % f.matches.length
                     else if (e.key === Qt.Key_Up) f.pick = (f.pick + f.matches.length - 1) % f.matches.length
@@ -264,7 +276,7 @@ Item {
             anchors.centerIn: parent
             spacing: 8
             // In a narrow window the keys go: with them the buttons are wider than the form and push it past the edge
-            KeyCap { visible: root.width >= 560; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: a.hint; tint: root.c.faint }
+            KeyCap { visible: root.width >= 560; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: a.hint }
             Text { id: t; anchors.verticalCenter: parent.verticalCenter; color: a.tint; font.family: root.c.font; font.pixelSize: 12 }
         }
     }
@@ -371,6 +383,7 @@ Item {
                 color: root.c.body; font.family: root.c.font; font.pixelSize: 14
                 selectionColor: root.c.sel; selectByMouse: true
                 activeFocusOnTab: true
+                Keys.onPressed: e => pasteFiles.key(e, body)
                 // Keep the caret in view while typing past the bottom.
                 onCursorRectangleChanged: {
                     const r = cursorRectangle
@@ -404,6 +417,9 @@ Item {
             Action { text: "Send"; hint: "ctrl ⏎"; tint: root.c.accent; onClicked: root.send(root.fields()) }
         }
     }
+
+    // Files pasted are attached too (Files' ⌘C), and text pastes as text.
+    readonly property PasteFiles pasteFiles: PasteFiles { composer: root }
 
     // Files dropped from a file manager are attached.
     DropArea {
@@ -524,7 +540,7 @@ Item {
                     spacing: 18
                     Row {
                         spacing: 8
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "r"; tint: root.c.faint }
+                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "r" }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: consent.more ? "Back" : "Read more"; color: moreHover.hovered ? root.c.accent : root.c.dim
@@ -535,12 +551,12 @@ Item {
                     }
                     Row {
                         spacing: 8; visible: !consent.more
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "↑ ↓  ⏎"; tint: root.c.faint }
+                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "↑ ↓  ⏎" }
                         Text { anchors.verticalCenter: parent.verticalCenter; text: "Choose"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 12 }
                     }
                     Row {
                         spacing: 8; visible: !consent.more
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc"; tint: root.c.faint }
+                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc" }
                         Text { anchors.verticalCenter: parent.verticalCenter; text: "Write without Claude"; color: root.c.faint; font.family: root.c.font; font.pixelSize: 12 }
                     }
                 }

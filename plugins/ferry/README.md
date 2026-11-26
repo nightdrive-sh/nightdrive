@@ -4,13 +4,13 @@ A mailbox between your computers and your phone: leave photos, files, text or a 
 
 ![Ferry's menu in the top bar](ferry.jpg)
 
-Ferry is an app of its own, for Linux, the Mac and the iPhone, and comes with Nightdrive: the release Nightdrive pins, checked against its sha256 before it's installed, with its menu in the top bar; `nightdrive update` updates it too (removed, `nightdrive apps install ferry` brings it back). Welcome to Nightdrive sets it up after Tailscale. ⌘⇧T tiles its window. A Ferry from before, when the plugin had its own server, moves over with its phones and its box.
+Ferry is an app of its own, for Linux, the Mac and the iPhone, and comes with Nightdrive: the release Nightdrive pins, checked against its sha256 before it's installed, with its menu in the top bar; `nightdrive update` updates it, and Ferry doesn't offer its own update past that release (removed, `nightdrive apps install ferry` brings it back). Welcome to Nightdrive sets it up after Tailscale. ⌘⇧T tiles its window. A Ferry from before, when the plugin had its own server, moves over with its phones and its box.
 
 ## On the computer
 
-- The menu lists what your other devices sent: a click copies a text or opens a file, and a file drags out into another app.
+- The menu lists what your other devices sent: a click copies a text or opens a file, and either one drags out into another app (a text as plain text; a code or a password without showing it).
 - **Aa**, **Send Clipboard** and **+** send a text, the clipboard or files to the device in the pill above them. Click the pill to pick another device or add one. Files dragged over the menu can be dropped on any device's tile, or on the inbox icon in the top bar for the picked one.
-- A send to a phone waits in the box until that phone picks it up. A send to another computer goes straight there (not while it's asleep), and Send Clipboard puts it on that computer's clipboard.
+- A send to a phone waits in the box until that phone picks it up. A send to another computer goes straight there, and Send Clipboard puts it on that computer's clipboard. While that computer is asleep or off, the send waits at the top of the menu (Waiting for … · 3 d left) and goes once it's back, for 3 days at most; its × cancels it.
 - What arrives goes to Downloads, with a notification. The phone's Send Clipboard lands on the clipboard too.
 - Everything leaves the box after 7 days, a code or a password after 15 minutes or as soon as it's copied. Codes and passwords stay out of notifications and the clipboard history.
 - **Settings** (beside Clear) forgets a device on all your devices: click it twice. Add it back with Add Device.
@@ -44,9 +44,16 @@ ferry enable
 | `ferry get [n]` | An item from the phone (the newest without a number): a text printed, a file saved here |
 | `ferry open <n>` | Opens a file |
 | `ferry copy <n>` | Copies a text |
+| `ferry rm <n>` | Takes an item out of the box, or cancels a send that waits |
 | `ferry qr` | The page's QR code, for adding a phone |
 
-A new Ferry release reaches Nightdrive once `plugins/ferry/pin` has written its tag and sha256 to `release.conf` and that is committed. `FERRY_FROM=<a Ferry checkout's linux/>` installs one that isn't pinned (`plugins/ferry/install.sh`).
+A new Ferry release reaches Nightdrive once `plugins/ferry/pin` has written its tag and sha256 to `release.conf` and that is committed; `nightdrive release` warns when the pin is behind Ferry's latest release. `FERRY_FROM=<a Ferry checkout's linux/>` installs one that isn't pinned (`plugins/ferry/install.sh`).
+
+## Claude
+
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Ferry), Claude can read what's in the box and which devices there are, and send files or a text to a device only after you allow it on Nightdrive's card, which names the device as Ferry finds it, and whether it is online. It doesn't delete anything.
+
+Claude sends only files in your home folder, by the same rules as its file tools: only from the folders Settings › Claude › Access › Apps and files lets it use (a link counts where it points), nothing hidden (no part of the path starting with a dot, so not `~/.ssh` or settings), no link that leads out of home or into a hidden folder, and not home itself or its own folders (Downloads, Documents…) whole. A folder sends its files, leaving out hidden ones and folders linked into it. One path that breaks a rule stops the whole send, with the reason. The card also says how many files go and how big they are together (Sends: 3 files, 4.2 MB), and nothing is sent if that has changed by then. `nightdrive files check PATH…` lists what a send would take.
 
 ## Privacy
 

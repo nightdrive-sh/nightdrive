@@ -2,11 +2,13 @@
 
 ## Apps
   Hyper              Caps Lock: Hyper + a letter opens an app (below); your own: Launcher › Settings › Apps › App shortcuts
-  ⌘ Enter            Terminal
-  ⌘ ⌥ Enter          Claude Code (with text typed in the Launcher: sends it as the prompt)
+  ⌘ Enter            Terminal (in the Launcher with text typed: Ask Claude, as ⌘⌥Enter; on the Ask Claude row or its toast: Claude Code in a terminal)
+  ⌘ ⌥ Enter          Ask Claude: the text typed in the Launcher, with Nightdrive's tools (without text: Claude Code in a terminal)
+  ⌘ ⌃ Enter          Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt)
   ⌘ Space            Launcher (↑↓ select, Enter open, Esc close; on an app ⌃Enter adds/removes it in Apps, ⌥Enter starts it at login)
+  ⌘ ⌥ Space          Ask Claude: opens or closes its toast in the Launcher's place, with the conversation
   Hyper B / ⌘ ⇧ Enter  Browser (the default apps: Launcher › Settings › Apps › Default apps)
-  Hyper F            Files
+  Hyper F            Files: a new window, home
   Hyper E            Email
   F8 (play)          Play/pause {!deck}
   Hyper W            WhatsApp {whatsapp}
@@ -15,7 +17,7 @@
   Hyper Y            YouTube {youtube}
   ⌘ Esc / F3         Notifications (history, do not disturb)
   ⌘ Ctrl L           Lock screen
-  ⌃ ⌥ F3             Lock screen, and brings back a lock that died (Hyprland's "lockscreen app died" screen)
+  ⌃ ⌥ F3             Lock screen; replaces a lock that died or broke (Hyprland's "lockscreen app died" screen)
   ⌘ ⇧ Space          Top bar by keyboard (←/→ menu, ↑/↓ row, Enter select, Esc close)
   ⌘ ⇧ K              This help
 
@@ -34,45 +36,56 @@
   ⌘ ⌃ C              Send to Claude: the selected text or files, or the clipboard's picture, to a Claude Code session's prompt, not sent (a preview and the sessions first; a new one too)
 
 ## Windows
-  ⌘ W                Close window; background apps (Deck, WhatsApp, Slack, 1Password…) are only hidden and keep running, with a green dot in the Launcher (their shortcut brings them back)
+  ⌘ W                Close window; background apps (Deck, WhatsApp, Slack, 1Password…) are only hidden and keep running, with a green dot in the Launcher (their shortcut brings them back). A fullscreen window (a game) closes only with a second ⌘W within 2 s; the same for ⌘Q
   ⌘ Q                Quit the app for real: closes all its windows, and an app left running in the tray is asked to quit too (also the background apps; in Deck `q` does the same)
   ⌘ ⇧ U              Reopen the window closed with ⌘W, where it was; again: the one before it (up to 10). A terminal opens in the same folder, Claude Code in the same conversation, editors start again (hypr/reopen-commands)
   ⌘ ⇧ F              Fullscreen
-  ⌘ ⇧ T              Tile or float the window; a floating one goes to the centre (Deck: tiled → floating at start size in the centre; moved → back to centre; already there → tiles)
+  ⌘ ⇧ T              Tile or float the window; a floating one goes to the centre, a small or screen-sized tile at 70 % of the screen (Deck: tiled → floating at start size in the centre; moved → back to centre; already there → tiles)
   ⌘ ⇧ J              Toggle split direction (vertical/horizontal)
-  ⌘ arrows           Move focus between windows
+  ⌘ arrows           Move focus between windows; a group of tabs (a project manager's sessions) is one window
+  ⌃ ⌥ ⌘ ← / →       Previous / next tab of a group of tabs
   ⌥ Tab / ⌥ ⇧ Tab    Next / previous window of the same app (on any workspace)
+  Hyper ← / →        Previous / next Claude Code session, in the sessions bar's order (on any workspace; the bar may be off)
+  Hyper ↑ / ↓        Previous / next lead in that order: a session that opened others (a project manager, say)
+  Hyper 1 … 9        The first … ninth Claude Code session in that order (a session's card in the bar shows its key)
   ⌘ ⇧ arrows         Move window
+  ⌘ ⇧ G             Make the window a group of tabs, or break its group up
+  ⌘ ⌥ ⇧ arrows       Move the window into the group (or window) that way; with none there, out of its own group
   ⌘ + mouse drag     Move window / right button: resize
+  ⌘ ⌥ − / ⌘ ⌥ +      Window narrower / wider (5 % of the screen; held, it repeats). US keyboard: ⌘ ⌥ =; the keypad's − / + too
   ⌘ + drag           A top bar icon: move it (the order is kept; also Launcher › Settings › Top bar › Items)
   ⌃ ⌘ + click       A link: the window it opens floats in the centre (not a link that opens in a tab)
   ⌘ ⌥ ← / →         Previous / next tab (any app: sends Ctrl+PageUp/PageDown)
   ⌃ ⌘ ← / →         Back / forward (browsers, web apps, Nautilus)
   ⌥ ← / →           Move by word (⇧ selects)
+  ⌥ ↓ / ⌥ ↑          Files: open the selected folder / go to the parent folder
 
 ## Workspaces (like macOS Spaces)
   ⌘ 1 … ⌘ 0          Go to workspace (⌘ 0: the laptop's own screen, with an external display)
-  ⌘ ⇧ 1 … ⌘ ⇧ 0      Move window to workspace
-  ⌘ ⌥ 1 … ⌘ ⌥ 0      Move all windows to workspace (and go there). These three and ⌘ ⇧ F also work over a VM's window, which otherwise takes every key
+  ⌘ §              Go to the second external display's workspace (⌘ ⇧ § / ⌘ ⌥ ⇧ §: move the window / all windows there)
+  ⌘ ⇧ 1 … ⌘ ⇧ 0      Move window to workspace (a tab alone: out of its group, the rest stay)
+  ⌘ ⌥ ⇧ 1 … ⌘ ⌥ ⇧ 0  Move all windows to workspace (and go there). These three and ⌘ ⇧ F also work over a VM's window, which otherwise takes every key
   ⌘ Tab / ⌘ ⇧ Tab    Next / previous workspace
   3-finger swipe     Switch workspace
   4-finger swipe     Move window in the swipe direction
   ⌘ D                Drawer: show / hide (slides up over the windows)
   3-finger swipe ↑ ↓ Drawer: show / hide
-  ⌘ ⇧ D              Put the window in the drawer / take it back out
+  ⌘ ⇧ D              Put the window in the drawer / take it back out (a tab alone, out of its group; back on its workspace, into the group again)
 
 ## Screenshots
   ⌘ ⇧ S              Region to the clipboard
   ⌘ ⌥ S              Window to the clipboard (click the window)
   ⌘ ⌥ ⇧ S            Whole screen to the clipboard (Save in the notification keeps a copy in Downloads)
-  ⌘ Space → Tools › Screenshot   Region, window or whole screen (saved to a file and the clipboard)
+  ⌘ ⌃ S              Text in a region to the clipboard (OCR; no picture is kept)
+  ⌘ Space → Tools › Screenshot   Region, window or whole screen (saved to a file and the clipboard), or Text
 
 ## Other
   ⌘ ⌫ / Delete in Settings › Background   Delete the selected own background (press twice; moves it to the trash)
-  Top-row keys       Volume, screen brightness (F1/F2); keyboard backlight = ⌘F1/⌘F2
+  Top-row keys       Volume, screen brightness (F1/F2, 5 % steps); keyboard backlight = ⌘F1/⌘F2
   F3                 Notification center (hamburger menu)
   F4                 Launcher (like ⌘Space)
   F5 / Fn / Insert   Dictation, held: speak, let go to type it (F5 or Fn on a Mac, Insert on a PC)
+  ⌘ ⇧ F5 / Fn / Insert   Dictation to Ask Claude, held: let go and it's sent, a small card shows the answer (into the field when its toast is open)
   ⌘ F5              Mic on/off (toast)
   F6                 Do not disturb (hides notifications, toast shows state)
   ⌃ + click          In the terminal: a link, or a file or folder path in the output (Claude Code's too): a folder in Files, a file in the code editor at its line (file.py:42)

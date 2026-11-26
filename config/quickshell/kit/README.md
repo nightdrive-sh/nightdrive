@@ -15,19 +15,42 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | Part | What it is |
 |---|---|
 | `AppLook` | The colours: the desktop's theme, with the terminal's background behind the window and a few shades from it |
-| `AppSidebar` | The sidebar: the app's name (`AppTitle`) level with the view's header, a column of rows, a line on its right |
+| `AppSidebar` | The sidebar: the app's name (`AppTitle`) level with the view's header, a column of rows, a line on its right; `titleItems` at the title's right (`titleHovered`: Mail's gear shows only then); `headerLine` a line under the header, level with the view's (a search there: Notes) |
+| `AppAccountBar` | The accounts at the sidebar's foot under a line: each one's label and count, a click picks one (`picked`); one account is its label alone |
 | `AppTitle` | The app's name with the wordmark's block cursor: "Mail█" |
 | `AppNavRow` | A row of the sidebar: glyph, name, count; `selected`, `dropTarget`, `active` (the keyboard is in the sidebar) |
-| `AppPointer` | In the window's RowLayout: the pointer moving hides the keys' frame (`c.keyboard`: the app's key handlers call `c.moved(e)`, which only Tab and the arrows turn on) |
-| `AppRow` | A list row's ground, for a `ListView` delegate: `selected`, `marked` (the keyboard's place, list not focused), `active` (the keys are here: a frame) |
+| `AppPointer` | In the window's RowLayout: the pointer moving hides the keys' frame (`c.keyboard`: the app's key handlers call `c.moved(e)`, which only Tab and the arrows turn on) and brings back the hover colour any key put away (`c.pointerAway`: `AppRow`, `AppNavRow`) |
+| `AppRow` | A list row's ground, for a `ListView` delegate: `selected`, `marked` (the keyboard's place, list not focused), `checked` (marked for what the keys do next, as Files' marked files: a bar in the theme's colour, `c.checked`, stronger when also selected), `active` (the keys are here: a frame) |
 | `AppButton` | A framed button with a glyph and a label (Play, New list); `strong`, `on`, a tip with its key (`tipAlign`) |
+| `AppBarButton` | A frameless button of the bar over a view (Mail's message, Notes' note): glyph and name, dim until hovered; `strong` for what Enter does; `compact` keeps the glyph alone, `glyphSize` (14) for a bar of glyphs alone, a tip with its key (`tipAlign`) |
 | `AppIconButton` | A glyph-only button (Back, Settings) with a tip (`tipSide`, `tipAlign`) |
+| `AppSegments` | One of a few that go together as one framed switch (Week \| Month): `options` `[{ label, glyph, tip, keys }]`, `current`, `picked(i)`; the fill slides to the picked part, `compact` shows the glyphs |
 | `AppSearchField` | The search glyph and a field; Return, ↓ and Esc come out as signals |
-| `AppPanel` | A card over the dimmed window (settings, a question, a first start); a click outside comes out as a signal |
+| `AppPanel` | A card over the dimmed window (settings, a question, a first start); a click outside comes out as a signal. Never taller than the window: its content scrolls, and its last row of `AppPanelButton`s stays in sight under it |
+| `AppPanelButton` | A panel's answer (Create, Cancel): its keys in the theme colour, then the word; `strong` for the one Return gives |
+| `AppConfirm` | A yes-or-no `AppPanel` before what can't be undone: `question`, `detail`, `action`; Return yes, Esc no; `other` a second answer on Ctrl+Return (`otherChosen`) |
+| `AppPrompt` | An `AppPanel` that asks for a name: `ask(title, initial, then, pickTo)`, the text picked (only up to `pickTo` when given: a name without its suffix); `then` gets it trimmed |
+| `AppMenu` | A small menu floating at a row, with a search over its rows (Files' Open with), no scrim: `open(anchor, items)` with `[{ text, detail, icon, section }]` (icon a theme name or a path, section a heading), `title`, `hint` with `hintKeys` as caps before it; ↑ ↓, ⏎ or a click `picked(item, modifiers)`, Esc or a click outside `closed()`. Drawn over the window, under the anchor or above it, inside the edges |
+| `AppField` | A labelled text field in a frame for the panels, with a `hint` ("GB"); typing into a read-only one comes out as `refused`; `keyFilter` sees each key first, for a part built on it |
+| `AppDatePicker` | An `AppField` for a day, the region's way (5.11.2026, 11/5/2026), typed or picked from a month grid (`AppMonthGrid`) that opens on a click, its calendar glyph or ↓: ← → a day, ↑ ↓ a week, PgUp PgDn a month, ⏎ picks, Esc closes. `day` is the text read back ("YYYY-MM-DD", "" when unreadable; a day without its year takes `base`'s), `set(day)`, `picked(day)`. The grid is drawn over the window, below or above the field, its days lower in a low window, so a scrolling panel doesn't cut it |
+| `AppMonthGrid` | A month of six weeks in the region's week order, the month's name between its arrows: `cursor` (the keys' day, its month shown), `picked`, `clicked(day)`, `monthMoved(n)`. Holds no keys: `AppDatePicker`'s field does |
+| `AppTextArea` | A labelled text of a few lines in a frame (a task's note): ⏎ a new line, Ctrl+⏎ `save`, Tab the next field |
+| `AppChips` | One of a few as chips in a row (the list a task goes in): `options` `[{ id, name, color? }]`, `picked`; ← → move it |
+| `AppCheck` | A box to tick and its word (Important): `on`, Space or a click turns it (`toggled`), ⏎ `accepted` |
+| `AppNote` | What went wrong, at the foot of the page, in the danger colour, until ✕; two lines at most |
+| `AppToast` | What just happened, in a rounded card at the top of the window: `show(text, { sticky, danger, duration, action, run })`, or several buttons with `actions: [{ label, run }]` (Open, Show in folder), gone after 4 s (a failure 8 s, one with an action such as Undo 7 s), sticky until the next; a click dismisses it, `act()` runs the first action for a key (⌘Z) |
 | `AppKeyAction` | A key in a box and a word to click: "⏎ Set up with Claude" |
-| `Tip` | A button's tip: what it does and its key |
-| `KeyCap` | Keys in boxes: "⌘N  c" |
+| `AppAudio` | Plays a sound file through ffmpeg into PipeWire, no visuals: `path`, `duration` (the caller knows it), `app` and `title` (its names in the Sound menu); `play()`, `pause()`, `toggle()`, `seek(t)`, `skip(d)`, `stop()`, `command(file, from)` (its ffmpeg arguments), `position`, `progress`, `playing`, `failed(text)`; pause, a seek and a new path stop ffmpeg at once (SIGKILL). Recorder's player, Inbox's sound files, Files' previews |
+| `Tip` | A button's tip: what it does and its key; shown, it draws over the whole window and stays inside it |
+| `Spinner` | A turning glyph while something runs in the background (Mail's fetch), shown at least a moment; a tip says what runs |
+| `KeyCap` | Keys as caps: "⌘N  c" is [⌘][N] [c] (`or`: a "/" between the alternatives); `tint` colours them, `capSize` (22) makes them smaller |
+| `Key` | One key cap, Raycast's way: a square a little lighter than its ground, a name (esc, HYPER) wider. The launcher uses it too (`import qs.kit as Kit`) |
 | `KeySheet` | The window's keys, on ? and Ctrl+? |
+| `Regional` | Dates and times the user's way (Settings › Region, `regions.json`): `format(dateOrIso, "short" \| "day" \| "medium" \| "long" \| "time" \| "month")` (3.11.2026, Tue 3 November 2026; 11/3/2026 in the US), `time("14:30")`, `relative(date)` (a list's "when": the time today, Yesterday, the weekday this week, then the day: 9:30, Tue, 28.10.), `range(a, b)` ("2 – 8 Nov 2026"), `parse(text, baseIso)` and `parseTime(text)` back to "YYYY-MM-DD" and "HH:MM" ("" when unreadable), `weekStart`, `weekdays`, `h24`, `example`. Names stay English. A singleton over `Dates.js`, whose pure functions take the region as an argument |
+| `Markdown.js` | Markdown as HTML for a rich-text `Text` in the theme's colours: `html(md, c)` (headings, lists and task boxes as `box:N` links, quotes, code, rules, pipe tables in `MarkdownTable.js`, bold, italic, links, #tags as `tag:NAME` links); HTML in it shows as text, and only web and mail links are links. `mark(html, words, c)` marks a search's words. Notes' reading view, Inbox's messages; tests in `markdown_test.py` |
+| `Scroll.js` | Touchpad scrolling the macOS way, for `TouchScroll.qml` (the desktop's, which every app links and puts in each `ListView` or `Flickable`): slow fingers move the content pixel for pixel, quick swipes further, it glides after a lift and stops when the fingers move again; a mouse wheel keeps Qt's own. Every tunable value is in its `TUNING`; tests in `scroll_test.py` |
+| `region.py` | The same region for an app's Python (notifications, a command's output): `current()` (the region's entry: `short`, `day`, `time`…), `fmt(date, pattern)`. Found through the app's `app/kit` link (`sys.path`), as Tasks' and Calendar's `lib` do |
+| `keyring.py` | Whether the login keyring is locked, for a sync's `ExecCondition` (exit 0 when locked; `is_locked()` from Python), so a password command doesn't pop up gnome-keyring's prompt before the login. Run as `python3 "$APP_DIR/app/kit/keyring.py"` (Mail's, Contacts' and Calendar's `keyring-locked`) |
 
 The app's command (`nightmail`, `deck-window`) sources `kit/app.sh` through the same link, after setting `QS_DIR`,
 `APP_TITLE` (the window's title) and `APP_IPC` (its IpcHandler's target): it starts the window or brings it forward,

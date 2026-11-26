@@ -1,0 +1,9 @@
+{
+  "_comment": "Settings › Region: how dates and times are written, the one source for the region command (hypr/scripts/region) and the kit (Region.qml, Dates.js). The language stays English: month and weekday names come from Dates.js, not the locale. Patterns: d dd M MM MMM MMMM yy yyyy ddd dddd H HH h mm AP. order is how a typed date is read (dmy, mdy, ymd); a new region is one entry here, with a locale that glibc has.",
+  "fi":  { "name": "Finland",        "locale": "fi_FI.UTF-8", "order": "dmy", "short": "d.M.yyyy",   "day": "d.M.",  "medium": "d MMM yyyy",  "long": "ddd d MMMM yyyy",   "time": "H:mm",    "weekStart": 1 },
+  "se":  { "name": "Sweden",         "locale": "sv_SE.UTF-8", "order": "ymd", "short": "yyyy-MM-dd", "day": "d/M",   "medium": "d MMM yyyy",  "long": "ddd d MMMM yyyy",   "time": "HH:mm",   "weekStart": 1 },
+  "de":  { "name": "Germany",        "locale": "de_DE.UTF-8", "order": "dmy", "short": "dd.MM.yyyy", "day": "d.M.",  "medium": "d MMM yyyy",  "long": "ddd d MMMM yyyy",   "time": "HH:mm",   "weekStart": 1 },
+  "uk":  { "name": "United Kingdom", "locale": "en_GB.UTF-8", "order": "dmy", "short": "dd/MM/yyyy", "day": "d/M",   "medium": "d MMM yyyy",  "long": "ddd d MMMM yyyy",   "time": "HH:mm",   "weekStart": 1 },
+  "us":  { "name": "United States",  "locale": "en_US.UTF-8", "order": "mdy", "short": "M/d/yyyy",   "day": "M/d",   "medium": "MMM d, yyyy", "long": "ddd, MMMM d, yyyy", "time": "h:mm AP", "weekStart": 0 },
+  "iso": { "name": "ISO 8601",       "locale": "en_DK.UTF-8", "order": "ymd", "short": "yyyy-MM-dd", "day": "MM-dd", "medium": "d MMM yyyy",  "long": "ddd d MMMM yyyy",   "time": "HH:mm",   "weekStart": 1 }
+}

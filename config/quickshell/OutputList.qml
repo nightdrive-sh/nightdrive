@@ -70,7 +70,8 @@ Column {
                 if (p["media.class"] !== o.mediaClass) continue
                 if (/^easyeffects_/.test(p["node.name"])) continue   // EasyEffects' virtual device, not a real output
                 sinks.push({ id: ob.id, name: p["node.description"] || p["node.name"], current: p["node.name"] === defName,
-                             bt: /^bluez_/.test(p["node.name"]), node: p["node.name"] })
+                             bt: /^bluez_/.test(p["node.name"]), node: p["node.name"],
+                             mac: (p["api.bluez5.address"] || "").toUpperCase() })
             }
             o.sinkList = sinks
             if (o.btMakeDefault !== "") {
@@ -87,11 +88,12 @@ Column {
     }
     Sh {
         id: btProc
-        // Audio Sink UUID = headphones / speakers. Without bluetoothd (the sandbox, a VM) bluetoothctl aborts or hangs
+        // Audio Sink UUID = headphones / speakers. Without bluetoothd (the sandbox, a VM) bluetoothctl aborts or hangs.
+        // Anchored: newer BlueZ also prints per-bearer lines ("LE.Connected: no") for a device connected over BR/EDR
         script: 'systemctl is-active -q bluetooth 2>/dev/null || exit 0\n' +
                 'bluetoothctl devices Paired | sed "s/\\x1b\\[[0-9;]*m//g" | while read -r _ mac name; do\n' +
                 '  info=$(bluetoothctl info "$mac")\n' +
-                '  grep -q "Connected: no" <<<"$info" && grep -q "UUID: Audio Sink" <<<"$info" && echo "$mac|$name"\n' +
+                '  grep -Eq "^\\s*Connected: no" <<<"$info" && grep -q "UUID: Audio Sink" <<<"$info" && echo "$mac|$name"\n' +
                 'done'
         onResult: text => o.btList = text.split("\n").filter(l => l.indexOf("|") > 0)
                                        .map(l => ({ mac: l.slice(0, 17), name: l.slice(18) }))
@@ -132,15 +134,17 @@ Column {
 
     // One list, the same kinds together: the machine's own devices (MacBook Pro …, then Built-in …), Bluetooth headphones
     // (connected, then the ones a click connects or switches to headset mode), other wired ones (USB, HDMI), then AirPlay
-    // speakers; alphabetically within each. SystemLevels' Sound page sorts the same way (group()).
+    // speakers; alphabetically within each. SoundLevels' Sound page sorts the same way (group()).
     function group(d) {
         return d.type === "btconnect" ? 3 : d.type === "btmic" ? 2 : /^MacBook Pro/i.test(d.name) ? 0 : /^Built-in/i.test(d.name) ? 1
              : d.bt ? 2 : /^raop_sink\./.test(d.node || "") ? 5 : 4
     }
     readonly property var rows: {
+        // A paired device whose output is already here is connected, whatever a stale btList says: matched by address
+        const live = o.sinkList.map(d => d.mac).filter(m => m !== "")
         const r = o.sinkList.map(d => Object.assign({ type: "dev" }, d))
             .concat((o.kind === "source" ? o.btMics : []).map(d => Object.assign({ type: "btmic" }, d)))
-            .concat((o.kind === "sink" ? o.btList : []).map(d => Object.assign({ type: "btconnect" }, d)))
+            .concat((o.kind === "sink" ? o.btList.filter(d => live.indexOf(d.mac.toUpperCase()) < 0) : []).map(d => Object.assign({ type: "btconnect" }, d)))
         return r.sort((a, b) => o.group(a) - o.group(b) || a.name.localeCompare(b.name))
     }
 

@@ -1,0 +1,154 @@
+#!/bin/bash
+# recorder: Nightdrive Recorder (plugins/recorder, README.md): sound from a microphone recorded into ~/Recordings, its
+# window, and the commands the window, the keys, the top bar and Claude's tools use. The recording itself is pw-record
+# run by lib/capture.py as a process of its own, so it goes on with the window closed.
+set -uo pipefail
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app                                     # Recorder's own Quickshell config, apart from the desktop's shell
+LIB=$APP_DIR/lib
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+# shellcheck disable=SC2034  # read by kit/app.sh, sourced below
+APP_TITLE=Recorder
+# shellcheck disable=SC2034  # read by kit/app.sh
+APP_IPC=recorder
+. "$QS_DIR/kit/app.sh"
+
+# A change made outside the window (a key, the top bar, Claude, a terminal) shows in it, and in the bar, at once
+changed() {
+  local status=$?
+  running && ipc refresh
+  qs ipc call bar refreshModule recorder >/dev/null 2>&1
+  return $status
+}
+
+# Puts Recorder among the desktop's apps (share/recorder.desktop), with Exec's full path filled in: the compositor's
+# PATH may not have ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons" "$(python3 "$LIB/settings.py" get --json | jq -r .path)"
+  cp "$APP_DIR/share/recorder.svg" "$icons/nightdrive-recorder.svg"
+  sed "s|^Exec=recorder|Exec=$HOME/.local/bin/recorder|" "$APP_DIR/share/recorder.desktop" > "$apps/nightdrive-recorder.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Installed: $apps/nightdrive-recorder.desktop"
+}
+
+# Takes Recorder out of the desktop's apps; a recording being made is saved first, and the recordings stay
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  python3 "$LIB/capture.py" status --json | jq -e '.state != "idle"' >/dev/null && python3 "$LIB/capture.py" save
+  app_command quit >/dev/null 2>&1 || true
+  rm -f "$data/applications/nightdrive-recorder.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-recorder.svg"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$data/applications" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Recorder is out of your apps; your recordings stay in $(python3 "$LIB/settings.py" get --json | jq -r .path)."
+}
+
+# Trash's undo: back from the trash (files restore takes no --json; the window's asks for it all the same)
+restore() {
+  local names=() json=false a
+  for a in "$@"; do if [[ $a == --json ]]; then json=true; else names+=("$a"); fi; done
+  "$APP_DIR/../../bin/nightdrive" files restore "${names[@]}" >/dev/null || return 1
+  changed
+  if $json; then printf '%s\n' "${names[@]}" | jq -R . | jq -sc '{restored: .}'; else echo "Restored ${#names[@]}."; fi
+}
+
+# transcribe NAME [--wait] [--json], transcribe --cancel NAME: lib/transcribe.py's start (in the background, the
+# default), run (here, with its progress) and cancel
+transcribe() {
+  local args=() wait=false cancel=false a
+  for a in "$@"; do
+    case $a in
+      --wait) wait=true ;;
+      --cancel) cancel=true ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  if $cancel; then python3 "$LIB/transcribe.py" cancel "${args[@]}"
+  elif $wait; then python3 "$LIB/transcribe.py" run "${args[@]}"
+  else python3 "$LIB/transcribe.py" start "${args[@]}"
+  fi
+}
+
+# The recording's WAV picked in the file manager (FileManager1's ShowItems: Nautilus, Dolphin…); without one, its
+# folder opened
+show() {
+  local path
+  path=$(python3 "$LIB/recordings.py" info --json -- "${1:-}" | jq -r .path) || return 1
+  gdbus call --session --dest org.freedesktop.FileManager1 --object-path /org/freedesktop/FileManager1 \
+    --method org.freedesktop.FileManager1.ShowItems "['file://$(jq -rn --arg p "$path" '$p | @uri' | sed 's|%2F|/|g')']" "" \
+    >/dev/null 2>&1 || xdg-open "$(dirname "$path")" >/dev/null 2>&1 &
+  disown 2>/dev/null
+  [[ ${2:-} == --json ]] && jq -nc --arg p "$path" '{shown: $p}'
+  return 0
+}
+
+usage() {
+  cat <<USAGE
+Usage: recorder [command]
+
+  (none), open     open Recorder, or bring it forward if it is open
+  record           start recording (--mic NODE: from that PipeWire source; --name NAME), or go on after a pause
+  pause            pause; record or toggle goes on
+  toggle           record, pause or go on: one key for all three
+  save             end the recording and save it as NAME.wav in ~/Recordings (--name NAME: under that name)
+  new              save, and start the next recording at once
+  status           what is being recorded and for how long (--json: {state: idle|recording|paused, name, mic,
+                   elapsed, started})
+  list             the recordings, newest first (--json; --limit N)
+  info NAME        one recording: its length, transcript and exports (--json)
+  transcript NAME  its transcript's text (--json: {name, duration, transcript (its path), text})
+  rename NAME NEW  a new name for the recording, its transcript and exports (--json)
+  trash NAME       the recording and its files to the trash, where Files puts them back (--json)
+  restore NAME…    back from the trash (the names trash --json gives)
+  export NAME FMT  a copy beside it as mp3, m4a, flac or opus (--json); export formats: the four
+  show NAME        the recording in Files, picked
+  transcribe NAME  NAME.txt beside it, a paragraph a minute with its time, in the background (--json; --wait: here,
+                   with its progress; --cancel NAME: stop it, the transcript before it stays)
+  transcriptions   those under way and those that failed (--json: {jobs: [{name, state, done, total, error}]})
+  models           the transcription models, and what each still needs (--json)
+  headsets         the Bluetooth headsets to record from (--json): --mic takes their card
+  config           the settings (--json); config KEY VALUE changes one: folder, mic, model (parakeet|medium|whisper),
+                   language (auto|fi|en), transcribe_on_save (on|off)
+  install          Recorder among the desktop's apps (the installer), and ~/Recordings
+  uninstall        take it out again (your recordings stay)
+  restart          close and open again (after a change to the app)
+  quit             close the window (a recording goes on)
+  log              follow the app's log (QML errors show up here)
+  help             this text
+
+A command's --json prints the state after it, for the window, the bar and Claude's tools.
+USAGE
+}
+
+case ${1:-open} in
+  record|pause|toggle|save|new) python3 "$LIB/capture.py" "$@"; changed ;;
+  status)    python3 "$LIB/capture.py" "$@" ;;
+  list|info|transcript) python3 "$LIB/recordings.py" "$@" ;;
+  rename|trash) python3 "$LIB/recordings.py" "$@"; changed ;;
+  restore)   restore "${@:2}" ;;
+  export)    python3 "$LIB/export.py" "${@:2}"; changed ;;
+  show)      show "${@:2}" ;;
+  transcribe) transcribe "${@:2}"; changed ;;
+  transcriptions) python3 "$LIB/transcribe.py" status "${@:2}" ;;
+  models)    python3 "$LIB/voxtype.py" check "${@:2}" ;;
+  headsets)  python3 "$LIB/bluetooth.py" list "${@:2}" ;;
+  config)
+    if (($# > 2)) || { (($# == 2)) && [[ $2 != --json ]]; }; then
+      python3 "$LIB/settings.py" set "${@:2}"; changed
+    else
+      python3 "$LIB/settings.py" get "${@:2}"
+    fi
+    ;;
+  install)   install_app ;;
+  uninstall) uninstall_app ;;
+  help|-h|--help) usage ;;
+  *)
+    app_command "$@"; status=$?        # open (the default), settings, restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac

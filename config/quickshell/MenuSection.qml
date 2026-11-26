@@ -12,12 +12,14 @@ Text {
     width: parent ? parent.width : 0
     topPadding: apart ? 20 : 6
     text: title.toUpperCase()
+    textFormat: Text.PlainText   // a title may be a device's name: never markup
     color: Theme.primary
     font { family: Theme.font; pixelSize: 11; letterSpacing: 0.6 }
     Text {
         visible: s.subtitle !== ""
         anchors { right: parent.right; baseline: parent.baseline }
         text: s.subtitle.toUpperCase()
+        textFormat: Text.PlainText
         color: Theme.dim
         font { family: Theme.font; pixelSize: 10; letterSpacing: 0.6 }
     }

@@ -5,7 +5,8 @@
 #   inside check          Hyprland --verify-config, hyprctl configerrors, Quickshell's errors since its last (re)load,
 #                         nightdrive plugin check
 #   inside shot FILE      grim of Hyprland's output
-#   inside vnc start|stop wayvnc on the container's port 5900 (the host publishes it on the tailnet address only)
+#   inside vnc start|stop wayvnc on the container's port 5900 (the host publishes it on the tailnet address only), with
+#                         user nd and a password (RSA-AES), which start prints
 #   inside exec CMD…      a command with the session's environment (hyprctl, qs, …)
 set -u
 export XDG_RUNTIME_DIR=/tmp/xdg
@@ -46,19 +47,27 @@ check() {
   local fail=0 out
   # Hyprland and Quickshell reload a second or so after a save: a check right after an edit waits for that
   [[ -n $(find ~/nightdrive/config -newermt '-3 seconds' -print -quit 2>/dev/null) ]] && sleep 2
-  if ! out=$(Hyprland --verify-config -c ~/.config/hypr/hyprland.lua 2>&1); then
-    echo "== Hyprland --verify-config"
-    # only its result: the lines before it are Hyprland's start-up log
-    sed -n '/Config parsing result/,$p' <<<"$out" | sed '1d;/^$/d' | grep . || echo "$out"
+  # The result, not the exit code, decides: Hyprland 0.56.2 segfaults after printing it when the Lua config made a timer
+  # at load (layer-keys.lua's poll), because tearing down the config removes timers from an event loop that verify mode
+  # never made. stdbuf: through a pipe the result would sit in stdout's buffer and die with the crash.
+  local rc result
+  out=$(stdbuf -oL Hyprland --verify-config -c ~/.config/hypr/hyprland.lua 2>&1); rc=$?
+  # only its result: the lines before it are Hyprland's start-up log
+  result=$(sed -n '/Config parsing result/,$p' <<<"$out" | sed '1d;/^$/d')
+  if [[ $result != "config ok" ]]; then
+    echo "== Hyprland --verify-config (exit $rc)"
+    if [[ -n $result ]]; then echo "$result"; else echo "no result: it crashed before parsing ended"; echo "$out"; fi
     fail=1
   fi
   out=$(hyprctl configerrors 2>&1)
   if [[ -n ${out//[[:space:]]/} ]]; then echo "== hyprctl configerrors"; echo "$out"; fail=1; fi
   # Quickshell: only since its last (re)load, so an error that's fixed and reloaded no longer counts. A failed reload keeps
   # the old config running and logs ERROR lines; a QML runtime error is a WARN with its place, e.g. "@Osd.qml[13:-1]: …"
-  # (the other WARNs are Qt's own noise: propertyCache, portal registration).
+  # (the other WARNs are Qt's own noise: propertyCache, portal registration). The container has no PipeWire (no sound by
+  # design), so Quickshell's failure to connect to it at launch isn't a finding.
   out=$(qs log 2>&1 | sed 's/\x1b\[[0-9;]*m//g' \
         | awk '/INFO: (Launching config|Reloading configuration)/ { n = 0; delete l; next }
+               /ERROR quickshell\.service\.pipewire.*Failed to connect pipewire context/ { next }
                /^ *ERROR/ || (/^ *WARN/ && /@[^ ]+\.qml\[/) { l[++n] = $0 }
                END { for (i = 1; i <= n; i++) print l[i] }')
   if [[ -n $out ]]; then echo "== qs log (since the last reload)"; echo "$out"; fail=1; fi
@@ -68,6 +77,16 @@ check() {
   exit $fail
 }
 
+VNC_DIR=$HOME/.config/wayvnc
+vnc_auth() {
+  [[ -s $VNC_DIR/config ]] && return
+  mkdir -p "$VNC_DIR"; chmod 700 "$VNC_DIR"
+  [[ -s $VNC_DIR/rsa_key.pem ]] || ssh-keygen -q -m pem -t rsa -b 3072 -N "" -f "$VNC_DIR/rsa_key.pem" >/dev/null
+  local pw; pw=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)
+  ( umask 077; printf '%s\n' enable_auth=true username=nd "password=$pw" "rsa_private_key_file=$VNC_DIR/rsa_key.pem" \
+      >"$VNC_DIR/config" )
+}
+
 case ${1:-} in
   start) start "$2" "$3" ;;
   check) check ;;
@@ -75,7 +94,11 @@ case ${1:-} in
   vnc) case ${2:-start} in
          # -r: the cursor drawn into the image (Remmina showed none without it, and it doesn't depend on the cursor capture
          # that Hyprland fails on shape changes)
-         start) pgrep -x wayvnc >/dev/null || setsid -f wayvnc -r -o "$OUTPUT" 0.0.0.0 5900 >/tmp/wayvnc.log 2>&1 ;;
+         # A password, with RSA-AES (wayvnc takes one only with encryption): made once per container, printed on each
+         # start for the host to show. The tailnet alone let anyone on it in, a shared node or device included (#1930)
+         start) vnc_auth
+                pgrep -x wayvnc >/dev/null || setsid -f wayvnc -C "$VNC_DIR/config" -r -o "$OUTPUT" 0.0.0.0 5900 >/tmp/wayvnc.log 2>&1
+                echo "password: $(sed -n 's/^password=//p' "$VNC_DIR/config")" ;;
          stop) pkill -x wayvnc; true ;;
        esac ;;
   exec) shift; exec "$@" ;;

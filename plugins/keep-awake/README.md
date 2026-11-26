@@ -19,4 +19,6 @@ Keeps the computer awake while you need it: watching, presenting, a long downloa
 
 It's a systemd inhibitor: `systemd-inhibit --list` shows it as Keep Awake.
 
+Claude can tell whether it's on, and turn it on or off (Settings › Claude › Access › Keep awake): a notification with Undo, which goes back to how it was.
+
 Needs: nothing to install (systemd-inhibit comes with systemd)

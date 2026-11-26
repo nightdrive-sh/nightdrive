@@ -33,6 +33,7 @@ Item {
         id: titleText
         anchors { left: parent.left; verticalCenter: parent.verticalCenter; verticalCenterOffset: h.lead / 2 }
         text: h.title.toUpperCase()
+        textFormat: Text.PlainText   // a title may be a device's name: never markup
         color: Theme.primary
         font { family: Theme.font; pixelSize: h.apart ? 11 : 12; weight: h.apart ? Font.Normal : Font.Medium; letterSpacing: 0.6 }
     }
@@ -41,6 +42,7 @@ Item {
         anchors { right: h.action !== "" ? actionPill.left : parent.right; rightMargin: h.action !== "" ? 10 : h.edgeRoom
                   baseline: titleText.baseline }
         text: h.subtitle.toUpperCase()
+        textFormat: Text.PlainText
         color: Theme.dim
         font { family: Theme.font; pixelSize: 10; letterSpacing: 0.6 }
     }
@@ -48,7 +50,7 @@ Item {
     Rectangle {
         id: actionPill
         visible: h.action !== ""
-        readonly property bool lit: h.actionEnabled && (actionArea.containsMouse || (h.navSelected && !h.showToggle))
+        readonly property bool lit: h.actionEnabled && (actionArea.containsMouse && !MenuPointer.pointerAway || (h.navSelected && !h.showToggle))
         anchors { right: parent.right; rightMargin: h.edgeRoom; verticalCenter: parent.verticalCenter; verticalCenterOffset: h.lead / 2 }
         width: actionText.implicitWidth + 18; height: 20; radius: 10
         color: lit ? Theme.sel : "transparent"
@@ -78,7 +80,7 @@ Item {
         property bool navSelected: false
         readonly property string label: h.toolLabel || h.tool   // `menu navkey` names it
         function navActivate() { h.toolClicked() }
-        readonly property bool lit: toolArea.containsMouse || navSelected
+        readonly property bool lit: toolArea.containsMouse && !MenuPointer.pointerAway || navSelected
         anchors { right: parent.right; rightMargin: h.showToggle ? 44 : 0; verticalCenter: parent.verticalCenter; verticalCenterOffset: h.lead / 2 }
         width: h.toolLabel !== "" ? toolRow.width + 18 : 20; height: 20; radius: 10
         color: lit ? Theme.sel : "transparent"

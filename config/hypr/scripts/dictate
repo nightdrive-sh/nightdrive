@@ -1,48 +1,102 @@
 #!/bin/bash
 # dictate <start|stop>: F5 (speech to text). If the mic is muted, don't start recording; show a "MIC MUTED" toast instead.
-# dictate daemon: started at login (hyprland.lua) with the best Parakeet model that is installed.
+# dictate daemon: started at login (hyprland.lua) with config.toml's Parakeet model (int8).
 # dictate <fn-down|fn-up>: Fn held. Starts only after 0.3 s so that Fn combos (Fn+arrows, Fn+Backspace …) don't trigger dictation.
+# dictate claude-start, claude-fn-down: ⌘⇧ + the key (Dashboard #1908): the text goes to Ask Claude instead of being
+#   typed (quickshell/AskClaudeToast.qml), which sends it at once, "say and forget" (#3122), or puts it in its field
+#   when the toast is open (a terminal's Claude Code when its tools aren't set up). Any release of the key stops it
+#   (stop, fn-up).
+# With the lid closed the built-in mic hears nothing: Nightdrive's iOS app listens instead when it is open and ready
+#   (Companion, #3173: bin/companion mic, config/companion/lib/mic.py). Its words go where Voxtype's would have.
 vt="$HOME/.local/bin/voxtype-onnx"
 run=${XDG_RUNTIME_DIR:-/run/user/$UID}
-models="$HOME/.local/share/voxtype/models"
-# The full model gets English names and sentence breaks clearly better than int8 (0.3 s slower), but it's an extra
-# 2.4 GB download (docs/dictation.md), so config.toml keeps int8 and this picks the full one when it's there.
-FULL_MODEL=parakeet-tdt-0.6b-v3
 # Your own cleanup of the text before it's typed (not in the repo, docs/dictation.md): text in on stdin, out on stdout
 POST_PROCESS="$HOME/.config/voxtype/post-process"
+scripts=$(dirname "$(readlink -f "$0")")
+claude_txt="$run/dictate-claude.txt"   # where a dictation to Claude is written, and a sign that one is going on
+held="$run/dictate-held"               # the key is down: a start that tried the app and fell back checks it
+remote="$run/dictate-remote"           # the app's dictation is going on (Companion's server keeps it, for the toast)
+companion="$scripts/../../../bin/companion"
+
+# The app instead of the built-in mic: only with the lid closed and Companion's server running. Returns once the app
+# listens, or 1 (none ready, or it didn't answer in 2.5 s)
+remote_start() {
+  [[ $(cat "$run/nightdrive-lid" 2>/dev/null) == closed && -S $run/nightdrive/companion-mic.sock ]] || return 1
+  "$companion" mic start >/dev/null 2>&1
+}
+
+# Ask Claude gets the text (⌘⇧): in its toast when that is ready, else a terminal's Claude Code
+to_claude() {
+  local text=$1
+  text=${text#"${text%%[![:space:]]*}"}; text=${text%"${text##*[![:space:]]}"}
+  [[ -n $text ]] || { qs ipc call askClaude cancel >/dev/null 2>&1; exit 0; }
+  if "$scripts/ask-claude" --ready; then qs ipc call askClaude draft "$text"
+  else exec "$scripts/terminal-or-claude" -- "$text"; fi
+}
+
+# The app's words: your own cleanup as Voxtype's get it, then typed as Voxtype types (wtype), or to Claude
+remote_text() {
+  local text=$1 clean
+  if [[ -n $text && -x $POST_PROCESS ]] && clean=$(printf '%s' "$text" | timeout 2 "$POST_PROCESS"); then text=$clean; fi
+  if [[ -e $claude_txt ]]; then rm -f "$claude_txt"; to_claude "$text"
+  elif [[ -n ${text//[[:space:]]/} ]]; then wtype -- "$text"; fi
+}
 case $1 in
   daemon)
-    # A daemon that is killed (pkill, an update) leaves its OSD running: each restart added one more Quickshell. The
-    # new daemon starts its own, so close those whose daemon is gone.
+    # A daemon that is killed (pkill, an update) leaves its OSD running: each restart added one more Quickshell. Its OSD
+    # is off now (Nightdrive draws the toast, quickshell/DictationToast.qml), but one from a daemon started before that
+    # may still run: close those whose daemon is gone.
     for p in $(pgrep -u "$USER" -f '[q]s -p .*/voxtype/quickshell'); do
       parent=$(ps -o ppid= -p "$p" | tr -d ' ')
       [[ $(ps -o comm= -p "${parent:-1}") == voxtype* ]] || kill "$p"
     done
-    # Both go into a copy of the config: the daemon ignores --model, and Voxtype's config has no include
-    conf="$HOME/.config/voxtype/config.toml"
-    if [[ -d $models/$FULL_MODEL || -x $POST_PROCESS ]]; then
-      {
-        if [[ -d $models/$FULL_MODEL ]]; then sed "s/^model = \"$FULL_MODEL-int8\"/model = \"$FULL_MODEL\"/" "$conf"; else cat "$conf"; fi
-        if [[ -x $POST_PROCESS ]]; then printf '\n[output.post_process]\ncommand = "%s"\ntimeout_ms = 2000\n' "$POST_PROCESS"; fi
+    # The full Parakeet model is no longer picked when it's installed (#1946): it gets English names a little better,
+    # but writes short Finnish words in Cyrillic ("testi" → "Тесты.", 5 of 8 short words in a test), int8 none.
+    # The post-process goes into a copy of the config: Voxtype's config has no include
+    if [[ -x $POST_PROCESS ]]; then
+      { cat "$HOME/.config/voxtype/config.toml"
+        printf '\n[output.post_process]\ncommand = "%s"\ntimeout_ms = 2000\n' "$POST_PROCESS"
       } > "$run/voxtype-config.toml"
       exec "$vt" -c "$run/voxtype-config.toml" daemon
     fi
     exec "$vt" daemon ;;
-  fn-down)
+  fn-down|claude-fn-down)
+    start=start; [[ $1 == claude-* ]] && start=claude-start
     touch "$run/dictate-fn"
-    ( sleep 0.3; [[ -e $run/dictate-fn ]] && { touch "$run/dictate-fn-active"; "$0" start; } ) & ;;
+    ( sleep 0.3; [[ -e $run/dictate-fn ]] && { touch "$run/dictate-fn-active"; "$0" "$start"; } ) & ;;
   fn-up)
     rm -f "$run/dictate-fn"
     [[ -e $run/dictate-fn-active ]] && { rm -f "$run/dictate-fn-active"; "$0" stop; } ;;
-  start)
-    if wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | grep -q MUTED; then
+  start|claude-start)
+    rm -f "$claude_txt"
+    touch "$held"
+    # Without Claude Code it's plain dictation: there's nothing else the text could go to
+    file=(); [[ $1 == claude-start && -x $HOME/.local/bin/claude ]] && { : >"$claude_txt"; file=(--file="$claude_txt"); }
+    if remote_start; then
+      [[ -e $claude_txt ]] && qs ipc call askClaude dictating >/dev/null 2>&1
+    elif [[ ! -e $held ]]; then
+      rm -f "$claude_txt"       # let go while the app was tried: its stop has ended it, nothing to record
+    elif wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | grep -q MUTED; then
       qs ipc call osd micblocked
       touch "$run/dictate-blocked"
     else
       rm -f "$run/dictate-blocked"
-      "$vt" record start >/dev/null 2>&1
+      # Ask Claude's toast opens listening (#1996), before the recording starts, so the dictation's own small card
+      # doesn't show first
+      [[ -e $claude_txt ]] && qs ipc call askClaude dictating >/dev/null 2>&1
+      "$vt" record start "${file[@]}" >/dev/null 2>&1
     fi ;;
   stop)
+    rm -f "$held"
     # If the start was blocked, there is nothing to stop
-    if [[ -e $run/dictate-blocked ]]; then rm -f "$run/dictate-blocked"; else "$vt" record stop >/dev/null 2>&1; fi ;;
+    if [[ -e $run/dictate-blocked ]]; then rm -f "$run/dictate-blocked" "$claude_txt"
+    elif [[ -e $remote ]]; then
+      # The app's: it stops and sends its words, which the server hands over here
+      remote_text "$("$companion" mic stop 2>/dev/null)"
+    elif [[ -e $claude_txt ]]; then
+      # --wait returns once the text is in the file (or it gave up: no text, nothing asked)
+      "$vt" record stop --wait --timeout 60 >/dev/null 2>&1
+      text=$(<"$claude_txt"); rm -f "$claude_txt"
+      to_claude "$text"
+    else "$vt" record stop >/dev/null 2>&1; fi ;;
 esac

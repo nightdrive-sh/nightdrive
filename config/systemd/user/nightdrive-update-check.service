@@ -1,6 +1,8 @@
 # Looks for new Nightdrive commits and notifies (nightdrive update check). Started by the timer of the same name.
 [Unit]
 Description=Check for Nightdrive updates
+# A notification when it keeps failing (config/hypr/scripts/unit_failed.py)
+OnFailure=nightdrive-unit-failed@%n.service
 
 [Service]
 Type=oneshot

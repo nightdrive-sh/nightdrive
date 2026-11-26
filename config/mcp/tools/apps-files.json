@@ -1,0 +1,233 @@
+{
+  "tools": [
+    {
+      "name": "games_list",
+      "title": "Games",
+      "description": "The games on this computer, as the Launcher's Games lists them (the controller's Xbox button opens it): .desktop apps whose category is Game, and the games in Steam's library. Each has id (for games_launch), name, source (desktop or steam), installed (false while Steam is still downloading it) and progress (percent while downloading).",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "games", "list", "--json"],
+      "class": "read",
+      "area": "apps-files"
+    },
+    {
+      "name": "games_launch",
+      "title": "Start a game",
+      "description": "Start a game by its id from games_list. It takes the screen, so the user allows it first. A Steam game starts through Steam, which may take a minute (on an ARM Mac Steam runs emulated); one still downloading opens in Steam, which goes on downloading.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"id": {"type": "string", "pattern": "^(desktop|steam):.+$", "description": "The game's id from games_list"}},
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "games", "launch", "{id}", "--json"],
+      "class": "act",
+      "area": "apps-files"
+    },
+    {
+      "name": "windows_list",
+      "title": "Open windows",
+      "description": "The windows open on this desktop, the most recently used first: address, app, title, workspace (\"background\" for an app hidden in the background), whether it has the focus and whether it is on screen now, its size in logical pixels, whether it floats and whether it is an X11 (Xwayland) app. A window Send to Claude leaves out (a password manager, a private browser window, an app the user listed) is there as private, without its title. Use the address to name the window to the other window tools.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "windows", "list", "--json"],
+      "class": "read",
+      "area": "apps-files"
+    },
+    {
+      "name": "windows_view",
+      "title": "See a window",
+      "description": "A picture of one window as it is on screen now, to read what it shows (a page, a document, an error). Only a window on screen: one that isn't must be brought forward first. The user is usually asked on screen first, with the app and the window's title (not for the apps they let you see without asking), so take one picture of what you need rather than several. Only the window itself, nothing over it. Never of a window Send to Claude leaves out (password managers, private browser windows, the apps the user listed); that is the user's choice, so don't try another way.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window": {"type": "string", "description": "Its address (the list of open windows has them), or an app's name (its most recently used window)"}
+        },
+        "required": ["window"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "windows", "shot", "{window}", "--json", "--inline"],
+      "card": ["nightdrive", "windows", "shot", "{window}", "--check"],
+      "card_note": "The picture shows all the window shows: a password manager's popup in the browser too, and a password made visible in a page.",
+      "unasked_by": "apps",
+      "image": "image",
+      "class": "read",
+      "area": "screen"
+    },
+    {
+      "name": "windows_focus",
+      "title": "Bring a window forward",
+      "description": "Brings a window forward and gives it the focus, switching to its workspace (one hidden in the background comes to the current one). While the user is typing it waits for a pause (up to 30 s), so what they type doesn't go to another window; if they type on, it refuses: then call it again a little later, without asking them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "window": {"type": "string", "description": "Its address from windows_list, or an app's name (its most recently used window)"}
+        },
+        "required": ["window"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "windows", "focus", "{window}", "--json", "--unless-typing"],
+      "timeout": 60,
+      "stops_on_cancel": true,
+      "undo": ["nightdrive", "windows", "focus", "{previous}", "--unless-typing"],
+      "notice": "Brought {app} forward",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "apps_open",
+      "title": "Open an app",
+      "description": "Opens an app, as the Launcher does, by its name (\"Firefox\", \"Files\") or desktop id (org.gnome.Nautilus); one that is already open is brought forward instead. An unclear name returns the apps it could mean. Only the Launcher's apps, without arguments: open a file with files_open, an address with open_address. Not while the user is typing, as windows_focus.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "app": {"type": "string", "description": "The app's name or desktop id"}
+        },
+        "required": ["app"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "windows", "open", "--app", "{app}", "--json", "--unless-typing"],
+      "timeout": 60,
+      "stops_on_cancel": true,
+      "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}", "--unless-typing"],
+      "notice": "Opened {opened}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "open_address",
+      "title": "Open an address",
+      "description": "Opens a web address (http, https) in the default browser, or a mailto: link in the mail app's composer (nothing is sent; it may set to, cc, subject and body, nothing else). Opening an address sends it to that site, so the user allows it on screen first: once per site (the exact host), after which that site's addresses open without asking; an address that holds another address (a redirect) or a long query, and a mailto:, ask every time. Not while the user is typing, as windows_focus.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string", "title": "Address", "description": "http://, https:// or mailto:"}
+        },
+        "required": ["url"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "windows", "open", "--url", "{url}", "--json", "--unless-typing"],
+      "timeout": 60,
+      "stops_on_cancel": true,
+      "asks_if": ["nightdrive", "windows", "site", "{url}"],
+      "first_note": "Once you allow it, Claude opens addresses on {key} without asking from now on. One that leads on to another address, or carries a long query, still asks.",
+      "class": "act",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_recent",
+      "title": "Recent files",
+      "description": "The newest files in the user's Downloads, Pictures and Documents (and folders three levels below them) that are in the folders the user lets Claude use, newest first: path, name, folder, size in bytes, modified (ISO 8601) and type. Use it for \"the PDF I just downloaded\" or \"my last screenshot\". Hidden files are left out.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folders": {"type": "array", "items": {"type": "string", "enum": ["downloads", "pictures", "documents"]}, "description": "Default: all three"},
+          "name": {"type": "string", "description": "Only names with this text in them (any case)"},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 50, "description": "How many, default 10"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "recent", "--json", ["--in", "{folders}"], ["--name", "{name}"], ["--limit", "{limit}"]],
+      "class": "read",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_open",
+      "title": "Open a file",
+      "description": "Opens a file or folder in the user's home folder in its default app (a PDF in the viewer, a folder in Files). Only documents, pictures, sound, video, text and folders: never a program, a script or a launcher, nor what does something as it opens (a web page, an SVG, XML, a playlist, an event or a contact file), nor anything hidden (no part of the path starting with a dot), outside home or outside the folders the user lets Claude use (a link counts where it points). Not while the user is typing, as windows_focus.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "description": "An absolute path, or one relative to home (~ works too)"}
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "open", "--json", "--unless-typing", "--", "{path}"],
+      "timeout": 60,
+      "stops_on_cancel": true,
+      "undo": ["nightdrive", "windows", "close", "{new}", "--focus", "{previous}", "--unless-typing"],
+      "notice": "Opened {opened}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_mkdir",
+      "title": "Make a folder",
+      "description": "Makes one new folder in the user's home folder, in a folder that exists (one level at a time). To make a folder and move files into it, use files_move alone: it makes its folder. Only in the folders the user lets Claude use; nothing hidden (no name starting with a dot), nothing in ~/Mail, ~/Notes, ~/Projects, a mail folder or a git repository. Undo removes it while it is empty.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "description": "The new folder: an absolute path, or one relative to home (~ works too)"}
+        },
+        "required": ["path"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "mkdir", "--json", "--", "{path}"],
+      "card": ["nightdrive", "files", "mkdir", "--check", "--", "{path}"],
+      "undo": ["nightdrive", "files", "move-back", "--made", "{made}", "--", "{back}"],
+      "notice": "Made the folder {what}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_move",
+      "title": "Move files",
+      "description": "Moves files or folders in the user's home folder into a folder, which is made if it isn't there (its own folder must exist): \"make a folder for today in Downloads and move its files there\" is one call. Several paths go together: all or none, with one Undo that puts them all back (and removes the folder it made). Nothing is ever overwritten: a name already in the folder stops the call, which names every one in the way; then ask the user, or rename first. Moves within one disk only. The same limits as files_trash, for the paths and for the folder: not home's own folders (Downloads, Documents…) themselves, nothing out of or into ~/Mail, ~/Notes, ~/Projects, a mail folder or a git repository, nothing hidden, nothing outside the folders the user lets Claude use (a link counts where it points). A move of a folder, of over 50 files, or from one of those folders into another asks the user on screen first, with every path.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "What to move: absolute paths, or relative to home"},
+          "folder": {"type": "string", "description": "The folder they go into, kept by their own names: absolute, or relative to home"}
+        },
+        "required": ["paths", "folder"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "move", "--json", "--into", "{folder}", "--", "{paths}"],
+      "card": ["nightdrive", "files", "move", "--check", "--into", "{folder}", "--", "{paths}"],
+      "asks_if": ["nightdrive", "files", "move", "--asks", "--into", "{folder}", "--", "{paths}"],
+      "undo": ["nightdrive", "files", "move-back", "--made", "{made}", "--", "{back}"],
+      "notice": "Moved {what} to {into}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_rename",
+      "title": "Rename a file",
+      "description": "Gives a file or folder in the user's home folder a new name in the same folder (to move it elsewhere, use files_move). The name is one part: no /, not starting with a dot, no newlines. Nothing is overwritten: a name that is taken stops it; ask the user for another. The same limits as files_move.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "description": "What to rename: an absolute path, or relative to home"},
+          "name": {"type": "string", "maxLength": 255, "description": "The new name, with its extension (report.pdf)"}
+        },
+        "required": ["path", "name"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "rename", "--json", "--", "{path}", "{name}"],
+      "card": ["nightdrive", "files", "rename", "--check", "--", "{path}", "{name}"],
+      "undo": ["nightdrive", "files", "move-back", "--made", "{made}", "--", "{back}"],
+      "notice": "Renamed {what} to {name}",
+      "class": "change",
+      "area": "apps-files"
+    },
+    {
+      "name": "files_trash",
+      "title": "Move to the trash",
+      "description": "Moves files or folders in the user's home folder to the trash, where Files shows them and can put them back; nothing is deleted for good (there is no tool for that). Not home's own folders (Downloads, Documents…), nothing in ~/Mail, ~/Notes, ~/Projects, a mail folder or a git repository, nothing hidden, nothing outside home or the folders the user lets Claude use. Several paths go together: all or none. The user is usually asked on screen first, with every path and how many files each folder holds, so trash what belongs together in one call.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "Absolute paths, or relative to home"}
+        },
+        "required": ["paths"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "files", "trash", "--json", "--", "{paths}"],
+      "card": ["nightdrive", "files", "trash", "--check", "--", "{paths}"],
+      "undo": ["nightdrive", "files", "restore", "--", "{names}"],
+      "notice": "Moved {what} to the trash",
+      "class": "change",
+      "area": "apps-files",
+      "deletes": true
+    }
+  ]
+}

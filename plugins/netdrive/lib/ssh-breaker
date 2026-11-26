@@ -1,0 +1,22 @@
+#!/bin/bash
+# Network Drives: the ssh rclone runs for a drive (mountcmd.connection_flags), behind a circuit breaker.
+#   ssh-breaker FLAGFILE ssh ARGS…
+# rclone's cache tries a download 10 times, and offline each try would wait out ssh's ConnectTimeout: a program
+# opening a file would hang for a minute. So once ssh fails (exit 255: it couldn't connect, or the link died), the
+# tries for the next HOLD seconds fail at once without touching the network, and the program gets its error after one
+# timeout instead of ten. The next try after that reaches for the network again.
+HOLD=10
+
+flag=$1
+shift
+if [[ -f $flag ]]; then
+  age=$(( $(date +%s) - $(stat -c %Y "$flag" 2>/dev/null || echo 0) ))
+  if (( age < HOLD )); then
+    echo "netdrive: the host didn't answer ${age} s ago; trying again in $(( HOLD - age )) s" >&2
+    exit 255
+  fi
+fi
+"$@"
+rc=$?
+if (( rc == 255 )); then touch "$flag"; else rm -f "$flag"; fi
+exit "$rc"

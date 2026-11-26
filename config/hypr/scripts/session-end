@@ -9,6 +9,12 @@ case ${1:-} in
   poweroff) sound=shutdown; cmd=(systemctl poweroff) ;;
   *) echo "usage: session-end logout|reboot|poweroff" >&2; exit 2 ;;
 esac
+# Closing the lid during the sound would suspend the machine first, and the frozen `systemctl poweroff` would only
+# run when the lid is next opened, hours of battery later: hold off the lid and sleep until the command has run.
+if [[ $1 != logout && -z ${SESSION_END_INHIBITED:-} ]] && command -v systemd-inhibit >/dev/null; then
+  SESSION_END_INHIBITED=1 exec systemd-inhibit --what=handle-lid-switch:sleep --mode=block \
+    --who=Nightdrive --why="Shutting down" "$0" "$@"
+fi
 # At most a few seconds: a stuck audio server never keeps the machine from going down
 timeout 4 "$HOME/.config/hypr/scripts/sounds" event "$sound" >/dev/null 2>&1
 exec "${cmd[@]}"

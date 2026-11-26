@@ -1,0 +1,15 @@
+# One device's screen (plugins/vnc-display): its headless output, and wayvnc on it (bin/vnc-display run, lib/serve.py).
+# An instance per device, enabled by `vnc-display add` or `on` and disabled by `off` or `remove`: nothing listens while no
+# device is added.
+[Unit]
+Description=Nightdrive VNC display %i
+PartOf=nightdrive-session.target
+After=nightdrive-session.target
+
+[Service]
+ExecStart=%h/.local/bin/vnc-display run %i
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=nightdrive-session.target

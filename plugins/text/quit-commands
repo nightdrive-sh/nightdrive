@@ -1,0 +1,2 @@
+# ⌘Q on Text's window asks about unsaved files in the window before it goes (hypr/scripts/quit-app)
+^org\.quickshell$ @ ^Text$ = "$HOME/.local/bin/text" ask-quit

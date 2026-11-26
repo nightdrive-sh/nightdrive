@@ -1,0 +1,134 @@
+#!/bin/bash
+# bt-pair MAC [--again] | --follow: pair a Bluetooth device, trust it and connect it, for the top bar's Bluetooth menu and the
+# launcher's Settings › Bluetooth. Its output streams (a keyboard's passkey line has to show while it waits); when it
+# exits non-zero, its last line says what went wrong, in words for the menu.
+#   --again   forget the device first, wait for it in pairing mode and pair it anew
+#   --follow  follow the pairing that runs now, if one does (a menu opened again meanwhile); "__mac MAC" comes first
+#
+# Pairing has to bond too: BlueZ keeps the keys only then, and refuses an input device's connection without them
+# ("Rejected connection from !bonded device"). An Xbox controller that connected by itself, outside pairing mode, to a
+# computer that had forgotten it was paired without bonding: Paired yes, Bonded no, connected but with no input device
+# and nothing saying why (#3629). So the bond is checked after pairing, and the menu offers --again for such a device.
+#
+# The work runs in a session of its own and writes to LOG; what the caller runs only follows LOG. The menu's process
+# dies with the menu, and a menu closed while pairing (to reach for the controller) killed pair && trust && connect
+# half-way, leaving a device paired but not trusted (#3629). A second call while one pairs follows that one instead.
+exec 2>&1
+set -uo pipefail
+
+PAIR_TIMEOUT=60   # s for bluetoothctl's pair: a keyboard's passkey has to be typed in that time
+FIND_TIMEOUT=90   # s to wait for a forgotten device in pairing mode (--again): an Xbox controller switches off when
+                  # forgotten, and has to be switched on and its pair button held first
+LOG=${XDG_RUNTIME_DIR:-/tmp}/nightdrive-bt-pair.log   # the worker's lines, then "__exit N"; LOG.pid its pid
+
+if [[ ${1:-} == --follow ]]; then
+  kill -0 "$(cat "$LOG.pid" 2>/dev/null)" 2>/dev/null || exit 0
+  set -- ""   # follow() below needs no device
+fi
+mac=${1?usage: bt-pair MAC [--again] | --follow}
+again=false
+[[ ${2:-} == --again ]] && again=true
+
+# Follow LOG to its "__exit N" line, printing each whole line (one still being written waits for its newline)
+follow() {
+  local n=0 l lines
+  while :; do
+    if [[ -s $LOG && -z $(tail -c 1 "$LOG") ]]; then
+      mapfile -t -s "$n" lines <"$LOG"
+      for l in "${lines[@]}"; do
+        n=$((n + 1))
+        [[ $l == "__exit "* ]] && exit "${l#__exit }"
+        echo "$l"
+      done
+    fi
+    # A worker gone without its last line (killed): say so rather than wait forever
+    if ! kill -0 "$(cat "$LOG.pid" 2>/dev/null)" 2>/dev/null && [[ $(tail -n 1 "$LOG") != "__exit "* ]]; then
+      echo "Pairing stopped"
+      exit 1
+    fi
+    sleep 0.3
+  done
+}
+if [[ ${BT_PAIR_WORKER:-} != 1 ]]; then
+  kill -0 "$(cat "$LOG.pid" 2>/dev/null)" 2>/dev/null && follow
+  [[ -n $mac ]] || exit 0
+  : >"$LOG"
+  # setsid without -f execs (a background job leads no group), so $! is the worker
+  BT_PAIR_WORKER=1 setsid "$0" "$@" >>"$LOG" 2>&1 </dev/null &
+  echo $! >"$LOG.pid"
+  follow
+fi
+scan=""
+finish() {
+  local rc=$?
+  [[ -n $scan ]] && kill "$scan" 2>/dev/null
+  echo "__exit $rc"
+}
+trap finish EXIT
+echo "__mac $mac"   # which device a menu following it shows as busy
+
+strip() { sed -u 's/\x1b\[[0-9;]*m//g; s/\r//g'; }
+info() { bluetoothctl info "$mac" 2>/dev/null | strip; }
+# BlueZ before Bonded existed (5.7x) has no such line: pairing implied it there
+bonded() {
+  local i
+  i=$(info)
+  grep -q '^\s*Bonded: yes' <<<"$i" || ! grep -q '^\s*Bonded:' <<<"$i"
+}
+name=$(info | sed -n 's/^\s*Alias: //p')
+name=${name:-The device}
+HOW="put it in pairing mode (hold its pair button until its light flashes fast) and pair it again"
+
+if $again; then
+  bluetoothctl remove "$mac" >/dev/null 2>&1
+  # BlueZ only pairs a device it has found: scan until it shows up, and through the pairing (stopped on exit)
+  bluetoothctl --timeout $((FIND_TIMEOUT + PAIR_TIMEOUT)) scan on >/dev/null 2>&1 &
+  scan=$!
+  for ((i = 0; i < FIND_TIMEOUT; i++)); do
+    bluetoothctl info "$mac" >/dev/null 2>&1 && break
+    sleep 1
+  done
+  bluetoothctl info "$mac" >/dev/null 2>&1 ||
+    { echo "$name didn't show up: $HOW. If another computer has it, forget it there first."; exit 1; }
+fi
+
+# A device that is paired already (it paired by itself meanwhile) isn't paired again: BlueZ 5.88's pair then connects
+# instead and waits out its timeout. The bond decides below
+# (info is read whole first: grep -q leaving early would fail the pipe under pipefail)
+state=$(info)
+if ! grep -q '^\s*Paired: yes' <<<"$state"; then
+  # Trusted before pairing: a controller opens its input connection while pairing, and an untrusted one makes BlueZ
+  # ask the default agent (Blueman: an "Authorize service" notification), while the pairing times out waiting
+  # (AuthenticationTimeout, #3629). Taken back if the pairing fails
+  bluetoothctl trust "$mac" >/dev/null 2>&1
+  result=""
+  while IFS= read -r line; do
+    # Other devices' events come in between ([CHG] …, hex dumps while a scan runs): only the pair's own lines go on
+    [[ -z $line || $line =~ ^\[(CHG|NEW|DEL)\]|^[[:space:]] ]] && continue
+    echo "$line"
+    [[ $line == *"Pairing successful"* || $line == *"Failed to pair"* ]] && result=$line
+  # Not bluetoothctl's own --timeout: it waits the whole time even after "Pairing successful", and meanwhile BlueZ
+  # drops the idle link and the controller goes back to searching (#3629). timeout only ends a pair that hangs
+  done < <(timeout "$PAIR_TIMEOUT" bluetoothctl --agent KeyboardDisplay pair "$mac" 2>&1 | strip)
+  [[ $result == *"Pairing successful"* || $result == *AlreadyExists* ]] || bluetoothctl untrust "$mac" >/dev/null 2>&1
+  case $result in
+    *"Pairing successful"* | *AlreadyExists*) ;;
+    *AuthenticationCanceled* | *AuthenticationRejected* | *AuthenticationFailed* | *AuthenticationTimeout*)
+      echo "$name refused the pairing: $HOW."; exit 1 ;;
+    *ConnectionAttemptFailed* | *"Page Timeout"* | *"not available"* | "")
+      echo "$name didn't answer: switch it on, $HOW."; exit 1 ;;
+    *) echo "$result"; exit 1 ;;
+  esac
+fi
+
+if ! bonded; then
+  echo "$name paired, but its key wasn't saved, so it can't connect: $HOW."
+  exit 2
+fi
+# Trusted (again, for a device paired already), it may connect by itself when switched on (a controller, headphones).
+# connect returns on its answer (its own --timeout would wait it out): timeout only ends one that hangs
+bluetoothctl trust "$mac" >/dev/null 2>&1
+out=$(timeout 30 bluetoothctl connect "$mac" 2>&1 | strip | grep -vE '^\[(CHG|NEW|DEL)\]|^[[:space:]]')
+echo "$out"
+grep -q "Connection successful" <<<"$out" ||
+  { echo "$name is paired, but didn't connect: switch it on, or click it to connect."; exit 1; }

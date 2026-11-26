@@ -22,10 +22,10 @@ link() {
 # login.
 external=$HOME/.local/share/nightdrive/plugins   # plugins from elsewhere (nightdrive plugins add)
 reenable=()
-for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,keyd,alsa,voxtype,gtk-3.0,gtk-4.0}/* \
+for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,systemd/user/wireplumber.service.d,keyd,alsa,voxtype,gtk-3.0,gtk-4.0}/* \
   "$HOME"/.config/systemd/user/*.wants/* "$HOME"/.config/fontconfig/conf.d/* "$HOME"/.config/wireplumber/wireplumber.conf.d/* \
   "$HOME"/.local/bin/* "$HOME"/.local/share/* "$HOME"/.local/share/{applications,nightdrive,easyeffects/output,voxtype/quickshell}/* \
-  "$HOME"/.local/share/nautilus-python/extensions/* "$HOME"/.bashrc.d/* "$HOME"/.cache/nightdrive/plugins.d/icons/*; do
+  "$HOME"/.local/share/nautilus-python/extensions/* "$HOME"/.bashrc.d/* "$HOME"/.local/state/nightdrive/plugins.d/icons/*; do
   [[ -L $l && ! -e $l ]] || continue
   t=$(readlink "$l")
   if [[ $l == *.wants/* && ${l##*/} == nightdrive-* ]] || [[ $t == "$repo/"* || $t == "$external/"* ]]; then
@@ -34,7 +34,7 @@ for l in "$HOME"/.config/* "$HOME"/.config/{systemd/user,keyd,alsa,voxtype,gtk-3
   fi
 done
 
-for d in hypr hyprpolkitagent topbar fuzzel kitty ghostty alacritty foot quickshell screensaver greeter welcome; do   # hyprpolkitagent: the polkit password prompt's size; greeter: the lock at startup (greeter/lock.qml) and the preview; welcome: Welcome to Nightdrive
+for d in hypr hyprpolkitagent topbar fuzzel kitty ghostty alacritty foot quickshell screensaver greeter welcome displays; do   # hyprpolkitagent: the polkit password prompt's size; greeter: the lock at startup (greeter/lock.qml) and the preview; welcome: Welcome to Nightdrive; displays: the Displays window
   link "$repo/config/$d" "$HOME/.config/$d"
 done
 # foot's config includes your local.ini and won't start without one
@@ -70,8 +70,12 @@ for f in "$repo"/config/easyeffects/output/*.json; do link "$f" "$HOME/.local/sh
 cp -n "$repo/config/easyeffects/db/easyeffectsrc" "$HOME/.config/easyeffects/db/easyeffectsrc"
 
 link "$repo/config/wireplumber/wireplumber.conf.d/51-bt-no-headset-autoswitch.conf" "$HOME/.config/wireplumber/wireplumber.conf.d/51-bt-no-headset-autoswitch.conf"   # don't make the BT headset mic the default
+# Network speakers (AirPlay, Sonos) aren't the default or an app's output after a login (hypr/scripts/forget-network-sound)
+link "$repo/config/systemd/user/wireplumber.service.d/50-nightdrive-forget-network-sound.conf" "$HOME/.config/systemd/user/wireplumber.service.d/50-nightdrive-forget-network-sound.conf"
 
 link "$repo/config/applications/nm-connection-editor.desktop" "$HOME/.local/share/applications/nm-connection-editor.desktop"   # Fedora ships none
+# slack:, zoommtg: … links of apps with no Linux version: a notification instead of the portal's "No Apps available"
+link "$repo/config/applications/nightdrive-app-link.desktop" "$HOME/.local/share/applications/nightdrive-app-link.desktop"
 # macbook_mic alias for dictation (voxtype): the MacBook's mic on Apple Silicon, the default mic elsewhere
 if [[ $("$repo/config/hypr/scripts/platform" name) == asahi ]]; then asound=asoundrc; else asound=asoundrc.generic; fi
 link "$repo/config/alsa/$asound" "$HOME/.config/alsa/asoundrc"
@@ -108,13 +112,17 @@ done
 # Session target: brings up graphical-session.target, which xdg-desktop-portal needs (started by hyprland.lua)
 link "$repo/config/systemd/user/nightdrive-session.target" "$HOME/.config/systemd/user/nightdrive-session.target"
 # Update check: every 6 h a fetch, and a notification when new commits are waiting (nightdrive update check).
-# Snippets and crash reports: linked only, started when turned on (nightdrive snippets enable; launcher › Settings ›
-# Notifications). The plugin folders' units are linked below.
+# The controller's Xbox button (nightdrive-gamepad.service) is enabled below, with the update check.
+# Snippets, crash reports, Companion, the Hub's sync and backup: linked only, started when turned on (nightdrive snippets enable; launcher ›
+# Settings › Notifications; Settings › Companion; nightdrive backup setup). The plugin folders' units are linked below.
+# The services' failure notice: OnFailure=nightdrive-unit-failed@%n.service in a unit (hypr/scripts/unit_failed.py).
 units=(nightdrive-update-check.service nightdrive-update-check.timer nightdrive-snippets.service
-       nightdrive-crash-reports.service)
+       nightdrive-crash-reports.service nightdrive-companion.service nightdrive-unit-failed@.service
+       nightdrive-hub-sync.service nightdrive-hub-sync.timer nightdrive-backup.service nightdrive-backup.timer
+       nightdrive-gamepad.service)
 for u in "${units[@]}"; do link "$repo/config/systemd/user/$u" "$HOME/.config/systemd/user/$u"; done
 
-# ⌘Enter (terminal) and ⌘⌥Enter (Claude Code) open in ~/Projects, and kitty fails to start in a folder that doesn't exist
+# ⌘Enter (terminal) and ⌘⌃Enter (Claude Code) open in ~/Projects, and kitty fails to start in a folder that doesn't exist
 mkdir -p "$HOME/Projects"
 
 # Claude Code's notifications come from "Claude" with the session's topic, a click goes to its window, and a permission
@@ -123,20 +131,28 @@ mkdir -p "$HOME/Projects"
 # same for every session) goes off, unless you picked a channel.
 cn='~/.config/hypr/scripts/claude-notify'
 cs="$HOME/.claude/settings.json"
+# A permission request or question waits in the hook for Companion's answer as long as it is open in the terminal, up
+# to a day (claude-notify's WAIT_OPEN, #3162), not Claude Code's default 600 s: its PermissionRequest hook gets this
+hook_timeout=86400
 mkdir -p "$HOME/.claude"; [[ -s $cs ]] || echo '{}' > "$cs"
 for ev in Notification PermissionRequest; do
   jq -e --arg e "$ev" --arg c "$cn" '[.hooks[$e][]?.hooks[]?.command] | index($c)' "$cs" >/dev/null 2>&1 && continue
   jq --arg e "$ev" --arg c "$cn" '.hooks[$e] += [{matcher: "", hooks: [{type: "command", command: $c}]}]' "$cs" > "$cs.tmp" \
     && mv "$cs.tmp" "$cs" || rm -f "$cs.tmp"
 done
+if jq -e --arg c "$cn" --argjson t "$hook_timeout" 'any(.hooks.PermissionRequest[]?.hooks[]?; .command == $c and .timeout != $t)' \
+     "$cs" >/dev/null 2>&1; then
+  jq --arg c "$cn" --argjson t "$hook_timeout" '.hooks.PermissionRequest[]?.hooks[]? |= (if .command == $c then .timeout = $t else . end)' \
+    "$cs" > "$cs.tmp" && mv "$cs.tmp" "$cs" || rm -f "$cs.tmp"
+fi
 cg="$HOME/.claude.json"
 if [[ -s $cg ]] && jq -e '.preferredNotifChannel == null or .preferredNotifChannel == "auto"' "$cg" >/dev/null 2>&1; then
   jq '.preferredNotifChannel = "notifications_disabled"' "$cg" > "$cg.tmp" && mv "$cg.tmp" "$cg" || rm -f "$cg.tmp"
 fi
 
-# The nightdrive command (bin/nightdrive)
+# The nightdrive command (bin/nightdrive). Its parts in bin/nightdrive.d are sourced from the repo, not commands: not linked
 mkdir -p "$HOME/.local/bin"
-for f in "$repo"/bin/*; do link "$f" "$HOME/.local/bin/$(basename "$f")"; done
+for f in "$repo"/bin/*; do [[ -d $f ]] || link "$f" "$HOME/.local/bin/$(basename "$f")"; done
 
 # Plugin folders (plugins/<id>/ and the external ones, see plugins/README.md): their commands (bin/), user units
 # (systemd/) and Files extensions (nautilus-python/, which show only while the plugin is on), whether installed or not: an
@@ -174,6 +190,8 @@ for d in "$repo"/plugins/*/ "$external"/*/; do
 done
 systemctl --user daemon-reload 2>/dev/null || true
 systemctl --user enable --now nightdrive-update-check.timer 2>/dev/null || true
+# The controller's Xbox button opens Games (hypr/scripts/gamepad-home): on for everyone, idle without a controller
+systemctl --user enable --now nightdrive-gamepad.service 2>/dev/null || true
 for u in "${reenable[@]}"; do
   [[ -e $HOME/.config/systemd/user/$u ]] && systemctl --user enable "$u" 2>/dev/null && echo "enabled     $u (again)"
 done
@@ -204,9 +222,15 @@ for f in "$repo"/config/bash/*.sh; do link "$f" "$HOME/.bashrc.d/$(basename "$f"
 # Voxtype (speech to text, F5): config. The binaries ~/.local/bin/voxtype{,-onnx} and models ~/.local/share/voxtype/models are installed by hand (see docs/dictation.md).
 mkdir -p "$HOME/.config/voxtype"
 link "$repo/config/voxtype/config.toml" "$HOME/.config/voxtype/config.toml"
-mkdir -p "$HOME/.local/share/voxtype/quickshell"
-link "$repo/config/voxtype/OsdSurface.qml" "$HOME/.local/share/voxtype/quickshell/OsdSurface.qml"   # modified OSD (top centre, no dimming)
-for f in listening.wav done.wav; do link "$repo/config/voxtype/$f" "$HOME/.local/share/voxtype/quickshell/$f"; done   # its sound cues (found next to it)
+# Until 30.10.2026 Voxtype drew the dictation toast in a Quickshell of its own (our OsdSurface.qml linked into
+# ~/.local/share/voxtype/quickshell, its links removed above); now Nightdrive's shell does (quickshell/DictationToast.qml)
+# and config.toml turns Voxtype's off. A daemon started before that still runs it: restart the daemon once, as at login
+# (dictate daemon closes the old card).
+if pgrep -u "$(id -u)" -f '[q]s -p .*/voxtype/quickshell' >/dev/null && [[ -n ${WAYLAND_DISPLAY:-} ]]; then
+  pkill -u "$(id -u)" -f '[v]oxtype.* daemon$' && sleep 0.5
+  setsid -f env PATH="$HOME/.local/bin:$PATH" "$HOME/.config/hypr/scripts/dictate" daemon >/dev/null 2>&1
+  echo "restarted   the dictation daemon (its toast is Nightdrive's own now)"
+fi
 
 # Firefox: userChrome.css (tabs below the address bar) into the default profile, and user.js (enables userChrome.css)
 # with the choices of launcher › Settings › Apps › Firefox: firefox-prefs writes it, as it isn't a link

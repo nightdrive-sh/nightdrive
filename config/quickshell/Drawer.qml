@@ -5,7 +5,7 @@ import Quickshell.Wayland
 
 // The empty drawer: when the drawer (⌘D, Hyprland's special:drawer, hypr/bindings.lua) is open with no windows in it,
 // a panel the size of the drawer slides up from the bottom and tells how to fill it. With windows in it, Hyprland's
-// own drawer shows alone. The size matches the drawer's workspace rule in hypr/hyprland.lua (95 % high, edge to edge).
+// own drawer shows alone. The size matches the drawer's workspace rule in hypr/appearance.lua (95 % high, edge to edge).
 Variants {
     model: Quickshell.screens
 

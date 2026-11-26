@@ -8,7 +8,7 @@ import curses, json, os, sys
 TOP = os.path.expanduser("~/.config/topbar")
 CONF, LOCAL_CONF = os.path.join(TOP, "adjust.conf"), os.path.join(TOP, "local.adjust.conf")
 MODULES, LOCAL_MODULES = os.path.join(TOP, "modules.jsonc"), os.path.join(TOP, "local.modules.jsonc")
-PLUGINS = os.path.expanduser("~/.cache/nightdrive/plugins.d/bar.json")   # the installed plugin folders' modules
+PLUGINS = os.path.expanduser("~/.local/state/nightdrive/plugins.d/bar.json")   # the installed plugin folders' modules
 
 
 def fmt(v):

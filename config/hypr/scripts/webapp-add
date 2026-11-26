@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Usage: webapp-add "Name" https://address [icon-file-or-name]
 #        webapp-add --fix-classes
+#        webapp-add --icon "Name"
 # Creates a .desktop file that opens the page as a standalone Chromium app window.
 # --fix-classes sets every webapp's StartupWMClass to the class Chromium gives its window (setup-user.sh, so at each
 # update): webapps made before this script had webapp-<slug>, from the --class that Chromium ignores. The class is
 # what finds the app's window: notifications (Notifs.qml), the launcher, Share.
+# --icon prints the named webapp's icon (a file or a theme name), or nothing: the launcher's "Webapp added" notification
+# shows it, so the slug is made in one place only.
 set -euo pipefail
 
 apps="$HOME/.local/share/applications"
@@ -36,6 +39,13 @@ if [[ ${1:-} == --fix-classes ]]; then
   exit 0
 fi
 
+slugify() { echo "$1" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-'; }
+
+if [[ ${1:-} == --icon ]]; then
+  sed -n 's/^Icon=//p' "$apps/webapp-$(slugify "${2:-}").desktop" 2>/dev/null | head -n1
+  exit 0
+fi
+
 name="${1:-}"; url="${2:-}"; icon="${3:-}"
 if [[ -z $name || -z $url ]]; then
   echo "Usage: webapp-add \"Name\" https://address [icon]" >&2; exit 1
@@ -43,7 +53,7 @@ fi
 
 [[ $url =~ ^[a-z]+:// ]] || url="https://$url"
 
-slug=$(echo "$name" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-')
+slug=$(slugify "$name")
 icons="$HOME/.local/share/icons/webapps"
 mkdir -p "$apps" "$icons"
 

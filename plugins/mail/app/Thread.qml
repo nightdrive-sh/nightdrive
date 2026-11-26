@@ -1,8 +1,9 @@
 import QtQuick
 import qs
 import qs.kit
+import "order.js" as Order
 
-// The open thread: its subject, then each message with its attachments. Mail's reading pane, and a message window's.
+// The open thread: its subject, then each message, its attachments in its header (Attachments.qml). Mail's reading pane, and a message window's.
 Flickable {
     id: root
     // From the window it is in: the look, notmuch, and Mail's helpers (name, fullDate, rich, openPart …).
@@ -13,8 +14,10 @@ Flickable {
     property int htmlMode: 0            // 0 text, 1 HTML on the dark page, 2 HTML on light paper
     signal cycleHtml()
     signal openBrowser()
-    signal resumeDraft()
-    // Buttons above the thread, for the mouse: [{ id, icon, text, short, tip, keys }]; a click sends act(id). Where they
+    signal resumeDraft(string draftId)
+    signal trashDraft(string draftId)
+    // Buttons above the thread, for the mouse (the kit's AppBarButton, as Notes'): [{ id, icon, text, short, tip, keys, strong }];
+    // a click sends act(id), strong lights the one Enter presses. Where they
     // don't all fit beside the view button, the short names show, and where those don't either, only the icons. Held
     // under the pointer, a button says what it does and its key (tip, keys).
     property var actions: []
@@ -46,9 +49,33 @@ Flickable {
     readonly property int foldFrom: 3
     property var unfolded: ({})         // message ids opened by a click
     property var quotesShown: ({})      // message ids whose quote "…" shows
-    onMessagesChanged: { unfolded = ({}); quotesShown = ({}) }
+    // The same thread read again (a reply in it sent: shell.qml's refresh) keeps the messages opened; another starts anew
+    property string shownThread: ""
+    onMessagesChanged: {
+        const first = messages.length ? messages[0].id : ""
+        if (first !== shownThread) { unfolded = ({}); quotesShown = ({}) }
+        shownThread = first
+        loadUnsubscribes()
+    }
+    // A newsletter's unsubscribe link, by message id (lib/unsubscribe.py, #2393): read for the whole thread in one go
+    // when it opens, as notmuch's JSON hasn't the List-Unsubscribe header. A late answer for an earlier thread only
+    // adds ids this one hasn't.
+    property var unsubscribes: ({})
+    function loadUnsubscribes() {
+        unsubscribes = ({})
+        const ids = messages.filter(m => !m.draft).map(m => m.id)
+        if (!ids.length) return
+        nm.nightmail(["unsubscribe"].concat(ids), t => {
+            let r
+            try { r = JSON.parse(t) } catch (e) { return }
+            if (r.links) unsubscribes = Object.assign({}, unsubscribes, r.links)
+        })
+    }
+    // The newest message received or sent stays open, also when a draft written later comes after it
+    readonly property int newest: Order.newest(messages)
     function folded(m, i) {
-        return messages.length >= foldFrom && i < messages.length - 1 && !m.draft && m.tags.indexOf("unread") < 0 && !unfolded[m.id]
+        return messages.length >= foldFrom && i < messages.length - 1 && i !== newest && !m.draft
+               && m.tags.indexOf("unread") < 0 && !unfolded[m.id]
     }
     // A link in a message opens on the web, or as a new message (mailto:). Any other kind (file:, smb:, an app's own)
     // would open something on this computer at a stranger's word, so it doesn't open at all.
@@ -93,47 +120,25 @@ Flickable {
     // A mouse drag selects a message's text instead of dragging the page; the wheel and the touchpad still scroll
     acceptedButtons: Qt.NoButton
     TouchScroll { view: root }
-    component ActButton: Rectangle {
-        id: btn
-        property string icon
-        property string label
-        property string tip
-        property string keys
-        property bool compact: false
-        signal clicked()
-        Tip { y: btn.height + 6; c: root.c; text: btn.tip; keys: btn.keys; hovered: bh.hovered }
-        implicitWidth: btnRow.implicitWidth + 20
-        implicitHeight: 30
-        radius: 8
-        color: bh.hovered ? c.hover : "transparent"
-        HoverHandler { id: bh; cursorShape: Qt.PointingHandCursor }
-        TapHandler { onTapped: btn.clicked() }
-        Row {
-            id: btnRow
-            anchors.centerIn: parent
-            spacing: 7
-            Text { anchors.verticalCenter: parent.verticalCenter; text: Icons.g(btn.icon); font.family: Icons.family; font.pixelSize: 14; color: bh.hovered ? c.text : c.dim }
-            Text { visible: !btn.compact; anchors.verticalCenter: parent.verticalCenter; text: btn.label; font.family: c.font; font.pixelSize: 12; color: bh.hovered ? c.text : c.dim }
-        }
-    }
+    OutDrag { id: outDrag; c: root.c }
     // The buttons measured with their names and short names, to see which fit left of the view button
     Row {
         id: fullBar
         visible: false
         spacing: 2
-        Repeater { model: root.actions; delegate: ActButton { required property var modelData; icon: modelData.icon; label: modelData.text } }
+        Repeater { model: root.actions; delegate: AppBarButton { required property var modelData; c: root.c; glyph: modelData.icon; label: modelData.text } }
     }
     Row {
         id: shortBar
         visible: false
         spacing: 2
-        Repeater { model: root.actions; delegate: ActButton { required property var modelData; icon: modelData.icon; label: modelData.short || modelData.text } }
+        Repeater { model: root.actions; delegate: AppBarButton { required property var modelData; c: root.c; glyph: modelData.icon; label: modelData.short || modelData.text } }
     }
     Row {
         id: iconBar
         visible: false
         spacing: 2
-        Repeater { model: root.actions; delegate: ActButton { required property var modelData; icon: modelData.icon; compact: true } }
+        Repeater { model: root.actions; delegate: AppBarButton { required property var modelData; c: root.c; glyph: modelData.icon; compact: true } }
     }
     // The buttons stay at the top while the thread scrolls under them, on a solid band of the page's colour with a line
     // below it
@@ -164,12 +169,16 @@ Flickable {
         spacing: 2
         Repeater {
             model: root.actions
-            delegate: ActButton {
+            delegate: AppBarButton {
                 required property var modelData
                 required property int index
                 visible: !bar.compact || index < bar.fits
-                icon: modelData.icon; label: bar.full ? modelData.text : modelData.short || modelData.text; compact: bar.compact
+                c: root.c
+                glyph: modelData.icon; label: bar.full ? modelData.text : modelData.short || modelData.text; compact: bar.compact
+                strong: !!modelData.strong
                 tip: modelData.tip || ""; keys: modelData.keys || ""
+                // The last one, at the window's edge when there is no view button, keeps its tip inside the window
+                tipAlign: !viewButton.visible && index === root.actions.length - 1 ? "right" : "left"
                 onClicked: root.act(modelData.id)
             }
         }
@@ -236,17 +245,24 @@ Flickable {
         // The gaps are the messages' own, so folded ones lie close together
         spacing: 0
         // The headers are plain text: with a tag in them Qt would read them as HTML and load an <img> past the body's
-        // blocked images (the body alone is HTML, from app.rich and safeHtml)
-        Text {
-            textFormat: Text.PlainText
+        // blocked images (the body alone is HTML, from app.rich and safeHtml). The subject is selected and copied as
+        // the text is (#3611).
+        TextEdit {
+            textFormat: TextEdit.PlainText
             width: parent.width
             bottomPadding: 12
             visible: root.messages.length > 0
             text: root.messages.length ? root.messages[0].subject : ""
-            wrapMode: Text.Wrap
+            wrapMode: TextEdit.Wrap
+            readOnly: true
+            selectByMouse: true
+            activeFocusOnPress: false
+            persistentSelection: true
+            onSelectedTextChanged: root.selected(this)
+            selectionColor: c.sel
             font.family: c.font; font.pixelSize: 22; font.weight: Font.Medium; font.letterSpacing: -0.2
-            lineHeight: 1.1
             color: c.title
+            HoverHandler { cursorShape: Qt.IBeamCursor }
         }
         Repeater {
             model: root.messages
@@ -295,6 +311,16 @@ Flickable {
                     // In a narrow pane the date goes under the address instead of beside the name.
                     readonly property bool wide: width >= 520
                     width: parent.width; height: hdr.implicitHeight + 28
+                    // Dragged, the message goes out as a line Claude reads it by (OutDrag.qml, #3611): into a
+                    // terminal, or any app that takes text. The chip is made as it is pressed, ready for the drag.
+                    PointHandler { onActiveChanged: if (active) outDrag.prepare(msgCol.modelData.subject, false) }
+                    DragHandler {
+                        target: null
+                        grabPermissions: PointerHandler.TakeOverForbidden
+                        cursorShape: Qt.ClosedHandCursor
+                        onActiveChanged: active ? outDrag.message(head, msgCol.modelData, app.name(msgCol.modelData.from))
+                                                : outDrag.release(head)
+                    }
                     Column {
                         id: hdr
                         width: parent.width
@@ -343,8 +369,19 @@ Flickable {
                         }
                         Text {
                             visible: !head.wide
+                            width: parent.width; elide: Text.ElideRight
                             text: app.fullDate(modelData.timestamp); color: c.faint; font.family: c.font; font.pixelSize: 12
                         }
+                        // The attachments last in the header, in sight as the message opens, a little apart from
+                        // the address above them
+                        Item { visible: attachments.visible; width: 1; height: 8 }
+                        Attachments {
+                            id: attachments; width: parent.width; c: root.c; app: root.app; msg: modelData
+                            unsubscribe: root.unsubscribes[modelData.id] || null; openLink: root.openLink
+                        }
+                        // A calendar invitation in it, with Nightdrive Calendar: what, when, and Add to calendar
+                        Item { visible: invitation.visible; width: 1; height: 8 }
+                        Invitation { id: invitation; width: parent.width; c: root.c; app: root.app; msg: modelData }
                     }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: c.line }
                 }
@@ -404,80 +441,12 @@ Flickable {
                         HoverHandler { cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor }
                     }
                 }
-                // Attachments: a click opens one, "Save" puts it in the downloads folder.
-                Flow {
-                    width: parent.width
-                    visible: !msgCol.isFolded && modelData.files.length > 0
-                    spacing: 8
-                    Repeater {
-                        model: modelData.files
-                        delegate: Rectangle {
-                            id: file
-                            required property var modelData
-                            readonly property var msg: msgCol.modelData
-                            implicitWidth: fileRow.implicitWidth + 28
-                            implicitHeight: 34
-                            radius: 8
-                            border.color: c.line
-                            color: fileHover.hovered ? c.hover : "transparent"
-                            HoverHandler { id: fileHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler { onTapped: app.openPart(file.msg, file.modelData) }
-                            Row {
-                                id: fileRow
-                                anchors.centerIn: parent
-                                spacing: 10
-                                Text {
-                                    id: fileName
-                                    textFormat: Text.PlainText
-                                    text: file.modelData.name; color: c.text; font.family: c.font; font.pixelSize: 12
-                                    width: Math.min(implicitWidth, 280); elide: Text.ElideMiddle
-                                }
-                                Text { text: app.size(file.modelData.size); color: c.faint; font.family: c.font; font.pixelSize: 11; anchors.baseline: fileName.baseline }
-                                Text {
-                                    text: "Save"; font.family: c.font; font.pixelSize: 11; anchors.baseline: fileName.baseline
-                                    color: saveHover.hovered ? c.accent : c.dim
-                                    opacity: fileHover.hovered ? 1 : 0
-                                    HoverHandler { id: saveHover }
-                                    TapHandler { onTapped: app.savePart(file.msg, file.modelData) }
-                                }
-                            }
-                        }
-                    }
-                    // Two or more: all of them to the downloads folder at once
-                    Rectangle {
-                        visible: msgCol.modelData.files.length > 1
-                        implicitWidth: allRow.implicitWidth + 24
-                        implicitHeight: 34
-                        radius: 8
-                        color: allHover.hovered ? c.hover : "transparent"
-                        HoverHandler { id: allHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: app.saveAll(msgCol.modelData) }
-                        Row {
-                            id: allRow
-                            anchors.centerIn: parent
-                            spacing: 7
-                            Text { anchors.verticalCenter: parent.verticalCenter; text: Icons.g("download"); font.family: Icons.family; font.pixelSize: 14; color: allHover.hovered ? c.accent : c.dim }
-                            Text { anchors.verticalCenter: parent.verticalCenter; text: "Save all"; font.family: c.font; font.pixelSize: 12; color: allHover.hovered ? c.accent : c.dim }
-                        }
-                    }
-                }
-                // A draft is written on in the writing window.
-                Rectangle {
+                // A draft is written on in the writing window; one with a twin says so (#3625)
+                DraftBar {
                     visible: !msgCol.isFolded && modelData.draft
-                    implicitWidth: draftRow.implicitWidth + 28
-                    implicitHeight: 34
-                    radius: 8
-                    color: draftHover.hovered ? c.hover : "transparent"
-                    border.color: c.line
-                    HoverHandler { id: draftHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: root.resumeDraft() }
-                    Row {
-                        id: draftRow
-                        anchors.centerIn: parent
-                        spacing: 8
-                        KeyCap { anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "⏎"; tint: c.faint }
-                        Text { anchors.verticalCenter: parent.verticalCenter; text: "Continue writing"; color: c.accent; font.family: c.font; font.pixelSize: 12 }
-                    }
+                    c: root.c; app: root.app; msg: modelData; messages: root.messages
+                    onResume: root.resumeDraft(modelData.id)
+                    onTrash: root.trashDraft(modelData.id)
                 }
                 Item { visible: !msgCol.isFolded; width: 1; height: 56 }
             }

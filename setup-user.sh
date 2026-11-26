@@ -15,7 +15,7 @@ SIX_CAPS_SHA256=7b54a46671722fb670647c9c3951e6e618b6a9d876fc5d9ae34dfd311628ae5a
 BLESH_REF=d81fd54feb0d996fdff20dca27eaf0201f7015cc   # master of 8.9.2026, in use since 14.10.2026; contrib is pinned by it
 
 fetch() {   # URL SHA256 FILE
-  curl -fsSL -o "$3" "$1" && sha256sum -c --quiet - <<<"$2  $3" || { echo "    $1: not downloaded, or not the file expected (sha256 $2)" >&2; return 1; }
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$3" "$1" && sha256sum -c --quiet - <<<"$2  $3" || { echo "    $1: not downloaded, or not the file expected (sha256 $2)" >&2; return 1; }
 }
 
 echo "==> Nerd Fonts symbols (icons for the top bar and menus)"
@@ -65,6 +65,12 @@ echo "==> Default apps: images open in Loupe (instead of the browser); Markdown 
 "$repo/config/hypr/scripts/default-apps" set images org.gnome.Loupe.desktop --if-unset
 # The terminal: kitty (Nightdrive's settings and colours) until another is chosen; unset, xdg-terminal-exec would pick any
 "$repo/config/hypr/scripts/default-apps" set terminal kitty.desktop --if-unset
+# A Chromium browser (Brave…) chosen as the browser: links from other apps in a new window (its own entry, rewritten as
+# its Exec may change with the browser's update)
+"$repo/config/hypr/scripts/default-apps" refresh
+# Source code (.json, .py…) with no code editor chosen: text/plain's app written down for xdg-open, which can't find it
+# through the types' parents as Files does, and opened a .json in Ferry
+"$repo/config/hypr/scripts/default-apps" follow
 
 echo "==> Webapps: the window class Chromium gives them (their notifications, the launcher and Share find the window)"
 "$repo/config/hypr/scripts/webapp-add" --fix-classes

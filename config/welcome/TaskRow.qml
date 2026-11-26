@@ -17,11 +17,13 @@ AppRow {
     readonly property int sideWidth: 260    // the right's room, the same on every row, so picking one doesn't rewrap its text
     signal activated()
 
-    // Its state, from tasks' row: running and done come from the system, skipped and started from setup.json
-    readonly property bool byHand: task.id !== "claude" && (manual || !claudeIn)
+    // Its state, from tasks' row: running and done come from the system, skipped and started from setup.json. Claude's
+    // access is a choice in this window (AccessView), never a setup
+    readonly property bool access: task.id === "claude-access"
+    readonly property bool byHand: task.id !== "claude" && !access && (manual || !claudeIn)
     readonly property string stage: task.running ? "running" : task.done ? "done" : task.mark === "skipped" ? "skipped"
                                   : selfPath ? "todo" : task.mark === "started" ? "started" : byHand ? "needs" : "todo"
-    readonly property string action: selfPath ? "Open README" : ({
+    readonly property string action: access ? (stage === "done" ? "Change" : "Choose") : selfPath ? "Open README" : ({
         running: "Show",
         done: task.id === "claude" ? "" : byHand ? "Show the steps" : "Run again",    // signed in is as far as Claude's row goes
         needs: task.steps ? "Set up by hand" : "Open the steps",

@@ -1,6 +1,9 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "blanks.js" as Blanks
+import "flowed.js" as Flowed
+import "order.js" as Order
 
 // The only part that talks to notmuch, and the only Quickshell import besides the window:
 // a later native host replaces this file and keeps the same functions.
@@ -48,11 +51,30 @@ QtObject {
         })
     }
 
-    // Threads matching the query, newest first.
+    // Threads matching the query, newest first, each with attachments: true when a message in it has a file attached.
     function search(query, done) {
         json(["search", "--format=json", "--limit=500", query],
              t => JSON.parse(t).map(x => Object.assign(x, { subject: oneLine(x.subject), authors: authors(x.authors) })),
-             [], done)
+             [], rows => attachments(rows, done))
+    }
+
+    // notmuch tags a message "attachment" when a part of it is sent as one (signature and other inline pictures
+    // aren't), but an invitation's invite.ics is one too: a message whose only files are calendar ones doesn't count,
+    // unless a PDF (an agenda) came with it. The same query is in lib/browse.py (FILES), for `nightmail search`.
+    readonly property string files: "tag:attachment and not ((mimetype:application/ics or mimetype:text/calendar)"
+                                    + " and not mimetype:application/pdf)"
+    // Only the threads already tagged are asked about (a few dozen ids, ~25 ms), so a folder of thousands costs the
+    // same. If notmuch can't answer, the tag alone decides.
+    function attachments(rows, done) {
+        const maybe = rows.filter(r => r.tags.indexOf("attachment") >= 0)
+        for (const r of rows) r.attachments = false
+        if (!maybe.length) { done(rows); return }
+        json(["search", "--format=json", "--output=threads",
+              "(" + maybe.map(r => "thread:" + r.thread).join(" or ") + ") and " + files],
+             t => JSON.parse(t), null, ids => {
+                 for (const r of maybe) r.attachments = !ids || ids.indexOf(r.thread) >= 0
+                 done(rows)
+             })
     }
 
     // notmuch lists the authors of the messages the query matched, then "| " and the rest's (e.g. your own reply in
@@ -69,10 +91,31 @@ QtObject {
         return (s || "").replace(/\s+/g, " ").trim()
     }
 
-    // The thread's messages in order, each { from, to, date, subject, tags, body } with the body as plain text.
+    // The thread's messages by date, oldest first and without deleted drafts (order.js), each { from, to, date,
+    // subject, tags, body } with the body as plain text.
     function show(thread, done) {
         json(["show", "--format=json", "--include-html", "--entire-thread=true", "thread:" + thread],
-             t => { const out = []; flatten(JSON.parse(t), out); return out }, [], done)
+             t => { const out = []; flatten(JSON.parse(t), out); return Order.order(out) }, [], list => unflow(list, done))
+    }
+
+    // A format=flowed text's paragraphs joined (flowed.js, #3321). notmuch's JSON leaves Content-Type's parameters
+    // out, so lib/flowed.py reads the header from the file, for the messages whose text looks flowed (a line ending
+    // in a space goes on in the next): most mail isn't asked about. If it can't answer, the lines stay as they are.
+    readonly property string flowReader: composer.replace(/compose\.py$/, "flowed.py")
+    function unflow(list, done) {
+        const maybe = list.filter(m => m.flowable)
+        for (const m of list) delete m.flowable
+        if (!maybe.length) { done(list); return }
+        // (reduce, not flatMap: Qt's engine has no flatMap)
+        const pairs = maybe.reduce((a, m) => a.concat([m.id, m.file]), [])
+        proc.createObject(nm, { command: ["python3", flowReader].concat(pairs), done: t => {
+            let r = {}
+            try { r = JSON.parse(t) } catch (e) {}
+            for (const m of maybe)
+                if (r[m.id] !== undefined) m.body = Blanks.tidy(plainText(Flowed.unflow(m.plain, r[m.id])))
+            for (const m of maybe) { delete m.plain; delete m.file }
+            done(list)
+        } })
     }
 
     // Mail's own command (bin/nightmail), e.g. for Claude's card: its output as text.
@@ -102,10 +145,10 @@ QtObject {
         } })
     }
 
-    // Deletes a query's messages in Trash for good (lib/erase.py); done gets { erased } or { error }.
+    // Deletes a query's messages in Trash (or folder: "Spam") for good (lib/erase.py); done gets { erased } or { error }.
     readonly property string eraser: composer.replace(/compose\.py$/, "erase.py")
-    function erase(query, from, done) {
-        proc.createObject(nm, { command: ["python3", eraser, query].concat(from), done: t => {
+    function erase(query, from, done, folder) {
+        proc.createObject(nm, { command: ["python3", eraser, "--folder", folder || "Trash", query].concat(from), done: t => {
             let r
             try { r = JSON.parse(t) } catch (e) { r = { error: t.trim() || "No answer from erase.py" } }
             done(r)
@@ -113,7 +156,7 @@ QtObject {
     }
 
     // An attachment of a message being read (lib/parts.py): "open" copies it where it can be opened from, "save" to
-    // the downloads folder. done gets { path } or { error }.
+    // the downloads folder (never over a file there: "name (2).pdf"). done gets { path } or { error }.
     readonly property string parter: composer.replace(/compose\.py$/, "parts.py")
     function part(cmd, msgid, part, name, done) {
         proc.createObject(nm, { command: ["python3", parter, cmd, msgid, String(part), name], done: t => {
@@ -143,6 +186,9 @@ QtObject {
         } })
     }
 
+    // Show in folder: the folder the saved files are in, with them picked, in the file manager (parts.py show)
+    function showSaved(paths) { proc.createObject(nm, { command: ["python3", parter, "show"].concat(paths), done: t => {} }) }
+
     // Files to attach, from the desktop's file picker; done gets their paths (none when cancelled).
     function pick(done) {
         proc.createObject(nm, { command: ["zenity", "--file-selection", "--multiple", "--separator=\n", "--title=Attach files"],
@@ -164,22 +210,25 @@ QtObject {
         run(["tag"].concat(changes, ["--", query]), () => { if (done) done() })
     }
 
-    // notmuch nests a thread as [[message, [replies]]]; walk it in reading order.
-    function flatten(node, out) {
+    // notmuch nests a thread as [[message, [replies]]]; walk it in the tree's order (show() then sorts it by date).
+    // parent: the message a reply answers (its In-Reply-To), for twins.js
+    function flatten(node, out, parent) {
         if (!Array.isArray(node)) return
         for (const n of node) {
             if (Array.isArray(n) && n.length === 2 && n[0] && n[0].headers) {
-                out.push(message(n[0]))
-                flatten(n[1], out)
+                out.push(message(n[0], parent || ""))
+                flatten(n[1], out, n[0].id)
             } else {
-                flatten(n, out)
+                flatten(n, out, parent)
             }
         }
     }
 
-    function message(m) {
-        const parts = { plain: "", html: "", files: [] }
+    function message(m, parent) {
+        const parts = { plain: "", html: "", files: [], invite: false }
         collect(m.body || [], parts, "")
+        const file = Array.isArray(m.filename) ? m.filename[0] : m.filename
+        const flowable = parts.plain !== "" && !!file && Flowed.maybe(parts.plain)
         return {
             id: m.id,
             from: m.headers.From || "",
@@ -187,10 +236,19 @@ QtObject {
             subject: oneLine(m.headers.Subject),
             timestamp: m.timestamp,
             tags: m.tags || [],
+            parent: parent || "",
             draft: (m.filename || []).some(f => /\/Drafts\/(cur|new)\//.test(f)),
-            body: (parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)).replace(/^\s+|\s+$/g, ""),
+            sent: (m.filename || []).some(f => /\/Sent\/(cur|new)\//.test(f)),
+            gone: Order.deletedDraft(m.tags, m.filename),   // for order(), which leaves it out and takes this off
+            // Blank lines tidied for reading (blanks.js): a newsletter's runs of empty and NBSP lines become one
+            body: Blanks.tidy(parts.plain !== "" ? plainText(parts.plain) : htmlToText(parts.html)),
             html: parts.html !== "" ? safeHtml(parts.html) : "",
-            files: parts.files      // attachments: { part, name, size } (size in bytes, or -1)
+            files: parts.files,     // attachments: { part, name, size } (size in bytes, or -1)
+            invite: parts.invite,   // a calendar invitation in it: Invitation.qml reads it by Calendar
+            // For unflow() only, which takes them off: the raw text and its file, when it may be format=flowed
+            flowable: flowable,
+            plain: flowable ? parts.plain : undefined,
+            file: flowable ? file : undefined
         }
     }
 
@@ -200,6 +258,8 @@ QtObject {
         for (const part of list) {
             const type = (part["content-type"] || "").toLowerCase()
             if (Array.isArray(part.content)) { collect(part.content, parts, type); continue }
+            // An invitation's own text/calendar part (in multipart/alternative, no file name), or an .ics attached
+            if (type === "text/calendar" || type === "application/ics" || /\.ics$/i.test(part.filename || "")) parts.invite = true
             if (part["content-disposition"] === "attachment" || part.filename && type.indexOf("text/") !== 0) {
                 if (parent === "multipart/related" && part["content-id"] && part["content-disposition"] !== "attachment") continue
                 parts.files.push({ part: part.id, name: part.filename || "attachment", size: part["content-length"] || (part.content || "").length || -1 })

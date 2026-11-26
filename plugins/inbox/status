@@ -1,0 +1,8 @@
+#!/bin/bash
+# Inbox's top bar module (module.jsonc): always the mailbox, so it is there to click (#3212). While some are unread its
+# flag is up with how many; once all are read the flag is down and there is no number, as in the sessions bar. Nothing
+# pops up and nothing sounds: a message is to look at when you have time, not now (docs/inbox.md).
+# The core's command by its path (config/inbox): it's there whether ~/.local/bin is in the bar's PATH or not.
+. ~/.config/topbar/scripts/emit
+n=$(python3 ../../config/inbox/cli.py count 2>/dev/null)
+if (( ${n:-0} > 0 )); then emit mailbox-flag-up "$n"; else emit mailbox-flag-down ""; fi

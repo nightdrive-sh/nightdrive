@@ -26,13 +26,15 @@ Rectangle {
     readonly property int pad: padded ? 10 : 0
     signal clicked()
     signal rightClicked()
-    readonly property bool hoverShown: hoverCheckIcon !== "" && (area.containsMouse || navSelected)
+    // The mouse's hover, put away by a key till the mouse moves (MenuPointer.qml)
+    readonly property bool pointed: area.containsMouse && !MenuPointer.pointerAway
+    readonly property bool hoverShown: hoverCheckIcon !== "" && (pointed || navSelected)
     readonly property bool hoverOnly: checkIcon === "" && hoverCheckIcon !== ""   // nothing to show until the mouse comes
 
     height: 34
     radius: 5
     // Action buttons (Open …, Disconnect) get a faint wash of the theme colour so they read as buttons
-    color: (area.containsMouse && interactive) || navSelected ? Theme.hover
+    color: (pointed && interactive) || navSelected ? Theme.hover
          : active && interactive ? Theme.sel
          : action || tinted ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.07) : "transparent"
     border { width: navSelected ? 1 : 0; color: Theme.primary }
@@ -79,6 +81,9 @@ Rectangle {
         }
         elide: Text.ElideRight
         text: row.action ? row.label.toUpperCase() : row.label
+        // A label is often someone else's text (a device's or network's name, another device's Ferry text): Qt's
+        // AutoText would draw it as markup if it looked like a tag (a link, an <img> loaded from the net)
+        textFormat: Text.PlainText
         color: row.fg
         font { family: Theme.font; pixelSize: row.action ? 11 : 13; letterSpacing: row.action ? 0.6 : 0 }
     }
@@ -94,6 +99,7 @@ Rectangle {
             visible: row.detail !== "" && !row.busy
             anchors.verticalCenter: parent.verticalCenter
             text: row.detail
+            textFormat: Text.PlainText   // as the label: never markup
             color: Theme.dim
             font { family: Theme.font; pixelSize: 11 }
             opacity: row.hoverOnly && row.hoverShown ? 0 : 1   // the hover icon comes in its place

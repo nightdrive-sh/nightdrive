@@ -1,0 +1,14 @@
+# Companion's server (config/companion, bin/companion; docs/companion.md). Linked only, started when turned on:
+# Settings › Companion, or nightdrive companion on.
+[Unit]
+Description=Nightdrive Companion
+PartOf=nightdrive-session.target
+After=nightdrive-session.target
+
+[Service]
+ExecStart=%h/.local/bin/companion run
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=nightdrive-session.target

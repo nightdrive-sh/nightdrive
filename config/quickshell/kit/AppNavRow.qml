@@ -3,7 +3,8 @@ import QtQuick.Layouts
 import qs
 
 // A row of the sidebar: a glyph, a name and a count on the right. Picked, its glyph takes the accent and its name the title
-// colour. Anything put inside it (a button that shows under the pointer) lies over the row.
+// colour. Anything put inside it (a button that shows under the pointer) lies over the row. Its pointer's colour waits
+// after a key, as AppRow's.
 Rectangle {
     id: root
     required property QtObject c
@@ -14,7 +15,7 @@ Rectangle {
     property bool selected: false
     property bool dropTarget: false     // something dragged over it would land here
     property bool active: false         // the keyboard is in the sidebar (Tab): the picked row has a frame of the accent
-    readonly property alias hovered: hover.hovered
+    readonly property bool hovered: hover.hovered && !c.pointerAway
     signal clicked()
     Layout.fillWidth: true
     Layout.leftMargin: 12

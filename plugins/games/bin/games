@@ -1,0 +1,104 @@
+#!/bin/bash
+# games: Nightdrive Games' window (plugins/games, README.md): the games on this computer as covers. The list and the
+# starting are the core's (`nightdrive games`, hypr/scripts/games), so this command opens the window, and gives the
+# controller's Xbox button (hypr/scripts/gamepad-home) its mode and the moves in it.
+set -uo pipefail
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app                                     # Games' own Quickshell config, apart from the desktop's shell
+
+# shellcheck disable=SC2034  # read by kit/app.sh, sourced below
+APP_TITLE=Games
+# shellcheck disable=SC2034  # read by kit/app.sh
+APP_IPC=games
+. "$QS_DIR/kit/app.sh"
+
+# The window's answer to an IPC call (kit's ipc throws it away)
+ask() { qs ipc -p "$QS_DIR" call games "$@" 2>/dev/null; }
+
+# tv: open in the controller's mode: bigger covers and the controller's hints. hyprland.lua floats the window in the
+# middle; from the Xbox button it takes the focus, so the keys work too
+tv() {
+  open_ready || return 1
+  ask tv true >/dev/null
+  command -v hyprctl >/dev/null || return 0
+  local addr=""
+  for _ in $(seq 20); do
+    addr=$(hyprctl -j clients 2>/dev/null | jq -r --argjson pid "$(pid || echo 0)" --arg t "$APP_TITLE" \
+             '[.[] | select(.pid == $pid and .title == $t)] | first | .address // empty')
+    [[ -n $addr ]] && break; sleep 0.05
+  done
+  [[ -n $addr ]] && hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+  return 0
+}
+
+# state: open while the window is showing and has the focus (the controller's moves are for it then), else nothing
+state() {
+  running || return 0
+  hyprctl -j activewindow 2>/dev/null | jq -e --argjson pid "$(pid)" --arg t "$APP_TITLE" '.pid == $pid and .title == $t' \
+    >/dev/null && echo open
+}
+
+# home: the Xbox button. Open (the controller's mode) unless it is showing already, then it closes. Prints open or closed
+home() {
+  if [[ $(state) == open ]]; then stop; echo closed
+  else tv && echo open; fi
+}
+
+# Puts Games among the desktop's apps (share/games.desktop), with Exec's full path filled in: the compositor's PATH
+# may not have ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/games.svg" "$icons/nightdrive-games.svg"
+  sed "s|^Exec=games|Exec=$HOME/.local/bin/games|" "$APP_DIR/share/games.desktop" > "$apps/nightdrive-games.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Installed: $apps/nightdrive-games.desktop"
+}
+
+# Takes Games out of the desktop's apps; the Xbox button then opens the Launcher's Games instead
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  app_command quit >/dev/null 2>&1 || true
+  rm -f "$data/applications/nightdrive-games.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-games.svg"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$data/applications" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Games is out of your apps; the Xbox button opens the Launcher's Games instead."
+}
+
+usage() {
+  cat <<USAGE
+Usage: games [command]
+
+  (none), open     open Games, or bring it forward if it is open
+  tv               open it in the controller's mode (bigger, with its hints)
+  home             the Xbox button: open in the controller's mode, or close when it is showing
+  pad BUTTON       the controller in the window: up, down, left, right, a, b (prints ok, or nothing when it isn't showing)
+  state            open while the window is showing and has the focus, else nothing
+  install          Games among the desktop's apps (the installer)
+  uninstall        take it out again
+  restart          close and open again (after a change to the app)
+  quit             close the window
+  log              follow the app's log (QML errors show up here)
+  help             this text
+
+The games themselves: nightdrive games (list, launch ID).
+USAGE
+}
+
+case ${1:-open} in
+  tv)        tv ;;
+  home)      home ;;
+  pad)       running && ask pad "${2:?usage: games pad BUTTON}" ;;
+  state)     state ;;
+  install)   install_app ;;
+  uninstall) uninstall_app ;;
+  help|-h|--help) usage ;;
+  *)
+    app_command "$@"; status=$?        # open (the default), restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac

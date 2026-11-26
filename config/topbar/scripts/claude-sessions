@@ -1,11 +1,70 @@
 #!/bin/bash
 # The Claude Code sessions running in a terminal window on this desktop, for the Claude menu (Claude.qml):
-# [{address, pid, dir, started}], address = the window (hyprctl clients), started = epoch seconds.
-# The window's title tells the rest live (Claude Code sets it: ✳ when it waits for you, a spinner while it works).
-# A session in tmux or over ssh has no window of its own and isn't listed.
+# [{address, pid, dir, started, name, status, waitingFor, last, since}], address = the window (hyprctl clients), started
+# = epoch seconds. The window's title tells the rest live (Claude Code sets it: ✳ when it waits for you, a spinner while it works).
+# account: the Claude Code account it runs on (claude-accounts: its CLAUDE_CONFIG_DIR, ~/.claude without one), and
+# accountDefault, true for ~/.claude's: the sessions bar tags the others with the account's name.
+# From Claude Code's own record of the session (<its config dir>/sessions/PID.json, missing in an old version: then empty):
+# name (the session's name, /rename), status (busy, idle, waiting: it asks you something) and waitingFor (what), and
+# last, the last line of its last reply (its transcript), for the sessions bar's hover (SessionsBar.qml); since, when its
+# status last changed (epoch seconds, 0 if unknown): the bar's time, how long a turn has run or it has waited for you.
+# pm: true for a project manager's session (PM_NAME).
+# openerPid and openerName: the session that opened it with `nightdrive ask` (terminal-or-claude puts them in its
+# environment), 0 and "" for one you opened; the bar groups a session's openings beside it (SessionGroups.js).
+# transcript: the path of its conversation (<its config dir>/projects/<dir>/<sessionId>.jsonl), "" when not found; Companion
+# reads it (config/companion/lib/transcript.py), as a folder may hold several sessions' transcripts on several accounts.
+# A background session of Claude Code's daemon (`claude --bg`) is listed by the window showing it (`claude agents`),
+# found by the window's title: its record, PID and folder (bg_record). A session in tmux or over ssh has no window of its
+# own and isn't listed.
 set -uo pipefail
+readonly TAIL=300    # transcript lines read from the end for the last reply: a long tool run has no text in between
+readonly LAST=300    # characters of the last line kept
+readonly HOPS=20     # continued-in links followed at most, so a loop of them can't hang the bar
+# A project manager's session: its name ends "… Project Manager" or "… PM" (ndpm's "Nightdrive Project Manager", "Cold
+# Start PM"). Decided here, once, as pm: the PM space (Claude.qml → hypr/pm-space.lua) and Companion's pinned tiles
+# (companion/lib/sessions.py) both read it. Only the name: a topic such as "#3078 Companion PM order" isn't one (#3079).
+readonly PM_NAME='\s+(project\s+manager|pm)\s*$'
+
+# The transcript being written now. Claude Code may carry a conversation on in a new transcript (a new sessionId) and
+# end the old one with {"type":"continued-in","continuedInSessionId":…}, while the session's record keeps the first id:
+# without following that, the bar's last line and Companion's view stop where the old file ends (#3134).
+current() {
+  local t=$1 next hop
+  for (( hop = 0; hop < HOPS; hop++ )); do
+    next=$(grep -F '{"type":"continued-in"' "$t" 2>/dev/null \
+             | jq -r 'select(.type == "continued-in") | .continuedInSessionId // empty' 2>/dev/null | tail -n 1)
+    [[ $next =~ ^[A-Za-z0-9-]+$ && -r ${t%/*}/$next.jsonl ]] || break
+    t=${t%/*}/$next.jsonl
+  done
+  printf '%s\n' "$t"
+}
+
+# The record of the background session a window shows (#3200), for a claude with no record of its own: a session of
+# Claude Code's daemon (`claude --bg`, /bg) runs under the daemon, no window's child (its process isn't even named
+# claude), and a terminal shows it with `claude agents`, which has no record. Nothing on disk says which session that
+# shows (the daemon's attach journal names only its PID), but its window's title is the session's name as Claude Code
+# titles any session ("✳ NAME", a spinner while it works). A bg record of that name in the same account whose process
+# lives (procStart: its start time, so a reused PID doesn't count); the newest if there are several.
+bg_record() {
+  local conf=$1 title=$2 p start f
+  [[ -n $title ]] || return
+  jq -r --arg t "$title" 'select(.kind == "bg" and (.name // "") != "" and (.name == $t or .name == ($t | sub("^\\S+\\s+"; ""))))
+        | "\(.updatedAt // 0)\t\(.pid)\t\(.procStart // "")\t\(input_filename)"' "$conf"/sessions/*.json 2>/dev/null \
+    | sort -rn | while IFS=$'\t' read -r _ p start f; do
+        [[ $p =~ ^[0-9]+$ && -r /proc/$p/stat ]] || continue
+        [[ -z $start || $(sed 's/.*) //' "/proc/$p/stat" | awk '{print $20}') == "$start" ]] || continue
+        echo "$f"; break
+      done
+}
+
 clients=$(hyprctl -j clients 2>/dev/null) || { echo '[]'; exit 0; }
 now=$(date +%s)
+# The accounts' names by config dir; the first is the default's
+declare -A accounts=()
+default_dir=
+while IFS=$'\t' read -r aname adir; do
+  accounts[$adir]=$aname; [[ -n $default_dir ]] || default_dir=$adir
+done < <("$(dirname "$0")/claude-accounts")
 for pid in $(pgrep -x claude); do
   # Up the parents to the terminal's window
   p=$pid addr=
@@ -17,5 +76,45 @@ for pid in $(pgrep -x claude); do
   [[ -n $addr ]] || continue
   dir=$(readlink "/proc/$pid/cwd" 2>/dev/null) || continue
   age=$(ps -o etimes= -p "$pid" | tr -d ' ')
-  jq -nc --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" '{address: $a, pid: $pid, dir: $d, started: $s}'
+  # Its environment is readable as it's ours; NUL-separated: its account, and who opened it
+  env=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -E '^(NIGHTDRIVE_OPENER_(PID|NAME)|CLAUDE_CONFIG_DIR)=')
+  conf=$(sed -n 's/^CLAUDE_CONFIG_DIR=//p' <<<"$env"); conf=${conf%/}; conf=${conf:-$default_dir}
+  # A dir no account lists (a one-off CLAUDE_CONFIG_DIR) goes by its own name, as claude-accounts would name it
+  account=${accounts[$conf]:-$(b=${conf##*/}; b=${b#.}; echo "${b#claude-}")}
+  rec="$conf/sessions/$pid.json"
+  # No record: a window showing a background session (bg_record). The session stands in for it, the window kept: its
+  # PID (the sessions it opened name it as their opener, SessionGroups.js), folder, start, account and opener
+  if [[ ! -r $rec ]] && bg=$(bg_record "$conf" "$(jq -r --arg a "$addr" 'first(.[] | select(.address == $a) | .title) // ""' <<<"$clients")") \
+     && [[ -n $bg ]]; then
+    rec=$bg pid=$(jq -r .pid "$rec")
+    dir=$(jq -r '.cwd // empty' "$rec"); dir=${dir:-$(readlink "/proc/$pid/cwd" 2>/dev/null)}
+    age=$(ps -o etimes= -p "$pid" | tr -d ' ')
+    env=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -E '^(NIGHTDRIVE_OPENER_(PID|NAME))=')
+  fi
+  [[ -r $rec ]] && info=$(jq -c '{name: (.name // ""), status: (.status // ""), waitingFor: (.waitingFor // ""), sid: (.sessionId // ""),
+                                    since: ((.statusUpdatedAt // 0) / 1000 | floor)}' "$rec" 2>/dev/null) || info=
+  [[ -n $info ]] || info='{"name":"","status":"","waitingFor":"","sid":"","since":0}'
+  # The last reply's last line: the transcript is <its config dir>/projects/<the dir, mangled>/<sessionId>.jsonl, found
+  # by its id rather than by mangling the dir as Claude Code does
+  last='""' tpath='' sid=$(jq -r .sid <<<"$info")
+  if [[ -n $sid ]]; then
+    for t in "$conf"/projects/*/"$sid".jsonl; do
+      [[ -r $t ]] || continue
+      t=$(current "$t")
+      tpath=$t
+      # As a JSON string, one line however many the reply has
+      last=$(tac "$t" | head -n "$TAIL" | jq -c 'select(.type == "assistant") | [.message.content[]? | select(.type == "text") | .text]
+               | join("\n") | select(test("\\S"))' 2>/dev/null | head -n 1)
+      [[ -n $last ]] || last='""'
+      break
+    done
+  fi
+  opid=$(sed -n 's/^NIGHTDRIVE_OPENER_PID=//p' <<<"$env"); [[ $opid =~ ^[0-9]+$ ]] || opid=0
+  oname=$(sed -n 's/^NIGHTDRIVE_OPENER_NAME=//p' <<<"$env")
+  jq -nc --arg acc "$account" --argjson accdef "$([[ $conf == "$default_dir" ]] && echo true || echo false)" \
+     --argjson op "$opid" --arg on "$oname" --arg a "$addr" --argjson pid "$pid" --arg d "$dir" --argjson s "$(( now - ${age:-0} ))" --argjson i "$info" \
+     --argjson l "$last" --argjson n "$LAST" --arg tp "$tpath" --arg pm "$PM_NAME" \
+     '{address: $a, pid: $pid, dir: $d, started: $s} + ($i | del(.sid)) + {pm: ($i.name | test($pm; "i"))}
+      + {openerPid: $op, openerName: $on, account: $acc, accountDefault: $accdef, transcript: $tp}
+      + {last: ($l | gsub("^\\s+|\\s+$"; "") | split("\n") | map(select(test("\\S"))) | last // "" | .[0:$n])}'
 done | jq -sc 'unique_by(.address)'

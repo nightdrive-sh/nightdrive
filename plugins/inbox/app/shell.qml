@@ -1,0 +1,268 @@
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Io
+import qs
+import qs.kit
+
+// Inbox, Nightdrive's window for the messages Claude's sessions and apps leave to look at later (#3132; kept and acted
+// on by the core's `nightdrive inbox`, config/inbox): Inbox, Archive and who they are from (NavSidebar), the messages
+// newest first (MessageList), and the open one with its text, buttons and pictures (MessageView). A run button asks
+// first (RunPanel), a picture opens over the window (ImageViewer). This file holds the window together: the narrow
+// window's turns, the IPC, the keys (their sheet: KeyHelp.qml) and what the bar's and the message's buttons do.
+ShellRoot {
+    FloatingWindow {
+        id: win
+        title: "Inbox"
+        implicitWidth: 1100
+        implicitHeight: 700
+        color: c.bg
+        onClosed: Qt.quit()
+
+        AppLook { id: c }
+        Store { id: store }
+        Actions { id: actions; command: store.command }
+        KeyHelp { id: keyHelp }
+        readonly property QtObject look: c
+
+        // Narrow windows, as Notes': below navMin the sidebar hides (Tab or the list's button shows it), and below
+        // onePaneMax the list and the message take turns: Esc on the message shows the list, a click or Enter on a
+        // message the message; there Tab shows the sidebar in the list's place. ⌘B shows and hides the sidebars.
+        readonly property int navMin: 960
+        readonly property int onePaneMax: 720
+        // Mail's measures, so the two windows line up: the sidebar's title and the list's search are headerHeight
+        // high, the first row headerGap under them, and the bar over the message barHeight high
+        readonly property int headerHeight: 22
+        readonly property int headerGap: 30
+        readonly property int barHeight: 54
+        readonly property bool onePane: width < onePaneMax
+        property var sidebarChoice: null
+        property var navChoice: null
+        property bool listOpen: true                // in one pane: the list shows instead of the message
+        property bool navOpen: false                // in one pane, with the list open: the sidebar instead of it
+        readonly property bool sidebarShown: onePane ? listOpen && !navOpen : sidebarChoice !== null ? sidebarChoice : true
+        readonly property bool navShown: onePane ? listOpen && navOpen
+            : sidebarShown && (navChoice !== null ? navChoice : width >= navMin)
+        onOnePaneChanged: { listOpen = true; navOpen = false }
+        function toggleSidebar() { if (onePane) { listOpen = !listOpen; navOpen = false } else sidebarChoice = !sidebarShown }
+        property bool navForKeys: false
+        function toFolders() {
+            if (nav.activeFocus) return fromFolders()
+            navForKeys = !navShown
+            if (onePane) { listOpen = true; navOpen = true }
+            else if (navForKeys) { sidebarChoice = true; navChoice = true }
+            nav.forceActiveFocus()
+        }
+        function fromFolders() {
+            if (onePane) navOpen = false
+            else if (navForKeys) navChoice = null
+            navForKeys = false
+            view.forceActiveFocus()
+        }
+        function pick(id) { sel.clear(); store.picked = id; listOpen = false; navOpen = false; view.forceActiveFocus() }
+        function find() {
+            if (onePane) { listOpen = true; navOpen = false } else sidebarChoice = true
+            list.field.forceActiveFocus()
+        }
+        function searchDone(clear) {
+            if (clear) { list.field.text = ""; store.setSearch("") }
+            view.forceActiveFocus()
+        }
+        // 1–3 and Ctrl+↑ Ctrl+↓: the sidebar's first rows (NavSidebar.views), as Mail's folders
+        readonly property var views: ["inbox", "unread", "archive"]
+        function stepView(d) {
+            const i = views.indexOf(store.view) + d
+            if (i >= 0 && i < views.length) store.pickView(views[i])
+        }
+        function fromPicked(key, label) { if (key) { store.pickFrom(key, label); if (onePane) listOpen = true } }
+
+        function failed(text) { toast.show(text, { danger: true }) }
+        // Archive, read and delete, on the open message or every selected one (MessageOps.qml)
+        MessageOps { id: ops; store: store; actions: actions; toast: toast }
+        readonly property QtObject sel: store.selection
+        function archive() { ops.archive() }
+        function toggleRead() { ops.toggleRead() }
+        // Delete asks first, about what was selected when it was pressed
+        property var deleting: []
+        function askDelete() { deleting = sel.targets(); if (deleting.length) confirm.visible = true }
+        function remove() { if (deleting.length) ops.remove(deleting); deleting = [] }
+        // A button, or the sender's session or task; a run one only by way of its card (ask)
+        function press(which, yes) {
+            const m = store.message
+            if (!m) return
+            actions.press(m.id, which, !!yes, r => toast.show(
+                r.copied ? "Copied " + r.copied + ": no task address set (docs/inbox.md)"
+                : r.ran ? "Started " + r.label : r.session ? "Going to the session" : "Opened " + r.label), failed)
+        }
+        function ask(i) {
+            const m = store.message
+            const a = m && m.actions ? m.actions[i] : null
+            if (!a) return
+            if (a.kind !== "run") return press(String(i))
+            runPanel.index = i
+            runPanel.ask(a, m.sender.label, m.sender.kind === "other")
+        }
+        function firstImage() {
+            const imgs = store.message ? (store.message.attachments || []).filter(f => (f.type || "").startsWith("image/")) : []
+            if (imgs.length) viewer.show(imgs, 0)
+        }
+
+        IpcHandler {
+            target: "inbox"
+            function refresh(): void { store.raw = ""; store.refresh() }
+            // `inbox show ID`: picked, from the inbox or the archive it is in
+            function pick(id: string): void { store.follow(id, false); win.listOpen = false }
+            function pickArchived(id: string): void { store.follow(id, true); win.listOpen = false }
+            // `inbox from KEY`: one sender's messages
+            function from(key: string, label: string): void { store.view = "inbox"; store.search = ""; store.pickFrom(key, label) }
+        }
+        Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.toggleSidebar() }
+        Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
+        Shortcut { sequences: ["Ctrl+F", "Meta+F"]; enabled: !runPanel.visible && !confirm.visible; onActivated: win.find() }
+        Shortcut { sequences: ["Ctrl+Z", "Meta+Z"]; enabled: !list.field.activeFocus; onActivated: toast.act() }
+
+        RowLayout {
+            id: content
+            anchors.fill: parent
+            spacing: 0
+            AppPointer { c: win.look }
+
+            NavSidebar {
+                id: nav
+                visible: win.navShown
+                Layout.preferredWidth: win.onePane ? -1 : win.width < 900 ? 168 : 208
+                Layout.fillWidth: win.onePane
+                z: 1
+                c: win.look
+                store: store
+                headerHeight: 2 * 18 + win.headerHeight
+                contentTop: 18 + win.headerHeight + win.headerGap
+                active: activeFocus
+                onDone: win.fromFolders()
+                onChosen: if (win.onePane) win.navOpen = false
+            }
+            MessageList {
+                id: list
+                visible: win.sidebarShown
+                navShown: win.navShown
+                onShowNav: win.toFolders()
+                Layout.preferredWidth: win.onePane ? -1 : Math.max(250, Math.min(370, win.width * 0.3 - 30))
+                barHeight: win.barHeight
+                searchHeight: win.headerHeight
+                firstRow: 18 + win.headerHeight + win.headerGap
+                Layout.fillWidth: win.onePane
+                c: win.look
+                store: store
+                onSearchDone: clear => win.searchDone(clear)
+                active: view.activeFocus
+                onPicked: id => win.pick(id)
+                onPickedRange: i => { win.sel.range(i); view.forceActiveFocus() }
+                onPickedOne: i => { win.sel.toggle(i); view.forceActiveFocus() }
+            }
+            // While the list shows in one pane the message is there at no width: it keeps the keyboard, so the arrows
+            // still move between the messages, as in Notes
+            MessageView {
+                id: view
+                Layout.preferredWidth: win.onePane && win.listOpen ? 0 : -1
+                Layout.fillWidth: !(win.onePane && win.listOpen)
+                Layout.fillHeight: true
+                clip: true
+                c: win.look
+                store: store
+                onePane: win.onePane
+                barHeight: win.barHeight
+                focus: true
+                onBack: win.listOpen = true
+                onArchive: win.archive()
+                onToggleRead: win.toggleRead()
+                onRemove: win.askDelete()
+                onPress: which => win.press(which)
+                onAsk: i => win.ask(i)
+                onViewImage: (images, i) => viewer.show(images, i)
+                onFromPicked: (key, label) => win.fromPicked(key, label)
+                onNotice: (text, danger) => toast.show(text, { danger: danger })
+                Keys.onPressed: e => win.key(e)
+            }
+        }
+
+        function key(e) {
+            const k = e.key, shift = e.modifiers & Qt.ShiftModifier
+            const enter = k === Qt.Key_Return || k === Qt.Key_Enter
+            win.look.moved(e)                  // Tab and the arrows show the keys' frame (AppPointer)
+            sheet.pressed(e)
+            if (e.accepted) return
+            const cmd = e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
+            const alt = e.modifiers & Qt.AltModifier
+            // Mail's keys where they mean the same (#3672): 1–3 the views as Mail's 1–6 its folders, Tab the sidebar,
+            // v selects and goes on, o l open; the message's buttons moved to ⌥1 … ⌥8 for them
+            const narrowList = win.onePane && win.listOpen && !win.navOpen
+            const narrowMessage = win.onePane && !win.listOpen
+            // ⇧↓ ⇧↑ (⇧J ⇧K) select from the open message on, ⌘A (Ctrl+A) every one, Esc none (Selection.qml)
+            if (shift && (k === Qt.Key_Down || k === Qt.Key_J)) sel.range(store.index + 1)
+            else if (shift && (k === Qt.Key_Up || k === Qt.Key_K)) sel.range(store.index - 1)
+            else if (cmd && k === Qt.Key_A) sel.all()
+            else if (k === Qt.Key_Escape && sel.any) sel.clear()
+            else if (cmd && (k === Qt.Key_Up || k === Qt.Key_Down)) win.stepView(k === Qt.Key_Down ? 1 : -1)
+            else if (k === Qt.Key_Tab || k === Qt.Key_Backtab) win.toFolders()
+            else if (alt && k >= Qt.Key_1 && k <= Qt.Key_8) win.ask(k - Qt.Key_1)
+            else if (!cmd && !alt && k >= Qt.Key_1 && k <= Qt.Key_3) store.pickView(win.views[k - Qt.Key_1])
+            // Files' v: select and go on; j k then keep what is selected. Moving on otherwise leaves it, as Mail's arrows do
+            else if (e.text === "v" && !narrowMessage) sel.markNext()
+            else if (sel.marking && (k === Qt.Key_Down || k === Qt.Key_J)) sel.moveMarking(1)
+            else if (sel.marking && (k === Qt.Key_Up || k === Qt.Key_K)) sel.moveMarking(-1)
+            else if (k === Qt.Key_Down || k === Qt.Key_J) { sel.clear(); store.step(1) }
+            else if (k === Qt.Key_Up || k === Qt.Key_K) { sel.clear(); store.step(-1) }
+            else if (k === Qt.Key_Home) { sel.clear(); store.pickAt(0) }
+            else if (k === Qt.Key_End) { sel.clear(); store.pickAt(store.messages.length - 1) }
+            // Narrow: Enter, o, l or → open the message in the list's place (Mail's and Files' open), Esc or ← back;
+            // ← → stay the sounds' while a message with sounds is on show
+            else if (narrowList && (enter || e.text === "o" || e.text === "l" || k === Qt.Key_Right)) { if (store.message) win.listOpen = false }
+            else if (narrowMessage && k === Qt.Key_Left && !view.sounds.any) win.listOpen = true
+            else if (e.text === "/") win.find()
+            else if (e.text === "a") win.archive()
+            else if (e.text === "U" || shift && k === Qt.Key_U) ops.allRead()
+            else if (e.text === "u") win.toggleRead()
+            else if (e.text === "d" || k === Qt.Key_Delete || k === Qt.Key_Backspace) win.askDelete()
+            else if (e.text === "s" && store.message && store.message.from.kind === "claude") win.press("session")
+            else if (e.text === "t" && store.message && store.message.task) win.press("task")
+            else if (e.text === "i") win.firstImage()
+            // The message's sounds: p plays or pauses, ← → the one before or after (to compare a few quickly)
+            else if (e.text === "p" && view.sounds.any) view.sounds.toggle()
+            else if (k === Qt.Key_Left && view.sounds.any) view.sounds.step(-1)
+            else if (k === Qt.Key_Right && view.sounds.any) view.sounds.step(1)
+            else if (k === Qt.Key_Space) view.scroll((shift ? -1 : 1) * (view.height - 120))
+            else if (k === Qt.Key_PageDown) view.scroll(view.height - 120)
+            else if (k === Qt.Key_PageUp) view.scroll(-(view.height - 120))
+            else if (narrowMessage && k === Qt.Key_Escape) win.listOpen = true
+            else if (k === Qt.Key_Escape && store.search) win.searchDone(true)
+            else if (k === Qt.Key_Escape && store.from) store.pickView(store.view)
+            else return
+            e.accepted = true
+        }
+
+        AppConfirm {
+            id: confirm
+            visible: false
+            behind: content
+            c: win.look
+            cardWidth: Math.min(440, win.width - 32)
+            question: win.deleting.length > 1 ? "Delete " + win.deleting.length + " messages?"
+                : win.deleting.length ? "Delete “" + win.deleting[0].title + "”?" : ""
+            detail: win.deleting.length > 1 ? "They go for good, with their files. Archive (a) keeps them out of the way instead."
+                : "It goes for good, with its files. Archive (a) keeps it out of the way instead."
+            onAnswered: ok => { visible = false; if (ok) win.remove(); else win.deleting = []; view.forceActiveFocus() }
+        }
+        RunPanel {
+            id: runPanel
+            property int index: -1
+            visible: false
+            behind: content
+            c: win.look
+            cardWidth: Math.min(560, win.width - 32)
+            onAnswered: ok => { visible = false; if (ok) win.press(String(index), true); view.forceActiveFocus() }
+        }
+        ImageViewer { id: viewer; c: win.look; behind: content; onClosed: view.forceActiveFocus() }
+        KeySheet { id: sheet; c: win.look; groups: keyHelp.groups }
+        AppToast { id: toast; c: win.look }
+    }
+}

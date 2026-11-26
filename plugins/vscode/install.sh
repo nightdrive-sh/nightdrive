@@ -5,7 +5,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 
 # Verify the Microsoft key fingerprint before importing it
 key=$(mktemp); trap 'rm -f "$key"' EXIT
-curl -fsSL -o "$key" https://packages.microsoft.com/keys/microsoft.asc
+curl --proto '=https' --tlsv1.2 -fsSL -o "$key" https://packages.microsoft.com/keys/microsoft.asc
 gpg --show-keys --with-colons "$key" | grep -q '^fpr:::::::::BC528686B50D79E339D3721CEB3E94ADBE1229CF:' \
   || { echo "Microsoft key fingerprint does not match, aborting"; exit 1; }
 sudo rpm --import "$key"

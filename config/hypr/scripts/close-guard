@@ -1,0 +1,39 @@
+#!/bin/bash
+# close-guard KEY COMMAND [ARGS…]: the close keys (⌘W, ⌘Q) run their script through this (#2555).
+# A fullscreen window (Hyprland fullscreen, not just maximised) is often a game, where a stray ⌘W loses the play:
+# the first press only shows "Press ⌘W again to close" for WINDOW_MS, and a second press within it closes as usual.
+# Any other window closes at once: this path is one plain `hyprctl activewindow` and an exec, so it doesn't feel slower.
+# KEY is the label in the toast ("⌘W"). The pending press is a file per window in the runtime dir, so ⌘W then ⌘Q
+# on the same window also counts as the second press.
+WINDOW_MS=2000
+state=${XDG_RUNTIME_DIR:-/tmp}/nightdrive-close-guard
+
+key=$1; shift
+[[ $# -gt 0 ]] || { echo "usage: close-guard KEY COMMAND [ARGS…]" >&2; exit 2; }
+
+# The text form, read with bash alone: no jq on the path every ⌘W takes
+win=$(hyprctl activewindow 2>/dev/null)
+addr=$(sed -n '1s/^Window \([0-9a-f]*\) .*/\1/p' <<<"$win")
+fs=$(sed -n 's/^[[:space:]]*fullscreen: \([0-9]*\)$/\1/p' <<<"$win")
+# Hyprland's fullscreen state is a bit mask: 1 maximised, 2 fullscreen. Only 2 is guarded.
+if [[ -z $addr ]] || (( (${fs:-0} & 2) == 0 )); then
+  rm -f "$state"
+  exec "$@"
+fi
+
+# ⌘Q with the launcher open is the launcher's (it quits the app selected there), not the window under it: let the
+# command decide, as quit-app does first.
+if [[ $1 == */quit-app && $# -eq 1 ]] && [[ $(qs ipc call launcher quitSelected 2>/dev/null) == ok ]]; then
+  exit 0
+fi
+
+now=$(date +%s%3N)
+read -r prev_addr prev_ms 2>/dev/null <"$state"
+if [[ $prev_addr == "$addr" ]] && (( now - ${prev_ms:-0} <= WINDOW_MS )); then
+  rm -f "$state"
+  exec "$@"
+fi
+echo "$addr $now" >"$state"
+# A toast (an Overlay layer, so it shows over the fullscreen window, unlike a notification, and also with do not
+# disturb on)
+qs ipc call osd note x-circle "Press $key again to close" "$WINDOW_MS" >/dev/null 2>&1 &

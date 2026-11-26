@@ -30,11 +30,14 @@ fi
 
 # A free port, asked from the system; the server binds only to this machine
 port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
-# All of its output away from ours: a pipe it held open would keep the caller (nightdrive release … | less) waiting
+# Detached, its output in a log of its own: a pipe it held open would keep the caller (nightdrive release … | tail)
+# waiting for its 20 minutes. The log goes with the clones when it stops.
+log=$dir/server.log
 setsid -f bash -c 'timeout "$1" python3 -m http.server "$2" --bind 127.0.0.1 --directory "$3/website/public"
-  rm -rf "$3"' _ "$SERVE_FOR" "$port" "$dir" </dev/null >/dev/null 2>&1
+  rm -rf "$3"' _ "$SERVE_FOR" "$port" "$dir" </dev/null >"$log" 2>&1
 served=1
 url=http://127.0.0.1:$port/changelog/
 for _ in $(seq 50); do python3 -c "import urllib.request as u; u.urlopen('$url')" 2>/dev/null && break; sleep 0.1; done
-echo "    $url (for $SERVE_FOR)"
-command -v xdg-open >/dev/null && xdg-open "$url" >/dev/null 2>&1 || true
+echo "    $url (for $SERVE_FOR; its log $log)"
+# Detached too: xdg-open waits for the browser's launcher, and Brave's stays up with its output through cat
+command -v xdg-open >/dev/null && setsid -f xdg-open "$url" </dev/null >/dev/null 2>&1 || true

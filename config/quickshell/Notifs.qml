@@ -4,11 +4,17 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import Quickshell.Wayland
+import qs.kit
+import "NotifGroups.js" as Groups
 
 // Notification server (org.freedesktop.Notifications; replaced mako on 14.10.2026). NotificationPopups.qml draws the popups,
 // NotificationsMenu.qml the history. The app's icon comes from its .desktop file, so every notification shows one.
-// Like mako's ignore-timeout: every popup goes after `timeout` whatever the app asks (Chromium and nm-applet ask for never);
-// critical ones stay until clicked. Do not disturb hides the popups, the history keeps them.
+// Like mako's ignore-timeout: every popup goes after `timeout` whatever the app asks (Chromium and nm-applet ask for never).
+// Priority (#1982): a pinned one (urgency critical, or hint x-nightdrive-pin: `-h boolean:x-nightdrive-pin:true`, Claude's
+// permission requests) stays until answered or dismissed and gets through do not disturb, without a sound; a low one
+// goes only to the history, without a popup. Do not disturb hides the other popups, the history keeps them.
+// The rest stack by app, newest on top (NotifGroups.js, NotificationStack.qml); a sender can keep its own stack apart
+// with hint x-nightdrive-group (`-h string:x-nightdrive-group:sessions`: Claude's sessions, apart from its changes).
 // Under the login screen at an autologin start (greeter/lock.qml) they're quiet and wait: their popups show after the
 // password, and they never chime.
 // A new notification plays a sound (hypr/scripts/sounds; Settings › Notifications): regular or urgent by its urgency,
@@ -17,14 +23,14 @@ import Quickshell.Wayland
 // The history keeps what still matters (stale rows are noise that buries the rest):
 // - Replaced: a notification with the same stack tag as an earlier one from its app (hints x-dunst-stack-tag or
 //   x-canonical-private-synchronous: `notify-send -h string:x-dunst-stack-tag:NAME`) takes its place without a sound,
-//   and one with the same text as an earlier one moves that row to the top instead of adding a second.
+//   and one with the same text (and picture) as an earlier one moves that row to the top instead of adding a second.
 // - Withdrawn: a notification stays open after its popup goes, so its app can still close it (a chat read on the phone,
 //   a reminder whose meeting began), and then its row goes too. Not when the app has no window left: apps close their
 //   notifications when they quit, and those rows stay.
 // - Expired: hint x-nightdrive-expires (int, seconds: `-h int:x-nightdrive-expires:3600`) removes the row that long after.
 // - Transient (`notify-send -e`, "Copied" and the like): only the popup, never a row.
 //   qs ipc call notifications toggleDnd     → "true" when do not disturb is now on (hypr/scripts/dnd, F6)
-//   qs ipc call notifications dismissAll | clear | count
+//   qs ipc call notifications dismissAll | clear | count | rows | removeTag APP TAG   (nightdrive notifications)
 Singleton {
     id: s
 
@@ -43,12 +49,14 @@ Singleton {
         onLoadFailed: s.timeout = s.defaultTimeout
     }
     readonly property int maxHistory: 50
-    readonly property int maxPopups: 6
+    readonly property int maxPopups: 6        // on screen: pinned ones and stacks
+    readonly property int maxStack: 5         // cards in a stack; the older ones are in the history
     readonly property int soundGap: 2000      // ms: an app's notifications closer together than this chime once
 
     property var popups: []                   // [{ uid, n (Notification), entry (history row) }], newest first
     property var history: []                  // [{ uid, app, summary, body, icon, image, preview, entry, time, tag, expires }], newest first
-    property var live: ({})                   // uid → its Notification, while it's open (popup shown or not)
+    property var live: ({})                   // uid → its Notification, while it's open (popup shown or not); replaced, not
+                                              // changed in place, so the menu sees a pinned one close
     property var shownAtReload: []            // uids that had a popup when Quickshell reloaded
     property alias dnd: persist.dnd
     property double now: Date.now()           // for "2 min ago": updated every 30 s
@@ -94,8 +102,10 @@ Singleton {
     onHistoryChanged: {
         persist.historyJson = JSON.stringify(history)
         // A row that went (×, Clear, pushed out, replaced, expired) closes its notification: the app may stop waiting on it
-        for (const u of Object.keys(live))
-            if (!live[u].transient && !history.some(h => String(h.uid) === u)) live[u].expire()
+        // (over a copy: each expire() closes one, and closed() replaces `live` while this goes on)
+        const open = Object.entries(live)
+        for (const [u, n] of open)
+            if (n && typeof n.expire === "function" && !n.transient && !history.some(h => String(h.uid) === u)) n.expire()
     }
     Timer {
         interval: 30000; repeat: true; running: true
@@ -105,13 +115,14 @@ Singleton {
         }
     }
 
-    // "now", "5 min", "2 h", then the time of day
+    // "now", "5 min", "2 h", then when as the apps' lists say it, the region's way (Settings › Region): the time today
+    // (14:30, 2:30 PM in the US), Yesterday, the weekday this week, then the day
     function ago(t) {
         const m = Math.floor((now - t) / 60000)
         if (m < 1) return "now"
         if (m < 60) return m + " min"
         if (m < 6 * 60) return Math.floor(m / 60) + " h"
-        return Qt.formatTime(new Date(t), "HH:mm")
+        return Regional.relative(new Date(t))
     }
 
     // Icons for names the icon theme doesn't have (blueman's headphones), recoloured by hypr/scripts/theme
@@ -139,10 +150,13 @@ Singleton {
         if (a === "") return null
         const dotted = a.replace(/\s+/g, ".")
         const first = a.split(/\s+/)[0]
+        // An entry named after the app plus a suffix, only when it is the one such entry: "Webapp" would otherwise
+        // borrow the first webapp-*.desktop's icon (webapp-youtube), and any generic name an unrelated app's
+        const prefixed = all.filter(e => id(e).startsWith(a + "-"))
         return all.find(e => id(e) === a || id(e).split(".").pop() === a || (e.name || "").toLowerCase() === a
                              || (e.startupClass || "").toLowerCase() === a)
-            || all.find(e => id(e).endsWith("." + dotted) || (e.name || "").toLowerCase() === first || id(e).startsWith(a + "-"))   // blueman → blueman-manager
-            || null
+            || all.find(e => id(e).endsWith("." + dotted) || (e.name || "").toLowerCase() === first)
+            || (prefixed.length === 1 ? prefixed[0] : null)   // blueman → blueman-manager
     }
 
     function remove(uid) {
@@ -152,11 +166,11 @@ Singleton {
     // A popup on top (or, under the login screen, after the password)
     function pop(p) {
         if (locked) { held = held.filter(h => h.uid !== p.uid).concat([p]); return }
-        if (dnd || menuOpen) { if (p.n.transient) p.n.expire(); return }
+        if ((dnd && !p.entry.pinned) || menuOpen || p.entry.low) { if (p.n.transient) p.n.expire(); return }
         const all = [p].concat(popups.filter(q => q.uid !== p.uid))
-        // Too many: the oldest go (into the history only)
-        popups = all.slice(0, maxPopups)
-        for (const q of all.slice(maxPopups)) if (q.n.transient) q.n.expire()
+        // Too many: the oldest go (into the history only), never a pinned one
+        popups = Groups.trim(all, maxPopups, maxStack)
+        for (const q of all) if (popups.indexOf(q) < 0 && q.n.transient) q.n.expire()
     }
     // The popup goes; the notification stays open for the history unless it's transient
     function hide(uid) {
@@ -170,7 +184,9 @@ Singleton {
     readonly property int withdrawWait: 1500
     property var withdrawn: []                // [uid]
     function closed(uid, reason) {
-        delete live[uid]
+        const l = Object.assign({}, live)
+        delete l[uid]
+        live = l
         remove(uid)
         if (reason !== NotificationCloseReason.CloseRequested) return
         withdrawn = withdrawn.concat([uid])
@@ -303,17 +319,22 @@ Singleton {
                 wmclass: e ? e.startupClass : "",
                 time: same ? prev.time : Date.now(),
                 critical: n.urgency === NotificationUrgency.Critical,
+                pinned: n.urgency === NotificationUrgency.Critical || hints["x-nightdrive-pin"] === true,
+                low: n.urgency === NotificationUrgency.Low,
                 // A level to show as a meter under the text, 0–100 (hint value: `-h int:value:N`; -1 = none)
                 value: typeof hints.value === "number" ? Math.max(0, Math.min(100, hints.value)) : -1,
                 tag: "",
                 expires: hints["x-nightdrive-expires"] > 0 ? Date.now() + hints["x-nightdrive-expires"] * 1000 : 0
             }
             s.relabel(row, n)
+            row.group = Groups.key(row.app, String(hints["x-nightdrive-group"] || ""))
             const stack = hints["x-dunst-stack-tag"] || hints["x-canonical-private-synchronous"] || ""
             if (stack) row.tag = row.app + "\n" + stack
-            // The earlier one this replaces: the same stack tag, or else the same text (in the history, or a transient popup)
+            // The earlier one this replaces: the same stack tag, or else the same text and picture (in the history, or a
+            // transient popup). The picture counts: each screenshot says the same words but is a different picture of its own.
             const twin = s.history.concat(s.popups.map(p => p.entry)).find(h => h.uid !== row.uid && h.app === row.app
-                && (row.tag ? h.tag === row.tag : h.summary === row.summary && h.body === row.body))
+                && (row.tag ? h.tag === row.tag
+                            : h.summary === row.summary && h.body === row.body && (h.image || "") === row.image))
             const others = s.history.filter(h => h.uid !== row.uid && (!twin || h.uid !== twin.uid))
             // (twin's notification closes as its row goes: onHistoryChanged)
             s.history = n.transient ? others : [row].concat(others).slice(0, s.maxHistory)
@@ -321,7 +342,7 @@ Singleton {
             if (!s.dnd && !s.locked && !old && !prev && !(twin && row.tag)) s.chime(row, n)
             n.tracked = true
             if (!old) {
-                s.live[row.uid] = n
+                s.live = Object.assign({}, s.live, { [row.uid]: n })
                 n.closed.connect(reason => s.closed(row.uid, reason))
             }
             // Handed over again after a reload: its popup comes back only if it was showing
@@ -350,18 +371,26 @@ Singleton {
         if (live[uid]) live[uid].dismiss()
         history = history.filter(h => h.uid !== uid)
     }
-    // The popups go (the menu opened, do not disturb); the notifications stay open for the history
+    // The popups go (the menu opened); the notifications stay open for the history. Do not disturb leaves the pinned ones.
     function dismissAll() { for (const p of popups.slice()) hide(p.uid) }
+    function quiet() { for (const p of popups.slice()) if (!p.entry.pinned) hide(p.uid) }
 
     IpcHandler {
         target: "notifications"
-        function toggleDnd(): string { s.dnd = !s.dnd; if (s.dnd) s.dismissAll(); return String(s.dnd) }
-        function setDnd(on: bool): void { s.dnd = on; if (on) s.dismissAll() }
+        function toggleDnd(): string { s.dnd = !s.dnd; if (s.dnd) s.quiet(); return String(s.dnd) }
+        function setDnd(on: bool): void { s.dnd = on; if (on) s.quiet() }
         function getDnd(): string { return String(s.dnd) }
         function dismissAll(): void { s.dismissAll() }
         function clear(): void { s.history = [] }
         function count(): int { return s.history.length }
-        // For testing: the rows as JSON (app, summary, body, tag, expires)
-        function rows(): string { return JSON.stringify(s.history.map(h => ({ app: h.app, summary: h.summary, body: h.body, tag: h.tag, expires: h.expires }))) }
+        // The rows as JSON (app, summary, body, time, tag, expires): tests, and `nightdrive notifications list`
+        function rows(): string { return JSON.stringify(s.history.map(h => ({ app: h.app, summary: h.summary, body: h.body, time: h.time, tag: h.tag, expires: h.expires, group: h.group, pinned: h.pinned }))) }
+        // Takes away what an app sent with this stack tag, popup and row; how many (`nightdrive notifications remove`:
+        // the undo of Claude's notifications_send)
+        function removeTag(app: string, stack: string): int {
+            const gone = s.history.filter(h => h.tag === app + "\n" + stack)
+            for (const h of gone) { s.remove(h.uid); s.forget(h.uid) }
+            return gone.length
+        }
     }
 }

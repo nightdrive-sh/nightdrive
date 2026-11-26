@@ -1,0 +1,12 @@
+# Due tasks' notifications every minute (plugins/tasks; `tasks enable` turns it on, the plugin's installer runs that)
+[Unit]
+Description=Nightdrive Tasks: look for due tasks every minute
+
+[Timer]
+OnCalendar=minutely
+AccuracySec=5s
+# A task that came due while the computer slept is notified when it wakes
+Persistent=true
+
+[Install]
+WantedBy=timers.target

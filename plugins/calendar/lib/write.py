@@ -1,0 +1,291 @@
+#!/usr/bin/env python3
+"""Adding and deleting events: `calendar add` and `calendar delete` (Claude's calendar_add and calendar_delete).
+
+    write.py add [--json]                    the event on stdin as JSON, or as options (below)
+        --calendar ID --title T --start S [--end E] [--location L] [--notes N] [--reminder MINUTES] [--repeat R]
+    write.py delete [--check] [--scope this|all] [--occurrence START] CALENDAR UID
+                                             --check: stdin's JSON must name the event (title, start), as Claude's
+                                             confirmation card showed it, or nothing is deleted. A recurring event
+                                             says which: --scope all, every time; this, the one time --occurrence
+                                             (or --check's start) names, as calendar_events gives its start
+    write.py shared [--calendar ID] [--from ID]
+                                             calendar_add's (and calendar_update's) asks_if: yes when add would put the event in a calendar
+                                             others see (calendars.conf's `shared`), so the card asks every time;
+                                             otherwise `first NAME (ID)`, so it asks until the user allows one add
+                                             to that calendar (Nightdrive remembers it, #1929)
+
+start and end are local times, "YYYY-MM-DDTHH:MM", or days, "YYYY-MM-DD", for an all-day event; an all-day event's
+end is its last day (not iCalendar's day after). Without end: an hour, or the one day. reminder: an alarm that many
+minutes before the start (alarms.py: 0 at the start, -540 9:00 on an all-day event's day), none without it. repeat:
+repeat.py's (weekly, or {"every": "week", "interval": 2, "until": "2027-06-01"}); the start is its first time.
+
+The event is a new .ics in the calendar's folder, then `calendar sync SOURCE/CALENDAR` takes it to the server (or the next
+round does, when it can't now). Only a calendar of a CalDAV account that isn't read-only takes one: the ICS ones are
+read from an address, and a read-only account's sync would take a new event away again. A repeat (repeat.py) makes
+it recurring; changing an event is change.py's.
+"""
+
+import datetime as dt
+import json
+import re
+import subprocess
+import sys
+import uuid
+import zoneinfo
+from pathlib import Path
+
+import icalendar
+
+import alarms   # it imports this file too: each uses the other's functions only once loaded
+import calendars
+import repeat   # the same
+import series   # the same: it uses shown() and when()
+
+COMMAND = Path(__file__).resolve().parents[1] / "bin/calendar"
+PRODID = "-//Nightdrive//Calendar//EN"
+SYNC_TIMEOUT = 90
+NAME_MAX = 100   # of a calendar's name in calendar_add's first-time key: the key is one line of 200 at most
+
+
+def local_zone():
+    """The system's zone by name (Europe/Helsinki), so the phone shows the event in it rather than in UTC"""
+    target = Path("/etc/localtime").resolve()
+    try:
+        return zoneinfo.ZoneInfo(str(target).split("/zoneinfo/", 1)[1])
+    except (IndexError, zoneinfo.ZoneInfoNotFoundError):
+        return dt.datetime.now().astimezone().tzinfo
+
+
+def when(text, field):
+    """A date for a day, an aware datetime for a time; exits with a message a reader can act on"""
+    text = (text or "").strip()
+    try:
+        if len(text) == 10:
+            return dt.date.fromisoformat(text)
+        moment = dt.datetime.fromisoformat(text)
+    except ValueError:
+        sys.exit(f"{field} is YYYY-MM-DD (all day) or YYYY-MM-DDTHH:MM (local time), not {text!r}.")
+    return moment if moment.tzinfo else moment.replace(tzinfo=local_zone())
+
+
+def shown(value):
+    """The form events.py prints and the card shows: local time to the minute, or the day"""
+    if isinstance(value, dt.datetime):
+        if value.tzinfo:
+            value = value.astimezone(local_zone())
+        return value.strftime("%Y-%m-%dT%H:%M")
+    return value.isoformat()
+
+
+def span(start, last):
+    """In words for the notification: "2026-11-05 10:00–11:30", "2026-11-13 – 2026-11-15" """
+    a, b = shown(start).replace("T", " "), shown(last).replace("T", " ")
+    if a == b:
+        return a
+    return f"{a}–{b[11:]}" if a[:10] == b[:10] and len(a) > 10 else f"{a} – {b}"
+
+
+def writable(calendar_id):
+    """The calendar an event may go in, or exit with what can be used instead"""
+    found = calendars.calendars()
+    ok = [c for c in found if not c["read_only"]]   # an ICS source is always read-only
+    if not calendar_id and len(ok) == 1:
+        return ok[0]
+    c = next((x for x in found if calendar_id in (x["id"], x["name"])), None)
+    names = ", ".join(f"{x['name']} ({x['id']})" for x in ok) or "none: every calendar here is read-only"
+    if c is None:
+        sys.exit(f"No calendar {calendar_id!r}. The ones that take events: {names}." if calendar_id
+                 else f"Which calendar? The ones that take events: {names}.")
+    if c not in ok:
+        sys.exit(f"{c['name']} is read-only here (an ICS address, or an account with read-only = yes). "
+                 f"The ones that take events: {names}.")
+    return c
+
+
+def sync(cal):
+    """The calendar up to the server now, it alone (a hiccup in another of the account's mustn't fail it); False when
+    that failed (the next round takes it). A calendar left empty needs --force-delete: vdirsyncer won't empty the
+    server's otherwise, taking an empty folder for a mistake"""
+    force = [] if any(Path(cal["path"]).glob("*.ics")) else ["--force-delete"]
+    try:
+        done = subprocess.run([str(COMMAND), "sync", *force, cal["id"]], capture_output=True, text=True,
+                              timeout=SYNC_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return False
+    if done.returncode != 0:
+        print(f"calendar: sync {cal['name']}: {done.stderr.strip()[-500:]}", file=sys.stderr)
+    return done.returncode == 0
+
+
+def add(data):
+    title = (data.get("title") or "").strip()
+    if not title:
+        sys.exit("An event needs a title.")
+    cal = writable((data.get("calendar") or "").strip())
+    start = when(data.get("start"), "start")
+    all_day = not isinstance(start, dt.datetime)
+    if data.get("end"):
+        end = when(data["end"], "end")
+        if isinstance(end, dt.datetime) == all_day:
+            sys.exit("start and end are both days (all day) or both times.")
+        end = end + dt.timedelta(days=1) if all_day else end   # iCalendar's DTEND is the day after
+    else:
+        end = start + (dt.timedelta(days=1) if all_day else dt.timedelta(hours=1))
+    if end <= start:
+        sys.exit("end is before start.")
+    uid = str(uuid.uuid4()).upper()
+    event = icalendar.Event()
+    event.add("uid", uid)
+    event.add("dtstamp", dt.datetime.now(dt.timezone.utc))
+    event.add("created", dt.datetime.now(dt.timezone.utc))
+    event.add("summary", title)
+    event.add("dtstart", start)
+    event.add("dtend", end)
+    for key, field in (("location", "location"), ("notes", "description")):
+        if (data.get(key) or "").strip():
+            event.add(field, data[key].strip())
+    alarms.set_reminder(event, alarms.minutes(data.get("reminder")))
+    repeat.set_rule(event, repeat.spec(data.get("repeat")))
+    ics = icalendar.Calendar()
+    ics.add("prodid", PRODID)
+    ics.add("version", "2.0")
+    ics.add_component(event)
+    ics.add_missing_timezones()
+    path = Path(cal["path"]) / f"{uid}.ics"
+    tmp = path.with_suffix(".tmp")
+    tmp.write_bytes(ics.to_ical())
+    tmp.replace(path)
+    synced = sync(cal)
+    last = end - dt.timedelta(days=1) if all_day else end
+    return {"uid": uid, "calendar": cal["id"], "calendar_name": cal["name"], "title": title, "start": shown(start),
+            "end": shown(last), "all_day": all_day, "when": span(start, last), "synced": synced,
+            **({"repeat": repeat.read(event)["text"]} if "rrule" in event else {}),
+            **({} if synced else {"note": "Saved on this computer; the next sync takes it to the server."})}
+
+
+def event_file(cal, uid):
+    """The .ics holding uid: vdirsyncer names files by their UID mostly, but not always. A uid that would name a file
+    elsewhere (a /, a leading .) is no event's: the file name is made from it (#1862)"""
+    if not uid or "/" in uid or "\0" in uid or uid.startswith("."):
+        return None
+    folder = Path(cal["path"])
+    direct = folder / f"{uid}.ics"
+    if direct.is_file():
+        return direct
+    # A long UID (Outlook's are 112 characters) is folded over lines in the file, as iCalendar folds at 75 octets:
+    # the lines are unfolded before the search, or an invitation just added isn't found again (#3310). The whole line
+    # must match, so a UID that begins another's isn't taken for it.
+    line = re.compile(r"^UID(;[^:\r\n]*)?:" + re.escape(uid) + r"\r?$", re.M)
+    for path in folder.glob("*.ics"):
+        try:
+            if line.search(re.sub(r"\r?\n[ \t]", "", path.read_text(errors="replace"))):
+                return path
+        except OSError:
+            continue
+    return None
+
+
+def event_parts(cal, uid):
+    """The file, its calendar, the VEVENTs of uid (a recurring one's changed times too) and the event itself (else its
+    first changed time); exits with what to do instead"""
+    path = event_file(cal, uid)
+    if path is None:
+        sys.exit(f"No event {uid} in {cal['name']}: calendar_events gives the uids.")
+    ics = icalendar.Calendar.from_ical(path.read_bytes())
+    events = [e for e in ics.walk("VEVENT") if str(e.get("uid")) == uid]
+    if not events:
+        sys.exit(f"No event {uid} in {cal['name']}.")
+    main = next((e for e in events if "recurrence-id" not in e), events[0])
+    return path, ics, events, main
+
+
+def delete(calendar_id, uid, check, scope=None, occurrence=None):
+    """The event, or of a recurring one (scope) every time or the one occurrence names (series.py). check: what the
+    card showed, the time's title and start, which must still be so (a recurring event's: one of its times)"""
+    cal = writable(calendar_id)
+    path, ics, events, main = event_parts(cal, uid)
+    if check is not None and not occurrence:
+        occurrence = check.get("start")
+    data = {"scope": scope, "occurrence": occurrence}
+    which = series.scope(events, data)
+    shown_event, start = main, shown(main.decoded("dtstart"))
+    if which is not None:
+        rid, found = series.locate(main if "recurrence-id" not in main else None, events, occurrence or start)
+        shown_event = found or main
+        start = shown(found.decoded("dtstart")) if found is not None else shown(series.aware(rid))
+    title = str(shown_event.get("summary", ""))
+    if check is not None and (check.get("title", "").strip() != title.strip() or check.get("start") != start):
+        sys.exit(f"Nothing deleted: the event is {title!r} at {start}, not what the card showed. Read it again with "
+                 "calendar_events.")
+    master = main if "recurrence-id" not in main else None
+    if which == "this" and series.drop(ics, master, events, occurrence):
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(ics.to_ical())
+        tmp.replace(path)
+    else:
+        path.unlink()
+    synced = sync(cal)
+    return {"deleted": uid, "calendar": cal["id"], "title": title, "start": start, "synced": synced,
+            **({"scope": which} if which else {})}
+
+
+def options(argv):
+    """--name value pairs to a dict"""
+    out, rest = {}, list(argv)
+    while rest:
+        flag = rest.pop(0)
+        if not flag.startswith("--") or not rest:
+            sys.exit(__doc__)
+        out[flag[2:]] = rest.pop(0)
+    return out
+
+
+def main(argv):
+    if not argv or argv[0] not in ("add", "delete", "shared"):
+        sys.exit(__doc__)
+    if argv[0] == "shared":
+        # The calendar add would take, or its reason why none (which add would give too). The key has the id, which
+        # only this calendar has, and the name the card shows: a calendar renamed on the server asks again
+        # --from: calendar_update's event's calendar, --calendar where it goes (move_to); an event moved out of a
+        # shared calendar, or into one, changes what others see, so either asks every time
+        opts = options(argv[1:])
+        source = (opts.get("from") or "").strip()
+        if source and writable(source)["shared"]:
+            print("yes")
+            return
+        cal = writable((opts.get("calendar") or source).strip())
+        name = " ".join(cal["name"].split())[:NAME_MAX]
+        print("yes" if cal["shared"] else f"first {name} ({cal['id']})")
+        return
+    as_json = "--json" in argv
+    args = [a for a in argv[1:] if a != "--json"]
+    if argv[0] == "add":
+        data = options(args) if args else json.load(sys.stdin)
+        result = add(data)
+    else:
+        check = "--check" in args
+        args = [a for a in args if a != "--check"]
+        opts = {}
+        for flag in ("--scope", "--occurrence"):
+            if flag in args:
+                i = args.index(flag)
+                if i + 1 >= len(args):
+                    sys.exit(f"{flag} takes a value")
+                opts[flag[2:]] = args[i + 1]
+                del args[i:i + 2]
+        if len(args) != 2:
+            sys.exit("Usage: calendar delete [--check] [--scope this|all] [--occurrence START] CALENDAR UID")
+        result = delete(args[0], args[1], json.load(sys.stdin) if check else None, **opts)
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False))
+    elif "deleted" in result:
+        print(f"Deleted: {result['title']} ({result['start']})")
+    else:
+        print(f"Added to {result['calendar_name']}: {result['title']} ({result['start']} – {result['end']})"
+              + (f", {result['repeat'].lower()}" if result.get("repeat") else ""))
+    if not result["synced"]:
+        print("Not synced yet: the next sync takes it to the server.", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

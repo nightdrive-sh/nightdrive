@@ -1,19 +1,21 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.kit
 
-// Contacts' settings (⌘, or launcher › Settings › Apps › Contacts): the accounts with how many contacts each has here,
-// when the sync last ran, and the two things to do about them: sync now, and add an account (with Claude, as the first
-// start does). The accounts themselves are the user's accounts.conf (README.md › Setting up an account).
+// Contacts' settings (⌘, or launcher › Settings › Apps › Contacts): the list's order (first or last name, F and L), the
+// accounts with how many contacts each has here, when the sync last ran, and the two things to do about them: sync now,
+// and add an account (with Claude, as the first start does). The accounts themselves are the user's accounts.conf
+// (README.md › Setting up an account); the order is lib/settings.py's, which cards.py sorts by.
 AppPanel {
     id: root
-    required property var app           // the window: accounts, command, startSetup(), say()
+    required property var app           // the window: accounts, sortBy, command, load(), startSetup(), say()
     signal closed()
     visible: false
     cardWidth: 520
     spacing: 22
 
-    property string lastSync: ""        // HH:MM of the timer's last round today, else its date
+    property string lastSync: ""        // the timer's last round: its time today, else its day and time
     property bool syncing: false
 
     function open() { visible = true; forceActiveFocus(); when.running = true }
@@ -24,6 +26,13 @@ AppPanel {
         syncer.running = true
     }
     function addAccount() { close(); app.startSetup() }
+    // The switch moves at once; the list follows once cards.py has read the cards again in the new order
+    function sortBy(by) {
+        if (by === app.sortBy || sorter.running) return
+        app.sortBy = by
+        sorter.command = ["python3", Quickshell.shellDir + "/../lib/settings.py", "sort", by]
+        sorter.running = true
+    }
 
     onOutsideTapped: close()
     Keys.onPressed: e => {
@@ -31,6 +40,8 @@ AppPanel {
         if (k === Qt.Key_Escape || ((k === Qt.Key_Comma) && (e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)))) close()
         else if (k === Qt.Key_S) syncNow()
         else if (k === Qt.Key_A) addAccount()
+        else if (k === Qt.Key_F) sortBy("first")
+        else if (k === Qt.Key_L) sortBy("last")
         e.accepted = true
     }
 
@@ -41,9 +52,18 @@ AppPanel {
         stdout: StdioCollector {
             onStreamFinished: {
                 const m = text.match(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/)
-                const today = Qt.formatDate(new Date(), "yyyy-MM-dd")
-                root.lastSync = !m ? "" : m[1] === today ? m[2] : Qt.formatDate(new Date(m[1]), "d MMMM") + " " + m[2]
+                // The region's way: 14:30 today (2:30 PM in the US), else "Yesterday 14:30", "Tue 14:30", "28.10. 14:30"
+                const today = Regional.iso(new Date())
+                root.lastSync = !m ? "" : m[1] === today ? Regional.time(m[2]) : Regional.relative(m[1]) + " " + Regional.time(m[2])
             }
+        }
+    }
+    Process {
+        id: sorter
+        stderr: StdioCollector { id: sortErr }
+        onExited: code => {
+            if (code !== 0) root.app.say(sortErr.text.trim() || "Couldn't change the order.")
+            root.app.load()     // also after a failure: the switch goes back to what the file says
         }
     }
     Process {
@@ -59,7 +79,23 @@ AppPanel {
     Row {
         width: parent.width
         Text { anchors.verticalCenter: parent.verticalCenter; width: parent.width - escHint.width; text: "Settings"; color: c.title; font.family: c.font; font.pixelSize: 15; font.weight: Font.Medium }
-        KeyCap { id: escHint; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc"; tint: root.c.faint }
+        KeyCap { id: escHint; anchors.verticalCenter: parent.verticalCenter; c: root.c; keys: "esc" }
+    }
+
+    Item {
+        width: parent.width
+        implicitHeight: order.implicitHeight
+        Text { anchors.verticalCenter: parent.verticalCenter; text: "Sort by"; color: c.text; font.family: c.font; font.pixelSize: 13 }
+        AppSegments {
+            id: order
+            anchors.right: parent.right
+            c: root.c
+            tipAlign: "right"
+            options: [{ label: "First name", tip: "Anna Virtanen under A", keys: "F" },
+                      { label: "Last name", tip: "Anna Virtanen under V", keys: "L" }]
+            current: root.app.sortBy === "last" ? 1 : 0
+            onPicked: i => root.sortBy(i === 1 ? "last" : "first")
+        }
     }
 
     Column {

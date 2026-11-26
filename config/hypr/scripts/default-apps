@@ -7,10 +7,18 @@
                                     APP opens all of the kind's types; --if-unset leaves a kind the user has chosen alone
                                     (setup-user.sh's own defaults, run again at every update)
   default-apps open KIND [--focus]  start the kind's app (Hyper B / F / E); --focus brings an open window up instead
+  default-apps refresh              rewrite the browser's new-window entry for the chosen browser (setup-user.sh, at
+                                    every update: a Chromium browser chosen before it existed gets one)
+  default-apps follow               write down text/plain's app for the source code types no code editor was chosen
+                                    for (setup-user.sh, at every update; set text does it too): see follow()
 
 A choice is written to ~/.config/mimeapps.list for every type of the kind. Left unwritten, the default can come from
 whatever registers the type last (mimeinfo.cache): that is how aerc's copy in ~/.local/share/applications took over
 mailto links (19.10.2026).
+A Chromium browser (Brave, Chrome…) has no setting for where links from other apps open: they become tabs of its last
+window. As the browser, it gets a hidden entry of its own, nightdrive-newwindow-<id>.desktop, whose Exec adds
+--new-window, so each link opens in a window of its own in the grid, as Firefox's does (hypr/scripts/firefox-prefs).
+current() answers with the browser itself, so the launcher, Hyper B and the reopen list never see the wrapper.
 The terminal has no type: its choice is ~/.config/xdg-terminals.list, read by xdg-terminal-exec (hypr/scripts/terminal,
 and GIO for the apps that run in a terminal).
 """
@@ -18,9 +26,14 @@ import glob, json, os, re, subprocess, sys
 
 HOME = os.path.expanduser("~")
 MIMEAPPS = os.environ.get("XDG_CONFIG_HOME", HOME + "/.config") + "/mimeapps.list"
-MANAGED = "# managed by fuzzel/sync-apps"   # its copies hide an app from the launcher: not a reason to leave it out here
+MANAGED = "# managed by fuzzel/sync-apps"
+WRAP = "nightdrive-newwindow-"              # the new-window entry of a Chromium browser: WRAP + the browser's id
+# A Chromium browser, by its program's name or its desktop id (Flatpaks run "flatpak run"): they all take --new-window
+CHROMIUM = re.compile(r"chrom|brave|vivaldi|edge|opera|thorium|helium", re.I)   # its copies hide an app from the launcher: not a reason to leave it out here
 SCRIPTS = os.path.dirname(os.path.realpath(__file__))
 TERMINALS = os.environ.get("XDG_CONFIG_HOME", HOME + "/.config") + "/xdg-terminals.list"
+# The app follow() last wrote for the source code types (text/plain's then)
+FOLLOWED = os.environ.get("XDG_STATE_HOME", HOME + "/.local/state") + "/nightdrive/code-follows-text"
 
 # key, name, glyph, where Install › Software has more (a search, or cat:<category> where its most installed are the right
 # ones: the categories are broad, PDF readers are in Utilities, and the search matches the words as one phrase), types
@@ -36,7 +49,9 @@ KINDS = [
      ["x-scheme-handler/https", "x-scheme-handler/http", "text/html", "application/xhtml+xml"], []),
     ("email", "Email", "mail", "email", ["x-scheme-handler/mailto"], []),
     ("files", "Files", "folder", "file manager", ["inode/directory"], []),
-    ("text", "Text editor", "file-pen-line", "text editor", ["text/plain"], ["TextEditor"]),
+    # A .csv too: a spreadsheet app registers it last and took it, but most are a few lines to read or fix (#3414)
+    ("text", "Text editor", "file-pen-line", "text editor", ["text/plain", "text/csv", "text/tab-separated-values"],
+     ["TextEditor"]),
     # Without its own default, source code opens in the text editor (its types are text/plain's): Markdown's in Apostrophe
     ("code", "Code editor", "code", "code", CODE, ["TextEditor", "IDE"]),
     ("terminal", "Terminal", "square-terminal", "cat:terminals", [], ["TerminalEmulator"]),
@@ -76,17 +91,21 @@ def app_dirs():
 
 
 def entries():
-    """Desktop id -> the app's own entry: the first one in the search path that isn't sync-apps' hiding copy."""
-    found = {}
+    """Desktop id -> the app's own entry: the first one in the search path that isn't sync-apps' hiding copy. A copy
+    that renames the app (X-Nightdrive-Renamed: Nautilus as "Files (Nautilus)" beside Nightdrive's Files) lends it
+    its name, so the two Files rows here can be told apart."""
+    found, names = {}, {}
     for d in app_dirs():
         for path in glob.glob(d + "/**/*.desktop", recursive=True):
             app_id = os.path.relpath(path, d).replace("/", "-")
             if app_id in found and not found[app_id]["managed"]:
                 continue
             keys, managed = entry_keys(path)
+            if managed and keys.get("X-Nightdrive-Renamed") == "true" and "Name" in keys:
+                names.setdefault(app_id, keys["Name"])
             if app_id not in found or found[app_id]["managed"]:
                 found[app_id] = {"keys": keys, "managed": managed}
-    return {k: v["keys"] for k, v in found.items()}
+    return {k: dict(v["keys"], Name=names[k]) if k in names else v["keys"] for k, v in found.items()}
 
 
 def usable(keys, by_type=False):
@@ -108,13 +127,14 @@ def app_info(app_id, keys):
 
 
 def current(mime):
-    """The app that opens the type, as GIO (Files, the browsers, xdg-open) finds it: a type without a default of its own
-    gets its parent's (a .py file: text/plain's), which xdg-mime query doesn't tell."""
+    """The app that opens the type, as GIO (Files, gio open, the browsers) finds it: a type without a default of its own
+    gets its parent's (a .py file: text/plain's), which xdg-mime query doesn't tell. xdg-open doesn't ask GIO under
+    Hyprland: it reads the type with mimetype (perl-File-MimeInfo) and the default with xdg-mime, see follow()."""
     try:
         out = subprocess.run(["gio", "mime", mime], capture_output=True, text=True, timeout=5,
                              env=dict(os.environ, LC_ALL="C")).stdout
         m = re.match(r"Default application for .*?: (\S+\.desktop)", out)
-        return m.group(1) if m else ""
+        return unwrap(m.group(1)) if m else ""
     except (OSError, subprocess.TimeoutExpired):
         return ""
 
@@ -198,28 +218,144 @@ def put(lines, section, values):
     return out
 
 
+def unwrap(app_id):
+    """The browser behind its new-window entry; any other id as it is."""
+    return app_id[len(WRAP):] if app_id.startswith(WRAP) else app_id
+
+
+def new_window_exec(app_id, keys):
+    """The browser's Exec with --new-window before its URL, or "" for a browser that isn't Chromium's or has no %U
+    (then it keeps its own entry). Flatpak's file forwarding wraps the URL as @@u %U @@: the flag goes before it."""
+    exe = keys.get("Exec", "")
+    words = exe.split()
+    prog = os.path.basename(words[0]) if words else ""
+    if not (CHROMIUM.search(prog) or prog == "flatpak" and CHROMIUM.search(app_id)): return ""
+    if "--new-window" in words: return exe
+    for code in ("@@u", "%U", "%u"):
+        if code in words:
+            i = words.index(code)
+            return " ".join(words[:i] + ["--new-window"] + words[i:])
+    return ""
+
+
+def write_wrapper(app_id, keys, exe, types):
+    """The browser's hidden new-window entry, in ~/.local/share/applications (the first one GIO reads)."""
+    data_home = os.environ.get("XDG_DATA_HOME", HOME + "/.local/share") + "/applications"
+    os.makedirs(data_home, exist_ok=True)
+    lines = ["[Desktop Entry]", "# written by hypr/scripts/default-apps: links from other apps in a new window",
+             "Type=Application", "Name=" + keys.get("Name", app_id[:-8]), "Exec=" + exe, "NoDisplay=true",
+             "MimeType=" + ";".join(types) + ";"]
+    lines += [k + "=" + keys[k] for k in ("Icon", "TryExec", "StartupWMClass") if keys.get(k)]
+    path = f"{data_home}/{WRAP}{app_id}"
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(path + ".tmp", path)
+    return WRAP + app_id
+
+
+def remove_wrappers(keep=""):
+    """The new-window entries of browsers no longer chosen: left behind, they'd stay in Open With lists."""
+    data_home = os.environ.get("XDG_DATA_HOME", HOME + "/.local/share") + "/applications"
+    for path in glob.glob(f"{data_home}/{WRAP}*.desktop"):
+        if os.path.basename(path) != keep:
+            os.remove(path)
+
+
+def refresh_browser():
+    """The chosen browser's new-window entry written again (its Exec may change with an update), and made the
+    default for a Chromium browser chosen before there was one. Nothing when no browser is chosen."""
+    lines = read_mimeapps()
+    k = next(k for k in KINDS if k[0] == "browser")
+    inside, cur = False, ""
+    for line in lines:
+        if line.startswith("["):
+            inside = line.strip() == "[Default Applications]"
+        elif inside and line.split("=", 1)[0].strip() == k[4][0]:
+            cur = line.split("=", 1)[1].strip().split(";")[0]
+    if cur and unwrap(cur) in entries():
+        set_default("browser", unwrap(cur))
+
+
 def set_default(kind, app_id, if_unset=False):
     k = next((k for k in KINDS if k[0] == kind), None)
     if k is None: sys.exit(f"Unknown kind: {kind} ({', '.join(k[0] for k in KINDS)})")
     if not app_id.endswith(".desktop"): app_id += ".desktop"
-    if app_id not in entries(): sys.exit(f"No such app: {app_id}")
+    apps = entries()
+    if app_id not in apps: sys.exit(f"No such app: {app_id}")
     if kind == "terminal":
         set_terminal(app_id, if_unset)
         return
     types = k[4]
     lines = read_mimeapps()
     if if_unset and chosen(lines, types): return
+    if kind == "browser":
+        exe = new_window_exec(app_id, apps[app_id])
+        app_id = write_wrapper(app_id, apps[app_id], exe, types) if exe else app_id
+        remove_wrappers(keep=app_id)
+    write_mimeapps(lines, {t: app_id for t in types})
+    if kind == "code":
+        forget_followed()   # the user's own choice now: follow() leaves it alone
+    elif kind == "text":
+        follow()
+
+
+def write_mimeapps(lines, values):
+    """mimeapps.list with values (type: app) as the types' defaults."""
     old = associations(lines)
-    lines = put(lines, "[Default Applications]", {t: app_id for t in types})
+    lines = put(lines, "[Default Applications]", values)
     # Also in [Added Associations] (first): GIO takes a default only from the apps that open the type, and an app that
     # doesn't list it (VS Code and source code) is one only from there, as after Files' "Open With"
     lines = put(lines, "[Added Associations]",
-                {t: ";".join([app_id] + [a for a in old.get(t, "").split(";") if a and a != app_id]) + ";" for t in types})
+                {t: ";".join([a] + [o for o in old.get(t, "").split(";")
+                                    if o and o != a and not o.startswith(WRAP)]) + ";" for t, a in values.items()})
     os.makedirs(os.path.dirname(MIMEAPPS), exist_ok=True)
     tmp = MIMEAPPS + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     os.replace(tmp, MIMEAPPS)
+
+
+def defaults(lines):
+    """[Default Applications] as type: app."""
+    out, inside = {}, False
+    for line in lines:
+        if line.startswith("["):
+            inside = line.strip() == "[Default Applications]"
+        elif inside and "=" in line:
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def forget_followed():
+    try:
+        os.remove(FOLLOWED)
+    except FileNotFoundError:
+        pass
+
+
+def follow():
+    """Source code with no code editor chosen opens in the text editor (text/plain's app), as GIO finds it through the
+    types' parents. xdg-open finds no default there: mimetype follows a type's parents only one step (application/json
+    → json5, not on to text/javascript and text/plain), and its fallback, mimeopen, then takes application/octet-stream's
+    app (Ferry's send window). So those types get text/plain's app written down, and again when it changes: FOLLOWED
+    keeps the app written, so a type with any other app (the user's choice, an app of its own) stays as it is."""
+    text = current("text/plain")
+    if not text: return
+    try:
+        with open(FOLLOWED, encoding="utf-8") as f:
+            last = f.read().strip()
+    except FileNotFoundError:
+        last = ""
+    lines = read_mimeapps()
+    own = defaults(lines)
+    values = {t: text for t in CODE
+              if own.get(t) != text and (own.get(t) == last if t in own else current(t) == text)}
+    if values: write_mimeapps(lines, values)
+    if text != last:
+        os.makedirs(os.path.dirname(FOLLOWED), exist_ok=True)
+        with open(FOLLOWED, "w", encoding="utf-8") as f:
+            f.write(text + "\n")
 
 
 def set_terminal(app_id, if_unset=False):
@@ -268,6 +404,10 @@ def main(args):
         set_default(args[1], args[2], "--if-unset" in args[3:])
     elif args[:1] == ["open"] and len(args) >= 2:
         open_kind(args[1], "--focus" in args[2:])
+    elif args == ["refresh"]:
+        refresh_browser()
+    elif args == ["follow"]:
+        follow()
     elif args == ["--json"]:
         print(json.dumps(kinds()))
     elif not args or args == ["list"]:

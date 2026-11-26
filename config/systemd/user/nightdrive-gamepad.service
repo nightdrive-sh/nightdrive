@@ -1,0 +1,14 @@
+# The controller's Xbox button opens Games, and the controller moves in it (hypr/scripts/gamepad-home,
+# #3530). Idle until a controller connects: it looks for one every 2 s. On for everyone (link.sh enables it).
+[Unit]
+Description=Nightdrive: the controller's Xbox button opens Games
+PartOf=nightdrive-session.target
+After=nightdrive-session.target
+
+[Service]
+ExecStart=%h/.config/hypr/scripts/gamepad-home
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=nightdrive-session.target

@@ -52,15 +52,16 @@ for dev in /dev/video*; do
   grep -q ':capture:' "/run/udev/data/c$((16#$maj)):$((16#$min))" 2>/dev/null && cams+=("$dev")
 done
 if (( ${#cams[@]} )); then
-  # "<device> /proc/<pid>/fd" per open file
-  while read -r dev dir; do
+  # "<device> <pid>" per open file. One stat over the fds' links rather than find: find walks /proc/<pid>/fd as a
+  # directory tree and aborts (SIGABRT, a core dump each time) when a process exits mid-walk; stat only fails that file.
+  while read -r dev pid; do
     [[ " ${cams[*]} " == *" $dev "* ]] || continue
-    pid=${dir#/proc/}; pid=${pid%/fd}
     comm=$(cat "/proc/$pid/comm" 2>/dev/null) || continue
     [[ $comm =~ $SERVERS ]] && continue
     exe=$(readlink "/proc/$pid/exe" 2>/dev/null)
     streams+=$'\n'"camera"$'\t'"$comm"$'\t'"${exe##*/}"
-  done < <(find /proc/[0-9]*/fd -maxdepth 1 -lname '/dev/video*' -printf '%l %h\n' 2>/dev/null)
+  done < <(QUOTING_STYLE=literal stat -c '%N' /proc/[0-9]*/fd/* 2>/dev/null \
+             | sed -n 's|^/proc/\([0-9]*\)/fd/[0-9]* -> \(/dev/video[0-9]*\)$|\2 \1|p')
 fi
 
 mic=(); camera=()

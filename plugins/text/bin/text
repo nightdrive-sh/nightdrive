@@ -1,0 +1,78 @@
+#!/bin/bash
+# text: Nightdrive's editor for plain text (plugins/text, README.md): its window, the files it opens, and its install,
+# which makes it the text editor in Settings › Apps › Default apps unless the user has chosen one.
+set -uo pipefail
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app                                     # Text's own Quickshell config, apart from the desktop's shell
+DEFAULT_APPS=$APP_DIR/../../config/hypr/scripts/default-apps
+DESKTOP_ID=nightdrive-text.desktop
+
+# shellcheck disable=SC2034  # read by kit/app.sh, sourced below
+APP_TITLE=Text
+# shellcheck disable=SC2034  # the same
+APP_IPC=text
+. "$QS_DIR/kit/app.sh"
+
+# Each file to the window, by its absolute path: not through symlinks (realpath -s), so the window names the file as it
+# was opened, and textfile.py writes through the link
+open_files() {
+  local f
+  open_ready || { echo "Text didn't start: text log says why" >&2; return 1; }
+  for f in "$@"; do
+    [[ $f == file://* ]] && f=$(python3 -c 'import sys, urllib.parse as u; print(u.unquote(u.urlparse(sys.argv[1]).path))' "$f")
+    ipc open "$(realpath -s -- "$f")"
+  done
+}
+
+# Puts Text among the desktop's apps (share/text.desktop), with Exec's full path filled in (the compositor's PATH may
+# not have ~/.local/bin), and makes it the text editor while none is chosen: text/plain had no app of its own, so a .txt
+# opened in LibreOffice Writer, the last to register it (#3414). A choice the user made stays (--if-unset).
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/text.svg" "$icons/nightdrive-text.svg"
+  sed "s|^Exec=text|Exec=$HOME/.local/bin/text|" "$APP_DIR/share/text.desktop" > "$apps/$DESKTOP_ID"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  "$DEFAULT_APPS" set text "$DESKTOP_ID" --if-unset
+  echo "Installed: $apps/$DESKTOP_ID"
+}
+
+# Takes Text out of the desktop's apps. Where it was the text editor, the files go to whatever GIO finds next.
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  app_command quit >/dev/null 2>&1 || true
+  rm -f "$data/applications/$DESKTOP_ID" "$data/icons/hicolor/scalable/apps/nightdrive-text.svg"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$data/applications" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Text is out of your apps."
+}
+
+usage() {
+  cat <<USAGE
+Usage: text [FILE…] | text command
+
+  (none), open     open Text, or bring it forward if it is open
+  FILE…            open the files in it (each one beside the others)
+  ask-quit         quit, asking first about what isn't saved (⌘Q: quit-commands)
+  install          Text among the desktop's apps, and the text editor unless you chose one
+  uninstall        take it out again
+  restart          close and open again (after a change to the app)
+  quit             close Text at once (what isn't saved is lost)
+  log              follow the app's log (QML errors show up here)
+  help             this text
+USAGE
+}
+
+case ${1:-open} in
+  ask-quit)  running && ipc quit ;;
+  install)   install_app ;;
+  uninstall) uninstall_app ;;
+  help|-h|--help) usage ;;
+  open|restart|quit|log) app_command "$@" ;;
+  --) open_files "${@:2}" ;;
+  -*) usage >&2; exit 2 ;;
+  *)  open_files "$@" ;;
+esac

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Moves the messages of a notmuch query to a sibling folder of the one they are in (the account's Trash, Archive …).
 
-    move.py FOLDER QUERY [FROM …]     e.g. move.py Trash thread:0000000000000005 example/INBOX
+    move.py [--sexp] FOLDER QUERY [FROM …]     e.g. move.py Trash thread:0000000000000005 example/INBOX
+
+QUERY is notmuch's infix syntax (Mail's window), or with --sexp its s-expression syntax (inbox.py, whose ids are
+quoted strings there: ids.py).
 
 FROM are the folders files may move from: "account/INBOX" (under ~/Mail), or "INBOX" for that folder in any account.
 A message's files elsewhere stay: one mailed between two of your accounts is in both, and only the account being
@@ -25,6 +28,7 @@ import subprocess
 import sys
 
 import compose
+import ids
 
 ARCHIVE = "Archive"
 
@@ -60,18 +64,21 @@ def target(path, dest):
 
 
 def main():
-    dest, query, sources = sys.argv[1], sys.argv[2], sys.argv[3:]
+    args = sys.argv[1:]
+    syntax = ["--query=sexp"] if args[:1] == ["--sexp"] else []
+    dest, query, sources = args[len(syntax)], args[len(syntax) + 1], args[len(syntax) + 2:]
     root = notmuch("config", "get", "database.path").strip()
 
     def source(f):
         where = os.path.relpath(os.path.dirname(os.path.dirname(f)), root)      # account/folder
         return not sources or any(s == where or "/" not in s and s == folder(f) for s in sources)
 
-    ids = notmuch("search", "--output=messages", "--exclude=false", query).split()
+    found_ids = notmuch("search", "--output=messages", "--exclude=false", *syntax, "--", query).split()
     kept = all_mail_dirs()
     moved = 0
-    for mid in ids:
-        found = notmuch("search", "--output=files", "--exclude=false", f'id:"{mid.removeprefix("id:")}"').split("\n")
+    for mid in found_ids:
+        # Its own id, quoted: a Message-ID with a quote in it can't widen the search to other mail
+        found = notmuch("search", "--output=files", "--exclude=false", "--query=sexp", ids.message(mid)).split("\n")
         files = [f for f in found if f and os.path.exists(f)]
         for acc in {account_dir(f) for f in files}:
             mine = [f for f in files if account_dir(f) == acc]
@@ -93,7 +100,7 @@ def main():
                 moved += 1
     if moved:
         notmuch("new", "--quiet", "--no-hooks")
-    print(json.dumps({"moved": moved, "ids": [i.removeprefix("id:") for i in ids]}))
+    print(json.dumps({"moved": moved, "ids": [i.removeprefix("id:") for i in found_ids]}))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,39 @@
+{
+  "tools": [
+    {
+      "name": "contacts_find",
+      "title": "Find contacts",
+      "description": "Searches the user's contacts (Nightdrive Contacts: iCloud, Google and CardDAV address books, one person's cards in several accounts as one) and returns each match's id and name, with their company, title, email addresses and phone numbers as far as the user's Access gives them (a part it leaves out is missing, not empty). Every word must match a name or nickname, or one of those parts or a street address if given; a number matches without its spaces or leading 0 (040 123 finds +358 40 123). Search for someone: a word of at least 2 characters, not single letters. count is how many matched, people at most limit (25) of them. Searches and cards give you at most 100 different people an hour: search for the ones the user needs, not for everyone. Use it to find someone's address or number, then contacts_card with the id for the card.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "title": "Search", "description": "Words to look for, e.g. a name, a company or part of a number; one of them at least 2 characters, or 3 digits of a number", "minLength": 2},
+          "limit": {"type": "integer", "title": "At most", "description": "How many people to return (default and most 25)", "minimum": 1, "maximum": 25}
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "command": ["contacts", "find", "--json", ["--limit", "{limit}"], "{query}"],
+      "class": "read",
+      "mask": ["people.org", "people.title"],
+      "area": "contacts"
+    },
+    {
+      "name": "contacts_card",
+      "title": "Contact card",
+      "description": "One person's card from the user's contacts: name, nickname and the accounts and card ids it comes from, and of company, title, email addresses, phone numbers, street addresses, web addresses, birthday (YYYY-MM-DD, or --MM-DD without the year) and note those the user's Access gives (a part it leaves out is missing, not empty; card numbers, codes and passwords in the note, company, title and nickname are masked). who is an id from contacts_find, an email address or a phone number (if Access gives those). An error says when no one matches.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "who": {"type": "string", "title": "Who", "description": "A card's id (from contacts_find), an email address or a phone number"}
+        },
+        "required": ["who"],
+        "additionalProperties": false
+      },
+      "command": ["contacts", "card", "--json", "{who}"],
+      "mask": ["note", "org", "title", "nickname"],
+      "class": "read",
+      "area": "contacts"
+    }
+  ]
+}

@@ -33,6 +33,18 @@ screen_args() {
   fi
 }
 
+# The guest's sound (lib/arch.sh's SOUND), played through PipeWire as a stream named for the VM (in the host's
+# mixer, as its own app). None without qemu-audio-pipewire (a Garage installed before sound came: the VM starts
+# anyway, silent). Headless, the card is there but plays into nothing: a test VM mustn't play on the user's speakers
+sound_args() {
+  local backend
+  if [[ -n ${GARAGE_HEADLESS:-} ]]; then backend=none,id=snd0
+  elif "$QEMU" -audiodev help 2>/dev/null | grep -qx pipewire; then backend="pipewire,id=snd0,out.stream-name=$(qv "$1")"
+  else return 0
+  fi
+  printf '%s\n' -audiodev "$backend" "${SOUND[@]}"
+}
+
 # qemu_cmd NAME: its command line, into QEMU_CMD (start runs it, garage-ctl cmdline prints it). Run from the VM's
 # folder: the sockets go there by a short path (qmp, qga)
 qemu_cmd() {
@@ -46,6 +58,7 @@ qemu_cmd() {
   [[ -n $ISO ]] && cd=(-device virtio-scsi-pci -device scsi-cd,drive=cd,bootindex=1
                        -drive "if=none,id=cd,media=cdrom,readonly=on,format=raw,file=$(qv "$ISO")")
   local screen=(); mapfile -t screen < <(screen_args)
+  local sound=(); mapfile -t sound < <(sound_args "$name")
   # A disk image's first boot: its user and the rest, until they have run (lib/firstboot.sh)
   local firstboot=(); mapfile -t firstboot < <(firstboot_args "$name")
   local pin=(); [[ -n $PIN ]] && pin=(taskset -c "$PIN")
@@ -58,6 +71,7 @@ qemu_cmd() {
     -device virtio-blk-pci,drive=disk,bootindex=0
     "${screen[@]}"
     -device qemu-xhci -device usb-kbd -device usb-tablet
+    "${sound[@]}"
     "${cd[@]}"
     # The guest's sshd on the host's loopback, at its own port (lib/ssh.sh: `ssh NAME`), as SDL shares no clipboard
     -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22"
@@ -167,6 +181,50 @@ synctime() {
   local rc=0
   qga "$1" guest-set-time "{\"time\": $(date +%s%N)}" >/dev/null 2>&1 || rc=$?
   ((rc == 0 || rc == 3)) || [[ ! -S $(dir "$1")/qga.sock ]] || die "$1: its clock wasn't set"
+}
+
+# The host screen's scale, that of the screen its window is on, into the guest (#1630): a Nightdrive guest takes it
+# (config/hypr/vm-display.lua) until one is picked in its Settings › Display, so its text is as big as the host's.
+# The overlay (overlay/shell.qml) sends it by qemu's pid, the window's, when the window comes and when it goes to a
+# screen of another scale. Through the guest agent: a file in the guest's /run, as Fedora's SELinux lets the agent
+# write only there and in /tmp. Exit 3 while the guest has no agent (booting): the overlay tries again
+GUEST_SCALE_FILE=/run/nightdrive-host-scale
+guest_scale() {
+  local pid=$1 scale=$2 d name="" h
+  [[ $pid =~ ^[0-9]+$ ]] || die "guest-scale PID SCALE: qemu's pid"
+  [[ $scale =~ ^[0-9]+(\.[0-9]+)?$ ]] || die "Bad scale: $scale"
+  for d in "$ROOT"/*/; do
+    [[ $(cat "$d/pid" 2>/dev/null) == "$pid" ]] && { name=$(basename "$d"); break; }
+  done
+  [[ -n $name ]] && running "$name" || die "No running VM with pid $pid"
+  [[ $(vm_state "$name") == paused* ]] && exit 3
+  h=$(qga "$name" guest-file-open "{\"path\": \"$GUEST_SCALE_FILE\", \"mode\": \"w\"}") || exit $?
+  qga "$name" guest-file-write "{\"handle\": $h, \"buf-b64\": \"$(printf '%s\n' "$scale" | base64 -w0)\"}" >/dev/null
+  qga "$name" guest-file-close "{\"handle\": $h}" >/dev/null
+}
+
+# Text typed into it (#1872), for an installer's console, which has no clipboard: lib/typekeys.py, on stdin or from the
+# host's clipboard (--clipboard: the window's v). --keymap: the layout the guest's console has, us (an installer's) or fi
+TYPEKEYS=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/typekeys.py
+type_text() {
+  local name=${1:-} keymap=us clip=0
+  shift || true
+  while (($#)); do
+    case $1 in
+      --keymap) keymap=${2:-}; shift 2 || die "--keymap us|fi" ;;
+      --clipboard) clip=1; shift ;;
+      *) die "type NAME [--keymap us|fi] [--clipboard]" ;;
+    esac
+  done
+  need "$name"; running "$name" || die "$name isn't running"
+  [[ $(vm_state "$name") == paused* ]] && die "$name is paused: resume it first"
+  [[ $keymap == us || $keymap == "fi" ]] || die "Keymap: us or fi"
+  if ((clip)); then
+    local text; text=$(wl-paste -n -t text 2>/dev/null) && [[ -n $text ]] || die "Nothing to type: the clipboard has no text"
+    printf '%s' "$text" | (cd "$(dir "$name")" && python3 -I "$TYPEKEYS" qmp.sock "$name" "$keymap")
+  else
+    (cd "$(dir "$name")" && python3 -I "$TYPEKEYS" qmp.sock "$name" "$keymap")
+  fi
 }
 
 # Its SDL window's address and workspace, found by qemu's pid ("" while it has none)

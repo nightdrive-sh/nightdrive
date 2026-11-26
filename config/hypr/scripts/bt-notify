@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Bluetooth's Connected / Disconnected notifications, with a Disconnect button on Connected.
+
+Headphones that connect to every computer they know when switched on (a Sony WH-1000XM6 to a Mac and to this machine)
+often need dropping from this one at once: the button does it from the notification. It only disconnects, as the
+Headphones and Bluetooth menus do (Device1.Disconnect, what `bluetoothctl disconnect` calls): the device stays paired.
+
+Replaces Blueman's own notifications (its ConnectionNotifier plugin), which can't carry buttons: this switches that
+plugin off in Blueman's settings at start, so there are never two. The rest of Blueman (its tray icon, pairing) stays.
+Like Blueman's, the battery is added to Connected once the device reports it ("Connected 80%").
+Started by hyprland.lua; listens to BlueZ on the system bus. One instance only (flock).
+"""
+import fcntl, os, sys
+
+import dbus, dbus.mainloop.glib
+from gi.repository import Gio, GLib
+
+BLUEMAN_SCHEMA = "org.blueman.general"
+BLUEMAN_PLUGIN = "ConnectionNotifier"
+BATTERY_WAIT = 30   # s: how long after connecting a battery level still goes into the Connected notification
+APP = "Bluetooth"
+# BlueZ's Icon property (a freedesktop name) -> a Lucide icon, as the menus show devices
+ICONS = [("audio-head", "headphones"), ("audio-", "speaker"), ("input-mouse", "mouse"), ("input-keyboard", "keyboard"),
+         ("input-gaming", "gamepad-2"), ("phone", "smartphone"), ("computer", "laptop")]
+
+DEVICE = "org.bluez.Device1"
+BATTERY = "org.bluez.Battery1"
+PROPS = "org.freedesktop.DBus.Properties"
+
+
+def silence_blueman():
+    """Blueman's ConnectionNotifier off ("!Name" in its plugin list); a running blueman-applet unloads it at once."""
+    source = Gio.SettingsSchemaSource.get_default()
+    if not source or not source.lookup(BLUEMAN_SCHEMA, True):
+        return   # Blueman isn't installed
+    settings = Gio.Settings.new(BLUEMAN_SCHEMA)
+    plugins = [p for p in settings.get_strv("plugin-list") if p.lstrip("!") != BLUEMAN_PLUGIN]
+    if "!" + BLUEMAN_PLUGIN not in settings.get_strv("plugin-list"):
+        settings.set_strv("plugin-list", plugins + ["!" + BLUEMAN_PLUGIN])
+        Gio.Settings.sync()
+
+
+def icon_for(bluez_icon):
+    for prefix, icon in ICONS:
+        if bluez_icon.startswith(prefix):
+            return "lucide:" + icon
+    return "lucide:bluetooth"
+
+
+class Notifier:
+    def __init__(self, system, session):
+        self.system = system
+        # Follows the name: Quickshell (the notification server) may start after this, or restart
+        self.notify = dbus.Interface(session.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+                                                        introspect=False, follow_name_owner_changes=True),
+                                     "org.freedesktop.Notifications")
+        self.shown = {}     # device path -> its Connected notification's id, while that may still get the battery
+        self.actions = {}   # notification id -> device path, while its Disconnect button is there
+        system.add_signal_receiver(self.on_properties, "PropertiesChanged", PROPS, "org.bluez", path_keyword="path")
+        system.add_signal_receiver(self.on_interfaces, "InterfacesAdded", "org.freedesktop.DBus.ObjectManager", "org.bluez")
+        session.add_signal_receiver(self.on_action, "ActionInvoked", "org.freedesktop.Notifications")
+        session.add_signal_receiver(self.on_closed, "NotificationClosed", "org.freedesktop.Notifications")
+
+    def props(self, path, iface):
+        try:
+            return dbus.Interface(self.system.get_object("org.bluez", path), PROPS).GetAll(iface)
+        except dbus.DBusException:
+            return {}
+
+    def send(self, path, body, replaces=0, button=False):
+        dev = self.props(path, DEVICE)
+        name = str(dev.get("Alias") or dev.get("Name") or "")
+        if not name:
+            return 0
+        actions = ["disconnect", "Disconnect"] if button else []
+        try:
+            nid = int(self.notify.Notify(APP, dbus.UInt32(replaces), icon_for(str(dev.get("Icon", ""))), name, body,
+                                         actions, {"transient": dbus.Boolean(True, variant_level=1)}, -1))
+        except dbus.DBusException as e:
+            print("notify:", e, file=sys.stderr)
+            return 0
+        if button:
+            self.actions[nid] = path
+        return nid
+
+    def connected(self, path):
+        level = self.props(path, BATTERY).get("Percentage")
+        if level is not None:
+            self.send(path, "Connected %d%%" % level, button=True)
+            return
+        nid = self.send(path, "Connected", button=True)
+        if nid:
+            self.shown[path] = nid
+            GLib.timeout_add_seconds(BATTERY_WAIT, self.give_up, path, nid)
+
+    def give_up(self, path, nid):
+        if self.shown.get(path) == nid:   # not a later connection's
+            del self.shown[path]
+        return False
+
+    def battery(self, path, level):
+        nid = self.shown.pop(path, None)
+        if nid and nid in self.actions:   # still open: the same notification, now with the battery
+            self.send(path, "Connected %d%%" % level, replaces=nid, button=True)
+
+    def on_properties(self, iface, changed, invalidated, path=None):
+        if iface == DEVICE and "Connected" in changed:
+            if changed["Connected"]:
+                self.connected(path)
+            else:
+                self.shown.pop(path, None)
+                self.send(path, "Disconnected")
+        elif iface == BATTERY and "Percentage" in changed:
+            self.battery(path, int(changed["Percentage"]))
+
+    def on_interfaces(self, path, ifaces):
+        # The battery often appears as an interface of its own a moment after connecting
+        if BATTERY in ifaces and "Percentage" in ifaces[BATTERY]:
+            self.battery(str(path), int(ifaces[BATTERY]["Percentage"]))
+
+    def on_action(self, nid, key):
+        path = self.actions.pop(int(nid), None)
+        if path and key == "disconnect":
+            dbus.Interface(self.system.get_object("org.bluez", path), DEVICE).Disconnect(
+                reply_handler=lambda: None, error_handler=lambda e: print("disconnect:", e, file=sys.stderr))
+
+    def on_closed(self, nid, reason):
+        self.actions.pop(int(nid), None)
+
+
+def main():
+    lock = open(os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "bt-notify.lock"), "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return
+    silence_blueman()
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    Notifier(dbus.SystemBus(), dbus.SessionBus())
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,10 @@
+# Calendar's sync every 15 minutes (plugins/calendar; `calendar enable` turns it on, the plugin's installer runs that)
+[Unit]
+Description=Nightdrive Calendar: sync calendars every 15 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target

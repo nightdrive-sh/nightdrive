@@ -1,0 +1,5 @@
+<!-- The Nightdrive mark without its frame: logo/nightdrive-icon-small.svg's N and block, cropped to them -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="6.38 8.47 20.42 15.13" width="27" height="20" role="img" aria-label="Nightdrive">
+  <path fill="#ece6f5" d="M6.88 22.84H9.39V16.76C9.39 15.45 9.24 13.32 9.12 12.11L12.68 22.84H16V8.97H13.49V14.67C13.49 15.98 13.66 18.32 13.8 19.7L10.21 8.97H6.88Z"/>
+  <rect x="18.3" y="9.0" width="8.0" height="14.1" fill="#c071eb"/>
+</svg>

@@ -1,0 +1,53 @@
+{
+  "tools": [
+    {
+      "name": "places_list",
+      "title": "Places",
+      "description": "The user's places: names they gave to Wi-Fi networks (work = the office's network), for reminders and scheduled commands that wait for arriving at or leaving one. Each place's name, its networks (wifi: SSIDs) and whether this computer is there now (here), and the Wi-Fi networks it is on now (wifi). Look here first when the user says \"when I get to work\" or \"when I leave home\": a place is matched by its name, in any case.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightdrive", "places", "list", "--json"],
+      "class": "read",
+      "area": "sound-display"
+    },
+    {
+      "name": "places_add",
+      "title": "Add a place",
+      "description": "Names Wi-Fi networks as a place (work, home, the cottage), or adds networks to a place that is there. Without wifi it takes the network this computer is on now: when the user says \"this network is work\" or names a place that places_list doesn't have, ask once which network it is, offering the one now. One network may be in two places; the answer's shared says which others have it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 40, "title": "Place", "description": "What the user calls it: work, home"},
+          "wifi": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 32}, "maxItems": 10, "title": "Wi-Fi networks", "description": "The networks' names (SSIDs). Without: the one this computer is on now"}
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "places", "add", "--json", "--", "{name}", ["{wifi}"]],
+      "before": ["nightdrive", "places", "show", "--", "{name}"],
+      "undo": ["nightdrive", "places", "put", "--", "{name}", "{previous}"],
+      "notice": "Place {name}: {wifi}",
+      "class": "change",
+      "area": "sound-display"
+    },
+    {
+      "name": "places_remove",
+      "title": "Remove a place",
+      "description": "Takes a place away, by its name from places_list. Reminders and commands waiting for it then wait for a place that isn't there.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 40, "title": "Place", "description": "Its name from places_list"}
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "command": ["nightdrive", "places", "remove", "--json", "--", "{name}"],
+      "before": ["nightdrive", "places", "show", "--", "{name}"],
+      "undo": ["nightdrive", "places", "put", "--", "{name}", "{previous}"],
+      "notice": "Removed the place {name}",
+      "class": "change",
+      "deletes": true,
+      "area": "sound-display"
+    }
+  ]
+}

@@ -41,7 +41,9 @@
 /* Adwaita draws most widgets with its own colours, not the names above: set the rules directly */
 /* One colour for the whole window, as in gtk-4.0/gtk.css: the look's background and opacity, with see-through panes */
 window, .background { background-color: @nd_window; color: @nd_text; }
-headerbar, .titlebar { background: transparent; color: @nd_text; border-color: @nd_divider; box-shadow: none; }
+/* Unlike GTK 4, GTK 3 doesn't paint the window's background under the title bar: a transparent header bar let the
+   window behind show through (the Save dialog's top). So the header bar paints the same colour itself. */
+headerbar, .titlebar { background: @nd_window; color: @nd_text; border-color: @nd_divider; box-shadow: none; }
 textview, textview text, .view, .view text, iconview { background-color: transparent; color: @nd_text; }
 /* The lines between the panes and under the header bar: the kit apps' divider, as in gtk-4.0/gtk.css */
 separator { background-color: @nd_divider; }

@@ -1,0 +1,11 @@
+#!/bin/bash
+# Network Drives' top bar module (module.jsonc): nothing while all is well; cloud-off when a drive that should be
+# mounted isn't (orange while it waits for its host, red when it failed), cloud-upload with a count while files upload.
+# bin/netdrive bar decides, from systemd and /proc/self/mounts only: it never touches a drive's folder.
+. ~/.config/topbar/scripts/emit
+read -r icon class text < <(bin/netdrive bar 2>/dev/null)
+case $icon in
+  cloud-off) emit cloud-off "" "$class" ;;
+  cloud-upload) emit cloud-upload "$text" pulse ;;
+  *) emit "" "" ;;
+esac

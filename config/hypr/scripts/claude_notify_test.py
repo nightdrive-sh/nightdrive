@@ -1,0 +1,371 @@
+#!/usr/bin/env python3
+"""claude-notify's answers from Companion (#3137): `python3 config/hypr/scripts/claude_notify_test.py`. The hook leaves
+a request's whole input for Companion, takes Companion's Allow for it (an edit too, which its notification can't show)
+only by the request's id, and never for one too long to leave whole. Hyprland, the notification and Quickshell are
+stubbed: nothing shows and no window moves."""
+
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import tempfile
+import time
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+HOOK = os.environ.get("CLAUDE_NOTIFY", os.path.join(HERE, "claude-notify"))
+ADDR = "0xtest"
+SID = "0b6c4a3e-1d2f-4e5a-9b8c-7d6e5f4a3b2c"
+EDIT = {"file_path": "/tmp/x/notes.md", "old_string": "a", "new_string": "a\nb", "replace_all": False}
+
+STUBS = {
+    # the session's window is this test's process (the hook's parent); another window has the keyboard, unless CN_ACTIVE
+    "hyprctl": """#!/bin/bash
+case "$*" in
+  "-j clients") printf '[{"pid": %s, "address": "%s", "title": "✳ test"}]' "$CN_PID" "$CN_ADDR" ;;
+  "-j activewindow") printf '{"address": "%s"}' "${CN_ACTIVE:-0xother}" ;;
+esac""",
+    # keeps its arguments, prints its id at once, then waits as -w does for an action that never comes (CN_CLOSE:
+    # closed with none)
+    "notify-send": "#!/bin/bash\nprintf '%s\\n' \"$@\" > \"$CN_NOTIFIED\"\necho 7\n[[ -n ${CN_CLOSE:-} ]] && exit 0\nexec sleep 600",
+    # answers barShown with CN_BAR (the sessions bar there to see), else as if Quickshell weren't running
+    "qs": "#!/bin/bash\n[[ $* == *barShown* && -n ${CN_BAR:-} ]] && { echo true; exit 0; }\nexit 1",
+    "gdbus": "#!/bin/bash\nexit 0",
+}
+
+
+@unittest.skipUnless(shutil.which("jq"), "needs jq")
+class CompanionAnswer(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        bin_ = os.path.join(self.tmp, "bin")
+        os.mkdir(bin_)
+        for name, text in STUBS.items():
+            path = os.path.join(bin_, name)
+            with open(path, "w") as f:
+                f.write(text + "\n")
+            os.chmod(path, 0o755)
+        self.state = os.path.join(self.tmp, "run", "nightdrive", "claude-notify")
+        self.env = {"PATH": f"{bin_}:/usr/bin:/bin", "HOME": self.tmp, "XDG_RUNTIME_DIR": os.path.join(self.tmp, "run"),
+                    "CN_PID": str(os.getpid()), "CN_ADDR": ADDR, "LANG": "C.UTF-8",
+                    "CLAUDE_CONFIG_DIR": os.path.join(self.tmp, "claude"),
+                    "CN_NOTIFIED": os.path.join(self.tmp, "notified")}
+        self.proc = None
+
+    def tearDown(self):
+        if self.proc and self.proc.poll() is None:
+            self.proc.kill()
+            self.proc.wait()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def record(self, status, waiting_for="", at=None):
+        """Claude Code's record of the session (<config dir>/sessions/<pid>.json), as it writes it: compact JSON."""
+        d = os.path.join(self.env["CLAUDE_CONFIG_DIR"], "sessions")
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "4242.json.tmp"), "w") as f:
+            json.dump({"pid": 4242, "sessionId": SID, "status": status, "waitingFor": waiting_for,
+                       "statusUpdatedAt": at or int(time.time() * 1000)}, f, separators=(",", ":"))
+        os.replace(os.path.join(d, "4242.json.tmp"), os.path.join(d, "4242.json"))
+
+    def start(self, tool, tool_input):
+        event = {"hook_event_name": "PermissionRequest", "cwd": "/home/me/proj", "session_id": SID, "tool_name": tool,
+                 "tool_input": tool_input}
+        self.proc = subprocess.Popen([HOOK], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=self.env)
+        self.proc.stdin.write(json.dumps(event))
+        self.proc.stdin.close()
+
+    def ask(self, tool, tool_input):
+        """Starts the hook on a permission request; returns what it left for Companion: (perm, input or None)."""
+        self.start(tool, tool_input)
+        perm = os.path.join(self.state, f"{ADDR}.perm")
+        for _ in range(100):
+            if os.path.exists(perm) and os.path.getsize(perm):
+                break
+            time.sleep(0.05)
+        with open(perm) as f:
+            p = json.load(f)
+        try:
+            with open(os.path.join(self.state, f"{ADDR}.input")) as f:
+                inp = json.load(f)
+        except FileNotFoundError:
+            inp = None
+        return p, inp
+
+    def answer(self, line):
+        """Writes Companion's answer as sessions.answer does, and waits until the hook has read it or ended."""
+        ans = os.path.join(self.state, f"{ADDR}.answer")
+        with open(ans + ".tmp", "w") as f:
+            f.write(line + "\n")
+        os.replace(ans + ".tmp", ans)
+        for _ in range(40):
+            if not os.path.exists(ans) or self.proc.poll() is not None:
+                return
+            time.sleep(0.05)
+
+    def decision(self, timeout=3):
+        out, _ = self.proc.communicate(timeout=timeout)
+        return json.loads(out)["hookSpecificOutput"]["decision"] if out.strip() else None
+
+    def test_an_edit_is_left_whole_and_allowed_from_companion(self):
+        p, inp = self.ask("Edit", EDIT)
+        self.assertEqual((p["tool"], p["allow"], p["whole"]), ("Edit", False, True))   # the notification: no Allow
+        self.assertEqual(inp, {"request": p["request"], "input": EDIT})
+        self.answer(f"allow {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "allow"})
+        self.assertFalse(os.path.exists(os.path.join(self.state, f"{ADDR}.input")))    # gone with the request
+
+    def test_an_answer_for_another_request_is_ignored(self):
+        p, _ = self.ask("mcp__dash__note_edit", {"id": "98", "edits": [{"old": "a", "new": "b"}]})
+        self.answer("allow someother")
+        self.assertIsNone(self.proc.poll())                                            # still waits
+        self.answer(f"deny {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "deny", "message": "Denied from Companion"})
+
+    def test_a_command_outside_the_sandbox(self):
+        p, inp = self.ask("Bash", {"command": "ls", "dangerouslyDisableSandbox": True})
+        self.assertEqual((p["allow"], p["whole"]), (False, True))
+        self.assertTrue(inp["input"]["dangerouslyDisableSandbox"])
+        self.answer(f"allow {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "allow"})
+
+    def test_too_long_to_leave_whole_gets_no_allow(self):
+        p, inp = self.ask("Write", {"file_path": "/tmp/x/big", "content": "x" * 200_001})
+        self.assertEqual((p["allow"], p["whole"], inp), (False, False, None))
+        self.answer(f"allow {p['request']}")
+        self.assertIsNone(self.proc.poll())                                            # refused: still waits
+        self.proc.send_signal(signal.SIGTERM)
+        self.assertIsNone(self.decision())                                             # left to the terminal
+
+
+    # #3146: Companion types into a session by bringing its window up, and away from the computer it stays the active
+    # one. A request then still reaches Companion (no notification: you may be in that window), and ends when the
+    # session's record says it was answered elsewhere, so Companion never offers Allow for one that's gone.
+    def test_the_active_window_still_leaves_the_request_for_companion(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.record("waiting", "permission prompt")
+        p, inp = self.ask("Edit", EDIT)
+        self.assertEqual(inp, {"request": p["request"], "input": EDIT})
+        time.sleep(1.2)
+        self.assertIsNone(self.proc.poll())                                            # waits, though active
+        self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
+        self.answer(f"allow {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "allow"})
+
+    def test_answered_in_the_terminal_the_request_goes(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.record("waiting", "permission prompt")
+        self.ask("Edit", EDIT)
+        time.sleep(0.6)
+        self.record("busy")                                                            # the terminal's Yes
+        self.assertIsNone(self.decision())                                             # left to the terminal
+        self.assertEqual(os.listdir(self.state), [])                                   # Companion has nothing
+
+    def test_a_newer_request_ends_the_one_before(self):
+        self.record("waiting", "permission prompt")
+        self.ask("Write", {"file_path": "/tmp/x/a", "content": "a"})
+        time.sleep(0.6)
+        self.record("waiting", "permission prompt", int(time.time() * 1000) + 5)      # the next one's prompt
+        self.assertIsNone(self.decision())
+
+    def test_an_older_waiting_stamp_is_not_this_request(self):
+        self.record("waiting", "permission prompt", int(time.time() * 1000) - 60_000)  # the request before this one
+        p, _ = self.ask("Edit", EDIT)
+        self.record("waiting", "permission prompt")                                    # this one's
+        time.sleep(0.6)
+        self.assertIsNone(self.proc.poll())
+        self.answer(f"deny {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "deny", "message": "Denied from Companion"})
+
+    # #3126, #3182: while the sessions bar is there to see, a question or a permission request pops up nothing (its
+    # chip asks) but still reaches Companion
+    def test_a_question_while_the_bar_shows_is_quiet_but_reaches_companion(self):
+        self.env["CN_BAR"] = "1"
+        self.record("waiting", "question")
+        q = {"questions": [{"question": "Commit?", "options": [{"label": "Yes"}, {"label": "No"}]}]}
+        self.start("AskUserQuestion", q)
+        ask = os.path.join(self.state, f"{ADDR}.ask")                                 # Companion's copy of it
+        for _ in range(100):
+            if os.path.exists(ask) and os.path.getsize(ask):
+                break
+            time.sleep(0.05)
+        with open(ask) as f:
+            self.assertEqual(json.load(f)["questions"][0]["question"], "Commit?")
+        time.sleep(0.6)
+        self.assertIsNone(self.proc.poll())                                            # waits for an answer
+        self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
+
+    def notified(self):
+        """The notification's arguments, once the hook has sent it (None: it sent none)."""
+        for _ in range(40):
+            if os.path.exists(self.env["CN_NOTIFIED"]) and os.path.getsize(self.env["CN_NOTIFIED"]):
+                with open(self.env["CN_NOTIFIED"]) as f:
+                    return f.read().splitlines()
+            time.sleep(0.05)
+        return None
+
+    def test_a_permission_request_while_the_bar_shows_is_quiet_but_reaches_companion(self):
+        self.env["CN_BAR"] = "1"
+        self.record("waiting", "permission prompt")
+        p, _ = self.ask("Edit", EDIT)
+        time.sleep(0.6)
+        self.assertIsNone(self.proc.poll())                                            # waits for an answer
+        self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
+        self.answer(f"allow {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "allow"})
+
+    def test_without_the_sessions_record_it_notifies_while_the_bar_shows(self):
+        self.env["CN_BAR"] = "1"                                                       # an older Claude Code: no record
+        self.ask("Edit", EDIT)
+        self.assertIsNotNone(self.notified())
+
+    # #3182: the notification offers Allow and Deny only when it shows all it allows; else Review alone
+    def test_what_it_cannot_show_gets_review_alone(self):
+        self.ask("Edit", EDIT)
+        args = self.notified()
+        self.assertIn("show=Review", args)
+        self.assertFalse([a for a in args if a.startswith(("allow=", "deny="))])
+
+    def test_what_it_shows_gets_allow_and_deny(self):
+        self.ask("Bash", {"command": "ls", "description": "List"})
+        args = self.notified()
+        self.assertTrue({"allow=Allow", "deny=Deny", "show=Show session"} <= set(args))
+
+    # #3162: a question stays on Companion for as long as it is open in the terminal: in the active window, after its
+    # notification closed, past Claude Code's default 600 s for a hook; it goes once answered or the session is gone
+    def question(self):
+        self.record("waiting", "question")
+        self.start("AskUserQuestion", {"questions": [{"question": "Commit?", "header": "Commit",
+                                                      "options": [{"label": "Yes", "description": "Commit it"}]}]})
+        ask = os.path.join(self.state, f"{ADDR}.ask")
+        for _ in range(100):
+            if os.path.exists(ask) and os.path.getsize(ask):
+                break
+            time.sleep(0.05)
+        with open(ask) as f:
+            return json.load(f)
+
+    def left(self):
+        """What the hook left for Companion (not the notification's id, which it keeps by window)."""
+        return [n for n in os.listdir(self.state) if n != ADDR]
+
+    def test_a_question_in_the_active_window_reaches_companion(self):
+        self.env["CN_ACTIVE"] = ADDR
+        q = self.question()
+        self.assertEqual(q["questions"][0]["options"], [{"label": "Yes", "description": "Commit it"}])
+        time.sleep(1.2)
+        self.assertIsNone(self.proc.poll())
+        self.answer(f'answer {q["request"]} {{"Commit?": "Yes"}}')
+        self.assertEqual(self.decision()["updatedInput"]["answers"], {"Commit?": "Yes"})
+
+    def test_a_closed_notification_leaves_the_question_on_companion(self):
+        self.env["CN_CLOSE"] = "1"                                                     # closed at once, no action
+        self.question()
+        time.sleep(1.2)
+        self.assertIsNone(self.proc.poll())                                            # still waits for an answer
+        self.assertTrue(os.path.exists(os.path.join(self.state, f"{ADDR}.ask")))
+        self.record("busy")                                                            # answered in the terminal
+        self.assertIsNone(self.decision())
+        self.assertEqual(self.left(), [])
+
+    def test_the_session_gone_takes_the_question_away(self):
+        self.question()
+        time.sleep(0.6)
+        os.remove(os.path.join(self.env["CLAUDE_CONFIG_DIR"], "sessions", "4242.json"))  # Claude Code quit
+        self.assertIsNone(self.decision())
+        self.assertEqual(self.left(), [])
+
+    def test_answered_before_the_hook_looks_it_goes(self):
+        # a pick in the terminal within a second: the record never shows the hook its request waiting, only what came
+        # after (stamped after the hook began); before, the hook waited 590 s and Companion showed a question gone
+        self.record("busy", "", int(time.time() * 1000) + 400)
+        self.start("AskUserQuestion", {"questions": [{"question": "Commit?", "options": [{"label": "Yes"}]}]})
+        self.assertIsNone(self.decision(timeout=4))
+        self.assertEqual(self.left(), [])
+
+    def test_an_old_request_leaves_the_newer_question_alone(self):
+        self.question()
+        time.sleep(0.6)                                                                # seen waiting
+        ask = os.path.join(self.state, f"{ADDR}.ask")
+        newer = {"request": "Newer1", "questions": [{"question": "Push?", "options": [{"label": "No"}]}]}
+        with open(ask, "w") as f:                                                      # the next request's hook
+            json.dump(newer, f, separators=(",", ":"))
+        self.record("waiting", "question", int(time.time() * 1000) + 5)              # its prompt ends this one
+        self.assertIsNone(self.decision())
+        with open(ask) as f:
+            self.assertEqual(json.load(f), newer)                                      # left where it was
+
+    def test_link_sh_gives_the_hook_longer_than_it_waits(self):
+        with open(HOOK) as f:
+            wait = int(re.search(r"^readonly WAIT_OPEN=(\d+)", f.read(), re.M).group(1))
+        with open(os.path.join(HERE, "..", "..", "..", "link.sh")) as f:
+            timeout = int(re.search(r"^hook_timeout=(\d+)", f.read(), re.M).group(1))
+        self.assertGreater(wait, 3600)                                                 # an hour's question still waits
+        self.assertLess(wait, timeout)                                                 # and ends before it is killed
+
+    def test_without_a_record_the_active_window_answers_in_the_terminal(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.start("Edit", EDIT)
+        self.assertIsNone(self.decision())                                             # as before #3146
+        self.assertFalse(os.path.exists(os.path.join(self.state, f"{ADDR}.perm")))
+
+    # #3065: away from the computer (Companion's presence file), the active window isn't you there: a request without
+    # the session's record waits for Companion too. The file counts only while the server that wrote it runs.
+    def presence(self, away, pid=None, start=None):
+        pid = pid or os.getpid()           # this test stands in for the server: it runs
+        if start is None:
+            with open(f"/proc/{pid}/stat") as f:
+                start = int(f.read().rsplit(")", 1)[1].split()[19])
+        path = os.path.join(self.env["XDG_RUNTIME_DIR"], "nightdrive", "presence.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + ".tmp", "w") as f:
+            json.dump({"away": away, "why": "locked" if away else "", "pid": pid, "start": start}, f)
+        os.replace(path + ".tmp", path)
+
+    def test_away_the_active_window_waits_for_companion(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.presence(True)
+        p, inp = self.ask("Edit", EDIT)
+        self.assertEqual(inp, {"request": p["request"], "input": EDIT})
+        time.sleep(1.2)
+        self.assertIsNone(self.proc.poll())                                            # waits, though active
+        self.assertFalse(os.path.exists(self.env["CN_NOTIFIED"]))                      # no notification
+        self.answer(f"allow {p['request']}")
+        self.assertEqual(self.decision(), {"behavior": "allow"})
+
+    def test_back_at_the_computer_the_terminal_has_it(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.presence(True)
+        self.ask("Edit", EDIT)
+        self.presence(False)
+        self.assertIsNone(self.decision(timeout=3))                                    # ends within a second or so
+        self.assertFalse(os.path.exists(os.path.join(self.state, f"{ADDR}.perm")))
+
+    def test_at_the_computer_or_a_dead_server_is_as_before(self):
+        self.env["CN_ACTIVE"] = ADDR
+        for case in ({"away": False}, {"away": True, "start": 1}, {"away": True, "pid": 2 ** 22 + 1, "start": 1}):
+            with self.subTest(**case):
+                self.presence(**case)
+                self.start("Edit", EDIT)
+                self.assertIsNone(self.decision())
+                self.assertFalse(os.path.exists(os.path.join(self.state, f"{ADDR}.perm")))
+
+    def test_away_a_question_in_the_active_window_reaches_companion(self):
+        self.env["CN_ACTIVE"] = ADDR
+        self.presence(True)
+        self.start("AskUserQuestion", {"questions": [{"question": "Which?", "header": "H", "options": [
+            {"label": "A", "description": "a"}, {"label": "B", "description": "b"}]}]})
+        ask = os.path.join(self.state, f"{ADDR}.ask")
+        for _ in range(100):
+            if os.path.exists(ask):
+                break
+            time.sleep(0.05)
+        with open(ask) as f:
+            req = json.load(f)["request"]
+        self.answer(f'answer {req} {{"Which?": "B"}}')
+        self.assertEqual(self.decision()["updatedInput"]["answers"], {"Which?": "B"})
+
+
+if __name__ == "__main__":
+    unittest.main()

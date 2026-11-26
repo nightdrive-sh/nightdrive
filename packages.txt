@@ -36,9 +36,15 @@ swaybg
 wl-clipboard
 # The launcher's calculator (qalc: maths, units, currencies; Calculator.qml)
 qalculate
+# Fedora's app catalog: Install › Software's search shows Fedora's apps (LibreOffice Writer) by name, with icons
+# (hypr/scripts/pkg-search, pkg-info). Fedora Minimal has none
+appstream-data
 cliphist
 grim
 slurp
+# Screenshot › Text (⌘⌃S) reads a region's text: other languages are tesseract-langpack-<lang> (hypr/scripts/screenshot-text)
+tesseract
+tesseract-langpack-eng
 brightnessctl
 playerctl
 jq
@@ -52,6 +58,8 @@ blueman
 # hypr/scripts/headphones-ctl (Sony and AirPods: listening mode, ear detection over Bluetooth)
 python3-dbus
 python3-gobject
+# hypr/scripts/gamepad-home: the controller's Xbox button opens Games
+python3-evdev
 papirus-icon-theme
 jetbrains-mono-fonts-all
 eza
@@ -102,6 +110,9 @@ flatpak
 unzip
 zip
 xdg-utils
+# xdg-open reads a file's type from its name (mimetype), as Files and gio open do: without it, under Hyprland, it asks
+# file(1), which calls a .md or .csv plain text and opens it in text/plain's app, not its own (#3273)
+perl-File-MimeInfo
 # Commands the scripts use that only KDE pulled in: pw-play, pw-dump, pw-cli, pw-record, pw-cat (sounds, the Volume menu,
 # dictation), pactl (sounds, Bluetooth audio; otherwise only nwg-panel's, which Nightdrive keeps out), xdg-user-dir
 # (screenshots, wallpapers), sensors (the System menu), tar (installers), lspci (hypr/scripts/platform)

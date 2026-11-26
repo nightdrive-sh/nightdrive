@@ -11,6 +11,37 @@ FIRST_PORT=2222
 good_user() { [[ $1 =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; }
 good_port() { [[ $1 =~ ^[0-9]+$ ]] && (($1 >= 1024 && $1 <= 65535)); }
 
+# The host's ssh key for a new VM's first boot (lib/firstboot.sh), as "FROM<tab>KEY": ~/.ssh/id_*.pub, else what ssh's
+# agent holds (ssh's IdentityAgent, as 1Password's sets it, else SSH_AUTH_SOCK): its first ed25519 key, else its first.
+# Public keys only: ssh-add -L lists them, and nothing private is read. Nothing when there is none
+host_key() {
+  local k agent keys
+  for k in "$HOME"/.ssh/id_ed25519.pub "$HOME"/.ssh/id_ecdsa.pub "$HOME"/.ssh/id_rsa.pub; do
+    [[ -f $k ]] && { printf '%s\t%s\n' "~${k#"$HOME"}" "$(head -1 "$k")"; return 0; }
+  done
+  agent=$(ssh -G localhost </dev/null 2>/dev/null | awk '/^identityagent / { print $2; exit }')
+  case $agent in
+    none) return 0 ;;
+    ""|SSH_AUTH_SOCK|'$SSH_AUTH_SOCK') agent=${SSH_AUTH_SOCK:-} ;;
+  esac
+  agent=${agent/#\~/$HOME}
+  [[ -n $agent && -S $agent ]] || return 0
+  # A locked or stuck agent mustn't hold up a new VM
+  keys=$(SSH_AUTH_SOCK=$agent timeout 5 ssh-add -L 2>/dev/null) || return 0
+  k=$(grep -m1 '^ssh-ed25519 ' <<<"$keys") || k=$(grep -m1 -E '^(ssh-|ecdsa-|sk-)' <<<"$keys") || return 0
+  printf 'agent\t%s\n' "$k"
+}
+
+# JSON for the New VM panel, which says which key a VM from an image gets: { from: "~/.ssh/id_ed25519.pub" | "agent",
+# type: "ED25519", name: the key's comment (1Password's: its item's name) }, or {} when there is none
+ssh_key() {
+  local from key type name
+  IFS=$'\t' read -r from key < <(host_key) || { echo '{}'; return 0; }
+  read -r type _ name <<<"$key"
+  jq -nc --arg from "$from" --arg type "$type" --arg name "${name:-}" \
+    '{ from: $from, type: ($type | sub("^ssh-"; "") | sub("-.*"; "") | ascii_upcase), name: $name }'
+}
+
 # The ports the VMs have, one a line (NAME's left out: its own doesn't count against it)
 vm_ports() {
   local d n SSH_PORT MEM CPUS ISO SSH_USER

@@ -1,7 +1,8 @@
 // A click on a link that would open another site in a new tab or window: the app window would put it in Chromium. Here
-// it goes to background.js instead, which hands it to the default browser. Only after the page's own handlers (bubble
-// phase, defaultPrevented): a site that handles the click itself (often with window.open) is left to it, and
-// background.js catches that new window. A link that stays in the window (a login's redirect) is never touched.
+// it goes to the background worker (background-N.js) instead, which hands it to the default browser. Only after the
+// page's own handlers (bubble phase, defaultPrevented): a site that handles the click itself (often with window.open)
+// is left to it, and the worker catches that new window. A link that stays in the window (a login's redirect) is never
+// touched.
 "use strict";
 
 function newWindowClick(e, a) {

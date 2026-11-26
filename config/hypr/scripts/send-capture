@@ -14,13 +14,11 @@
 #   window.png     a screenshot of the window
 #   meta.json      { addr, class, title, window: {x, y, w, h}, files, primary, clip, clipChars, shot }
 # The same apps are left out as in Claude writes: password managers, keyrings, private browser windows (claude-write
-# always) and your own (launcher › Settings › Claude writes › Not in these apps).
+# always) and your own (launcher › Settings › Claude writes › Not in these apps): claude-write blocked decides.
 set -uo pipefail
 
 readonly WORK="${XDG_RUNTIME_DIR:-/run/user/$UID}/nightdrive/send"
 readonly WRITE="$HOME/.config/hypr/scripts/claude-write"
-readonly WRITE_SETTINGS="$HOME/.local/state/nightdrive/claude-write.json"
-readonly BLOCKED_TITLES='(Private Browsing|Incognito|InPrivate)'   # as in claude-write
 # File managers whose ⌘C (Ctrl+C) copies the selected files as a text/uri-list (window class, a regex)
 readonly FILE_MANAGERS='^(org\.gnome\.Nautilus|nautilus|thunar|nemo|pcmanfm(-qt)?|org\.kde\.dolphin|caja)$'
 readonly COPY_WAIT=20          # × 0.05 s for the file manager's copy to reach the clipboard
@@ -80,14 +78,11 @@ win=$(hyprctl -j activewindow 2>/dev/null) || win='{}'
 addr=$(jq -r '.address // ""' <<<"$win"); class=$(jq -r '.class // ""' <<<"$win")
 title=$(jq -r '.title // ""' <<<"$win")
 [[ -z $addr ]] && exit 0
-always=$("$WRITE" always 2>/dev/null)
-shopt -s nocasematch
-if [[ ( -n $always && $class =~ $always ) || $title =~ $BLOCKED_TITLES ]] \
-   || jq -e --arg c "$class" '(.blocked // []) | map(ascii_downcase) | index($c | ascii_downcase)' "$WRITE_SETTINGS" >/dev/null 2>&1; then
+"$WRITE" blocked "$class" "$title"
+if (( $? != 1 )); then   # 1 is "not left out": anything else (an error, an older claude-write) gathers nothing
   notify "Not in this window: nothing was gathered."
   exit 0
 fi
-shopt -u nocasematch
 
 rm -rf "$WORK"; mkdir -p -m 700 "$WORK"
 umask 077

@@ -4,7 +4,7 @@ import Quickshell.Io
 
 // Theme Editor: the look's values (hypr/scripts/theme look / set) with a slider or a colour each, applied as they change.
 // Opened from the launcher (Settings › Theme › Theme Editor…): qs ipc call themeeditor open.
-// An ordinary window: Hyprland floats it at the right edge (hyprland.lua, float-theme-editor), ⌘⇧T tiles it like any
+// An ordinary window: Hyprland floats it at the right edge (hypr/rules.lua, float-theme-editor), ⌘⇧T tiles it like any
 // other. The other windows can be clicked meanwhile, so the active and inactive borders show as they will look.
 // Esc or ✕ closes. (Not named *Menu.qml: shell.qml treats those as top bar menus.)
 FloatingWindow {

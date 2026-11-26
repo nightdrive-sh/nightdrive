@@ -20,7 +20,7 @@ Your contacts from iCloud, Google or another CardDAV server, kept in sync both w
 | ⌘E or `e` | Edit |
 | `Delete` | Delete, after asking |
 | ⌘R | Read the contacts again |
-| ⌘, | Settings: the accounts, Sync now (`S`), Add an account with Claude (`A`) |
+| ⌘, | Settings: sort by first or last name (`F`, `L`), the accounts, Sync now (`S`), Add an account with Claude (`A`) |
 
 - All contacts shows each person once: their cards in iCloud and Google (the same name, and a number or address in common) are one. Under it each account has its own, with its groups.
 - They are kept as vCard files in `~/.local/share/contacts`, a folder per account, and vdirsyncer syncs them every 30 minutes. A change you make here goes to the server at once.
@@ -33,7 +33,7 @@ Your contacts from iCloud, Google or another CardDAV server, kept in sync both w
 
 ## Editing
 
-- The labels (mobile, home, work…) take your own too (Custom…). The birthday is 3.5.1980, or 3.5. without the year. The photo keeps the middle square, 512 pixels at most.
+- The labels (mobile, home, work…) take your own too (Custom…). The birthday is written your region's way (Settings › Region): 3.5.1980, or 3.5. without the year (5/3/1980 and 5/3 in the US). The photo keeps the middle square, 512 pixels at most.
 - ⌘S (or ⌘⏎) saves, `Esc` leaves, asking first if something changed. A new contact goes in the account the sidebar is on; with several accounts, the editor's top line picks another.
 - A person whose cards in several accounts show as one is edited a card at a time; `Delete` deletes them all.
 - Saving writes only what you changed: whatever else the card holds (an iPhone's related names, Google's own fields) stays. Offline, the change goes at the next sync.
@@ -79,6 +79,10 @@ password-cmd = secret-tool lookup service carddav.googleapis.com user you@exampl
 
 Google's CardDAV with an app password works, but Google's own documentation asks for OAuth. If Google ever stops taking it, vdirsyncer's `google_contacts` with an OAuth client of your own is the way left.
 
+## Claude
+
+With Nightdrive's tools for Claude on (Settings › Claude › Access › Contacts), Claude can search your contacts and read a card, but not change them. It gets the name and the parts of a card you tick in Access › Contacts: company, job title, email addresses and phone numbers on the Normal level; street addresses, birthday, web addresses and the note only if you turn them on (the note, company, title and nickname with card numbers, codes and passwords masked). What is off isn't searched or looked up by either. Its search needs a word of at least two characters (a number three digits) and gives at most 25 people, and searches and cards give it at most 100 different people an hour. On Normal, reading asks you each time. These hold for Claude's calls only: `contacts find` and `contacts card` in a terminal give everything.
+
 ## In a terminal
 
 | Command | What it does |
@@ -87,8 +91,11 @@ Google's CardDAV with an app password works, but Google's own documentation asks
 | `contacts search TEXT` | Opens Contacts on what a search finds |
 | `contacts show WHO` | Opens the card of WHO: an email address, a number, or a card's id |
 | `contacts new [NAME] [EMAIL]` | A new contact in the editor, with these filled in |
-| `contacts settings` | Opens the settings: the accounts, Sync now, Add an account |
+| `contacts settings` | Opens the settings: the order, the accounts, Sync now, Add an account |
+| `contacts sort [first\|last]` | Sorts the list by first name (the default) or last name (Anna Virtanen under V); alone, says which (`--json`). A company without a last name goes by its name |
 | `contacts people` | Everyone as JSON (names, numbers, email and street addresses), as Mail and the Launcher read them |
+| `contacts find QUERY` | The people a search finds, without the window (`--json`; `--limit N`, 25 by default) |
+| `contacts card WHO` | WHO's whole card, without the window: a card's id (as `find` gives it), an email address or a number (`--json`) |
 | `contacts setup` | Sets up an account with Claude, in a terminal |
 | `contacts sync [NAME…]` | Syncs every account's contacts both ways now (or these accounts'), then fetches iCloud's new photos |
 | `contacts accounts` | The accounts and how many contacts each has here |

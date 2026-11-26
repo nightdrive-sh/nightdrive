@@ -1,9 +1,11 @@
 #!/usr/bin/python3 -I
-"""The Welcome window's list, as JSON on stdout: signing in to Claude first, then every installed plugin whose plugin.conf
+"""The Welcome window's list, as JSON on stdout: signing in to Claude first, then how much Claude may use of the desktop
+(only with Claude Code installed: the window asks it itself, AccessView), then every installed plugin whose plugin.conf
 has a `setup` (Tailscale, Mail, Deck…): FIRST's, then the others in plugins' order.
   tasks
 Each row: { id, name, icon, about, done, running, mark, setup, help, steps, readme }
-  done     the thing works: Claude is signed in, or the plugin's `configured` test succeeds (its `setup` ran to the end)
+  done     the thing works: Claude is signed in, a level is chosen (claude-access.json), or the plugin's `configured`
+           test succeeds (its `setup` ran to the end)
   running  its Claude session is open (claude-setup's pid file)
   mark     setup.json's word for it: "started", "skipped" or ""
   setup    the command line that starts its setup (claude-setup, through the plugin's own command)
@@ -21,6 +23,7 @@ STATE = os.path.join(HOME, ".local/state/nightdrive/setup.json")
 RUN = os.path.join((os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"), "nightdrive/setup")
 SCRIPTS = os.path.join(HOME, ".config/hypr/scripts")
 CLAUDE = os.path.join(HOME, ".local/bin/claude")
+ACCESS = os.path.join(HOME, ".config/nightdrive/claude-access.json")  # config/mcp/access.py writes it
 SITE = "https://nightdrive.sh/plugins/"                              # the website's page for each of the repo's plugins
 TEST_TIMEOUT = 5                                                     # seconds for a configured test
 # What to set up first, the rest after them in plugins' order: the network, then mail and its contacts before music
@@ -28,6 +31,8 @@ FIRST = ("tailscale", "mail", "contacts", "deck")
 
 CLAUDE_ABOUT = ("Sign in first: the rest are set up with Claude. "
                 "Claude Code needs a Pro or Max plan, or an API account.")
+ACCESS_ABOUT = ("How much Claude may use of your desktop: its apps and settings, from any Claude Code session. "
+                "Settings › Claude › Access changes it later, area by area.")
 
 
 def running(tid):
@@ -93,6 +98,11 @@ def main():
     rows = [{ "id": "claude", "name": "Claude", "icon": "sparkles", "about": CLAUDE_ABOUT, "done": signed_in(),
               "running": running("claude"), "mark": marks.get("claude", ""),
               "setup": [os.path.join(SCRIPTS, "claude-setup"), "signin"], "help": "", "steps": False, "readme": "" }]
+    # Nightdrive's tools for Claude (config/mcp): without Claude Code there is nothing to give them to
+    if os.access(CLAUDE, os.X_OK):
+        rows.append({ "id": "claude-access", "name": "Claude's access", "icon": "shield-half", "about": ACCESS_ABOUT,
+                      "done": os.path.isfile(ACCESS), "running": False, "mark": marks.get("claude-access", ""),
+                      "setup": [], "help": "", "steps": False, "readme": "" })
     for _, _, pid, folder, c, external in plugins():
         rows.append({
             "id": pid, "name": c.get("name", pid), "icon": c.get("icon", "puzzle"),

@@ -2,20 +2,25 @@
 """Gathers the parts of the plugin folders that are on (installed) where the desktop reads them. `nightdrive plugins
 installed` runs this with one line per such folder on stdin: id<TAB>folder.
   plugin-parts
-Writes, in ~/.cache/nightdrive/plugins.d (only when the content changes, so the file watches don't fire for nothing):
+Writes, in ~/.local/state/nightdrive/plugins.d (only when the content changes, so the file watches don't fire for nothing):
   active    the same id<TAB>folder lines: hypr/bindings.lua runs each folder's bindings.lua, hypr/scripts/shortcuts adds
             its SHORTCUTS.md
-  bar.json  {modules, menus, sizes, levels} for Quickshell (TopBar.qml, shell.qml, Launcher.qml): module.jsonc's modules,
-            with their commands run in the plugin's folder; the folder's <Name>Menu.qml files by menu name; the modules'
-            icon sizes; the folder's <Name>Levels.qml files (the launcher's levels)
+  bar.json  {modules, menus, sizes, levels, today} for Quickshell (TopBar.qml, shell.qml, Launcher.qml): module.jsonc's
+            modules, with their commands run in the plugin's folder; the folder's <Name>Menu.qml files by menu name; the
+            modules' icon sizes; the folder's <Name>Levels.qml files (the launcher's levels); its <Name>Today.qml files
+            (a part under the clock menu's month: Calendar's events today, later Tasks')
   icons/    links to the folders' own bar icons (icons/<name>.svg), which topbar/scripts/icon looks up after the core's:
             a plugin's icon can't replace a Lucide one or the bar's own
 Outside the repo, so a read-only checkout (nightdrive sandbox) works too. Folders that aren't on aren't in any of them,
-so their module, menu, icons, keys and shortcut lines don't show anywhere."""
-import glob, json, os, shlex, sys
+so their module, menu, icons, keys and shortcut lines don't show anywhere.
+State, not cache: what is listed here runs (Hyprland loads each folder's Lua, the bar its commands and menus, the MCP
+server its tools), so a cache cleaner or a rule that lets Claude write in ~/.cache mustn't change it (#1950). Until
+11.2026 it was ~/.cache/nightdrive/plugins.d: the first run here removes that one."""
+import contextlib, glob, json, os, shlex, shutil, sys
 
-OUT = os.path.expanduser("~/.cache/nightdrive/plugins.d")
-COMMANDS = ("status", "right", "middle", "drop")   # module.jsonc keys holding shell commands
+OUT = os.path.expanduser("~/.local/state/nightdrive/plugins.d")
+OLD = os.path.expanduser("~/.cache/nightdrive/plugins.d")    # before #1950
+COMMANDS = ("status", "click", "right", "middle", "drop")   # module.jsonc keys holding shell commands
 
 
 def jsonc(path):
@@ -31,9 +36,12 @@ def write(name, text):
             return
     except OSError:
         pass
-    with open(path + ".tmp", "w") as f:
+    # A temporary file of this process's own: two runs at once (an update's app install and the dnf hook) shared
+    # one .tmp, and the slower one's replace found it gone (FileNotFoundError, #3483)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
         f.write(text)
-    os.replace(path + ".tmp", path)
+    os.replace(tmp, path)
 
 
 def icons(folders):
@@ -44,18 +52,21 @@ def icons(folders):
         for f in sorted(glob.glob(os.path.join(d, "icons", "*.svg"))):
             want.setdefault(os.path.basename(f), f)
     os.makedirs(out, exist_ok=True)
+    # Another run at the same time (see write) may remove or make the same link first: it's then as wanted already
     for name in os.listdir(out):
         path = os.path.join(out, name)
         if not (os.path.islink(path) and os.readlink(path) == want.get(name)):
-            os.remove(path)
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(path)
     for name, f in want.items():
         if not os.path.lexists(os.path.join(out, name)):
-            os.symlink(f, os.path.join(out, name))
+            with contextlib.suppress(FileExistsError):
+                os.symlink(f, os.path.join(out, name))
 
 
 def main():
     folders = [l.rstrip("\n").split("\t", 1) for l in sys.stdin if "\t" in l]
-    modules, menus, sizes, levels = [], {}, {}, []
+    modules, menus, sizes, levels, today = [], {}, {}, [], []
     for pid, d in folders:
         here = "cd " + shlex.quote(d) + " && "
         path = os.path.join(d, "module.jsonc")
@@ -83,10 +94,12 @@ def main():
             base = os.path.basename(f)[:-len("Menu.qml")]
             menus[base[0].lower() + base[1:]] = f
         levels += sorted(glob.glob(os.path.join(d, "[A-Z]*Levels.qml")))
+        today += sorted(glob.glob(os.path.join(d, "[A-Z]*Today.qml")))
     os.makedirs(OUT, exist_ok=True)
     icons(folders)
     write("active", "".join(f"{pid}\t{d}\n" for pid, d in folders))
-    write("bar.json", json.dumps({"modules": modules, "menus": menus, "sizes": sizes, "levels": levels}, indent=1) + "\n")
+    write("bar.json", json.dumps({"modules": modules, "menus": menus, "sizes": sizes, "levels": levels, "today": today}, indent=1) + "\n")
+    shutil.rmtree(OLD, ignore_errors=True)   # once the new one is there: an old list nothing reads any more
 
 
 if __name__ == "__main__":

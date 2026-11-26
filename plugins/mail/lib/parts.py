@@ -2,9 +2,10 @@
 """Attachments of a message being read: open one, or save it.
 
     parts.py open MSGID PART NAME    copies the part to ~/.cache/nightmail/parts/ and prints {"path": ...} to open
-    parts.py save MSGID PART NAME    copies it to the downloads folder, next to what is there, and prints {"path": ...}
+    parts.py save MSGID PART NAME    copies it to the downloads folder and prints {"path": ...}
     parts.py save-all MSGID PART NAME [PART NAME …]
-                                     the same for each, and prints {"paths": [...]}
+                                     the same for each, all or none, and prints {"paths": [...]}
+    parts.py show PATH [PATH …]      the folder they are in, with them picked, in the file manager (Show in folder)
     parts.py html MSGID              writes the message's HTML for the browser, with nothing that loads from the network,
                                      to $XDG_RUNTIME_DIR/nightmail/ and prints {"path": ...} to open. With remote images
                                      in it, a bar at the top links to a second page that loads them.
@@ -24,6 +25,10 @@ import re
 import subprocess
 import sys
 import urllib.parse
+from pathlib import Path
+
+import ids
+import newfile
 
 PARTS = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "nightmail", "parts")
 # The HTML pages: in memory (tmpfs), the user's alone, gone at logout. Never in /tmp, where another user could make
@@ -55,37 +60,50 @@ def downloads():
     return d if d and d != os.path.expanduser("~") else os.path.expanduser("~/Downloads")
 
 
-def free(folder, name):
-    """A path in folder that takes nothing over: name, then name (2), name (3) …"""
-    stem, ext = os.path.splitext(name)
-    path, n = os.path.join(folder, name), 2
-    while os.path.exists(path):
-        path, n = os.path.join(folder, f"{stem} ({n}){ext}"), n + 1
-    return path
-
-
-def write(cmd, msgid, part, name):
-    name = os.path.basename(name) or "attachment"
-    data = raw(msgid, part)
-    if cmd == "open":
-        folder = os.path.join(PARTS, hashlib.sha1(msgid.encode()).hexdigest()[:12])
-        path = os.path.join(folder, name)
-    else:
-        folder = downloads()
-        path = free(folder, name)
+def write(msgid, part, name):
+    """A part copied where it can be opened from (the cache, by the message), to open it."""
+    name = newfile.clean_name(name)
+    folder = os.path.join(PARTS, hashlib.sha1(msgid.encode()).hexdigest()[:12])
     os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, name)
     with open(path, "wb") as fh:
-        fh.write(data)
+        fh.write(raw(msgid, part))
     return path
+
+
+def save(msgid, pairs):
+    """Parts ([part, name, part, name …]) saved in the downloads folder without asking (#3627): never over a file
+    there, a name taken gets " (2)" (newfile), and all or none. Returns their paths."""
+    folder = downloads()
+    os.makedirs(folder, exist_ok=True)
+    files = [(newfile.clean_name(pairs[i + 1]), raw(msgid, pairs[i])) for i in range(0, len(pairs) - 1, 2)]
+    return [str(p) for p in newfile.write_all(folder, files)]
+
+
+def show(paths):
+    """Show in folder: the file manager that holds org.freedesktop.FileManager1 (Files, or Nautilus) opens the folder
+    they are in with them picked. Without one, the folder opens in what the desktop opens folders with."""
+    uris = "[" + ", ".join("'" + Path(p).resolve().as_uri().replace("'", "%27") + "'" for p in paths) + "]"
+    try:
+        subprocess.run(["gdbus", "call", "--session", "--dest", "org.freedesktop.FileManager1",
+                        "--object-path", "/org/freedesktop/FileManager1",
+                        "--method", "org.freedesktop.FileManager1.ShowItems", uris, ""],
+                       capture_output=True, check=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        subprocess.Popen(["xdg-open", str(Path(paths[0]).parent)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
 
 
 def raw(msgid, part=None):
-    args = ["notmuch", "show", "--format=raw"] + (["--part=" + part] if part else []) + [f'id:"{msgid}"']
+    args = (["notmuch", "show", "--format=raw"] + (["--part=" + part] if part else [])
+            + ["--query=sexp", ids.message(msgid)])
     return subprocess.run(args, capture_output=True, check=True).stdout
 
 
-def page(msgid):
-    msg = email.message_from_bytes(raw(msgid), policy=email.policy.default)
+def cleaned(msg):
+    """A message's HTML with nothing in it that loads by itself or takes the page's head over, and the top it goes
+    under: (top, title, text), for page() and for Claude's PDF (save.py). top is the sender's doctype and the opening
+    of our own head, title one from the subject when the HTML has none."""
     body = msg.get_body(preferencelist=("html",))
     if body is None:
         raise ValueError("This message has no HTML version")
@@ -117,6 +135,12 @@ def page(msgid):
     doctype = re.search(r"<!doctype\b[^<>]*>", text, re.I)
     text = re.sub(r"<!doctype\b[^>]*>", "", text, flags=re.I)
     top = (doctype.group(0) if doctype else "") + "\n<html><head>\n"
+    return top, title, text
+
+
+def page(msgid):
+    msg = email.message_from_bytes(raw(msgid), policy=email.policy.default)
+    top, title, text = cleaned(msg)
     stem = hashlib.sha1(msgid.encode()).hexdigest()[:12]
     os.makedirs(PAGES, mode=0o700, exist_ok=True)
 
@@ -136,14 +160,18 @@ def page(msgid):
 
 
 def main():
-    cmd, msgid = sys.argv[1:3]
+    cmd, msgid = sys.argv[1], sys.argv[2]
     if cmd == "html":
         print(json.dumps({"path": page(msgid)}))
     elif cmd == "save-all":
-        pairs = sys.argv[3:]
-        print(json.dumps({"paths": [write("save", msgid, pairs[i], pairs[i + 1]) for i in range(0, len(pairs) - 1, 2)]}))
+        print(json.dumps({"paths": save(msgid, sys.argv[3:])}))
+    elif cmd == "save":
+        print(json.dumps({"path": save(msgid, sys.argv[3:5])[0]}))
+    elif cmd == "show":
+        show(sys.argv[2:])
+        print(json.dumps({"shown": len(sys.argv) - 2}))
     else:
-        print(json.dumps({"path": write(cmd, msgid, sys.argv[3], sys.argv[4])}))
+        print(json.dumps({"path": write(msgid, sys.argv[3], sys.argv[4])}))
 
 
 if __name__ == "__main__":

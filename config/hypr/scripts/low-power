@@ -1,0 +1,93 @@
+#!/bin/bash
+# Low Power Mode (launcher › Settings › Battery, the top bar's battery menu, the low battery warning at 10 %): the
+# power-saver profile of power-profiles-daemon, which tuned-ppd provides (packages.txt; TuneD's powersave: on a PC the
+# CPU's boost off and its energy preference at power; on Asahi less, the governor stays schedutil). Only on a machine
+# with a battery. Plugging in the charger turns it off (BatteryWatch.qml), back to the profile from before; tuned-ppd
+# itself picks balanced-battery for balanced while on battery.
+#   low-power status [--json]           on | off  ({state, available, suggest})
+#   low-power on|off|toggle [--json]
+#   low-power suggest [on|off] [--json] whether the 10 % warning offers it (default on)
+#   low-power offer SUMMARY BODY PCT    the 10 % warning (BatteryWatch.qml), with Turn On when it may offer it
+set -uo pipefail
+state="$HOME/.local/state/nightdrive"
+before="$state/low-power-before"       # the profile to go back to (balanced, performance)
+nosuggest="$state/low-power-nosuggest" # there when the warning shouldn't offer it
+
+# power-profiles-daemon's D-Bus API (the Settings' own: polkit lets the active session change it without a password)
+ppd=(org.freedesktop.UPower.PowerProfiles /org/freedesktop/UPower/PowerProfiles org.freedesktop.UPower.PowerProfiles)
+profile() { busctl --system get-property "${ppd[@]}" ActiveProfile 2>/dev/null | sed -E 's/^s "(.*)"$/\1/'; }
+set_profile() { busctl --system set-property "${ppd[@]}" ActiveProfile s "$1"; }
+
+# The machine's own battery, as topbar/scripts/status finds it (not a Bluetooth mouse's: scope Device)
+has_battery() {
+  local d
+  for d in /sys/class/power_supply/*; do
+    [[ $(cat "$d/type" 2>/dev/null) == Battery && $(cat "$d/scope" 2>/dev/null) != Device ]] && return 0
+  done
+  return 1
+}
+available() { has_battery && busctl --system get-property "${ppd[@]}" Profiles 2>/dev/null | grep -q '"power-saver"'; }
+status() { [[ $(profile) == power-saver ]] && echo on || echo off; }
+suggesting() { [[ -e $nosuggest ]] && echo off || echo on; }
+json() {
+  printf '{"state": "%s", "available": %s, "suggest": %s}\n' "$(status)" "$(available && echo true || echo false)" \
+    "$([[ $(suggesting) == on ]] && echo true || echo false)"
+}
+need() {
+  available && return
+  if has_battery; then echo "power-profiles-daemon (tuned-ppd) isn't running, so Low Power Mode can't be set." >&2
+  else echo "This computer has no battery: Low Power Mode is for laptops." >&2; fi
+  exit 1
+}
+bar() { qs ipc call bar refreshModule battery >/dev/null 2>&1; }   # its icon turns yellow while on
+
+turn_on() {
+  [[ $(status) == on ]] && return
+  mkdir -p "$state"
+  profile > "$before"
+  set_profile power-saver || exit 1
+  bar
+}
+turn_off() {
+  [[ $(status) == off ]] && return
+  local to; to=$(cat "$before" 2>/dev/null)
+  [[ $to == balanced || $to == performance ]] || to=balanced
+  set_profile "$to" || exit 1
+  rm -f "$before"
+  bar
+}
+
+case ${1:-} in
+  status) ;;
+  on) need; turn_on ;;
+  off) need; turn_off ;;
+  toggle) need; if [[ $(status) == on ]]; then turn_off; else turn_on; fi ;;
+  suggest)
+    case ${2:-} in
+      on) rm -f "$nosuggest" ;;
+      off) mkdir -p "$state"; : > "$nosuggest" ;;
+      ""|--json) ;;
+      *) sed -n '7,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    esac
+    [[ " $* " == *" --json "* ]] && json || suggesting
+    exit 0 ;;
+  offer)
+    # The low battery warning itself, with the button (Notifs.qml shows actions as buttons): critical, so it stays;
+    # its stack tag and meter as BatteryWatch.qml's own warning. The card closing (the charger) answers nothing.
+    [[ $# -ge 4 ]] || { echo "usage: low-power offer SUMMARY BODY PCT" >&2; exit 1; }
+    # Without the button when it's already on, can't be, or the user said not to suggest it.
+    hints=(-a Battery -i lucide:battery-warning -u critical -h string:x-dunst-stack-tag:battery-low -h "int:value:$4"
+           -h boolean:suppress-sound:true)
+    if [[ $(status) == on || $(suggesting) == off ]] || ! available; then notify-send "${hints[@]}" "$2" "$3"; exit 0; fi
+    answer=$(notify-send "${hints[@]}" -w -A on="Turn On Low Power Mode" "$2" "$3")
+    # Still on battery when the answer comes: a click after the charger went in would turn it on for nothing
+    if [[ $answer == on ]] && [[ $(busctl --system get-property org.freedesktop.UPower /org/freedesktop/UPower \
+         org.freedesktop.UPower OnBattery 2>/dev/null) == "b true" ]]; then
+      available && turn_on
+    fi
+    exit 0 ;;
+  *) sed -n '7,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
+# status prints the state; the others only with --json (Claude's tool: config/mcp/tools/sound-display.json)
+if [[ ${2:-} == --json ]]; then json
+elif [[ $1 == status ]]; then status; fi

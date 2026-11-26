@@ -1,0 +1,78 @@
+#!/usr/bin/python3 -I
+# Network speakers aren't remembered across a login, as on a Mac (#1909): before WirePlumber starts
+# (config/systemd/user/wireplumber.service.d), its state forgets AirPlay (raop_sink, Sonos) and other network outputs:
+#   default-nodes      the stack of outputs chosen before: a network one there became the default again as soon as
+#                      the speaker was found on the network, so sound went to another room after a restart
+#   stream-properties  each app's remembered output ("target"): the app alone would play to the speaker
+# What's left decides: the computer's own output, or wired or Bluetooth headphones chosen before. The speakers' own
+# volumes stay. WirePlumber has no setting for this: node.restore-default-targets and node.stream.restore-target turn
+# the memory off for every output, headphones too.
+#   forget-network-sound [--dry-run] [DIR]   DIR: WirePlumber's state (default $XDG_STATE_HOME/wireplumber);
+#                                            --dry-run prints what would go and changes nothing
+import os
+import re
+import sys
+
+# The same node names as `sound remote` (config/hypr/scripts/sound): outputs that play elsewhere, over the network
+NETWORK = re.compile(r"^(raop|roc|tunnel|snapcast|rtp|pulse-tunnel)", re.I)
+# default-nodes keys: default.configured.audio.sink, then .0, .1 … (WirePlumber stops reading at the first gap)
+STACK = re.compile(r"^(default\.configured\.audio\.sink)(\.\d+)?=(.*)$")
+TARGET = re.compile(r'"target":\s*"((?:[^"\\]|\\.)*)"\s*,?\s*')
+
+
+def default_nodes(lines, log):
+    """The sink stack without network outputs, renumbered so it has no gaps; other lines as they were."""
+    kept, out, at = [], [], None
+    for line in lines:
+        m = STACK.match(line)
+        if not m:
+            out.append(line)
+            continue
+        at = len(out) if at is None else at
+        if NETWORK.match(m.group(3)):
+            log(f"default-nodes: {m.group(3)}")
+        else:
+            kept.append(m.group(3))
+    if at is not None:
+        names = ["default.configured.audio.sink"] + [f"default.configured.audio.sink.{i}" for i in range(len(kept))]
+        out[at:at] = [f"{k}={v}" for k, v in zip(names, kept)]
+    return out
+
+
+def stream_properties(lines, log):
+    """Each stream's remembered target dropped when it is a network output (the stream then follows the default)."""
+    out = []
+    for line in lines:
+        m = TARGET.search(line)
+        if m and NETWORK.match(m.group(1)):
+            log(f"stream-properties: {line.split('=', 1)[0]} -> {m.group(1)}")
+            line = (line[:m.start()] + line[m.end():]).replace(", }", "}")
+        out.append(line)
+    return out
+
+
+def main(args):
+    dry = "--dry-run" in args
+    args = [a for a in args if a != "--dry-run"]
+    state = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+    folder = args[0] if args else os.path.join(state, "wireplumber")
+    for name, fix in (("default-nodes", default_nodes), ("stream-properties", stream_properties)):
+        path = os.path.join(folder, name)
+        try:
+            with open(path) as f:
+                lines = f.read().splitlines()
+        except FileNotFoundError:
+            continue
+        gone = []
+        new = fix(lines, gone.append)
+        for g in gone:
+            print(("would forget " if dry else "forgot ") + g)
+        if gone and not dry:
+            # A whole new file in one rename: WirePlumber never reads half of one
+            with open(path + ".tmp", "w") as f:
+                f.write("\n".join(new) + "\n")
+            os.replace(path + ".tmp", path)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

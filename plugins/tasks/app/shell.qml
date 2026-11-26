@@ -1,0 +1,443 @@
+import QtQuick
+import QtQuick.Layouts
+import Quickshell
+import Quickshell.Io
+import qs
+import qs.kit
+import "Views.js" as Views
+
+// Nightdrive Tasks: Today, Upcoming and the lists in the sidebar, their tasks on the right (Views.js says which and
+// under which headings); / or ⌘F searches every list (SearchHeader). New (n) adds one and ⏎ or e
+// changes one, in a panel (TaskEditor); Space ticks one off and Delete trashes it, with Undo in the toast (Actions).
+// ⇧N, F2 and Delete in the sidebar make, rename and delete a list (ListActions, the buttons in ViewHeader).
+// Changes come from Claude (mcp.json), the `tasks` command and the notifications' Done and Later too, which all ask it
+// to read them again (`tasks …` calls refresh). lib/cli.py reads and writes the VTODO files.
+ShellRoot {
+    id: shell
+    FloatingWindow {
+        id: win
+        title: "Tasks"
+        implicitWidth: 960
+        implicitHeight: 720
+        color: c.bg
+        // Closing the window (⌘W) quits Tasks, as Contacts: a process left without its window would only look open
+        onClosed: { ops.flush(); Qt.quit() }
+
+        AppLook { id: c }
+        readonly property QtObject look: c
+
+        IpcHandler {
+            target: "tasks"
+            function refresh(): void { win.load() }
+            function openSettings(): void {}     // the kit's `tasks settings`: Tasks has none yet
+            // `tasks new [LIST]`: the new task panel, in that list (its name or id) when there is one
+            function newTask(list: string): void {
+                const l = win.lists.find(x => x.id === list || x.name.toLowerCase() === list.toLowerCase())
+                win.newTask(l ? l.id : "")
+            }
+            // The lists' panels, as ⇧N, F2 and Delete in the sidebar open them, for the list on show
+            function newList(): void { listOps.create() }
+            function renameList(): void { if (win.view.kind === "list") listOps.rename(win.view) }
+            function removeList(): void { if (win.view.kind === "list") listOps.remove(win.view) }
+            // The panel for a task of the view by number from 1 (0: the picked one), as ⏎ opens it
+            function edit(row: int): void { win.editTask(row > 0 ? row - 1 : win.current) }
+            // The search with these words, as / and typing them would
+            function search(words: string): void { win.openSearch(words) }
+            // A row of the sidebar by its name (Today, Upcoming, a list, Done), and a task in it by number from 1
+            function pick(name: string, row: int): void {
+                const i = win.sources.findIndex(s => s.name.toLowerCase() === name.toLowerCase())
+                if (i >= 0) win.pickSource(i)
+                if (row > 0) win.move(row - 1)
+            }
+        }
+
+        readonly property int headerHeight: 22
+        readonly property int headerGap: 30
+        readonly property string helper: Quickshell.shellDir + "/../lib/cli.py"
+        readonly property int doneMax: 100   // Done shows the newest: a list kept for years would be long
+
+        property var tasks: []              // every task, open and done (cli.py list --view all), soonest first
+        property var lists: []              // [{ id, name, open }]
+        property string today: ""           // YYYY-MM-DD, from the same read
+        property bool loaded: false
+        readonly property var sources: {
+            const open = tasks.filter(t => !t.done)
+            const rows = [{ kind: "today", name: "Today", glyph: "sun", count: open.filter(t => t.due && t.due.slice(0, 10) <= today).length },
+                          { kind: "upcoming", name: "Upcoming", glyph: "calendar", count: open.filter(t => t.due).length }]
+            for (const l of lists) rows.push({ kind: "list", id: l.id, name: l.name, glyph: "list", count: l.open })
+            rows.push({ kind: "done", name: "Done", glyph: "circle-check", count: "" })
+            return rows
+        }
+        property int source: 0
+        // The search shows in place of the view picked, which comes back when it ends
+        property bool searching: false
+        property string query: ""
+        onQueryChanged: if (searching) filter("", 0)
+        readonly property var view: searching ? { kind: "search", name: "Search" } : sources[source] || sources[0]
+        readonly property bool mixed: view.kind !== "list"   // rows say their list
+        property var shown: []
+        property int current: -1
+
+        property string keepNext: ""        // a task to pick once the next read is in (the one just added)
+        property string keepList: ""        // a list's id to show then (one just made, renamed or brought back)
+        // Not while moves are still being written (Reorder): the last one reads the files once it is done
+        function load() { if (!reorder.busy) loader.running = true }
+        Process {
+            id: loader
+            command: ["python3", win.helper, "list", "--json", "--view", "all"]
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    let d
+                    try { d = JSON.parse(text) } catch (e) { console.warn("cli.py list: " + e); return }
+                    const keep = win.keepNext || (win.shown[win.current] ? win.shown[win.current].id : "")
+                    const show = win.keepNext !== ""   // one just added or brought back: scrolled to if it is out of sight
+                    const seen = win.view.kind + ":" + (win.view.id || "")
+                    win.keepNext = ""
+                    const was = win.keepList || (win.view.kind === "list" ? win.view.id : "")
+                    win.keepList = ""
+                    win.tasks = d.tasks
+                    ops.settle(d.tasks)
+                    win.lists = d.lists
+                    win.today = d.now.slice(0, 10)
+                    win.loaded = true
+                    // The same list stays picked when one before it comes or goes; Today when it has gone itself
+                    if (was) { const i = win.sources.findIndex(s => s.id === was); win.source = i >= 0 ? i : 0 }
+                    win.source = Math.min(win.source, win.sources.length - 1)
+                    // The same view read again keeps its scroll (#3249); another one (its list gone) starts at the top
+                    const same = seen === win.view.kind + ":" + (win.view.id || "")
+                    win.filter(keep, win.current, same ? (show ? "show" : "hold") : "")
+                }
+            }
+        }
+        Component.onCompleted: { load(); list.forceActiveFocus() }
+        // Today moves on with the clock, and a sync or another app may change the files: read them again each minute
+        Timer { interval: 60000; running: true; repeat: true; onTriggered: win.load() }
+        // A sync (nightdrive hub), Claude's tools or `tasks` in a terminal change the files too: lib/watch.py prints a
+        // line once such a burst is over, and the lists are read again then rather than up to a minute later. A read
+        // still running waits for its end, so the change isn't missed. Without the watcher, the minute's read remains.
+        Process {
+            running: true
+            command: ["python3", Quickshell.shellDir + "/../lib/watch.py"]
+            stdout: SplitParser { onRead: reread.restart() }
+        }
+        Timer { id: reread; interval: 150; onTriggered: loader.running ? restart() : win.load() }
+        // Upcoming's headings are worked out with the rows: a change of region writes them again at once
+        Connections { target: Regional; function onRegionChanged() { win.filter(win.shown[win.current] ? win.shown[win.current].id : "", win.current, "hold") } }
+
+        // When a task is due, the region's way (Settings › Region, the kit's Regional), as lib/when.py's label writes it
+        // for the notifications and Claude: "Today 14:00", "Tomorrow", "Fri 6.11." this week, "20.11.", "4.1.2027";
+        // "Today 2:00 PM", "Fri 11/6" in the US. Ahead, not behind, so not Regional.relative (a list's "when" it was).
+        // dayOnly leaves the time out: Upcoming's headings
+        function dueLabel(due, dayOnly) {
+            if (!due) return ""
+            const day = due.slice(0, 10)
+            const d = new Date(day + "T12:00"), now = new Date((today || Regional.iso(new Date())) + "T12:00")
+            const diff = Math.round((d - now) / 86400000)
+            const text = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : diff === -1 ? "Yesterday"
+                       : diff > 1 && diff < 7 ? Regional.dayName(d.getDay(), true) + " " + Regional.format(day, "day")
+                       : Regional.format(day, d.getFullYear() === now.getFullYear() ? "day" : "short")
+            return due.length > 10 && !dayOnly ? text + " " + Regional.time(due.slice(11, 16)) : text
+        }
+        // When it was ticked off, as Mail's and Notes' lists say when: "Done 14:30", "Done yesterday", "Done Tue"
+        function doneLabel(completed) {
+            if (!completed) return "Done"
+            const when = Regional.relative(completed)
+            return "Done " + (when === "Yesterday" ? "yesterday" : when)
+        }
+        // What Views.js needs besides the tasks and the view
+        function viewOptions() {
+            return { today: today, query: query, lists: lists, doneMax: doneMax, dayLabel: day => dueLabel(day, true) }
+        }
+        // keep: the task to pick again; at: the row to stay at when it has gone (done, moved, trashed), else the first.
+        // scroll "hold" (a read of the view on show): the rows stay where they were, see holdScroll; "show": the same,
+        // but the picked one is scrolled to when out of sight; "": a new view, from the picked row
+        function filter(keep, at, scroll) {
+            const place = scroll ? holdScroll.mark() : null
+            shown = Views.rows(tasks, view, viewOptions())
+            const i = keep ? shown.findIndex(t => t.id === keep) : -1
+            current = i >= 0 ? i : shown.length ? Math.max(0, Math.min(at || 0, shown.length - 1)) : -1
+            if (!shown.length) return
+            if (place) holdScroll.restore(place, scroll === "show")
+            else listView.positionViewAtIndex(current, ListView.Contain)
+        }
+        ScrollHold { id: holdScroll; view: listView; app: win }
+        // The rows in a new order (a task moved, Reorder) before the files say so: the view stays where it was
+        function reshow(rows, index) {
+            const y = listView.contentY
+            shown = rows; current = index
+            listView.forceLayout()
+            listView.contentY = y
+            listView.positionViewAtIndex(index, ListView.Contain)
+        }
+        function pickSource(i) {
+            if (i < 0 || i >= sources.length) return
+            if (searching) endSearch()
+            source = i; filter("")
+        }
+        // The search (/, ⌘F, `tasks search`): the field takes the keys; words given are searched at once
+        function openSearch(words) {
+            if (!searching) { searching = true; filter("", 0) }
+            if (words) { searchBar.field.text = words; query = words }
+            pane = "list"
+            searchBar.field.forceActiveFocus()
+        }
+        function endSearch() { searching = false; query = ""; searchBar.field.text = "" }
+        // Esc: the view picked before, with the task found still picked when it is there
+        function closeSearch() {
+            const keep = shown[current] ? shown[current].id : ""
+            endSearch(); filter(keep, 0); toList()
+        }
+        // The new task panel: in the list the window shows, or listId; due today when the view is Today, where a task
+        // without a day wouldn't show
+        function newTask(listId) {
+            editor.open(listId || (view.kind === "list" ? view.id : ""), view.kind === "today" ? "today" : "")
+        }
+        // The picked task (or the one at index) in the panel, to change it
+        function editTask(index) {
+            const t = shown[index === undefined ? current : index]
+            if (t) editor.edit(t)
+        }
+        // Whether a task (cli.py's row of it) shows in the view the window has: if not, the toast says where it went
+        function inView(task) { return Views.shows(task, view, viewOptions()) }
+        // What just happened, at the top of the window (the kit's toast)
+        function say(t, danger) { toast.show(t, { danger: !!danger }) }
+        function offer(t, undo) { toast.show(t, { action: "Undo", run: undo }) }
+        Actions { id: ops; app: win }
+        readonly property Item mover: reorder         // a row dragged to another place (TaskRow)
+        readonly property var ticking: ops.ticking   // the rows ticked a moment ago (Actions.toggle)
+        // A task's circle, Space: done, or back to open in Done
+        function toggleDone(index) { ops.toggle(shown[index === undefined ? current : index]) }
+        // c or Copy text under the picked task's note: the note to the clipboard, as it is. copied names the task for a
+        // moment, so its button says Copied
+        property string copied: ""
+        Timer { id: copiedFor; interval: 1500; onTriggered: win.copied = "" }
+        function copyNote(index) {
+            const t = shown[index === undefined ? current : index]
+            if (!t || !t.note) { say("No note to copy"); return }
+            Quickshell.execDetached(["wl-copy", "--", t.note])
+            copied = t.id; copiedFor.restart()
+        }
+        function move(d) {
+            if (!shown.length) return
+            current = Math.max(0, Math.min(shown.length - 1, current + d))
+            listView.positionViewAtIndex(current, ListView.Contain)
+        }
+
+        // Tab moves the keys between the sidebar (↑ ↓ pick a row there) and the tasks, as in Contacts
+        property string pane: "list"
+        readonly property bool listFocused: list.activeFocus && pane === "list" && !searchBar.field.activeFocus
+        // The field is in the same focus scope: it lets go first, or the scope would hand the keys back to it
+        function toList() { pane = "list"; searchBar.field.focus = false; list.forceActiveFocus() }
+
+        Shortcut { sequence: "Ctrl+R"; onActivated: win.load() }
+        // The toast's Undo while it shows, else the window's newest change; not while a panel's field has the keys
+        Shortcut { sequence: "Ctrl+Z"; enabled: !editor.visible && !listOps.busy; onActivated: if (!toast.act()) ops.undo() }
+        Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
+        Shortcut { sequences: ["Ctrl+F", "Meta+F"]; enabled: !editor.visible && !listOps.busy; onActivated: win.openSearch("") }
+        Shortcut { sequences: ["Ctrl+B", "Meta+B"]; onActivated: win.sidebarChoice = !win.sidebarShown }
+
+        readonly property int sidebarMin: 640
+        property var sidebarChoice: null    // ⌘B's, over what the width says
+        readonly property bool sidebarShown: sidebarChoice !== null ? sidebarChoice : width >= sidebarMin
+        onSidebarShownChanged: if (!sidebarShown) pane = "list"
+
+        RowLayout {
+            id: content
+            anchors.fill: parent
+            spacing: 0
+            AppPointer { c: win.look }
+
+            AppSidebar {
+                Layout.preferredWidth: win.width < 800 ? 168 : 208
+                visible: win.sidebarShown
+                c: win.look
+                title: "Tasks"
+                titleItems: AppIconButton {
+                    c: win.look; glyph: "list-plus"; tip: "New list"; keys: "⇧N"; tipAlign: "right"
+                    onClicked: listOps.create()
+                }
+                headerHeight: 2 * 18 + win.headerHeight
+                contentTop: 18 + win.headerHeight + win.headerGap
+                bottomMargin: 24
+                Repeater {
+                    model: win.sources
+                    delegate: AppNavRow {
+                        required property var modelData
+                        required property int index
+                        // A gap between Today and Upcoming and the lists, and before Done
+                        Layout.topMargin: (modelData.kind === "list" && win.sources[index - 1].kind !== "list") || modelData.kind === "done" ? 14 : 0
+                        c: win.look
+                        glyph: modelData.glyph
+                        label: modelData.name
+                        count: modelData.count === 0 ? "" : modelData.count
+                        countColor: modelData.kind === "today" && win.tasks.some(t => t.overdue) ? c.danger : c.faint   // something is late
+                        selected: index === win.source && !win.searching
+                        active: win.pane === "sources" && list.activeFocus
+                        onClicked: { win.pickSource(index); win.toList() }
+                    }
+                }
+                Item { Layout.fillHeight: true }
+            }
+
+            FocusScope {
+                id: list
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                focus: true
+                Keys.onPressed: e => {
+                    const k = e.key, ctrl = e.modifiers & Qt.ControlModifier, alt = e.modifiers & Qt.AltModifier
+                    win.look.moved(e)
+                    sheet.pressed(e)
+                    if (e.accepted) return
+                    if (alt && win.pane === "list" && (k === Qt.Key_Up || k === Qt.Key_Down)) reorder.step(k === Qt.Key_Up ? -1 : 1)
+                    else if (k === Qt.Key_Tab || k === Qt.Key_Backtab) win.pane = win.pane === "list" && win.sidebarShown ? "sources" : "list"
+                    else if (win.pane === "sources" && (k === Qt.Key_Down || k === Qt.Key_J)) win.pickSource(win.source + 1)
+                    else if (win.pane === "sources" && (k === Qt.Key_Up || k === Qt.Key_K)) win.pickSource(win.source - 1)
+                    else if (win.pane === "sources" && (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Right || k === Qt.Key_Escape)) win.pane = "list"
+                    else if (ctrl && k === Qt.Key_Down) win.pickSource(win.source + 1)
+                    else if (ctrl && k === Qt.Key_Up) win.pickSource(win.source - 1)
+                    else if (k === Qt.Key_Down || k === Qt.Key_J) win.move(1)
+                    else if (k === Qt.Key_Up || k === Qt.Key_K) win.move(-1)
+                    else if (k === Qt.Key_PageDown) win.move(10)
+                    else if (k === Qt.Key_PageUp) win.move(-10)
+                    else if (k === Qt.Key_Home) win.move(-win.shown.length)
+                    else if (k === Qt.Key_End) win.move(win.shown.length)
+                    else if (k >= Qt.Key_1 && k <= Qt.Key_9 && !ctrl) win.pickSource(k - Qt.Key_1)
+                    else if (k === Qt.Key_Slash || e.text === "/") win.openSearch("")
+                    else if (k === Qt.Key_Escape && win.searching) win.closeSearch()
+                    else if (k === Qt.Key_N && !ctrl && (e.modifiers & Qt.ShiftModifier)) listOps.create()
+                    else if (k === Qt.Key_N && !ctrl) win.newTask("")
+                    else if (k === Qt.Key_F2 && win.view.kind === "list") listOps.rename(win.view)
+                    else if (k === Qt.Key_Delete && !ctrl && win.pane === "sources") { if (win.view.kind === "list") listOps.remove(win.view) }
+                    else if ((k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_E) && !ctrl) win.editTask()
+                    else if (k === Qt.Key_Space && !ctrl) win.toggleDone()
+                    else if (k === Qt.Key_C && !ctrl) win.copyNote()
+                    else if (k === Qt.Key_Delete && !ctrl) ops.trash(win.shown[win.current])
+                    else return
+                    e.accepted = true
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 0
+                    ViewHeader {
+                        visible: !win.searching
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 28
+                        Layout.rightMargin: 28
+                        Layout.topMargin: 18
+                        Layout.preferredHeight: win.headerHeight
+                        c: win.look
+                        app: win
+                        onRenameList: listOps.rename(win.view)
+                        onRemoveList: listOps.remove(win.view)
+                        onSearch: win.openSearch("")
+                    }
+                    SearchHeader {
+                        id: searchBar
+                        visible: win.searching
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 28
+                        Layout.rightMargin: 28
+                        Layout.topMargin: 18
+                        Layout.preferredHeight: win.headerHeight
+                        c: win.look
+                        app: win
+                    }
+                    Rectangle { Layout.fillWidth: true; Layout.topMargin: 17; Layout.preferredHeight: 1; color: c.divider }
+
+                    ListView {
+                        id: listView
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.leftMargin: 12
+                        Layout.rightMargin: 12
+                        clip: true
+                        model: win.shown
+                        currentIndex: win.current
+                        boundsBehavior: Flickable.StopAtBounds
+                        highlightMoveDuration: 0
+                        TouchScroll { view: listView }
+                        spacing: 2
+                        topMargin: 12        // as the left margin, and room for the drop line above the first row (Reorder)
+                        bottomMargin: 12
+                        section.property: "section"
+                        section.delegate: Text {
+                            required property string section
+                            textFormat: Text.PlainText
+                            visible: section !== ""
+                            height: visible ? implicitHeight : 0
+                            leftPadding: 16; topPadding: 12; bottomPadding: 4
+                            text: section
+                            color: section === "Overdue" ? c.danger : c.faint
+                            font.family: c.font; font.pixelSize: 11; font.weight: Font.Medium
+                        }
+                        delegate: TaskRow { c: win.look; app: win }
+                        Reorder { id: reorder; view: listView; app: win; ops: ops; c: win.look }
+                        Column {
+                            visible: win.loaded && win.shown.length === 0
+                            anchors.centerIn: parent
+                            spacing: 8
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: win.view.kind === "today" ? "Nothing due today" : win.view.kind === "done" ? "Nothing done yet"
+                                    : win.view.kind !== "search" ? "No tasks here"
+                                    : win.query.trim() ? "Nothing found for “" + win.query.trim() + "”" : "Words in a task's title or note"
+                                color: c.faint; font.family: c.font; font.pixelSize: 12
+                            }
+                            Text {
+                                visible: win.tasks.length === 0 && !win.searching
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "n adds one, or ask Claude to"
+                                color: c.faint; font.family: c.font; font.pixelSize: 11
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        KeySheet {
+            id: sheet
+            c: win.look
+            groups: [
+                { title: "Tasks", keys: [["↑ ↓  j k", "Previous, next (the picked task shows its whole note)"], ["PgUp PgDn", "Ten up, down"], ["Home End", "First, last"], ["⏎  e", "Edit it"], ["Space", "Done; in Done, open again (again within 2 s: called off)"], ["c", "Copy its note"], ["Delete", "To the trash"], ["⌥↑ ⌥↓", "Move it up, down in its list (or drag it)"], ["⌘Z", "Undo the last change"]] },
+                { title: "Window", keys: [["Ctrl ↑ ↓", "Previous, next in the sidebar"], ["1 – 9", "Go to a row of the sidebar"], ["Tab", "Sidebar, tasks"], ["⌘R", "Read the tasks again"], ["⌘B", "Hide or show the sidebar"]] },
+                { title: "Search", keys: [["/  ⌘F", "Search every list"], ["⏎  ↓", "To the tasks found"], ["Esc", "End the search"]] },
+                { title: "Changing them", keys: [["n", "New task"], ["⏎  e", "Edit the picked one"], ["Space  Delete", "Done, to the trash"]] },
+                { title: "Lists", keys: [["⇧N", "New list"], ["F2", "Rename the list"], ["Tab  Delete", "Delete the list (from the sidebar)"]] },
+                { title: "New task, edit", keys: [["⏎  Ctrl ⏎", "Add or save it (⏎ is a new line in the note)"], ["Tab", "The next field"], ["← →", "Another list"], ["Space", "Important, on or off"], ["↓", "A day's month to pick from"], ["Esc", "Leave it"]] }
+            ]
+        }
+
+        TaskEditor {
+            id: editor
+            behind: content
+            c: win.look
+            app: win
+            onClosed: win.toList()
+            // `cli.py add` doesn't ask the window to read again (only the `tasks` command does): read here, and pick it
+            onAdded: task => {
+                win.keepNext = task.id
+                win.load()
+                win.say(win.inView(task) ? "Added" : "Added to " + task.list + (task.due ? ", " + win.dueLabel(task.due) : ""))
+            }
+            // Out of the view after the change (another list, a later day): where it went, and the row in its place
+            onEdited: task => {
+                win.keepNext = win.inView(task) ? task.id : ""
+                win.load()
+                win.say(win.inView(task) ? "Saved" : "Moved to " + task.list + (task.due ? ", " + win.dueLabel(task.due) : ""))
+            }
+        }
+        ListActions {
+            id: listOps
+            c: win.look
+            app: win
+            ops: ops
+            behind: content
+            onClosed: win.toList()
+        }
+        // Last, over the panel too
+        AppToast { id: toast; c: win.look }
+    }
+}

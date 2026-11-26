@@ -1,0 +1,14 @@
+# Nightdrive Hub: apps' files synced every 5 minutes, the first time a minute after login (config/hub/lib/cli.py).
+# On with `nightdrive hub join URL` or `nightdrive hub timer on`, off with `nightdrive hub timer off` or `leave`.
+[Unit]
+Description=Sync apps' files with Nightdrive Hub every 5 minutes
+
+[Timer]
+OnStartupSec=1min
+OnUnitActiveSec=5min
+# Woken from sleep: a sync then, not up to 5 minutes later, so the other device's changes are there when you look
+Persistent=true
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

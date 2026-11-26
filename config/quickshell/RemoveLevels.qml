@@ -4,7 +4,8 @@ import Quickshell
 // The launcher's System › Remove: Software (the packages you installed with dnf, and your Flatpak apps) and Webapps.
 // A search on Remove itself looks in both, and the tag tells which a row is. Enter on a package opens its details
 // (DetailCard.qml; src and remove: Enter there removes it in a terminal); a webapp asks twice, as its logins go with it.
-// Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered).
+// Ctrl+Enter on either removes at once (yesCmd: the same command without its question), for when you're sure.
+// Launcher.qml asks it like DefaultAppsLevels (levels, titles, parents, items, activate, footer, entered, ctrlActivate).
 Item {
     id: r
     property var launcher: null
@@ -18,12 +19,22 @@ Item {
     readonly property var titles: ({ remove: "System › Remove", removesw: "Remove › Software", removeweb: "Remove › Webapps" })
     readonly property var parents: ({ remove: "system", removesw: "remove", removeweb: "remove" })
 
-    function footer(level, query) { return "" }
+    function footer(level, query) {
+        const cur = launcher.results[launcher.selIndex] || {}
+        if (!cur.yesCmd) return ""
+        return (cur.confirm ? "Enter: remove (asks again)" : "Enter: details") + "  ·  Ctrl+Enter: remove without asking"
+    }
     function opened() {}
     function entered(level) { removeProc.running = true; webappProc.running = true }
     function shiftActivate(it) {}
     // The rows are the launcher's: a package's details, or a confirmed action
     function activate(it) { return false }
+    function ctrlActivate(it) {
+        if (!it.yesCmd) return false
+        launcher.open = false
+        Quickshell.execDetached(it.yesCmd)
+        return true
+    }
 
     function items(level, q) {
         if (level === "remove") {
@@ -79,14 +90,16 @@ Item {
                 const a = appOf[p.name]
                 return { kind: "action", name: a ? a.name : p.name, summary: a && a.name.toLowerCase() !== p.name ? p.summary + "  ·  " + p.name : p.summary,
                          iconFile: a && a.icon ? a.icon : undefined, glyph: a && a.icon ? undefined : "package-minus", app: !!a,
-                         src: "dnf", id: p.name, remove: true, cmd: term('sudo dnf remove "$1"', p.name) }
+                         src: "dnf", id: p.name, remove: true, cmd: term('sudo dnf remove "$1"', p.name),
+                         yesCmd: term('sudo dnf remove -y "$1"', p.name) }
             }).concat(apps.map(([id, name, desc]) => ({ kind: "action", name: name, summary: (desc || "") + "  ·  Flatpak", iconFile: id, app: true,
-                                                        src: "flatpak", id: id, remove: true, cmd: term('flatpak uninstall --user "$1"', id) })))
+                                                        src: "flatpak", id: id, remove: true, cmd: term('flatpak uninstall --user "$1"', id),
+                                                        yesCmd: term('flatpak uninstall --user -y "$1"', id) })))
                 .sort((a, b) => a.name.localeCompare(b.name))
             r.removeLoaded = true
         }
     }
-    // Webapps: removing one takes its logins too (its Chromium profile), so Enter asks twice
+    // Webapps: removing one takes its logins too (its Chromium profile), so Enter asks twice; Ctrl+Enter doesn't (yesCmd)
     Sh {
         id: webappProc
         command: [r.scripts + "/webapp-remove", "--list"]
@@ -95,7 +108,7 @@ Item {
                 kind: "action", name: name, iconFile: icon || undefined, summary: url.replace(/^[a-z]+:\/\//, "").replace(/\/.*$/, ""),
                 confirm: true, armHint: "Enter again: remove, logins too",
                 cmd: ["bash", "-c", 'out=$("$0" "$1" 2>&1) && notify-send -a Webapp "Webapp removed" "$2" || notify-send -u critical -a Webapp "Removing webapp failed" "$out"',
-                      r.scripts + "/webapp-remove", slug, name] }))
+                      r.scripts + "/webapp-remove", slug, name] })).map(w => Object.assign(w, { yesCmd: w.cmd }))
         }
     }
 }

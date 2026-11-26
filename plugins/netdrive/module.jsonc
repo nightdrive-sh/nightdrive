@@ -1,0 +1,3 @@
+// Network Drives' top bar module: shown only when a drive needs a look (./status: one that should be mounted and
+// isn't, a failed upload) or while files are uploading; a click opens NetdriveMenu.qml
+{ "interval": 10, "after": "system", "size": 17, "label": "Network Drives (only when one needs a look)", "glyph": "cloud" }

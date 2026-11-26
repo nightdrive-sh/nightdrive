@@ -1,0 +1,13 @@
+[Desktop Entry]
+# `games install` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH
+# may not have ~/.local/bin), and the icon to ~/.local/share/icons/hicolor/scalable/apps.
+Type=Application
+Name=Games
+GenericName=Nightdrive Games
+Comment=The games on this computer, with their covers; the controller's Xbox button opens it
+Keywords=games;play;steam;controller;xbox;gamepad;
+Icon=nightdrive-games
+Exec=games
+Terminal=false
+Categories=Utility;
+StartupNotify=false

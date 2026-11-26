@@ -6,6 +6,8 @@
 #   - Fedora Minimal's own packages (base-pc.txt or base-asahi.txt here)
 #   - Nightdrive's package lists (packages*.txt) and what install.sh's steps add (the boot splash, an NVIDIA driver)
 #   - the installed plugins' packages (plugin.conf's packages=, `nightdrive plugins packages`)
+#   - in a virtual machine, its hypervisor's guest agents (qemu-guest-agent, spice-vdagent…)
+#   - common command-line tools (TOOLS), and what is in use: a VPN plugin a connection needs, cron where it has jobs
 #   - the packages dnf protects, and the ones given with --keep
 #   - yours: user-installed, but not by the system's image (its kiwi transactions in dnf history), not by KDE's groups,
 #     and never in Nightdrive's lists (their git history: one dropped from them goes, and is listed apart)
@@ -28,6 +30,9 @@ STATE=/usr/lib/sysimage/libdnf5
 # Fusion, dnf's copr command (setup-hyprland-repo.sh). And Podman, where it's installed: `nightdrive sandbox` runs in it
 EXTRAS=(plymouth plymouth-plugin-two-step plymouth-theme-spinner ImageMagick jetbrains-mono-fonts akmod-nvidia akmods
         mokutil openssl rpmfusion-free-release rpmfusion-nonfree-release dnf5-plugins podman)
+# Command-line tools a desktop's user expects, though Fedora Minimal doesn't have them: they stay where installed
+# (Jari's call, #1633)
+TOOLS=(rsync wget2-wget bc tree man-pages bind-utils whois traceroute)
 # The boot chain: what of it is installed always stays, and dnf is told to protect it. By pattern, as a kernel's files
 # aren't always in kernel-core (Fedora 44 on aarch64 has none: kernel-uki-dtbloader provides kernel-core-uname-r).
 # On a Mac also Asahi's: the repos its kernel, Mesa and boot chain update from (and the vendor change that lets their
@@ -132,6 +137,16 @@ lists=()
 for l in "${LISTS[@]}"; do [[ $l == packages-pc.txt && $kind != pc || $l == packages-asahi.txt && $kind != asahi ]] || lists+=("$repo/$l"); done
 add_file "${lists[@]}"
 add "${EXTRAS[@]}"
+# In a VM, its hypervisor's agents: without them the host can't shut it down cleanly (Garage's stop falls back to the
+# power button, which Nightdrive ignores), set its clock or share the clipboard (#1632). Another hypervisor's go
+if [[ $machine == vm ]]; then
+  case $(systemd-detect-virt --vm 2>/dev/null) in
+    qemu|kvm) add qemu-guest-agent spice-vdagent spice-webdavd ;;
+    vmware) add 'open-vm-tools*' ;;
+    microsoft) add 'hyperv-daemons*' 'hypervvssd' 'hypervkvpd' 'hypervfcopyd' ;;
+    oracle) add 'virtualbox-guest-additions*' ;;
+  esac
+fi
 read -ra plugin_pkgs <<<"$("$repo/bin/nightdrive" plugins packages | tr '\n' ' ')"
 add "${plugin_pkgs[@]}"
 # The edition's release packages (fedora-release-kde-desktop, fedora-release-identity-kde-desktop: the name in
@@ -148,6 +163,32 @@ done
 add "${protected[@]}"
 mapfile -t boot < <(installed "${BOOT[@]}")
 add "${boot[@]}"; protected+=("${boot[@]}")
+add "${TOOLS[@]}"
+
+# --- In use, though the image installed it: removing it would stop something silently (#1633) ---
+inuse=()
+# NetworkManager's VPN plugins a connection uses (vpn.service-type org.freedesktop.NetworkManager.openvpn →
+# NetworkManager-openvpn; a plugin's package brings the VPN program along)
+while read -r n; do
+  t=$(nmcli -g vpn.service-type connection show "$n" 2>/dev/null) || continue
+  p=NetworkManager-${t##*.}; [[ $p == NetworkManager-openswan ]] && p=NetworkManager-libreswan
+  [[ -n ${inst[$p]:-} ]] && inuse+=("$p")
+done < <(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$NF == "vpn" { sub(/:[^:]*$/, ""); print }' || true)
+# cron: a crontab of this user's (others' aren't readable without root), or a job in /etc/cron* that no package owns
+cron_jobs() {
+  crontab -l >/dev/null 2>&1 && return 0
+  [[ -r /var/spool/cron ]] && [[ -n $(ls -A /var/spool/cron 2>/dev/null) ]] && return 0
+  local f
+  for f in /etc/cron.d/* /etc/cron.{hourly,daily,weekly,monthly}/*; do
+    [[ -f $f ]] && ! rpm -qf "$f" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+if [[ -n ${inst[cronie]:-} ]] && cron_jobs; then
+  mapfile -t -O "${#inuse[@]}" inuse < <(installed cronie cronie-anacron crontabs)
+fi
+mapfile -t inuse < <(printf '%s\n' "${inuse[@]}" | sed '/^$/d' | sort -u)
+add "${inuse[@]}"
 
 # --- Yours: user-installed, not by the image, a group or Nightdrive ---
 declare -A notyours ever
@@ -231,6 +272,7 @@ summary() {
   else echo "Yours: none found (installed by you, not by KDE or Nightdrive)"; fi
   echo "Goes: ${#goes[@]} packages, KDE and what only it needed (and a few that only these recommended, found afterwards):"
   fold_list "${goes[@]}"
+  (( ${#inuse[@]} )) && { echo "In use, they stay (a VPN connection's plugin, cron with jobs):"; fold_list "${inuse[@]}"; }
   if (( ${#dropped[@]} )); then
     echo "Among them, once Nightdrive's but no longer in its lists (--keep NAME keeps one):"; fold_list "${dropped[@]}"
   fi
@@ -351,15 +393,24 @@ mkdir -p "${UNDO%/*}"
   echo "# with \"Group state for \"\" not found\" (dnf5 putting back KDE's group reasons): the packages are back all the same"
   echo "sudo dnf history rollback --ignore-extras $before"
   echo "$repo/config/greeter/switch.sh off    # KDE's login screen again"
-  (( ${#configs[@]} )) && echo "mv $BACKUP/* ~/.config/ && rmdir $BACKUP    # KDE's settings"
+  # Before Plasma's first login: it makes kdedefaults and the like anew, and a mv onto them fails ("Directory not
+  # empty"); cp -a merges (#1634)
+  settings="cp -a $BACKUP/. ~/.config/ && rm -r $BACKUP    # KDE's settings, before you log in to Plasma"
+  (( ${#configs[@]} )) && echo "$settings"
+  echo "sudo reboot"
   if (( snapshot )); then
     echo
-    echo "# If dnf can't (an old version gone from the repos): the root as it was, from the snapshot. /home isn't in it,"
-    echo "# nor /boot when it's a partition of its own"
+    echo "# If dnf can't (an old version gone from the repos): the root as it was, from the snapshot. /home isn't in it, so"
+    echo "# KDE's settings and this file stay where they are; nor is /boot when it's a partition of its own"
     echo "sudo mount -o subvolid=5 $root_dev /mnt"
     echo "sudo mv /mnt${root_sub} /mnt${root_sub}.minimal"
     echo "sudo btrfs subvolume snapshot /mnt/$snap_name /mnt${root_sub}"
-    echo "sudo umount /mnt && sudo reboot    # afterwards: sudo btrfs subvolume delete /mnt${root_sub}.minimal (mounted as above)"
+    (( ${#configs[@]} )) && echo "$settings"
+    echo "sudo umount /mnt && sudo reboot"
+    echo "# After the reboot, in Nightdrive (the snapshot was taken once its login screen was in place) or a text console:"
+    echo "$repo/config/greeter/switch.sh off    # KDE's login screen again"
+    echo "sudo mount -o subvolid=5 $root_dev /mnt && sudo btrfs subvolume delete /mnt${root_sub}.minimal && sudo umount /mnt"
+    echo "rm ${UNDO/#$HOME/\~}    # this file: its dnf rollback no longer applies"
     echo
     echo "# Happy with Minimal: the snapshot holds on to the old files, so delete it to free the space"
     echo "sudo mount -o subvolid=5 $root_dev /mnt && sudo btrfs subvolume delete /mnt/$snap_name && sudo umount /mnt"

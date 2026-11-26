@@ -43,6 +43,18 @@ Item {
     }
     function shutDown() { if (root.running && (!root.stopping || root.slow)) root.ctl.power("stop", root.vm.name) }
     function forceOff() { if (root.running) root.ctl.power("kill", root.vm.name) }
+    // v: the clipboard's text typed into its console as keys on a US keyboard, as an installer's has, which has no
+    // clipboard of its own (#1872: garage-ctl type)
+    function typeClipboard() {
+        if (!root.running || root.paused) root.ctl.error = "Start " + root.vm.name + " to type into it"
+        else root.act(["type", root.vm.name, "--clipboard"])
+    }
+    // c: the clipboard's text onto its clipboard, through its guest agent, to paste there with its own keys (#3117:
+    // garage-ctl clip). Its window getting the keyboard does the same by itself (overlay/ClipSync.qml), unless turned off
+    function sendClipboard() {
+        if (!root.running || root.paused) root.ctl.error = "Start " + root.vm.name + " to send it the clipboard"
+        else root.act(["clip", root.vm.name, "--clipboard"])
+    }
     function takeSnapshot() { snapshots.take() }
     function focusSnapshots() { snapshots.focusList() }
     readonly property bool snapshotsFocused: snapshots.focused

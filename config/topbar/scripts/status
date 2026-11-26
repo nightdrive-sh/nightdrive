@@ -6,12 +6,13 @@
 kind=${1:?usage: status <name>}
 
 # The machine's own battery as UPower names it (MacBook: battery_macsmc_battery). Found in /sys/class/power_supply,
-# skipping Bluetooth mice and keyboards (scope Device). Empty on a desktop: the module stays hidden.
+# skipping Bluetooth mice and keyboards (scope Device). Empty on a desktop: the module stays hidden. Prints the sysfs
+# folder; UPower's path is made from its name.
 battery() {
   local d
   for d in /sys/class/power_supply/*; do
     [[ $(cat "$d/type" 2>/dev/null) == Battery && $(cat "$d/scope" 2>/dev/null) != Device ]] || continue
-    local n=${d##*/}; echo "/org/freedesktop/UPower/devices/battery_${n//-/_}"; return
+    echo "$d"; return
   done
 }
 
@@ -19,19 +20,24 @@ battery() {
 
 case $kind in
   wifi)
+    # Connected but no internet (NetworkManager's connectivity check: limited, none, or a captive portal's sign-in;
+    # config/hypr/scripts/net-watch notifies): the icon in orange, Wi-Fi's with a "!". Not a check of its own: NM's
+    # last result, which net-watch refreshes the bar on
+    cls=; case $(nmcli networking connectivity 2>/dev/null) in limited|none|portal) cls=warning ;; esac
+    wifi=wifi; [[ -n $cls ]] && wifi="wifi-alert"
     # The traffic goes over a cable (NetworkManager prefers it to Wi-Fi, which stays connected as a standby): a cable,
     # whether Wi-Fi is on or not
-    if [[ $(~/.config/hypr/scripts/net-primary | jq -r '.type // ""') == ethernet ]]; then emit cable ""; exit; fi
+    if [[ $(~/.config/hypr/scripts/net-primary | jq -r '.type // ""') == ethernet ]]; then emit cable "" "$cls"; exit; fi
     # No Wi-Fi device (a VM, a PC on a cable) and no cable either: no network, which a crossed-out Wi-Fi wouldn't say
     if ! nmcli -t -f TYPE device 2>/dev/null | grep -qx wifi; then
-      if nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable ""; else emit unplug "" off; fi
+      if nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable "" "$cls"; else emit unplug "" off; fi
       exit
     fi
     if [[ $(nmcli radio wifi 2>/dev/null) != enabled ]]; then emit wifi-off "" off; exit; fi
-    if nmcli -t -f ACTIVE device wifi list --rescan no 2>/dev/null | grep -q '^yes'; then emit wifi ""
+    if nmcli -t -f ACTIVE device wifi list --rescan no 2>/dev/null | grep -q '^yes'; then emit "$wifi" "" "$cls"
     # Connecting (also after waking up): the arcs fill up one by one (BarModule.qml animates icons separated by |)
     elif nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^wifi:connecting'; then emit "wifi-zero|wifi-low|wifi-high|wifi" ""
-    elif nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable ""
+    elif nmcli -t -f TYPE,STATE device 2>/dev/null | grep -q '^ethernet:connected'; then emit cable "" "$cls"
     else emit wifi-off "" off; fi ;;
   bluetooth)
     # Without an adapter (a VM) bluetooth.service is stopped and bluetoothctl would wait forever
@@ -55,18 +61,28 @@ case $kind in
        && [[ $(~/.local/bin/doubletake-ctl status 2>/dev/null | jq -r .state) == streaming ]]; then emit screen-share "" active
     elif [[ $(~/.config/hypr/scripts/nightlight status) == on ]]; then emit monitor-dot ""; else emit monitor ""; fi ;;
   battery)
-    dev=$(battery); [[ -z $dev ]] && { emit "" ""; exit; }
-    info=$(upower -i "$dev" 2>/dev/null)
+    sys=$(battery); [[ -z $sys ]] && { emit "" ""; exit; }
+    n=${sys##*/}; info=$(upower -i "/org/freedesktop/UPower/devices/battery_${n//-/_}" 2>/dev/null)
     pct=$(grep -oP 'percentage:\s*\K[0-9]+' <<<"$info"); st=$(grep -oP 'state:\s*\K\S+' <<<"$info")
+    # UPower's answer comes now and then empty (a D-Bus call that fails for a moment), which showed a bare "%" and a red
+    # battery: then the kernel's own figures (sysfs: capacity, status "Charging"), and a plain battery if those fail too
+    if [[ -z $pct ]]; then
+      pct=$(cat "$sys/capacity" 2>/dev/null); st=$(tr '[:upper:]' '[:lower:]' <"$sys/status" 2>/dev/null)
+      [[ $pct =~ ^[0-9]+$ ]] || { emit battery ""; exit; }
+    fi
     cls=
     if [[ $st == charging ]]; then icon=battery-charging
     else
       (( pct <= 10 )) && cls=critical || { (( pct <= 20 )) && cls=warning; }
       if (( pct < 40 )); then icon=battery-low; elif (( pct < 60 )); then icon=battery-medium; else icon=battery-full; fi
     fi
+    # Low Power Mode (hypr/scripts/low-power) shows yellow, as on an iPhone; only the critical red wins over it
+    [[ -z $cls && $(~/.config/hypr/scripts/low-power status) == on ]] && cls=warning
     emit "$icon" "$pct%" "$cls" ;;
   claude)
     exec ~/.config/topbar/scripts/claude-bar status ;;   # its right click cycles what it shows
+  claude2)
+    exec ~/.config/topbar/scripts/claude-bar status 2 ;; # the second Claude Code account's; hidden without one
   system)
     IFS=$'\t' read -r _ _ cls < <(~/.config/topbar/scripts/sysinfo bar)
     [[ $cls == high ]] && cls=critical

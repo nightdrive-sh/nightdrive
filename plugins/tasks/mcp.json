@@ -1,0 +1,233 @@
+{
+  "tools": [
+    {
+      "name": "tasks_list",
+      "title": "List tasks",
+      "description": "The user's tasks in Nightdrive Tasks (kept on this computer, a list per folder): each task's id, title, note, list, due (YYYY-MM-DD, or YYYY-MM-DDTHH:MM local time), due_label, overdue, priority (high, low or empty) and done. view: open (default: every task not done, soonest due first, those without a due last; with list, in the list's own order, as the user sees it), today (due today or earlier, overdue included), upcoming (every open task with a due), done (the 50 done most recently), all. Also gives now (the local time, to work out dates from) and the lists with their open counts. Use the ids with tasks_edit, tasks_done, tasks_undone, tasks_snooze, tasks_move and tasks_trash.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "view": {"type": "string", "enum": ["open", "today", "upcoming", "done", "all"], "title": "Which", "description": "Which tasks (default open)"},
+          "list": {"type": "string", "title": "List", "description": "Only this list's, by its name"},
+          "query": {"type": "string", "title": "Search", "description": "Words that must all be in the title or the note"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["tasks", "list", "--json", ["--view", "{view}"], ["--list", "{list}"], ["--query", "{query}"]],
+      "mask": ["tasks.title", "tasks.note"],
+      "class": "read",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_add",
+      "title": "Add a task",
+      "description": "Adds a task to Nightdrive Tasks. With a due, the user gets a notification at that time (a due date without a time: at 9:00 that day) with Done and Later. list is a list's name; a name that isn't one yet makes a new list (tasks_list gives the lists, so check it before making a near-duplicate); without it, the list Tasks. Returns the task with its id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string", "title": "Task", "description": "What to do, short", "minLength": 1},
+          "due": {"type": "string", "title": "Due", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD, +3d (a date the user's way, 5.11. or 11/5, is read by their Settings › Region; YYYY-MM-DD always as such); TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h. Leave it out for a task without a date"},
+          "list": {"type": "string", "title": "List", "description": "The list's name (default Tasks)"},
+          "note": {"type": "string", "title": "Note", "description": "More about it, as plain text"},
+          "priority": {"type": "string", "enum": ["high", "normal", "low"], "title": "Priority"}
+        },
+        "required": ["title"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "add", "--json", ["--due", "{due}"], ["--list", "{list}"], ["--note", "{note}"], ["--priority", "{priority}"], "--", "{title}"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Added the task {title}",
+      "notice_many": "Added {count} tasks",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_done",
+      "title": "Mark a task done",
+      "description": "Marks a task in Nightdrive Tasks done (it moves to the done view). id is a task's id from tasks_list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "done", "--json", "--", "{id}"],
+      "mask": ["title", "note"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Marked {title} done",
+      "notice_many": "Marked {count} tasks done",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_undone",
+      "title": "Mark a task not done",
+      "description": "Puts a task in Nightdrive Tasks that is done back among the open ones, as it was before it was ticked off (its due stays). id is a task's id from tasks_list (view done).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "undone", "--json", "--", "{id}"],
+      "mask": ["title", "note"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Marked {title} not done",
+      "notice_many": "Marked {count} tasks not done",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_snooze",
+      "title": "Move a task's due",
+      "description": "Gives a task in Nightdrive Tasks a new due time, as the notification's Later does: without until, an hour from now (a task due on a day without a time: tomorrow). With until, that time (also to set a due on a task that has none, or to bring one earlier). It is notified again at the new time.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"},
+          "until": {"type": "string", "title": "Until", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD, +3d (a date the user's way, 5.11. or 11/5, is read by their Settings › Region; YYYY-MM-DD always as such); TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "snooze", "--json", ["--until", "{until}"], "--", "{id}"],
+      "mask": ["title", "note"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Moved {title} to {due_label}",
+      "notice_many": "Moved {count} tasks to another day",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_edit",
+      "title": "Change a task",
+      "description": "Changes a task in Nightdrive Tasks: give only what changes. title; due as [DAY] [TIME] (as tasks_add takes it), or clear_due to take its date away; note replaces the whole note (\"\" empties it); list moves it to that list (a name that isn't one yet makes a new list); priority. To give a task a later time as the notification's Later does, tasks_snooze is shorter. id is a task's id from tasks_list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"},
+          "title": {"type": "string", "title": "Title", "description": "Its new title", "minLength": 1},
+          "due": {"type": "string", "title": "Due", "description": "[DAY] [TIME]: DAY is today, tomorrow, mon … sun (the next one, not today), YYYY-MM-DD, +3d (a date the user's way, 5.11. or 11/5, is read by their Settings › Region; YYYY-MM-DD always as such); TIME is HH:MM, or 12 h as 3pm, 3:30 PM (alone: the next such time). Or +30m, +2h"},
+          "clear_due": {"type": "boolean", "title": "No due", "description": "true takes the task's date and time away"},
+          "note": {"type": "string", "title": "Note", "description": "The whole new note, as plain text"},
+          "list": {"type": "string", "title": "List", "description": "The list's name to move it to"},
+          "priority": {"type": "string", "enum": ["high", "normal", "low"], "title": "Priority"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "edit", "--json", ["--title", "{title}"], ["--due", "{due}"], ["--no-due", "{clear_due}"], ["--note", "{note}"], ["--list", "{list}"], ["--priority", "{priority}"], "--", "{id}"],
+      "mask": ["title", "note"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Changed the task {title}",
+      "notice_many": "Changed {count} tasks",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_move",
+      "title": "Move a task in its list",
+      "description": "Changes a task's place in its list's own order (the order the user sees in the list, and tasks_list with list gives): to up or down one place, top or bottom, or just before or after another open task of the same list (its id). Only open tasks have a place. Today and Upcoming stay by date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"},
+          "to": {"type": "string", "enum": ["up", "down", "top", "bottom"], "title": "Where"},
+          "before": {"type": "string", "title": "Before", "description": "The id of the task it goes just before"},
+          "after": {"type": "string", "title": "After", "description": "The id of the task it goes just after"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "move", "--json", ["--to", "{to}"], ["--before", "{before}"], ["--after", "{after}"], "--", "{id}"],
+      "mask": ["title", "note"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Moved the task {title} in its list",
+      "notice_many": "Moved {count} tasks in their lists",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_trash",
+      "title": "Move a task to the trash",
+      "description": "Takes a task out of Nightdrive Tasks (it is kept for 30 days, and the user can undo it from the notification). For a task that is finished, use tasks_done instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "title": "Task", "description": "The task's id from tasks_list"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "trash", "--json", "--", "{id}"],
+      "mask": ["title", "note"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Moved the task {title} to the trash",
+      "notice_many": "Moved {count} tasks to the trash",
+      "class": "change",
+      "area": "tasks",
+      "deletes": true
+    },
+    {
+      "name": "tasks_list_new",
+      "title": "Make a task list",
+      "description": "Makes a new, empty list in Nightdrive Tasks (a list is a folder; tasks_add and tasks_edit also make one when given a name that isn't one yet). Refused when a list has that name already (any case): tasks_list gives the lists.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "title": "Name", "description": "The new list's name", "minLength": 1}
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "list-new", "--json", "--", "{name}"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Made the task list {name}",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_list_rename",
+      "title": "Rename a task list",
+      "description": "Gives a list in Nightdrive Tasks another name; its tasks stay in it. Refused when another list has that name already.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {"type": "string", "title": "List", "description": "The list's name, as tasks_list gives the lists"},
+          "name": {"type": "string", "title": "New name", "description": "The list's new name", "minLength": 1}
+        },
+        "required": ["list", "name"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "list-rename", "--json", "--", "{list}", "{name}"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Renamed the task list {old} to {name}",
+      "class": "change",
+      "area": "tasks"
+    },
+    {
+      "name": "tasks_list_remove",
+      "title": "Remove a task list",
+      "description": "Removes a list from Nightdrive Tasks. A list with tasks in it is refused (the error says how many) unless with_tasks is true: then its tasks go to the trash with it (kept for 30 days), and the user can undo the whole removal from the notification. Ask the user before removing a list that has open tasks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {"type": "string", "title": "List", "description": "The list's name, as tasks_list gives the lists"},
+          "with_tasks": {"type": "boolean", "title": "With its tasks", "description": "true moves the list's tasks to the trash with it"}
+        },
+        "required": ["list"],
+        "additionalProperties": false
+      },
+      "command": ["tasks", "list-remove", "--json", ["--with-tasks", "{with_tasks}"], "--", "{list}"],
+      "undo": ["tasks", "restore", "{undo}"],
+      "notice": "Removed the task list {name}",
+      "class": "change",
+      "area": "tasks",
+      "deletes": true
+    }
+  ]
+}

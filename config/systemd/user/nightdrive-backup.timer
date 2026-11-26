@@ -1,0 +1,14 @@
+# nightdrive backup: checked every hour, run once a day (config/backup/lib/cli.py, DUE_HOURS). Hourly rather than at a
+# set time, so a laptop asleep at night or away from the network is backed up at its next chance.
+# On with `nightdrive backup setup` or `nightdrive backup timer on`, off with `nightdrive backup timer off`.
+[Unit]
+Description=Back up this computer once a day
+
+[Timer]
+OnStartupSec=10min
+OnUnitActiveSec=1h
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

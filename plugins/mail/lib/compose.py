@@ -12,7 +12,7 @@
 
 reply, forward and resume say which account the message came to ("account": the one whose folder under ~/Mail it is
 in), and send and draft use the account the JSON names. JSON holds account, to, cc, subject, body, attachments (file
-paths) and, for a reply, in_reply_to and references; draft_id is
+paths) and, for a reply, in_reply_to and references (calendar: an invitation's answer, an iTIP REPLY); draft_id is
 the copy saved in Drafts before, which a new save or sending removes. A forward's or a draft's attachments are copied
 out of the message into ~/.cache/nightmail/parts/ first, so a message is always built from files. Every command prints one JSON object;
 failures are {"error": "..."}, so the window can show them.
@@ -50,7 +50,11 @@ import ssl
 import subprocess
 import sys
 from email.message import EmailMessage
-from email.utils import formataddr, formatdate, getaddresses, make_msgid, parseaddr, parsedate_to_datetime
+from email.utils import formataddr, formatdate, make_msgid, parseaddr, parsedate_to_datetime
+
+import blanks
+import ids
+import recipients
 
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "nightmail", "account.conf")
 PARTS = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "nightmail", "parts")
@@ -92,7 +96,7 @@ def account(name=None):
 def account_id(msgid):
     """The account a message belongs to: the one whose folder under ~/Mail holds its file."""
     root = subprocess.run(["notmuch", "config", "get", "database.path"], capture_output=True, text=True).stdout.strip()
-    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", f'id:"{msgid}"'],
+    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", "--query=sexp", ids.message(msgid)],
                            capture_output=True, text=True, check=True).stdout.split("\n")
     accs = accounts()
     for path in filter(None, files):
@@ -144,13 +148,14 @@ def reply(msgid, to_all):
     aid = account_id(msgid)
     acc = account(aid)
     out = subprocess.run(["notmuch", "reply", "--format=json", "--reply-to=" + ("all" if to_all else "sender"),
-                          "id:" + msgid], capture_output=True, text=True, check=True).stdout
+                          "--query=sexp", ids.message(msgid)], capture_output=True, text=True, check=True).stdout
     data = json.loads(out)
     h, orig = data["reply-headers"], data["original"]
     when = parsedate_to_datetime(orig["headers"]["Date"]).strftime("%a %d %b %Y, %H:%M") if orig["headers"].get("Date") else ""
     name, addr = parseaddr(orig["headers"].get("From", ""))
-    # notmuch reply leaves an HTML part's text out: an HTML-only message is read from its file
-    quoted = "\n".join(">" + line if line.startswith(">") else "> " + line if line else ">" for line in (plain_text(orig.get("body", [])) or body_text(parsed(msgid))).rstrip().split("\n"))
+    # notmuch reply leaves an HTML part's text out: an HTML-only message is read from its file. Its blank lines are
+    # tidied as the read view shows them (blanks.py): no long runs of ">" lines from a newsletter's padding.
+    quoted = "\n".join(">" + line if line.startswith(">") else "> " + line if line else ">" for line in blanks.tidy(plain_text(orig.get("body", [])) or body_text(parsed(msgid))).split("\n"))
     return {
         "to": h.get("To", ""),
         "cc": h.get("Cc", ""),
@@ -170,7 +175,7 @@ def signed(acc):
 
 def parsed(msgid):
     """The message as an email.message.EmailMessage, read from its file."""
-    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", f'id:"{msgid}"'],
+    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", "--query=sexp", ids.message(msgid)],
                            capture_output=True, text=True, check=True).stdout.split("\n")
     with open(next(p for p in files if p and os.path.exists(p)), "rb") as fh:
         return email.message_from_binary_file(fh, policy=email.policy.default)
@@ -211,8 +216,9 @@ def forward(msgid):
     }
 
 
-def resume(msgid):
-    msg = parsed(msgid)
+def resume(msgid, msg=None):
+    """msg: the draft already read (drafts.py sends the copy it compared), else it is read from its file."""
+    msg = parsed(msgid) if msg is None else msg
     return {
         "to": str(msg.get("To", "")),
         "cc": str(msg.get("Cc", "")),
@@ -240,6 +246,9 @@ def build(acc, f):
         msg["References"] = f.get("references") or f["in_reply_to"]
     msg["User-Agent"] = "Nightdrive Mail"
     msg.set_content(f.get("body", ""))
+    if f.get("calendar"):
+        # An invitation's answer (invitation_reply.py): the iTIP REPLY beside the text, as calendars look for it
+        msg.add_alternative(f["calendar"], subtype="calendar", params={"method": "REPLY"})
     for path in f.get("attachments") or []:
         kind = mimetypes.guess_type(path)[0] or "application/octet-stream"
         with open(path, "rb") as fh:
@@ -255,7 +264,7 @@ def file_in(folder, msg, tags):
 def send(f):
     acc = account(f.get("account"))
     msg = build(acc, f)
-    rcpts = [a for _, a in getaddresses([f.get("to", ""), f.get("cc", "")]) if a]
+    rcpts = recipients.addresses([f.get("to", ""), f.get("cc", "")])
     if not rcpts:
         return {"error": "No recipient"}
     host, _, port = acc["smtp"].partition(":")
@@ -276,20 +285,45 @@ def send(f):
     return {"ok": True, "id": msg["Message-ID"].strip("<>")}
 
 
+def files_of(msgid):
+    out = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", "--query=sexp", ids.message(msgid)],
+                         capture_output=True, text=True, check=True).stdout.split("\n")
+    return [p for p in out if p and os.path.exists(p)]
+
+
+def reindexed(msgid):
+    """The message's files after notmuch has looked again: a sync may have renamed them (mbsync's flags)."""
+    subprocess.run(["notmuch", "new", "--quiet", "--no-hooks"], check=True)
+    return files_of(msgid)
+
+
 def drop(msgid):
     """Removes an earlier saved draft (replaced by a newer save, or sent)."""
     if not msgid:
         return
-    files = subprocess.run(["notmuch", "search", "--output=files", "--exclude=false", f'id:"{msgid}"'],
-                           capture_output=True, text=True, check=True).stdout.split("\n")
-    for path in filter(None, files):
-        if os.path.exists(path):
-            os.remove(path)
+    for path in files_of(msgid):
+        os.remove(path)
     subprocess.run(["notmuch", "new", "--quiet", "--no-hooks"], check=True)
+
+
+def drafted(paths):
+    return [p for p in paths if re.search(r"/Drafts/(cur|new|tmp)/", p)]
 
 
 def draft(f):
     """Files the message in Drafts, in place of the copy saved before (draft_id)."""
+    # A save while writing (autosave, #3660) whose copy has left Drafts elsewhere (sent, thrown away, or replaced by
+    # Claude's mail_draft) is refused: it would bring the message back as a second draft. The window says so, and ⌘S
+    # still saves it as a new one.
+    # Only a copy in Drafts counts: one thrown away in Mail, or replaced by Claude (redraft.py), waits in Trash.
+    if f.get("autosave") and f.get("draft_id") and not drafted(files_of(f["draft_id"])) \
+            and not drafted(reindexed(f["draft_id"])):
+        import redraft   # only here: compose.py is the window's, redraft.py Claude's
+        if redraft.replaced_by(f["draft_id"]):
+            return {"error": "Not saved: Claude wrote a new version of this draft, in Drafts. ⌘S keeps this one too",
+                    "gone": True}
+        return {"error": "Not saved: its draft was sent or changed elsewhere. ⌘S saves it again",
+                "gone": True}
     acc = account(f.get("account"))
     msg = build(acc, f)
     file_in(acc["drafts"], msg, ["+draft"])
@@ -298,7 +332,7 @@ def draft(f):
 
 
 def thread_text(msgid):
-    out = subprocess.run(["notmuch", "show", "--format=json", "--entire-thread=true", "id:" + msgid],
+    out = subprocess.run(["notmuch", "show", "--format=json", "--entire-thread=true", "--query=sexp", ids.message(msgid)],
                          capture_output=True, text=True, check=True).stdout
     msgs = []
 

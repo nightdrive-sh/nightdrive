@@ -1,0 +1,157 @@
+{
+  "tools": [
+    {
+      "name": "notes_list",
+      "title": "List notes",
+      "description": "The user's notes (Nightdrive Notes: Markdown files in ~/Notes, which the user writes in its window or in Apostrophe), newest first: each one's id (its path in the folder, e.g. Shopping.md or Work/Plan.md), title (its first heading, else the file name), when it was last saved, its first line of text, its size in bytes, its folder (\"\" at the top) and its tags (#words in its text). folder and tag narrow it to the notes in that folder and its subfolders, and to those with that tag (or one nested in it, #project takes #project/q3). count is how many match, limit of them returned (default 50, 0 for all); folders lists every folder (empty ones too) with count, its notes and those under it, and tags every tag with how many notes have it. Use notes_read with an id for the whole text, notes_search to find by words.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {"type": "integer", "title": "At most", "description": "How many notes to return, newest first (default 50, 0 for all)", "minimum": 0},
+          "folder": {"type": "string", "title": "Folder", "description": "Only the notes in this folder and its subfolders, its path as in folders (e.g. Work or Work/Plans)"},
+          "tag": {"type": "string", "title": "Tag", "description": "Only the notes with this tag (without the #), or a tag nested in it"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["notes", "list", "--json", ["--limit", "{limit}"], ["--folder", "{folder}"], ["--tag", "{tag}"]],
+      "mask": ["notes.title", "notes.excerpt"],
+      "class": "read",
+      "area": "notes"
+    },
+    {
+      "name": "notes_search",
+      "title": "Search notes",
+      "description": "Finds the user's notes that have every word (case aside) in their title or text, newest first: each one's id, title, when it was saved, and up to three of its lines where the words are. count is how many matched, at most limit returned (default 25).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "title": "Search", "description": "Words to look for"},
+          "limit": {"type": "integer", "title": "At most", "description": "How many notes to return (default 25)", "minimum": 1}
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "search", "--json", ["--limit", "{limit}"], "{query}"],
+      "mask": ["notes.title", "notes.excerpt", "notes.lines"],
+      "class": "read",
+      "area": "notes"
+    },
+    {
+      "name": "notes_read",
+      "title": "Read a note",
+      "description": "One of the user's notes whole: its id, title, when it was saved, its path, and its Markdown text. note is an id from notes_list or notes_search, or a note's title. An error says when there is no such note.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"}
+        },
+        "required": ["note"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "read", "--json", "{note}"],
+      "mask": ["title", "excerpt", "text"],
+      "class": "read",
+      "area": "notes"
+    },
+    {
+      "name": "notes_create",
+      "title": "New note",
+      "description": "Writes a new note in ~/Notes, or in its folder when one is given (made if it isn't there): the file is named after the title (a number added when that name is taken), and starts with the title as its heading (# title), then text, which is Markdown; tags are #words in the text (#idea). Returns the new note's id. The user is told and can undo it, which moves the note to the trash.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string", "title": "Title", "description": "The note's title, also its file name", "minLength": 1},
+          "text": {"type": "string", "title": "Text", "description": "The note's text in Markdown, under its heading (may be empty)"},
+          "folder": {"type": "string", "title": "Folder", "description": "The folder to write it in, its path as notes_list's folders give it (e.g. Work); the top when left out"}
+        },
+        "required": ["title", "text"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "create", "--json", ["--folder", "{folder}"], "{title}"],
+      "stdin": "{text}",
+      "undo": ["notes", "trash", "--json", "{id}"],
+      "notice": "Wrote the note {title}",
+      "notice_many": "Wrote {count} notes",
+      "class": "change",
+      "area": "notes"
+    },
+    {
+      "name": "notes_append",
+      "title": "Add to a note",
+      "description": "Adds text (Markdown) to the end of one of the user's notes, on a line of its own; nothing already in it changes. note is an id or a title. For a list, add the new items as \"- item\" lines. The user is told and can undo it while the note hasn't been edited since.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"},
+          "text": {"type": "string", "title": "Text", "description": "What to add, in Markdown", "minLength": 1}
+        },
+        "required": ["note", "text"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "append", "--json", "{note}"],
+      "stdin": "{text}",
+      "undo": ["notes", "unappend", "{id}", "{size_before}", "{size_after}"],
+      "notice": "Added to the note {title}",
+      "class": "change",
+      "area": "notes"
+    },
+    {
+      "name": "notes_rename",
+      "title": "Rename a note",
+      "description": "Gives one of the user's notes a new title: its first heading (# …) becomes the title, its level kept (a note without one gets \"# title\" at the top), and the file is named after it in the same folder (a number added when that name is taken), so its id changes: the new one is in the answer. note is an id or a title. Nothing else in the note changes. The user is told and can undo it while the note hasn't been edited since.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"},
+          "title": {"type": "string", "title": "New title", "description": "The note's new title, also its file name", "minLength": 1}
+        },
+        "required": ["note", "title"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "rename", "--json", "--", "{note}", "{title}"],
+      "undo": ["notes", "unrename", "--json", "--expect", "{md5}", "--", "{id}", "{old_id}", "{old_head}"],
+      "notice": "Renamed the note to {title}",
+      "class": "change",
+      "area": "notes"
+    },
+    {
+      "name": "notes_move",
+      "title": "Move a note to a folder",
+      "description": "Moves one of the user's notes into another folder of ~/Notes (a real folder, as Files shows it), its file name kept (a number added when that name is taken there), so its id changes: the new one is in the answer. folder is a path as notes_list's folders give it (e.g. Work or Work/Plans), \"\" for the top; one that isn't there yet is made. note is an id or a title. The user is told and can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"},
+          "folder": {"type": "string", "title": "Folder", "description": "The folder to move it to, \"\" for the top"}
+        },
+        "required": ["note", "folder"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "move", "--json", "--", "{note}", "{folder}"],
+      "undo": ["notes", "move", "--json", "--", "{id}", "{old_folder}"],
+      "notice": "Moved the note {title} to {id}",
+      "class": "change",
+      "area": "notes"
+    },
+    {
+      "name": "notes_trash",
+      "title": "Move a note to the trash",
+      "description": "Moves one of the user's notes to the desktop's trash, where Files can put it back; nothing is deleted for good (there is no tool for that). note is an id or a title. The user is told and can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {"type": "string", "title": "Note", "description": "The note's id (e.g. Shopping.md) or its title"}
+        },
+        "required": ["note"],
+        "additionalProperties": false
+      },
+      "command": ["notes", "trash", "--json", "{note}"],
+      "undo": ["notes", "restore", "--", "{names}"],
+      "notice": "Moved the note {title} to the trash",
+      "notice_many": "Moved {count} notes to the trash",
+      "class": "change",
+      "area": "notes",
+      "deletes": true
+    }
+  ]
+}

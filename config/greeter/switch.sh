@@ -4,8 +4,8 @@
 #                       handover of the screen at boot instead of two. After logging out, the login screen is greetd's.
 # switch.sh text      → greetd's text login (agreety), which starts the desktop after the password: the way in when the
 #                       Nightdrive login screen doesn't work. "!bash" typed at its login prompt logs in to a text console.
-# switch.sh off       → the distribution's own login screen (Fedora KDE's plasmalogin), or the text login where there's
-#                       none (Fedora Minimal)
+# switch.sh off       → the login screen that was in use before greetd (plasmalogin on Fedora KDE, gdm on Workstation,
+#                       sddm…), else the one of them installed, or the text login where there's none (Fedora Minimal)
 # Doesn't stop the running session. If Hyprland doesn't start, the login screen puts a text login in its place
 # (greeter.sh); if nothing comes up: ctrl+alt+F3, log in and run `switch.sh text`, then `sudo reboot`.
 set -euo pipefail
@@ -14,9 +14,14 @@ CONF=/etc/greetd/config.toml
 PAM=/etc/pam.d/nightdrive-lock
 # The login screens a distribution brings, the one of them that's installed is enabled by `off` (install.sh: other_dm)
 OTHER_DMS=(plasmalogin sddm gdm lightdm)
+# Which of them was the display manager before greetd took its place: `off` brings that one back, not the first of
+# OTHER_DMS that happens to be installed (gdm's machine with plasmalogin installed too would lose its own, #1662)
+PREVIOUS=/etc/greetd/previous-display-manager
 
 greetd_on() {
   local dm
+  dm=$(basename "$(readlink /etc/systemd/system/display-manager.service 2>/dev/null)" .service)
+  if [[ -n $dm && $dm != greetd ]]; then echo "$dm" | sudo install -Dm 0644 /dev/stdin "$PREVIOUS"; fi
   for dm in "${OTHER_DMS[@]}"; do sudo systemctl disable "$dm.service" 2>/dev/null || true; done
   sudo systemctl enable --force greetd.service
 }
@@ -58,10 +63,14 @@ case "${1:-}" in
        echo "greetd enabled from the next boot, logging in $user by itself; the session starts locked." ;;
   text) text_login
        echo "greetd's text login enabled from the next boot: log in, and the desktop starts." ;;
-  off) other=""
-       for dm in "${OTHER_DMS[@]}"; do
-         [[ -n $(systemctl list-unit-files --no-legend "$dm.service" 2>/dev/null) ]] && { other=$dm; break; }
-       done
+  off) other=$(cat "$PREVIOUS" 2>/dev/null || true)
+       # Gone since (nightdrive minimal removed KDE's): the one installed now, if any
+       [[ -n $other && -n $(systemctl list-unit-files --no-legend "$other.service" 2>/dev/null) ]] || other=""
+       if [[ -z $other ]]; then
+         for dm in "${OTHER_DMS[@]}"; do
+           [[ -n $(systemctl list-unit-files --no-legend "$dm.service" 2>/dev/null) ]] && { other=$dm; break; }
+         done
+       fi
        if [[ -n $other ]]; then
          sudo systemctl disable greetd.service 2>/dev/null || true
          sudo systemctl enable --force "$other.service"

@@ -8,10 +8,16 @@ Themes). Choices: ~/.local/state/theme-color, ~/.local/state/nightdrive/theme-lo
   theme set KEY VALUE  sets one of them and applies it (VALUE default: back to the Default theme's)
   theme themes         "id<TAB>name<TAB>main colour hex<TAB>background<TAB>own?<TAB>current | changed?": Nightdrive's
                        themes (config/hypr/themes), then yours (~/.config/nightdrive/themes)
+  theme themes --json  the same as JSON: {colors: [key…], themes: [{id, name, color, own}]}
   theme use ID         the theme's colour and look
+  theme state          the theme now as JSON: {theme (its id), name, color, changed (from the saved theme), look}
+  theme restore COLOR LOOK-JSON ID   puts back what state printed (undo for Claude's tools, config/mcp/tools)
   theme save NAME      the colour and look as a theme of yours (the same name again: updates it)
   theme delete ID      deletes a theme of yours
   theme reset          back to the Default theme
+  theme fonts          "family<TAB>installed?<TAB>current?": the fonts on trial (FONTS) for Settings › Theme › Font
+  theme font [FAMILY]  prints / sets the menus', launcher's and apps' font (an installed family, e.g. "DM Sans";
+                       `default`: JetBrains Mono). Kept apart from the themes while other fonts are tried (#1839)
   theme apply          writes ~/.cache/nightdrive/: theme.json (Quickshell), notify-icons, fuzzel.ini, hyprlock.conf,
                        hyprtoolkit.conf (the polkit password prompt),
                        gtk-colors.css (imported by config/gtk-*/gtk.css), the look's files for the terminals and
@@ -28,7 +34,13 @@ HOME = os.environ["HOME"]
 STATE = f"{HOME}/.local/state/theme-color"
 LOOK_STATE = f"{HOME}/.local/state/nightdrive/theme-look.json"   # only the settings changed from LOOK
 NAME_STATE = f"{HOME}/.local/state/nightdrive/theme-name"        # the theme last chosen or saved (its id)
-OWN_THEMES = f"{HOME}/.config/hypr/themes"                       # Nightdrive's: the repo's config/hypr/themes
+FONT_STATE = f"{HOME}/.local/state/nightdrive/font"              # the UI font's family; none = Theme.qml's default
+# The fonts on trial for the UI (#1839), JetBrains Mono (the default) first. Others work too with `theme font FAMILY`.
+FONTS = ["JetBrains Mono", "Inter Variable", "Geist", "Atkinson Hyperlegible Next", "DM Sans", "Rubik", "Mulish",
+         "Figtree", "Work Sans", "Plus Jakarta Sans", "Source Sans 3"]
+# Nightdrive's: the repo's config/hypr/themes, found from this script (linked to ~/.config/hypr/themes too), so a
+# checkout that link.sh hasn't linked (CI, a worktree) reads its own
+OWN_THEMES = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "themes")
 MY_THEMES = f"{HOME}/.config/nightdrive/themes"                  # yours, saved from Theme Editor
 OUT = f"{HOME}/.cache/nightdrive"
 APOSTROPHE = f"{HOME}/.var/app/org.gnome.gitlab.somas.Apostrophe/config/gtk-4.0"   # a Flatpak: can't read ~/.cache
@@ -141,6 +153,18 @@ def themes():
     return out
 
 
+def font():
+    try:
+        return open(FONT_STATE).read().strip()
+    except OSError:
+        return ""
+
+
+def installed_fonts():
+    out = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True).stdout
+    return {f.strip() for line in out.splitlines() for f in line.split(",")}
+
+
 def theme_name():
     try:
         return open(NAME_STATE).read().strip()
@@ -206,6 +230,28 @@ def rgba(hexcol, pct):
     return f"rgba({hexcol[1:]}{alpha(pct)})"
 
 
+def mix(a, b, t):
+    return rgb2hex(*(x * (1 - t) + y * t for x, y in zip(hex2rgb(a), hex2rgb(b))))
+
+
+def contrast(a, b):
+    """WCAG contrast ratio of two (r, g, b) in 0…1."""
+    lum = lambda c: sum(k * (x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4) for k, x in zip((0.2126, 0.7152, 0.0722), c))
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def readable(text, fill, opacity, need=4.5):
+    """text, lightened (darkened on a light fill) until it reads at need:1 on fill at opacity over any wallpaper: the
+    worst of a white and a black one behind it. The group tabs (#3195) sit on the wallpaper, which may be either.
+    When nothing reaches need, the one that reads best."""
+    def worst(t):
+        return min(contrast(hex2rgb(t), tuple(f * opacity + w * (1 - opacity) for f in hex2rgb(fill)))
+                   for w in (0, 1))
+    tries = [mix(text, towards, i / 20) for towards in ("#ffffff", "#000000") for i in range(21)]
+    return next((t for t in tries if worst(t) >= need), max(tries, key=worst))
+
+
 def write(path, text):
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
@@ -218,8 +264,10 @@ def apply():
     os.makedirs(OUT, exist_ok=True)
     lk = look()
     bg, op = lk["background"], lk["background-opacity"]
+    # font only when one is chosen: Theme.qml falls back to its own default
     write(f"{OUT}/theme.json", json.dumps(dict(p, name=current(), launcherBg="#" + alpha(lk["background-opacity"])
-                                               + lk["background"][1:]), indent=1) + "\n")
+                                               + lk["background"][1:], **({"font": font()} if font() else {})),
+                                          indent=1) + "\n")
     hx = {k: v[1:] for k, v in p.items()}
     # Notification icons (quickshell/data/notify-icons, drawn in the original muted colour) in the theme's text colour
     src, icons = f"{HOME}/.config/quickshell/data/notify-icons", f"{OUT}/notify-icons"
@@ -308,14 +356,30 @@ def apply_look(lk):
     inactive = rgba(lk["inactive-border-color"], lk["inactive-border-opacity"]) if lk["inactive-border"] == "on" \
         else "rgba(00000000)"
     inactive_shadow = shadow if lk["inactive-shadow"] == "on" else "rgba(00000000)"
-    write(f"{OUT}/look.lua", "-- written by theme: hyprland.lua runs it after its own look, `theme set` over IPC\n"
+    # Window groups' tabs (a project manager's sessions, pm-space.lua; #3195): the shown one the look's background tinted
+    # 45 % with the theme's colour (the border's blue stood out too much; more and Teal's white text falls under
+    # 4.5:1), its text light; the others the background, their text the theme's dim. Both nearly opaque (and blurred,
+    # appearance.lua): the border's colour at 30 % let a bright wallpaper wash the tab and its light text out.
+    # readable() keeps the text at 4.5:1 or better over any wallpaper, whatever colours the theme has; the UI font
+    border = rgba(lk["border-color"], lk["border-opacity"])
+    tab_on = mix(lk["background"], palette(current())["primary"], 0.45)
+    tab_on_text = readable("#e6e1eb", tab_on, 0.94, 7)
+    tab_off_text = readable(palette(current())["dim"], lk["background"], 0.86)
+    write(f"{OUT}/look.lua", "-- written by theme: appearance.lua runs it after its own look, `theme set` over IPC\n"
           "hl.config({\n"
-          f'    general = {{ col = {{ active_border = "{rgba(lk["border-color"], lk["border-opacity"])}", '
+          f'    general = {{ col = {{ active_border = "{border}", '
           f'inactive_border = "{inactive}" }} }},\n'
           f'    decoration = {{ shadow = {{ enabled = {"true" if lk["shadow"] == "on" else "false"}, '
           f'range = {lk["shadow-size"]}, color = "{shadow}", '
           f'color_inactive = "{inactive_shadow}" }} }},\n'
-          "})\n")
+          f'    group = {{ col = {{ border_active = "{border}", border_inactive = "{inactive}" }},\n'
+          f'              groupbar = {{ font_family = "{font() or FONTS[0]}", col = {{ active = "{rgba(tab_on, 94)}", '
+          f'inactive = "{rgba(lk["background"], 86)}" }},\n'
+          f'                           text_color = "{rgba(tab_on_text, 100)}", '
+          f'text_color_inactive = "{rgba(tab_off_text, 100)}" }} }},\n'
+          "})\n"
+          # layer-keys.lua: while a layer holds the keyboard the active window wears these inactive colours
+          "if NightdriveLayerKeys then NightdriveLayerKeys(true) end\n")
 
 
 def reload_look():
@@ -373,6 +437,31 @@ elif args[:1] == ["set"] and len(args) == 3:
     write(LOOK_STATE, json.dumps(mine, indent=1) + "\n")
     apply()
     reload_look()
+elif args == ["themes", "--json"]:
+    print(json.dumps({"colors": list(THEMES), "themes": [
+        {"id": tid, "name": t.get("name", tid), "color": t.get("color", "violet"), "own": mine}
+        for tid, (t, mine) in themes().items()]}, indent=1))
+elif args[:1] == ["state"]:
+    tid, lk, col = theme_name(), look(), current()
+    t = themes().get(tid, ({}, False))[0]
+    print(json.dumps({"theme": tid, "name": t.get("name", tid), "color": col,
+                      "changed": not t or dict(LOOK, **t.get("look", {})) != lk or t.get("color") != col,
+                      "look": lk}, indent=1))
+elif args[:1] == ["restore"] and len(args) == 4:
+    if args[1] not in THEMES:
+        sys.exit(f"unknown colour: {args[1]} ({', '.join(THEMES)})")
+    try:
+        values = json.loads(args[2])
+    except ValueError:
+        values = None
+    if not isinstance(values, dict):
+        sys.exit("LOOK-JSON: an object, as theme state prints it")
+    save_look(dict(LOOK, **{k: v for k, v in values.items() if k in LOOK}))
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    write(STATE, args[1] + "\n")
+    write(NAME_STATE, args[3] + "\n")
+    apply()
+    reload()
 elif args[:1] == ["themes"]:
     cur, lk, col = theme_name(), look(), current()
     for tid, (t, mine) in themes().items():
@@ -404,6 +493,24 @@ elif args[:1] == ["delete"] and len(args) == 2:
         os.remove(NAME_STATE)       # the values stay: they just aren't a saved theme any more
 elif args[:1] == ["reset"]:
     use("default")
+elif args == ["fonts"]:
+    have, cur = installed_fonts(), font() or FONTS[0]
+    for f in FONTS:
+        print(f"{f}\t{'installed' if f in have else ''}\t{'current' if f == cur else ''}")
+elif args[:1] == ["font"] and len(args) <= 2:
+    if len(args) == 1:
+        print(font() or "JetBrains Mono")
+    else:
+        if args[1] in ("default", FONTS[0]):
+            if os.path.exists(FONT_STATE):
+                os.remove(FONT_STATE)
+        else:
+            # Only an installed family: Qt would quietly draw a fallback for an unknown one
+            if args[1] not in installed_fonts():
+                sys.exit(f"font not installed: {args[1]} (fc-list : family lists them)")
+            os.makedirs(os.path.dirname(FONT_STATE), exist_ok=True)
+            write(FONT_STATE, args[1] + "\n")
+        apply()      # Quickshell watches theme.json: the menus, launcher and apps change at once
 elif args[:1] == ["color"]:
     if len(args) == 1:
         print(current())

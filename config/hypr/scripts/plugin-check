@@ -11,7 +11,9 @@ list, the status command is executable), the icons status emits
 before the rows; no hex colours or font names: Theme.* and Theme.font / Icons.family), SHORTCUTS.md (lines the key list
 reads), hyprland.lua (no keys: those go in bindings.lua), the scripts' syntax (bash -n, ast.parse, luac -p if there is
 a luac). A plugins.txt line: its fields, icon, default and group, and
-docs/plugins/<id>.md as a README. Findings as file:line: message, one per line; exit 1 if any, 2 for an unknown id."""
+docs/plugins/<id>.md as a README. Findings as file:line: message, one per line; exit 1 if any, 2 for an unknown id.
+Warnings (file:line: warning: …, on stderr) don't change the exit: a plugin with commands in bin/ but no mcp.json
+and no mcp=none; a timer's service in systemd/ without the failure notice (OnFailure=nightdrive-unit-failed@%n.service)."""
 import ast, glob, json, os, re, shutil, subprocess, sys
 
 REPO = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../.."))
@@ -21,12 +23,12 @@ BAR_ICONS = os.path.join(REPO, "config/topbar/icons")             # the bar's ow
 CORE_MODULES = os.path.join(REPO, "config/topbar/modules.jsonc")
 
 CONF_KEYS = ("name", "icon", "description", "default", "install", "installed", "packages", "units", "group", "version",
-             "author", "order", "setup", "configured", "welcome", "bundled")
+             "author", "order", "setup", "configured", "welcome", "bundled", "repos", "mcp")
 CONF_NEEDED = ("name", "icon", "description", "installed", "version", "author")   # without installed it never counts
                                                              # as installed; version and author go in bug reports
 GROUPS = ("app", "recommended", "webapp", "plugin")
-MODULE_KEYS = {"name", "interval", "status", "menu", "right", "middle", "spacing", "drop", "after", "before", "size",
-               "label", "glyph"}                                           # modules.jsonc's header; needs is implied
+MODULE_KEYS = {"name", "interval", "status", "menu", "click", "right", "middle", "spacing", "drop", "after", "before",
+               "size", "label", "glyph"}                                           # modules.jsonc's header; needs is implied
 FACTS = ("Homepage", "Needs", "Keys")                             # in this order, the last lines of a README
 ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 HEX = re.compile(r"""["'`]#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})["'`]""")
@@ -34,6 +36,7 @@ FONT = re.compile(r"""\bfamily\s*:\s*["'`]""")
 ROWS = re.compile(r"\b(MenuRow|MenuSection|MenuNote|MenuButton)\s*\{")
 
 findings = []
+warnings = []        # what may be fine but should be a choice: they don't fail the check
 unchecked = []       # .lua files, on a machine without luac
 
 
@@ -47,6 +50,10 @@ def show(path):
 
 def find(path, line, msg):
     findings.append(f"{show(path)}:{line}: {msg}")
+
+
+def warn(path, line, msg):
+    warnings.append(f"{show(path)}:{line}: warning: {msg}")
 
 
 def code(line):
@@ -127,7 +134,59 @@ def check_conf(d, pid, icons):
     for k in ("install", "installed"):
         if conf.get(k) and (err := shell_syntax(conf[k], d)):
             find(path, at[k], f"{k}: {err}")
+    # An installer that adds a package repository says so: Claude's card for installing the plugin shows it (#1879)
+    if not conf.get("repos", "").strip() and (via := adds_repo(d, conf.get("install", ""))):
+        how = "" if via is True else f" (through {via}" + (f", repos={v}" if (v := repos_for(via)) else "") + ")"
+        find(path, at.get("install", 1), f"its installer adds a package repository{how}: name it in repos=")
     return conf
+
+
+REPO_ADDED = re.compile(r"yum\.repos\.d|copr enable|config-manager|addrepo")
+# The repo's own setup scripts a plugin's installer may call ("$repo/setup-hyprland-repo.sh"): one that adds a repository
+# adds it for the installer too, so the call counts (#1948). REPO_OF: what repos= should then say, where it is known.
+# The words after the name are its arguments, up to a redirect, a comment or the line's end: setup-rpmfusion.sh's say
+# which of RPM Fusion's repos it adds, so its REPO_OF value has a {} filled in once for each (#1951). That script knows
+# them by name: it adds them by installing their release RPM, which REPO_ADDED can't see in its text.
+SETUP_SCRIPT = re.compile(r"(?:^|[/\s\"'])(setup-[\w-]+\.sh)\b[\"']?((?:[ \t]+[\w-]+)*)")
+RPMFUSION = "https://mirrors.rpmfusion.org/{}/fedora"
+REPO_OF = {"setup-hyprland-repo.sh": "copr:@nightdrive/nightdrive", "setup-rpmfusion.sh": RPMFUSION}
+# An installer may also install RPM Fusion's release RPM itself (dnf install …/rpmfusion-free-release-$(rpm -E %fedora)…)
+RELEASE_RPM = re.compile(r"\binstall\b[^\n;&|]*rpmfusion-(free|nonfree)-release")
+
+
+def read(path):
+    try:
+        with open(path) as fh:
+            return fh.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def adds_repo(d, install):
+    """Whether the install command, the script in the folder it names, or a setup-*.sh of the repo's that either calls
+    adds a dnf repository: False, True, or what adds it for the finding: a setup script with its arguments
+    ("setup-rpmfusion.sh free") or the release RPM installed ("rpmfusion-free-release")"""
+    script = os.path.join(d, install.split()[0]) if install.split() else ""
+    text = install + "\n" + (read(script) if os.path.isfile(script) else "")
+    if m := RELEASE_RPM.search(text):
+        return f"rpmfusion-{m[1]}-release"
+    if REPO_ADDED.search(text):
+        return True
+    for name, args in dict.fromkeys(SETUP_SCRIPT.findall(text)):
+        if name in REPO_OF or REPO_ADDED.search(read(os.path.join(REPO, name))):
+            return " ".join([name, *args.split()])
+    return False
+
+
+def repos_for(via):
+    """The repos= value for what adds_repo found, or None where it isn't known"""
+    name, *args = via.split()
+    if m := re.fullmatch(r"rpmfusion-(\w+)-release", name):
+        return RPMFUSION.format(m[1])
+    value = REPO_OF.get(name)
+    if value and "{}" in value:
+        return " ".join(value.format(a) for a in args) or None
+    return value
 
 
 def shell_syntax(cmd, cwd):
@@ -337,6 +396,35 @@ def check_hyprland(d):
             find(path, n, "a key in hyprland.lua: keys go in bindings.lua (the top bar menu repeats those while it's open)")
 
 
+# A feature reaches Claude too (AGENTS.md › Done): a plugin with a command of its own gets an mcp.json, or says it
+# chose not to with mcp=none. Only a warning: whether a tool fits is a judgement the check can't make (#1799).
+def check_mcp(d, conf):
+    path = os.path.join(d, "plugin.conf")
+    line = next((n for n, l in enumerate(open(path).read().split("\n"), 1) if l.startswith("mcp=")), 1)
+    has_json = os.path.isfile(os.path.join(d, "mcp.json"))
+    if "mcp" in conf and conf["mcp"] != "none":
+        find(path, line, f"mcp={conf['mcp']}: only mcp=none (no tools for Claude, on purpose)")
+    elif conf.get("mcp") == "none" and has_json:
+        find(path, line, "mcp=none, but there is an mcp.json")
+    bindir = os.path.join(d, "bin")
+    cmds = sorted(f for f in os.listdir(bindir) if os.path.isfile(os.path.join(bindir, f))
+                  and os.access(os.path.join(bindir, f), os.X_OK)) if os.path.isdir(bindir) else []
+    if cmds and not has_json and "mcp" not in conf:
+        warn(path, 1, f"bin/{cmds[0]} but no mcp.json: give Claude its tools, or mcp=none (plugins/README.md)")
+
+
+# A timer's service fails where nobody looks (#3309): it gets the notice when it keeps failing (#3313). Only a warning: a
+# plugin may tell of failures its own way.
+def check_units(d):
+    for timer in sorted(glob.glob(os.path.join(d, "systemd", "*.timer"))):
+        service = timer[:-len(".timer")] + ".service"
+        if not os.path.isfile(service):
+            continue
+        if not re.search(r"^OnFailure=.*\bnightdrive-unit-failed@%n\.service", open(service).read(), re.M):
+            warn(service, 1, "a timer's service without OnFailure=nightdrive-unit-failed@%n.service: its failures "
+                             "show nowhere (plugins/README.md › Services)")
+
+
 def check_scripts(d):
     """The syntax of its scripts: by extension or #! line. web/ and other data files are left alone."""
     luac = next((c for c in ("luac", "luac5.4", "luac5.5", "luac5.3") if shutil.which(c)), None)
@@ -375,12 +463,14 @@ def check_folder(pid, d, src, taken, icons):
     if pid in taken:
         find(os.path.join(d, "plugin.conf"), 1, f"the id {pid} is taken by {taken[pid]}: this one is skipped")
     conf = check_conf(d, pid, icons)
+    check_mcp(d, conf)
     check_readme(os.path.join(d, "README.md"), conf.get("name", pid), os.path.exists(os.path.join(d, "bindings.lua")))
     opens = check_modules(d, pid, icons)
     check_status_icons(d, icons)
     check_menus(d, opens)
     check_shortcuts(d)
     check_hyprland(d)
+    check_units(d)
     check_scripts(d)
 
 
@@ -427,6 +517,8 @@ def main():
     for f in findings:
         print(f)
     sys.stdout.flush()
+    for w in warnings:
+        print(w, file=sys.stderr)
     if unchecked:
         print(f"(Lua not checked, no luac here: {', '.join(unchecked)}; sudo dnf install lua)", file=sys.stderr)
     if findings:

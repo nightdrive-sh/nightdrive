@@ -47,6 +47,7 @@ ShellRoot {
         property var groups: []             // [{ id, account, name, members: [uid] }]
         property var everyone: []           // every account's cards, by name (cards.py list)
         property var people: []             // the same with one person's cards in several accounts as one (All contacts)
+        property string sortBy: "first"      // the list's order, Settings' (lib/settings.py): "first" or "last" name
         property bool loaded: false
         // The sidebar's rows: All, each account (with more than one), then the groups
         readonly property var sources: {
@@ -75,7 +76,9 @@ ShellRoot {
                     win.keepNext = ""
                     win.accounts = d.accounts
                     win.groups = d.groups
-                    const add = x => Object.assign(x, { letter: win.letter(x.name), haystack: win.haystack(x) })
+                    win.sortBy = d.sortBy || "first"
+                    // The letter from what the list is ordered by: Virtanen's V when it goes by last name
+                    const add = x => Object.assign(x, { letter: win.letter(x.sort || x.name), haystack: win.haystack(x) })
                     win.everyone = d.contacts.map(add)
                     win.people = d.people.map(add)
                     win.loaded = true
@@ -180,20 +183,18 @@ ShellRoot {
             if (onePane && !cardOpen) openCard()
             card.chooseEmail()
         }
+        // The birthday on the card, the region's way: "3 May 1980", "May 3, 1980"; without the year "3 May", "May 3"
+        // (the region's medium date, its year left out). cards.py has YYYY-MM-DD or --MM-DD
         function when(b) {
-            // YYYY-MM-DD or --MM-DD (no year)
-            const m = b.match(/^(\d{4}|-)-(\d{2})-(\d{2})$/) || b.match(/^--(\d{2})-(\d{2})$/)
+            const m = b.match(/^(\d{4}|-)-(\d{2})-(\d{2})$/) || b.match(/^--()(\d{2})-(\d{2})$/)
             if (!m) return b
-            const year = m.length === 4 ? m[1] : "", mo = parseInt(m.length === 4 ? m[2] : m[1]), d = parseInt(m.length === 4 ? m[3] : m[2])
-            const date = Qt.formatDate(new Date(2000, mo - 1, d), "d MMMM")
-            return year && year !== "-" ? date + " " + year : date
+            if (/^\d{4}$/.test(m[1])) return Regional.format(b, "medium")
+            return Regional.format("2000-" + m[2] + "-" + m[3], Regional.region.medium.replace(/,? *y+/, ""))
         }
 
-        // A quiet line under the list for what just happened
-        property string note: ""
+        // What just happened, in the kit's toast at the top of the window (a line under the list went unnoticed);
         // sticky: it stays until the next one (a sync, which tells when it's done)
-        function say(t, sticky) { note = t; if (sticky) noteTimer.stop(); else noteTimer.restart() }
-        Timer { id: noteTimer; interval: 4000; onTriggered: win.note = "" }
+        function say(t, sticky) { toast.show(t, { sticky: sticky }) }
 
         // Without an account yet, Contacts offers to set one up (setupPanel), and looks again now and then, so the
         // contacts show once the setup's first sync has fetched them
@@ -441,15 +442,6 @@ ShellRoot {
                             }
                         }
                     }
-                    Text {
-                        textFormat: Text.PlainText
-                        Layout.fillWidth: true
-                        Layout.margins: 28
-                        Layout.topMargin: 8
-                        visible: win.note !== ""
-                        elide: Text.ElideRight
-                        text: win.note; color: c.dim; font.family: c.font; font.pixelSize: 11
-                    }
                 }
                 Rectangle { visible: !win.onePane; anchors.right: parent.right; width: 1; height: parent.height; color: c.divider }
             }
@@ -473,16 +465,6 @@ ShellRoot {
                 c: win.look
                 onDone: win.endEdit()
             }
-        }
-
-        // What just happened (Copied: …), where the list's line for it is away: under the card, in one pane
-        Text {
-            textFormat: Text.PlainText
-            visible: win.note !== "" && win.onePane && win.cardOpen
-            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-            anchors.margins: 24
-            elide: Text.ElideRight
-            text: win.note; color: c.dim; font.family: c.font; font.pixelSize: 11
         }
 
         // Contacts' first start, before an account: Enter (or the button) opens Claude Code in a terminal, which sets
@@ -547,5 +529,6 @@ ShellRoot {
                                          ["Click", "Copy a number, write to an address"]] }
             ]
         }
+        AppToast { id: toast; c: win.look }
     }
 }

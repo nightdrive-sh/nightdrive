@@ -7,16 +7,18 @@ you): without one Hyprland crashes at start. Tested on x86_64 (Rocky Linux 9, In
 14" MacBook Pro, M2 Max); not on macOS, where Podman runs in a VM without a GPU.
 
     nightdrive sandbox up           # builds the image the first time (~10 min, ~4.5 GB: KWin brings much of KDE), then starts it
-    nightdrive sandbox check        # exit 1 and the findings: Hyprland's config, Quickshell, plugin check
+    nightdrive sandbox check        # exit 1 and the findings: Hyprland's config, Quickshell, plugin check, size guard
     nightdrive sandbox shot NAME    # prints the path of NAME.png (in ~/.cache/nightdrive/sandbox/shots)
     nightdrive sandbox ipc launcher openLevel settings
     nightdrive sandbox exec hyprctl clients
     nightdrive sandbox vnc          # wayvnc on the tailnet address, for watching and clicking; `vnc stop` ends it
     nightdrive sandbox down
+    nightdrive sandbox list         # every sandbox container, its checkout, VNC port and memory (--json too)
 
 `check`, `shot`, `ipc` and `exec` start the sandbox first if it isn't up. `check` runs `Hyprland --verify-config`,
 `hyprctl configerrors` and reads Quickshell's log since its last reload: a failed reload (`ERROR`) or a QML runtime error
-(`WARN … @File.qml[line:col]: …`), and runs `nightdrive plugin check` on the plugins. Paths in its output are the repo's.
+(`WARN … @File.qml[line:col]: …`), runs `nightdrive plugin check` on the plugins, and the size guard on the repo
+(`config/hypr/scripts/size-guard`, AGENTS.md › Conventions). Paths in its output are the repo's.
 
 The repo is mounted read-only, so an edit reloads in the sandbox right away, as on the desktop (and the same Quickshell
 quirks apply: it doesn't watch `shell.qml` once that file has been replaced by a new one, and components listed in
@@ -31,14 +33,36 @@ systemd works too, as there's no user manager to start anything: `nightdrive san
 nightdrive-localsend.service && nightdrive plugins installed'` (LocalSend). A plugin folder put in the container's
 `~/.local/share/nightdrive/plugins/` is picked up like one of the repo's, which is handy for trying one out.
 
+## One per checkout
+
+Each checkout has a sandbox of its own, so sessions working in different worktrees don't queue on one container or take
+over each other's. The main checkout's is `nightdrive-sandbox`, as before; a worktree's is named after its folder without
+the `dotfiles-` prefix: `~/dotfiles-ask` runs `nightdrive-sandbox-ask`. Each has its own folder for screenshots and logs
+(`~/.cache/nightdrive/sandbox-ask/shots`) and its own VNC port, the first free one from 5901 up (`list` and `vnc` show it).
+Two sessions in one checkout share its sandbox (its keys and open launcher too); one that needs its own picks a name:
+`nightdrive sandbox --name 2069 up`, and the same `--name 2069` on each command after it (or `NIGHTDRIVE_SANDBOX=2069`).
+
+`up` won't remove a container of its name that runs another checkout (an older shared one, or two worktrees with the same
+folder name elsewhere), and `down` removes only this checkout's: `--name ID down` removes that one whatever it runs.
+`list` marks a container whose checkout is gone, e.g. a removed worktree: remove it with `--name ID down`.
+
+A sandbox takes about 1 GB of memory and some of your inotify instances (`fs.inotify.max_user_instances`, 1024 after
+`nightdrive update`): when those run out, a new sandbox's Hyprland starts with no output. `up` warns when memory or
+instances run short and says how many other sandboxes are up. The image is shared: it is tagged with a hash of the
+Containerfile and the package lists, so checkouts with the same ones use one image, and a branch that changes them builds
+its own beside it instead of over it.
+`nightdrive sandbox prune` removes the images no container uses.
+
 ## Display and VNC
 
 The display sizes are constants at the top of `config/sandbox/sandbox`. Screenshots are taken at 3024x1964, scale 2 (the
 MacBook Pro 14"). `vnc` drops it to 1512x982 at scale 1, the same UI size with a quarter of the pixels, which a viewer over
 the tailnet keeps up with; `vnc stop` sets it back.
 
-VNC is published only on the host's tailnet address (`tailscale ip -4`, read when the sandbox starts) on port 5901, with no
-password: the tailnet is the boundary. The host's firewall must let 5901/tcp in from the tailnet; `vnc` prints the
+VNC is published only on the host's tailnet address (`tailscale ip -4`, read when the sandbox starts) on port 5901 (a
+further sandbox the next free one), with
+user `nd` and a password that `vnc` prints (new with each `up`). It is encrypted with RSA-AES, which the viewer must support:
+TigerVNC 1.13 or later does. The host's firewall must let the port in from the tailnet; `vnc` prints the
 firewalld command. The size is fixed: a viewer's "SetDesktopSize failed" is harmless (TigerVNC: turn off "Resize remote
 session").
 
@@ -59,11 +83,11 @@ compositor with xdg_wm_base v6 and wl_compositor v6: sway 1.11 and Weston 15 are
   instances with the same display connection.
 - `cursor.no_hardware_cursors` in the container's `local.lua`: KWin would draw the cursor outside Hyprland's frames, so moving
   it wouldn't update the VNC image. wayvnc runs with `-r` (the cursor drawn into the image): Remmina showed none without it.
-- wayvnc is Fedora's 0.9.1 rebuilt with one upstream change (first stage of the Containerfile): Hyprland fails a cursor
-  capture frame when the cursor changes shape, e.g. on a click, and 0.9.1 then exits, dropping the viewer. 0.10 only logs it,
-  but needs neatvnc/aml 1.x. The rebuild can go once Fedora ships 0.10.
+- wayvnc is 0.10 from Nightdrive's COPR, as VNC Display's: Hyprland fails a cursor capture frame when the cursor changes
+  shape, e.g. on a click, and Fedora 44's 0.9.1 then exits, dropping the viewer. 0.10 only logs it.
 - A file mounted inside the read-only repo needs a file to mount over, and Podman would create a missing one in the repo
   itself, owned by a subordinate uid. `up` makes an empty `local.lua` / `xdph.conf` instead when the repo has none, and
   `down` removes them again (only if still empty). They are git-ignored.
-- The image is labelled with a hash of the Containerfile and the package lists; `up` rebuilds it when that changes.
+- The image is tagged (and labelled) with a hash of the Containerfile and the package lists; `up` builds it when no image
+  has that hash, and tags one built under another tag (the old `:latest`) instead of building it again.
   `nightdrive sandbox build` rebuilds it by hand.

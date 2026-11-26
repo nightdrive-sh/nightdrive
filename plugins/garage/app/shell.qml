@@ -110,7 +110,7 @@ ShellRoot {
                     onNewVm: win.showNew = true
                 }
 
-                NoteLine {
+                AppNote {
                     id: note
                     anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
                     anchors.margins: 20
@@ -135,6 +135,8 @@ ShellRoot {
                     else if (e.text === "x") page.shutDown()
                     else if (e.text === "X") page.forceOff()
                     else if (e.text === "t") page.takeSnapshot()
+                    else if (e.text === "v") page.typeClipboard()
+                    else if (e.text === "c") page.sendClipboard()
                     else if (k === Qt.Key_Tab) page.focusSnapshots()
                     else if (k === Qt.Key_F2) page.renameVm()
                     else return
@@ -163,14 +165,14 @@ ShellRoot {
             onDeleteVm: { win.showSettings = false; page.deleteVm() }
         }
 
-        NamePanel {
+        AppPrompt {
             id: namePanel
             behind: content
             c: win.look
             onClosed: page.refocus()
         }
 
-        ConfirmPanel {
+        AppConfirm {
             id: confirmPanel
             behind: content
             visible: win.confirmDone !== null

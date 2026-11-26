@@ -1,0 +1,4 @@
+#!/bin/bash
+# translate: Nightdrive Translate (plugins/translate, README.md). The work is lib/cli.py's; `translate --help` lists
+# the commands. System Python, standard library only: an offline engine's own packages live in its venv (lib/setup.py).
+exec python3 "$(dirname "$(dirname "$(readlink -f "$0")")")/lib/cli.py" "$@"

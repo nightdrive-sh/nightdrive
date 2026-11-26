@@ -1,0 +1,33 @@
+{
+  "tools": [
+    {
+      "name": "keep_awake_status",
+      "title": "Keep Awake's state",
+      "description": "Whether Keep Awake is on (no screensaver, lock, screen-off or sleep, closing the lid included): on, until (Unix time it turns off by itself, 0 = until turned off) and minutes (the time chosen).",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["keep-awake", "status"],
+      "class": "read",
+      "area": "keep-awake"
+    },
+    {
+      "name": "keep_awake_set",
+      "title": "Keep the computer awake",
+      "description": "Turns Keep Awake on (no screensaver, lock, screen-off or sleep, closing the lid included) for minutes, or until turned off without them, or turns it off: back to the usual idle times. On again replaces the earlier time. Logging out turns it off.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {"type": "string", "enum": ["on", "off"], "title": "Keep awake"},
+          "minutes": {"type": "integer", "minimum": 1, "maximum": 1440, "title": "Minutes", "description": "With on: how long. Leave it out for until turned off"}
+        },
+        "required": ["state"],
+        "additionalProperties": false
+      },
+      "command": ["keep-awake", "{state}", ["{minutes}"]],
+      "before": ["keep-awake", "status"],
+      "undo": ["keep-awake", "restore", "{on}", "{until}", "{minutes}"],
+      "notice": "Keep Awake {state}",
+      "class": "change",
+      "area": "keep-awake"
+    }
+  ]
+}

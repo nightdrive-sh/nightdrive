@@ -1,0 +1,84 @@
+#!/bin/bash
+# The sound output and its volume as JSON, for scripts and Claude's tools (config/mcp/tools/sound-display.json). The
+# volume keys and the Sound menu (VolumeMenu.qml, OutputList.qml) do the same with wpctl; this is their headless side.
+#   sound                          {volume, muted, output: {name, description}, outputs: [{name, description, current}]}
+#   sound volume [PCT] [--mute on|off]
+#                                  sets the default output's volume (0–100: never above, as the keys) and/or mute;
+#                                  prints {volume, muted, mute} after (mute is "on"/"off", what --mute takes back)
+#   sound output [NAME]            makes the output with that node name (from `sound`) the default; prints {output}
+#                                  before the change, then the new one (the name is what undoes it)
+#   sound remote NAME              yes when that output plays elsewhere, over the network (AirPlay, ROC, a tunnel):
+#                                  Claude's sound_output asks on the card first (#1887); no otherwise, unknown too
+#   sound card NAME                that output for the card: {"Plays on": description, "Where": …}
+# The outputs leave out EasyEffects' virtual sink, as the menu does: it isn't a device.
+set -euo pipefail
+
+# Every output as JSON lines {id, name, description}, and the default's node name, from one pw-dump
+dump() { pw-dump 2>/dev/null; }
+outputs() {
+  jq -c '
+    ([.[] | select(.type == "PipeWire:Interface:Metadata") | .metadata[]? |
+      select(.key == "default.audio.sink") | .value.name] | first) as $def |
+    .[] | select(.type == "PipeWire:Interface:Node") | (.info.props // {}) as $p |
+    select($p["media.class"] == "Audio/Sink" and ($p["node.name"] | test("^easyeffects_") | not)) |
+    {id, name: $p["node.name"], description: ($p["node.description"] // $p["node.name"]), current: ($p["node.name"] == $def),
+     remote: ($p["node.network"] == true or ($p["node.name"] | test("^(raop|roc|tunnel|snapcast|rtp|pulse-tunnel)"; "i")))}'
+}
+
+# The default output's volume in percent and whether it is muted: "40 false"
+level() {
+  wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{ printf "%d %s\n", $2 * 100 + 0.5, (/MUTED/ ? "true" : "false") }'
+}
+
+volume_json() {
+  read -r vol muted < <(level)
+  jq -nc --argjson v "$vol" --argjson m "$muted" '{volume: $v, muted: $m, mute: (if $m then "on" else "off" end)}'
+}
+
+wpctl get-volume @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 || { echo "No sound output: PipeWire isn't running, or has no output device." >&2; exit 1; }
+
+case ${1:-} in
+  "")
+    list=$(dump | outputs | jq -sc .)
+    read -r vol muted < <(level)
+    jq -nc --argjson l "$list" --argjson v "$vol" --argjson m "$muted" \
+      '{volume: $v, muted: $m, output: ($l | map(select(.current)) | first | if . then {name, description} else null end),
+        outputs: ($l | map({name, description, current}))}' ;;
+  volume)
+    shift
+    pct="" mute=""
+    while (( $# )); do
+      case $1 in
+        --mute) mute=${2:-}; shift 2 ;;
+        *) pct=$1; shift ;;
+      esac
+    done
+    # Out of range is a mistake to report, not to round: 150 meant something else than full volume
+    [[ -z $pct || ( $pct =~ ^[0-9]+$ && $pct -le 100 ) ]] || { echo "The volume is a whole percent, 0 to 100 (not $pct)." >&2; exit 1; }
+    [[ -z $mute || $mute =~ ^(on|off)$ ]] || { echo "--mute takes on or off (not $mute)." >&2; exit 1; }
+    [[ -n $pct ]] && wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ "$pct%"
+    [[ -n $mute ]] && wpctl set-mute @DEFAULT_AUDIO_SINK@ "$([[ $mute == on ]] && echo 1 || echo 0)"
+    # The volume keys' toast, when there is a desktop to show it on
+    [[ -n $pct$mute ]] && qs ipc call osd volume >/dev/null 2>&1 || true
+    volume_json ;;
+  output)
+    name=${2:-}
+    list=$(dump | outputs)
+    if [[ -n $name ]]; then
+      id=$(jq -r --arg n "$name" 'select(.name == $n) | .id' <<<"$list" | head -n1)
+      [[ -n $id ]] || { echo "No sound output named $name. These are: $(jq -r .name <<<"$list" | paste -sd' ')" >&2; exit 1; }
+      wpctl set-default "$id"
+      list=$(dump | outputs)
+    fi
+    jq -sc 'map(select(.current)) | first | {output: (.name // null), description: (.description // null)}' <<<"$list" ;;
+  remote|card)
+    [[ -n ${2:-} ]] || { echo "usage: sound $1 NAME" >&2; exit 1; }
+    out=$(dump | outputs | jq -sc --arg n "$2" 'map(select(.name == $n)) | first // {}')
+    if [[ $1 == remote ]]; then
+      jq -r 'if .remote then "yes" else "no" end' <<<"$out"
+    else
+      jq -c 'if .name == null then {"Plays on": "an output not found"} else {"Plays on": .description,
+               Where: (if .remote then "On the network: a speaker that may be in another room" else "This computer" end)} end' <<<"$out"
+    fi ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

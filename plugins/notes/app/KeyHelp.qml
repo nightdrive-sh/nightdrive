@@ -1,0 +1,36 @@
+import QtQuick
+
+// The window's keys for its key sheet (? and Ctrl+?, kit/KeySheet.qml). shell.qml does what they say: change a key
+// there, and its line here.
+QtObject {
+    readonly property var groups: [
+        { title: "Notes", keys: [
+            ["↑ ↓  j k", "Move"],
+            ["Home  End", "The newest, the oldest"],
+            ["/  ⌘F", "Search the titles and text (Esc: every note)"],
+            ["⏎  e", "Write in it"],
+            ["n  ⌘N", "New note: its title on the first line, then write"],
+            ["F2  r", "Rename: its heading and file follow"],
+            ["Del  ⌘⌫", "Move to the trash (⌘Z puts it back)"],
+            ["m", "Move to a folder (or drag it onto one)"],
+            ["f", "Folders and tags: ↑ ↓ pick, ⏎ back to the notes"],
+            ["Del", "In the folders: remove an empty one"],
+            ["⇧⏎", "Open in Apostrophe"],
+            ["Space  ⇧Space", "Scroll the note"],
+            ["⌘B", "Show or hide the sidebars"],
+            ["Click a #tag", "Its notes"],
+            ["Click a box", "Tick or untick the task"],
+            ["Esc", "Narrow window: the notes"]] },
+        { title: "Writing", keys: [
+            ["Esc", "Back to reading"],
+            ["⌘S", "Save now (it saves by itself); changed elsewhere: keep mine"],
+            ["⏎", "In a list: the next item; on an empty one, the list ends"],
+            ["Tab  ⇧Tab", "Nest a list item under the one above, and back"],
+            ["⌘B  ⌘I", "Bold, italic (again: no longer)"],
+            ["⌘K", "Link: the selection its text, a copied address its target"],
+            ["⌘Z  ⇧⌘Z", "Undo, redo"]] },
+        { title: "Window", keys: [
+            ["?", "These keys"],
+            ["⌘Q", "Quit"]] }
+    ]
+}

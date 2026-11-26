@@ -1,0 +1,84 @@
+#!/bin/bash
+# ⌘⌥Enter, Ask Claude: what was typed in the launcher goes to Claude Code in the background (claude -p), with Nightdrive's
+# tools only (Dashboard #1876; how it is set up: ask-claude.d/setup.sh). A turn runs as a transient systemd user unit
+# (ask-claude.d/unit.sh, #2244), so it outlives Quickshell's restart, for up to 15 minutes; its events go to the
+# conversation's events.jsonl, which Ask Claude's toast reads (quickshell/AskClaudeSession.qml). When it ends with the
+# toast closed, a notification says so (ask-claude.d/notify.sh).
+# ⌘⌃Enter (terminal-or-claude) sends the text to Claude Code in a terminal instead, as ⌘⌥Enter did before.
+#   ask-claude                        the key: the launcher's text (askClaude in Launcher.qml), else as ⌘⌃Enter
+#   ask-claude --toggle               ⌘⌥Space: opens or closes Ask Claude's toast (quickshell/AskClaudeToast.qml,
+#                                     Dashboard #1895); Claude Code in a terminal when the tools aren't there
+#   ask-claude [--name NAME] [--] PROMPT   ask in the background: "Claude is working…" with Cancel, then the answer as
+#                                     a notification; in a terminal when Claude Code or the server is missing
+#   ask-claude --start [--resume ID] [--name NAME] [--] PROMPT
+#       for Ask Claude's toast: starts a turn and prints {"id"} (the conversation's), or {"error": "busy" | "notools" | …}
+#       with exit 4 while one runs, 3 without the tools. --resume ID goes on with that conversation.
+#   ask-claude --cancel               stops the running turn (the toast's ⌃C and small card, the working notification)
+#   ask-claude --current              the latest conversation: {id, running, last (ms)}, or {}
+#   ask-claude list [--json]          the conversations kept (7 days after their last turn), newest first
+#   ask-claude --dictated …           the request was dictated (Ask Claude's "say and forget", #3154): the dictation's
+#                                     prompt too (ask-claude-dictated.txt), with its unsure mark (AskClaudeUnsure.js)
+#   ask-claude --ready                exit 0 when Ask Claude's toast can run: Claude Code and the tools are there
+#                                     (hypr/scripts/dictate, which otherwise takes a dictated question to a terminal)
+#   ask-claude save ID FILE           a result card's Save: the conversation's download into Downloads (ask-claude.d/save.py)
+#   ask-claude undo CHANGE…           the small card's Undo (#3157): the turn's changes, by their ids (mcp/undo_turn.py)
+#   ask-claude --run ID MODE [--name NAME] [--resume] -- PROMPT   the unit's own: one turn (ask-claude.d/run.sh)
+# claude_bin, icon (setup.sh) and the flags here (dictated) are shared with the sourced parts
+# shellcheck disable=SC2034,SC2154
+scripts=$(dirname "$(readlink -f "$0")")
+for part in setup unit run notify history; do
+  # shellcheck source=/dev/null
+  source "$scripts/ask-claude.d/$part.sh" || exit 1
+done
+
+new_id() { cat /proc/sys/kernel/random/uuid; }
+ready() { [[ -x $claude_bin && -n $(server) ]]; }
+
+name=; mode=notify; resume=; dictated=0   # dictated: read by start_turn and claude_flags
+while (( $# )); do
+  case $1 in
+    --name) name=${2:-}; shift 2 ;;
+    --start) mode=toast; shift ;;
+    --dictated) dictated=1; shift ;;
+    --ready) ready; exit ;;
+    --cancel) cancel_turn; exit 0 ;;
+    --current) current_turn; exit 0 ;;
+    save) exec "$scripts/ask-claude.d/save.py" "${@:2}" ;;
+    undo) exec python3 "$scripts/../../mcp/undo_turn.py" "${@:2}" ;;
+    list) [[ ${2:-} == --json ]]; list_turns $(( ! $? )); exit 0 ;;
+    --toggle) ready && [[ "$(qs ipc call askClaude toggle 2>/dev/null)" = "ok" ]] && exit 0
+              exec "$scripts/terminal-or-claude" ;;
+    --resume) resume=${2:-}; shift 2
+              [[ $resume =~ ^[0-9a-f-]{36}$ ]] || { echo "--resume needs a session id" >&2; exit 2; } ;;
+    --run) id=${2:-}; mode=${3:-}; shift 3; resumed=0
+           [[ $id =~ ^[0-9a-f-]{36}$ && $mode =~ ^(toast|notify)$ ]] || { echo "--run ID toast|notify" >&2; exit 2; }
+           while (( $# )); do
+             case $1 in
+               --name) name=${2:-}; shift 2 ;; --resume) resumed=1; shift ;; --dictated) dictated=1; shift ;;
+               --) shift; break ;; *) break ;;
+             esac
+           done
+           run_turn "$id" "$mode" "$name" "$resumed" "$*"; exit ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+if (( ! $# )); then
+  [[ $mode == toast ]] && { jq -cn '{ error: "Nothing to ask" }'; exit 2; }
+  [ "$(qs ipc call launcher askClaude background 2>/dev/null)" = "ok" ] && exit 0
+  exec "$scripts/terminal-or-claude"
+fi
+prompt=$*
+
+if ! ready; then
+  [[ $mode == toast ]] && { jq -cn '{ error: "notools" }'; exit 3; }
+  exec "$scripts/terminal-or-claude" ${name:+--name "$name"} -- "$prompt"
+fi
+[[ $mode == notify && -n $resume ]] && { echo "--resume is the toast's (--start)" >&2; exit 2; }
+if [[ $mode == toast ]]; then start_turn "${resume:-$(new_id)}" toast "$name" "$resume" "$prompt"; exit; fi
+start_turn "$(new_id)" notify "$name" "" "$prompt" >/dev/null
+rc=$?
+# One turn at a time: a request from a shell or a key while one runs says so where it was asked
+(( rc == 4 )) && notify-send -a Claude -i "$icon" -e -- "Claude is still working" \
+  "One request at a time: wait for it, or cancel it from its notification"
+exit "$rc"

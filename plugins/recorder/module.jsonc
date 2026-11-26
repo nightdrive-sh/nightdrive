@@ -1,0 +1,5 @@
+// Recorder's top bar module: shown only while a recording is being made or paused (./status): the microphone and the
+// time, pulsing while it records, dimmed while paused. A click pauses or goes on, a right click saves, a middle click
+// opens the window. No menu: the window is the place for the rest. Left of the plugins at the left end, as Keep Awake.
+{ "interval": 1, "menu": "", "click": "bin/recorder toggle", "right": "bin/recorder save", "middle": "bin/recorder",
+  "before": ["home", "deck", "claude"], "size": 16, "label": "Recorder", "glyph": "mic" }

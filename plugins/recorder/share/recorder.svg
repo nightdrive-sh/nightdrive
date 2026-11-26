@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Recorder's app icon: Lucide's mic as a neon sign, made like Notes' and Mail's (near black, a glow under the line)
+       in a recording light's red, which none of the other apps' icons uses -->
+  <defs>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffa08b"/><stop offset=".5" stop-color="#ff3b3b"/><stop offset="1" stop-color="#e01e4f"/></linearGradient>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="#16141f"/>
+  <g transform="translate(76 76) scale(15)" fill="none" stroke="url(#neon)" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="2.2" filter="url(#glow)">
+      <path d="M12 19v3M19 10v2a7 7 0 0 1-14 0v-2"/>
+      <rect x="9" y="2" width="6" height="13" rx="3"/>
+    </g>
+    <g stroke-width="1.5">
+      <path d="M12 19v3M19 10v2a7 7 0 0 1-14 0v-2"/>
+      <rect x="9" y="2" width="6" height="13" rx="3"/>
+    </g>
+  </g>
+</svg>

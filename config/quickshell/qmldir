@@ -1,6 +1,7 @@
 singleton Icons 1.0 Icons.qml
 singleton Theme 1.0 Theme.qml
 Sh 1.0 Sh.qml
+ClipCopy 1.0 ClipCopy.qml
 MenuRow 1.0 MenuRow.qml
 PrivacyApps 1.0 PrivacyApps.qml
 MicLevel 1.0 MicLevel.qml
@@ -14,11 +15,38 @@ SettingColor 1.0 SettingColor.qml
 SettingButton 1.0 SettingButton.qml
 SettingDropdown 1.0 SettingDropdown.qml
 Launcher 1.0 Launcher.qml
+LauncherLevels 1.0 LauncherLevels.qml
+LauncherMenus 1.0 LauncherMenus.qml
+LauncherSettings 1.0 LauncherSettings.qml
+LauncherSearch 1.0 LauncherSearch.qml
+LauncherApps 1.0 LauncherApps.qml
+LauncherShortcuts 1.0 LauncherShortcuts.qml
+LauncherIpc 1.0 LauncherIpc.qml
+LauncherSearchField 1.0 LauncherSearchField.qml
+LauncherList 1.0 LauncherList.qml
+LauncherRow 1.0 LauncherRow.qml
+LauncherWallGrid 1.0 LauncherWallGrid.qml
 Osd 1.0 Osd.qml
+CleanToast 1.0 CleanToast.qml
+Toast 1.0 Toast.qml
+ToastStack 1.0 ToastStack.qml
+Dictation 1.0 Dictation.qml
+DictationMeter 1.0 DictationMeter.qml
+DictationIndicator 1.0 DictationIndicator.qml
+AskClaudeListening 1.0 AskClaudeListening.qml
+AskClaudeToast 1.0 AskClaudeToast.qml
+SessionsBar 1.0 SessionsBar.qml
+SessionChip 1.0 SessionChip.qml
+SessionTip 1.0 SessionTip.qml
+SessionsInbox 1.0 SessionsInbox.qml
+AskClaudePanel 1.0 AskClaudePanel.qml
+AskClaudeStatus 1.0 AskClaudeStatus.qml
+KeyFooter 1.0 KeyFooter.qml
 Picker 1.0 Picker.qml
 PowerDialog 1.0 PowerDialog.qml
 CodeDialog 1.0 CodeDialog.qml
 Drawer 1.0 Drawer.qml
+OutsideClick 1.0 OutsideClick.qml
 Divider 1.0 Divider.qml
 Shelf 1.0 Shelf.qml
 OutputList 1.0 OutputList.qml
@@ -29,6 +57,7 @@ singleton Claude 1.0 Claude.qml
 singleton PrimaryWatch 1.0 PrimaryWatch.qml
 NotificationPopups 1.0 NotificationPopups.qml
 NotificationCard 1.0 NotificationCard.qml
+NotificationStack 1.0 NotificationStack.qml
 Bar 1.0 Bar.qml
 BarModule 1.0 BarModule.qml
 BarText 1.0 BarText.qml
@@ -40,7 +69,17 @@ WiredProfiles 1.0 WiredProfiles.qml
 Toggle 1.0 Toggle.qml
 TouchScroll 1.0 TouchScroll.qml
 AppIcon 1.0 AppIcon.qml
-SystemLevels 1.0 SystemLevels.qml
+singleton IconFiles 1.0 IconFiles.qml
+RowCopy 1.0 RowCopy.qml
+WifiLevels 1.0 WifiLevels.qml
+BluetoothLevels 1.0 BluetoothLevels.qml
+SoundLevels 1.0 SoundLevels.qml
+TailscaleLevels 1.0 TailscaleLevels.qml
+CompanionLevels 1.0 CompanionLevels.qml
+HubLevels 1.0 HubLevels.qml
+StatusLevels 1.0 StatusLevels.qml
+RegionLevels 1.0 RegionLevels.qml
+MirroringLevels 1.0 MirroringLevels.qml
 HomeLevels 1.0 HomeLevels.qml
 DefaultAppsLevels 1.0 DefaultAppsLevels.qml
 AppKeyLevels 1.0 AppKeyLevels.qml
@@ -48,6 +87,9 @@ singleton Home 1.0 Home.qml
 singleton Plugins 1.0 Plugins.qml
 SharePicker 1.0 SharePicker.qml
 ClaudeWrite 1.0 ClaudeWrite.qml
+ClaudeUsage 1.0 ClaudeUsage.qml
+ClaudeMenu 1.0 ClaudeMenu.qml
+ClaudeBarToggle 1.0 ClaudeBarToggle.qml
 ClaudeWriteButton 1.0 ClaudeWriteButton.qml
 ClaudeWritePlace 1.0 ClaudeWritePlace.qml
 LevelRing 1.0 LevelRing.qml
@@ -59,17 +101,46 @@ AirPodsSettings 1.0 AirPodsSettings.qml
 ThemeEditor 1.0 ThemeEditor.qml
 BehaviourLevels 1.0 BehaviourLevels.qml
 AboutLevels 1.0 AboutLevels.qml
+WebSearchLevels 1.0 WebSearchLevels.qml
 Calculator 1.0 Calculator.qml
 InstallLevels 1.0 InstallLevels.qml
 ToolsLevels 1.0 ToolsLevels.qml
+RemindLevels 1.0 RemindLevels.qml
+RemindToast 1.0 RemindToast.qml
+ScheduleLevels 1.0 ScheduleLevels.qml
+PlacesLevels 1.0 PlacesLevels.qml
+SwipeOff 1.0 SwipeOff.qml
+SessionsLevels 1.0 SessionsLevels.qml
 ClipPicker 1.0 ClipPicker.qml
 AppearanceLevels 1.0 AppearanceLevels.qml
 DisplayLevels 1.0 DisplayLevels.qml
 RemoveLevels 1.0 RemoveLevels.qml
 PasswordLevels 1.0 PasswordLevels.qml
 ThemeLevels 1.0 ThemeLevels.qml
+GamesLevels 1.0 GamesLevels.qml
 DetailCard 1.0 DetailCard.qml
+ClaudeAccessLevels 1.0 ClaudeAccessLevels.qml
 ClaudeWriteLevels 1.0 ClaudeWriteLevels.qml
 SendCapture 1.0 SendCapture.qml
 SendClaudeLevels 1.0 SendClaudeLevels.qml
+AskClaudeHint 1.0 AskClaudeHint.qml
+AskClaudeLevels 1.0 AskClaudeLevels.qml
+AskClaudeHistoryLevels 1.0 AskClaudeHistoryLevels.qml
+AskClaudeField 1.0 AskClaudeField.qml
+AskClaudeThread 1.0 AskClaudeThread.qml
+AskClaudeConfirm 1.0 AskClaudeConfirm.qml
+AskClaudeResults 1.0 AskClaudeResults.qml
+AskClaudeCard 1.0 AskClaudeCard.qml
+AskClaudeCardButton 1.0 AskClaudeCardButton.qml
+AskClaudeCardSound 1.0 AskClaudeCardSound.qml
+AskClaudeCardImage 1.0 AskClaudeCardImage.qml
+AskClaudeCardPage 1.0 AskClaudeCardPage.qml
+AskClaudeCardFile 1.0 AskClaudeCardFile.qml
+singleton AskClaudeSession 1.0 AskClaudeSession.qml
 PolkitWatch 1.0 PolkitWatch.qml
+ClaudeConfirm 1.0 ClaudeConfirm.qml
+ClaudeConfirmField 1.0 ClaudeConfirmField.qml
+Typing 1.0 Typing.qml
+FieldBox 1.0 FieldBox.qml
+singleton MenuPointer 1.0 MenuPointer.qml
+singleton DragOut 1.0 DragOut.qml

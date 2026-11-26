@@ -1,0 +1,13 @@
+# One backup with restic (nightdrive backup run --due): only when the last good one is a day old, so the hourly timer
+# backs up once a day. A repository out of reach isn't a failure until none has gone through in 3 days; an error is,
+# and a streak of them is one notification (hypr/scripts/unit_failed.py).
+[Unit]
+Description=Back up this computer with restic
+After=network-online.target
+OnFailure=nightdrive-unit-failed@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/nightdrive backup run --due --quiet
+Nice=19
+IOSchedulingClass=idle

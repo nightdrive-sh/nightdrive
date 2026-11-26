@@ -12,6 +12,7 @@ jobs:
   notify:
     if: github.repository == 'nightdrive-sh/nightdrive'
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - run: gh api repos/nightdrive-sh/nightdrive-website/dispatches -f event_type=nightdrive-main -f "client_payload[sha]=$GITHUB_SHA"
         env:

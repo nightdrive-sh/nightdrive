@@ -1,6 +1,8 @@
 # Dictation (Voxtype)
 
 Hold **F5** or **Fn** on a Mac, **Insert** on a PC (or another key: below), speak, and let go: the text is typed into the active window.
+With **⌘⇧** held too, it goes to [Ask Claude](claude.md) instead and is sent when you let go: a small card shows Claude
+working and then its answer.
 
 It runs fully offline with [Voxtype](https://github.com/peteonrails/voxtype) and NVIDIA's Parakeet model, on the CPU (about 1.4 s for 6 s of speech on an M2 Max).
 
@@ -8,32 +10,25 @@ Voxtype is installed by hand:
 
 1. Download the binaries for your machine from the [Voxtype releases](https://github.com/peteonrails/voxtype/releases)
    (version 1.1.0) into `~/.local/bin`, check their sha256 (`SHA256SUMS.txt`) and drop the version and platform from the
-   names: `voxtype-onnx` (Parakeet), plus `voxtype-osd`, `voxtype-osd-quickshell` and `voxtype-audio-bridge` for the
-   on-screen recording card.
+   names: `voxtype-onnx` (Parakeet), plus `voxtype-audio-bridge`, which gives the recording card its sound level
+   (the card itself is Nightdrive's, below the top bar; Voxtype's own is turned off).
    - PC: the `linux-x86_64` files, `onnx-avx2` for `voxtype-onnx` (`onnx-avx512` if `grep avx512f /proc/cpuinfo` finds it).
    - Apple Silicon Mac: the `linux-aarch64` files.
-   - Leave out `voxtype-osd-gtk4`: without it the card is the Quickshell one below, which fits the desktop.
-2. Download the model (into `~/.local/share/voxtype/models`). For better accuracy, also download the full one
-   (`--model parakeet-tdt-0.6b-v3`, 2.4 GB): it gets English names and sentence breaks clearly better, about 0.3 s slower
-   for 20 s of speech. The daemon uses it whenever it's there.
+2. Download the model (into `~/.local/share/voxtype/models`). Parakeet picks the language itself and can't be told
+   which: the int8 model keeps short Finnish words in Finnish, the full one (`parakeet-tdt-0.6b-v3`) often writes them
+   in Cyrillic ("testi" → "Тесты."), so the daemon no longer uses it, even when it's installed.
 
 ```sh
 voxtype-onnx setup --download --model parakeet-tdt-0.6b-v3-int8
 ```
 
-3. Install the OSD's QML. `link.sh` then replaces its `OsdSurface.qml` with the one in `config/voxtype/` (card at the top
-   centre, no dimming).
-
-```sh
-voxtype setup quickshell --source <voxtype repo>/quickshell
-```
-
-4. `sudo dnf install wtype` so the text can be typed into windows (without it, it goes to the clipboard).
-5. Log out and in: Hyprland starts the daemon at login.
+3. `sudo dnf install wtype` so the text can be typed into windows (without it, it goes to the clipboard).
+4. Log out and in: Hyprland starts the daemon at login.
 
 The settings are in `config/voxtype/config.toml`, which `link.sh` links into `~/.config/voxtype/`. `hypr/scripts/dictate`
 starts the daemon with the best model installed, and handles the keys and the muted-mic check. The mic is the MacBook's
-own on a Mac, and the default one elsewhere.
+own on a Mac, and the default one elsewhere. With the lid closed it is Nightdrive's iOS app, when it is open on an iPad
+or iPhone ([Companion](companion.md)): the card names the device instead of showing the level.
 
 ## Your own corrections
 
@@ -49,10 +44,12 @@ is awkward (a laptop's Fn layer), give dictation another key in `config/hypr/loc
 
 ```lua
 hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate start"), { locked = true })
-hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate stop"), { locked = true, release = true, transparent = true })
+hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate stop"), { locked = true, release = true, transparent = true, ignore_mods = true })
+hl.bind("SUPER + SHIFT + Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dictate claude-start"), { locked = true })
 ```
 
-(`transparent` keeps the release working when you click with the mouse while holding the key.)
+(`transparent` keeps the release working when you click with the mouse while holding the key, `ignore_mods` when ⌘⇧
+is still held; the third line dictates to Ask Claude.)
 
 `hyprctl reload` isn't needed: Hyprland reloads on save. Things that got in the way on a Keychron K8:
 
@@ -67,3 +64,4 @@ hl.bind("Pause", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/dic
 - `sudo keyd monitor` shows what a key sends.
 
 Timings for 6 s of speech on the CPU: Parakeet 1.4 s, Whisper small 4.3 s, medium 13.7 s, large-v3-turbo 24 s.
+Whisper with `language = ["fi", "en"]` gets Finnish right but takes 48 s for a 3 s word on an M2 Max's CPU.

@@ -30,7 +30,8 @@ Nightdrive puts all of that together into one opinionated desktop.
   dictation, and sleep is tuned for Asahi.
 - **Everything is a keystroke away.** One launcher handles apps, passwords, clipboard history, emoji, screenshots, settings,
   installing packages and power. You rarely need a terminal for everyday things.
-- **Apps of its own.** Mail, Contacts, Deck, Garage, Disk Usage and Ferry come with it, made for the keyboard and in the desktop's colours.
+- **Apps of its own.** Files, Mail, Contacts, Calendar, Tasks, Notes, Text, Recorder, Deck, Garage, Disk Usage and Ferry come with it, made
+  for the keyboard and in the desktop's colours.
 - **Simple and readable.** Plain config files, a few small scripts, and comments that explain *why*.
 
 ## Highlights
@@ -47,8 +48,13 @@ Nightdrive puts all of that together into one opinionated desktop.
 - **Power**: lock, sleep, log out, restart and shut down
 - **Music**: while it plays, a player row above the list
 
-Type a question and press ⌘⌥Enter to send it to Claude Code. Search "Rename current space" to name the workspace you're
-on in the bar.
+Type a request and press ⌘Enter, or Enter on the **Ask Claude** row: Claude does it with [Nightdrive's
+tools](docs/claude.md) in a toast in the Launcher's place, showing each step and its answer, and you can write back (⌘⌃Enter sends
+it to Claude Code in a terminal instead). The tools are experimental: what Claude reads with them (a mail, a file) goes to
+Anthropic as part of the conversation ([What reaches Anthropic](docs/claude.md#what-reaches-anthropic)). When nothing
+matches, **Open in Browser** under it opens what you typed in the default browser: an address as it is, anything else
+as a search with the browser's own search engine. Search "Rename current space" to name the workspace
+you're on in the bar.
 
 It counts too: type `3*8`, `15% of 80`, `5 km in miles` or `100 eur in usd`, and the answer is the first row; Enter
 copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal comma in results* answers `3,5`.
@@ -57,16 +63,28 @@ copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal 
 
 ### Apps of its own
 
-Mail, Contacts, Deck and Ferry come with every install; Garage and Disk Usage wait in Launcher › System › Install ›
-Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled narrower, the sidebar
-steps aside; narrower still, the list and the message take turns.
+Files, Mail, Contacts, Deck, Ferry, Notes, Text, Tasks, Calendar and Games come with every install; Garage and Disk Usage wait in Launcher ›
+System › Install › Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled
+narrower, the sidebar steps aside; narrower still, the list and the message take turns.
 
+- **[Files](plugins/files/README.md)**: your files and folders, with yazi's keys beside the ⌘ ones, a preview at the
+  side and a big one on Space; it opens the folders other apps open, and shares the clipboard and trash with them
 - **[Mail](plugins/mail/README.md)**: any IMAP account, quiet reading, notifications you can answer from
 - **[Contacts](plugins/contacts/README.md)**: iCloud, Google or CardDAV, in sync both ways; Mail and the Launcher find them
 - **[Deck](plugins/deck/README.md)**: Spotify (Premium) with your albums on a shelf, in the bar, the Launcher and the media keys
 - **[Garage](plugins/garage/README.md)**: virtual machines from a ready-made Fedora or an ISO, with snapshots to go back to
 - **[Disk Usage](plugins/disk-usage/README.md)**: what takes up the space, folder by folder, and the caches and Trash to clean up
 - **[Ferry](plugins/ferry/README.md)**: a mailbox over Tailscale between your computers and your phone
+- **[Notes](plugins/notes/README.md)**: your Markdown notes in `~/Notes`, written in its window, in folders and with
+  #tags, found as you type there and in the Launcher; Apostrophe still opens them, if you like it better
+- **[Text](plugins/text/README.md)**: plain text files, configs and scripts, side by side; what opens a .txt, .csv or
+  .json, saved only when you say so
+- **[Calendar](plugins/calendar/README.md)**: your iCloud, Google and CalDAV calendars by month, week, day or agenda,
+  with reminders as notifications, invitations from Mail and repeating events; the Launcher finds what's coming
+- **[Tasks](plugins/tasks/README.md)**: new, and simple for now. Its window shows your tasks (a notification when one
+  comes due), and you add and change them with its command or by asking Claude ([Claude and your desktop](docs/claude.md))
+- **[Games](plugins/games/README.md)**: your games with their covers, Steam's too; the controller's Xbox button opens it,
+  and the d-pad and A play one
 
 ![Mail four ways: folders, list and message; list and message; and in a narrow window the list, then the message](docs/releases/0.6.0-mail-sizes.jpg)
 
@@ -99,26 +117,76 @@ code or a card number stays hidden until you choose it.
 
 Click an icon and a small menu opens under it:
 
-- **Wi-Fi** (and Ethernet with your wired profiles) and **Bluetooth**
-- **Display**: brightness, night light, each screen's scale and refresh rate, and mirroring to a TV (Screen Mirroring
-  plugin)
-- **Battery**: time left and the battery's health
+- **Wi-Fi** (and Ethernet with your wired profiles) and **Bluetooth**. A device connecting shows a notification with
+  **Disconnect**, for headphones that join every computer they know: it disconnects them from this one and keeps them paired.
+  A controller (Xbox) remembers one computer: to move it here from another, forget it there, hold its pair button until
+  its light flashes fast and pair it in the menu. One paired without its key kept (it connects but does nothing) says
+  **pair again**: click it with the controller in pairing mode
+- **Display**: brightness, night light, each screen's scale and refresh rate, and Arrange displays: the screens as tiles
+  to drag where they stand on your desk (the laptop's too, with the lid closed), so the pointer crosses where they meet,
+  the main display (workspaces 1–9: Make main, or `m`) and a phone dragged to Away, out of the pointer's reach. A drop
+  is applied at once. Beside the picture, the picked display's resolution, scale and refresh rate; a screen made larger
+  or smaller stays beside its neighbours. **Other displays**: mirroring to a TV
+  (Screen Mirroring plugin), an iPad or iPhone as a display of its own (VNC Display plugin)
+- **Battery**: time left, the battery's health and **Low Power Mode** (tuned's power-saver profile; the icon turns
+  yellow). The low battery warning at 10 % offers to turn it on, plugging in the charger turns it off; Launcher ›
+  Settings › Battery has both switches
 - **System**: load, memory, temperatures and the heaviest processes
-- **Date and time**: a month's calendar with week numbers; ‹ › browse the months
+- **Date and time**: a month's calendar with week numbers; ‹ › browse the months. With Calendar, today's events under it: a click opens one
 - **Tailscale**: your devices, and on or off
 - **Sound**: volume and the output, the microphone's volume and which one
 - **Headphones**, while Bluetooth headphones are connected: their battery (AirPods per pod and case), an EQ preset made
   for them, noise cancelling, and music or headset mode
 - **Microphone** and **Camera**, only while an app uses them: which apps
 - **Notifications** (≡ at the right end, or ⌘Esc): the ones you've had, and Do Not Disturb. A click opens the app, a
-  right click removes one, Clear removes all.
+  right click removes one, Clear removes all. Popups from one app stack up, newest on top: **+N more** opens the stack,
+  each with its own buttons. A critical one, or one that waits for your answer (Claude's permission requests), stays on
+  screen until you answer or dismiss it, and gets through Do Not Disturb without a sound; a low one goes straight to
+  this list, without a popup. The list stacks them the same way, under **Needs you** what still waits for an answer.
 - **Music**: what Deck is playing, with the cover, the progress and the controls
-- **Claude**: your Claude Code sessions and usage limits. A dot on the icon tells a session finished while you were
-  elsewhere, and a click goes to its window. A right click changes what the icon shows (5-hour or weekly usage, or the
-  number of sessions).
+- **Claude**: your Claude Code sessions and usage limits, under a robot (the sessions bar's too). A red dot on it tells a
+  session is asking you something or finished while you were elsewhere, and a click goes to its window. A right click
+  changes what it shows beside it: 5-hour or weekly usage as a number or a thin bar under the robot (orange past 90 %,
+  red past 95 %), the number of sessions, or nothing. **runs out Tue** after Weekly's reset says the week's limit would
+  end before it at your pace, judged by your earlier weeks once there are some (it needs half a day of use first;
+  the history is in `~/.local/state/nightdrive/claude-usage`). Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
+  (windows make room): one asking you something gets a red question mark and one waiting for your permission an
+  orange shield (red after 3 minutes, hopping faster), which hop until you go to its window, one whose last reply
+  ends on a ✅ line gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
+  session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a bold name, the ones it
+  opened following it; the groups, their sessions and the others go in the order of their workspaces, and on one
+  workspace by window, left to right and top to bottom, a dot between each group or lone session.
+  A lead stays one when the sessions it opened have closed. Chips are as wide as their names, and share the bar
+  equally only when they don't fit. After the name, once past 5 minutes, how long its turn has run or it has waited
+  for you (not on a finished one); a turn past 10 minutes, likely stuck, shows its time in orange. A session named
+  `#N topic` (`nightdrive ask --name`) shows the task number small there, not in its name, while the name fits.
+  **Hyper ←** / **Hyper →** go to the previous / next session in this order, bar or no bar, and **Hyper ↑** /
+  **Hyper ↓** to the previous / next lead, and **Hyper 1** … **Hyper 9** to the first … ninth (a session's card
+  shows its key; a digit you gave an app in App shortcuts stays the app's). The bar follows Settings › Top bar opacity, its focused session the active
+  workspace's colour.
+  **Launcher › Sessions** lists them all, the closed ones too: the running first (Enter goes to the window), then the
+  rest, the newest first (Enter opens a terminal in its folder and goes on with the conversation, on its account).
+  Typing searches their names, folders and task numbers (`#3120` or `3120`).
+  **A project manager's space**: a session named *… Project Manager* or *… PM* (`claude -n`; or a background session,
+  `claude --bg`, in the window that shows it with `claude agents`) gets a workspace of its own, as the left column, full height and half the width; started on a workspace with other windows, it moves to
+  the first empty one. The sessions it opens with `nightdrive ask --background` open there on the right, as one group
+  of tabs: one shows, its tab strip lists them, and a click, **⌃⌥⌘ ← / →** or the Hyper keys above switch between
+  them. A new one is the last tab, behind the one shown, and the keyboard stays where you are. Nothing else joins
+  the group: another window opened there is a tile beside it. A window a Claude session opens itself (a test terminal,
+  an app's preview) never takes the keyboard, on any workspace: it is a tile where you are, for you to click. Alone, once its sessions
+  have all closed, it fills the width; restarted, it goes back to its space (by its name). Moved to another workspace,
+  alone or with ⌘ ⌥ ⇧ + a number, it makes that one its space, and its sessions open there whichever workspace you are
+  on; a session moved away with ⌘ ⇧ + a number or ⌘ ⇧ D leaves the group and stays where it went (back from the drawer, it rejoins it). Other workspaces, and sessions no PM opened, are as before.
+  **Two Claude accounts** (a Claude Code config dir each, `CLAUDE_CONFIG_DIR`): `~/.claude` and every `~/.claude-*`
+  you have signed in to are found by themselves. The second account then gets a Claude icon of its own beside the
+  first, each with its own menu (its sessions, **New session** on it and its usage), right-click setting and dot,
+  and a session on another account than `~/.claude` has the account's name small beside its name in the sessions bar. To name them, or add a config dir kept elsewhere, list them in
+  `~/.config/nightdrive/claude-accounts`, a line each: `~/.claude-work work` (the dir, then the name; without one, a
+  dir's name is its own: `~/.claude-work` is *work*). `nightdrive claude accounts` shows what it found.
 
 ⌘⇧Space walks through the menus with the arrow keys, and ⌘+drag moves an icon. On a narrow screen the icons that don't
-fit go into a **…** menu, the ones farthest from the clock first.
+fit go into a **…** menu, the ones farthest from the clock first. If that's still not enough, the logo and then the empty
+workspaces make room.
 
 ![The music, home and headphones menus in the top bar](docs/screenshots/menus.jpg)
 
@@ -126,10 +194,11 @@ fit go into a **…** menu, the ones farthest from the clock first.
 
 **Launcher › System › Install › Software** searches Fedora's packages and Flathub's apps at once, one row per app, with the
 details before installing (Tab there takes Flathub's when both have it). Browse has the 100 most popular apps and
-categories. System › Remove takes software and web apps away.
+categories. System › Remove takes software and web apps away; Ctrl+Enter there removes one without asking.
 
-Nightdrive's own apps (Mail, Contacts, Deck, Ferry) and Tailscale come with every install; Garage, Nightdrive's app for
-virtual machines, and Disk Usage wait in System › Install › Recommended. The rest are optional parts, under System › Install:
+Nightdrive's own apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Inbox) and Tailscale come with every install;
+Garage, Nightdrive's app for virtual machines, and Disk Usage wait in System › Install › Recommended. The rest are optional parts,
+under System › Install:
 
 - **Recommended**: apps Nightdrive sets up for you (1Password, Home Assistant…)
 - **Webapp**: ready-made web apps with a key, or any site of your own
@@ -140,17 +209,30 @@ A part that isn't installed doesn't show anywhere: no Launcher level, bar icon o
 ### A drawer for what you want at hand
 
 ⌘⇧D drops the active window into the drawer, and ⌘D slides the drawer up over your windows, dimming and blurring the rest.
-⌘D again puts it away. ⌘⇧D in the drawer sends the window back to the workspace and place it came from. It suits notes,
+⌘D again puts it away. ⌘⇧D in the drawer sends the window back to the workspace and place it came from. A tab goes alone,
+out of its group, and back on its workspace it is a tab in that group again. It suits notes,
 a to-do list or a chat you want one keystroke away without giving them a workspace of their own.
 
 ![The drawer empty, and with a terminal and Files in it](docs/screenshots/drawer.jpg)
 
 ### Little things that add up
 
-- **Shelf**: drag a file to the top edge of the screen to park it, then drag it into another app.
+- **Shelf**: drag a file to the top edge of the screen to park it, then drag it into another app. Settings › Shelf
+  turns it off.
 - **Dictation**: hold F5 or Fn on a Mac, Insert on a PC, speak, and let go. It runs fully offline with Voxtype and Parakeet ([setup](docs/dictation.md)).
 - **Snippets**: Launcher › Tools › Snippets; Enter pastes one. With auto-expand on, typing a trigger anywhere replaces it
   with the text. A snippet can have several lines (Shift+Enter), like an email signature.
+- **Remind**: Launcher › Tools › Remind, pick the minutes (or type them: 25, 1h30m, or a time: 22:45), On wake, At
+  login or On arriving / On leaving a place, type the message, Enter. It comes as a banner at the top of the screen with
+  a sound, apart from the notifications, and stays until you dismiss it. The waiting ones are listed there too: Enter
+  twice cancels one. They wait over a logout or a restart; one that came due meanwhile shows at the next login.
+- **Schedule**: Launcher › Tools › Schedule, pick when (minutes, a time, On wake, At login, On arriving / On leaving a
+  place; or type it: 25, 14:45, arrive work), type a command or a message to Claude, Enter. The row says how it is read,
+  **Run** or **Ask Claude**; the row under it is the other reading. The waiting ones are listed there: Enter twice
+  cancels one, Ctrl+Enter runs it now. The same as `nightdrive schedule` (below).
+- **Places**: name the Wi-Fi networks where you are: Settings › Places › "*network* is…" at the office (or
+  `nightdrive places add work`), or tell Claude "this network is work". A place is known by its network, so no location
+  service is needed. Enter on a place lists its networks: Enter twice takes one off, and typing a name adds another.
 - **From your phone**: [Ferry](plugins/ferry/README.md), one of Nightdrive's apps, is a mailbox over Tailscale between your
   computers and your phone. Two experimental plugins: [LocalSend](plugins/localsend/README.md) receives files from a
   phone once you accept them, and [AirPlay Receiver](plugins/airplay-receiver/README.md) mirrors an iPhone, iPad or Mac
@@ -160,23 +242,54 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   these and video calls, asks in a themed window: the whole screen or one window.
 - **Themes**: seven colours that change the whole desktop at once, two synthwave wallpapers and your own (Settings ›
   Theme). GTK windows such as Files and the file picker follow the colour too.
-- **Background apps**: ⌘W only hides chat apps and the music player, so they keep running. Their shortcut brings them straight back.
+- **Background apps**: ⌘W only hides chat apps and the music player, so they keep running (a tab alone: the rest of its group stays). Their shortcut brings them straight back.
 - **Claude Code waits for you?** Its notification says which session and what it wants, and a permission request can
-  be answered right there (Allow, Deny). Allow is offered only when the notification shows all it allows: a long
-  command, one run outside the sandbox, a file edit or an MCP tool is answered in its session.
+  be answered right there (Allow, Deny) when the notification shows all it allows: a long command, one run outside the
+  sandbox, a file edit or an MCP tool gets Review instead, which goes to its session. While the sessions
+  bar is there to see (on, not under a fullscreen window or the drawer, you at the computer), it does the telling: a
+  session that finishes, waits, asks you something or wants your permission gets its chip's mark and no notification
+  (none in the history either; Companion still gets the question or request), and one opened in the background says
+  nothing. Nor does one opened from the window you're in, as you asked for it.
 - **Closed by mistake?** ⌘⇧U opens the window you closed with ⌘W again, in the same place. A terminal comes back in the
-  same folder, with Claude Code in the same conversation. Press again for the one before it.
+  same folder, with Claude Code in the same conversation. Press again for the one before it. A fullscreen window (a
+  game) isn't closed by a stray key: ⌘W or ⌘Q asks you to press it again within 2 s.
+- **No internet?** When Wi-Fi or a cable is connected but the internet doesn't answer for 10 s, a notification says
+  so, and **Back online** when it comes back; meanwhile the network icon is orange, Wi-Fi's with a "!". A hotel's or
+  café's sign-in page gets a notification of its own: click it to sign in. None when you turn Wi-Fi off or right after
+  waking up. It follows NetworkManager's own check, once a minute. Off: Launcher › Settings › Notifications › Internet
+  connection.
 - **Battery ran out?** When the battery is low (under 20 % as the laptop goes to sleep, and each minute from 5 %), the open
   windows are kept. If it runs out, the next login asks whether to open them again, each on its workspace.
 - **Web apps**: any site as an app window, from Launcher › System › Install › Webapp; System › Remove › Webapps removes
   one, with its logins. Their notifications have the web app's own name and icon (and emoji: Slack's `:thumbsup:` as
-  👍), and a link to another site opens in your default browser.
+  👍), and a link to another site opens in your default browser; a window of the app's own site (Slack's sign-in to
+  another workspace) stays an app window, never a Chromium one. A page that tries to open Slack's, Zoom's or Teams'
+  desktop app (which have no Linux version here) gets a notification instead of an "Open With…" dialog: use the page's
+  link to the web version.
 - **Default apps**: which app opens links, mail, folders, text, code, images, video, music, PDFs and calendar files, and
   which terminal ⌘Enter opens: Launcher › Settings › Apps › Default apps (or `nightdrive defaults`). Hyper B, F and E
-  open the browser, Files and Email you chose.
+  open the browser, Files and Email you chose. Text files (.txt, .csv, .json) open in Nightdrive's Text until you
+  choose another text editor, and code too until you choose a code editor. A link
+  from another app opens in a new window, not as a tab: Firefox's is a setting there (Settings › Apps › Firefox), and
+  Brave, Chromium and Chrome always do.
 - **App shortcuts**: which app Hyper + a letter or digit opens: Launcher › Settings › Apps › App shortcuts. Your choice
   replaces a default, Nightdrive's or a plugin's. The other shortcuts are in the config files ([Make it yours](#make-it-yours)).
+- **Cleaning the keyboard**: search "clean keyboard" in the Launcher (or `nightdrive clean`): the keyboard and touchpad
+  stop working for 15 s, with a countdown, and come back by themselves (also if you close the lid). A mouse still works:
+  click the countdown to end it sooner.
 - **Mouse**: the wheel's scroll speed, from 0.5× to 3×, in Launcher › Settings › Mouse. The trackpad keeps its own.
+  The keyboard goes to the window the mouse moves into. A drag let go over another window (text selected
+  past a window's edge) leaves the keyboard where it was, until the mouse goes on into a window or you click.
+- **Game Mode**: the CPU at full speed for a game, in Launcher › Settings › Game Mode (or `nightdrive game-mode on`).
+  Without it the CPU slows down between frames to save power, and a game stutters (a long frame every second); off goes
+  back to the profile from before. It is power-profiles-daemon's performance profile (tuned's throughput-performance).
+- **Games**: the controller's Xbox button opens [Games](plugins/games/README.md) (without that app, Launcher › Games),
+  and the d-pad, A and B work there; while a Steam game runs, the button is Steam's. Launcher › Games lists the same
+  games, and searching finds Steam's (`nightdrive games` too).
+- **Region**: how dates and times are written, apart from the language: Finland 3.11.2026, the US 11/3/2026 and 2:30 PM
+  with weeks from Sunday, ISO 2026-11-03 and a few more, in Launcher › Settings › Region (or `nightdrive region set fi`).
+  Nightdrive's apps follow at once; it is `LC_TIME` in `~/.config/locale.conf`, so other programs started after follow
+  it too, and write their month and day names in the region's language. Not chosen, the apps write ISO dates and 24 h.
 - **Remote login**: SSH into this computer from another one, off by default. Turn it on in Launcher › Settings › Remote
   login. It works over Tailscale from anywhere, and on the networks you allow: the one you turn it on at, and each new
   one asks with a notification (safe at home or work, not at a café).
@@ -184,7 +297,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   start hidden. Only 1Password (if installed) is on by default, as its SSH agent and the Passwords level need it.
 - **Login screen**: a password-only login screen in the theme's colours, for the user who installed Nightdrive. It is the
   lock screen too. Another user logs in from the text console (Ctrl+Alt+F3, with Fn on a Mac keyboard). If the lock
-  screen ever dies, it comes back by itself, still locked; if it doesn't, ⌃⌥F3 starts it again.
+  screen ever dies, it comes back by itself, still locked; if it keeps dying, a plainer lock (hyprlock) takes over. If a
+  screen stays blank or on Hyprland's "lockscreen app died" screen, ⌃⌥F3 replaces it with a new one.
 
 ## What's included
 
@@ -196,22 +310,26 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Browser | Firefox | themed, tabs below the address bar, no tab bar with one tab, starts with an empty window (Launcher › Settings › Apps › Firefox) |
 | Mail | [Mail](plugins/mail/README.md) (Nightdrive's own) | quiet reading, notifications you can answer from, replies Claude writes for you to read first |
 | Contacts | [Contacts](plugins/contacts/README.md) (Nightdrive's own) | iCloud, Google and CardDAV, in sync both ways; Mail and the Launcher find them too |
+| Calendar | [Calendar](plugins/calendar/README.md) (Nightdrive's own, vdirsyncer and khal) | iCloud, Google and CalDAV; reminders as notifications, today's events in the clock menu, invitations from Mail |
 | Music | [Deck](plugins/deck/README.md) (Nightdrive's own Spotify player, needs Premium) | bar icon, music menu, player row in the Launcher, media keys |
 | Phone | [Ferry](plugins/ferry/README.md) (Nightdrive's own) | a mailbox both ways with your phone and other computers, over Tailscale |
+| Sync | [Hub](docs/hub.md) (Nightdrive's own) | Tasks the same on all your computers through a small server of your own, over Tailscale (Settings › Hub) |
+| Backup | [restic](docs/backup.md) (`nightdrive backup`) | this computer once a day, encrypted, to an SSH server, a bucket or another disk; snapshots to restore from |
+| iPad | [Companion](docs/companion.md) (Nightdrive's own) | your Claude Code sessions, dictation and six buttons of your own on an iPad or a phone, over Tailscale (Settings › Companion) |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
 | Disk space (optional) | [Disk Usage](plugins/disk-usage/README.md) (Nightdrive's own) | what takes up the space, folder by folder; Clean up empties the Trash and caches |
 | Passwords (optional) | [1Password](plugins/1password/README.md) and its `op` CLI | Passwords level in the Launcher, SSH agent |
-| AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘⌥Enter, ask from the Launcher, Claude writes (⌘⇧C), sessions and usage limits in the bar |
+| AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘Enter asks from the Launcher, ⌘⌃Enter in a terminal, Claude writes (⌘⇧C), sessions and usage limits in the bar |
 | Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet, offline) | hold F5 or Fn (Mac), Insert (PC) to talk |
 | Network | NetworkManager, BlueZ, [Tailscale](plugins/tailscale/README.md) | Wi-Fi, Bluetooth and Tailscale menus |
-| Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 %), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
-| Notifications | Quickshell | the app's icon and buttons, history and Do Not Disturb in the bar, a low battery warning; a crashed app's notification can Ask Claude why |
+| Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 % and forgotten at the next login, as on a Mac), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
+| Notifications | Quickshell | the app's icon and buttons, history and Do Not Disturb in the bar, a low battery warning, the internet dropping; a crashed app's notification can Ask Claude why |
 | Sounds | Nightdrive's own, made from scratch | notification sounds to choose from, and the desktop's own (volume, screenshot, charger, devices, lock); Launcher › Settings › Notifications turns them off |
-| Files and images | Nautilus, Loupe | |
+| Files and images | [Files](plugins/files/README.md) (Nightdrive's own), Loupe | yazi's keys, a preview, Quick Look on Space; opens every folder. Nautilus stays installed as Files (Nautilus), found by search |
 | Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) | `.md` files open in it, themed |
 | Web apps | Chromium app windows | your own, or ready-made ones with a key: WhatsApp, Slack, Teams, YouTube |
-| External display | Hyprland | workspaces 1–9 on the display, one on the laptop's screen (⌘0); with the lid closed only the display is used; where the laptop's screen is in Launcher › Settings › Display |
-| Lock and idle | the login screen as the lock, hypridle | a screensaver after 10 min (a synthwave sunset, a falling-characters rain or a big clock), lock after 30 min (Settings › Screensaver) |
+| External display | Hyprland | workspaces 1–9 on the main display, one on the laptop's screen (⌘0) and one on a second display (⌘§, the key left of 1); with the lid closed only the displays are used; where the screens are and which is the main one in Launcher › Settings › Display › Arrange displays |
+| Lock and idle | the login screen as the lock, hypridle | a screensaver after 10 min (a synthwave sunset, a falling-characters rain or a big clock), lock after 30 min (Settings › Screensaver); while locked, the same screensaver after the same 10 min, and a key or the mouse brings the password back (`nightdrive preview lock-saver [saver\|rain\|clock]` shows it) |
 | Smart home (optional) | [Home Assistant](plugins/home-assistant/README.md) | rooms, devices and scenes in the Launcher, pinned devices in the bar |
 | Mail, alternative (optional) | Thunderbird | themed, with a minimal toolbar ([details](docs/thunderbird.md)) |
 | [Mac Keyboard Shortcuts](plugins/keyd/README.md) (optional) | [keyd](https://github.com/rvaiya/keyd) | ⌥⌫ deletes a word, ⌘⌫ to the line start; in Files Enter renames, ⌘O opens |
@@ -244,10 +362,11 @@ On a fresh Fedora 44 (above), logged in as your user on its text console, with a
 
 ```sh
 nmcli device wifi connect "Network name" --ask   # on Wi-Fi; a cable needs nothing
-curl -fsSL https://nightdrive.sh/install | bash
+curl --proto '=https' --tlsv1.2 -fsSL https://nightdrive.sh/install | bash
 ```
 
-That runs [`bootstrap.sh`](bootstrap.sh): it installs git, clones Nightdrive into `~/dotfiles` and starts its installer.
+That runs [`bootstrap.sh`](bootstrap.sh): it installs git, clones Nightdrive into `~/dotfiles`, checks out the release
+the site names (it stops if GitHub's `main` doesn't have it) and starts its installer.
 `bash -s -- --dev` clones the dev channel instead; the [installer options](#installer-options) go after `--` too. The
 same by hand:
 
@@ -266,9 +385,10 @@ A minimal Fedora gets what a desktop edition would have: it boots to the login s
 AirPlay in as on Fedora KDE, and SSH stays off until you turn on Remote login (Launcher › Settings), unless you install
 over ssh.
 
-Claude Code, Tailscale, Mail, Contacts, Deck and Ferry come with every install and stay quiet until you set them up. The
-optional parts that are on by default (Apostrophe, YouTube) come too; the rest can be added later from the Launcher
-(System › Install) or with `nightdrive plugins install ID` (`nightdrive apps install garage` for an app).
+Claude Code, Tailscale and Nightdrive's apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Inbox) come with every
+install and stay quiet until you set them up. The optional parts that are on by default (Apostrophe, YouTube) come too;
+the rest can be added later from the Launcher (System › Install) or with `nightdrive plugins install ID`
+(`nightdrive apps install garage` for an app).
 
 **Trying it on the system you already use?** Nightdrive doesn't remove your apps: on a Mac only the services listed
 under [Installer options](#installer-options) go (`--choose` unticks them). Your configs in `~/.config` are moved aside to
@@ -285,7 +405,7 @@ picks the login screen:
 | `autologin` | Nightdrive's, the desktop behind it (the default) |
 | `on` | Nightdrive's, starting the desktop after the password |
 | `text` | A text login that starts the desktop after the password (`!bash` at its prompt for a text console), until the graphics are fixed |
-| `off` | On Fedora KDE, KDE's (KDE stays installed as a fallback); on Fedora Minimal, which has none, the text login |
+| `off` | The one in use before Nightdrive's (KDE's on Fedora KDE, which stays installed as a fallback; GNOME's gdm…); on Fedora Minimal, which has none, the text login |
 
 ### Installer options
 
@@ -301,8 +421,8 @@ Give them to `./install.sh`, or after `--` in the curl line (`bash -s -- --choos
 | `--vm` | The virtual machine settings, if the VM isn't detected as one ([docs/vm.md](docs/vm.md)) |
 | `--no-nvidia` | On a PC, leaves an NVIDIA card's driver alone instead of installing RPM Fusion's ([docs/pc.md](docs/pc.md)) |
 | `--with 1password,slack` | These optional parts on top of the defaults (`--dry-run` lists the ids) |
-| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale, Mail, Contacts, Deck or Ferry too |
-| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale, Mail, Contacts, Deck and Ferry come with each |
+| `--without youtube` | The defaults without these; combines with `--with`, and leaves out Tailscale or one of Nightdrive's apps (`mail`, `tasks`…) too |
+| `--all` / `--none` / `--defaults` | Every optional part / none / the defaults (Apostrophe, YouTube); Tailscale and Nightdrive's apps come with each |
 | `--dry-run` | Shows the optional parts, the packages and system settings it would add and what it would remove, then stops |
 
 To pick the optional parts yourself, run `./install.sh --choose`: it lists them first (a number toggles one, Enter
@@ -343,8 +463,9 @@ reports) and other Wi-Fi chips' firmware, listed in `packages-remove-asahi.txt`.
 
 At your first login, **Welcome to Nightdrive** opens and asks whether you have Claude Code (a Pro or Max plan).
 
-- **With Claude**, sign in there first. Then Claude sets up Tailscale, Mail, Contacts, Deck and Ferry with you, each in
-  a session of its own that does only that one thing.
+- **With Claude**, sign in there first, and choose how much Claude may use of your desktop (*Claude's access*, see
+  [Claude and your desktop](docs/claude.md)). Then Claude sets up Tailscale, Mail, Contacts, Calendar, Tasks, Deck and
+  Ferry with you, each in a session of its own that does only that one thing.
 - **Without**, it shows each one's steps right there, one at a time in plain words.
 - **I'll do it myself** lists the apps, each opening its README in Apostrophe.
 
@@ -372,13 +493,16 @@ nightdrive minimal   # asks once; --keep kate,okular keeps KDE apps you still us
 ```
 
 It switches to Nightdrive's login screen, takes a read-only btrfs snapshot of the root and lets dnf remove what nothing
-you keep needs. The kernel, the boot loader and what the system needs to start or repair itself always stay: if dnf would
-remove one of them, it stops first. KDE's settings move to `~/.local/share/nightdrive/kde-config-<time>`, and Wi-Fi
+you keep needs. The kernel, the boot loader and what the system needs to start or repair itself always stay (in a virtual
+machine also its guest agents): if dnf would remove one of them, it stops first. Common command-line tools (rsync, wget,
+man pages…) stay too, as do a VPN plugin one of your connections uses and cron when it has jobs. KDE's settings move to `~/.local/share/nightdrive/kde-config-<time>`, and Wi-Fi
 networks whose password was in KDE's wallet ask for it again.
 
 The way back is printed at the end and kept in `~/.local/state/nightdrive/minimal-undo.txt`: `sudo dnf history rollback`
-while the repos still have KDE's versions, or the snapshot in the root's place. Once you're happy with Minimal, delete
-the snapshot (the same file says how), as it holds on to KDE's files.
+while the repos still have KDE's versions, or the snapshot in the root's place. Either way, put KDE's settings back
+before you log in to Plasma (the file's `cp -a` line), as Plasma makes its own anew; `/home` isn't in the snapshot, so
+they wait there. Once you're happy with Minimal, delete the snapshot (the same file says how), as it holds on to KDE's
+files.
 
 ### Updating
 
@@ -389,8 +513,9 @@ You can also update any time from the Launcher (**Update**) or a terminal:
 nightdrive update
 ```
 
-An install without one of Nightdrive's apps (Mail, Contacts, Deck, Ferry) gets it with the next update, once. Remove
-one, and it stays removed: Launcher › System › Install › Recommended or `nightdrive apps install mail` brings it back.
+An install without one of Nightdrive's apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Inbox) gets it with the next
+update, once. Remove one, and it stays removed: Launcher › System › Install › Recommended or
+`nightdrive apps install mail` brings it back.
 Settings › Apps › Nightdrive apps turns one off or on.
 
 It never overwrites your own edits: a repo with uncommitted changes is skipped with a note. On an install older than the
@@ -411,23 +536,46 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | Command | What it does |
 |---|---|
 | `nightdrive update` | Updates Nightdrive and the system (above) |
-| `nightdrive update check` | Only looks for new changes (what the six-hourly check runs) |
+| `nightdrive update check` | Only looks for new changes, and for system files (in /etc) that differ from the repo's (what the six-hourly check runs) |
 | `nightdrive channel` | The update channel, stable or dev; `nightdrive channel dev` switches to it |
 | `nightdrive version` | The release you have, and the channel |
 | `nightdrive minimal --dry-run` | On an install on Fedora KDE: what turning it into Fedora Minimal would remove, and what stays as yours; without `--dry-run` it does it ([Install](#install)) |
 | `nightdrive theme color teal` | Theme colour: violet, blue, teal, green, amber, rose or graphite; aerc (if you use it) gets it too, unless you have picked a styleset of your own |
 | `nightdrive theme set background '#181722'` | The look: the terminals', the Launcher's, Firefox's and Thunderbird's background and opacity, the window borders and shadows; `nightdrive theme look` lists the settings, `default` puts one back (also Theme Editor, Launcher › Settings › Theme) |
+| `nightdrive theme font "DM Sans"` | The font of the menus, the Launcher and the apps (with `font` in the local slot `trials`, also Launcher › Settings › Theme › Font, which lists the fonts on trial): an installed family (`fc-list : family`); without a name, prints it; `default` goes back to JetBrains Mono. Sizes are made for JetBrains Mono, so another font may look a little small |
 | `nightdrive theme save "My theme"` | Saves the colour and the look as a theme of your own; `nightdrive theme themes` lists them, `use ID` switches, `delete ID` removes one, `reset` goes back to Default |
-| `nightdrive wallpaper set <image>` | Changes the wallpaper; `nightdrive wallpaper current` prints it |
-| `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one |
+| `nightdrive wallpaper set <image>` | Changes the wallpaper (an image from elsewhere, such as Downloads, is copied to your own backgrounds first); `nightdrive wallpaper current` prints it |
+| `nightdrive display list` | Each screen's even scales; `nightdrive display scale eDP-1 2` sets one, `mode eDP-1 2560x1440` the resolution (`auto` for either goes back to the default). With `--keep` last, a card asks whether to keep it and it goes back in 20 s unless you do. `display json` gives it all as JSON |
+| `nightdrive displays` | The Displays window (Settings › Display › Arrange displays). `nightdrive arrange` lists where the screens are (`--json`); `arrange side DP-1 left HDMI-A-1` puts one beside another, `main DP-1` makes it the main display, `away HEADLESS-IPHONE` a phone out of reach, `reset` back to Hyprland's own places |
+| `nightdrive sound` | Volume and outputs as JSON; `sound volume 40` sets the volume (`--mute on`/`off`), `sound output NAME` the output |
+| `nightdrive brightness 60` | The screen's brightness in percent; without a number, prints it |
+| `nightdrive screenshot text` | Pick a region: its text goes to the clipboard and is printed (OCR, as ⌘⌃S); `region`, `window` and `full` save a screenshot too, `clip`, `winclip` and `fullclip` only copy it |
+| `nightdrive network` | Wi-Fi and the network as JSON, with whether the internet answers; `network wifi off` (or `all`) turns it off, `on` again; `--keep` as with the display |
+| `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
+| `nightdrive low-power on` | Low Power Mode on a laptop, `off` or `toggle`; `status` (`--json`). `suggest off` stops the 10 % warning offering it |
+| `nightdrive game-mode on` | Game Mode: the CPU at full speed for games, `off` (back to the profile from before) or `toggle`; `status` (`--json`) |
+| `nightdrive games` | The games here, from their `.desktop` files and Steam's library (`--json`); `launch ID` starts one |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
+| `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
+| `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |
+| `nightdrive notifications` | The latest notifications (`--limit N`, `--json`); `dnd on` / `off` turns Do Not Disturb on or off, `send "Title" "Text"` shows one (`--app NAME`) and `remove TAG` takes it away again |
+| `nightdrive remind 15 "Tea"` | A reminder in 15 minutes (`90m`, `1h30m`; up to a week) or at a time (`22:45`, the next one), as Launcher › Tools › Remind sets one; also on `wake` (the first unlock after the computer next wakes), at the next `login`, or on arriving at or leaving a place of `nightdrive places` (`remind "arrive work" "Finish the sheets" --from 05:00`: not before then, so said in the evening it waits for the morning). One that comes behind the lock waits for the unlock; an arrival that hasn't come in a week comes anyway, saying so. `remind list` shows the waiting ones (`--json`), `remind cancel ID` (or `all`) takes one away |
+| `nightdrive schedule 14:45 "make"` | Runs a command at a time (`14:45`, the next one), in minutes (`15`, `1h30m`; up to a week), on `wake` (the first unlock after the computer next wakes from sleep), at the next `login`, or on arriving at or leaving a place of `nightdrive places` (`schedule "arrive work" make`, `"leave work"`: its Wi-Fi comes or goes; `--from 05:00`: not before then, so said in the evening it waits for the morning; one that hasn't come in a week asks, **Run** or **Skip**), once, with a notification saying what ran and how it went (its output: `journalctl --user -u 'nightdrive-schedule-ID*'`); one argument is a shell line, several are words. A line whose first word isn't a program (`schedule wake "start the morning's tasks"`) is a message to Claude instead: a new Claude Code session gets it in a window of its own, or with `--to SESSION` (an id or a name from `nightdrive sessions`, e.g. `--to "Nightdrive Project Manager"`) that session: typed into its window after a 5-second warning if it runs (not while it waits for your answer), else resumed with it. Adding it says which it is (**Run** or **Ask Claude**, as `schedule list` does); `--run` or `--claude` says it instead. `--dry-run --json` only says how it would be read. `schedule list` shows the waiting ones (`--json`), `schedule run ID` runs one now, `schedule cancel ID` (or `all`) takes one away and `schedule uncancel ID` gives it back. Claude can schedule one too (its tools in [Claude](docs/claude.md)), say to go on with the work in the morning: you allow each on the card, and it shows as by Claude. Nothing runs behind the lock: a time or an arrival that comes while the computer sleeps or is locked runs at the unlock. One missed over a logout or a restart runs at login if it is under 12 hours late; an older one asks, **Run** or **Skip** |
+| `nightdrive places add work` | Names the Wi-Fi network you're on as a place (`add home "Koti" "Koti 5G"` names others), for reminders and commands that wait for arriving or leaving; `places` lists them and whether you're there (`--json`), `places here` says where you are, `remove NAME` and `forget NAME SSID` take one away. Names match in any case; one network may be in two places (eduroam). Kept in `~/.config/nightdrive/places.json`, yours only. `places check` (`--json`) notices arriving and leaving, run by itself when the network changes, at waking, login and unlock: arriving is joining a place's network after 2 h away (a weekend asleep counts, a lunch nap doesn't), leaving is its network gone for 3 min; `journalctl -t nightdrive-places` shows them |
+| `nightdrive windows` | The open windows (`--json`); `focus WINDOW` brings one forward (an address or an app), `shot WINDOW` takes a picture of one on screen (never of one Send to Claude leaves out), `open firefox` opens an app or brings it forward, `open https://…` an address |
+| `nightdrive files recent` | The newest files in Downloads, Pictures and Documents (`--in downloads`, `--name TEXT`, `--json`); `open PATH` opens one in its default app, `trash PATH…` moves to the trash, `restore NAME…` puts back, `mkdir PATH` makes a folder, `move --into FOLDER PATH…` and `rename PATH NAME` move and rename (never over a file; `move-back` is their undo) and `check PATH…` lists what a send (Claude's Ferry tool) would take. Only in your home folder and nothing hidden; programs and scripts aren't opened. Claude's tools keep also to the folders in Access (docs/claude.md); `folders` lists those it offers |
 | `nightdrive topbar adjust` | Top bar icon and text sizes, half a pixel at a time, live |
-| `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the system language's order); also Launcher › Settings › Top bar › Date format |
-| `nightdrive apps` | Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage, Disk Usage) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
+| `nightdrive topbar date dmy` | The clock's date: `dmy` 19.10., `mdy` 10/19, `iso` 10-19 or `auto` (the region's, Settings › Region, which also sets its time: 2:30 PM in the US); also Launcher › Settings › Top bar › Date format |
+| `nightdrive region set fi` | How dates and times are written: `fi`, `se`, `de`, `uk`, `us` or `iso`; `nightdrive region` shows it, `list` lists them (`--json`); also Launcher › Settings › Region |
+| `nightdrive apps` | Nightdrive's own apps (Files, Mail, Contacts, Deck, Ferry, Garage, Disk Usage, Notes, Text, Tasks, Calendar) and whether each is installed; `nightdrive apps install garage` installs one, `off` and `on` as for plugins |
 | `nightdrive plugins` | Optional parts and whether each is installed and on; `nightdrive plugins install home-assistant` runs one's installer |
 | `nightdrive plugins off ferry` | Hides an installed part from the desktop and stops its services, for one that misbehaves (`on` brings it back; also the switch on its page in the Launcher) |
+| `nightdrive software search gimp` | Fedora's packages and Flathub's apps, as System › Install › Software finds them; `info dnf ID` (or `flatpak`, `plugin`), `installed` and `plugins` tell more (`--json`). `install dnf ID` or `install flatpak ID` installs one, `remove` removes it, `preview install …` shows first what would change; dnf asks for the password in the system's own dialog |
 | `nightdrive plugins add <git-url>` | Adds a plugin from someone else's repo, marked external in the Launcher; `nightdrive update` keeps it up to date, `nightdrive plugins remove ID` deletes it |
-| `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌥Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--effort LEVEL`, `--background` (without taking the keyboard) and `--workspace WS` |
+| `nightdrive ask "Fix the clock"` | Opens Claude Code in a new terminal with that as its first message, as ⌘⌃Enter does from the Launcher; `--dir DIR`, `--name NAME`, `--model MODEL` (opus unless given), `--effort LEVEL` (medium unless given), `--background` (without taking the keyboard), `--workspace WS` and `--account NAME` (one of `nightdrive claude accounts`; without it, the account of the session it's run from). Run from a Claude Code session, the new one is grouped beside it in the sessions bar |
+| `nightdrive sessions` | Your Claude Code sessions, running and closed, the newest first, as Launcher › Sessions lists them (`--query TEXT`, `--limit N`, `--json`); `sessions resume ID` goes on with one: its window, or a terminal in its folder |
+| `nightdrive claude accounts` | Your Claude Code accounts, each a config dir (`--json`); `nightdrive claude usage` the usage limits as JSON (`--account NAME`, `--all`), as the Claude menu shows them |
+| `nightdrive mcp access open` | Claude's access, the window of Launcher › Settings › Claude › *Access*: each area's Read, Modify and Delete, `Allow`, `Ask` or `No`. `level strict` (`normal`, `open`) sets them all, `set mail read allow` one, and `nightdrive mcp access` alone shows what applies. `nightdrive mcp install` gives Claude Code the tools, `remove` takes them away |
 | `nightdrive welcome` | Opens Welcome to Nightdrive: setting up Tailscale, Mail, Contacts, Deck, Ferry… with Claude (signed in first), each on its own, by hand a step at a time, or from their READMEs (Launcher › System › *Set up Nightdrive*) |
 
 ## Keys
@@ -438,8 +586,10 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | Keys | Action |
 |---|---|
 | ⌘ Space | Launcher |
-| ⌘ Enter | Terminal |
-| ⌘ ⌥ Enter | Claude Code (with text typed in the Launcher: sends it as the prompt) |
+| ⌘ ⌥ Space | Ask Claude: opens or closes its toast in the Launcher's place |
+| ⌘ Enter | Terminal (in the Launcher with text typed: Ask Claude, as ⌘⌥Enter) |
+| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, done with Nightdrive's tools only, its steps and answer in a toast in the Launcher's place (Claude Code without text) |
+| ⌘ ⌃ Enter | Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt) |
 | ⌘ C / ⌘ V / ⌘ X | Copy, paste, cut, in every app |
 | ⌘ S | Save |
 | ⌘ W | Close (background apps are only hidden) |
@@ -447,22 +597,26 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | ⌘ ⇧ U | Open the closed window again |
 | ⌘ ⇧ F | Fullscreen |
 | ⌘ ⇧ T | Tile or float the window |
+| ⌘ ⌥ − / ⌘ ⌥ + | The window narrower / wider (US keyboard: ⌘ ⌥ =) |
 | ⌘ ⇧ J | Split direction (⌘ ⇧ arrows move the window) |
+| ⌘ ⇧ G | Window tabs: make the window a group, or break it up (⌘ ⌥ ⇧ arrows: into the group that way, or out; ⌃ ⌥ ⌘ ← / →: its previous / next tab; ⌘ ⇧ + a number and ⌘ ⇧ D move a tab alone, out of its group) |
 | ⌥ Tab / ⌥ ⇧ Tab | The app's next / previous window |
 | ⌘ 1…0 | Go to a workspace |
 | ⌘ ⇧ 1…0 | Move the window there |
 | ⌘ D | Drawer: show or hide |
-| ⌘ ⇧ D | Put the window in the drawer, or take it back out |
+| ⌘ ⇧ D | Put the window in the drawer, or take it back out (a tab alone; back, into its group) |
 | ⌘ ⇧ V | Clipboard history |
 | ⌘ ⇧ E | Emoji |
 | ⌘ ⇧ C | Claude writes, in any app ([Claude writes](#claude-writes)) |
 | ⌘ ⌃ C | Send the selection, files or a picture to a Claude Code session ([Send to Claude](#send-to-claude)) |
 | ⌘ ⇧ S | Screenshot of a region, to the clipboard (Save in the notification keeps a copy) |
 | ⌘ ⌥ S / ⌘ ⌥ ⇧ S | Screenshot of a window / of the screen |
+| ⌘ ⌃ S | The text in a region to the clipboard (OCR, English; other languages: their `tesseract-langpack-<lang>`, and e.g. `eng+fin` in `~/.config/nightdrive/ocr-languages`) |
 | Hyper B / F / E / M / P | Browser / Files / Email / Music / 1Password |
 | ⌘ ⇧ Space | Walk through the top bar menus with the keyboard |
 | ⌘ Esc | Notifications |
 | F5 / Fn / Insert | Dictation, held: F5 or Fn on a Mac, Insert on a PC ([another key](docs/dictation.md)) |
+| ⌘ ⇧ + dictation key | Dictate to Ask Claude: sent as you let go, a small card shows the answer ([Claude](docs/claude.md)) |
 | ⌘ ⇧ K | All shortcuts (also in the Launcher under *Keybindings*) |
 
 The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
@@ -490,7 +644,8 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
 - **Reopened terminals**: the programs that ⌘⇧U starts again in a closed terminal (editors and the like) are in
   [`config/hypr/reopen-commands`](config/hypr/reopen-commands).
 - **Launcher apps**: only the apps in [`config/fuzzel/apps-allow.txt`](config/fuzzel/apps-allow.txt) are listed. Search finds
-  the rest.
+  the rest. An app whose program isn't installed (its `TryExec`, or else its `Exec`) is left out, even if its `.desktop`
+  file remains.
 - **Private additions**: some things don't belong in a public repo, like work tools or a personal dashboard. You can keep them in
   your own private repo and link them into git-ignored *local* slots. Nightdrive loads them when they exist:
 
@@ -498,7 +653,7 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   |---|---|
   | `config/hypr/local.d/*.lua` | autostart entries, window rules, keybindings |
   | `config/hypr/background-apps.local`, `reopen-commands.local`, `SHORTCUTS.local.md` | more background apps, more programs ⌘⇧U starts again, your own entries in the shortcut list |
-  | `config/quickshell/local/` | `<Name>Menu.qml` bar menus, and `LauncherExtension.qml` for your own Launcher levels |
+  | `config/quickshell/local/` | `<Name>Menu.qml` bar menus, `LauncherExtension.qml` for your own Launcher levels, and `trials`: a line per feature on trial to show (`font`: Launcher › Settings › Theme › Font) |
   | `config/fuzzel/apps-allow.local.txt` | more apps shown in the Launcher |
   | `config/kitty/local.conf`, `config/ghostty/local.ghostty`, `config/alacritty/local.toml`, `config/foot/local.ini` | your own kitty, Ghostty, Alacritty and foot settings (font, size, keys), over Nightdrive's |
   | `config/firefox/user.local.js` | your own Firefox prefs (`user_pref(…)`, e.g. the Browser Toolbox), after Nightdrive's; written into the profile by `nightdrive update` |
@@ -511,7 +666,8 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   under it. Icons are SVGs: Lucide by name, or `pack:name` from any [Iconify](https://icon-sets.iconify.design) set (fetched
   once). Sizes are in `config/topbar/adjust.conf`.
   Quickshell reloads when one of its files is saved, and a short popup says so ("The top bar reloaded", "restarted", or
-  "didn't reload" with the error), so it doesn't go unnoticed.
+  "didn't reload" with the error), so it doesn't go unnoticed. If it crashes, it starts again by itself and says so; after
+  three crashes in two minutes it stays off: `nightdrive restart` starts it.
 - The menus use ordinary command-line tools such as `wpctl`, `nmcli`, `bluetoothctl`, `upower`, `tailscale`, `cliphist` and `dnf`.
   There are no daemons of their own.
 - The theme script (`config/hypr/scripts/theme`) derives every shade from one colour. It writes a small file for Quickshell,
@@ -522,15 +678,32 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
 
 - **Known issues** that have a workaround but no fix in Nightdrive yet are listed in [docs/known-issues.md](docs/known-issues.md),
   each with its own issue labelled `known issue`.
+- **A background service that keeps failing tells you.** Mail's, Calendar's and Contacts' syncs, the reminders, due
+  tasks and the update check run on timers, out of sight: when one fails 3 times in a row, a notification says which,
+  with its last error and **Show the log** (`journalctl --user -u UNIT`), at most once a day per service. A sync
+  doesn't count a failure while you're offline, and waits until it has failed for 2 hours.
 - **Hyprland comes from Nightdrive's own COPR.** Fedora's own repositories have no Hyprland, so on every machine the
   installer takes the Hyprland packages from [`@nightdrive/nightdrive`](https://copr.fedorainfracloud.org/coprs/g/nightdrive/nightdrive/)
   (aarch64 and x86_64; specs in [nightdrive-packages](https://github.com/nightdrive-sh/nightdrive-packages)) and limits
-  that repository to them. Ghostty comes from there too.
+  that repository to them. Its signing key is checked by fingerprint before dnf trusts it (`nightdrive update` asks
+  for sudo once to set this up on an existing install). Ghostty comes from there too, VNC Display's wayvnc
+  (Fedora 44's is too old), and Quickshell, which the top bar runs on (Fedora 44's crashes on Hyprland 0.57).
+- **More inotify instances.** The installer (and `nightdrive update`) sets `fs.inotify.max_user_instances` to 1024
+  in `/etc/sysctl.d/60-nightdrive-inotify.conf`: Fedora's 128 runs out with the top bar, a few windows and terminals,
+  and the next program then fails to start with "Too many open files". A higher value of your own still wins.
 - **The Claude menu** reads your plan's limits with Claude Code's own sign-in, so Claude Code must have been run once.
 - **Claude writes (⌘⇧C)** sends the selected text (or what you type in its card), and the window's class and title, to
   Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers
   or claude.ai connectors, and nothing is saved as a session. Its text goes in only after you've seen it, the clipboard
   gets its own content back, and the text isn't kept in the clipboard history.
+- **Claude and your desktop.** With Nightdrive's tools on in Claude Code (Launcher › Settings › Claude › *Access*, or
+  `nightdrive mcp install`), any Claude Code session can use your desktop as far as Access allows. Each area (Mail,
+  Appearance…) has Read, Modify and Delete, each *Allow*, *Ask* (Nightdrive's own card asks you each time) or *No* (not
+  there for Claude at all). *Strict* gives only Nightdrive's docs and status; *Normal* asks before reading what is
+  private (mail, contacts, calendar, notes, recordings, notifications, the screen) and before deleting; *Open* allows the
+  rest.
+  Sending, installing and devices always ask; passwords are never there. What each area gives, and how to turn it off:
+  [docs/claude.md](docs/claude.md).
 - **No credentials are stored in this repo.** Tokens stay with each app (Deck, Claude Code) or in 1Password.
 
 ## Want to participate?
@@ -558,7 +731,6 @@ Nightdrive is work in progress, and help of almost any kind moves it forward:
 Inspired by [Omarchy](https://omarchy.org). Built on [Hyprland](https://hypr.land) and [Quickshell](https://quickshell.org), on top of the [Asahi Linux](https://asahilinux.org) team's work. The colours start
 from the [Tokyo Night](https://github.com/enkia/tokyo-night-vscode-theme) palette, and the icons are [Lucide](https://lucide.dev) (ISC).
 The wallpapers were made with ChatGPT image generation for now (artists welcome, see [Want to participate?](#want-to-participate)).
-The Tailscale logo in the bar is Tailscale's trademark.
 
 ## License
 

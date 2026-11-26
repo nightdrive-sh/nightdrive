@@ -6,7 +6,7 @@
 # (app-keys reads the defaults from that).
 d=$HOME/.config/hypr
 list=$HOME/.cache/nightdrive/plugins
-active=$HOME/.cache/nightdrive/plugins.d/active   # id<TAB>folder of the installed plugin folders (nightdrive plugins installed)
+active=$HOME/.local/state/nightdrive/plugins.d/active   # id<TAB>folder of the installed plugin folders (nightdrive plugins installed)
 [[ -e $list ]] || "$HOME/.local/bin/nightdrive" plugins installed >/dev/null 2>&1
 {
   cat "$d/SHORTCUTS.md" 2>/dev/null

@@ -1,0 +1,25 @@
+# What `nightdrive backup` leaves out: restic's --exclude-file, a pattern a line ($HOME is expanded; docs/backup.md).
+# Yours to edit: written once from Nightdrive's default, never overwritten. Other disks, network mounts and folders
+# with a CACHEDIR.TAG are left out anyway.
+
+# Caches and the trash: made again, or meant to go
+$HOME/.cache
+$HOME/.local/share/Trash
+$HOME/.var/app/*/cache
+node_modules
+
+# Programs, not your files: installed again from Flathub, Steam or the container registry
+$HOME/.local/share/flatpak
+$HOME/.local/share/containers
+$HOME/.local/share/Steam
+$HOME/.steam
+
+# Downloaded speech and language models: many GB, fetched again as docs/dictation.md and Ollama do
+$HOME/.local/share/voxtype/models
+$HOME/.ollama/models
+
+# Garage's virtual machines: disk images of many GB, changed whole by every boot. Back one up by hand if you need it
+$HOME/.local/share/nightdrive/garage
+
+# Nightdrive Hub's live data, written while it runs: its nightly copy, ~/nightdrive-hub-backup, is backed up instead
+$HOME/nightdrive-hub
