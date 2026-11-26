@@ -86,8 +86,8 @@ Rectangle {
                         width: parent.width
                         elide: Text.ElideRight
                         // A code or a password isn't shown on the bar's menu, which others may see (Ferry names it so)
-                        text: r.isFile ? r.modelData.name || "" : r.modelData.secret ? "Code or password"
-                            : (r.modelData.text || "").replace(/\s+/g, " ").trim()
+                        text: r.modelData.secret && !r.isFile ? "Code or password"
+                            : w.menu.oneLine(r.isFile ? r.modelData.name : r.modelData.text)
                         // What was sent may have come from anywhere (a paste): AutoText would draw it as markup
                         textFormat: Text.PlainText
                         color: Theme.accent

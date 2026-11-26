@@ -71,6 +71,16 @@ Column {
         while (n >= 1000 && i < 3) { n /= 1000; i++ }
         return (i === 0 ? n : n.toFixed(1)) + " " + u[i]
     }
+    // Another device's text or file name on one line, as Ferry's own `ferry list` shows it: its whitespace one space,
+    // and the C0 and C1 controls, DEL and the bidi controls as escapes (\x1b, \u202e). Not markup (rows are
+    // PlainText), but a bidi control would make the row read in another order than the text is ("photo" U+202E
+    // "gpj.exe" reads "photoexe.jpg"). What a click copies or a drag carries is the text as it came.
+    function oneLine(s) {
+        return (s || "").replace(/\s+/g, " ").trim().replace(/[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, c => {
+            const n = c.charCodeAt(0)
+            return n < 0x100 ? "\\x" + n.toString(16).padStart(2, "0") : "\\u" + n.toString(16).padStart(4, "0")
+        })
+    }
     function act(it) {
         if (it.kind === "text") { m.copied = { id: it.id, item: it, at: Math.max(0, m.received.indexOf(it)) }; m.run(["copy", it.id]); m.flashOn(it.id) }
         else { m.run(["open", it.id]); m.close() }

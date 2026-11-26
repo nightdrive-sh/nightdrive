@@ -101,7 +101,7 @@ Item {
         Text {
             width: parent.width
             elide: Text.ElideRight
-            text: r.isFile ? r.modelData.name : r.modelData.text.replace(/\s+/g, " ").trim()
+            text: r.menu.oneLine(r.isFile ? r.modelData.name : r.modelData.text)
             // Another device's text or file name: AutoText would draw it as markup if it looked like a tag (a link, an
             // <img> that loads from the net). The line under it holds the sender's name.
             textFormat: Text.PlainText
