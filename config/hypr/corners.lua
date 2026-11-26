@@ -9,7 +9,7 @@ return function(BAR_HEIGHT, session)
     -- turns them on. The shader is tuned for the MacBook's 3024×1964 display (scale 2.0). Even then they are off when a window
     -- is fullscreen (bar hidden), and under the login screen (no bar either).
     -- Top bar opacity (Settings › Top bar opacity, hypr/scripts/bar-style): below 100 % we use a copy of the shader written by
-    -- the script, in which the top corners are as transparent as the bar. The change is applied with `hyprctl reload`.
+    -- the script, in which the top corners are as transparent as the bar. The change is applied with NightdriveShaderRefresh below.
     local function corner_shader_path()
         local f = io.open(HOME .. "/.local/state/bar-opacity")
         local v = f and tonumber(f:read("l"))
@@ -32,6 +32,14 @@ return function(BAR_HEIGHT, session)
         return v == "on"
     end
     local night = night_on()
+    -- bar-style opacity and nightlight apply their change with `hyprctl eval "NightdriveShaderRefresh()"`, not a config
+    -- reload: a reload takes the keyboard from the launcher (a layer surface), so the next value couldn't be tried (#3702)
+    local update_corners   -- below
+    function NightdriveShaderRefresh()
+        corner_shader = corner_shader_path()
+        night = night_on()
+        update_corners()
+    end
     local function night_shader(corners)
         local f = io.open(corner_shader)
         if not f then return "" end
@@ -55,7 +63,6 @@ return function(BAR_HEIGHT, session)
     -- they show, as the real login screen does:
     -- hyprctl eval "NightdriveCornersHidden(true)"; a config reload brings them back
     local corners_hidden = false
-    local update_corners   -- below
     function NightdriveCornersHidden(on)
         corners_hidden = on
         update_corners()
