@@ -100,6 +100,27 @@ class Follow(unittest.TestCase):
         self.follow()
         self.assertFalse(os.path.exists(self.mimeapps))
 
+    def set_text_if_unset(self):
+        apps = {"nightdrive-text.desktop": {"Name": "Text"}, "writer.desktop": {"Name": "Writer"}}
+        with mock.patch.object(da, "entries", lambda: apps), mock.patch.object(da, "current", self.current):
+            da.set_default("text", "nightdrive-text.desktop", if_unset=True)
+        return da.defaults(da.read_mimeapps())
+
+    def test_text_editor_installed(self):
+        # #3414: nothing chosen, text/plain fell to the last app registering it (Writer), and the code types followed it
+        self.gio = {"text/plain": "writer.desktop", "application/json": "writer.desktop"}
+        self.follow()
+        own = self.set_text_if_unset()
+        for t in ("text/plain", "text/csv", "application/json"):
+            self.assertEqual(own[t], "nightdrive-text.desktop", t)
+
+    def test_text_editor_chosen_stays(self):
+        # A text editor the user chose (Settings › Apps › Default apps) is left alone by an install or an update
+        Path(self.mimeapps).write_text("[Default Applications]\ntext/plain=writer.desktop\n")
+        own = self.set_text_if_unset()
+        self.assertEqual(own["text/plain"], "writer.desktop")
+        self.assertNotIn("text/csv", own)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Text's app icon: Lucide's file-pen-line as a neon sign, made like Notes' (near black, a glow under the line), in
+       cyan and violet so it doesn't mix up with Notes' amber beside it -->
+  <defs>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6bf0ff"/><stop offset=".5" stop-color="#7aa8ff"/><stop offset="1" stop-color="#b57bff"/></linearGradient>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="-8" y="-8" width="40" height="40"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="#16141f"/>
+  <g transform="translate(76 76) scale(15)" fill="none" stroke="url(#neon)" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="2.2" filter="url(#glow)">
+      <path d="m18 5-2.414-2.414A2 2 0 0 0 14.172 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/>
+      <path d="M21.378 12.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+      <path d="M8 18h1"/>
+    </g>
+    <g stroke-width="1.5">
+      <path d="m18 5-2.414-2.414A2 2 0 0 0 14.172 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/>
+      <path d="M21.378 12.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+      <path d="M8 18h1"/>
+    </g>
+  </g>
+</svg>
