@@ -178,7 +178,7 @@ class AskClaude(unittest.TestCase):
 
     def test_downloads_folder_reaches_the_server(self):
         # #2242: web_download's folder is the conversation's, given to the server on its command line; an old
-        # conversation's folder goes
+        # conversation's folder goes. #3157: so is the conversation's id, which marks the changes its card can undo
         old = self.state / "old-one"
         (old / "files").mkdir(parents=True)
         os.utime(old, (0, 0))
@@ -187,7 +187,8 @@ class AskClaude(unittest.TestCase):
         files = self.state / session / "files"
         server = json.loads(Path(f"{self.log}.mcp").read_text())["mcpServers"]["nightdrive"]
         self.assertEqual(server, {"type": "stdio", "command": "/usr/bin/env",
-                                  "args": [f"NIGHTDRIVE_ASK_FILES={files}", "/x/bin/nightdrive", "mcp"]})
+                                  "args": [f"NIGHTDRIVE_ASK_FILES={files}", f"NIGHTDRIVE_ASK_ID={session}",
+                                           "/x/bin/nightdrive", "mcp"]})
         self.assertTrue(files.is_dir())
         self.assertEqual(files.stat().st_mode & 0o777, 0o700)
         self.assertFalse(old.exists())
