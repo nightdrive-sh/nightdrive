@@ -69,7 +69,7 @@ case ${1:-open} in
   help|-h|--help) usage ;;
   *)
     # A folder: the window opens on it
-    if [[ -d $1 ]]; then
+    if [[ -d ${1:-} ]]; then   # ${1:-}: set -u, and the launcher starts it with no argument
       open_ready; ipc open "$(readlink -f "$1")"; exit
     fi
     app_command "$@"; status=$?        # open (the default), restart, quit, log
