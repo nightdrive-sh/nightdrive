@@ -32,6 +32,10 @@ QtObject {
         else if (ctrl && (k === Qt.Key_Up || k === Qt.Key_Down)) {}
         // The arrows move in the list, as in Mac Mail (Space pages through the message); with the thread
         // alone on show they scroll it, and j k or ⌥ arrows move on. Only the list on show: PgUp PgDn too
+        // Files' v: mark and go on; j k then move among the marks without dropping them (shell.qml, markNext)
+        else if (k === Qt.Key_V && !ctrl && !(win.onePane && win.readerOpen)) win.markNext()
+        else if (win.marking && (k === Qt.Key_Down || k === Qt.Key_J)) win.moveMarking(win.current + 1)
+        else if (win.marking && (k === Qt.Key_Up || k === Qt.Key_K)) win.moveMarking(win.current - 1)
         else if (win.listOnly && (k === Qt.Key_Down || k === Qt.Key_J)) win.open(Math.min(win.current + 1, win.threads.length - 1))
         else if (win.listOnly && (k === Qt.Key_Up || k === Qt.Key_K)) win.open(Math.max(win.current - 1, 0))
         else if (win.listOnly && k === Qt.Key_PageDown) win.open(Math.min(win.current + 10, win.threads.length - 1))
@@ -46,10 +50,11 @@ QtObject {
         else if (k === Qt.Key_H) win.htmlMode = (win.htmlMode + 1) % 3
         // ⌘C copies the text selected in the message (Thread.copy), and never starts a new message
         else if (reader.isCopy(e)) reader.copy()
-        else if (k === Qt.Key_C) win.compose("new")
+        // n as well as c and ⌘N: Files leaves n free, so it means a new message in both hands' habits
+        else if (k === Qt.Key_C || k === Qt.Key_N && !ctrl) win.compose("new")
         else if (k === Qt.Key_F) win.compose("forward")
-        // Enter opens the thread in a window of its own; in one pane, first in the window
-        else if (k === Qt.Key_Return || k === Qt.Key_Enter) { if (writer.draft()) win.compose("resume"); else if (win.onePane && !win.readerOpen) win.openReader(); else win.openWindow(win.current) }
+        // Enter opens the thread in a window of its own; in one pane, first in the window. o and l (Files' open) too.
+        else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_O || k === Qt.Key_L) { if (writer.draft()) win.compose("resume"); else if (win.onePane && !win.readerOpen) win.openReader(); else win.openWindow(win.current) }
         // r answers everyone, ⇧R only the sender; ⌘⇧C (Ctrl+Shift+C) has Claude write the reply.
         else if (k === Qt.Key_R && !alt) win.compose(e.modifiers & Qt.ShiftModifier ? "reply" : "all")
         else if (k === Qt.Key_A || k === Qt.Key_E) ops.archive()

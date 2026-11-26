@@ -10,17 +10,18 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | ↑ ↓ or `j` `k` | Move in the list |
 | `Space` ⇧Space | Page through the message |
 | `/` or ⌘F | Search the account's folders but Spam and Trash (notmuch's query syntax); each thread shows the folder it is in. `Esc` clears it |
-| ⌥F | While searching: only the folder picked (also how Spam and Trash are searched), or all again |
+| ⌥F, or `Tab` in the search | While searching: only the folder picked (also how Spam and Trash are searched), or all again |
 | `1`–`6` or Ctrl+↑ Ctrl+↓ | Inbox, Sent, Drafts, Archive, Spam, Trash |
 | ⌘B | Hide or show the folders |
 | `Tab` ⇧Tab | Keys to the folders and back |
 | Ctrl+Tab Ctrl+⇧Tab | The next account |
-| `Enter` | The thread in a window of its own (in Drafts, the draft) |
+| `Enter` or `o` `l` | The thread in a window of its own (in Drafts, the draft) |
 | `h` | Text, HTML on the dark page, or HTML as it was sent |
 | ⇧H | The HTML in your browser, with nothing loaded from the network |
 | `u` ⇧U | Mark unread; mark the whole folder (or what a search found) read |
-| `a` `d` `!` | Archive, Trash, spam (in Spam: not spam) |
+| `a` `d` (⌘⌫) `!` | Archive, Trash, spam (in Spam: not spam) |
 | ⌘Z | Undo |
+| `v` | Select the thread and go on to the next, as in Files; `j` `k` then keep what is selected. `Esc` lets go |
 | ⇧↑ ⇧↓ ⌘A | Select several threads (Ctrl-click adds one) |
 | ⌘⇧⌫ | Empty Trash, or in Spam empty Spam: asks first, and can't be undone (`d` in Trash deletes one for good) |
 
@@ -42,7 +43,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 
 | Keys | |
 | --- | --- |
-| `c` or ⌘N | New message |
+| `c` `n` or ⌘N | New message |
 | `r` ⇧R | Reply to all; to the sender only |
 | `f` | Forward, with the attachments |
 | Ctrl+Enter | Send |
@@ -51,6 +52,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | `Esc` | Close: saved again if it was saved before, a new one thrown away on the second `Esc` |
 
 - `nightmail new FILE…` writes a new message with the files attached, as Files' `m` does; a message being written takes them instead.
+- What you write is saved in Drafts as you go (a few seconds after you stop typing, and every half minute), over the same draft, so a crash or a restart loses little: the message is in Drafts. Thrown away with `Esc`, it leaves Drafts too. If its draft was sent or changed elsewhere meanwhile (Claude's `mail_draft`), saving stops and says so: ⌘S saves it again.
 - Sending goes on in the background. A message that can't be sent stays in Drafts, and "Not sent" in the sidebar tells why.
 - A reply goes from the account the message came to; a click on From changes it. Your signature (`signature` in `account.conf`, below) goes above the quote.
 - To and Cc suggest addresses from your mail, and from Nightdrive Contacts.

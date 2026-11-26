@@ -41,6 +41,8 @@ Rectangle {
             onEscapePressed: { text = ""; win.reload(false); list.forceActiveFocus() }
             onReturnPressed: list.forceActiveFocus()
             onDownPressed: list.forceActiveFocus()
+            // Tab while searching switches all folders and this one, as ⌥F does (and Tab in Files' filter)
+            Keys.onPressed: e => { if ((e.key === Qt.Key_Tab || e.key === Qt.Key_Backtab) && win.searcher.on) { win.searcher.toggle(); e.accepted = true } }
             Timer { id: searchDelay; interval: 150; onTriggered: win.reload(false) }
         }
         // Under the search, level with the line under the thread's buttons (the last pixel of Thread.barHeight)

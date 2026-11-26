@@ -204,7 +204,7 @@ ShellRoot {
             // Something to do on the thread (a notification's Reply) needs it on show
             if (then && onePane) readerOpen = true
             current = i
-            picked = []; anchorId = ""
+            picked = []; anchorId = ""; marking = false
             if (listOnly) return
             htmlMode = settings.view
             if (i < 0) { messages = []; return }
@@ -310,8 +310,21 @@ ShellRoot {
             if (a === i) { open(i); return }
             picked = threads.slice(Math.min(a, i), Math.max(a, i) + 1).map(t => t.thread)
             anchorId = threads[a].thread
-            current = i
+            current = i; marking = false
         }
+        // v marks the thread the keyboard is on (or unmarks it) and goes on to the next, as in Files. While marking,
+        // j k move the keyboard and keep the marks (ListKeys.qml); any other way of opening a thread drops them. With
+        // the last mark gone the next thread opens, so the keys never act on one that isn't shown.
+        property bool marking: false
+        function markNext() {
+            const t = threads[current]
+            if (!t) return
+            const next = Math.min(current + 1, threads.length - 1)
+            picked = isPicked(t) ? picked.filter(p => p !== t.thread) : picked.concat([t.thread])
+            if (!picked.length) { open(next); return }
+            anchorId = t.thread; marking = true; current = next
+        }
+        function moveMarking(i) { if (i >= 0 && i < threads.length) current = i }
         function togglePick(i) {
             const id = threads[i].thread
             const base = picked.length ? picked : threads[current] ? [threads[current].thread] : []
@@ -485,11 +498,11 @@ ShellRoot {
         property alias cheats: sheet.shown
 
         readonly property var keyHelp: [
-            { title: "Read", keys: [["↑ ↓  j k", "Previous, next"], ["⏎", "Open in a window"], ["Esc  ←", "Back to the list (narrow window)"], ["PgUp PgDn", "In the list alone: a page in it"], ["↑ ↓", "In the thread alone: scroll it"], ["Space ⇧Space  PgDn PgUp", "Page down, up"], ["h", "HTML or text"], ["⇧H", "HTML in the browser"],
-                                    ["⌘F  /", "Search all folders but Spam, Trash"], ["⌥F", "Search only this folder, or all"], ["Esc", "Clear the search"]] },
-            { title: "Act", keys: [["a", "Archive"], ["d  ⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Fetch new mail"],
-                                   ["⇧↑ ⇧↓  ⇧-click", "Select several"], ["Ctrl-click", "Select or leave out"], ["⌘A", "Select all"]] },
-            { title: "Write", keys: [["⌘N  c", "New message"], ["r", "Reply to all"], ["⇧R", "Reply to the sender only"], ["f", "Forward"],
+            { title: "Read", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  o  l", "Open in a window"], ["Esc  ←", "Back to the list (narrow window)"], ["PgUp PgDn", "In the list alone: a page in it"], ["↑ ↓", "In the thread alone: scroll it"], ["Space ⇧Space  PgDn PgUp", "Page down, up"], ["h", "HTML or text"], ["⇧H", "HTML in the browser"],
+                                    ["⌘F  /", "Search all folders but Spam, Trash"], ["⌥F  Tab", "Search only this folder, or all"], ["Esc", "Clear the search"]] },
+            { title: "Act", keys: [["a", "Archive"], ["d  ⌫  ⌘⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Fetch new mail"],
+                                   ["v", "Select, and on to the next"], ["⇧↑ ⇧↓  ⇧-click", "Select several"], ["Ctrl-click", "Select or leave out"], ["⌘A", "Select all"]] },
+            { title: "Write", keys: [["⌘N  c  n", "New message"], ["r", "Reply to all"], ["⇧R", "Reply to the sender only"], ["f", "Forward"],
                                      ["⏎", "Continue a draft (in Drafts)"], ["⌘⇧C", "Claude writes the reply"], ["⌘⇧C", "…from the selected text"],
                                      ["⌘⇧A", "Attach files"], ["⌘V", "Paste: copied files are attached"],
                                      ["Ctrl ⏎", "Send"], ["⌘S", "Save in Drafts"], ["Esc", "Close (Esc Esc: throw away)"]] },
