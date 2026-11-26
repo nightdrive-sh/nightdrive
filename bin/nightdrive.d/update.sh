@@ -232,7 +232,7 @@ update() {
 # source, Contacts' accounts after `contacts disable`, Ferry's box), and it is marked without installing. Without sudo (can_sudo, update) it waits, unmarked, for a run in a terminal. A
 # failed install is marked too, so a build that fails doesn't run again on every update: missed has the command.
 # Only the repo's plugins: an external one can't install itself by naming the group. An app with bundled=no in its
-# plugin.conf (Garage) isn't offered at all: it waits in Install › Recommended for the user to pick it.
+# plugin.conf (Garage, Disk Usage) isn't offered at all: it waits in Install › Recommended for the user to pick it.
 offer_apps() {
   local a id name inst dir trace apps did=0
   mkdir -p "${offered%/*}"; touch "$offered"

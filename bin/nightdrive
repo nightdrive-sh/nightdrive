@@ -74,7 +74,7 @@ usage() {
   row "mcp access [open|level|set|option|allowed|forget]" "What Claude may use: open (the window), level strict|normal|open, set AREA read|modify|delete allow|ask|no, option AREA ID on|off (a list: add|remove ITEM); allowed: what the card asked once (a calendar), forget TOOL [KEY] to be asked again"
   row "welcome"                  "Welcome to Nightdrive: set up Tailscale, Mail, Deck… with Claude or by hand"
   section "Apps"
-  row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage), and which are installed"
+  row "apps [list]"              "Nightdrive's own apps (Mail, Contacts, Deck, Ferry, Garage, Disk Usage), and which are installed"
   row "apps install NAME"        "Install one, or again after removing it, e.g. nightdrive apps install garage"
   row "apps off|on NAME"         "Hide an installed one from the desktop and stop its services, or bring it back"
   section "Software"

@@ -1,0 +1,79 @@
+#!/bin/bash
+# disk-usage: open Nightdrive's Disk Usage, on a folder if one is given, and what it does from a terminal
+# (plugins/disk-usage, README.md).
+set -u
+
+APP_DIR=$(dirname "$(dirname "$(readlink -f "$0")")")   # the plugin's folder
+QS_DIR=$APP_DIR/app                                     # Disk Usage's own Quickshell config, apart from the desktop's shell
+
+# The window: started, brought forward, waited for and stopped by the apps' kit (app/kit/app.sh)
+# shellcheck disable=SC2034  # app.sh, sourced below, reads APP_TITLE and APP_IPC
+APP_TITLE="Disk Usage"
+# shellcheck disable=SC2034  # as APP_TITLE
+APP_IPC=diskusage
+. "$QS_DIR/kit/app.sh"
+
+# Puts Disk Usage among the desktop's apps (share/disk-usage.desktop, its Keywords for the launcher's search, and its
+# icon), with Exec's full path filled in: the compositor's PATH may not have ~/.local/bin.
+install_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  local apps=$data/applications icons=$data/icons/hicolor/scalable/apps
+  mkdir -p "$apps" "$icons"
+  cp "$APP_DIR/share/disk-usage.svg" "$icons/nightdrive-disk-usage.svg"
+  sed "s|^Exec=disk-usage|Exec=$HOME/.local/bin/disk-usage|" "$APP_DIR/share/disk-usage.desktop" > "$apps/nightdrive-disk-usage.desktop"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true     # the launcher's list
+  echo "Installed: $apps/nightdrive-disk-usage.desktop"
+}
+
+# Takes it out of the apps, so it is back in Install › Recommended (plugin.conf's installed test). The scans' cache goes
+# with it; nothing of yours was ever in it.
+uninstall_app() {
+  local data=${XDG_DATA_HOME:-$HOME/.local/share}
+  app_command quit >/dev/null 2>&1 || true
+  rm -f "$data/applications/nightdrive-disk-usage.desktop" "$data/icons/hicolor/scalable/apps/nightdrive-disk-usage.svg"
+  rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/nightdrive/disk-usage"
+  command -v update-desktop-database >/dev/null && update-desktop-database "$data/applications" 2>/dev/null
+  "$HOME/.config/fuzzel/sync-apps" >/dev/null 2>&1 || true
+  echo "Disk Usage is out of your apps. Install it again from Launcher › System › Install › Recommended."
+}
+
+usage() {
+  cat <<USAGE
+Usage: disk-usage [command | FOLDER]
+
+  (none), open     open Disk Usage, or bring it forward
+  FOLDER           open it on FOLDER (scanned, and kept in the sidebar)
+  top [FOLDER] [N] the N biggest entries of FOLDER (default: your home folder, 20), in the terminal
+  places [--json]  the sidebar's places: each one's disk (size, free, used) and its last scan's total
+  clean [--json]   what Clean up can free, and how much (--json: [{id, name, what, size}])
+  clean ID…        empty these (clean's first column), or all for every one
+  cleanup          open Clean up in the window
+  install          Disk Usage among the desktop's apps (the installer)
+  uninstall        take it out again
+  restart          close and open again (after a change to the app)
+  quit             close Disk Usage
+  log              follow the app's log (QML errors show up here)
+  help             this text
+USAGE
+}
+
+case ${1:-open} in
+  top)        python3 "$APP_DIR/lib/scan.py" top "${2:-$HOME}" "${3:-20}" ;;
+  places)     python3 "$APP_DIR/lib/scan.py" places ;;
+  clean)      if [[ ${2:-} == --json ]]; then python3 "$APP_DIR/lib/clean.py" list
+              elif (($# > 1)); then python3 "$APP_DIR/lib/clean.py" run --text "${@:2}"; else python3 "$APP_DIR/lib/clean.py" list --text; fi ;;
+  cleanup)    open_ready; ipc cleanUp ;;
+  install)    install_app ;;
+  uninstall)  uninstall_app ;;
+  help|-h|--help) usage ;;
+  *)
+    # A folder: the window opens on it
+    if [[ -d $1 ]]; then
+      open_ready; ipc open "$(readlink -f "$1")"; exit
+    fi
+    app_command "$@"; status=$?        # open (the default), restart, quit, log
+    ((status == 2)) && { usage >&2; exit 2; }
+    exit $status
+    ;;
+esac

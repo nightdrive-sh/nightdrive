@@ -1,0 +1,59 @@
+{
+  "tools": [
+    {
+      "name": "disk_usage_disks",
+      "title": "Disks and their free space",
+      "description": "The places in Disk Usage's sidebar as a JSON list: Home, the system disk (This computer, /), mounted disks and the folders the user chose there, each with its disk's size, free and used (bytes) and, once scanned, total (bytes in that place) and scanned (Unix time). Use it for how full a disk is; disk_usage_top tells what fills a folder.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["python3", "lib/scan.py", "places"],
+      "class": "read",
+      "area": "disk-usage"
+    },
+    {
+      "name": "disk_usage_top",
+      "title": "What takes the space in a folder",
+      "description": "The biggest entries of a folder in the user's home, biggest first, as Disk Usage counts them (the space on the disk; a hard-linked file once; other disks mounted inside left out): path, total and files in it, scanned (Unix time; a scan under an hour old is reused, else it walks the folder, which for a whole home takes up to a minute), disk (its disk's size, free, used) and entries [{name, kind (folder, file, smaller items, hidden), size (bytes), share (% of the folder)}]. Hidden entries (.cache, .local) are one row of kind hidden: disk_usage_cleanable tells what of them Clean up can empty. Only folders the user lets Claude use (Settings › Claude › Access › Apps and files): fails with the reason for others. To look deeper, call it again on an entry's folder.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 4096, "title": "Folder", "description": "An absolute path or ~/… (default: the home folder)"},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 100, "title": "Entries", "description": "How many (default 20)"}
+        },
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/claude.py", "top", ["--limit", "{limit}"], ["--", "{path}"]],
+      "class": "read",
+      "area": "disk-usage",
+      "options_from": ["apps-files"],
+      "timeout": 300
+    },
+    {
+      "name": "disk_usage_cleanable",
+      "title": "What Clean up can free",
+      "description": "What Disk Usage's Clean up can empty without losing anything of the user's, as a JSON list: id, name, what (one line) and size (bytes now). The kinds: trash (the Trash, on every disk: deleted for good), thumbnails, browsers (browsers' caches; logins and history stay), packages (pip, uv, npm, Yarn, Cargo and Go downloads) and shaders (graphics drivers' caches). Nothing else in ~/.cache is ever touched. disk_usage_clean empties them.",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["python3", "lib/clean.py", "list"],
+      "class": "read",
+      "area": "disk-usage"
+    },
+    {
+      "name": "disk_usage_clean",
+      "title": "Clean up disk space",
+      "description": "Empties the kinds of Disk Usage's Clean up named by their ids (disk_usage_cleanable lists them with their sizes): only those named folders, never anything else. It can't be undone: the Trash's files are gone for good, and the caches are made again by their apps. The user allows it on screen first, seeing each kind with its size. Returns freed (bytes) and failed (what couldn't go, at most 10). Ask the user first which kinds they want gone, the Trash especially.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string", "enum": ["trash", "thumbnails", "browsers", "packages", "shaders"]}, "title": "What to empty"}
+        },
+        "required": ["ids"],
+        "additionalProperties": false
+      },
+      "command": ["python3", "lib/clean.py", "run", "{ids}"],
+      "card": ["python3", "lib/claude.py", "card", "{ids}"],
+      "class": "act",
+      "deletes": true,
+      "area": "disk-usage",
+      "timeout": 300
+    }
+  ]
+}
