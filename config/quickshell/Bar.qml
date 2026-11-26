@@ -228,13 +228,18 @@ Variants {
         // The modules from the right edge leftwards. On a MacBook with a notch (appledrm.show_notch=1) a module that would
         // reach under it goes, with the rest, to the notch's left side. The notch's width: the `notch` row in adjust.conf
         // (px, 0 = none), otherwise found from the internal screen's resolution.
+        // The gap kept on each side of the notch (logical px), beyond the module's own padding (~9 px around its icon,
+        // which is already enough not to look cut). Small on purpose: the icons come close to the notch, and the space
+        // beside it is room for the bar's own marks (#3428).
+        readonly property int notchMargin: 0
         readonly property real notchWidth: {
             const row = TopBar.sizesLocal.notch || TopBar.sizesPublic.notch
             if (row) return row.size
-            // Physical sizes with the notch shown -> its physical width (approximate, a little wider than the notch)
-            const known = { "3024x1964": 400, "3456x2234": 400, "2560x1664": 360, "2880x1864": 360 }
+            // Physical sizes with the notch shown -> the notch's physical width. The 14" measured on the panel with a
+            // ruler (#3701: 360); the 16" has the same pixel density and notch. The Airs' are estimates.
+            const known = { "3024x1964": 360, "3456x2234": 360, "2560x1664": 344, "2880x1864": 344 }
             const phys = Math.round(modelData.width * dpr) + "x" + Math.round(modelData.height * dpr)
-            return known[phys] ? known[phys] / dpr : 0
+            return known[phys] ? known[phys] / dpr + 2 * notchMargin : 0
         }
         // A narrow screen: modules that would reach over the workspaces are tucked into a "…" left of the rest
         // (BarOverflow, OverflowMenu), the leftmost first: your order puts the ones you look at most near the clock.
