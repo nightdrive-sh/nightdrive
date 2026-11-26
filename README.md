@@ -63,8 +63,8 @@ copies it. Exchange rates refresh daily, and Settings › Launcher › *Decimal 
 
 ### Apps of its own
 
-Files, Mail, Contacts, Deck, Ferry, Notes, Text, Tasks, Calendar and Games come with every install; Garage and Disk Usage wait in Launcher ›
-System › Install › Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled
+Files, Mail, Contacts, Deck, Ferry, Notes, Text, Tasks, Calendar, Disk Usage and Games come with every install; Garage waits in
+Launcher › System › Install › Recommended. They're made for the keyboard, in the desktop's colours, and fit any window: tiled
 narrower, the sidebar steps aside; narrower still, the list and the message take turns.
 
 - **[Files](plugins/files/README.md)**: your files and folders, with yazi's keys beside the ⌘ ones, a preview at the
@@ -196,8 +196,8 @@ workspaces make room.
 details before installing (Tab there takes Flathub's when both have it). Browse has the 100 most popular apps and
 categories. System › Remove takes software and web apps away; Ctrl+Enter there removes one without asking.
 
-Nightdrive's own apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Inbox) and Tailscale come with every install;
-Garage, Nightdrive's app for virtual machines, and Disk Usage wait in System › Install › Recommended. The rest are optional parts,
+Nightdrive's own apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Disk Usage, Inbox) and Tailscale come with every install;
+Garage, Nightdrive's app for virtual machines, waits in System › Install › Recommended. The rest are optional parts,
 under System › Install:
 
 - **Recommended**: apps Nightdrive sets up for you (1Password, Home Assistant…)
@@ -317,7 +317,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Backup | [restic](docs/backup.md) (`nightdrive backup`) | this computer once a day, encrypted, to an SSH server, a bucket or another disk; snapshots to restore from |
 | iPad | [Companion](docs/companion.md) (Nightdrive's own) | your Claude Code sessions, dictation and six buttons of your own on an iPad or a phone, over Tailscale (Settings › Companion) |
 | Virtual machines (optional) | [Garage](plugins/garage/README.md) (Nightdrive's own, qemu and KVM) | Hyper G; ready-made Fedora VMs or an ISO, snapshots to go back to |
-| Disk space (optional) | [Disk Usage](plugins/disk-usage/README.md) (Nightdrive's own) | what takes up the space, folder by folder; Clean up empties the Trash and caches |
+| Disk space | [Disk Usage](plugins/disk-usage/README.md) (Nightdrive's own) | what takes up the space, folder by folder; Clean up empties the Trash and caches |
 | Passwords (optional) | [1Password](plugins/1password/README.md) and its `op` CLI | Passwords level in the Launcher, SSH agent |
 | AI | [Claude Code](https://claude.com/claude-code) (log in once with `claude`) | ⌘Enter asks from the Launcher, ⌘⌃Enter in a terminal, Claude writes (⌘⇧C), sessions and usage limits in the bar |
 | Dictation | [Voxtype](https://github.com/peteonrails/voxtype) (Parakeet, offline) | hold F5 or Fn (Mac), Insert (PC) to talk |
@@ -385,7 +385,7 @@ A minimal Fedora gets what a desktop edition would have: it boots to the login s
 AirPlay in as on Fedora KDE, and SSH stays off until you turn on Remote login (Launcher › Settings), unless you install
 over ssh.
 
-Claude Code, Tailscale and Nightdrive's apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Inbox) come with every
+Claude Code, Tailscale and Nightdrive's apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Disk Usage, Inbox) come with every
 install and stay quiet until you set them up. The optional parts that are on by default (Apostrophe, YouTube) come too;
 the rest can be added later from the Launcher (System › Install) or with `nightdrive plugins install ID`
 (`nightdrive apps install garage` for an app).
@@ -513,7 +513,7 @@ You can also update any time from the Launcher (**Update**) or a terminal:
 nightdrive update
 ```
 
-An install without one of Nightdrive's apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Inbox) gets it with the next
+An install without one of Nightdrive's apps (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Disk Usage, Inbox) gets it with the next
 update, once. Remove one, and it stays removed: Launcher › System › Install › Recommended or
 `nightdrive apps install mail` brings it back.
 Settings › Apps › Nightdrive apps turns one off or on.

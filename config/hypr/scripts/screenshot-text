@@ -1,6 +1,6 @@
 #!/bin/bash
 # screenshot-text → pick a region; its text (OCR, tesseract) goes to the clipboard and stdout. No picture is kept.
-# Run as `screenshot text` (⌘⌃S, Launcher › Tools › Screenshot › Text) or `nightdrive screenshot text`.
+# Run as `screenshot text` (⌘⌃S, Launcher › Tools › Screenshot › Copy text) or `nightdrive screenshot text`.
 # Languages: tesseract's -l, e.g. eng+fin, from the first line of LANG_FILE (default eng). Each needs its
 # tesseract-langpack-<lang> package; packages.txt installs only English.
 set -o pipefail

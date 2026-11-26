@@ -86,7 +86,7 @@ author=@jarilehtinen
 | `mcp` | `none`: the plugin gives Claude no tools, on purpose. Without it, a plugin with a command in `bin/` and no [`mcp.json`](#tools-for-claude-mcpjson) gets a warning from `nightdrive plugin check` |
 | `order` | A number, default 50: `install.sh` installs the plugins in this order, and the lists show them in it. Lower goes first; the same order keeps the folders' (alphabetical) order, then `plugins.txt`'s lines. Home Assistant has 90: its installer asks for addresses, so it runs last |
 
-An `app` (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Inbox, Games) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
+An `app` (Files, Mail, Contacts, Calendar, Notes, Text, Tasks, Deck, Ferry, Recorder, Disk Usage, Inbox, Games) is part of Nightdrive, like the apps that come with macOS: every install gets it without asking,
 it isn't listed in System › Install while it's installed, and its settings are in Settings › Apps (Nightdrive apps
 turns one off or on). It must be fine installed and never set up: one that needs an account (Mail,
 Contacts, Calendar) stays quiet without it, its timers' units skipped by a `Condition…`/`ExecCondition` rather than

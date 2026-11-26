@@ -64,7 +64,7 @@ Item {
             { kind: "action", name: "Window", glyph: "app-window", cmd: shot("window") },
             { kind: "action", name: "Full screen", glyph: "monitor", cmd: shot("full") },
             // OCR: a region's text to the clipboard, no picture kept (hypr/scripts/screenshot-text)
-            { kind: "action", name: "Text", glyph: "scan-text", cmd: shot("text"), extra: "ocr recognise copy text" }
+            { kind: "action", name: "Copy text", glyph: "scan-text", cmd: shot("text"), extra: "ocr recognise copy text" }
         ],
         install: [
             { kind: "nav", name: "Software", glyph: "package-plus", target: "software", summary: "dnf + Flatpak" },

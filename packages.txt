@@ -42,7 +42,7 @@ appstream-data
 cliphist
 grim
 slurp
-# Screenshot › Text (⌘⌃S) reads a region's text: other languages are tesseract-langpack-<lang> (hypr/scripts/screenshot-text)
+# Screenshot › Copy text (⌘⌃S) reads a region's text: other languages are tesseract-langpack-<lang> (hypr/scripts/screenshot-text)
 tesseract
 tesseract-langpack-eng
 brightnessctl
