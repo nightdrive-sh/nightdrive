@@ -1,0 +1,15 @@
+[Desktop Entry]
+# `text install` copies this to ~/.local/share/applications with Exec's full path filled in (the compositor's PATH
+# may not have ~/.local/bin), and the icon to ~/.local/share/icons/hicolor/scalable/apps. MimeType lists the plain text
+# kinds it is meant for, so it is in Files' Open with for them; source code is the code editor's in Default apps.
+Type=Application
+Name=Text
+GenericName=Text Editor
+Comment=Plain text files, configs and scripts, to read and change
+Keywords=text;editor;txt;csv;json;config;
+Icon=nightdrive-text
+Exec=text %F
+Terminal=false
+Categories=Utility;TextEditor;
+MimeType=text/plain;text/csv;text/tab-separated-values;text/x-log;application/json;application/xml;text/xml;application/x-yaml;application/yaml;application/toml;application/x-shellscript;text/x-python3;text/x-python;
+StartupNotify=false

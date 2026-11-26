@@ -49,7 +49,9 @@ KINDS = [
      ["x-scheme-handler/https", "x-scheme-handler/http", "text/html", "application/xhtml+xml"], []),
     ("email", "Email", "mail", "email", ["x-scheme-handler/mailto"], []),
     ("files", "Files", "folder", "file manager", ["inode/directory"], []),
-    ("text", "Text editor", "file-pen-line", "text editor", ["text/plain"], ["TextEditor"]),
+    # A .csv too: a spreadsheet app registers it last and took it, but most are a few lines to read or fix (#3414)
+    ("text", "Text editor", "file-pen-line", "text editor", ["text/plain", "text/csv", "text/tab-separated-values"],
+     ["TextEditor"]),
     # Without its own default, source code opens in the text editor (its types are text/plain's): Markdown's in Apostrophe
     ("code", "Code editor", "code", "code", CODE, ["TextEditor", "IDE"]),
     ("terminal", "Terminal", "square-terminal", "cat:terminals", [], ["TerminalEmulator"]),
