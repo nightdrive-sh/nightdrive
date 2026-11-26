@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from unittest import mock
 
 # A home of its own before the modules read it
 TMP = tempfile.TemporaryDirectory()
@@ -65,6 +66,11 @@ class Scan(unittest.TestCase):
 
 class Claude(unittest.TestCase):
     def setUp(self):
+        # A first scan expects the disk's used space and folds what is under 1/EARLY_FOLD of it: on CI's disk that is
+        # megabytes, which would fold these test files away. A small disk keeps the result the same everywhere.
+        disk = mock.patch.object(scan.walk, "disk", return_value={"size": 10**9, "free": 10**8, "used": 10**6})
+        disk.start()
+        self.addCleanup(disk.stop)
         write(f"{HOME}/Videos/film.mkv", 300_000)
         write(f"{HOME}/.secret-app/data.bin", 200_000)
         write(f"{HOME}/.cache/thing/blob", 100_000)
