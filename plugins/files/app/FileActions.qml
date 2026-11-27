@@ -4,7 +4,7 @@ import "Format.js" as Format
 
 // What the keys, the header's buttons and a drop ask of Files, over Ops (the changes) and Clip (the clipboard): each
 // takes the marked files, or the picked one when none is marked (app.selection()), asks a name in the prompt when it
-// needs one, and the confirm before what can't be undone (deleting from the trash). changed() hears every result and
+// needs one, and the confirm before what takes files away (the trash, deleting from it). changed() hears every result and
 // picks what a change made, so a pasted or new file is the one picked after.
 QtObject {
     id: root
@@ -26,24 +26,35 @@ QtObject {
     function trashPicked() {
         if (app.readOnly()) return
         const ps = app.selection()
-        if (ps.length && !app.trashShown) { trashPaths(ps); app.marks = ({}) }
+        if (ps.length && !app.trashShown) trashPaths(ps)
     }
-    // To the trash at once, but asked first when home's own folders (Documents…), the sidebar's or home's hidden ones
-    // (.config, .local…) are among them: one d away, a running desktop's settings went with no word. Home itself, the
-    // folders above it and the trash are refused by lib/trash.py whatever asks.
+    // Every way to the trash asks first (d, Delete, ⌘⌫, a drop on Trash): a window that took the keyboard unnoticed
+    // while one typed a message sent a file there with one d, lost once the trash was emptied (#3711). The question
+    // names the files, a few and then how many more, so a stray d shows what it would take. Home's own folders
+    // (Documents…), the sidebar's and home's hidden ones (.config…) get a line of their own: one d away, a running
+    // desktop's settings went. Home itself, the folders above it and the trash are refused by lib/trash.py whatever asks.
+    readonly property int namesShown: 3
     function kept(p) {
         const d = app.places.data
         const name = Format.base(p)
         return d.standard.indexOf(p) >= 0 || d.pinned.some(e => e.path === p) || d.bookmarks.some(e => e.path === p)
             || (Format.parent(p) === app.home && name.startsWith("."))
     }
+    // “a”, “b” and “c”, or “a”, “b”, “c” and 4 more
+    function names(ps) {
+        const q = ps.slice(0, ps.length > namesShown + 1 ? namesShown : ps.length).map(p => "“" + Format.base(p) + "”")
+        const more = ps.length - q.length
+        if (more) return q.join(", ") + " and " + more + " more"
+        return q.length === 1 ? q[0] : q.slice(0, -1).join(", ") + " and " + q[q.length - 1]
+    }
     function trashPaths(ps) {
         const ask = ps.filter(kept)
-        if (!ask.length) { app.ops.trash(ps); return }
-        pending = () => app.ops.trash(ps)
-        confirm.question = ps.length === 1 ? "Move “" + Format.base(ps[0]) + "” to the trash?" : "Move " + ps.length + " items to the trash?"
-        confirm.detail = (ps.length === 1 ? "It is" : "Among them, " + ask.map(Format.base).join(", ") + (ask.length === 1 ? " is" : " are"))
-                       + " one of home's own folders or the sidebar's. Undo or the trash puts " + (ps.length === 1 ? "it" : "them") + " back."
+        pending = () => { app.ops.trash(ps); app.marks = ({}) }   // a No keeps the marks
+        confirm.question = ps.length === 1 ? "Move " + names(ps) + " to the trash?" : "Move " + ps.length + " items to the trash?"
+        const which = ps.length === 1 ? "" : names(ps) + ". "
+        const own = !ask.length ? "" : (ps.length === 1 ? "It is" : names(ask) + (ask.length === 1 ? " is" : " are"))
+                  + " one of home's own folders or the sidebar's. "
+        confirm.detail = which + own + "Undo or the trash puts " + (ps.length === 1 ? "it" : "them") + " back."
         confirm.action = "Move to Trash"
         confirm.visible = true
     }

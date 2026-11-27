@@ -434,7 +434,7 @@ FloatingWindow {
             { title: "Moving", keys: [["↑ ↓  j k", "Previous, next"], ["→ ⏎  l  o", "Open: into a folder, a file in its app"], ["→  l on an archive", "Look into it, read-only (⏎ extracts it)"], ["⏎ on a program", "Asks: Run, Run in Terminal (⌘⏎)"], ["O", "Open with: pick the app (⌘⏎: always)"], ["← ⌫  h", "Up a folder"], ["gg  G", "First, last"], ["⌥← ⌥→", "Back, forward"], ["~  gh  gd", "Home, home, Downloads"], ["⌘L", "Go to a folder by its path"]] },
             { title: "Looking", keys: [["Space", "The big preview (↑ ↓ through the files, Space closes)"], ["p  ←  →", "In it, a sound: play or pause, 5 s back or on"], ["i", "The preview at the right"], ["/  ⌘F", "Filter by name (Esc: all again)"], ["f  Tab", "Search all of home (Tab: back to this folder)"], [".", "Hidden files"], ["s  S", "Sort by name, time, size, type; turn round"], ["t", "Thumbnails in a grid, columns, the list again"], ["+  −", "Larger, smaller thumbnails"], ["⌘B", "The sidebar"], ["⌘,", "Settings: Normal or Compact rows"]] },
             { title: "Marking", keys: [["v", "Mark, and on to the next"], ["⇧↑ ⇧↓", "Mark on the way"], ["⌘A", "Mark all"], ["Ctrl-click", "Mark one (⌘-click moves the window)"], ["⇧-click  ⌘⇧-click", "Mark up to it, add up to it"], ["Esc", "No marks"]] },
-            { title: "Changing", keys: [["y  ⌘C", "Copy (pastes as the paths in a terminal)"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["m", "Mail: attached to a new message"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["y, then p", "In an archive: take files out, into a folder"], ["⌘Z", "Undo"]] },
+            { title: "Changing", keys: [["y  ⌘C", "Copy (pastes as the paths in a terminal)"], ["x  ⌘X", "Cut"], ["p  ⌘V", "Paste here"], ["d  ⌘⌫", "To the trash, after asking (⏎ yes, Esc no)"], ["r  F2", "Rename"], ["a", "New file (end with / for a folder)"], ["⌘⇧N", "New folder"], ["c", "Compress: zip, tar.gz, tar.xz, tar"], ["m", "Mail: attached to a new message"], ["⏎  e", "Extract an archive here (⌘O: open it in its app)"], ["y, then p", "In an archive: take files out, into a folder"], ["⌘Z", "Undo"]] },
             { title: "Places", keys: [["Tab", "Sidebar, list"], ["⌘N", "A new window, in this folder"], ["b  ⌘D", "Bookmark the picked folder, or not"], ["Drag", "Onto a folder or the sidebar: moved; from another app: copied"], ["Drag in the sidebar", "A folder to another place, or to the other group"]] },
             { title: "Trash", keys: [["u", "Put back"], ["d", "Delete for good"], ["⌘⇧⌫", "Empty the trash"]] }
         ]
@@ -443,7 +443,12 @@ FloatingWindow {
     SettingsPanel { win: win; behind: content; onVisibleChanged: if (!visible) win.toList() }
     CompressPanel { id: compressPanel; app: win; behind: content }
     AppPrompt { id: prompt; c: win.look; behind: content; onClosed: win.toList() }
-    AppConfirm { id: confirm; c: win.look; behind: content; visible: false; onAnswered: ok => acts.answered(ok) }
+    // A letter typed while it asks answers No: one still typing into what they think is a message field would
+    // otherwise send the file away with the Enter that ends their line (#3711). Return and Enter still answer yes.
+    AppConfirm {
+        id: confirm; c: win.look; behind: content; visible: false; onAnswered: ok => acts.answered(ok)
+        Keys.onPressed: e => { if (/\S/.test(e.text) && !(e.modifiers & (Qt.ControlModifier | Qt.MetaModifier))) { e.accepted = true; acts.answered(false) } }
+    }
     Launch { id: launch; app: win; c: win.look; behind: content }
     AppToast { id: toast; c: win.look }
 }

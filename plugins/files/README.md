@@ -32,7 +32,7 @@ found by a search for "files" or "nautilus" after Files.
 | `s` `S` | Sort by name, time, size or type; the other way round (a click on a column's title too) |
 | `v` | Mark the file and go on to the next; ⇧↑ ⇧↓ mark on the way, ⌘A marks all, Esc unmarks. With the mouse Ctrl-click (the Control key: ⌘-click moves the window) marks one, ⇧-click the files from the one last clicked or picked to it (in place of the marks before), ⌘⇧-click adds them; in a filter or a search only the files shown |
 | `y` `x` `p` or ⌘C ⌘X ⌘V | Copy, cut, paste here: the marked files, else the picked one. A copy pastes as the files in a file browser, as their paths (one a line) in a terminal or a text field, and as attachments in Mail |
-| `d` or ⌘⌫ | To the trash |
+| `d`, Delete or ⌘⌫ | To the trash, after asking: the question names the files (a few, then how many more); ⏎ moves them, Esc or any letter typed keeps them |
 | `r` or F2 | Rename (the name without its ending is picked) |
 | `a` | A new file; a name ending in `/` makes a folder (⌘⇧N: a folder) |
 | `c` | Compress the marked files, else the picked one, into an archive here: its name and format (zip, tar.gz, tar.xz, tar; ↑ ↓ change it) |
@@ -53,7 +53,7 @@ found by a search for "files" or "nautilus" after Files.
 - Looking into an archive unpacks nothing: a zip lists at once, a compressed tar is read from start to end the first time (a big one shows how far), and its listing is kept in `~/.cache/nightdrive/files/archives`, so the next look is at once. A file previewed is taken out on its own into a temporary place that goes when you leave the archive.
 - The search of home is fd's, always up to date: what it leaves out stays out (hidden files unless `.` shows them, `.git`, and what a `.gitignore`, `.ignore` or `.fdignore` excludes), and so do other disks under the folder. It stops at 2000 files: type more to narrow it.
 - The grid's thumbnails (pictures, a PDF's first page, a video's frame) are kept where Nautilus and the other apps keep theirs (`~/.cache/thumbnails`), so each is drawn once and shared with them. Video frames need ffmpeg.
-- The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). `d` moves to it at once (Undo brings it back), but asks first about home's own folders (Documents…), the sidebar's and home's hidden ones (`.config`…); home itself, the folders above it and the trash never go. In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
+- The trash is the one Nautilus and `gio trash` use (a USB stick's stays on the stick). `d` asks before anything goes to it, a drop on Trash too (Undo brings it back), and says so when home's own folders (Documents…), the sidebar's or home's hidden ones (`.config`…) are among them; home itself, the folders above it and the trash never go. In it, `u` puts the picked files back where they were, `d` deletes them for good after asking, and ⌘⇧⌫ or Empty empties it.
 
 ## Open and Save
 
