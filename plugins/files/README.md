@@ -42,6 +42,7 @@ found by a search for "files" or "nautilus" after Files.
 | `b` or ⌘D | Bookmark the picked folder (with a file picked, the one you're in), or take it away |
 | `Tab` | Keys between the sidebar and the list |
 | ⌘N | A new window, in the same folder |
+| `T` | A terminal in the folder on show (the one chosen in Settings › Apps › Default apps); in an archive, the folder it is in |
 | ⌘B ⌘R | Hide the sidebar, read the folder again |
 | ⌘, | Settings (also the gear on the sidebar's title): Normal rows, taller and easy to click, or Compact |
 

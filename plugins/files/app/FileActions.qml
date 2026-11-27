@@ -84,6 +84,15 @@ QtObject {
         })
     }
 
+    // T: the desktop's terminal (Settings › Apps › Default apps) in the folder on show. In an archive, the folder it
+    // is in: its inside isn't a folder a shell can cd to. The trash's files are kept elsewhere, so it has none.
+    readonly property string terminal: app.home + "/.config/hypr/scripts/terminal"
+    function openTerminal() {
+        if (app.trashShown) { app.say("The trash has no folder to open a terminal in", true); return }
+        const dir = app.inArchive ? Format.parent(app.archive.file) : app.path
+        Quickshell.execDetached([terminal, "--dir", dir])
+    }
+
     // b, ⌘D: the picked folder among the bookmarks, or out of them; with a file picked, the folder on show
     function toggleBookmark() {
         if (app.trashShown || app.readOnly()) return
