@@ -314,7 +314,10 @@ hl.bind(mod .. " + SHIFT + J", function() NIGHTDRIVE_TOGGLESPLIT() end)
 -- A window group (a project manager's sessions, pm-space.lua) is one window to ⌘ arrows: they go straight to the next
 -- window (#3164: going through the tabs first took several presses to leave a group); ⌃⌥⌘←/→ switch its tabs
 -- (window-groups.lua)
-hl.config({ binds = { movefocus_cycles_groupfirst = false } })
+hl.config({ binds = { movefocus_cycles_groupfirst = false,
+    -- the arrows stay in the space: at a screen's edge they do nothing instead of going on to the next display (#3730);
+    -- a window goes to another display with ⌘⇧§ or ⌘⇧ 1…0
+    window_direction_monitor_fallback = false } })
 for _, dir in ipairs({ "left", "right", "up", "down" }) do
     hl.bind(mod .. " + " .. dir,             hl.dsp.focus({ direction = dir }))
     hl.bind(mod .. " + SHIFT + " .. dir,     function() NIGHTDRIVE_SWAP(dir) end)   -- slides (appearance.lua)

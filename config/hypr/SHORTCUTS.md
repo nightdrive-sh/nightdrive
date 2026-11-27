@@ -42,13 +42,13 @@
   ⌘ ⇧ F              Fullscreen
   ⌘ ⇧ T              Tile or float the window; a floating one goes to the centre, a small or screen-sized tile at 70 % of the screen (Deck: tiled → floating at start size in the centre; moved → back to centre; already there → tiles)
   ⌘ ⇧ J              Toggle split direction (vertical/horizontal)
-  ⌘ arrows           Move focus between windows; a group of tabs (a project manager's sessions) is one window
+  ⌘ arrows           Move focus between windows; a group of tabs (a project manager's sessions) is one window; they stay in the space, not crossing to another display
   ⌃ ⌥ ⌘ ← / →       Previous / next tab of a group of tabs
   ⌥ Tab / ⌥ ⇧ Tab    Next / previous window of the same app (on any workspace)
   Hyper ← / →        Previous / next Claude Code session, in the sessions bar's order (on any workspace; the bar may be off)
   Hyper ↑ / ↓        Previous / next lead in that order: a session that opened others (a project manager, say)
   Hyper 1 … 9        The first … ninth Claude Code session in that order (a session's card in the bar shows its key)
-  ⌘ ⇧ arrows         Move window
+  ⌘ ⇧ arrows         Move window, within the space (to another display: ⌘ ⇧ § or ⌘ ⇧ 1 … 0)
   ⌘ ⇧ G             Make the window a group of tabs, or break its group up
   ⌘ ⌥ ⇧ arrows       Move the window into the group (or window) that way; with none there, out of its own group
   ⌘ + mouse drag     Move window / right button: resize
