@@ -101,6 +101,8 @@ Item {
                 apps.appEntries(q).map(a => Object.assign({}, a, { item: Object.assign({}, a.item, { from: "Apps" }) })),
                 // Home Assistant's devices ("olohuone" → its lights): Enter turns one on/off right from the search
                 home.rootRows(),
+                // Ask Claude's history: only searched, its place is the Ask Claude window's ⌘H (#3428)
+                lv.askHistory.rootRows().map(r => ({ item: r, text: r.name, extra: r.extra || "" })),
                 // Steam's games ("tape" → Tape to Tape): Enter plays it
                 lv.games.rootRows(),
                 // The plugins' own rows (rootRows: Deck's albums, "fm-84" → Atlas)

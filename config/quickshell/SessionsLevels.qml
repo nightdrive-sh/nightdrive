@@ -20,9 +20,8 @@ Item {
     readonly property var levels: ["sessions"]
     readonly property var titles: ({ sessions: "Sessions" })
     readonly property var parents: ({})
-    // The root's row (LauncherMenus.qml), with how many run
+    // The root's row (LauncherMenus.qml): an arrow as the other rows that open a level, no count (#3428)
     readonly property var rootRow: ({ kind: "nav", name: "Sessions", glyph: "messages-square", target: "sessions",
-                                      summary: Claude.sessions.length ? Claude.sessions.length + " running" : undefined,
                                       extra: "claude code conversation resume continue history chat agent" })
 
     function home(dir) { const h = Quickshell.env("HOME"); return dir.startsWith(h) ? "~" + dir.slice(h.length) : dir }

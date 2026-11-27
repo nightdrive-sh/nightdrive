@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
+import QtQuick.Effects
 import qs.kit as Kit
 import "Words.js" as Words
 
@@ -357,6 +358,14 @@ PanelWindow {
 
     MouseArea { anchors.fill: parent; onClicked: win.open = false }
 
+    // A very soft, faint shadow under the card, as Ask Claude's (ToastStack.qml, #3428)
+    RectangularShadow {
+        x: card.x; y: card.y; width: card.width; height: card.height
+        radius: card.radius
+        blur: 40
+        offset.y: 6
+        color: Qt.rgba(0, 0, 0, 0.5)
+    }
     Rectangle {
         id: card
         // Only the details' widening is animated, not the screen's cap: on the first open the window's width is 0 until

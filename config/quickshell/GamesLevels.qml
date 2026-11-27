@@ -20,7 +20,7 @@ Item {
     readonly property var titles: ({ games: "Games" })
     readonly property var parents: ({})
     readonly property var rootRow: games.length ? [{ kind: "nav", name: "Games", glyph: "gamepad-2", target: "games",
-                                                     summary: String(games.length), extra: "play steam controller xbox gamepad pelit" }] : []
+                                                     extra: "play steam controller xbox gamepad pelit" }] : []
 
     function gameItem(x) {
         const steam = x.source === "steam"

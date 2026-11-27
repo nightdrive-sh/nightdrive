@@ -22,7 +22,8 @@ Item {
     readonly property var titles: ({ askhistory: "Ask Claude › History" })
     readonly property var parents: ({})
 
-    // The root's row, after Ask Claude's (LauncherMenus.qml): only when there is a conversation to go back to
+    // Its row, found by searching (LauncherSearch.qml; the Ask Claude window opens it with ⌘H, #3428): only when there
+    // is a conversation to go back to
     function rootRows() {
         if (!hint || !hint.installed || convs.length === 0) return []
         return [{ kind: "nav", name: "Ask Claude History", glyph: "history", target: "askhistory",
