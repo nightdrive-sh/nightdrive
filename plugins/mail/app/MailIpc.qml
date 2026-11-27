@@ -11,7 +11,7 @@ QtObject {
     required property var fetchWatch
     readonly property IpcHandler handler: IpcHandler {
         target: "mail"
-        function refresh(): void { root.win.reload(true) }
+        function refresh(): void { root.win.sorter.load(); root.win.reload(true) }
         // A search, as typed in the list's field (for tests: `qs ipc call mail search WORDS`, "" clears it)
         function search(text: string): void { root.win.search.text = text; root.win.reload(false) }
         // A fetch has started (`nightmail fetching`, from its fetch())

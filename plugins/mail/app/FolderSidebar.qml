@@ -3,8 +3,9 @@ import QtQuick.Layouts
 import qs.kit
 
 // The folders, with each one's unread count (in Drafts, every draft: they are read), ✓ under the pointer marking them all
-// read, and in Spam and Trash a bin beside it emptying them; the accounts at the foot and the fetch and outbox signs by
-// the title. Apart from shell.qml, which places it first in the window's row.
+// read, and in Spam and Trash a bin beside it emptying them; after a gap the account's own folders, which sort by sender
+// (#3733: a right click deletes one), and New folder; the accounts at the foot and the fetch and outbox signs by the
+// title. Apart from shell.qml, which places it first in the window's row.
 //
 // The title's line and the search's are as high (headerHeight) and as far from the top, so the first
 // folder and the first message line up.
@@ -35,6 +36,8 @@ AppSidebar {
             c: win.look
             glyph: modelData.glyph
             label: modelData.name
+            // A gap before your own folders
+            Layout.topMargin: modelData.own && !win.folders[index - 1].own ? 14 : 0
             // In a search of all folders none is picked: the list shows each thread's own (Search.qml)
             selected: index === win.folder && !win.searcher.wide
             dropTarget: index === ops.dropFolder
@@ -43,6 +46,7 @@ AppSidebar {
             countColor: c.dim
             active: panes.at === "folders"     // Tab's (Panes.qml)
             onClicked: win.pickFolder(index)
+            TapHandler { acceptedButtons: Qt.RightButton; onTapped: win.menus.folderMenu(folderRow, folderRow.index) }
             // Under the pointer, the unread count gives way to ✓: mark all read. In Spam and Trash the bin beside it
             // empties the folder (it asks first), so the two lie side by side, the bin outermost.
             AppIconButton {
@@ -70,6 +74,17 @@ AppSidebar {
             }
         }
     }
+    // Quiet until the pointer is on the sidebar; the gap before it is the own folders' when there are none yet
+    AppNavRow {
+        id: newFolderRow
+        c: win.look
+        glyph: "folder-plus"
+        label: "New folder"
+        Layout.topMargin: win.folders.some(f => f.own) ? 0 : 14
+        opacity: hovered ? 1 : sidebarHover.hovered ? 0.6 : 0.3
+        onClicked: win.menus.newFolder()
+    }
+    HoverHandler { id: sidebarHover }
     Item { Layout.fillHeight: true }
     AppAccountBar {
         c: win.look

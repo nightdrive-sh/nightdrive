@@ -10,6 +10,7 @@ QtObject {
     required property Item outDrag      // OutDrag.qml: the threads as text, once the drag leaves the window
     readonly property var nm: win.mailer
     readonly property var folders: win.folders
+    readonly property var sorter: win.sorter    // Sorting.qml: your own folders and their rules
 
     // The folder a thread is in: the one picked, or in a search of all folders the one it was found in (Search.qml).
     // What the keys and buttons do follows it: a thread found in Archive has no Archive button.
@@ -21,9 +22,13 @@ QtObject {
     // folder (on the server too, at the next sync, so a phone sees it the same way and the server's spam filter
     // learns from it) and open the next one. Not spam moves it back to the inbox. Threads a search found in several
     // folders move a folder at a time, and one ⌘Z takes them all back.
-    function moveThread(to, text, which) {
+    // then(finish): more to do once they have moved (sortInto's rules); finish({ text, undo }) or finish(null)
+    function moveThread(to, text, which, then) {
         const ts = (which || win.targets()).filter(t => dirOf(t) !== to)
-        if (!ts.length) return
+        if (!ts.length) {
+            if (then) then(more => { if (more && more.undo) done(more); win.reload(true) })
+            return
+        }
         // Other threads than the open one (dragged to a folder): the open one stays open
         const openId = win.threads[win.current] ? win.threads[win.current].thread : ""
         const keep = !ts.some(t => t.thread === openId)
@@ -38,8 +43,12 @@ QtObject {
         let left = groups.length
         const moved = () => {
             if (--left) return
-            if (undos.length) done({ text: text, undo: () => undos.forEach(u => u()) })
-            win.reload(keep, at)
+            const finish = more => {
+                if (more) { text = more.text || text; if (more.undo) undos.push(more.undo) }
+                if (undos.length) done({ text: text, undo: () => undos.forEach(u => u()) })
+                win.reload(keep, at)
+            }
+            if (then) then(finish); else finish(null)
         }
         for (const g of groups) moveGroup(to, g, undos, moved)
     }
@@ -118,11 +127,12 @@ QtObject {
         })
     }
 
-    // Threads dragged from the list onto a folder move there, as the keys move them (⌘Z too). Inbox, Archive, Spam
-    // and Trash take them; Sent and Drafts hold what you wrote, and the folder being looked at is where they are.
+    // Threads dragged from the list onto a folder move there, as the keys move them (⌘Z too). Inbox, Archive, Spam,
+    // Trash and your own folders take them; Sent and Drafts hold what you wrote, and the folder being looked at is
+    // where they are.
     property var dragged: null          // the threads being dragged (a picked one drags all the picked)
     property int dropFolder: -1         // the folder under it, if it takes it
-    function takesDrop(i) { return ["INBOX", "Archive", "Spam", "Trash"].indexOf(folders[i].dir) >= 0 && (win.searcher.wide || i !== win.folder) }
+    function takesDrop(i) { return (folders[i].own || ["INBOX", "Archive", "Spam", "Trash"].indexOf(folders[i].dir) >= 0) && (win.searcher.wide || i !== win.folder) }
     property point dragPos              // where the pointer is: the ghost follows it (DragGhost.qml)
     property Item dragFrom: null        // the row dragged from: the drag out is released with it
     // Out of the window, the drag goes on as the desktop's (OutDrag.qml): the threads as a line each, into a
@@ -150,10 +160,42 @@ QtObject {
         dragged = null; dropFolder = -1
         if (!t || i < 0) return
         const to = folders[i].dir
+        if (folders[i].own) { sortInto(i, t); return }
+        if (to === "INBOX" && t.some(x => folders[win.homeOf(x)].own)) { unsort(t); return }
         moveThread(to, to === "Trash" ? "Moved to Trash" : to === "Archive" ? "Archived" : to === "Spam" ? "Marked as spam"
                        : dirOf(t[0]) === "Spam" ? "Not spam: moved to Inbox" : "Moved to Inbox", t)
     }
     function archive() { moveThread("Archive", "Archived") }
+
+    // Your own folders sort by sender (#3733): threads dropped into one (or sent there with m or the menu) move as any
+    // drag moves them, then their senders' mail goes there from now on, with what of theirs is in the inbox now
+    // (sorting.py learn; domain: the senders' whole domains, from the menu). Dragged back to the inbox, their senders'
+    // rules end (forget). One ⌘Z takes back the move and the rules.
+    function sortInto(i, ts, domain) {
+        const to = folders[i].dir, acc = win.account.id
+        moveThread(to, "Moved to " + to, ts, finish => sorter.learn(acc, to, ts.map(t => "thread:" + t.thread), domain, r => {
+            if (r.error) { finish(null); win.say(r.error, { danger: true }); return }
+            const who = domain ? "all of " + r.added.concat(r.removed).map(x => x.domain).filter(x => x).join(", ")
+                               : r.senders.length === 1 ? r.senders[0] : r.senders.length + " senders"
+            const more = r.moved.length ? " (" + r.moved.length + " from the inbox too)" : ""
+            finish({ text: "Mail from " + who + " goes to " + to + " from now on" + more,
+                     undo: () => sorter.undo(r, () => win.reload(true)) })
+        }))
+    }
+    function unsort(ts) {
+        moveThread("INBOX", "Moved to Inbox", ts, finish => sorter.forget(win.account.id, ts.map(t => "thread:" + t.thread), r => {
+            if (r.error || !r.removed.length) { finish(null); return }
+            finish({ text: "Moved to Inbox: mail from " + r.removed.map(x => sorter.describe(x)).join(", ") + " comes to the inbox again",
+                     undo: () => sorter.undo(r) })
+        }))
+    }
+    // The open thread's sender stops being sorted (the thread's Stop, the menu): the mail stays where it is
+    function stopSorting(rule) {
+        sorter.removeRule(rule, r => {
+            if (r.error) { win.say(r.error, { danger: true }); return }
+            done({ text: "Mail from " + sorter.describe(rule) + " comes to the inbox again", undo: () => sorter.undo({ added: [], removed: r.removed }) })
+        })
+    }
     // The reading pane's buttons, for the mouse: what the keys do (a archive, d delete, ! spam, r reply …)
     readonly property var readerActions: {
         // (win.current and win.threads read here, so the buttons follow the thread opened in a search of all folders)

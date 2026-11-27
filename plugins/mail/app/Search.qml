@@ -22,7 +22,9 @@ QtObject {
     // The folders all folders means, and which one a thread found in several shows as: a received message in the inbox
     // or Archive before your reply to it in Sent. Their queries together hold every one of Mail's folders but Spam and
     // Trash, so a message in a folder of the server's that Mail doesn't show isn't found either.
+    // Your own folders (#3733) come last: their mail is in none of the others.
     readonly property var homes: ["INBOX", "Archive", "Drafts", "Sent"].map(d => win.folders.findIndex(f => f.dir === d))
+        .concat(win.folders.map((f, i) => f.own ? i : -1).filter(i => i >= 0))
 
     function scope() {
         return wide ? "(" + homes.map(i => win.folderQuery(i)).join(" or ") + ")" : win.folderQuery(win.folder)

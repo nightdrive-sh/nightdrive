@@ -65,6 +65,7 @@ QtObject {
         else if (k === Qt.Key_Exclam) ops.spam()
         else if (k === Qt.Key_U && shift) ops.markAllRead(win.folder, true)
         else if (k === Qt.Key_U) ops.toggleRead()
+        else if (k === Qt.Key_M && !ctrl) win.menus.moveMenu()      // your own folders (SortMenus.qml)
         else if (k >= Qt.Key_1 && k < Qt.Key_1 + win.folders.length) win.pickFolder(k - Qt.Key_1)
         else if (k === Qt.Key_PageDown || k === Qt.Key_PageUp) win.scrollMessage((k === Qt.Key_PageUp ? -1 : 1) * (reader.height - 80))
         else if (k === Qt.Key_Space) win.scrollMessage((e.modifiers & Qt.ShiftModifier ? -1 : 1) * (reader.height - 80))

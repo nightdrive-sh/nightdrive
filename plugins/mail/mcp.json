@@ -510,6 +510,107 @@
       "class": "act",
       "area": "mail",
       "deletes": true
+    },
+    {
+      "name": "mail_folders",
+      "title": "Mail's folders",
+      "description": "The user's own folders in Nightdrive Mail, by account id: those besides Inbox, Sent, Drafts, Archive, Spam and Trash, which sort mail by sender (an Offers folder for advertising). Their rules: mail_rules. Search one with mail_search (path:\"ACCOUNT/NAME/**\").",
+      "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "command": ["nightmail", "folders"],
+      "class": "read",
+      "area": "mail"
+    },
+    {
+      "name": "mail_rules",
+      "title": "Mail's sorting rules",
+      "description": "Where Nightdrive Mail sorts mail as it arrives: each rule's account, folder, and sender (an address) or domain (with its subdomains: shop.fi takes mail.shop.fi too). Mail a rule sorts goes to its folder unannounced instead of the inbox. Rules come from dragging mail into one of the user's folders, or from mail_sort.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"account": {"type": "string", "title": "Account", "description": "Only this account's, its id from mail_accounts"}},
+        "additionalProperties": false
+      },
+      "command": ["nightmail", "rules", ["--account", "{account}"]],
+      "class": "read",
+      "area": "mail"
+    },
+    {
+      "name": "mail_sort",
+      "title": "Sort mail into a folder",
+      "description": "What dragging mail into one of the user's own folders does in Nightdrive Mail: each given thread's sender (its newest message not from the user) gets a rule, so their mail goes to that folder from now on, unannounced, and their mail in the inbox now moves there too, with the given threads' inbox messages. domain: true sorts their whole domains (refused for public mail services such as gmail.com). A sender's rule into another folder is replaced. The user can undo it. The folder must exist (mail_folders). Sort only when the user asked to.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {"type": "string", "title": "Account", "description": "The account's id, from mail_accounts"},
+          "folder": {"type": "string", "title": "Folder", "description": "One of the account's own folders, from mail_folders"},
+          "ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "title": "Mail", "description": "Threads' ids (thread:…) or messages' ids, whose senders it sorts"},
+          "domain": {"type": "boolean", "title": "Whole domain", "description": "true sorts the senders' domains, not only their addresses"}
+        },
+        "required": ["account", "folder", "ids"],
+        "additionalProperties": false
+      },
+      "command": ["nightmail", "sort", ["--domain", "{domain}"], "{account}", "{folder}", "{ids}"],
+      "class": "change",
+      "undo": ["nightmail", "sort", "--undo", "{step}"],
+      "notice": "{line}",
+      "area": "mail"
+    },
+    {
+      "name": "mail_rule_remove",
+      "title": "Stop sorting a sender",
+      "description": "End one of Nightdrive Mail's sorting rules (mail_rules): that sender's (or domain's) new mail comes to the inbox, with a notification, again. Mail already sorted stays in its folder. The user can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {"type": "string", "title": "Account", "description": "The rule's account id"},
+          "kind": {"type": "string", "enum": ["sender", "domain"], "title": "Kind"},
+          "value": {"type": "string", "title": "Sender or domain", "description": "The rule's address or domain, as mail_rules gave it"}
+        },
+        "required": ["account", "kind", "value"],
+        "additionalProperties": false
+      },
+      "command": ["nightmail", "rules", "remove", "{account}", "{kind}", "{value}"],
+      "class": "change",
+      "undo": ["nightmail", "sort", "--undo", "{step}"],
+      "notice": "Mail from {value} comes to the inbox again",
+      "area": "mail"
+    },
+    {
+      "name": "mail_folder_create",
+      "title": "New mail folder",
+      "description": "Make one of the user's own folders in a Nightdrive Mail account: a real IMAP folder, on the server after the next sync (where the account syncs a channel per folder, Mail adds one to isyncrc). Mail dragged into it, or sorted with mail_sort, brings its sender's mail there from then on. The user can undo it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {"type": "string", "title": "Account", "description": "The account's id, from mail_accounts"},
+          "name": {"type": "string", "title": "Name", "maxLength": 60, "description": "The folder's name, e.g. Offers; not one of Mail's own"}
+        },
+        "required": ["account", "name"],
+        "additionalProperties": false
+      },
+      "command": ["nightmail", "folders", "create", "{account}", "{name}"],
+      "class": "change",
+      "undo": ["nightmail", "folders", "delete", "{account}", "{folder}"],
+      "undo_asks": true,
+      "notice": "New folder in Mail: {folder}",
+      "area": "mail"
+    },
+    {
+      "name": "mail_folder_delete",
+      "title": "Delete a mail folder",
+      "description": "Delete one of the user's own folders in Nightdrive Mail (mail_folders): its mail goes back to the inbox (unannounced), its sorting rules end, and the folder is deleted here, on the server and in isyncrc. It can't be undone. The user allows it on Nightdrive's card. Delete only when the user asked to.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {"type": "string", "title": "Account", "description": "The account's id, from mail_accounts"},
+          "name": {"type": "string", "title": "Folder", "description": "The folder's name, from mail_folders"}
+        },
+        "required": ["account", "name"],
+        "additionalProperties": false
+      },
+      "command": ["nightmail", "folders", "delete", "{account}", "{name}"],
+      "class": "act",
+      "area": "mail",
+      "deletes": true
     }
   ]
 }

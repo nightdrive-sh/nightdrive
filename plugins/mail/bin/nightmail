@@ -233,7 +233,13 @@ Usage: nightmail [command]
   save-pdf [--into FOLDER] -- ID
                  the message as a PDF there; nothing remote is loaded (lib/save.py, pdf.py)
   send ID        send a draft, through the account's SMTP server
-  notify         notify of new mail (notmuch's post-new hook runs it)
+  folders        your own folders, by account, as JSON; folders create ACCOUNT NAME, folders delete ACCOUNT NAME
+                 (its mail back to the inbox, its rules gone, the folder deleted on the server too)
+  rules [--account ID]  the sorting rules, as JSON; rules remove ACCOUNT sender|domain VALUE ends one
+  sort [--domain] ACCOUNT FOLDER ID…  as a drag into your own folder: the IDs' senders (or their domains) sorted
+                 there from now on, and their mail in the inbox moved there; sort --forget ACCOUNT ID… ends it;
+                 sort --undo takes back either, given its output on stdin
+  notify         sort new mail by the rules, then notify of what is left in the inbox (notmuch's post-new hook)
   blocked-notifications  which of Mail's notifications (JSON on stdin) are of mail Access › Mail keeps from Claude
   keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
   push           sync as soon as new mail comes to an inbox (IMAP IDLE; its service runs it)
@@ -299,7 +305,24 @@ case ${1:-open} in
     python3 "$APP_DIR/lib/drafts.py" show "${@:2}" ;;
   draft-card)   # mail_send's card: what goes out that Claude saw hidden
     python3 "$APP_DIR/lib/drafts.py" card "${@:2}" ;;
-  notify)    python3 "$APP_DIR/lib/notify.py" ;;
+  # The rules first (lib/classify.py): what they sort into your own folders isn't announced
+  notify)    python3 "$APP_DIR/lib/classify.py" >/dev/null; python3 "$APP_DIR/lib/notify.py" ;;
+  folders|rules|sort)
+    # Your own folders and their sorting by sender (lib/folders.py, rules.py, sorting.py); an open Mail shows it
+    case $1 in
+      folders) (($# > 1)) || set -- folders list; cmd=(folders.py "${@:2}") ;;
+      rules)   if [[ ${2:-} == remove ]]; then cmd=(rules.py "${@:2}"); else cmd=(rules.py list "${@:2}"); fi ;;
+      sort)
+        case ${2:-} in
+          --forget) cmd=(sorting.py forget "${@:3}") ;;
+          --undo)   cmd=(sorting.py undo) ;;
+          *)        cmd=(sorting.py learn "${@:2}") ;;
+        esac ;;
+    esac
+    python3 "$APP_DIR/lib/${cmd[0]}" "${cmd[@]:1}"; status=$?
+    [[ $1 != rules || ${2:-} == remove ]] && [[ ${2:-} != list ]] && running && ipc refresh
+    exit $status
+    ;;
   blocked-notifications) python3 "$APP_DIR/lib/blocked.py" notifications ;;   # `nightdrive notifications` for Claude
   fetch)     fetch "${@:2}" ;;
   fetching)  running && ipc fetching ;;     # fetch()'s, for Mail's spinner

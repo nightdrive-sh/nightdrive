@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Moves the messages of a notmuch query to a sibling folder of the one they are in (the account's Trash, Archive …).
 
-    move.py [--sexp] FOLDER QUERY [FROM …]     e.g. move.py Trash thread:0000000000000005 example/INBOX
+    move.py [--sexp] [--unread] FOLDER QUERY [FROM …]     e.g. move.py Trash thread:0000000000000005 example/INBOX
 
 QUERY is notmuch's infix syntax (Mail's window), or with --sexp its s-expression syntax (inbox.py, whose ids are
 quoted strings there: ids.py).
@@ -11,7 +11,9 @@ A message's files elsewhere stay: one mailed between two of your accounts is in 
 looked at moves its copy. Without FROM, every file of the message moves.
 
 Each file moves from <account>/<folder>/{cur,new}/ to <account>/FOLDER/cur/, without the ,U= (UID) part of its name
-so the sync tool uploads it as a new message there and removes it from where it was. Files already in FOLDER stay, and
+so the sync tool uploads it as a new message there and removes it from where it was. A file from new/ (no client has
+seen it) is marked read on the way, unless --unread (sorting.py, classify.py: mail sorted into your own folder is
+still to be read). Files already in FOLDER stay, and
 a message that has a file in FOLDER already only leaves the other folders (no second copy).
 
 An account with `all-mail = yes` in account.conf (Gmail, whose Archive is All Mail) holds every message in Archive,
@@ -53,18 +55,20 @@ def account_dir(path):
     return os.path.dirname(os.path.dirname(os.path.dirname(path)))
 
 
-def target(path, dest):
+def target(path, dest, unread=False):
     """Where a file goes in the folder dest: cur/, with no UID, and flags if it came from new/."""
     d = os.path.join(account_dir(path), dest, "cur")
     os.makedirs(d, exist_ok=True)
     name = re.sub(r",U=\d+", "", os.path.basename(path))
     if ":2," not in name:
-        name += ":2,S"
+        name += ":2," if unread else ":2,S"
     return os.path.join(d, name)
 
 
 def main():
     args = sys.argv[1:]
+    unread = "--unread" in args
+    args = [a for a in args if a != "--unread"]
     syntax = ["--query=sexp"] if args[:1] == ["--sexp"] else []
     dest, query, sources = args[len(syntax)], args[len(syntax) + 1], args[len(syntax) + 2:]
     root = notmuch("config", "get", "database.path").strip()
@@ -93,10 +97,10 @@ def main():
                 moved += len(movable)
             elif movable:
                 for f in movable:
-                    os.rename(f, target(f, dest))
+                    os.rename(f, target(f, dest, unread))
                 moved += len(movable)
             elif protected:
-                shutil.copy2(protected[0], target(protected[0], dest))
+                shutil.copy2(protected[0], target(protected[0], dest, unread))
                 moved += 1
     if moved:
         notmuch("new", "--quiet", "--no-hooks")

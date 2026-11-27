@@ -23,6 +23,8 @@ QtObject {
         else if (k === Qt.Key_Down || k === Qt.Key_J) { if (win.folder < win.folders.length - 1) win.pickFolder(win.folder + 1, true) }
         else if (k === Qt.Key_Up || k === Qt.Key_K) { if (win.folder > 0) win.pickFolder(win.folder - 1, true) }
         else if (k === Qt.Key_Escape || k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Right) pane = "list"
+        // One of your own folders: ⌫ deletes it, after asking (SortMenus.qml), as its menu does
+        else if ((k === Qt.Key_Backspace || k === Qt.Key_Delete) && win.folders[win.folder].own) win.menus.askDelete(win.folder)
         else return false
         return true
     }

@@ -11,7 +11,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | `Space` ⇧Space | Page through the message |
 | `/` or ⌘F | Search the account's folders but Spam and Trash (notmuch's query syntax); each thread shows the folder it is in. `Esc` clears it |
 | ⌥F, or `Tab` in the search | While searching: only the folder picked (also how Spam and Trash are searched), or all again |
-| `1`–`6` or Ctrl+↑ Ctrl+↓ | Inbox, Sent, Drafts, Archive, Spam, Trash |
+| `1`–`9` or Ctrl+↑ Ctrl+↓ | Inbox, Sent, Drafts, Archive, Spam, Trash, then your own folders |
 | ⌘B | Hide or show the folders |
 | `Tab` ⇧Tab | Keys to the folders and back |
 | Ctrl+Tab Ctrl+⇧Tab | The next account |
@@ -20,6 +20,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 | ⇧H | The HTML in your browser, with nothing loaded from the network |
 | `u` ⇧U | Mark unread; mark the whole folder (or what a search found) read |
 | `a` `d` (⌘⌫) `!` | Archive, Trash, spam (in Spam: not spam) |
+| `m` | Move to one of your own folders (or a new one), which sorts the sender there from now on (below) |
 | ⌘Z | Undo |
 | `v` | Select the thread and go on to the next, as in Files; `j` `k` then keep what is selected. `Esc` lets go |
 | ⇧↑ ⇧↓ ⌘A | Select several threads (Ctrl-click adds one) |
@@ -68,15 +69,27 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 - The first ⌘⇧C asks what Claude reads: the whole thread (the best replies), or only the text you select. Settings (⌘,) changes it.
 - It needs Claude Code signed in. The reply is written by `claude -p` with no tools, not even your MCP servers or connectors, so a message can't steer it into using them.
 
+## Your own folders
+
+Below Trash, after a gap, are the account's own folders, such as Offers for advertising you want to keep but not see in the inbox. New folder (under them) makes one; it is a real folder on the server, so your phone sees it too.
+
+- Drag mail into one of them, and that sender's mail goes there from then on: what is in the inbox from them now moves along, and new mail from them goes straight there as it arrives, unread but without a notification. ⌘Z takes back the move and the rule.
+- Dragged back to the inbox, the sender's mail comes to the inbox again. Into another of your folders, it goes there instead. Archive and Trash leave the rule as it is.
+- In one of your folders, a line under the subject says why a message is there, with Stop. A right click on a thread, or `m`, moves it with the keyboard (Inbox too) and has All mail from its domain (shop.fi takes mail.shop.fi too; not for gmail.com and the like) and Stop sorting.
+- A right click on a folder, or ⌫ on it after Tab, deletes it, after asking: its mail goes back to the inbox, unannounced, its rules end, and it is deleted on the server too.
+- Settings (⌘,) lists the account's rules, each with ✕ (or ⌫).
+- Mail sorts new mail on this computer, as it arrives: while it is off, new mail waits in the inbox, on your phone too, and is sorted at the next sync. The rules are kept in `~/.config/nightmail/rules.json`.
+- An account whose `isyncrc` syncs each folder by a channel of its own (Gmail, iCloud) gets a channel for each new folder, after a comment saying Mail added it; deleting the folder takes it away again. One with `Patterns *` and `Create Both` needs none.
+
 ## Notifications
 
 - New mail in the inbox gets a notification with Reply, Reply with Claude, Archive and Delete, also with Mail closed. More than three at once come as one.
 - Inbox mail arrives within seconds (IMAP IDLE); the other folders, and a server without IDLE, sync every 5 minutes. ⌘R fetches now; a turning icon beside Mail's name shows a fetch in progress.
-- Notmuch's post-new hook runs `nightmail notify`. A hook of your own is left alone: add `nightmail notify` to it.
+- Notmuch's post-new hook runs `nightmail notify`, which sorts new mail by your rules first. A hook of your own is left alone: add `nightmail notify` to it.
 
 ## Settings
 
-⌘, (or Launcher › Settings › Apps › Mail): whether writing and message windows float or open beside Mail, how a message opens, and what Claude reads. Kept in `~/.config/nightmail/settings.json`.
+⌘, (or Launcher › Settings › Apps › Mail): whether writing and message windows float or open beside Mail, how a message opens, what Claude reads, and the account's sorting rules (Your own folders). Kept in `~/.config/nightmail/settings.json`.
 
 ## Setting up an account
 
@@ -205,11 +218,14 @@ An iCloud account (with an app-specific password) is `imap.mail.me.com` and `smt
 | `nightmail unread`, `search QUERY [LIMIT]`, `thread ID`, `accounts` | Mail as JSON, without the window: unread threads, a notmuch search (each thread's `attachments`: true when a file is attached, as the list's paperclip), a thread's messages as text |
 | `nightmail invitation ID` | A message's calendar invitation as JSON, by Calendar (`calendar invite`); `--add CALENDAR` puts it in a calendar or updates it there, `--remove` takes a cancelled one out, `--reply accept|maybe|decline` sends the answer to its organiser |
 | `nightmail draft`, `draft-show ID`, `discard ID`, `draft-undo ID`, `send ID` | Drafts without the window: `draft` saves one from JSON on stdin (`{to, cc, subject, body, account}`, or a reply: `{reply_to, reply_all, body}`; `attachments`: absolute paths of files in home or /tmp, nothing hidden, at most 10 and 18 MB together), with the signature and quote; `{draft: ID, body}` writes a new version of a draft in its place, keeping its signature and quote (the one replaced goes to Trash, and `draft-undo ID` brings it back); a second draft answering the same message is refused; `send` sends one |
+| `nightmail folders`, `folders create ACCOUNT NAME`, `folders delete ACCOUNT NAME` | Your own folders by account, as JSON; delete puts their mail back in the inbox, ends their rules and deletes the folder on the server too |
+| `nightmail rules [--account ID]`, `rules remove ACCOUNT sender\|domain VALUE` | The sorting rules, as JSON; remove ends one |
+| `nightmail sort [--domain] ACCOUNT FOLDER ID…`, `sort --forget ACCOUNT ID…`, `sort --undo JSON` | What a drag into your folder does (each ID's sender, or their domain, sorted there, and their inbox mail moved along); `--forget` what a drag back does; `--undo` takes back either, given its output |
 | `nightmail unsubscribe MSGID…` | The messages' unsubscribe links as JSON (`links`: url, kind web or mail, from header or body); only reads |
 | `nightmail save-attachments [--into FOLDER] -- ID [NAME…]`, `save-pdf [--into FOLDER] -- ID` | Copies a message's attachments (all, or those named), or the message as a PDF, into a folder (Downloads by default), never over a file that is there; the PDF loads no remote images or anything else from the network |
 | `nightmail enable`, `disable` | Mail among the apps, its notifications and the sync, on or off (your mail and settings stay). Run `enable` again after changing `isyncrc`. |
 | `nightmail restart`, `quit`, `log` | After a change to Mail, and its QML errors |
 
-Claude Code uses these too, with Nightdrive's tools for Claude (Settings › Claude › Access › Mail): it reads and searches your mail and the invitations in it (and answers one when you allow it on the card), writes drafts (with files attached from the folders Access › Apps and files lets it use, or /tmp; asked again, it writes a new version of the reply's draft, keeping your changes to it, never a second draft), archives and saves attachments or a message as PDF (in those folders), which you can undo, and sends, deletes or empties Spam only after you allow it on Nightdrive's card, which shows exactly what goes out: a message Claude reads can't send or delete anything. Access › Mail › *Mail Claude never gets* keeps senders, domains and tags from it whole (`maija@example.com`, `bank.fi`, `tag:health`): that mail, and mail you sent them, isn't in its unread, searches or threads, nor its notifications in the latest notifications. Empty at first. These commands in a terminal give everything.
+Claude Code uses these too, with Nightdrive's tools for Claude (Settings › Claude › Access › Mail): it reads and searches your mail and the invitations in it (and answers one when you allow it on the card), writes drafts (with files attached from the folders Access › Apps and files lets it use, or /tmp; asked again, it writes a new version of the reply's draft, keeping your changes to it, never a second draft), archives and saves attachments or a message as PDF (in those folders), makes your own folders and sorts senders into them, or stops sorting one, which you can undo, and sends, deletes, empties Spam or deletes one of your folders only after you allow it on Nightdrive's card, which shows exactly what goes out: a message Claude reads can't send or delete anything. Access › Mail › *Mail Claude never gets* keeps senders, domains and tags from it whole (`maija@example.com`, `bank.fi`, `tag:health`): that mail, and mail you sent them, isn't in its unread, searches or threads, nor its notifications in the latest notifications. Empty at first. These commands in a terminal give everything.
 
 Needs: notmuch, isync (mbsync), an IMAP account; Claude Code for Claude's replies

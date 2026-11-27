@@ -1,8 +1,9 @@
 import QtQuick
 import qs.kit
 
-// Settings (⌘,): one row per choice; ←/→ or a click changes it, Esc or ⌘, closes. Apart from shell.qml, which keeps the
-// settings themselves (settings.json) and shows this panel over the window.
+// Settings (⌘,): one row per choice; ←/→ or a click changes it, Esc or ⌘, closes. Under them the account's sorting
+// rules (RulesSettings.qml), which ↓ goes on into and ⌫ ends. Apart from shell.qml, which keeps the settings themselves
+// (settings.json) and shows this panel over the window.
 AppPanel {
     id: settingsPanel
     required property var win
@@ -19,14 +20,20 @@ AppPanel {
     spacing: 28
     property int row: 0
     onOutsideTapped: win.showSettings = false
+    readonly property int settingCount: settingRows.length
     Keys.onPressed: e => {
+        const last = settingCount + rulesList.rules.length - 1
         const r = settingsPanel.settingRows[row]
-        const i = r.choices.findIndex(ch => ch[0] === win.settings[r.key])
+        const i = r ? r.choices.findIndex(ch => ch[0] === win.settings[r.key]) : -1
         if (e.key === Qt.Key_Escape) win.showSettings = false
-        else if (e.key === Qt.Key_Down) row = Math.min(row + 1, settingsPanel.settingRows.length - 1)
+        else if (e.key === Qt.Key_Down) row = Math.min(row + 1, last)
         else if (e.key === Qt.Key_Up) row = Math.max(row - 1, 0)
-        else if (e.key === Qt.Key_Left && i > 0) win.setting(r.key, r.choices[i - 1][0])
-        else if (e.key === Qt.Key_Right && i < r.choices.length - 1) win.setting(r.key, r.choices[i + 1][0])
+        else if (r && e.key === Qt.Key_Left && i > 0) win.setting(r.key, r.choices[i - 1][0])
+        else if (r && e.key === Qt.Key_Right && i < r.choices.length - 1) win.setting(r.key, r.choices[i + 1][0])
+        else if (!r && (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete)) {
+            rulesList.removeAt(row - settingCount)
+            row = Math.max(0, Math.min(row, last - 1))
+        }
         else return
         e.accepted = true
     }
@@ -67,5 +74,11 @@ AppPanel {
             }
             Text { width: parent.width; wrapMode: Text.Wrap; text: settingRow.modelData.hint; color: c.faint; font.family: c.font; font.pixelSize: 11 }
         }
+    }
+    RulesSettings {
+        id: rulesList
+        width: parent.width
+        win: settingsPanel.win
+        current: settingsPanel.row - settingsPanel.settingCount
     }
 }

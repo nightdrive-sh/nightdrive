@@ -40,6 +40,8 @@ AppRow {
     // out (⌘-click is the desktop's: it moves the window)
     TapHandler { acceptedModifiers: Qt.ShiftModifier; onTapped: { win.pickRange(row.index); win.list.forceActiveFocus() } }
     TapHandler { acceptedModifiers: Qt.ControlModifier; onTapped: { win.togglePick(row.index); win.list.forceActiveFocus() } }
+    // A right click: its menu, of your own folders (SortMenus.qml); a picked row's acts on all the picked
+    TapHandler { acceptedButtons: Qt.RightButton; onTapped: win.menus.threadMenu(row, row.picked ? win.targets() : [row.modelData]) }
     Column {
         id: col
         anchors.left: parent.left; anchors.right: parent.right

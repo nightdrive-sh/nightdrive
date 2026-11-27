@@ -21,6 +21,8 @@ Flickable {
     // don't all fit beside the view button, the short names show, and where those don't either, only the icons. Held
     // under the pointer, a button says what it does and its key (tip, keys).
     property var actions: []
+    property var sortRule: null         // in one of your own folders: the rule that brought the thread there (RuleLine)
+    signal stopSorting()
     signal act(string id)
     // In a window too narrow for the list beside it, the thread has the window to itself: a back button first in the bar
     property bool back: false
@@ -264,6 +266,7 @@ Flickable {
             color: c.title
             HoverHandler { cursorShape: Qt.IBeamCursor }
         }
+        RuleLine { c: root.c; rule: root.sortRule; onStop: root.stopSorting() }
         Repeater {
             model: root.messages
             delegate: Column {

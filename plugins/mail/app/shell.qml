@@ -84,8 +84,8 @@ ShellRoot {
 
         MailIpc { win: win; writer: writer; fetchWatch: fetchWatch }
 
-        // @NAME in a query is the account's folder NAME (folderQuery)
-        readonly property var folders: [
+        // @NAME in a query is the account's folder NAME, @{NAME} one whose name has more than letters (folderQuery)
+        readonly property var mailFolders: [
             { name: "Inbox", dir: "INBOX", glyph: "inbox", query: "@INBOX and tag:inbox" },
             { name: "Sent", dir: "Sent", glyph: "send", query: "@Sent" },
             // Drafts are read: the sidebar counts them all, as Apple Mail does, where the others count the unread (all)
@@ -96,6 +96,21 @@ ShellRoot {
             { name: "Spam", dir: "Spam", glyph: "ban", query: "@Spam" },
             { name: "Trash", dir: "Trash", glyph: "trash-2", query: "@Trash" }
         ]
+        // Then the account's own folders, which sort by sender (Sorting.qml, #3733). Gmail's Archive (All Mail) holds
+        // their mail too, so Archive leaves it out.
+        readonly property var ownFolders: (sorter.byAccount[account.id] || []).map(n => ({ name: n, dir: n, glyph: "folder", query: "@{" + n + "}", own: true }))
+        readonly property var folders: mailFolders.map(f => f.dir !== "Archive" ? f : Object.assign({}, f, {
+            query: f.query.replace("and not @Spam)", "and not @Spam" + ownFolders.map(o => " and not " + o.query).join("") + ")") }))
+            .concat(ownFolders)
+        // A folder made or deleted moves the ones after it: the folder on show stays by its name (Inbox if it went)
+        property string folderDir: "INBOX"
+        onFolderChanged: folderDir = folders[folder] ? folders[folder].dir : "INBOX"
+        onFoldersChanged: {
+            const i = folders.findIndex(f => f.dir === folderDir)
+            if (i !== folder) folder = Math.max(0, i)
+        }
+        Sorting { id: sorting }
+        readonly property QtObject sorter: sorting
         readonly property int arrowStep: 80     // px an arrow key scrolls the message
         readonly property int headerHeight: 22  // the folders' title line and the list's search line
         readonly property int headerGap: 30     // from them to the first folder and the first message
@@ -131,7 +146,7 @@ ShellRoot {
         // matches each term against any of a message's files, so "path:account/** and folder:INBOX" would also take a
         // message mailed between two of your accounts, from the other one's inbox.
         function folderQuery(i, a) {
-            return "(" + folders[i].query.replace(/@(\w+)/g, (m, d) => folderTerm(d, a)) + ")"
+            return "(" + folders[i].query.replace(/@\{([^}]*)\}|@(\w+)/g, (m, braced, d) => folderTerm(braced || d, a)) + ")"
         }
         function folderTerm(dir, a) {
             const m = (a || account).maildir
@@ -352,6 +367,17 @@ ShellRoot {
 
         // Moving, deleting, read and unread, ⌘Z and dragging to a folder (Actions.qml)
         Actions { id: ops; win: win; sidebar: sidebar; outDrag: outDrag }
+        // Your own folders' menus (a right click, m) and a new folder's name (SortMenus.qml)
+        SortMenus { id: sortMenus; win: win; ops: ops; menu: sortMenu; prompt: folderPrompt }
+        readonly property QtObject menus: sortMenus
+        readonly property QtObject operations: ops      // for the parts that don't get ops (RulesSettings.qml)
+        // In one of your own folders: the rule that brought the open thread there, for its Stop (RuleLine.qml)
+        readonly property var openRule: {
+            const t = threads[current], f = t ? folders[homeOf(t)] : null
+            if (!f || !f.own || !messages.length) return null
+            const a = sortMenus.senderOf(messages), r = a ? sorter.ruleFor(account.id, a) : null
+            return r && r.folder === f.dir ? r : null
+        }
         // Deleting for good asks first (ConfirmPanel.qml): { title, detail, action, run }
         property var confirm: null
         onConfirmChanged: if (confirm) confirmPanel.forceActiveFocus(); else list.forceActiveFocus()
@@ -432,6 +458,7 @@ ShellRoot {
                 if (r.error) { needsAccount = true; reload(false); return }
                 needsAccount = false
                 accounts = r.accounts
+                sorter.load()
                 acct = Math.max(0, accounts.findIndex(a => a.id === settings.account))
                 reload(false)
             })
@@ -492,6 +519,8 @@ ShellRoot {
                     onTrashDraft: draftId => ops.trashDraft(draftId)
                     actions: ops.readerActions
                     onAct: id => ops.act(id)
+                    sortRule: win.openRule
+                    onStopSorting: ops.stopSorting(win.openRule)
                 }
                 PickedPane { win: win; ops: ops }
             }
@@ -508,19 +537,21 @@ ShellRoot {
         ConfirmPanel { id: confirmPanel; behind: content; win: win }
         SetupPanel { id: setupPanel; behind: content; win: win }
         AppToast { id: toast; c: win.look }
+        AppMenu { id: sortMenu; c: win.look; placeholder: "Folder"; menuWidth: 380; onPicked: item => item.run() }
+        AppPrompt { id: folderPrompt; behind: content; c: win.look; onClosed: win.list.forceActiveFocus() }
 
         property alias cheats: sheet.shown
 
         readonly property var keyHelp: [
             { title: "Read", keys: [["↑ ↓  j k", "Previous, next"], ["⏎  o  l", "Open in a window"], ["Esc  ←", "Back to the list (narrow window)"], ["PgUp PgDn", "In the list alone: a page in it"], ["↑ ↓", "In the thread alone: scroll it"], ["Space ⇧Space  PgDn PgUp", "Page down, up"], ["h", "HTML or text"], ["⇧H", "HTML in the browser"],
                                     ["⌘F  /", "Search all folders but Spam, Trash"], ["⌥F  Tab", "Search only this folder, or all"], ["Esc", "Clear the search"]] },
-            { title: "Act", keys: [["a", "Archive"], ["d  ⌫  ⌘⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Fetch new mail"],
+            { title: "Act", keys: [["a", "Archive"], ["d  ⌫  ⌘⌫", "Move to Trash (in Trash: delete)"], ["!", "Spam (in Spam: not spam)"], ["m", "Move to your folder: its sender's mail goes there too"], ["⌘Z", "Undo"], ["u", "Unread (again: read)"], ["⇧U", "Mark all read"], ["⌘R", "Fetch new mail"],
                                    ["v", "Select, and on to the next"], ["⇧↑ ⇧↓  ⇧-click", "Select several"], ["Ctrl-click", "Select or leave out"], ["⌘A", "Select all"]] },
             { title: "Write", keys: [["⌘N  c  n", "New message"], ["r", "Reply to all"], ["⇧R", "Reply to the sender only"], ["f", "Forward"],
                                      ["⏎", "Continue a draft (in Drafts)"], ["⌘⇧C", "Claude writes the reply"], ["⌘⇧C", "…from the selected text"],
                                      ["⌘⇧A", "Attach files"], ["⌘V", "Paste: copied files are attached"],
                                      ["Ctrl ⏎", "Send"], ["⌘S", "Save in Drafts"], ["Esc", "Close (Esc Esc: throw away)"]] },
-            { title: "Folders", keys: [["Ctrl ↑ ↓", "Previous, next"], ["1 – 6", "Go to a folder"], ["↑ ↓", "In the folders: previous, next"], ["Tab ⇧Tab", "To the folders, and back"], ["Ctrl Tab  Ctrl ⇧Tab", "Next, previous account"], ["⌘⇧⌫", "Empty Trash (in Spam: Spam)"], ["⌘B", "Hide or show"], ["⌘,", "Settings"]] }
+            { title: "Folders", keys: [["Ctrl ↑ ↓", "Previous, next"], ["1 – 9", "Go to a folder"], ["↑ ↓", "In the folders: previous, next"], ["Tab ⇧Tab", "To the folders, and back"], ["Ctrl Tab  Ctrl ⇧Tab", "Next, previous account"], ["⌘⇧⌫", "Empty Trash (in Spam: Spam)"], ["⌫", "In the folders: delete your own folder"], ["⌘B", "Hide or show"], ["⌘,", "Settings"]] }
         ]
 
         KeySheet { id: sheet; c: win.look; groups: win.keyHelp }
