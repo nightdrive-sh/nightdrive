@@ -47,18 +47,8 @@ command, and ends with `--name ID down`. `nightdrive sandbox list` shows them al
   (stable or dev).
 - Check the branch before committing (`git branch --show-current`): it is `dev`. No commits straight to `main` and no
   cherry-picks, so `main` is always an earlier point of `dev` and a release has nothing to conflict with.
-- A release, and pushing, are the user's decisions: don't do either unasked. `nightdrive release [patch|minor|major]`
-  makes one from `dev`: the plugins' versions (`plugins bump`, plugins/README.md › Versions), the notes as a new section
-  of `CHANGELOG.md`, the website's docs check, a warning when Deck or Ferry has a newer release than the one pinned
-  (`DECK_REF` in `plugins/deck/install.sh`, `plugins/ferry/pin`; `config/hypr/scripts/release-pins`), then the commit,
-  the tag `vX.Y.Z`, `main` moved to it, the push, the GitHub release and, once the website has rebuilt, its publishing
-  (its `tools/publish.sh`). `--dry-run` shows what it would do.
-- Release notes are for users, in plain words: what they can now do, what works better, what they need to do. Never
-  the commit messages as such. Write them from the commits (`--dry-run` lists them), let the user read them, also as
-  the website's Changelog page (`nightdrive release … --notes FILE --preview`, or with `--dry-run`: built in throwaway
-  clones of dotfiles and the website's checkout, served on 127.0.0.1 for 20 minutes and opened in the browser), then
-  `nightdrive release … --notes FILE --yes`. A release with a name (Afterglow) gets `--name NAME`: the heading
-  `## 0.6.0 Afterglow – date` and the GitHub release "Nightdrive 0.6 Afterglow"; the tag and updates keep the number.
+- A release, and pushing, are the user's decisions: don't do either unasked. How a release is made (`nightdrive
+  release`, its notes and picture): `RELEASING.md`, read by the session that makes one.
 - A big piece of work that shouldn't hold up or swell the next release (a new app: Calendar, Contacts) gets a branch of
   its own off `dev`, in a worktree beside the live one: `git worktree add ~/dotfiles-<name> -b <name> dev`. `~/dotfiles`
   stays on `dev`, so the desktop doesn't change; an app runs from the worktree (`qs -p ~/dotfiles-<name>/plugins/<name>/app`)
@@ -67,12 +57,11 @@ command, and ends with `--name ID down`. `nightdrive sandbox list` shows them al
   there (`git merge dev`, often). The branch is merged into `dev` once it is usable, and reaches users in the release after.
 - A part of an app that works without Nightdrive (Deck's player and CLI) has a repo of its own in `~/Projects`; the
   Nightdrive window over it stays here, with the kit.
-- When it suits what was released, the notes get a picture of it (a collage of a few redesigned menus, a new window):
-  `docs/releases/<version>-<name>.jpg`, on a line of its own `![What it shows](docs/releases/…)`. The website's
-  Changelog shows it, the GitHub release too (the script points it at the tag), `nightdrive update` leaves it out.
 
 **Conventions**
 - English comments that explain *why*.
+- Read a big file in parts: `grep -n` first, then the range you need (`sed -n`, Read with offset). Whole only the
+  files you edit, never several at once just to look around: each read stays in the session's context.
 - Code is written only by Claude, so files stay small for the context: one file does one thing, ~200–400 lines. Past ~600,
   split off what stands on its own (a component, a library, a level); past ~800 it must be split (generated files such as
   `Icons.qml` excepted). A new app or feature is planned in small files from the start.
