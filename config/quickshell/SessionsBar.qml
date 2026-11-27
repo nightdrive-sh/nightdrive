@@ -167,7 +167,7 @@ PanelWindow {
     // width and whether it shows its time.
     readonly property var layout: {
         const n = items.length
-        if (n === 0) return { widths: [], times: [] }
+        if (n === 0) return { widths: [], times: [], icons: [] }
         const leadW = it => Math.min(maxLead, Math.ceil(2 * chipPad + iconW + 6 + fm.advanceWidth(label(it)) + tagW(it)))
         // The time as it reads now: it grows a step at 10 s, 1 min, 10 min, 1 h (the font's digits are one width)
         // Past maxChip the chip drops its tag (SessionChip.tagShown), so it is sized without one: sized with it and then
@@ -182,6 +182,7 @@ PanelWindow {
             return Math.min(maxChip, Math.ceil(base + (t ? timeGap + tfm.advanceWidth(t) : 0)))
         }
         const widths = items.map(it => it.kind === "dot" ? dotW + dotPad + dotPadR : it.lead ? leadW(it) : ownW(it))
+        const own = widths.slice()   // each chip's room for its whole name, before any sharing
         const others = items.map((it, i) => i).filter(i => items[i].kind === "chip" && !items[i].lead)
         let room = width - 2 * pad - gap * (n - 1) - (inbox.width ? inbox.width + gap : 0) - ask.width - gap
         items.forEach((it, i) => { if (it.kind === "dot" || it.lead) room -= widths[i] })
@@ -193,7 +194,10 @@ PanelWindow {
             if (!fits) widths[i] = share
             times[i] = fits || share >= textMin + timeW
         }
-        return { widths: widths, times: times }
+        // The icon alone only on a chip squeezed below textMin: one whose whole name is shorter than that ("Tori") is
+        // as wide as its own, and textMin alone left it nameless, just its spinner (#3734)
+        const icons = widths.map((w, i) => items[i].kind === "chip" && w < textMin && w < own[i])
+        return { widths: widths, times: times, icons: icons }
     }
     readonly property var widths: layout.widths
 
@@ -227,7 +231,7 @@ PanelWindow {
                     session: cell.it.session || ({})
                     lead: !!cell.it.lead
                     text: visible ? sb.label(cell.it) : ""
-                    iconOnly: width < sb.textMin
+                    iconOnly: !!sb.layout.icons[cell.index]
                     showTime: !!sb.layout.times[cell.index]
                     tag: visible ? sb.tag(cell.it) : ""
                     showTag: true   // the chip shows it only while its name fits beside it
