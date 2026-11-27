@@ -25,13 +25,15 @@ def short(text):
     return "\n" not in text.strip() and len(text.split()) <= SHORT
 
 
-def _run(argv, stdin=None, env=None):
+def _run(argv, stdin=None, env=None, stderr_to=None):
     try:
         done = subprocess.run(argv, input=stdin, capture_output=True, text=True, timeout=TIMEOUT, env=env)
     except FileNotFoundError:
         raise Problem(f"{argv[0]} isn't installed")
     except subprocess.TimeoutExpired:
         raise Problem("The translation took too long")
+    if stderr_to:
+        stderr_to(done.stderr, env)
     if done.returncode != 0:
         lines = [line for line in done.stderr.strip().splitlines() if line.strip()]
         raise Problem(lines[-1] if lines else f"{Path(argv[0]).name} failed")
@@ -117,13 +119,23 @@ def claude(name, spec, text, src, tgt):
     env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE")}
     out = _run([binary, "-p", "--tools", "", "--strict-mcp-config", "--no-session-persistence",
                 "--model", spec.get("model", "haiku"), "--system-prompt", system],
-               stdin=f"<text>\n{text}\n</text>\n", env=env).strip()
+               stdin=f"<text>\n{text}\n</text>\n", env=env, stderr_to=signin_warning).strip()
     if not out:
         raise Problem("Claude wrote nothing")
     if short(text):
         lines = [line.strip(" -•\t") for line in out.splitlines() if line.strip()]
         return {"translation": lines[0], "alternatives": lines[1:4]}
     return {"translation": out, "alternatives": []}
+
+
+def signin_warning(stderr, env):
+    """A sign-in about to end says so on stderr: Nightdrive's one notification a day, with a button to sign in (#3664)."""
+    if "sign-in" in (stderr or ""):
+        try:
+            subprocess.run([str(config.HOME / ".config/hypr/scripts/claude-signin"), "warn"], input=stderr, text=True,
+                           capture_output=True, timeout=10, env=env)
+        except (OSError, subprocess.SubprocessError):
+            pass
 
 
 # --- the user's own -------------------------------------------------------------------------------------------------

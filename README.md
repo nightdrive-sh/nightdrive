@@ -694,6 +694,9 @@ The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).
   in `/etc/sysctl.d/60-nightdrive-inotify.conf`: Fedora's 128 runs out with the top bar, a few windows and terminals,
   and the next program then fails to start with "Too many open files". A higher value of your own still wins.
 - **The Claude menu** reads your plan's limits with Claude Code's own sign-in, so Claude Code must have been run once.
+- **Claude Code's sign-in ends** after a while. In its last days Claude writes, Ask Claude, Mail and Translate notice
+  it and give a notification with the dates, once a day per account: **Sign in** opens a terminal with
+  `claude auth login` on that account. After the dates, they stop working until you sign in.
 - **Claude writes (⌘⇧C)** sends the selected text (or what you type in its card), and the window's class and title, to
   Anthropic through Claude Code, and only when you press the key. Claude has no tools there, not even your MCP servers
   or claude.ai connectors, and nothing is saved as a session. Its text goes in only after you've seen it, the clipboard

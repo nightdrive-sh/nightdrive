@@ -1,0 +1,3 @@
+#!/bin/bash
+# Claude Code's sign-in running out: claude_signin.py has it all (#3664). Here so the callers have one command to run.
+exec python3 "$(dirname "$(readlink -f "$0")")/claude_signin.py" "$@"

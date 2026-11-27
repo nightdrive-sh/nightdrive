@@ -40,6 +40,8 @@ run_turn() {   # id mode name resumed prompt
     kill -0 "$pid" 2>/dev/null || break   # wait returns early when the trap runs; Claude is still stopping
   done
   (( notify )) && working_done
+  # A sign-in about to end says so on stderr: one notification a day, with a button to sign in again (#3664)
+  grep -qs "sign-in" "$run/err" && "$HOME/.config/hypr/scripts/claude-signin" warn "$run/err" </dev/null >/dev/null 2>&1
 
   # How it ended: this turn's result (a result after `start`, not an earlier turn's)
   local last failed
