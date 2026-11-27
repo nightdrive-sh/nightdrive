@@ -223,9 +223,11 @@ ShellRoot {
     Binding { target: TopBar; property: "overflow"; value: bar.tuckedOf(root.menuScreen) }
 
     // Toasts below the bar (ToastStack.qml), stacked in this order; Ask Claude's conversation at the bottom centre,
-    // grown out of the island (#3704)
+    // grown out of the island (#3704). These on the main screen (#3741), as the notifications; the dictation's card
+    // and cleaning mode's countdown below on the focused one, where you type or clean
     ToastStack {
         id: toasts
+        onMain: true
         bottomCards: AskClaudeToast {
             id: askToast
             floating: toasts.floating
@@ -237,10 +239,12 @@ ShellRoot {
             onAskingChanged: if (asking && launcher.open) handOff.restart()
             onDrawn: if (handOff.running) { handOff.stop(); launcher.open = false }
         }
-        DictationToast { ask: askToast }   // the dictation's card (or the sessions bar's bubble, for Claude)
         Osd {}
-        CleanToast {}   // cleaning mode's countdown (hypr/scripts/clean-input)
         RemindToast {}  // a quick reminder that came due (hypr/scripts/remind, launcher › Tools › Remind)
+    }
+    ToastStack {
+        DictationToast { ask: askToast }   // the dictation's card (or the sessions bar's bubble, for Claude)
+        CleanToast {}   // cleaning mode's countdown (hypr/scripts/clean-input)
     }
 
     Timer { id: handOff; interval: 250; onTriggered: launcher.open = false }

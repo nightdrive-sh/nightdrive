@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
-import Quickshell.Io
 import Quickshell.Wayland
 import "SessionGroups.js" as Groups
 
@@ -48,34 +47,8 @@ PanelWindow {
     // The dot between groups: a quiet grey from the theme
     readonly property color line: Qt.rgba(Theme.dim.r, Theme.dim.g, Theme.dim.b, 0.38)
 
-    // The main screen: the Main display of Arrange displays (the "main" line of arrangementFile, arrangement.lua), else
-    // the one with workspace 1 (where everything comes back to, virtual-display.lua), else the first external one (it
-    // has 1–9, display.lua), never a virtual one (a tablet over VNC). Workspace 1 alone wasn't enough: empty and not
-    // shown, Hyprland drops it, and the bar went to the first screen, the laptop's (#3294).
-    readonly property string arrangementFile: Quickshell.env("HOME") + "/.local/state/nightdrive/arrangement"
-    property string mainKey: ""   // "desc:<make model serial>" for an external display, else an output's name
-    FileView {
-        path: sb.arrangementFile; watchChanges: true; onFileChanged: reload(); printErrors: false
-        onLoaded: {
-            const m = text().split("\n").map(l => l.match(/^main (.+)$/)).filter(m => m)
-            sb.mainKey = m.length ? m[m.length - 1][1].trim() : ""   // the last one wins, as in arrangement.lua
-        }
-        onLoadFailed: sb.mainKey = ""
-    }
-    readonly property var mainScreen: {
-        const real = Quickshell.screens.filter(s => !s.name.startsWith("HEADLESS-"))
-        const byName = n => n ? real.find(s => s.name === n) || null : null
-        let s = null
-        if (mainKey.startsWith("desc:")) {
-            // An external display goes by its description, which only Hyprland's monitor object carries
-            const mon = Hyprland.monitors.values.find(m => m.lastIpcObject
-                                                          && "desc:" + m.lastIpcObject.description === mainKey)
-            s = byName(mon ? mon.name : "")
-        } else s = byName(mainKey)
-        const w1 = Hyprland.workspaces.values.find(w => w.id === 1)
-        return s || byName(w1 && w1.monitor ? w1.monitor.name : "")
-            || real.find(s => !/^(eDP|LVDS|DSI)-/.test(s.name)) || real[0] || Quickshell.screens[0] || null
-    }
+    // The main screen (MainScreen.qml: the Displays window's Main display)
+    readonly property var mainScreen: MainScreen.screen
     readonly property var sessions: Claude.sessions
     readonly property var items: Groups.row(sessions, Claude.keptLeads)
     // The Repeater's model is the items' keys, not the items: a new array on every claude-sessions poll would make it

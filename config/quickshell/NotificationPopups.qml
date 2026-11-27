@@ -8,6 +8,7 @@ import "NotifGroups.js" as Groups
 // app's default action or its window), right click, × or a two-finger swipe right = dismiss (a closed stack: all of it),
 // the mouse over a stack keeps it.
 // Hyprland blurs what's behind the cards (layer rule in hypr/rules.lua, namespace nightdrive-notifications).
+// Always on the main screen (MainScreen.qml, the Displays window's Main display), not the focused one (#3741).
 PanelWindow {
     id: win
 
@@ -16,6 +17,7 @@ PanelWindow {
     readonly property int gap: 10              // between cards, and from the screen edge
     readonly property real bgOpacity: 0.85
 
+    screen: MainScreen.screen
     visible: Notifs.popups.length > 0
     // The full height, not the cards': the surface doesn't change size when one goes, so the cards sliding up into
     // its place aren't cut off by a window that already shrank (a flicker). Clicks pass through outside the cards (mask);

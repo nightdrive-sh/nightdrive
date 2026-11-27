@@ -6,7 +6,7 @@ import Quickshell.Hyprland
 import QtQuick.Shapes
 import QtQuick.Effects
 
-// The toasts' place: one surface at the top centre, just below the bar, with the shown cards (Toast.qml) stacked
+// The toasts' place: one surface at the top centre, just below the bar, on the focused screen or the main one (onMain), with the shown cards (Toast.qml) stacked
 // downwards in the order they're declared in shell.qml. Cards in bottomCards sit at the bottom centre instead and grow
 // upwards: Ask Claude's conversation (#3704), floating above the sessions bar's speech bubble when the bar shows on
 // this screen, else on the screen's bottom edge.
@@ -41,11 +41,17 @@ PanelWindow {
     // The whole screen, so the click catcher can cover it; nothing but the cards is drawn, and without a keyCard the
     // input region is the clickable card or nothing
     visible: anyShown
-    // The screen it will show on, chosen while hidden (#2062): left to Hyprland, the surface learned its screen only
-    // once mapped, so the first frame used the previous screen's height for Ask Claude's lowered (Screen.height) and
-    // the card jumped down a frame later. While shown it stays put, so focus moving doesn't carry a card along.
+    // On the main screen (MainScreen.qml), not the focused one: Ask Claude, volume and brightness, reminders (#3741).
+    // A binding, not place(): assigned by hand, a screen equal to the one Quickshell reports for a surface not yet
+    // given one was never passed on, and Hyprland put it on the focused screen after all. It follows a new main
+    // screen (made main, or the old one unplugged) at once, shown or not.
+    property bool onMain: false
+    screen: onMain ? MainScreen.screen : null
+    // Else the screen it will show on, chosen while hidden (#2062): left to Hyprland, the surface learned its screen
+    // only once mapped, so the first frame used the previous screen's height for Ask Claude's lowered (Screen.height)
+    // and the card jumped down a frame later. While shown it stays put, so focus moving doesn't carry a card along.
     function followFocus() {
-        if (anyShown) return
+        if (anyShown || onMain) return
         const f = Hyprland.focusedMonitor
         const s = (f && Quickshell.screens.find(x => x.name === f.name)) || Quickshell.screens[0]
         if (s && screen !== s) screen = s
@@ -54,6 +60,7 @@ PanelWindow {
     onAnyShownChanged: followFocus()
     Connections {
         target: Hyprland
+        enabled: !stack.onMain
         function onFocusedMonitorChanged() { stack.followFocus() }
     }
     anchors { top: true; bottom: true; left: true; right: true }

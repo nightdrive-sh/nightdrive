@@ -59,6 +59,7 @@ singleton TopBar 1.0 TopBar.qml
 singleton Notifs 1.0 Notifs.qml
 singleton Claude 1.0 Claude.qml
 singleton PrimaryWatch 1.0 PrimaryWatch.qml
+singleton MainScreen 1.0 MainScreen.qml
 NotificationPopups 1.0 NotificationPopups.qml
 NotificationCard 1.0 NotificationCard.qml
 NotificationStack 1.0 NotificationStack.qml
