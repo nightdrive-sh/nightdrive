@@ -46,7 +46,6 @@ Singleton {
     // ask it to through these, as neither knows the other
     signal showRequested(string text, bool send)   // open it: send text as a new request, or leave it in the field
     signal hideRequested()
-    signal historyRequested()                      // ⌘H in its field: the launcher's Ask Claude › History (shell.qml)
     signal deleteBackRequested(bool word)          // ⌘⌫ / ⌥⌫ over it, which Hyprland takes (Launcher.qml's IPC)
     property string draft: ""            // what the toast's field has, for ⌘Enter's terminal (Launcher.qml's IPC)
     // The toast shows the conversation now: Claude's confirmation card comes into it, a short one (ClaudeConfirm.qml
@@ -140,7 +139,7 @@ Singleton {
     // from the history on purpose (reopened), when a request goes on with it however old it is
     property bool reopened: false
     function stale() { return sessionId !== "" && !busy && !reopened && Date.now() - lastAt > freshAfter }
-    // The launcher's history (AskClaudeHistoryLevels.qml, #2246): an earlier conversation back in the toast, as it was,
+    // The history, the card's (AskClaudeHistory.qml, #3713) or the launcher's (AskClaudeHistoryLevels.qml, #2246): an earlier conversation back in the toast, as it was,
     // its cards too. False while another one runs: there is one conversation at a time, and the running one stays
     function open(id) {
         if (!/^[0-9a-f-]{36}$/.test(id) || ((busy || starter.running) && id !== sessionId)) return false

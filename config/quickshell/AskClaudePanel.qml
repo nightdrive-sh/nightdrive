@@ -14,7 +14,14 @@ Item {
     property bool listenOnly: false       // opened to listen (#1996): no keys yet, so no footer either
     property var dictation: null          // Dictation, for the listening wave
     readonly property alias field: field
+    // ⌘H: the earlier conversations in the card, where the conversation and the field were (AskClaudeHistory, #3713)
+    property bool browsing: false
     signal close()
+
+    function showHistory() { browsing = true; history.start() }
+    function hideHistory() { browsing = false; field.edit.forceActiveFocus() }
+    // The keys back, to the list or the field (from a card or prompt that had them)
+    function takeKeys() { if (browsing) history.forceActiveFocus(); else field.edit.forceActiveFocus() }
 
     function refuse() { Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/sounds", "event", "error"]) }
 
@@ -42,14 +49,14 @@ Item {
     // The other keys under the field, which keeps the whole width (#3704)
     readonly property real footerH: footer.visible ? footer.height + gap : 0
     readonly property int topPad: pad + fieldSide   // above the first thing: as the field's sides, so they line up
-    implicitHeight: topPad + pad + fieldH + threadH + footerH
+    implicitHeight: topPad + pad + (browsing ? history.implicitHeight : fieldH + threadH) + footerH
 
     // Shift+Enter (a new line) and Esc (close) aren't listed: what text fields and toasts do. Claude's card has its keys on
     // its buttons. ⌘Enter is Hyprland's key, not the field's (so it never sends or adds a line): over the toast it comes
     // over IPC (askClaude key in Launcher.qml) and goes on with the conversation in a terminal (AskClaudeLevels.terminal),
     // as ⌘Enter on the launcher's Ask Claude row does (#1980); without one yet, what was written is a new session's prompt.
     readonly property string terminalKey: "Cmd+Enter: open in terminal"
-    // Earlier conversations, in the launcher's Ask Claude › History (#3428): first in the row, at its right end
+    // Earlier conversations, in the card (#3713): first in the row, at its right end
     readonly property string historyKey: "Cmd+H: history"
     // A selection in the conversation (#1904): ⌘C copies it, and the footer says so for a moment once it has. Last in the
     // footer, so the main key stays at its right edge
@@ -58,13 +65,15 @@ Item {
     readonly property string copyKey: copied ? "Cmd+C: copied" : thread.selectedText !== "" ? "Cmd+C: copy" : ""
     // Enter's action is a small tile inside the field, at its right end (#3704); the other keys stay beside it, quiet
     readonly property string sendKey: listenOnly || session.pendingCard || session.busy ? "" : "Enter: send"
-    readonly property string keys: listenOnly ? "" : [historyKey, session.pendingCard ? ""
+    readonly property string browseKeys: "Enter: open  ·  Up+Down: move  ·  Esc: back"
+    readonly property string keys: listenOnly ? "" : browsing ? browseKeys : [historyKey, session.pendingCard ? ""
         : session.busy ? "Ctrl+C: stop  ·  " + terminalKey
         : session.entries.length ? terminalKey + "  ·  Cmd+N: new chat"
         : terminalKey, copyKey].filter(k => k !== "").join("  ·  ")
 
     Item {
         id: fieldRow
+        visible: !p.browsing
         x: p.pad + p.fieldSide
         y: p.fieldOnTop ? p.topPad : p.topPad + p.threadH
         width: p.width - 2 * (p.pad + p.fieldSide)
@@ -96,7 +105,7 @@ Item {
             // One still running: the text waits in the field
             onSent: text => { if (p.session.ask(text)) field.begin(""); else p.refuse() }
             onNewChat: { p.session.reset(); field.begin("") }
-            onHistory: p.session.historyRequested()
+            onHistory: p.showHistory()
             onLeaving: p.close()
             onRefused: p.refuse()
             onPaged: dir => thread.page(dir)
@@ -113,7 +122,7 @@ Item {
 
     AskClaudeThread {
         id: thread
-        visible: p.hasThread
+        visible: p.hasThread && !p.browsing
         x: p.pad
         y: p.fieldOnTop ? p.topPad + p.fieldH + p.gap : p.topPad
         width: p.width - 2 * x
@@ -126,12 +135,25 @@ Item {
 
     // The line between the conversation and the field (#3704), as wide as the field: clear of the card's edges
     Rectangle {
-        visible: p.hasThread && !p.fieldOnTop
+        visible: p.hasThread && !p.fieldOnTop && !p.browsing
         x: fieldRow.x
         width: fieldRow.width
         height: 1
         y: fieldRow.y - Math.round((p.fieldAbove + p.gap) / 2)
         color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.12)
+    }
+    AskClaudeHistory {
+        id: history
+        visible: p.browsing
+        x: p.pad
+        y: p.topPad
+        width: p.width - 2 * x
+        maxHeight: Math.max(120, p.maxHeight - p.topPad - p.pad - p.footerH)
+        fontSize: p.threadFontSize
+        selColor: p.fieldColor
+        onBack: p.hideHistory()
+        onOpened: p.hideHistory()
+        onRefused: p.refuse()
     }
     KeyFooter {
         id: footer

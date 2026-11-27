@@ -29,6 +29,7 @@ import "kit/Words.js" as Words
 //                                       or closes it: "ok"
 //   qs ipc call askClaude open          opens it, as the notification of a turn that ended does (ask-claude.d/notify.sh)
 //   qs ipc call askClaude shown         "open" or "closed": whether that notification is needed
+//   qs ipc call askClaude history       opens it on its history (AskClaudeHistory.qml), as ⌘H in it does
 Toast {
     id: toast
     property bool stepAside: false        // a password prompt or Claude's full card is up: they get the keys
@@ -85,7 +86,7 @@ Toast {
     Timer { id: settle; interval: 300; onTriggered: toast.instant = false }
 
     Binding { target: AskClaudeSession; property: "toastViewing"; value: toast.takesKeys }
-    onTakesKeysChanged: if (takesKeys) panel.field.edit.forceActiveFocus()   // back from a card that had the keys
+    onTakesKeysChanged: if (takesKeys) panel.takeKeys()   // back from a card that had the keys
     Binding { target: AskClaudeSession; property: "draft"; value: panel.field.text }
     Connections {
         target: AskClaudeSession
@@ -114,6 +115,7 @@ Toast {
     function close() {
         instant = true
         asking = false
+        panel.browsing = false              // it opens again on the conversation
         listening = false
         listenOnly = false
         grown = false
@@ -200,6 +202,8 @@ Toast {
         function toggle(): string { toast.toggle(); return "ok" }
         function open(): string { if (!toast.asking) toast.reopen(); return "ok" }
         function shown(): string { return toast.asking ? "open" : "closed" }
+        // Its history in the card, as ⌘H in the field (#3713): "ok"
+        function history(): string { if (!toast.asking) toast.reopen(); panel.showHistory(); return "ok" }
         // For the top bar's bubble (topbar/scripts/status askclaude): "bar" while the sessions bar's button has it
         // (SessionsAsk.qml), else open, busy, unseen (an answer not looked at) or idle
         function state(): string {

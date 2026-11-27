@@ -129,6 +129,7 @@ SendClaudeLevels 1.0 SendClaudeLevels.qml
 AskClaudeHint 1.0 AskClaudeHint.qml
 AskClaudeLevels 1.0 AskClaudeLevels.qml
 AskClaudeHistoryLevels 1.0 AskClaudeHistoryLevels.qml
+AskClaudeHistory 1.0 AskClaudeHistory.qml
 AskClaudeField 1.0 AskClaudeField.qml
 AskClaudeThread 1.0 AskClaudeThread.qml
 AskClaudeConfirm 1.0 AskClaudeConfirm.qml

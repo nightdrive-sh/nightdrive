@@ -17,8 +17,9 @@ toast, closes it without stopping Claude. The speech bubble then says Claude is 
 once it has answered, until you look (the row says so too); without the sessions bar the bubble is in the top bar. A
 click on it opens the toast again, as ⌘⌥Space does (⌘⌥Space anywhere opens it to write in). When Claude finishes with the toast closed, a notification says so, and its Open brings the conversation back. A
 request runs on its own, so it carries on through a restart of the desktop, which picks it up again.
-**Ask Claude History** (⌘H in the toast, or search the Launcher for it) lists the conversations of the last 7 days, newest first (typing
-searches them): Enter brings one back into the toast with its cards, and what you write there goes on with it.
+⌘H in the toast lists the conversations of the last 7 days in it, newest first: ↑↓ or J K move, Enter (or L) brings one back with
+its cards, and what you write there goes on with it; Esc (or H) goes back. **Ask Claude History** in the Launcher (search for it) is the
+same list, where typing searches the requests.
 Claude Code works with Nightdrive's tools and nothing else (no shell, files, hooks or plugins of its own; the web only
 when Access › Web allows it, as Normal does), so the card and Access below decide as always. On the web it searches,
 reads pages and downloads files: audio, pictures, PDF and zip of at most 25 MB (200 MB a conversation), from public

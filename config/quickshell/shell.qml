@@ -236,14 +236,6 @@ ShellRoot {
             // handOff closes it anyway if that frame doesn't come (the toast stepped aside for a password prompt).
             onAskingChanged: if (asking && launcher.open) handOff.restart()
             onDrawn: if (handOff.running) { handOff.stop(); launcher.open = false }
-            // ⌘H: its history, in the launcher (#3428), which takes the keys from it
-            Connections {
-                target: AskClaudeSession
-                function onHistoryRequested() {
-                    askToast.close()
-                    launcher.open = true; launcher.go("askhistory"); launcher.keyLevel = "askhistory"
-                }
-            }
         }
         DictationToast { ask: askToast }   // the dictation's card (or the sessions bar's bubble, for Claude)
         Osd {}

@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "AskClaudeHistory.js" as Hist
 
 // The launcher's Ask Claude history (Dashboard #2246): the earlier Ask Claude conversations, the newest first, and
 // Enter on one brings it back into Ask Claude's toast as it was, its steps, answers and result cards too; what is
@@ -22,8 +23,8 @@ Item {
     readonly property var titles: ({ askhistory: "Ask Claude › History" })
     readonly property var parents: ({})
 
-    // Its row, found by searching (LauncherSearch.qml; the Ask Claude window opens it with ⌘H, #3428): only when there
-    // is a conversation to go back to
+    // Its row, found by searching (LauncherSearch.qml): only when there is a conversation to go back to. ⌘H in Ask
+    // Claude's card shows the same list in the card itself (AskClaudeHistory.qml, #3713)
     function rootRows() {
         if (!hint || !hint.installed || convs.length === 0) return []
         return [{ kind: "nav", name: "Ask Claude History", glyph: "history", target: "askhistory",
@@ -31,19 +32,10 @@ Item {
                   extra: "claude ai assistant earlier recent previous conversations chats requests answers" }]
     }
 
-    function ago(ms) {
-        const d = Math.max(0, (Date.now() - ms) / 1000)
-        if (d < 60) return "now"
-        if (d < 3600) return Math.floor(d / 60) + " min"
-        if (d < 86400) return Math.floor(d / 3600) + " h"
-        return Math.floor(d / 86400) + " d"
-    }
     // What the row says under the request: how it ended when not well, then the follow-ups and the cards it found
     function sub(c) {
         const parts = []
-        if (c.status === "error") parts.push("failed")
-        else if (c.status === "timeout") parts.push("ran out of time")
-        else if (c.status === "cancelled") parts.push("stopped")
+        if (Hist.failure(c) !== "") parts.push(Hist.failure(c))
         if (c.turns > 1) parts.push(c.turns + " requests")
         if (c.results > 0) parts.push(c.results + (c.results === 1 ? " result" : " results"))
         return parts.join(" · ")
@@ -63,7 +55,7 @@ Item {
         const words = q.toLowerCase().split(/\s+/).filter(w => w)
         const rows = convs.filter(c => words.every(w => c.title.toLowerCase().indexOf(w) >= 0)).map(c => ({
             kind: "askhist", id: c.id, name: c.title || "(no text)", glyph: glyph(c), sub: sub(c) || undefined,
-            summary: c.status === "running" ? "working…" : c.id === session.sessionId ? "open" : ago(c.last) }))
+            summary: Hist.when(c, session.sessionId) }))
         if (rows.length) return rows
         if (!loaded) return launcher.hint("Reading the conversations…")
         return launcher.hint(words.length ? "No request with those words" : "No Ask Claude conversations in the last 7 days")

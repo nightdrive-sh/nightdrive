@@ -17,7 +17,7 @@ Item {
     readonly property alias edit: edit    // for ⌘⌫ / ⌥⌫ (Words.deleteBack, from Launcher.qml's IPC)
     signal sent(string text)
     signal newChat()
-    signal history()                           // ⌘H: earlier conversations (the launcher's Ask Claude › History, #3428)
+    signal history()                           // ⌘H: earlier conversations, in the card (AskClaudeHistory, #3713)
     signal leaving(string text)
     signal refused()                            // Enter with nothing to send
     signal paged(int dir)                       // PgUp (-1) / PgDn (1): the conversation's, not the field's
