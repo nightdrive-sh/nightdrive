@@ -131,8 +131,8 @@ QtObject {
     // Trash and your own folders take them; Sent and Drafts hold what you wrote, and the folder being looked at is
     // where they are.
     property var dragged: null          // the threads being dragged (a picked one drags all the picked)
-    property int dropFolder: -1         // the folder under it, if it takes it
-    function takesDrop(i) { return (folders[i].own || ["INBOX", "Archive", "Spam", "Trash"].indexOf(folders[i].dir) >= 0) && (win.searcher.wide || i !== win.folder) }
+    property int dropFolder: -1         // the folder under it, if it takes it; -2: New folder (made, then sorted into)
+    function takesDrop(i) { return i === -2 || (folders[i].own || ["INBOX", "Archive", "Spam", "Trash"].indexOf(folders[i].dir) >= 0) && (win.searcher.wide || i !== win.folder) }
     property point dragPos              // where the pointer is: the ghost follows it (DragGhost.qml)
     property Item dragFrom: null        // the row dragged from: the drag out is released with it
     // Out of the window, the drag goes on as the desktop's (OutDrag.qml): the threads as a line each, into a
@@ -158,7 +158,9 @@ QtObject {
         dragFrom = null
         const t = dragged, i = dropFolder
         dragged = null; dropFolder = -1
-        if (!t || i < 0) return
+        if (!t || i === -1) return
+        // On New folder: its name asked for, then the threads sorted into it, as m's New folder… does
+        if (i === -2) { win.menus.newFolder(j => sortInto(j, t)); return }
         const to = folders[i].dir
         if (folders[i].own) { sortInto(i, t); return }
         if (to === "INBOX" && t.some(x => folders[win.homeOf(x)].own)) { unsort(t); return }

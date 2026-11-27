@@ -71,7 +71,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 
 ## Your own folders
 
-Below Trash, after a gap, are the account's own folders, such as Offers for advertising you want to keep but not see in the inbox. New folder (under them) makes one; it is a real folder on the server, so your phone sees it too.
+Below Trash, after a gap, are the account's own folders, such as Offers for advertising you want to keep but not see in the inbox. New folder (under them) makes one, and mail dropped on it goes into the one it makes; it is a real folder on the server, so your phone sees it too.
 
 - Drag mail into one of them, and that sender's mail goes there from then on: what is in the inbox from them now moves along, and new mail from them goes straight there as it arrives, unread but without a notification. ⌘Z takes back the move and the rule.
 - Dragged back to the inbox, the sender's mail comes to the inbox again. Into another of your folders, it goes there instead. Archive and Trash leave the rule as it is.

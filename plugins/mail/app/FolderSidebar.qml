@@ -80,6 +80,7 @@ AppSidebar {
         c: win.look
         glyph: "folder-plus"
         label: "New folder"
+        dropTarget: ops.dropFolder === -2       // a thread dropped here goes into the folder it makes
         Layout.topMargin: win.folders.some(f => f.own) ? 0 : 14
         opacity: hovered ? 1 : sidebarHover.hovered ? 0.6 : 0.3
         onClicked: win.menus.newFolder()
@@ -120,13 +121,15 @@ AppSidebar {
         }
     ]
 
-    // The folder under a thread dragged from the list (pos in the window), if takes(i) says it takes it, else -1
+    // The folder under a thread dragged from the list (pos in the window), if takes(i) says it takes it, -2 for New
+    // folder, else -1
     function dropAt(pos, takes) {
         let at = -1
         for (let i = 0; i < win.folders.length; i++) {
             const f = folderRows.itemAt(i)
             if (f && takes(i) && f.contains(f.mapFromItem(null, pos.x, pos.y))) at = i
         }
+        if (at < 0 && takes(-2) && newFolderRow.contains(newFolderRow.mapFromItem(null, pos.x, pos.y))) at = -2
         return at
     }
 }

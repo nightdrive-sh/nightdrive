@@ -11,7 +11,7 @@ Rectangle {
     width: Math.min(320, ghostText.implicitWidth + 28); height: 34
     radius: 8
     color: c.solid
-    border.color: ops.dropFolder >= 0 ? c.primary : c.line
+    border.color: ops.dropFolder !== -1 ? c.primary : c.line
     Text {
         id: ghostText
         textFormat: Text.PlainText
