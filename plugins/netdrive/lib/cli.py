@@ -80,9 +80,8 @@ def run(name):
         if target:
             mountcmd.wait_for(target, notify)
     if d.get("key"):
-        notify("Unlocking its key")
         try:
-            sshkey.load(d["key"])
+            sshkey.load(d["key"], notify)
         except drives.Refused as e:
             notify(str(e))
             raise

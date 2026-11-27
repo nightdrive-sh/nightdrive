@@ -7,8 +7,8 @@ often came before 1Password had even started. So the drives can have a key of th
   keyring (Secret Service, through secret-tool), which the login opens, so the key file alone, on a disk or in a
   backup, is of no use.
 - An ssh-agent of Network Drives' own (mountcmd.agent_socket) holds it, unlocked once per login (load) with the
-  passphrase lib/askpass reads from the keyring. It runs as a user unit of its own (AGENT_UNIT), so restarting one
-  drive doesn't take it from the others.
+  passphrase lib/askpass reads from the keyring, once the keyring is open (wait_keyring). It runs as a user unit of
+  its own (AGENT_UNIT), so restarting one drive doesn't take it from the others.
 - The drive's ssh gets -i KEY, IdentitiesOnly and IdentityAgent (mountcmd.ssh_command), so ~/.ssh/config stays as it
   is, and the Host's 1Password key still logs in everywhere else.
 What it gives up: while the user is logged in, a program running as them can use that agent or read the keyring, as it
@@ -35,7 +35,10 @@ KEYRING = ["application", "nightdrive-netdrive", "key"]
 ASKPASS = str(Path(__file__).resolve().parent / "askpass")
 AGENT_WAIT = 5                          # s: the longest wait for a new agent to answer
 SYSTEMD = True                          # the agent as a user unit; the tests run it as a plain process instead
-UNLOCK_TIMEOUT = 15                     # s: ssh-add with the keyring's answer (a locked keyring may show its prompt)
+UNLOCK_TIMEOUT = 15                     # s: ssh-add with the keyring's answer
+# Exit 0 while the login keyring is locked or not yet there (its header says why both)
+KEYRING_CHECK = str(Path(__file__).resolve().parent / "keyring-locked")
+KEYRING_POLL = 2                        # s between looks while the keyring is locked
 _detached = []                          # an agent started without systemd, kept so Python doesn't warn it still runs
 
 
@@ -106,7 +109,7 @@ def keygen(p, passphrase):
 
 def env(key=KEY):
     e = dict(os.environ, SSH_AUTH_SOCK=mountcmd.agent_socket(), SSH_ASKPASS=ASKPASS, SSH_ASKPASS_REQUIRE="force",
-             NETDRIVE_KEY=path(key))
+             NETDRIVE_KEY=path(key), NETDRIVE_KEYRING_CHECK=KEYRING_CHECK)
     e.pop("DISPLAY", None)
     return e
 
@@ -146,12 +149,37 @@ def fingerprint(p):
     return r.stdout.split()[1] if r.returncode == 0 and len(r.stdout.split()) > 1 else ""
 
 
-def load(key=KEY):
+def keyring_locked():
+    """True while the login keyring is locked or not there yet, and when the check can't tell in time (waiting is
+    safe, a prompt isn't)"""
+    try:
+        r = subprocess.run([KEYRING_CHECK], capture_output=True, stdin=subprocess.DEVNULL, timeout=UNLOCK_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return True
+    return r.returncode == 0
+
+
+def wait_keyring(notify=lambda text: None, sleep=time.sleep):
+    """Returns once the login keyring is open (#3728). The drives start with the session, which at an autologin start
+    runs under the login screen, before the password that opens the keyring (the lock's PAM): asking the keyring then
+    opened gnome-keyring's own password prompt, and the drive failed when no one answered it. So a drive waits, saying
+    so on its status line, however long it takes, as it waits for its host."""
+    told = False
+    while keyring_locked():
+        if not told:
+            notify("Waiting for the login keyring: your password at the login screen opens it")
+            told = True
+        sleep(KEYRING_POLL)
+
+
+def load(key=KEY, notify=lambda text: None):
     """The key in the drives' agent, unlocked, starting the agent if it isn't running. Under a lock: every drive
-    starts at login at once, and only one may start the agent."""
+    starts at login at once, and only one may start the agent. First waits for the login keyring (wait_keyring)."""
     p = path(key)
     if not os.path.exists(p + ".pub"):
         raise drives.Refused(f"The drive's key {p} is missing: netdrive key NAME makes one.")
+    wait_keyring(notify)
+    notify("Unlocking its key")
     os.makedirs(mountcmd.runtime_dir(), mode=0o700, exist_ok=True)
     with open(os.path.join(mountcmd.runtime_dir(), "agent.lock"), "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)

@@ -2,8 +2,9 @@
 """Network Drives' own ssh key: `python3 plugins/netdrive/lib/sshkey_test.py`. The key is made with a passphrase that
 never reaches a command line, the drives' agent is started once and unlocks the key with what askpass gives, and a
 drive with a key logs in with only that key from that agent (never 1Password's). The keyring is stood in for by a
-secret-tool of the test's own (lib/askpass is the real one), and the agent runs as a plain process in the test's own runtime folder: the user's own agent and keyring
-are never touched. Needs ssh-keygen, ssh-agent and ssh-add."""
+secret-tool of the test's own (lib/askpass is the real one), and its lock by a check of the test's own (locked while
+NETDRIVE_TEST_LOCKED is set), and the agent runs as a plain process in the test's own runtime folder: the user's own
+agent and keyring are never touched. Needs ssh-keygen, ssh-agent and ssh-add."""
 import os
 import shutil
 import subprocess
@@ -33,9 +34,13 @@ class Key(unittest.TestCase):
         fake = tools / "secret-tool"          # the keyring: "lookup … key PATH" answers the test's passphrase
         fake.write_text('#!/bin/sh\n[ "$1" = lookup ] && [ "$5" = "$NETDRIVE_KEY" ] && printf "%s" "$NETDRIVE_TEST_PASS"\n')
         fake.chmod(0o700)
+        check = tools / "keyring-locked"      # lib/keyring-locked: exit 0 while locked
+        check.write_text('#!/bin/sh\n[ -n "$NETDRIVE_TEST_LOCKED" ]\n')
+        check.chmod(0o700)
         env = {"HOME": str(home), "XDG_RUNTIME_DIR": str(home / "run"), "NETDRIVE_TEST_PASS": PASS,
                "PATH": f"{tools}:{os.environ.get('PATH', '/usr/bin:/bin')}"}
-        self.patches = [mock.patch.dict(os.environ, env), mock.patch.object(sshkey, "SYSTEMD", False)]
+        self.patches = [mock.patch.dict(os.environ, env), mock.patch.object(sshkey, "SYSTEMD", False),
+                        mock.patch.object(sshkey, "KEYRING_CHECK", str(check))]
         for p in self.patches:
             p.start()
 
@@ -69,6 +74,23 @@ class Key(unittest.TestCase):
         with mock.patch.object(sshkey, "start_agent", side_effect=AssertionError("started twice")):
             sshkey.load(self.key)             # the second drive: the agent is there and has the key
 
+    def test_load_waits_for_the_keyring(self):
+        self.make()
+        told = []
+        with mock.patch.object(sshkey, "keyring_locked", side_effect=[True, True, False]) as locked, \
+                mock.patch.object(sshkey, "KEYRING_POLL", 0):
+            sshkey.load(self.key, told.append)
+        self.assertEqual(locked.call_count, 3)
+        self.assertTrue(told[0].startswith("Waiting for the login keyring"))
+        self.assertEqual(len([t for t in told if t.startswith("Waiting")]), 1, "said once, not on every look")
+        listed = subprocess.run(["ssh-add", "-l"], env=sshkey.env(self.key), capture_output=True, text=True).stdout
+        self.assertIn(sshkey.fingerprint(self.key), listed)
+
+    def test_keyring_locked_reads_the_check(self):
+        self.assertFalse(sshkey.keyring_locked())
+        with mock.patch.dict(os.environ, {"NETDRIVE_TEST_LOCKED": "1"}):
+            self.assertTrue(sshkey.keyring_locked())
+
     def test_wrong_passphrase_is_refused_without_looping(self):
         self.make()
         with mock.patch.dict(os.environ, {"NETDRIVE_TEST_PASS": "wrong"}), \
@@ -78,10 +100,20 @@ class Key(unittest.TestCase):
 
     def test_askpass_answers_only_the_first_prompt(self):
         def ask(prompt):
-            env = dict(os.environ, NETDRIVE_KEY=self.key)
-            return subprocess.run([sshkey.ASKPASS, prompt], env=env, capture_output=True, text=True)
+            return subprocess.run([sshkey.ASKPASS, prompt], env=sshkey.env(self.key), capture_output=True, text=True)
         self.assertEqual(ask(f"Enter passphrase for {self.key}: ").stdout, PASS)
         self.assertNotEqual(ask(f"Bad passphrase, try again for {self.key}: ").returncode, 0)
+
+    def test_askpass_never_asks_a_locked_keyring(self):
+        """secret-tool at a locked keyring opens gnome-keyring's own prompt (#3728): askpass answers nothing then"""
+        def ask(**extra):
+            env = dict(sshkey.env(self.key), **extra)
+            return subprocess.run([sshkey.ASKPASS, f"Enter passphrase for {self.key}: "], env=env,
+                                  capture_output=True, text=True)
+        locked = ask(NETDRIVE_TEST_LOCKED="1")
+        self.assertNotEqual(locked.returncode, 0)
+        self.assertEqual(locked.stdout, "")
+        self.assertEqual(ask(NETDRIVE_KEYRING_CHECK="").stdout, "", "no check, no answer")
 
     def test_missing_key_is_refused(self):
         with self.assertRaises(drives.Refused):

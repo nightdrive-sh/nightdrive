@@ -1,0 +1,13 @@
+#!/bin/bash
+# Network Drives: exit 0 while the drives' key mustn't ask the login keyring yet (#3728), 1 once it may. Used by
+# sshkey.wait_keyring and lib/askpass (through sshkey.env's NETDRIVE_KEYRING_CHECK); never asks for anything itself.
+# - No keyring on the bus yet: the drives start with the session, as NightdriveLocked starts the keyring's secrets part.
+#   A secret-tool then would have D-Bus start a keyring of its own, locked, which opens its password prompt. Asked of
+#   the bus itself (NameHasOwner), not of the keyring.
+# - Then the kit's keyring.py (Mail's, Contacts' and Calendar's syncs use it too): exit 0 while the login collection is
+#   locked, which it stays until the password at the login screen (its PAM opens it).
+kit=$(dirname "$(readlink -f "$0")")/../../../config/quickshell/kit/keyring.py
+owner=$(busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus NameHasOwner s \
+    org.freedesktop.secrets 2>/dev/null)
+[[ $owner == "b true" ]] || exit 0
+exec python3 -I "$kit"

@@ -3,4 +3,9 @@
 # Only the first prompt ("Enter passphrase for …") is answered. A wrong one makes ssh-add ask again ("Bad passphrase,
 # try again …"), and answering that too would loop forever; anything else (a confirmation) gets nothing either.
 [[ $1 == "Enter passphrase"* ]] || exit 1
+# Never while the login keyring is locked: secret-tool would open gnome-keyring's own password prompt (#3728).
+# sshkey.load waits for it first; this holds for any other way here. The check (lib/keyring-locked, exit 0 while
+# locked or not there yet) comes from sshkey.env: without it, nothing is answered.
+[[ -x $NETDRIVE_KEYRING_CHECK ]] || exit 1
+"$NETDRIVE_KEYRING_CHECK" && exit 1
 exec secret-tool lookup application nightdrive-netdrive key "$NETDRIVE_KEY"
