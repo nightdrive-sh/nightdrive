@@ -32,6 +32,9 @@ import fcntl, json, os, re, socket, subprocess, sys
 import dbus, dbus.service, dbus.mainloop.glib
 from gi.repository import GLib
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from spawn import spawn  # noqa: E402  reaps the EQ's shell: this runs all session (#3657)
+
 SONY_UUIDS = {"96cc203e-5068-46ad-b32d-e316f5e069ba": 1, "956c7b26-d49a-4ba8-b03f-b17d393cb6e2": 2}
 APPLE_UUID = "74ec2172-0bad-4d01-8f77-997b2be0722a"   # Apple accessories' AAP service
 NAMES = {"nc": "Noise cancelling", "adaptive": "Adaptive", "ambient": "Transparency", "off": "Passive"}
@@ -79,8 +82,8 @@ class Headphones:
         self.mode = mode
         if self.write("", NAMES[mode]):
             # the EQ follows the mode (headphones measured in several modes, see config/easyeffects/build-presets)
-            subprocess.Popen(["bash", "-c", f'cur=$("{EQ}" current) && [[ $cur != off ]] && "{EQ}" set "$cur"'],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            spawn(["bash", "-c", f'cur=$("{EQ}" current) && [[ $cur != off ]] && "{EQ}" set "$cur"'],
+                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def close(self):
         GLib.source_remove(self.watch)

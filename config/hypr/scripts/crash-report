@@ -43,6 +43,8 @@ QUIET_SECONDS = 60   # one notification per program in this time: a crash loop d
 FIELD_CHARS = 300    # Ask Claude: a journal field longer than this (a long command line) is cut
 HERE = os.path.dirname(os.path.realpath(__file__))
 REPO = os.path.realpath(os.path.join(HERE, "..", "..", ".."))
+sys.path.insert(0, HERE)
+from spawn import spawn  # noqa: E402  reaps the terminal it starts: the watcher runs all session (#3657)
 
 
 def systemctl(*args):
@@ -183,8 +185,8 @@ def ask(pid):
         "program (a known one?), and what I can do. Don't change anything before asking."
     )
     # kitty's own messages (e.g. "[PARSE ERROR] Unknown OSC escape code") would go to the watcher's journal
-    subprocess.Popen([os.path.join(HERE, "terminal-or-claude"), "--name", f"Crash: {name}", "--", prompt], start_new_session=True,
-                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    spawn([os.path.join(HERE, "terminal-or-claude"), "--name", f"Crash: {name}", "--", prompt], start_new_session=True,
+          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def message(c, where):
