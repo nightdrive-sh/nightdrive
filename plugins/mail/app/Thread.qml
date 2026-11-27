@@ -372,6 +372,11 @@ Flickable {
                             width: parent.width; elide: Text.ElideRight
                             text: app.fullDate(modelData.timestamp); color: c.faint; font.family: c.font; font.pixelSize: 12
                         }
+                        // Who it went to, short; a click opens each line (#3716)
+                        Item { visible: toLine.visible; width: 1; height: 2 }
+                        Recipients { id: toLine; width: parent.width; c: root.c; app: root.app; label: "To"; list: modelData.to }
+                        Recipients { width: parent.width; c: root.c; app: root.app; label: "Cc"; list: modelData.cc }
+                        Recipients { width: parent.width; c: root.c; app: root.app; label: "Bcc"; list: modelData.bcc }
                         // The attachments last in the header, in sight as the message opens, a little apart from
                         // the address above them
                         Item { visible: attachments.visible; width: 1; height: 8 }

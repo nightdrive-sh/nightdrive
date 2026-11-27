@@ -30,6 +30,7 @@ A quiet mail client for the keyboard. New mail arrives as a notification you can
 - In a narrow window the list and the thread take turns: `Enter` or → opens the thread, `Esc` or ← goes back. Moving in the list marks nothing read.
 - A paperclip after a thread's date: a file is attached to a message in it. An invitation's own `.ics` doesn't count, nor do pictures in the text (a signature's logo).
 - A thread reads by date, oldest first, with the newest message open at the end, even when it answers an earlier one. A draft you deleted isn't in it.
+- Under a message's sender: whom it went to (To, Cc, and Bcc when your sent copy kept it), by name, many as "Anna, Pekka and 3 more". A click opens each with their address and the Contacts button; a click on a name closes it.
 - In a long thread, the read messages fold to one line each, and a quote that is all in an earlier message hides behind `•••`.
 - The text view shows a run of blank lines as one (also lines of only invisible characters, which newsletters pad with), and so does a reply's quote. The message itself stays as it came.
 - In the text view, a message sent as format=flowed shows its paragraphs whole, re-wrapped to the window; other messages keep their line breaks, as joining lines by guesswork would break lists, addresses and code. A link written as `[https://…]` shows without its brackets, and Outlook's `name<https://…>` (a shared file) as the name, linked, without the file icon's address before it.

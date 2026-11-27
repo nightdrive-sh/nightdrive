@@ -91,7 +91,7 @@ QtObject {
         return (s || "").replace(/\s+/g, " ").trim()
     }
 
-    // The thread's messages by date, oldest first and without deleted drafts (order.js), each { from, to, date,
+    // The thread's messages by date, oldest first and without deleted drafts (order.js), each { from, to, cc, bcc, date,
     // subject, tags, body } with the body as plain text.
     function show(thread, done) {
         json(["show", "--format=json", "--include-html", "--entire-thread=true", "thread:" + thread],
@@ -233,6 +233,9 @@ QtObject {
             id: m.id,
             from: m.headers.From || "",
             to: m.headers.To || "",
+            // Who else it went to (Recipients.qml); Bcc only where the copy kept it, as a sent message's may
+            cc: m.headers.Cc || "",
+            bcc: m.headers.Bcc || "",
             subject: oneLine(m.headers.Subject),
             timestamp: m.timestamp,
             tags: m.tags || [],
