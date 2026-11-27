@@ -23,7 +23,8 @@ Fedora Asahi Remix with KDE Plasma works too, KDE staying as a fallback.
   the notch area.
 - **The top-row keys** control volume, brightness, the keyboard backlight and dictation (hold Fn).
 - **Sleep.** Asahi only has s2idle, where the Mac draws about 3 W asleep. Wi-Fi and Bluetooth are turned off while it
-  sleeps and back on at wake-up (`NIGHTDRIVE_RADIOS=0` in `/etc/nightdrive-sleep.conf` keeps them on).
+  sleeps and back on at wake-up (`NIGHTDRIVE_RADIOS=0` in `/etc/nightdrive-sleep.conf` keeps them on). When a driver
+  refuses to sleep, the Mac stays awake even with the lid closed: a notification then says which one.
 - **What a Mac doesn't use** goes: the Minimal image's server services (network logins and shares, system logs, crash
   reports) and other Wi-Fi chips' firmware (`packages-remove-asahi.txt`; `--choose` unticks it).
 - **macOS's partitions** (its disk, the boot picker's and the recovery's) are hidden from Files' sidebar. Nothing on the

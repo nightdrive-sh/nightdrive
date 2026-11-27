@@ -1,0 +1,22 @@
+#!/bin/bash
+# Tells the user the computer couldn't go to sleep (#2033).
+#   sleep-failed DEVICE ERRNO
+# config/system/nightdrive-sleep runs it in the user's systemd at the first failed sleep of a run: a driver refused to
+# suspend (DEVICE as /sys/power/suspend_stats names it, ERRNO negative), so the machine came back at once, and logind
+# keeps trying while the lid is closed. Without this it stayed awake for hours in a bag, unseen. The notification is
+# critical, so it waits for the user when they open the lid; its button shows the kernel's log of this boot's sleeps.
+HERE=$(dirname "$(readlink -f "$0")")
+TERMINAL=$HERE/terminal
+ICON=lucide:moon
+
+dev=$1 errno=$2
+who=${dev:-A device} fix="Restarting usually clears it."
+# Asahi's display driver: a display unplugged while the Mac slept left it refusing every sleep after (#2033)
+[[ $dev == *display-subsystem* ]] && who="The display driver" fix="Plugging the display back in, or restarting, clears it."
+body="$who refused to sleep${errno:+ (error $errno)}, so the computer is staying awake, even with the lid closed. $fix"
+
+pressed=$(notify-send -a Nightdrive -u critical -i "$ICON" -h string:x-dunst-stack-tag:sleep-failed \
+  -w -A "default=Show the log" -- "The computer can't sleep" "$body" </dev/null)
+[[ $pressed == default ]] &&
+  setsid -f "$TERMINAL" --class floating-tui -- journalctl -b -k -e -g 'PM: |failed to suspend' >/dev/null 2>&1
+exit 0

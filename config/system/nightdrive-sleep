@@ -3,10 +3,18 @@
 # Asahi only has s2idle: the machine draws ~3 W while asleep (~4–5 %/h). The hook
 #  - turns Wi-Fi and Bluetooth off before sleep and, if they were on, back on at wake-up (NetworkManager and BlueZ restore the
 #    connections themselves),
-#  - logs the battery energy before and after sleep so the effect can be measured: config/system/sleep-report.
+#  - logs the battery energy before and after sleep so the effect can be measured: config/system/sleep-report,
+#  - tells the user when a sleep failed (#2033): a driver that refuses it (on Asahi, apple-drm after a display was
+#    unplugged during sleep) brings the machine back at once, and logind tries again and again while the lid is closed,
+#    so it stays awake for hours in a bag. The kernel counts the failures (/sys/power/suspend_stats); the first one of a
+#    run notifies (hypr/scripts/sleep-failed, run as the desktop's user), a sleep that works ends the run.
 # To disable the radio cut-off: put NIGHTDRIVE_RADIOS=0 in /etc/nightdrive-sleep.conf.
 LOG=${NIGHTDRIVE_SLEEP_LOG:-/var/log/nightdrive-sleep.log}
-WAS_ON=/run/nightdrive-sleep.radios   # radios that were on before sleep
+RUN=${NIGHTDRIVE_SLEEP_RUN:-/run}
+WAS_ON=$RUN/nightdrive-sleep.radios   # radios that were on before sleep
+STATS=${NIGHTDRIVE_SUSPEND_STATS:-/sys/power/suspend_stats}
+FAILS=$RUN/nightdrive-sleep.fails     # the kernel's count of failed sleeps before this one
+FAILED=$RUN/nightdrive-sleep.failed   # a run of failed sleeps: since=, count=, dev=, errno= (0644, for the desktop to read)
 # The machine's own battery (MacBook: macsmc-battery), not a Bluetooth mouse's (scope Device); none on a desktop: no log values
 BAT=$NIGHTDRIVE_BATTERY
 if [ -z "$BAT" ]; then
@@ -18,11 +26,42 @@ RADIOS=1
 [ -r /etc/nightdrive-sleep.conf ] && . /etc/nightdrive-sleep.conf
 [ -n "$NIGHTDRIVE_RADIOS" ] && RADIOS=$NIGHTDRIVE_RADIOS
 
+# The first failure of a run calls hypr/scripts/sleep-failed in the user's own systemd (never run as root: it is in their
+# home); systemd-run returns once the unit is there, so sleep isn't held up. NIGHTDRIVE_SLEEP_NOTIFY replaces it in tests.
+notify() {
+  if [ -n "$NIGHTDRIVE_SLEEP_NOTIFY" ]; then "$NIGHTDRIVE_SLEEP_NOTIFY" "$@"; return 0; fi
+  s=$(loginctl show-seat seat0 -p ActiveSession --value 2>/dev/null)
+  u=$([ -n "$s" ] && loginctl show-session "$s" -p Name --value 2>/dev/null)
+  [ -n "$u" ] || return 0
+  script=$(getent passwd "$u" | cut -d: -f6)/.config/hypr/scripts/sleep-failed
+  [ -x "$script" ] || return 0
+  timeout 10 systemd-run --user --machine="$u@.host" --collect --quiet -- "$script" "$@" >/dev/null 2>&1
+  return 0
+}
+
+# post: did this sleep fail? Compares the kernel's fail count with pre's.
+check_failed() {
+  before=$(cat "$FAILS" 2>/dev/null); after=$(cat "$STATS/fail" 2>/dev/null)
+  rm -f "$FAILS"
+  [ -n "$before" ] && [ -n "$after" ] || return 0
+  if [ "$after" -le "$before" ]; then rm -f "$FAILED"; return 0; fi
+  dev=$(cat "$STATS/last_failed_dev" 2>/dev/null); errno=$(cat "$STATS/last_failed_errno" 2>/dev/null)
+  if [ -s "$FAILED" ]; then
+    since=$(sed -n 's/^since=//p' "$FAILED"); count=$(sed -n 's/^count=//p' "$FAILED")
+    printf 'since=%s\ncount=%s\ndev=%s\nerrno=%s\n' "$since" $((${count:-0} + 1)) "$dev" "$errno" > "$FAILED"
+  else
+    printf 'since=%s\ncount=1\ndev=%s\nerrno=%s\n' "$(date +%s)" "$dev" "$errno" > "$FAILED"
+    chmod 0644 "$FAILED"
+    notify "$dev" "$errno"
+  fi
+}
+
 log() { echo "$(date +%s) $1 $2 $(cat "$BAT/energy_now" 2>/dev/null) $(cat "$BAT/energy_full" 2>/dev/null) $(cat "$BAT/status" 2>/dev/null) radios=$RADIOS" >> "$LOG"; }
 
 case "$1" in
   pre)
     log pre "$2"
+    cat "$STATS/fail" > "$FAILS" 2>/dev/null
     if [ "$RADIOS" = 1 ] && [ -z "$NIGHTDRIVE_DRYRUN" ]; then
       rfkill -n -o TYPE,SOFT | awk '$2 == "unblocked" && ($1 == "wlan" || $1 == "bluetooth") { print $1 }' | sort -u > "$WAS_ON"
       for t in $(cat "$WAS_ON"); do rfkill block "$t"; done
@@ -34,6 +73,7 @@ case "$1" in
       rm -f "$WAS_ON"
     fi
     log post "$2"
+    check_failed
     ;;
 esac
 exit 0

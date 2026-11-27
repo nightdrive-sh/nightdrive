@@ -20,7 +20,7 @@ the *Known issue* form.
 - **[EasyEffects stops when an autoload file is broken (headphone EQ)](https://github.com/nightdrive-sh/nightdrive/issues/8)**:
   remove the empty or broken file from `~/.local/share/easyeffects/autoload/output`, then choose an EQ again.
 - **[The Mac doesn't sleep after an external display was unplugged while it slept](https://github.com/nightdrive-sh/nightdrive/issues/9)**:
-  restart the Mac; unplug an external display while the Mac is awake.
+  a notification says so; restart the Mac, or plug the display back in. Unplug an external display while the Mac is awake.
 - **[An external display on HDMI isn't found when the Mac starts with it plugged in](https://github.com/nightdrive-sh/nightdrive/issues/10)**:
   unplug the HDMI cable and plug it back in, or plug the display in after the Mac has started.
 
