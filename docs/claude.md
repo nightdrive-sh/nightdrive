@@ -30,7 +30,7 @@ the conversation (Enter allows, Esc denies), a long one on its own, and after 15
 what it asks then as in any session. Without the tools on, or without Claude Code, Ask Claude says so; ⌘⌃Enter opens a
 terminal.
 
-To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
+To ask by voice, hold ⌘⌥ with the [dictation](dictation.md) key (⌘⌥F5 or ⌘⌥Fn on a Mac, ⌘⌥Insert on a PC), speak, and
 let go: what you said is sent at once, as a new request, and you can go on with your work. Ask Claude's speech bubble
 shows Claude working, then red once it has answered; a click on it opens the conversation. When the request
 changed something (a task added, the volume set), its notification has **Undo**, which takes back all of that request's changes

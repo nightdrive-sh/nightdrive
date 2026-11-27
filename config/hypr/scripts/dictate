@@ -2,7 +2,7 @@
 # dictate <start|stop>: F5 (speech to text). If the mic is muted, don't start recording; show a "MIC MUTED" toast instead.
 # dictate daemon: started at login (hyprland.lua) with config.toml's Parakeet model (int8).
 # dictate <fn-down|fn-up>: Fn held. Starts only after 0.3 s so that Fn combos (Fn+arrows, Fn+Backspace …) don't trigger dictation.
-# dictate claude-start, claude-fn-down: ⌘⇧ + the key (Dashboard #1908): the text goes to Ask Claude instead of being
+# dictate claude-start, claude-fn-down: ⌘⌥ + the key (Dashboard #1908): the text goes to Ask Claude instead of being
 #   typed (quickshell/AskClaudeToast.qml), which sends it at once, "say and forget" (#3122), or puts it in its field
 #   when the toast is open (a terminal's Claude Code when its tools aren't set up). Any release of the key stops it
 #   (stop, fn-up).

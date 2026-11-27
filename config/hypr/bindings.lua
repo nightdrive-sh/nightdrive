@@ -103,12 +103,13 @@ hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate start"), { lock
 -- The releases are transparent: a mouse click while the key is held "shadows" the binds of every held key (Hyprland's
 -- shadowKeybinds), and the release would be skipped, so dictation kept recording until the key was pressed again.
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate stop"),  { locked = true, release = true, transparent = true, ignore_mods = true })    -- release -> transcribe and type
--- ⌘⇧ + the dictation key: the text goes to Ask Claude instead, sent as you let go (Dashboard #1908, #3122).
--- The releases above ignore modifiers, so the key's own release stops it whether ⌘⇧ is let go first or last.
-hl.bind(mod .. " + SHIFT + XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
-hl.bind(mod .. " + SHIFT + Insert", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
-hl.bind(mod .. " + SHIFT + XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate claude-fn-down"), { locked = true })
-hl.bind(mod .. " + SHIFT + F19",    hl.dsp.exec_cmd(scripts .. "/dictate claude-fn-down"), { locked = true })
+-- ⌘⌥ + the dictation key, beside ⌘⌥Space (Ask Claude's card) and ⌘⌥Enter: the text goes to Ask Claude instead, sent
+-- as you let go (Dashboard #1908, #3122; it was ⌘⇧ until #3718).
+-- The releases above ignore modifiers, so the key's own release stops it whether ⌘⌥ is let go first or last.
+hl.bind(mod .. " + ALT + XF86AudioMicMute", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
+hl.bind(mod .. " + ALT + Insert", hl.dsp.exec_cmd(scripts .. "/dictate claude-start"), { locked = true })
+hl.bind(mod .. " + ALT + XF86Fn", hl.dsp.exec_cmd(scripts .. "/dictate claude-fn-down"), { locked = true })
+hl.bind(mod .. " + ALT + F19",    hl.dsp.exec_cmd(scripts .. "/dictate claude-fn-down"), { locked = true })
 -- A PC keyboard has neither F5's mic key nor a Fn the system sees: Insert, held, is its dictation key (a Mac keyboard has
 -- no Insert). Plain Insert only, so Shift+Insert / Ctrl+Insert (paste, copy, and ⌘V / ⌘C above) still reach the app.
 hl.bind("Insert", hl.dsp.exec_cmd(scripts .. "/dictate start"), { locked = true })

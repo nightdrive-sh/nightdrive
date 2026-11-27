@@ -3,7 +3,7 @@ import QtQuick
 // The sessions bar's Ask Claude button (#3704), left of Inbox's: Ask Claude's bubble (AskClaudeGlyph). With the bar
 // showing it is where Ask Claude's state is (#3428):
 //   idle       the bubble, in the accent colour as the mailbox beside it
-//   listening  a dictation to Claude (⌘⇧ + the dictation key): the button widens, the bubble moving aside for the
+//   listening  a dictation to Claude (⌘⌥ + the dictation key): the button widens, the bubble moving aside for the
 //              microphone's level (DictationMeter) and "Listening", as dictation's own card (DictationToast.qml)
 //   working    the button widens to the left, the bubble moving aside for "Working", its dots hopping
 //   answered   (an answer you haven't seen: AskClaudeSession.unseen) the bubble red, knocking with two small hops

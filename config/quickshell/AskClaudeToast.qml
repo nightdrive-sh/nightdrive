@@ -7,7 +7,7 @@ import "Words.js" as Words
 // Dictation's toast, which grows into Ask Claude's (Dashboard #1895): one card in ToastStack.
 // - While Voxtype records it is the dictation indicator (DictationIndicator.qml), and it never takes a key: what you
 //   say is typed into the window you're in.
-// - ⌘⇧ + the dictation key (hypr/scripts/dictate) makes the dictation Claude's (dictating), "say and forget" (Dashboard
+// - ⌘⌥ + the dictation key (hypr/scripts/dictate) makes the dictation Claude's (dictating), "say and forget" (Dashboard
 //   #3122): the small card listens with Claude's glyph and never takes a key, and the text (draft) is sent at once as a
 //   new request, without Enter; the card then says Claude is working and, for a while, what it answered. Claude busy
 //   with an earlier one: the toast opens with the text in its field instead, to send once it's done. With the toast

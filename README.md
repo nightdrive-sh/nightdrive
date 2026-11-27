@@ -271,7 +271,8 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
   open the browser, Files and Email you chose. Text files (.txt, .csv, .json) open in Nightdrive's Text until you
   choose another text editor, and code too until you choose a code editor. A link
   from another app opens in a new window, not as a tab: Firefox's is a setting there (Settings › Apps › Firefox), and
-  Brave, Chromium and Chrome always do.
+  Brave, Chromium and Chrome always do. A document no installed app opens (an .xlsx with no spreadsheet app, an .epub
+  with no reader) says so, with the app to install where one is known, instead of opening as a zip in the file manager.
 - **App shortcuts**: which app Hyper + a letter or digit opens: Launcher › Settings › Apps › App shortcuts. Your choice
   replaces a default, Nightdrive's or a plugin's. The other shortcuts are in the config files ([Make it yours](#make-it-yours)).
 - **Cleaning the keyboard**: search "clean keyboard" in the Launcher (or `nightdrive clean`): the keyboard and touchpad
@@ -616,7 +617,7 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | ⌘ ⇧ Space | Walk through the top bar menus with the keyboard |
 | ⌘ Esc | Notifications |
 | F5 / Fn / Insert | Dictation, held: F5 or Fn on a Mac, Insert on a PC ([another key](docs/dictation.md)) |
-| ⌘ ⇧ + dictation key | Dictate to Ask Claude: sent as you let go, a small card shows the answer ([Claude](docs/claude.md)) |
+| ⌘ ⌥ + dictation key | Dictate to Ask Claude: sent as you let go, a small card shows the answer ([Claude](docs/claude.md)) |
 | ⌘ ⇧ K | All shortcuts (also in the Launcher under *Keybindings*) |
 
 The full list is in [`config/hypr/SHORTCUTS.md`](config/hypr/SHORTCUTS.md).

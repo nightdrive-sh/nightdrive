@@ -10,7 +10,7 @@ Item {
     id: ind
     required property Dictation dictation
     property bool running: false     // the meter animates only while it's seen
-    property bool toClaude: false    // the dictation goes to Ask Claude (⌘⇧, #3122): Claude's glyph for the mic
+    property bool toClaude: false    // the dictation goes to Ask Claude (⌘⌥, #3122): Claude's glyph for the mic
     readonly property var vt: dictation
     readonly property bool remote: vt.source !== ""
 

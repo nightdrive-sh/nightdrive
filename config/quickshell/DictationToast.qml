@@ -1,7 +1,7 @@
 import QtQuick
 
 // Dictation's card at the top centre (ToastStack), while Voxtype records or transcribes (DictationIndicator.qml), as it
-// was before #3428: what you say is typed into your window. A dictation to Ask Claude (⌘⇧, AskClaudeToast.listenOnly)
+// was before #3428: what you say is typed into your window. A dictation to Ask Claude (⌘⌥, AskClaudeToast.listenOnly)
 // is shown by the sessions bar's speech bubble instead while that bar shows (SessionsAsk.qml: Listening); without the
 // bar it is this card with Claude's glyph. Never while Ask Claude's toast is open: its field has a wave of its own.
 // It never takes a key.
