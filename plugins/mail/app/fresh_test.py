@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""When the open thread is read again after the list (fresh.js, #3612): `python3 plugins/mail/app/fresh_test.py`.
+"""When the open thread is read again after the list (fresh.js, #3612), and which new messages are
+marked read (#3615): `python3 plugins/mail/app/fresh_test.py`.
 A reply sent or a message a sync brought changes the thread's row (total, timestamp), and then its messages are read
 again; a tag alone (read, replied) doesn't, nor does another thread in the open one's place.
 
@@ -26,6 +27,8 @@ ShellRoot {
         onTriggered: {
             const c = %s, out = {}
             for (const k in c) out[k] = Fresh.changed(c[k][0], c[k][1])
+            const a = %s
+            for (const k in a) out["arrived_" + k] = Fresh.arrived(a[k][0], a[k][1])
             console.warn("RESULT " + JSON.stringify(out))
             Qt.quit()
         }
@@ -53,6 +56,17 @@ CASES = {
     "none_after": [ROW, None],
 }
 
+# Messages on show before and after a refresh (#3615): which new ones are marked read
+OLD = [{"id": "a@x", "tags": ["inbox"]}, {"id": "b@x", "tags": ["inbox", "unread"]}]
+ARRIVED = {
+    "new_unread": [OLD, OLD + [{"id": "c@x", "tags": ["inbox", "unread"]}]],
+    "new_read": [OLD, OLD + [{"id": "c@x", "tags": ["inbox", "sent"]}]],
+    # b was marked unread by the user and stays so
+    "nothing_new": [OLD, OLD],
+    "none_before": [None, OLD],
+    "none_after": [OLD, None],
+}
+
 
 @unittest.skipUnless(shutil.which("qs"), "needs Quickshell (qs)")
 class Fresh(unittest.TestCase):
@@ -60,7 +74,7 @@ class Fresh(unittest.TestCase):
     def setUpClass(cls):
         with tempfile.TemporaryDirectory() as tmp:
             shell = Path(tmp) / "shell.qml"
-            shell.write_text(RUNNER % ((HERE / "fresh.js").as_uri(), json.dumps(CASES)))
+            shell.write_text(RUNNER % ((HERE / "fresh.js").as_uri(), json.dumps(CASES), json.dumps(ARRIVED)))
             env = dict(os.environ, QT_QPA_PLATFORM="offscreen", NO_COLOR="1")
             run = subprocess.run(["qs", "-p", str(shell)], env=env, capture_output=True, text=True, timeout=30)
         log = run.stdout + run.stderr
@@ -88,6 +102,17 @@ class Fresh(unittest.TestCase):
     def test_no_thread_open(self):
         self.assertFalse(self.out["none_before"])
         self.assertFalse(self.out["none_after"])
+
+    def test_a_new_unread_message_is_marked_read(self):
+        self.assertEqual(self.out["arrived_new_unread"], ["c@x"])
+
+    def test_one_marked_unread_by_hand_stays_unread(self):
+        self.assertEqual(self.out["arrived_new_read"], [])
+        self.assertEqual(self.out["arrived_nothing_new"], [])
+
+    def test_no_messages_before_or_after(self):
+        self.assertEqual(self.out["arrived_none_before"], ["b@x"])
+        self.assertEqual(self.out["arrived_none_after"], [])
 
 
 if __name__ == "__main__":

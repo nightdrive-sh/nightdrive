@@ -9,6 +9,7 @@ FloatingWindow {
     required property var win
     required property var ops           // Actions.qml
     property var msgs: []
+    property string threadId: ""        // notmuch's thread id, for reading it again
     property int htmlMode: win.settings.view
     property bool opening: win.settings.composeFloats
     title: msgs.length ? msgs[0].subject || "(no subject)" : "Message"
@@ -22,6 +23,32 @@ FloatingWindow {
     color: win.look.bg
     visible: true
     onClosed: destroy()
+
+    // A message a sync brought, or a reply sent, shows here too (#3615): after each of the main window's reloads the
+    // thread's messages are counted, and read again when the count has changed (a count is cheaper than a show every
+    // 30 s). What came in is marked read as in the main window (SeenOnShow.qml).
+    property int known: -1
+    function count(done) {
+        win.mailer.run(["count", "--output=messages", "thread:" + threadId], t => done(parseInt(t) || 0))
+    }
+    function update() {
+        if (!threadId) return
+        count(n => {
+            // 0: indexing has joined the thread to another under a new id; what is on show stays
+            if (n === 0 || n === known) return
+            known = n
+            win.mailer.show(threadId, m => {
+                if (!m.length) return
+                const was = mw.msgs
+                mw.msgs = m
+                seen.arrived(was, m)
+            })
+        })
+    }
+    Component.onCompleted: if (threadId) count(n => known = n)
+    Connections { target: mw.win; function onReloaded() { mw.update() } }
+    SeenOnShow { id: seen; nm: win.mailer; shown: thread.visible && thread.Window.active; onMarked: win.reload(true) }
+
     function scroll(dy) { thread.cancelFlick(); thread.contentY = Math.max(0, Math.min(thread.contentHeight - thread.height, thread.contentY + dy)) }
 
     Thread {

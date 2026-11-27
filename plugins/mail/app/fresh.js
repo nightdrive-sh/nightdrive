@@ -9,3 +9,12 @@ function changed(was, now) {
     if (!was || !now || was.thread !== now.thread) return false
     return was.total !== now.total || was.timestamp !== now.timestamp
 }
+
+// The messages a refresh brought into the thread on show that are still unread (#3615), by id: was and now are the
+// thread's messages before and after (Notmuch.qml's show()). Only the new ones: a message the user marked unread
+// again stays so, and the open() that put the thread on show has already marked the rest read.
+function arrived(was, now) {
+    const before = {}
+    for (const m of was || []) before[m.id] = true
+    return (now || []).filter(m => !before[m.id] && (m.tags || []).indexOf("unread") >= 0).map(m => m.id)
+}

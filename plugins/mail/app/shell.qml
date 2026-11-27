@@ -167,10 +167,13 @@ ShellRoot {
         }
 
         // keep: the open thread stays open; at: where to open one when it has gone (the one after a moved thread)
+        // After each reload's list: the message windows look whether their thread has grown (MessageWindow.qml)
+        signal reloaded()
         function reload(keep, at) {
             const was = keep && current >= 0 ? threads[current] : undefined
             const id = was ? was.thread : ""
             finder.threads(list => {
+                win.reloaded()
                 setThreads(list, keep || at !== undefined)
                 let i = list.findIndex(t => t.thread === id)
                 if (i < 0) i = list.length > 0 ? Math.min(at || 0, list.length - 1) : -1
@@ -207,6 +210,7 @@ ShellRoot {
             if (then && onePane) readerOpen = true
             current = i
             picked = []; anchorId = ""; marking = false
+            seen.forget()
             if (listOnly) return
             htmlMode = settings.view
             if (i < 0) { messages = []; return }
@@ -237,8 +241,15 @@ ShellRoot {
         function refresh(i) {
             if (listOnly || i < 0) return
             const id = threads[i].thread
-            nm.show(id, m => { if (m.length && threads[current] && threads[current].thread === id) messages = m })
+            nm.show(id, m => {
+                if (!m.length || !threads[current] || threads[current].thread !== id) return
+                const was = messages
+                messages = m
+                seen.arrived(was, m)
+            })
         }
+        // What a refresh brought is marked read once the thread can be seen in the active window (SeenOnShow.qml)
+        SeenOnShow { id: seen; nm: nm; shown: reader.visible && reader.Window.active; onMarked: win.reload(true) }
 
         // Writing (Writing.qml) and its window (ComposeWindow.qml). compose and mailtoFields stay callable here: the
         // keys, IPC and Thread.qml's links (app.compose) ask for them on the window.
@@ -251,7 +262,7 @@ ShellRoot {
         function openWindow(i) {
             const t = threads[i]
             if (!t) return
-            nm.show(t.thread, m => { if (m.length) messageWindow.createObject(shell, { msgs: m, win: win, ops: ops }) })
+            nm.show(t.thread, m => { if (m.length) messageWindow.createObject(shell, { msgs: m, threadId: t.thread, win: win, ops: ops }) })
         }
 
         // An attachment opens in the app the desktop picks for it, or is saved in the downloads folder.
