@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""bt-agent MAC TIMEOUT: pair one Bluetooth device as its own pairing agent, for bt-pair.
+
+BlueZ asks the agent of the D-Bus connection that called Device1.Pair, and only the default agent when that connection
+has none. `bluetoothctl --agent KeyboardDisplay pair MAC` run as one command pairs before its agent is registered, so
+the default agent (Blueman) was asked: a keyboard's passkey went to Blueman and never reached the Bluetooth menu
+(#3631). Here the agent is registered first, on the connection that pairs.
+
+Its output, line by line, for bt-pair and the menu that follows it:
+  Passkey: 123456 / PIN code: 1234   to type on the device (a keyboard), then Enter
+  Pairing successful / Failed to pair: org.bluez.Error.…   the result, as bluetoothctl says it (bt-pair reads it)
+While a code waits to be typed and no menu shows it (BT_PAIR_WATCH: a directory of the pids of menus following the
+pairing), it is also a notification, closed once the pairing ends or a menu shows it again.
+"""
+import os, random, signal, sys
+
+import dbus, dbus.mainloop.glib, dbus.service
+from gi.repository import GLib
+
+AGENT_PATH = "/sh/nightdrive/btagent"
+CAPABILITY = "KeyboardDisplay"   # can show a code and take one: BlueZ then picks what the device can do
+WATCH_EVERY = 1000               # ms between looks at whether a menu shows the code
+APP = "Bluetooth"
+BLUEZ = "org.bluez"
+AGENT_IFACE = "org.bluez.Agent1"
+
+
+def out(line):
+    print(line, flush=True)
+
+
+class Agent(dbus.service.Object):
+    def __init__(self, bus, path, dev):
+        super().__init__(bus, AGENT_PATH)
+        self.path = path
+        self.dev = dev                  # the device's Device1 properties
+        self.code = ""                  # the code waiting to be typed, "" when none
+        self.nid = 0                    # its notification's id, 0 when none
+        self.notify = dbus.Interface(dbus.SessionBus().get_object("org.freedesktop.Notifications",
+                                                                  "/org/freedesktop/Notifications"),
+                                     "org.freedesktop.Notifications")
+        GLib.timeout_add(WATCH_EVERY, self.watch)
+
+    def keyboard(self):
+        return str(self.dev.get("Icon", "")).startswith("input-keyboard")
+
+    def show(self, kind, code):
+        if code == self.code:
+            return   # DisplayPasskey comes again for every key typed
+        self.code = code
+        out("%s: %s" % (kind, code))
+        self.watch()
+
+    # --- the notification, only while no menu shows the code ---
+    def watched(self):
+        d = os.environ.get("BT_PAIR_WATCH", "")
+        try:
+            pids = os.listdir(d) if d else []
+        except OSError:
+            return False
+        for p in pids:
+            try:
+                os.kill(int(p), 0)
+                return True
+            except (OSError, ValueError):
+                try:
+                    os.unlink(os.path.join(d, p))   # a menu gone without cleaning up
+                except OSError:
+                    pass
+        return False
+
+    def watch(self):
+        if self.code and not self.watched():
+            if not self.nid:
+                name = str(self.dev.get("Alias", "the keyboard"))
+                try:
+                    self.nid = int(self.notify.Notify(APP, dbus.UInt32(0), "keyboard", "Pairing " + name,
+                                                      "Type %s on %s, then Enter" % (self.code, name), [],
+                                                      {"urgency": dbus.Byte(2, variant_level=1)}, 0))
+                except dbus.DBusException as e:
+                    print("notify:", e, file=sys.stderr)
+        elif self.nid:
+            self.close()
+        return True
+
+    def close(self):
+        if self.nid:
+            try:
+                self.notify.CloseNotification(dbus.UInt32(self.nid))
+            except dbus.DBusException:
+                pass
+            self.nid = 0
+
+    # --- org.bluez.Agent1 ---
+    @dbus.service.method(AGENT_IFACE, in_signature="", out_signature="")
+    def Release(self):
+        pass
+
+    @dbus.service.method(AGENT_IFACE, in_signature="o", out_signature="s")
+    def RequestPinCode(self, device):
+        # A legacy device: the computer picks the PIN. A keyboard has it typed; anything else (old headsets) takes 0000
+        if not self.keyboard():
+            return "0000"
+        pin = "%06d" % random.randrange(1000000)
+        self.show("PIN code", pin)
+        return pin
+
+    @dbus.service.method(AGENT_IFACE, in_signature="os", out_signature="")
+    def DisplayPinCode(self, device, pincode):
+        self.show("PIN code", str(pincode))
+
+    @dbus.service.method(AGENT_IFACE, in_signature="o", out_signature="u")
+    def RequestPasskey(self, device):
+        passkey = random.randrange(1000000)
+        self.show("Passkey", "%06d" % passkey)
+        return dbus.UInt32(passkey)
+
+    @dbus.service.method(AGENT_IFACE, in_signature="ouq", out_signature="")
+    def DisplayPasskey(self, device, passkey, entered):
+        self.show("Passkey", "%06d" % passkey)
+
+    # The user asked for this pairing from the menu: a code both ends show (numeric comparison) is accepted, as a
+    # device with no keys can't be told otherwise. Only logged: there is nothing to type
+    @dbus.service.method(AGENT_IFACE, in_signature="ou", out_signature="")
+    def RequestConfirmation(self, device, passkey):
+        print("Confirmed code %06d" % passkey, file=sys.stderr, flush=True)
+
+    @dbus.service.method(AGENT_IFACE, in_signature="o", out_signature="")
+    def RequestAuthorization(self, device):
+        pass
+
+    @dbus.service.method(AGENT_IFACE, in_signature="os", out_signature="")
+    def AuthorizeService(self, device, uuid):
+        if device != self.path:
+            raise dbus.DBusException("Only the device being paired", name="org.bluez.Error.Rejected")
+
+    @dbus.service.method(AGENT_IFACE, in_signature="", out_signature="")
+    def Cancel(self):
+        self.code = ""
+        self.close()
+
+
+def on_signal(sig, fn):
+    """GLibUnix.signal_add where PyGObject has it: GLib.unix_signal_add warns there (and the warning reached the menu)."""
+    try:
+        from gi.repository import GLibUnix
+        GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, sig, fn)
+    except ImportError:
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, fn)
+
+
+def device_path(bus, mac):
+    objs = dbus.Interface(bus.get_object(BLUEZ, "/"), "org.freedesktop.DBus.ObjectManager").GetManagedObjects()
+    for path, ifaces in objs.items():
+        dev = ifaces.get("org.bluez.Device1")
+        if dev and str(dev.get("Address", "")).upper() == mac.upper():
+            return path, dev
+    return None, None
+
+
+def main():
+    if len(sys.argv) != 3:
+        sys.exit("usage: bt-agent MAC TIMEOUT")
+    mac, timeout = sys.argv[1], int(sys.argv[2])
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    bus = dbus.SystemBus()
+    path, props = device_path(bus, mac)
+    if not path:
+        out("Failed to pair: org.bluez.Error.DoesNotExist (Device %s not available)" % mac)
+        return 1
+    agent = Agent(bus, path, props)
+    manager = dbus.Interface(bus.get_object(BLUEZ, "/org/bluez"), "org.bluez.AgentManager1")
+    manager.RegisterAgent(AGENT_PATH, CAPABILITY)
+    device = dbus.Interface(bus.get_object(BLUEZ, path), "org.bluez.Device1")
+    loop = GLib.MainLoop()
+    rc = [1]
+
+    def ok():
+        out("Pairing successful")
+        rc[0] = 0
+        loop.quit()
+
+    def failed(e):
+        name = e.get_dbus_name() or ""
+        if name == "org.freedesktop.DBus.Error.NoReply":   # our timeout: the code wasn't typed in time
+            stop()
+            name = "org.bluez.Error.AuthenticationTimeout"
+        out("Failed to pair: %s %s" % (name, e.get_dbus_message() or ""))
+        loop.quit()
+
+    def stop(*_):
+        try:
+            device.CancelPairing()
+        except dbus.DBusException:
+            pass
+        loop.quit()
+        return False
+
+    # bt-pair's timeout (or the user) ends a pairing still waiting: BlueZ is told, not left pairing
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        on_signal(sig, stop)
+    device.Pair(reply_handler=ok, error_handler=failed, timeout=timeout)
+    loop.run()
+    agent.close()
+    try:
+        manager.UnregisterAgent(AGENT_PATH)
+    except dbus.DBusException:
+        pass
+    return rc[0]
+
+
+if __name__ == "__main__":
+    sys.exit(main())

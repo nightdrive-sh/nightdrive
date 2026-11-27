@@ -121,7 +121,8 @@ Click an icon and a small menu opens under it:
   **Disconnect**, for headphones that join every computer they know: it disconnects them from this one and keeps them paired.
   A controller (Xbox) remembers one computer: to move it here from another, forget it there, hold its pair button until
   its light flashes fast and pair it in the menu. One paired without its key kept (it connects but does nothing) says
-  **pair again**: click it with the controller in pairing mode
+  **pair again**: click it with the controller in pairing mode. A keyboard's code to type shows in the menu, or as a
+  notification while the menu is closed
 - **Display**: brightness, night light, each screen's scale and refresh rate, and Arrange displays: the screens as tiles
   to drag where they stand on your desk (the laptop's too, with the lid closed), so the pointer crosses where they meet,
   the main display (workspaces 1–9: Make main, or `m`) and a phone dragged to Away, out of the pointer's reach. A drop

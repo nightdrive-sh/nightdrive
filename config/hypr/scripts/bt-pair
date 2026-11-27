@@ -1,7 +1,8 @@
 #!/bin/bash
 # bt-pair MAC [--again] | --follow: pair a Bluetooth device, trust it and connect it, for the top bar's Bluetooth menu and the
 # launcher's Settings › Bluetooth. Its output streams (a keyboard's passkey line has to show while it waits); when it
-# exits non-zero, its last line says what went wrong, in words for the menu.
+# exits non-zero, its last line says what went wrong, in words for the menu. A caller that shows the passkey sets
+# BT_PAIR_SHOW=1; while none does (the launcher, a menu closed), bt-agent shows it as a notification.
 #   --again   forget the device first, wait for it in pairing mode and pair it anew
 #   --follow  follow the pairing that runs now, if one does (a menu opened again meanwhile); "__mac MAC" comes first
 #
@@ -20,6 +21,8 @@ PAIR_TIMEOUT=60   # s for bluetoothctl's pair: a keyboard's passkey has to be ty
 FIND_TIMEOUT=90   # s to wait for a forgotten device in pairing mode (--again): an Xbox controller switches off when
                   # forgotten, and has to be switched on and its pair button held first
 LOG=${XDG_RUNTIME_DIR:-/tmp}/nightdrive-bt-pair.log   # the worker's lines, then "__exit N"; LOG.pid its pid
+# The pids of the menus following the pairing (BT_PAIR_SHOW=1), which show a passkey: with none, bt-agent notifies
+export BT_PAIR_WATCH=$LOG.watch
 
 if [[ ${1:-} == --follow ]]; then
   kill -0 "$(cat "$LOG.pid" 2>/dev/null)" 2>/dev/null || exit 0
@@ -32,6 +35,11 @@ again=false
 # Follow LOG to its "__exit N" line, printing each whole line (one still being written waits for its newline)
 follow() {
   local n=0 l lines
+  if [[ ${BT_PAIR_SHOW:-} == 1 ]]; then
+    mkdir -p "$BT_PAIR_WATCH" && : >"$BT_PAIR_WATCH/$$"
+    trap 'rm -f "$BT_PAIR_WATCH/$$"' EXIT
+    trap 'exit 143' TERM   # the menu closing: EXIT's trap only runs on an exit
+  fi
   while :; do
     if [[ -s $LOG && -z $(tail -c 1 "$LOG") ]]; then
       mapfile -t -s "$n" lines <"$LOG"
@@ -109,7 +117,9 @@ if ! grep -q '^\s*Paired: yes' <<<"$state"; then
     [[ $line == *"Pairing successful"* || $line == *"Failed to pair"* ]] && result=$line
   # Not bluetoothctl's own --timeout: it waits the whole time even after "Pairing successful", and meanwhile BlueZ
   # drops the idle link and the controller goes back to searching (#3629). timeout only ends a pair that hangs
-  done < <(timeout "$PAIR_TIMEOUT" bluetoothctl --agent KeyboardDisplay pair "$mac" 2>&1 | strip)
+  # bt-agent pairs as its own agent: bluetoothctl's --agent wasn't registered in time, so Blueman got the passkey (#3631).
+  # Its own timeout cancels the pairing in BlueZ; timeout here only ends one that hangs
+  done < <(timeout $((PAIR_TIMEOUT + 10)) "$(dirname "$0")/bt-agent" "$mac" "$PAIR_TIMEOUT" 2>&1)
   [[ $result == *"Pairing successful"* || $result == *AlreadyExists* ]] || bluetoothctl untrust "$mac" >/dev/null 2>&1
   case $result in
     *"Pairing successful"* | *AlreadyExists*) ;;

@@ -102,6 +102,7 @@ Column {
     Process {
         id: pairProc
         property string last: ""
+        environment: ({ "BT_PAIR_SHOW": "1" })   // the menu shows the passkey: no notification while it is open
         stdout: SplitParser {
             onRead: line => {
                 const l = line.replace(/\x1b\[[0-9;]*m/g, "").trim()
