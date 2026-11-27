@@ -20,6 +20,7 @@ ShellRoot {
         onClosed: Qt.quit()
 
         AppLook { id: c }
+        AppOption { id: option }
         Store { id: store }
         Actions { id: actions; command: store.command }
         KeyHelp { id: keyHelp }
@@ -182,17 +183,19 @@ ShellRoot {
                 onFromPicked: (key, label) => win.fromPicked(key, label)
                 onNotice: (text, danger) => toast.show(text, { danger: danger })
                 Keys.onPressed: e => win.key(e)
+                Keys.onReleased: e => option.released(e)
             }
         }
 
         function key(e) {
             const k = e.key, shift = e.modifiers & Qt.ShiftModifier
             const enter = k === Qt.Key_Return || k === Qt.Key_Enter
+            option.pressed(e)                  // a Mac layout's ⌥ (AppOption): ⌥1 … ⌥8 below
             win.look.moved(e)                  // Tab and the arrows show the keys' frame (AppPointer)
             sheet.pressed(e)
             if (e.accepted) return
             const cmd = e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
-            const alt = e.modifiers & Qt.AltModifier
+            const alt = option.alt(e), digit = option.key(e)
             // Mail's keys where they mean the same (#3672): 1–3 the views as Mail's 1–6 its folders, Tab the sidebar,
             // v selects and goes on, o l open; the message's buttons moved to ⌥1 … ⌥8 for them
             const narrowList = win.onePane && win.listOpen && !win.navOpen
@@ -204,7 +207,7 @@ ShellRoot {
             else if (k === Qt.Key_Escape && sel.any) sel.clear()
             else if (cmd && (k === Qt.Key_Up || k === Qt.Key_Down)) win.stepView(k === Qt.Key_Down ? 1 : -1)
             else if (k === Qt.Key_Tab || k === Qt.Key_Backtab) win.toFolders()
-            else if (alt && k >= Qt.Key_1 && k <= Qt.Key_8) win.ask(k - Qt.Key_1)
+            else if (alt && digit >= Qt.Key_1 && digit <= Qt.Key_8) win.ask(digit - Qt.Key_1)
             else if (!cmd && !alt && k >= Qt.Key_1 && k <= Qt.Key_3) store.pickView(win.views[k - Qt.Key_1])
             // Files' v: select and go on; j k then keep what is selected. Moving on otherwise leaves it, as Mail's arrows do
             else if (e.text === "v" && !narrowMessage) sel.markNext()

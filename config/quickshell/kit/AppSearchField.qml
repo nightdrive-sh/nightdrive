@@ -11,6 +11,7 @@ FocusScope {
     property alias text: input.text
     property int pixelSize: 14
     property int reach: 14      // px around the line where a click still lands in the field, so the whole box takes it
+    property var keyFilter: null    // function(e): sees each key before the field (Mail's ⌥F); e.accepted = true takes it
     signal edited()
     signal returnPressed()
     signal downPressed()
@@ -40,6 +41,7 @@ FocusScope {
                 text: root.placeholder; color: root.c.faint; font: input.font
             }
             onTextEdited: root.edited()
+            Keys.onPressed: e => { if (root.keyFilter) { e.accepted = false; root.keyFilter(e) } }
             Keys.onReturnPressed: root.returnPressed()
             Keys.onDownPressed: root.downPressed()
             Keys.onEscapePressed: root.escapePressed()

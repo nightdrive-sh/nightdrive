@@ -283,6 +283,8 @@ for key, files_key in pairs(FILES_OPTION_KEYS) do
         end)
     end
 end
+-- The other ⌥ keys Nightdrive's own windows and layers read as Alt (⌥← ⌥→, ⌥⏎) get Alt there too (#3525)
+require("option-keys")(plugins.keyd)
 
 -- Next/previous tab ⌘⌥← / ⌘⌥→ in every app (Firefox, Chromium, Nautilus, Thunderbird: Ctrl+PageUp/PageDown)
 hl.bind(mod .. " + ALT + left",  hl.dsp.send_shortcut({ mods = "CTRL", key = "Prior" }))

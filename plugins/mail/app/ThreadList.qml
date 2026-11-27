@@ -43,6 +43,9 @@ Rectangle {
             onDownPressed: list.forceActiveFocus()
             // Tab while searching switches all folders and this one, as ⌥F does (and Tab in Files' filter)
             Keys.onPressed: e => { if ((e.key === Qt.Key_Tab || e.key === Qt.Key_Backtab) && win.searcher.on) { win.searcher.toggle(); e.accepted = true } }
+            // ⌥F with a Mac layout's ⌥ (AppOption): it would type its character, and the window's Alt+F never sees it
+            keyFilter: e => { win.option.pressed(e); win.searcher.optionKey(e) }
+            Keys.onReleased: e => win.option.released(e)
             Timer { id: searchDelay; interval: 150; onTriggered: win.reload(false) }
         }
         // Under the search, level with the line under the thread's buttons (the last pixel of Thread.barHeight)
@@ -83,6 +86,7 @@ Rectangle {
             bottomMargin: 12
             focus: true
             Keys.onPressed: e => keys.pressed(e)
+            Keys.onReleased: e => win.option.released(e)
             delegate: ThreadRow { win: root.win; ops: root.ops; writer: root.writer; panes: root.panes }
             Text {
                 visible: win.threads.length === 0

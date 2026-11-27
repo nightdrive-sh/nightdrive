@@ -34,6 +34,14 @@ QtObject {
         all = !all
         win.reload(false)
     }
+    // ⌥F with a Mac layout's level-3 ⌥ (kit/AppOption.qml), which the window's Alt+F never sees: from the search field
+    // and the list's keys (ThreadList.qml, ListKeys.qml). True when it took the key
+    function optionKey(e) {
+        if (!on || !win.option.level3(e) || win.option.key(e) !== Qt.Key_F) return false
+        toggle()
+        e.accepted = true
+        return true
+    }
 
     // The threads of query(), each with its home when the search is wide. One count per folder (4 more notmuch runs,
     // each only the threads' ids), so a list of hundreds costs the same as one of ten. A thread none of them names (a sync

@@ -30,6 +30,7 @@ ShellRoot {
 
         // The look, as Deck's: the apps' kit (kit/AppLook.qml)
         AppLook { id: c }
+        AppOption { id: optionKeys }
 
         Notmuch { id: nm }
         // The sidebar's spinner while mail is fetched (FetchWatch.qml); what came in shows at once, not at the timer
@@ -60,6 +61,7 @@ ShellRoot {
         property string inviteCalendar: ""
         // For components in their own files, which don't see this file's ids.
         readonly property QtObject look: c
+        readonly property QtObject option: optionKeys      // ⌥ + a character with a Mac layout (Search.optionKey)
         readonly property QtObject mailer: nm
         // The thread list and its search (ThreadList.qml), which most of what is below moves and reads
         readonly property ListView list: threadList.list

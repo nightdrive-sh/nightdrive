@@ -19,13 +19,14 @@ Every part takes the app's look as `c`: make one `AppLook { id: c }` in the wind
 | `AppAccountBar` | The accounts at the sidebar's foot under a line: each one's label and count, a click picks one (`picked`); one account is its label alone |
 | `AppTitle` | The app's name with the wordmark's block cursor: "Mail█" |
 | `AppNavRow` | A row of the sidebar: glyph, name, count; `selected`, `dropTarget`, `active` (the keyboard is in the sidebar) |
+| `AppOption` | ⌥ + a character key with a Mac layout, whose ⌥ Qt doesn't see as Alt (⌥2 comes as "@"): hand it the presses and releases (`pressed(e)`, `released(e)`), then `alt(e)` and `key(e)` (⌥2's key is `Qt.Key_2`). ⌥ + an arrow or ⏎ comes as Alt from Hyprland (`hypr/option-keys.lua`) |
 | `AppPointer` | In the window's RowLayout: the pointer moving hides the keys' frame (`c.keyboard`: the app's key handlers call `c.moved(e)`, which only Tab and the arrows turn on) and brings back the hover colour any key put away (`c.pointerAway`: `AppRow`, `AppNavRow`) |
 | `AppRow` | A list row's ground, for a `ListView` delegate: `selected`, `marked` (the keyboard's place, list not focused), `checked` (marked for what the keys do next, as Files' marked files: a bar in the theme's colour, `c.checked`, stronger when also selected), `active` (the keys are here: a frame) |
 | `AppButton` | A framed button with a glyph and a label (Play, New list); `strong`, `on`, a tip with its key (`tipAlign`) |
 | `AppBarButton` | A frameless button of the bar over a view (Mail's message, Notes' note): glyph and name, dim until hovered; `strong` for what Enter does; `compact` keeps the glyph alone, `glyphSize` (14) for a bar of glyphs alone, a tip with its key (`tipAlign`) |
 | `AppIconButton` | A glyph-only button (Back, Settings) with a tip (`tipSide`, `tipAlign`) |
 | `AppSegments` | One of a few that go together as one framed switch (Week \| Month): `options` `[{ label, glyph, tip, keys }]`, `current`, `picked(i)`; the fill slides to the picked part, `compact` shows the glyphs |
-| `AppSearchField` | The search glyph and a field; Return, ↓ and Esc come out as signals |
+| `AppSearchField` | The search glyph and a field; Return, ↓ and Esc come out as signals; `keyFilter` sees each key first |
 | `AppPanel` | A card over the dimmed window (settings, a question, a first start); a click outside comes out as a signal. Never taller than the window: its content scrolls, and its last row of `AppPanelButton`s stays in sight under it |
 | `AppPanelButton` | A panel's answer (Create, Cancel): its keys in the theme colour, then the word; `strong` for the one Return gives |
 | `AppConfirm` | A yes-or-no `AppPanel` before what can't be undone: `question`, `detail`, `action`; Return yes, Esc no; `other` a second answer on Ctrl+Return (`otherChosen`) |

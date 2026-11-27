@@ -14,6 +14,8 @@ QtObject {
     function pressed(e) {
         const k = e.key
         win.look.moved(e)              // Tab and the arrows show the keys' frame (AppPointer)
+        win.option.pressed(e)          // a Mac layout's ⌥ (AppOption): ⌥F
+        if (win.searcher.optionKey(e)) return
         // The list takes most keys before they reach the sheet: any but ? closes it here.
         if (win.cheats && k !== Qt.Key_Question && sheet.modifierKeys.indexOf(k) < 0) win.cheats = false
         if (panes.pressed(e)) { e.accepted = true; return }
