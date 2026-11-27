@@ -153,7 +153,9 @@ Click an icon and a small menu opens under it:
   the history is in `~/.local/state/nightdrive/claude-usage`). Its **Sessions bar** switch puts every session in a row at the bottom of the main screen
   (windows make room): one asking you something gets a red question mark and one waiting for your permission an
   orange shield (red after 3 minutes, hopping faster), which hop until you go to its window, one whose last reply
-  ends on a ✅ line gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window. A
+  ends on a ✅ line gets a green check, the mouse over one shows its folder, state and last line, and a click goes to its window.
+  As one starts to ask or gets its check, a soft sound (rising for a question, falling when done), never for the window
+  you're in nor in Do Not Disturb; Launcher › Settings › Notifications › Sessions bar sound turns it off. A
   session that opened others with `nightdrive ask` (a project manager, say) gets a bot and a bold name, the ones it
   opened following it; the groups, their sessions and the others go in the order of their workspaces, and on one
   workspace by window, left to right and top to bottom, a dot between each group or lone session.
@@ -326,7 +328,7 @@ a to-do list or a chat you want one keystroke away without giving them a workspa
 | Network | NetworkManager, BlueZ, [Tailscale](plugins/tailscale/README.md) | Wi-Fi, Bluetooth and Tailscale menus |
 | Audio | PipeWire, [EasyEffects](https://github.com/wwmm/easyeffects) | output switching (AirPlay speakers too, starting at most at 30 % and forgotten at the next login, as on a Mac), EQ presets for headphones, AirPods battery and settings, the headphone jack asks what went in |
 | Notifications | Quickshell | the app's icon and buttons, history and Do Not Disturb in the bar, a low battery warning, the internet dropping; a crashed app's notification can Ask Claude why |
-| Sounds | Nightdrive's own, made from scratch | notification sounds to choose from, and the desktop's own (volume, screenshot, charger, devices, lock); Launcher › Settings › Notifications turns them off |
+| Sounds | Nightdrive's own, made from scratch | notification sounds to choose from, and the desktop's own (volume, screenshot, charger, devices, lock) and the sessions bar's; Launcher › Settings › Notifications turns them off |
 | Files and images | [Files](plugins/files/README.md) (Nightdrive's own), Loupe | yazi's keys, a preview, Quick Look on Space; opens every folder. Nautilus stays installed as Files (Nautilus), found by search |
 | Markdown | [Apostrophe](https://apps.gnome.org/Apostrophe/) | `.md` files open in it, themed |
 | Web apps | Chromium app windows | your own, or ready-made ones with a key: WhatsApp, Slack, Teams, YouTube |

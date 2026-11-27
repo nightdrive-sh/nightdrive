@@ -10,6 +10,9 @@
 #                                      battery-low, error, device-in, device-out, lock, logout, shutdown), unless turned off;
 #                                      it returns when the sound has played (session-end waits for it)
 #   sounds system|volume [on|off]      prints / sets whether the desktop's sounds play at all, and the volume keys' tick
+#   sounds session asking|done         plays the sessions bar's sound (sessions/NAME.wav: a Claude session asks you, or
+#                                      has finished), unless turned off; quickshell/SessionsSound.qml checks the rest
+#   sounds sessions [on|off]           prints / sets whether the sessions bar plays them
 # Do not disturb silences only the sounds of things that happen by themselves (charger, battery, devices): their callers
 # in Quickshell check it. Feedback on what you just did (a key, a screenshot, a lock) always plays.
 # They play only on personal outputs, never on speakers in the room: the Mac's own speakers, wired headphones or Bluetooth
@@ -83,7 +86,12 @@ if [[ ${1:-} == event ]]; then
   [[ $2 == volume ]] && { switch volume || exit 0; play_volume; }
   play_file "$dir/system/$2.wav"
 fi
-if [[ ${1:-} == system || ${1:-} == volume ]]; then
+if [[ ${1:-} == session ]]; then
+  [[ ${2:-} == asking || ${2:-} == "done" ]] || { echo "usage: sounds session asking|done" >&2; exit 2; }
+  switch sessions || exit 0
+  play_file "$dir/sessions/$2.wav"
+fi
+if [[ ${1:-} == system || ${1:-} == volume || ${1:-} == sessions ]]; then
   case ${2:-} in
     "") switch "$1" && echo on || echo off ;;
     on|off) save "$1" "$2" ;;

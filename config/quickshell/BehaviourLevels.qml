@@ -138,6 +138,7 @@ Item {
     // tick: on | off, "" = not read yet (shown on)
     property string systemSounds: ""
     property string volumeTick: ""
+    property string sessionsSound: ""         // the sessions bar's (SessionsSound.qml): on | off, "" = not read yet (shown on)
     property string netWatch: ""              // "No internet" / "Back online" (hypr/scripts/net-watch): on | off, "" = not read yet (shown on)
     property string fumon: ""                 // uwsm's failed unit monitor (hypr/scripts/fumon): on | off | none, "" = not read yet
     function soundName(which, v) { return v === "none" ? "none" : (soundChoices[which].find(t => t[0] === v) || [])[1] }
@@ -157,6 +158,8 @@ Item {
               sub: "Screenshot, charger, battery, devices, lock, log out, errors" },
             { kind: "syssound", key: "volume", name: "Volume key tick", glyph: "volume-1", switchOn: volumeTick !== "off",
               sub: systemSounds === "off" ? "Off with the system sounds" : "A tick at the new level on each step" },
+            { kind: "syssound", key: "sessions", name: "Sessions bar sound", glyph: "bot", switchOn: sessionsSound !== "off",
+              sub: "A Claude session asks you something, or has finished" },
             { kind: "netwatch", name: "Internet connection", glyph: "globe", switchOn: netWatch !== "off",
               sub: "“No internet”, “Back online” and sign-in pages" }
         ].concat(fumon === "on" || fumon === "off" ? [   // only where uwsm has fumon (up to 0.26)
@@ -171,13 +174,14 @@ Item {
     // Settings › Notifications: the current sounds; select the current one
     Sh {
         id: soundsProc
-        script: 's="$HOME/.config/hypr/scripts/sounds"; "$s" regular; "$s" urgent; "$s" system; "$s" volume'
+        script: 's="$HOME/.config/hypr/scripts/sounds"; "$s" regular; "$s" urgent; "$s" system; "$s" volume; "$s" sessions'
         onResult: text => {
             const f = text.trim().split("\n")
             b.soundRegular = f[0] || ""
             b.soundUrgent = f[1] || ""
             b.systemSounds = f[2] || ""
             b.volumeTick = f[3] || ""
+            b.sessionsSound = f[4] || ""
             const l = b.launcher
             if ((l.level === "soundregular" || l.level === "soundurgent") && l.query === "")
                 l.selectWhere(r => r.value === (l.level === "soundregular" ? b.soundRegular : b.soundUrgent))
@@ -228,9 +232,11 @@ Item {
         if (level === "settings" || level === "crashreports") crashReportsProc.running = true
         if (level === "notiftime") Qt.callLater(() => launcher.selectWhere(r => r.summary === "current"))   // the cursor on the current time
     }
+    // What each switch's row plays on Shift+Enter
+    readonly property var syssoundFile: ({ system: "system/screenshot", volume: "system/volume", sessions: "sessions/done" })
     function shiftActivate(it) {
         if (it.kind === "sound") listenSound(it)
-        if (it.kind === "syssound") Quickshell.execDetached([scripts + "/sounds", "file", Quickshell.env("HOME") + "/.local/share/nightdrive/sounds/system/" + (it.key === "volume" ? "volume" : "screenshot") + ".wav"])
+        if (it.kind === "syssound") Quickshell.execDetached([scripts + "/sounds", "file", Quickshell.env("HOME") + "/.local/share/nightdrive/sounds/" + syssoundFile[it.key] + ".wav"])
     }
 
     function items(level, q) {
@@ -343,9 +349,11 @@ Item {
             l.keepSelection()
             const on = !it.switchOn
             if (it.key === "system") systemSounds = on ? "on" : "off"
+            else if (it.key === "sessions") sessionsSound = on ? "on" : "off"
             else volumeTick = on ? "on" : "off"
-            Quickshell.execDetached(["bash", "-c", '"$1" "$2" "$3" && [ "$3" = on ] && "$1" event "$4"', "_", scripts + "/sounds",
-                                     it.key, on ? "on" : "off", it.key === "volume" ? "volume" : "screenshot"])
+            const hear = it.key === "sessions" ? ["session", "done"] : ["event", it.key === "volume" ? "volume" : "screenshot"]
+            Quickshell.execDetached(["bash", "-c", '"$1" "$2" "$3" && [ "$3" = on ] && "$1" "$4" "$5"', "_", scripts + "/sounds",
+                                     it.key, on ? "on" : "off"].concat(hear))
             return true
         }
         if (it.kind === "sound") {       // stays open: each sound plays as it's chosen, so they can be compared

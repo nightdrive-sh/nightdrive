@@ -44,6 +44,7 @@ DictationToast 1.0 DictationToast.qml
 AskClaudeGlyph 1.0 AskClaudeGlyph.qml
 AskClaudeSendButton 1.0 AskClaudeSendButton.qml
 SessionsAsk 1.0 SessionsAsk.qml
+SessionsSound 1.0 SessionsSound.qml
 KeyFooter 1.0 KeyFooter.qml
 Picker 1.0 Picker.qml
 PowerDialog 1.0 PowerDialog.qml

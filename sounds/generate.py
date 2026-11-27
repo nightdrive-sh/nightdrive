@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -I
 """Makes the notification sounds (regular/*.wav, urgent/*.wav), agent-warn's (agent/*.wav), Mail's (mail/*.wav), the
-login screen's sounds (keys/*.wav) and the desktop's (system/*.wav, made in system.py) from scratch: no samples, so no
+sessions bar's (sessions/*.wav), the login screen's sounds (keys/*.wav) and the desktop's (system/*.wav, made in system.py) from scratch: no samples, so no
 licences to track.
 
   python3 sounds/generate.py      rewrites the .wav files next to this script
@@ -114,6 +114,15 @@ def slide(freq, to, dur, decay, glide):
 # (#1690) over swooshes and chimes: a two-note B5 E6 sounded like Mario's coin, the glide doesn't. Name → (sound, peak dBFS)
 MAIL = {
     "sent": (lambda: reverb(slide(B5, E6, .22, .06, .04), wet=.2), -21),
+}
+
+
+# quickshell/SessionsSound.qml: a Claude Code session in the sessions bar asks you something, or has finished its task
+# (✅). A pair picked by ear (#3743): the same soft fourth, rising for a question, falling to rest when it's done; quieter
+# than a notification, as the bar shows what it is. Name → (sound, peak dBFS)
+SESSIONS = {
+    "asking": (lambda: reverb(mix(note(B5, .3, start=0, decay=.07, amp=.8), note(E6, .55, start=.11, decay=.16)), wet=.28, tail=.5), -20),
+    "done": (lambda: reverb(mix(note(E6, .3, start=0, decay=.07, amp=.8), note(B5, .55, start=.11, decay=.16)), wet=.28, tail=.5), -20),
 }
 
 
@@ -248,6 +257,9 @@ if __name__ == "__main__":
     for name, (make, peak) in MAIL.items():
         write(os.path.join(HERE, "mail", name + ".wav"), make(), peak)
         print(f"mail/{name}.wav")
+    for name, (make, peak) in SESSIONS.items():
+        write(os.path.join(HERE, "sessions", name + ".wav"), make(), peak)
+        print(f"sessions/{name}.wav")
     for name, (make, peak) in KEYS.items():
         write(os.path.join(HERE, "keys", name + ".wav"), make(), peak)
         print(f"keys/{name}.wav")

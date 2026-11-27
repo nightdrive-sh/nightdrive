@@ -194,6 +194,9 @@ Singleton {
         if (JSON.stringify(a) !== JSON.stringify(askSeen)) askSeen = a
     }
 
+    // A sound as a session asks you or finishes, while the bar shows (#3743)
+    readonly property SessionsSound sound: SessionsSound { claude: c }
+
     // Claude Code's Notification hook (hypr/scripts/claude-notify): it asked for you, from a window you're not in
     IpcHandler {
         target: "claude"
