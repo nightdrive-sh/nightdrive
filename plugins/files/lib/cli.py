@@ -25,12 +25,15 @@ done exits 1 with the reason on stderr, in words for the toast.
   unpin PATH                   out of the sidebar's first group (pinned.py)
   place-move PATH --to places|bookmarks [--before PATH]   a folder to a group, before another of it or at its end
   mount DEVICE | unmount PATH
+  info PATH                    owner, permissions, size, times and type (info.py)
+  executable PATH on|off       the execute bit (x wherever r is; off: for no one)   undo: set-mode
+  set-mode PATH MODE           a file's mode back as it was (octal)
 """
 import argparse, json, os, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # -I leaves the script's folder out
-import fsops, members, pack, peek, pinned, places, trash, unpack         # noqa: E402
+import fsops, info, members, pack, peek, pinned, places, trash, unpack        # noqa: E402
 from fsops import Refused                                  # noqa: E402
 
 
@@ -116,6 +119,12 @@ def run(a):
         return places.mount(a.device)
     if v == "unmount":
         return places.unmount(a.path)
+    if v == "info":
+        return info.info(a.path)
+    if v == "executable":
+        return info.set_executable(a.path, a.state == "on")
+    if v == "set-mode":
+        return info.set_mode(a.path, a.mode)
     raise Refused(f"No command {v}.")
 
 
@@ -150,6 +159,9 @@ def parser():
     s.add_argument("--before", default="")
     s = sub.add_parser("peek"); s.add_argument("path"); s.add_argument("--long", action="store_true")
     sub.add_parser("mount").add_argument("device")
+    sub.add_parser("info").add_argument("path")
+    s = sub.add_parser("executable"); s.add_argument("path"); s.add_argument("state", choices=("on", "off"))
+    s = sub.add_parser("set-mode"); s.add_argument("path"); s.add_argument("mode")
     return p
 
 

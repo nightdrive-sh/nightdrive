@@ -53,6 +53,7 @@ QtObject {
             else if (k === Qt.Key_N) a.newWindow()
             else if (k === Qt.Key_D) a.acts.toggleBookmark()
             else if (k === Qt.Key_R) a.reload()
+            else if (k === Qt.Key_I) a.info.ask()                  // Finder's Get Info
             else if (k === Qt.Key_Backspace && shift && a.trashShown) a.acts.askEmpty()
             else if (k === Qt.Key_Backspace || k === Qt.Key_Delete) a.acts.trashPicked()
             else if (k === Qt.Key_Period || k === Qt.Key_Greater) a.showHidden = !a.showHidden   // ⌘⇧. as on a Mac
@@ -107,6 +108,7 @@ QtObject {
         else if (t === "S") a.reversed = !a.reversed
         else if (t === "~") a.go(a.home, "")
         else if (t === "i") a.previewChoice = !a.previewShown
+        else if (t === "I") a.info.ask()
         else if (t === "b") a.acts.toggleBookmark()
         else return false
         return true
