@@ -35,12 +35,18 @@ def discover(root):
                   if f and not os.path.islink(os.path.join(root, f)))
 
 
+def isolated_env(home):
+    """The environment without the desktop's variables, with home as HOME: the tests' and check.py's plugin check."""
+    env = {k: v for k, v in os.environ.items() if k not in DESKTOP_ENV and not k.startswith("PYTHON")}
+    # UTC and C.UTF-8 unless set: CI's container has no zone or locale of its own, and a desktop's must not differ
+    env.update(HOME=home, XDG_RUNTIME_DIR=home, TZ=env.get("TZ", "UTC"), LANG="C.UTF-8")
+    return env
+
+
 def run_one(root, f):
     """(file, ok, seconds, summary, tests skipped, output) for one test file. -v makes unittest name each skip's reason."""
     with tempfile.TemporaryDirectory(prefix="ci-test-") as home:
-        env = {k: v for k, v in os.environ.items() if k not in DESKTOP_ENV and not k.startswith("PYTHON")}
-        # UTC and C.UTF-8 unless set: CI's container has no zone or locale of its own, and a desktop's must not differ
-        env.update(HOME=home, XDG_RUNTIME_DIR=home, TZ=env.get("TZ", "UTC"), LANG="C.UTF-8")
+        env = isolated_env(home)
         start = time.monotonic()
         try:
             r = subprocess.run([sys.executable, "-I", f, "-v"], cwd=root, env=env, capture_output=True, text=True,

@@ -1,8 +1,9 @@
 name: CI
 
-# The checks in .github/ci/check.py: bash -n and ast.parse on every script, shellcheck against its baseline, a
-# secret scan of the whole history with gitleaks, and the unit tests (every *_test.py, .github/ci/tests.py). Run
-# them locally the same way: .github/ci/check.py --secrets.
+# The checks in .github/ci/check.py: bash -n and ast.parse on every script, shellcheck against its baseline, the
+# plugin check (nightdrive plugin check; lua's luac parses their Lua), a secret scan of the whole history with
+# gitleaks, and the unit tests (every *_test.py, .github/ci/tests.py). Run them locally the same way:
+# .github/ci/check.py --secrets.
 on:
   push:
     branches: [dev, main]

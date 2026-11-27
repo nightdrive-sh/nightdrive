@@ -5,9 +5,9 @@ save valid, then check:
 - Hyprland: `hyprctl configerrors` should be empty.
 - Quickshell: `qs log | tail` should show no QML errors.
 - Scripts: `bash -n` for shell, `ast.parse` for Python.
-- CI (`.github/workflows/ci.yml`) runs these on every push and pull request, with shellcheck, a secret scan and the
-  unit tests (every `*_test.py`, each as `python3 -I` with a throwaway home and no desktop variables):
-  `.github/ci/check.py [--secrets]` runs the same locally (`dnf install ShellCheck gitleaks`; `--tests-only`,
+- CI (`.github/workflows/ci.yml`) runs these on every push and pull request, with shellcheck, `nightdrive plugin
+  check` (in a throwaway home too), a secret scan and the unit tests (every `*_test.py`, each as `python3 -I` with a
+  throwaway home and no desktop variables): `.github/ci/check.py [--secrets]` runs the same locally (`dnf install ShellCheck gitleaks`; `--tests-only`,
   `--no-tests`). A test that needs a missing tool skips itself with the reason (`skipUnless`); one that can't pass in
   CI goes in `SKIP` in `.github/ci/tests.py` with its reason. A new test's packages go in ci.yml's install line.
   A shellcheck warning not in its baseline fails it: fix it, or add a `# shellcheck disable=SCxxxx` with the reason. A

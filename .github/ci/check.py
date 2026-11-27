@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The repo's CI checks, the same locally and in .github/workflows/ci.yml.
 
-  check.py                    syntax (bash -n, ast.parse), shellcheck and the unit tests (every *_test.py)
+  check.py                    syntax (bash -n, ast.parse), shellcheck, the plugin check and the unit tests
+                              (every *_test.py)
   check.py --secrets          gitleaks over the whole history as well
   check.py --no-tests         without the unit tests
   check.py --tests-only       only the unit tests (tests.py says how they run)
@@ -11,6 +12,11 @@ Shellcheck runs at severity warning against a baseline (shellcheck-baseline.txt)
 CI began are counted per file and code, and only more of them fails. Most were deliberate (word splitting of package
 lists, glob matches in [[ ]], a literal ~ in a message), and a baseline lets new code meet the full check without
 rewriting working scripts. A finding fixed lowers the count: --update-baseline then keeps it from coming back.
+
+The plugin check is `nightdrive plugin check` (config/hypr/scripts/plugin-check): every plugin against the rules in
+plugins/README.md, such as a README's list items on one line each, which the launcher cuts at a line break (#3659).
+It runs with a throwaway home, as the tests do, so plugins installed outside the repo on a developer's machine are
+left out and the result is the same as in CI.
 """
 import argparse
 import ast
@@ -20,12 +26,14 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # tests.py beside it, also under python3 -I
 import tests  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shellcheck-baseline.txt")
+PLUGIN_CHECK = os.path.join(ROOT, "config/hypr/scripts/plugin-check")
 SHELLS = (b"bash", b"/sh", b" sh")
 
 
@@ -101,6 +109,16 @@ def write_baseline(found):
             fh.write(f"{n} {f} {code}\n")
 
 
+def plugin_check():
+    """nightdrive plugin check over the repo's plugins: its findings (file:line: …) and warnings, 1 if any finding."""
+    with tempfile.TemporaryDirectory(prefix="ci-plugins-") as home:
+        r = subprocess.run([sys.executable, "-I", PLUGIN_CHECK], cwd=ROOT, env=tests.isolated_env(home),
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    for line in (r.stdout + r.stderr).splitlines():
+        print(f"plugin check: {line}")
+    return 1 if r.returncode else 0
+
+
 def secrets():
     """gitleaks over every commit; .gitleaksignore at the root lists the findings judged harmless."""
     if not shutil.which("gitleaks"):
@@ -143,6 +161,7 @@ def main():
     if fixed:
         print(f"shellcheck: {fixed} baseline findings are gone: run --update-baseline to keep them out")
 
+    bad += plugin_check()
     if args.secrets:
         bad += secrets()
     if not args.no_tests:
