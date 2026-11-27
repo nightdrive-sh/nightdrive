@@ -20,7 +20,8 @@ import "SessionGroups.js" as Groups
 // number small before its time instead of in its name, which starts with a capital (#2427), and the time in brackets
 // ("#2427 8 min" read as one number); the number goes before the name is shortened (SessionChip.tagShown). The number
 // is hidden for now (showTaskTag; #3043).
-// At its right end, Inbox's button (SessionsInbox.qml, #3179): the unread messages, as the top bar's mailbox.
+// At its right end, Inbox's button (SessionsInbox.qml, #3179): the unread messages, as the top bar's mailbox. Left of
+// it Ask Claude's (SessionsAsk.qml, #3704), which opens its conversation floating above it.
 PanelWindow {
     id: sb
     readonly property int barH: Theme.barHeight   // as tall as the top bar
@@ -182,7 +183,7 @@ PanelWindow {
         }
         const widths = items.map(it => it.kind === "dot" ? dotW + dotPad + dotPadR : it.lead ? leadW(it) : ownW(it))
         const others = items.map((it, i) => i).filter(i => items[i].kind === "chip" && !items[i].lead)
-        let room = width - 2 * pad - gap * (n - 1) - (inbox.width ? inbox.width + gap : 0)
+        let room = width - 2 * pad - gap * (n - 1) - (inbox.width ? inbox.width + gap : 0) - ask.width - gap
         items.forEach((it, i) => { if (it.kind === "dot" || it.lead) room -= widths[i] })
         const fits = others.reduce((a, i) => a + widths[i], 0) <= room
         const share = others.length ? Math.max(minChip, Math.floor(room / others.length)) : 0
@@ -252,6 +253,12 @@ PanelWindow {
         id: inbox
         running: sb.visible
         anchors { right: parent.right; rightMargin: sb.pad; verticalCenter: parent.verticalCenter }
+        height: sb.chipH
+    }
+    SessionsAsk {
+        id: ask
+        bar: sb
+        anchors { right: inbox.left; rightMargin: sb.gap; verticalCenter: parent.verticalCenter }
         height: sb.chipH
     }
 

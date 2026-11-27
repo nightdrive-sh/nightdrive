@@ -10,6 +10,8 @@ Flow {
     id: footer
     property string text: ""
     property real maxWidth: 600
+    property bool quiet: false
+    property real capTint: 0     // the caps' ground as a tint of the text colour; 0: Kit.Key's own (Ask Claude's lighter)   // every action as quiet as the rest: the main one is elsewhere (Ask Claude's field)
 
     readonly property var parts: text === "" ? [] : text.split(/\s+·\s+/).map(part => {
         const m = part.match(/^((?:Ctrl|Shift|Alt|Cmd|Enter|Esc|Tab|Space|Backspace|Up|Down|Left|Right|PgUp|PgDn|[A-Z](?=:))(?:\+(?:Ctrl|Shift|Alt|Cmd|Enter|Esc|Tab|Space|Backspace|Up|Down|Left|Right|PgUp|PgDn|[A-Z]))*)(?::\s*|\s+)(.*)$/)
@@ -29,12 +31,17 @@ Flow {
             required property var modelData
             required property int index
             // The first action with keys is the main one (Enter: open); the rest are quieter
-            readonly property bool main: index === 0 && modelData.keys.length > 0
+            readonly property bool main: !footer.quiet && index === 0 && modelData.keys.length > 0
             rightPadding: index > 0 ? 12 : 0     // 18 between actions with the Flow's spacing (right to left)
             spacing: 4
             Repeater {
                 model: part.modelData.keys
-                Kit.Key { required property string modelData; key: modelData; dim: !part.main }
+                Kit.Key {
+                    required property string modelData
+                    key: modelData
+                    dim: !part.main
+                    Binding on color { when: footer.capTint > 0; value: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, footer.capTint) }
+                }
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter

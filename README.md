@@ -49,7 +49,7 @@ Nightdrive puts all of that together into one opinionated desktop.
 - **Music**: while it plays, a player row above the list
 
 Type a request and press ⌘Enter, or Enter on the **Ask Claude** row: Claude does it with [Nightdrive's
-tools](docs/claude.md) in a toast in the Launcher's place, showing each step and its answer, and you can write back (⌘⌃Enter sends
+tools](docs/claude.md) in a toast at the bottom centre, showing each step and its answer, and you can write back (⌘⌃Enter sends
 it to Claude Code in a terminal instead). The tools are experimental: what Claude reads with them (a mail, a file) goes to
 Anthropic as part of the conversation ([What reaches Anthropic](docs/claude.md#what-reaches-anthropic)). When nothing
 matches, **Open in Browser** under it opens what you typed in the default browser: an address as it is, anything else
@@ -586,9 +586,9 @@ which app is yours to choose (Launcher › Settings › Apps › App shortcuts).
 | Keys | Action |
 |---|---|
 | ⌘ Space | Launcher |
-| ⌘ ⌥ Space | Ask Claude: opens or closes its toast in the Launcher's place |
+| ⌘ ⌥ Space | Ask Claude: opens or closes its toast at the bottom centre |
 | ⌘ Enter | Terminal (in the Launcher with text typed: Ask Claude, as ⌘⌥Enter) |
-| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, done with Nightdrive's tools only, its steps and answer in a toast in the Launcher's place (Claude Code without text) |
+| ⌘ ⌥ Enter | Ask Claude: what you typed in the Launcher, done with Nightdrive's tools only, its steps and answer in a toast at the bottom centre (Claude Code without text) |
 | ⌘ ⌃ Enter | Claude Code in a terminal (with text typed in the Launcher: sends it as the prompt) |
 | ⌘ C / ⌘ V / ⌘ X | Copy, paste, cut, in every app |
 | ⌘ S | Save |

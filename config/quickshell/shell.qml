@@ -222,21 +222,30 @@ ShellRoot {
     // The "…" menu lists the modules that didn't fit on its screen's bar
     Binding { target: TopBar; property: "overflow"; value: bar.tuckedOf(root.menuScreen) }
 
-    // Toasts below the bar (ToastStack.qml), stacked in this order: Ask Claude's open conversation stays put while a
-    // volume toast comes and goes below it
-    // Ask Claude's and dictation's small card, at the bottom centre (#3428): AskClaudeToast's state
-    AskClaudeIsland { toast: askToast }
+    // Toasts below the bar (ToastStack.qml), stacked in this order; Ask Claude's conversation at the bottom centre,
+    // grown out of the island (#3704)
     ToastStack {
-        AskClaudeToast {
+        id: toasts
+        bottomCards: AskClaudeToast {
             id: askToast
+            floating: toasts.floating
             // a password prompt or Claude's long card goes over it and takes the keys (a short card comes into it)
             stepAside: polkit.asking || (confirm.open && !confirm.inlined)
-            // Both would want the keyboard, so the launcher closes, but only once the toast, in its place and looking like
-            // it, is on screen over it (drawn): closing it first left a frame or two with neither, a flash (#1895).
+            // Both would want the keyboard, so the launcher closes, but only once the toast is on screen (drawn): closing
+            // it first left a frame or two with neither, a flash (#1895).
             // handOff closes it anyway if that frame doesn't come (the toast stepped aside for a password prompt).
             onAskingChanged: if (asking && launcher.open) handOff.restart()
             onDrawn: if (handOff.running) { handOff.stop(); launcher.open = false }
+            // ⌘H: its history, in the launcher (#3428), which takes the keys from it
+            Connections {
+                target: AskClaudeSession
+                function onHistoryRequested() {
+                    askToast.close()
+                    launcher.open = true; launcher.go("askhistory"); launcher.keyLevel = "askhistory"
+                }
+            }
         }
+        DictationToast { ask: askToast }   // the dictation's card (or the sessions bar's bubble, for Claude)
         Osd {}
         CleanToast {}   // cleaning mode's countdown (hypr/scripts/clean-input)
         RemindToast {}  // a quick reminder that came due (hypr/scripts/remind, launcher › Tools › Remind)

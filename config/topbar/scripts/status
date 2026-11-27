@@ -83,6 +83,16 @@ case $kind in
     exec ~/.config/topbar/scripts/claude-bar status ;;   # its right click cycles what it shows
   claude2)
     exec ~/.config/topbar/scripts/claude-bar status 2 ;; # the second Claude Code account's; hidden without one
+  askclaude)
+    # Ask Claude's bubble while the sessions bar, which has it, isn't shown (#3428): its dots while Claude works, red
+    # with an answer you haven't seen; a click opens it (modules.jsonc)
+    case $(qs ipc call askClaude state 2>/dev/null) in
+      bar|"") exit 0 ;;
+      busy)   emit "message-circle|message-circle-more" "" ;;
+      unseen) emit message-circle-more "" critical ;;
+      open)   emit message-circle-more "" active ;;
+      *)      emit message-circle-more "" ;;
+    esac ;;
   system)
     IFS=$'\t' read -r _ _ cls < <(~/.config/topbar/scripts/sysinfo bar)
     [[ $cls == high ]] && cls=critical

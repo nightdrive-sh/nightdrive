@@ -1,9 +1,8 @@
 # Dictation (Voxtype)
 
 Hold **F5** or **Fn** on a Mac, **Insert** on a PC (or another key: below), speak, and let go: the text is typed into the active window.
-While you speak, a small bar at the bottom centre of the screen (just above the sessions bar when it shows) listens.
-With **⌘⇧** held too, it goes to [Ask Claude](claude.md) instead and is sent when you let go: the same bar shows Claude
-working and then its answer.
+With **⌘⇧** held too, it goes to [Ask Claude](claude.md) instead and is sent when you let go: Ask Claude's speech bubble
+(sessions bar or top bar) shows it listening, Claude working and then that it has answered.
 
 It runs fully offline with [Voxtype](https://github.com/peteonrails/voxtype) and NVIDIA's Parakeet model, on the CPU (about 1.4 s for 6 s of speech on an M2 Max).
 

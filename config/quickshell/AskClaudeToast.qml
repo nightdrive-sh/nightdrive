@@ -14,11 +14,11 @@ import "Words.js" as Words
 //   open (and its keys) the dictation is a reply: a listening wave stands in for the field (AskClaudeListening.qml,
 //   #1997) and the text goes into it to check before Enter sends it.
 // - Esc, or a click beside it, closes it without stopping Claude; what was written stays in the field for next time.
-//   While Claude works the small card says so (AskClaudeStatus.qml), and for a while that it has answered; a click
-//   on it, or ⌘⌥Space (hypr/scripts/ask-claude --toggle), opens it again.
-// - The small card, the dictation's and Claude's, isn't in this toast but in the island at the bottom centre
-//   (AskClaudeIsland.qml, #3428): up here it covered the windows' top lines for as long as you dictated or Claude
-//   worked. This toast is only the open conversation; the island shows smallShown, with this toast's dictation.
+//   While Claude works the speech bubble says so, and that it has answered; a click on it, or ⌘⌥Space
+//   (hypr/scripts/ask-claude --toggle), opens it again.
+// - This toast is only the open conversation (#3428). Claude's state while it's closed is the speech bubble's, the
+//   sessions bar's (SessionsAsk.qml) or else the top bar's; the dictation's card is DictationToast.qml, at the top
+//   centre, with this toast's dictation (or the bubble, listening, for a dictation to Claude with the sessions bar).
 // - A dictated request that ends in an error, or that Claude marked unsure (AskClaudeSession.look, #3155), opens it large
 //   with the keys instead: what was heard and Claude's question are in the conversation, to answer by writing or by
 //   dictating into the field. Not while you dictate into a window: it waits until that's done.
@@ -34,14 +34,14 @@ Toast {
     property bool stepAside: false        // a password prompt or Claude's full card is up: they get the keys
 
     // --- Tunables ---
-    // As the launcher's card, and as it does on a narrow screen (a phone's, a VM's window): edge px from each side
+    // As wide as the launcher's card, and as it does on a narrow screen (a phone's, a VM's window): edge px from each side
     // (#3274). Its content wraps to it (AskClaudeThread's text, AskClaudeMarkdown's code blocks, the footer's lines).
     readonly property int wideWidth: 660
     readonly property int edge: 12                 // the launcher's
     readonly property int askWidth: Math.min(wideWidth, (Screen.width || wideWidth + 2 * edge) - 2 * edge)
-    readonly property real screenShare: 0.6        // the most of the screen's height it grows to before it scrolls
+    readonly property real screenShare: 0.6        // the most of the screen's height it grows to before it scrolls,
+    readonly property int extraHeight: 100         // and this much more (#3704), within the bars
     readonly property int listenGrace: 3000        // ms the card waits for the text after Voxtype is done
-    readonly property int answeredFor: 10000       // ms the closed card says Claude answered
 
     property bool asking: false           // Ask Claude's size, with its field and conversation
     // A dictation to Claude is on, before its text. listenOnly: it began with the toast closed, so its text is sent
@@ -49,37 +49,40 @@ Toast {
     property bool listening: false
     property bool listenOnly: false
     property bool grown: false            // the card has its Ask Claude size
-    property bool answeredShown: false    // an answer came while it was closed: the small card says so for a while
     // A dictated request's answer needs a look (AskClaudeSession.look): the toast opens large as soon as no dictation
     // is typing into a window, which would otherwise type into its field
     property bool lookPending: false
     readonly property bool lookNow: lookPending && !asking && !vt.shown && !listening && AskClaudeSession.look !== ""
     // Later, not in the handler: opening changes what lookNow is bound to (a binding loop)
     onLookNowChanged: if (lookNow) Qt.callLater(() => { if (toast.lookNow) toast.open(panel.field.text) })
-    readonly property bool working: !asking && (AskClaudeSession.busy || answeredShown || lookPending
-                                                || AskClaudeSession.undoState === "run")
-    // The small card's content: the dictation's indicator while you speak, else Claude's state
-    readonly property bool dictationCard: vt.shown
 
-    // The island's (AskClaudeIsland.qml): the dictation's card while you speak, else Claude's state
-    readonly property bool smallShown: !asking && (vt.shown || working)
     property alias dictation: vt
-    property bool statusHolding: false    // the pointer on the island's Undo: the answered card waits for the click
+    // The sessions bar's bubble listens with it (SessionsAsk.qml)
+    Binding { target: AskClaudeSession; property: "listening"; value: toast.listenOnly && vt.shown }
+    Binding { target: AskClaudeSession; property: "dictation"; value: vt }
     shown: asking
     takesKeys: asking && !stepAside && !listenOnly
-    sitsLow: grown                        // in the launcher's place whether it has the keys or not
+    // It sits in ToastStack's bottomCards (#3704): above the sessions bar's bubble, or at the bottom centre
     cardWidth: askWidth
     cardHeight: grown ? panel.implicitHeight : 48
-    // In Ask Claude's size it looks like the launcher and sits where the launcher's card does (Theme.cardTop), as it
-    // takes over from it (#1895): its background, corners and border. The small cards stay black and borderless (#1910),
-    // so the colour changes as the dictation's card grows.
-    border { color: Theme.primary; width: grown ? 2 : 0 }
-    color: grown ? Theme.launcherBg : Theme.bg
-    Behavior on color { enabled: !toast.instant; ColorAnimation { duration: 180 } }
-    radius: grown ? 12 : 10
-    lowered: Math.max(0, Math.round((Screen.height || 900) * Theme.cardTop) - Theme.barHeight - 8)
+    // Its top corners rounded and its foot on the bar (or the screen's edge); no keys border (the user's choice, #3704):
+    // the field's caret says where the keys are.
+    // Glass, as the notifications' cards (the user's pick of three, #3704): translucent, what's behind blurred
+    // (hypr/rules.lua), and a hairline round it. Flat black read as a hole in the screen rather than a card over it.
+    readonly property real glassOpacity: 0.90
+    // The launcher's (and the terminals') shade, tinted towards the theme, at the glass's opacity
+    color: Qt.rgba(Theme.launcherBg.r, Theme.launcherBg.g, Theme.launcherBg.b, glassOpacity)
+    border { width: 2; color: Theme.primary }   // the launcher's edge (#3428)
+    radius: 4   // as the windows' (Hyprland's rounding, hypr/appearance.lua)
+    // Floating above the sessions bar's button (ToastStack.floating, #3704) it is a card of its own, rounded all round;
+    // else its foot stands on the bar or the screen's edge
+    property bool floating: false
+    bottomLeftRadius: floating ? radius : 0
+    bottomRightRadius: floating ? radius : 0
     onOutsideClicked: close()
-    function tap() { open(panel.field.text) }   // the island clicked
+    // Opened with a key (⌘⌥Space) or from the launcher, its conversation lays itself out just after it shows: that first
+    // growth isn't animated, as the card is meant to appear at its size (#3704). Later growth (an answer coming) is.
+    Timer { id: settle; interval: 300; onTriggered: toast.instant = false }
 
     Binding { target: AskClaudeSession; property: "toastViewing"; value: toast.takesKeys }
     onTakesKeysChanged: if (takesKeys) panel.field.edit.forceActiveFocus()   // back from a card that had the keys
@@ -89,18 +92,10 @@ Toast {
         function onAnswered() {
             if (toast.asking) return
             if (AskClaudeSession.look !== "") toast.lookPending = true
-            else { toast.answeredShown = true; answeredTimer.restart() }
         }
-        // The small card's Undo (#3157): what it undid stays for a while, as the answer did
-        function onUndoFinished() { if (!toast.asking) { toast.answeredShown = true; answeredTimer.restart() } }
         function onShowRequested(text, send) { toast.request(text, send) }
         function onHideRequested() { toast.close() }
         function onDeleteBackRequested(word) { if (toast.takesKeys) Words.deleteBack(panel.field.edit, word) }
-    }
-    Timer {
-        id: answeredTimer
-        interval: toast.answeredFor
-        onTriggered: if (toast.statusHolding) restart(); else toast.answeredShown = false
     }
 
     Dictation { id: vt }
@@ -109,12 +104,11 @@ Toast {
     function open(text) {
         instant = true
         asking = true
-        answeredShown = false
         lookPending = false                 // opened anyway: it needn't open again once closed
         AskClaudeSession.unseen = false
         panel.field.begin(text)
         grown = true
-        Qt.callLater(() => toast.instant = false)   // the conversation's own growth still animates
+        settle.restart()                    // the conversation's own growth animates once it has laid itself out
     }
     // While Claude works the small card takes its place at once
     function close() {
@@ -186,8 +180,12 @@ Toast {
     AskClaudePanel {
         id: panel
         visible: toast.grown
+        background: toast.color
+        // By its foot: as the card grows upwards out of the island, the field and the newest lines show first
+        anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
         width: toast.askWidth
-        maxHeight: Math.round((Screen.height || 900) * toast.screenShare)
+        maxHeight: Math.min(Math.round((Screen.height || 900) * toast.screenShare) + toast.extraHeight,
+                            (Screen.height || 900) - 3 * Theme.barHeight)
         dictating: toast.asking && (vt.shown || toast.listening)
         listenOnly: toast.listenOnly
         dictation: vt
@@ -202,6 +200,12 @@ Toast {
         function toggle(): string { toast.toggle(); return "ok" }
         function open(): string { if (!toast.asking) toast.reopen(); return "ok" }
         function shown(): string { return toast.asking ? "open" : "closed" }
+        // For the top bar's bubble (topbar/scripts/status askclaude): "bar" while the sessions bar's button has it
+        // (SessionsAsk.qml), else open, busy, unseen (an answer not looked at) or idle
+        function state(): string {
+            const s = AskClaudeSession
+            return s.barButtonX >= 0 ? "bar" : toast.asking ? "open" : s.busy ? "busy" : s.unseen ? "unseen" : "idle"
+        }
         // The small card's Undo (#3157), for a key or a test: "ok", or "nothing" when the last turn left nothing to undo
         function undo(): string {
             if (!AskClaudeSession.undoable) return "nothing"

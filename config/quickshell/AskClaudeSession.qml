@@ -46,11 +46,19 @@ Singleton {
     // ask it to through these, as neither knows the other
     signal showRequested(string text, bool send)   // open it: send text as a new request, or leave it in the field
     signal hideRequested()
+    signal historyRequested()                      // ⌘H in its field: the launcher's Ask Claude › History (shell.qml)
     signal deleteBackRequested(bool word)          // ⌘⌫ / ⌥⌫ over it, which Hyprland takes (Launcher.qml's IPC)
     property string draft: ""            // what the toast's field has, for ⌘Enter's terminal (Launcher.qml's IPC)
     // The toast shows the conversation now: Claude's confirmation card comes into it, a short one (ClaudeConfirm.qml
     // decides, and sets card); the toast shows it while pendingCard and answers through card.decide()
     property bool toastViewing: false
+    // The sessions bar's Ask Claude button (SessionsAsk.qml, #3704): its centre's x on its screen, -1 without the bar,
+    // so the conversation can float above it with an arrow at it
+    property real barButtonX: -1
+    // A dictation to Ask Claude is listening (AskClaudeToast.listenOnly), and its Dictation, for the bubble's meter
+    property bool listening: false
+    property var dictation: null
+    property string barButtonScreen: ""
     readonly property bool viewing: toastViewing
     property var card: null              // set by ClaudeConfirm as it is made, cleared as it is destroyed (a reload)
     readonly property bool pendingCard: !!card && card.open && card.inlined

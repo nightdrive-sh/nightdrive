@@ -4,7 +4,7 @@ import "AskClaudeMarkdown.js" as Md
 
 // Ask Claude's conversation as it goes (AskClaudeSession): your requests in a darker box at the right, as in a chat (at
 // most youShare of the width, narrower for a short one), each step Claude takes as a row with its glyph (pulsing while
-// it runs, dim once done, red with ✕ when it failed), a robot's head while it thinks, and its answer's text as it is
+// it runs, dim once done, red with ✕ when it failed), Ask Claude's bubble while it thinks, and its answer's text as it is
 // written, as formatted Markdown (AskClaudeMarkdown.js); your requests stay plain text. Under a turn's answer, the
 // result cards Claude added while it ran (AskClaudeResults.qml, #2245), in line with its text.
 // It knows nothing of where it is shown (Ask Claude's toast, AskClaudePanel.qml): give it a width, maxHeight and the font.
@@ -42,6 +42,11 @@ Item {
     readonly property bool thinking: session.busy && session.live === "" && !session.entries.some(e => e.kind === "step" && e.state === "run")
     implicitHeight: Math.min(col.implicitHeight, maxHeight)
     clip: true
+    property color youColor: Theme.card   // your requests' bubbles (Ask Claude's toast gives its field's, #3704)
+    property int youInset: 0              // their right edge in from the thread's, to line up with what's below them
+    // The card's colour: the text fades into it at the bottom while there's more below (#3704)
+    property color fadeColor: "transparent"
+    readonly property int fadeH: 36
 
     // PgUp / PgDn (dir -1 / 1): most of a view's height, so a line stays in sight across the jump
     function page(dir) {
@@ -111,7 +116,7 @@ Item {
             t.selection = said
         }
     }
-    // Claude's own words: the robot's head beside them, the text a little smaller than the field's and in line with the
+    // Claude's own words: Ask Claude's bubble beside them, the text a little smaller than the field's and in line with the
     // steps' text; an error (no glyph) in the same place
     component Answer: Item {
         property string text: ""
@@ -154,11 +159,26 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         // A mouse drag selects text rather than scrolling (#1904); the touchpad (TouchScroll) and the wheel (below) scroll
         interactive: false
-        // The newest stays in view as the conversation grows, unless you scrolled up to read: then it stays where you are
-        // until you scroll back to the end
+        // The newest stays in view as the conversation grows, unless you scrolled to read: then it stays where you are
+        // until you scroll back. The view follows the end until Claude's answer begins, and then stops at the answer's
+        // first line, so a long answer reads from its start instead of its end (#3704)
         property bool pinned: true
-        function toEnd() { contentY = Math.max(0, contentHeight - height) }
-        onContentYChanged: pinned = contentY >= contentHeight - height - 4
+        function answerTop() {
+            if (liveAnswer.visible) return liveAnswer.y
+            const es = t.session.entries
+            for (let i = es.length - 1; i >= 0 && es[i].kind !== "you"; i--)
+                if (es[i].kind === "text") {
+                    const it = entries.itemAt(i)
+                    return it ? it.y : -1
+                }
+            return -1
+        }
+        function target() {
+            const end = Math.max(0, contentHeight - height), a = answerTop()
+            return a >= 0 ? Math.min(end, Math.max(0, a - 4)) : end
+        }
+        function toEnd() { contentY = target() }
+        onContentYChanged: pinned = Math.abs(contentY - target()) <= 4
         onContentHeightChanged: if (pinned) toEnd()
         onHeightChanged: if (pinned) toEnd()
         TouchScroll { view: view; step: t.stepHeight }
@@ -176,6 +196,7 @@ Item {
             spacing: 4
             bottomPadding: t.gap      // room under the last message, before the footer
             Repeater {
+                id: entries
                 model: t.session.entries
                 Item {
                     id: entry
@@ -193,7 +214,7 @@ Item {
                         id: heard
                         visible: entry.kind === "you" && !!entry.modelData.heard
                         y: index > 0 ? t.gap : 0
-                        x: t.width - width - 4
+                        x: t.width - t.youInset - width - 4
                         height: implicitHeight + 4
                         text: "Heard"
                         color: Theme.dim
@@ -203,18 +224,18 @@ Item {
                         id: you
                         visible: entry.kind === "you"
                         y: entry.above
-                        x: t.width - width
+                        x: t.width - t.youInset - width
                         width: youText.width
                         height: youText.implicitHeight + 20
                         radius: 10
-                        color: Theme.card
+                        color: t.youColor
                         Said {
                             id: youText
                             y: 10
                             // As wide as the text in one line, up to youShare: then it wraps
                             width: Math.min(implicitWidth, Math.round(t.width * t.youShare))
                             text: entry.kind === "you" ? entry.modelData.text : ""
-                            color: Theme.muted
+                            color: Theme.title   // bright on the theme highlight (#3428)
                             font.pixelSize: t.fontSize - 2
                         }
                     }
@@ -254,6 +275,7 @@ Item {
                 phase: "run"
             }
             Answer {
+                id: liveAnswer
                 visible: t.session.live !== ""
                 text: t.session.live.trim()
                 live: true
@@ -289,6 +311,16 @@ Item {
                     fontSize: t.fontSize
                 }
             }
+        }
+    }
+    // More below: the last lines fade out, so a cut-off answer reads as one that goes on
+    Rectangle {
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        height: t.fadeH
+        visible: view.contentY < view.contentHeight - view.height - 1
+        gradient: Gradient {
+            GradientStop { position: 0; color: Qt.rgba(t.fadeColor.r, t.fadeColor.g, t.fadeColor.b, 0) }
+            GradientStop { position: 1; color: t.fadeColor }
         }
     }
 }

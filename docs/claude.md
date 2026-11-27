@@ -6,18 +6,18 @@ in the Launcher, `nightdrive ask`, a terminal), and you decide in Settings how f
 
 **Ask Claude** is the quick way: type a request in the Launcher ("Open three Finnish news sites") and press ⌘Enter, or
 Enter on the **Ask Claude** row (the first, and after the hits when what you typed looks like a request; with nothing
-typed it opens the toast to write in, Shift+Enter for a new line). The Launcher closes, and a toast in its place shows
-the conversation: each step Claude takes, then its answer as it is written (formatted: bold, lists, code, links that open
+typed it opens the toast to write in, Shift+Enter for a new line). The Launcher closes, and a toast shows the conversation (above
+the sessions bar's speech bubble, left of its Inbox button, while the bar shows; else at the bottom centre): each step Claude takes, then its answer as it is written (formatted: bold, lists, code, links that open
 in the browser), and the field to write back. ⌃C stops it,
 ⌘N starts a new chat (so does a request from the search, or one after 15 minutes), PgUp and PgDn scroll a long answer,
 text dragged over with the mouse is copied with ⌘C,
 and ⌘Enter goes on with it in Claude Code in a terminal, where it has its usual tools again, in manual mode: what the
 tools read came along, so each tool asks first until you change the mode (⇧Tab). Esc, or a click beside the
-toast, closes it without stopping Claude: a small bar at the bottom centre of the screen (just above the sessions bar
-when it shows) says it is working (its ✕ cancels), then for a moment that it answered (the row says so too), and a click on it, or ⌘⌥Space, opens the toast again (⌘⌥Space anywhere opens it to write
-in). When Claude finishes with the toast closed, a notification says so, and its Open brings the conversation back. A
+toast, closes it without stopping Claude. The speech bubble then says Claude is working (its dots hop) and turns red
+once it has answered, until you look (the row says so too); without the sessions bar the bubble is in the top bar. A
+click on it opens the toast again, as ⌘⌥Space does (⌘⌥Space anywhere opens it to write in). When Claude finishes with the toast closed, a notification says so, and its Open brings the conversation back. A
 request runs on its own, so it carries on through a restart of the desktop, which picks it up again.
-**Ask Claude History**, under its row in the Launcher, lists the conversations of the last 7 days, newest first (typing
+**Ask Claude History** (⌘H in the toast, or search the Launcher for it) lists the conversations of the last 7 days, newest first (typing
 searches them): Enter brings one back into the toast with its cards, and what you write there goes on with it.
 Claude Code works with Nightdrive's tools and nothing else (no shell, files, hooks or plugins of its own; the web only
 when Access › Web allows it, as Normal does), so the card and Access below decide as always. On the web it searches,
@@ -31,9 +31,9 @@ what it asks then as in any session. Without the tools on, or without Claude Cod
 terminal.
 
 To ask by voice, hold ⌘⇧ with the [dictation](dictation.md) key (⌘⇧F5 or ⌘⇧Fn on a Mac, ⌘⇧Insert on a PC), speak, and
-let go: what you said is sent at once, as a new request, and you can go on with your work. The small bar at the bottom
-centre shows Claude working and then, for a moment, its answer; a click on it opens the conversation. When the request
-changed something (a task added, the volume set), the bar has **Undo**, which takes back all of that request's changes
+let go: what you said is sent at once, as a new request, and you can go on with your work. Ask Claude's speech bubble
+shows Claude working, then red once it has answered; a click on it opens the conversation. When the request
+changed something (a task added, the volume set), its notification has **Undo**, which takes back all of that request's changes
 at once. With Ask Claude's
 toast open, what you dictate goes into its field instead, to check before Enter sends it. While Claude is still busy with
 an earlier request, the toast opens with what you said in the field. Without the tools on, it goes to Claude Code in a

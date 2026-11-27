@@ -142,6 +142,13 @@ hl.layer_rule({
     blur  = true,
     ignore_alpha = 0.1,
 })
+-- Ask Claude's glass card (quickshell/AskClaudeToast.qml, #3428): blurred behind the card, not behind its faint shadow
+hl.layer_rule({
+    name  = "toast-blur",
+    match = { namespace = "^nightdrive-toast$" },
+    blur  = true,
+    ignore_alpha = 0.5,
+})
 
 -- Thunderbird: slightly translucent (values: active, inactive)
 hl.window_rule({

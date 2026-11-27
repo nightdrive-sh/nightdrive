@@ -30,6 +30,7 @@
   { "name": "microphone",    "interval": 2,  "first": true },
   { "name": "claude",        "interval": 15, "right": "~/.config/topbar/scripts/claude-bar next", "middle": "xdg-open https://claude.ai/settings/usage" },
   { "name": "claude2",       "interval": 15, "right": "~/.config/topbar/scripts/claude-bar next 2", "middle": "xdg-open https://claude.ai/settings/usage" },
+  { "name": "askclaude",     "interval": 2,  "menu": "", "click": "qs ipc call askClaude toggle" },
   { "name": "system",        "interval": 3 },
   { "name": "bluetooth",     "interval": 5,  "right": "blueman-manager" },
   { "name": "wifi",          "interval": 5,  "right": "nm-connection-editor" },

@@ -5,8 +5,9 @@
 // here gets its area's glyph and its name in words, so a new tool still reads sensibly. Claude Code's own WebSearch and
 // WebFetch come by their bare names, when Access › Web allows them (#2241).
 
-// The glyph for the thinking row: a robot's head while Claude thinks between steps
-var THINKING = "bot"
+// Ask Claude's glyph, for the thinking row and beside its answers: a bubble with three dots, its own (#3704); the robot's
+// head is the Claude menu's and the sessions'. AskClaudeGlyph draws the same bubble with its dots moving.
+var THINKING = "message-circle-more"
 
 // Areas by the name's start: the longest match wins (home_assistant before home)
 var AREAS = {

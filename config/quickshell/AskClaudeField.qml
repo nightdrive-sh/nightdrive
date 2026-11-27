@@ -17,6 +17,7 @@ Item {
     readonly property alias edit: edit    // for ⌘⌫ / ⌥⌫ (Words.deleteBack, from Launcher.qml's IPC)
     signal sent(string text)
     signal newChat()
+    signal history()                           // ⌘H: earlier conversations (the launcher's Ask Claude › History, #3428)
     signal leaving(string text)
     signal refused()                            // Enter with nothing to send
     signal paged(int dir)                       // PgUp (-1) / PgDn (1): the conversation's, not the field's
@@ -24,22 +25,15 @@ Item {
     property var copyElsewhere: () => false
 
     // --- Tunables ---
-    readonly property int bigSize: baseSize + 2   // the search field's size, for a short request
-    readonly property int smallSize: baseSize - 3 // the smallest, from smallFrom characters on
-    readonly property int bigUntil: 60                     // characters that still get the search field's size
-    readonly property int smallFrom: 400
-    readonly property int lineWeight: 40                   // a line break counts as this many characters
+    readonly property int bigSize: baseSize + 2   // the search field's size
     readonly property int maxLines: 8                      // lines in view before the field scrolls
     // Above and below the text: one line of the search field's font centred in its minHeight, as TextInput centres it,
     // so the text stays where it was when the search turns into this field
     readonly property real pad: Math.floor((minHeight - bigLine.height) / 2)
     FontMetrics { id: bigLine; font { family: Theme.font; pixelSize: f.bigSize; weight: f.fontWeight } }
 
-    // By the length rather than the lines: lines depend on the size, and the size would then flicker at a line's end
-    readonly property int amount: edit.text.length + (edit.text.split("\n").length - 1) * lineWeight
-    property real size: (bigSize - (bigSize - smallSize)
-                                           * Math.max(0, Math.min(1, (amount - bigUntil) / (smallFrom - bigUntil))))
-    Behavior on size { NumberAnimation { duration: 120 } }
+    // One size whatever its length: it used to shrink for a long text, which a paste made jump (#3428)
+    readonly property real size: bigSize
     FontMetrics { id: lineMetrics; font: edit.font }
     readonly property real lineH: lineMetrics.height
 
@@ -116,6 +110,8 @@ Item {
                     AskClaudeSession.stop(); event.accepted = true   // ⌃C as in a terminal; with a selection it copies
                 } else if (cmd && event.key === Qt.Key_N) {
                     f.newChat(); event.accepted = true
+                } else if (cmd && event.key === Qt.Key_H) {
+                    f.history(); event.accepted = true
                 } else if (event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown) {
                     f.paged(event.key === Qt.Key_PageUp ? -1 : 1); event.accepted = true
                 } else if (event.key === Qt.Key_Escape) {

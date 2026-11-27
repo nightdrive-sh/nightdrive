@@ -116,7 +116,7 @@ Singleton {
         if (names.join() !== allModules.map(m => m.name).join()) saveItems({ hidden: items.hidden, order: names })
     }
     // Names and glyphs for the launcher's list; a module can give its own "label" and "glyph" in modules.jsonc
-    readonly property var moduleLabels: ({ claude: ["Claude", "bot"], claude2: ["Claude, second account", "bot"], system: ["CPU and memory", "cpu"],
+    readonly property var moduleLabels: ({ claude: ["Claude", "bot"], claude2: ["Claude, second account", "bot"], askclaude: ["Ask Claude (without the sessions bar)", "message-circle-more"], system: ["CPU and memory", "cpu"],
                                            bluetooth: ["Bluetooth", "bluetooth"], wifi: ["Wi-Fi", "wifi"],
                                            volume: ["Volume", "volume-2"], headphones: ["Headphones", "headphones"], display: ["Display", "monitor"], battery: ["Battery", "battery-medium"],
                                            calendar: ["Date and time", "clock"], notifications: ["Notifications", "menu"],
