@@ -45,10 +45,12 @@ class Key(unittest.TestCase):
             p.start()
 
     def tearDown(self):
-        # The agent the test started (a plain process, by its socket in the test's folder)
-        subprocess.run(["pkill", "-f", f"[s]sh-agent -D -a {mountcmd.agent_socket()}"], capture_output=True)
+        # The agents the test started: plain processes sshkey keeps, stopped by their own handle (no pkill: CI's
+        # container has no procps, and a pattern could match an agent that isn't the test's)
         while sshkey._detached:
-            sshkey._detached.pop().wait(timeout=5)
+            agent = sshkey._detached.pop()
+            agent.terminate()
+            agent.wait(timeout=5)
         for p in reversed(self.patches):
             p.stop()
         self.tmp.cleanup()
