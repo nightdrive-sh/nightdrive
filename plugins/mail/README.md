@@ -87,6 +87,14 @@ Below Trash, after a gap, are the account's own folders, such as Offers for adve
 - Inbox mail arrives within seconds (IMAP IDLE); the other folders, and a server without IDLE, sync every 5 minutes. ⌘R fetches now; a turning icon beside Mail's name shows a fetch in progress.
 - Notmuch's post-new hook runs `nightmail notify`, which sorts new mail by your rules first. A hook of your own is left alone: add `nightmail notify` to it.
 
+## Claude waits for mail
+
+- Tell Claude what it is waiting for ("wake me when Liisa answers, or in 2 hours anyway"). Its `mail_watch` tool registers the mail it waits for, any notmuch query: a reply in a thread, mail from an address, a HelpScout or Slack notification. When that mail arrives, the session is woken with what Claude asked for and what came. The session can be closed meanwhile.
+- Nightdrive's card asks you to allow each watch, and shows which session it wakes and its time-out.
+- A watch is checked after each fetch, so it wakes within seconds. It wakes once and is then gone. Mail that was there already, your own sent mail and mail Access › Mail keeps from Claude never wake it.
+- The waking is a `nightdrive schedule` message to Claude: a running session gets it typed into its window, a closed one is resumed, and nothing runs while the screen is locked. A time-out waits in `nightdrive schedule list`.
+- `nightmail watch list` shows the watches, and `nightmail watch cancel ID` stops one.
+
 ## Settings
 
 ⌘, (or Launcher › Settings › Apps › Mail): whether writing and message windows float or open beside Mail, how a message opens, what Claude reads, and the account's sorting rules (Your own folders). Kept in `~/.config/nightmail/settings.json`.

@@ -512,6 +512,85 @@
       "deletes": true
     },
     {
+      "name": "mail_watch",
+      "title": "Wake me when mail comes",
+      "description": "Wait for an email without staying open: when new mail matching a notmuch query arrives (a reply in a thread: thread:… from mail_search; or from:, to:, subject:, words; HelpScout's or Slack's notification mail too), Nightdrive wakes a Claude Code session with prompt and what came (sender, subject, ids): typed into its window if it runs, else resumed. Default: this session; to: another session's name or id, as Nightdrive's list of sessions gives it, e.g. a project manager's name. One-shot: the first match wakes it and the watch is gone. Mail already matching, your own sent mail and drafts never wake it, nor mail Access › Mail keeps from you. timeout (90m, 2h, 14:45; within a week) wakes the session anyway then, saying no mail came. Nightdrive checks after each fetch (seconds with IMAP IDLE); nothing runs while the screen is locked: it waits for the unlock. Write prompt as the woken session will read it with nothing else to go on: what you were waiting for, what to do, and to bother the user only for a decision (Inbox or a notification). The user allows it on Nightdrive's card. Returns the watch: id, query, to, timeout, timeout_row (its row in Nightdrive's schedule).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Mail to wait for",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "notmuch query, e.g. 'thread:0000000000012abc' or 'from:example.com and subject:offer'"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Then",
+            "minLength": 1,
+            "maxLength": 3000,
+            "description": "What the woken session does, whole"
+          },
+          "to": {
+            "type": "string",
+            "title": "Session",
+            "maxLength": 200,
+            "description": "The session to wake: its name or id from the list of sessions. Default: this session"
+          },
+          "timeout": {
+            "type": "string",
+            "title": "Anyway at",
+            "maxLength": 25,
+            "pattern": "^[0-9hmin:. ]+$",
+            "description": "Wake the session anyway then if no mail came: minutes (90m, 2h) or a time of day (14:45)"
+          }
+        },
+        "required": ["query", "prompt"],
+        "additionalProperties": false
+      },
+      "command": ["nightmail", "watch", "add", "--stdin-json", "--json"],
+      "stdin": "json",
+      "card": ["nightmail", "watch", "card", ["--to", "{to}"], ["--timeout", "{timeout}"], "--", "{query}"],
+      "asks_if": ["echo", "yes"],
+      "class": "change",
+      "undo": ["nightmail", "watch", "cancel", "{id}"],
+      "notice": "Claude waits for mail: {query}",
+      "area": "mail"
+    },
+    {
+      "name": "mail_watches",
+      "title": "Mail Claude waits for",
+      "description": "The mail watches waiting (mail_watch's): id, query, prompt, to (the session it wakes, null for a new one), created, timeout (ISO 8601, or null) and timeout_row.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "command": ["nightmail", "watch", "list", "--json"],
+      "class": "read",
+      "area": "mail"
+    },
+    {
+      "name": "mail_watch_cancel",
+      "title": "Stop waiting for mail",
+      "description": "Take a mail watch away before it wakes anyone, its time-out too: id from mail_watch or mail_watches. When the awaited mail came some other way, or isn't needed now.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "pattern": "^[0-9a-f]{8}$"}
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "command": ["nightmail", "watch", "cancel", "{id}", "--json"],
+      "before": ["nightmail", "watch", "show", "{id}", "--json"],
+      "undo": ["nightmail", "watch", "restore", "{id}", "--json"],
+      "notice": "Claude stopped waiting for mail: {query}",
+      "class": "change",
+      "area": "mail"
+    },
+    {
       "name": "mail_folders",
       "title": "Mail's folders",
       "description": "The user's own folders in Nightdrive Mail, by account id: those besides Inbox, Sent, Drafts, Archive, Spam and Trash, which sort mail by sender (an Offers folder for advertising). Their rules: mail_rules. Search one with mail_search (path:\"ACCOUNT/NAME/**\").",
