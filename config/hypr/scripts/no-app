@@ -1,0 +1,137 @@
+#!/usr/bin/python3 -I
+"""No app: what opens a document no installed app opens, in place of the file manager that would take it as an archive.
+
+  no-app FILE...         the hidden entry's command (nightdrive-no-app.desktop, which guard writes): opens each file in its
+                         app if one has come since, else Files shows it with "No app opens …" (Open with…, the app to
+                         install), or a notification without Files
+  no-app guard [--json]  make the entry the default of the types no app opens, and take it away from those an app opens
+                         now (setup-user.sh, at every update; Software after an install or a removal)
+
+xdg-open and GIO (Firefox, GTK apps) take a type's app from its parents: with no spreadsheet app an .xlsx went to
+Nautilus, which opens zip archives, and an .odt to octet-stream's Ferry (#3715). Files asks fitting_app.py itself; for
+the rest the only place to say "no app" is mimeapps.list, which both read: guard writes this entry there for the
+guarded types (fitting_app.guarded_types) that nothing fits, in [Default Applications] and [Added Associations] (GIO
+takes a default only from the apps a type has). The entry steps aside by itself: a file it gets whose type an app now
+opens goes to that app, and guard runs again, so the line never stands between a new app and its files.
+"""
+import json, os, subprocess, sys
+from importlib.machinery import SourceFileLoader
+from importlib.util import module_from_spec, spec_from_loader
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, HERE)
+import fitting_app  # noqa: E402
+
+FILES = os.path.expanduser("~/.local/bin/files")       # Nightdrive Files (plugins/files), when it is installed
+DATA = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+# default-apps: mimeapps.list's reading and writing (no .py: loaded by its path, no __pycache__ in the repo)
+sys.dont_write_bytecode = True
+_loader = SourceFileLoader("default_apps", os.path.join(HERE, "default-apps"))
+defaults = module_from_spec(spec_from_loader("default_apps", _loader))
+_loader.exec_module(defaults)
+ID = fitting_app.NO_APP
+
+
+def without(lines, types):
+    """mimeapps.list's lines with this entry gone from the types' default and associations."""
+    out, section = [], ""
+    for line in lines:
+        if line.startswith("["):
+            section = line.strip()
+        elif "=" in line and section in ("[Default Applications]", "[Added Associations]"):
+            t, v = (s.strip() for s in line.split("=", 1))
+            if t in types and ID in v.split(";"):
+                rest = [a for a in v.split(";") if a and a != ID]
+                if section == "[Default Applications]" or not rest:
+                    continue
+                line = f"{t}={';'.join(rest)};"
+        out.append(line)
+    return out
+
+
+def write_entry():
+    """The hidden entry, with this script's full path: xdg-open parses an Exec itself and breaks on a quoted sh -c (as
+    app-link's), and the compositor's PATH has no ~/.local/bin. It lists no types: it is no type's app until guard names
+    it in mimeapps.list."""
+    exe = os.path.join(HERE, "no-app")
+    if any(c in exe for c in ' "\\`$'):
+        exe = '"' + exe.replace("\\", "\\\\").replace('"', '\\"').replace("`", "\\`").replace("$", "\\$") + '"'
+    text = ("[Desktop Entry]\n"
+            "# Written by hypr/scripts/no-app guard: the default of the documents no installed app opens (#3715)\n"
+            f"Type=Application\nName=No app\nExec={exe} %F\nNoDisplay=true\n")
+    path = os.path.join(DATA, "applications", ID)
+    try:
+        if open(path, encoding="utf-8").read() == text:
+            return
+    except FileNotFoundError:
+        pass
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def guard():
+    """Writes the entry for the guarded types nothing fits; drops it where an app fits now. Returns both lists."""
+    write_entry()
+    lines = defaults.read_mimeapps()
+    own = defaults.defaults(lines)
+    add, drop = [], []
+    for t in fitting_app.guarded_types():
+        fit = fitting_app.fitting(t) is not None
+        if own.get(t) == ID:
+            if fit: drop.append(t)
+        elif not fit and t not in own:      # a default of the user's own stays, even one whose app has gone
+            add.append(t)
+    if not add and not drop:
+        return {"added": [], "dropped": []}
+    lines = without(lines, set(drop))
+    if add:
+        old = defaults.associations(lines)
+        lines = defaults.put(lines, "[Default Applications]", {t: ID for t in add})
+        lines = defaults.put(lines, "[Added Associations]",
+                             {t: ";".join([ID] + [a for a in old.get(t, "").split(";") if a and a != ID]) + ";"
+                              for t in add})
+    os.makedirs(os.path.dirname(defaults.MIMEAPPS), exist_ok=True)
+    tmp = defaults.MIMEAPPS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, defaults.MIMEAPPS)
+    return {"added": add, "dropped": drop}
+
+
+def open_one(path):
+    info = fitting_app.check(path)
+    if info["app"]:
+        # An app came since guard last ran: it opens the file, and the entry steps aside for every type it now opens
+        guard()
+        subprocess.Popen(["gtk-launch", info["app"]["id"], path], start_new_session=True)
+        return
+    if os.access(FILES, os.X_OK):
+        # Files shows the file with what it says of one no app opens: Open with…, the app to install
+        subprocess.Popen([FILES, "open-file", path], start_new_session=True)
+        return
+    hint = info["install"]
+    body = (f"{hint['name']} opens it: Install › Software." if hint else "Open it with an app that reads it.")
+    subprocess.run(["notify-send", "-a", "Nightdrive", "-i", "dialog-information",
+                    f"No app opens {os.path.basename(path)}", f"{info['description']}. {body}"], check=False)
+
+
+def main(args):
+    if args[:1] == ["guard"]:
+        r = guard()
+        if "--json" in args:
+            print(json.dumps(r))
+        elif r["added"] or r["dropped"]:
+            print(f"No app: {len(r['added'])} types without an app now say so, {len(r['dropped'])} have one again")
+    elif args and not args[0].startswith("-"):
+        for a in args:
+            if a.startswith("file://"):
+                from urllib.parse import unquote, urlparse
+                a = unquote(urlparse(a).path)
+            open_one(os.path.abspath(a))
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

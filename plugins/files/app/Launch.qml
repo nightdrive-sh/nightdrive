@@ -8,7 +8,9 @@ import qs.kit
 // question, every time: a download must never start from a stray double click, and there is no setting to skip it.
 // Run starts it in its own folder, apart from Files, so it stays when Files closes; Run in Terminal shows what it
 // prints. One without its execute bit (as a download comes) gets Make Executable and Run instead. A file no app opens
-// says so in the toast, with Open with… (O) as its button.
+// says so in the toast, with Open with… (O) as its button, and Install <the app> first where one is known (#3715: an
+// .xlsx with no spreadsheet app is no app's, not the archive's file manager's). The install goes through Software
+// (`nightdrive software install`: dnf asks for the password in the system's dialog), and the file opens after it.
 AppConfirm {
     id: root
     required property var app
@@ -50,6 +52,20 @@ AppConfirm {
             .concat(terminal ? ["--terminal"] : []).concat(p.executable ? [] : ["--chmod"]), name: p.name })
         r.running = true
     }
+    function noApp(n) {
+        const acts = n.install ? [{ label: "Install " + n.install.name, run: () => install(n) }] : []
+        acts.push({ label: "Open with…", run: () => app.openWith.start() })
+        // Sticky with an install: reading which app it offers, and deciding, takes longer than a toast's few seconds
+        app.toast.show("No app opens " + n.name + (n.type && n.type !== "Unknown" ? " (" + n.type + ")" : ""),
+                       { actions: acts, sticky: !!n.install })
+    }
+    function install(n) {
+        app.toast.show("Installing " + n.install.name + "…", { sticky: true })
+        const r = installer.createObject(root, { command: [nightdrive, "software", "install", n.install.source,
+                                                           n.install.id, "--json"], file: n })
+        r.running = true
+    }
+    readonly property string nightdrive: Quickshell.env("HOME") + "/.local/bin/nightdrive"
     onAnswered: ok => { if (ok) start(false); else { prog = null; visible = false; app.toList() } }
     onOtherChosen: start(true)
 
@@ -62,8 +78,25 @@ AppConfirm {
             let d
             try { d = JSON.parse(said.text) } catch (e) { return }     // nothing printed: its app has it
             if (d.program) root.ask(d.program)
-            else if (d.noapp) root.app.toast.show("No app opens " + d.noapp.name + (d.noapp.type && d.noapp.type !== "Unknown" ? " (" + d.noapp.type + ")" : ""),
-                                                  { action: "Open with…", run: () => root.app.openWith.start() })
+            else if (d.noapp) root.noApp(d.noapp)
+        }
+    }
+    // Software's install: dnf may take a minute; the file opens in its new app when it is done
+    readonly property Component installer: Component {
+        Process {
+            id: inst
+            property var file
+            stdout: StdioCollector { id: instOut }
+            stderr: StdioCollector { id: instErr }
+            onExited: code => {
+                let d = {}
+                try { d = JSON.parse(instOut.text) } catch (e) {}
+                const name = inst.file.install.name
+                if (code === 0 && d.state === "installed") { root.app.say("Installed " + name); root.open(inst.file.path) }
+                else if (code === 0) root.app.say(name + " is still installing: open the file again when it is done")
+                else root.app.say(instErr.text.trim().split("\n").pop() || "Couldn't install " + name, true)
+                inst.destroy()
+            }
         }
     }
     // One process a run: the helper exits as soon as the program has started (or couldn't), with the reason on stderr

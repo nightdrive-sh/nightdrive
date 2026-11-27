@@ -11,7 +11,7 @@ import "Format.js" as Format
 ShellRoot {
     id: shell
     property var cut: []                  // the paths of the last cut, while the clipboard still holds them (Clip)
-    property var windows: []              // [{ id, path, select }]: what Variants makes a window for
+    property var windows: []              // [{ id, path, select, launch }]: what Variants makes a window for
     property int made: 0
     property var last: null               // the window last active
 
@@ -31,9 +31,9 @@ ShellRoot {
         settingsFile.setText(JSON.stringify(s, null, 2) + "\n")
     }
 
-    function open(path, select) {
+    function open(path, select, launch) {
         made++
-        windows = windows.concat([{ id: made, path: path || "", select: select || "" }])
+        windows = windows.concat([{ id: made, path: path || "", select: select || "", launch: !!launch }])
     }
     function closed(w) {
         if (last === w) last = null
@@ -45,6 +45,12 @@ ShellRoot {
         const all = instances.instances
         const w = last || (all.length ? all[all.length - 1] : null)
         if (w) w.go(path, select); else open(path, select)
+    }
+    // The same for a file to open as ⏎ would: no-app's, for a document no app opens (#3715)
+    function goOpening(path) {
+        const all = instances.instances
+        const w = last || (all.length ? all[all.length - 1] : null)
+        if (w) { w.go(Format.parent(path), path); w.openFile(path) } else open(Format.parent(path), path, true)
     }
     // A change to the sidebar's folders (a bookmark, one moved) reaches every window's
     function placesChanged() { for (const w of instances.instances) w.places.refresh() }
@@ -60,6 +66,7 @@ ShellRoot {
             key: modelData.id
             startPath: modelData.path
             startSelect: modelData.select
+            startOpen: modelData.launch || false
         }
     }
 
@@ -74,6 +81,10 @@ ShellRoot {
         // The folder a file is in, with the file picked (FileManager1's ShowItems, `files show`). Not "show" or
         // "open": qs ipc takes those for its own subcommands
         function showFile(path: string): void { shell.go(Format.parent(path), path) }
+        // A new window with the file picked and opened as ⏎ would (`files open-file`: no-app, for a document no app
+        // opens, so the window says so with Open with… and the app to install); openFileHere into the first window
+        function newWindowOpening(path: string): void { shell.open(Format.parent(path), path, true) }
+        function openFileHere(path: string): void { shell.goOpening(path) }
         function refresh(): void { for (const w of instances.instances) w.reload() }
         function openSettings(): void {       // the kit's `files settings`
             const all = instances.instances

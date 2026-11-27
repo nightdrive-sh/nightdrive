@@ -18,6 +18,7 @@ FloatingWindow {
     required property int key            // this window's in manager.windows
     property string startPath: ""         // where it opens (home when empty), and the file picked there
     property string startSelect: ""
+    property bool startOpen: false        // and opened as ⏎ would (`files open-file`, no-app's: says no app opens it)
     // Another app's Open or Save window (picker.qml, lib/portal.py): the request, and PickBar under the window
     property var pick: null
     title: pick ? pick.title : "Files"
@@ -25,7 +26,11 @@ FloatingWindow {
     implicitHeight: 720
     color: c.bg
     onClosed: { archive.leave(); manager.closed(win) }
-    Component.onCompleted: if (startPath) enter(startPath, startSelect)
+    Component.onCompleted: {
+        if (startPath) enter(startPath, startSelect)
+        if (startOpen && startSelect) launch.open(startSelect)
+    }
+    function openFile(p) { launch.open(p) }
 
     // The window last active is the one a folder from another app (IPC) goes to
     readonly property bool active: content.Window.active

@@ -71,6 +71,9 @@ echo "==> Default apps: images open in Loupe (instead of the browser); Markdown 
 # Source code (.json, .py…) with no code editor chosen: text/plain's app written down for xdg-open, which can't find it
 # through the types' parents as Files does, and opened a .json in Ferry
 "$repo/config/hypr/scripts/default-apps" follow
+# Documents no installed app opens (an .xlsx with no spreadsheet app, an .epub with no reader): no-app's hidden entry as
+# their default, so xdg-open and GIO's apps say so rather than open them as a zip in the file manager (#3715)
+"$repo/config/hypr/scripts/no-app" guard || true
 
 echo "==> Webapps: the window class Chromium gives them (their notifications, the launcher and Share find the window)"
 "$repo/config/hypr/scripts/webapp-add" --fix-classes

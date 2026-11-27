@@ -44,6 +44,17 @@ new_window() {   # [PATH [FILE]]: home, a folder, or a file picked in its folder
   fi
 }
 
+# A file in a new window, picked, and opened as ⏎ would: what no-app (hypr/scripts/no-app) hands over for a document no
+# app opens, so the window says so, with Open with… and the app to install (#3715)
+open_file() {
+  local p
+  p=$(resolve "${1:-}")
+  [[ -f $p ]] || { echo "files: $p isn't a file." >&2; return 1; }
+  if running; then ipc newWindowOpening "$p"
+  else start && ready && ipc openFileHere "$p"
+  fi
+}
+
 # A folder opens in a new window; a file shows in its folder, picked
 open_path() {
   local p
@@ -83,6 +94,7 @@ Usage: files [PATH | command]
   (none)         a new Files window, home, on this workspace
   PATH, URL      a folder in a new window; a file in its folder, picked
   show PATH      the same, for a file
+  open-file FILE a file opened as ⏎ in Files would: in its app, or "No app opens …" with Open with…
   enable         Files among the desktop's apps, as the one that opens folders (the installer)
   disable        take it away again: folders open in Nautilus
   picker on|off  Files as the apps' Open and Save window, or GTK's again; picker status [--json]
@@ -94,6 +106,7 @@ USAGE
 case ${1:-open} in
   open)       if [[ -n ${2:-} ]]; then open_path "$2"; else new_window; fi ;;
   show)       open_path "${2:-}" ;;
+  open-file)  open_file "${2:-}" ;;
   enable)     enable ;;
   disable)    disable ;;
   picker)     shift; exec "$APP_DIR/lib/picker-setup" "$@" ;;

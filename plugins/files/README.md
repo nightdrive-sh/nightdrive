@@ -14,7 +14,7 @@ found by a search for "files" or "nautilus" after Files.
 | ↑ ↓ or `j` `k` | Move in the list |
 | → ⏎ or `l` `o` | Open: into a folder, a file in its app (a double click too; ⌘O); on an archive ⏎ and `o` extract it (⌘O opens it), → and `l` look into it |
 | → or `l` on an archive | Into it as a read-only folder (zip, tar, tar.gz, tar.xz…): its folders, the preview and Space work, ← goes back out. `y` there and `p` in a folder take out only what was marked, else the picked one; what would change it (trash, rename, paste, compress) says it can't |
-| ⏎ on a program | Asks first, every time: Run, Run in Terminal (⌘⏎) or Cancel. A program (an ELF, an AppImage, a script with `#!` and its execute bit) runs in its own folder and stays when Files closes. One that came without its execute bit, as a download does, offers Make Executable and Run. A file no app opens says so, with Open with… |
+| ⏎ on a program | Asks first, every time: Run, Run in Terminal (⌘⏎) or Cancel. A program (an ELF, an AppImage, a script with `#!` and its execute bit) runs in its own folder and stays when Files closes. One that came without its execute bit, as a download does, offers Make Executable and Run. A file no app opens says so, with Open with… and, where one is known, the app to install (LibreOffice Calc for an .xlsx): an archive's app (Nautilus for a zip) never takes a document that is a zip inside |
 | `O` | Open with: the apps for the file's type, its default first, in a menu at the file; type to find any other app. ⏎ opens the file (or the marked ones) in it, ⌘⏎ also makes it the default for every file of the type |
 | ← ⌫ or `h` | Up a folder |
 | `gg` `G` | First, last |

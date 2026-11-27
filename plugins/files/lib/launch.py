@@ -1,8 +1,9 @@
 #!/usr/bin/python3 -I
 """Opening a file from Files (⏎, a double click, ⌘O): in its default app, or, when it is a program, only after asking.
 
-  launch.py open PATH           opens PATH in its default app and prints nothing; a program prints
-                                {"program": {...}} for the window to ask about, a file no app opens {"noapp": {...}}
+  launch.py open PATH           opens PATH in its app and prints nothing; a program prints {"program": {...}} for the
+                                window to ask about, a file no app opens {"noapp": {...}}, with the app to install for
+                                it where one is known (fitting_app.py: an archive's app doesn't open a document in it)
   launch.py run PATH [--terminal] [--chmod]
                                 runs the program in its own folder, apart from Files (--chmod: made executable first)
 
@@ -14,6 +15,8 @@ without it is still a program: the window offers to make it executable.
 import json, os, stat, subprocess, sys
 
 TERMINAL = os.path.expanduser("~/.config/hypr/scripts/terminal")   # the desktop's default terminal (Default apps)
+# hypr/scripts in this checkout: fitting_app.py, which xdg-open's no-app shares (a test runs the checkout's own)
+SCRIPTS = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../config/hypr/scripts"))
 ELF_MAGIC = b"\x7fELF"
 ET_EXEC, ET_DYN = 2, 3
 PT_INTERP = 3
@@ -68,16 +71,12 @@ def program(path):
     return {"kind": "appimage" if appimage else "elf", "executable": executable}
 
 
-def _default_app(path):
-    """The default app's name for the file's type and the type's description; GIO as `gio open` reads it."""
-    import gi
-    gi.require_version("Gio", "2.0")
-    from gi.repository import Gio
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from apps import content_type
-    ctype = content_type(path)
-    app = Gio.AppInfo.get_default_for_type(ctype, False)
-    return (app.get_display_name() if app else ""), Gio.content_type_get_description(ctype)
+def _fitting(path):
+    """fitting_app's check: the file's type, the app that really opens it (an .xlsx's archive parent's Nautilus doesn't,
+    #3715) and the app to install when none does."""
+    sys.path.insert(0, SCRIPTS)
+    import fitting_app
+    return fitting_app.check(path)
 
 
 def open_file(path):
@@ -85,10 +84,13 @@ def open_file(path):
     p = program(path)
     if p:
         return {"program": dict(p, name=os.path.basename(path), path=path)}
-    app, kind = _default_app(path)
-    if not app:
-        return {"noapp": {"name": os.path.basename(path), "type": kind}}
-    os.execvp("gio", ["gio", "open", path])
+    fit = _fitting(path)
+    if not fit["app"]:
+        return {"noapp": {"name": os.path.basename(path), "type": fit["description"], "path": path,
+                          "install": fit["install"]}}
+    # Its app by name, not gio open: GIO's default may be one that doesn't fit (the archive's file manager, no-app's
+    # entry) while another app does. gtk-launch, as the launcher and Open with start apps
+    os.execvp("gtk-launch", ["gtk-launch", fit["app"]["id"], os.path.abspath(path)])
 
 
 def run(path, terminal=False, make_executable=False):

@@ -4,7 +4,7 @@
 file no app opens says that, and that run starts the program in its own folder and session (so it outlives Files),
 makes it executable first only when asked, and in the terminal through the desktop's terminal script. Runs launch.py
 in a throwaway home with no apps of its own (the system's MIME database linked in), and only programs it wrote."""
-import json, os, subprocess, sys, tempfile, time, unittest
+import json, os, shutil, subprocess, sys, tempfile, time, unittest, zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -92,7 +92,8 @@ class Program(unittest.TestCase):
         self.assertIsNone(launch.program(str(self.t / "missing")))
 
 
-@unittest.skipUnless(HAVE_GIO and MIME.is_dir(), "needs GIO (python3-gobject) and shared-mime-info")
+@unittest.skipUnless(HAVE_GIO and MIME.is_dir() and shutil.which("update-desktop-database"),
+                     "needs GIO (python3-gobject), shared-mime-info and desktop-file-utils")
 class OpenAndRun(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -103,8 +104,8 @@ class OpenAndRun(unittest.TestCase):
         (t / "bin").mkdir()
         (t / "config").mkdir()
         (t / "game").mkdir()
-        # gio stand-in: what it was asked to open
-        self.tool("bin/gio", f"printf '%s\\n' \"$@\" > {t}/opened")
+        # gtk-launch stand-in: the app and the file it was asked to open
+        self.tool("bin/gtk-launch", f"printf '%s\\n' \"$@\" > {t}/opened")
         # The desktop's terminal script, standing in: its arguments, then the command itself
         self.tool(".config/hypr/scripts/terminal", f"printf '%s\\n' \"$@\" > {t}/terminal")
         # The program: where it ran, and whether its session is its own. The session id is field 6 of /proc/PID/stat,
@@ -152,15 +153,63 @@ class OpenAndRun(unittest.TestCase):
         self.assertEqual(json.loads(out)["noapp"]["name"], "data.bin")
         self.assertFalse((self.t / "opened").exists())
 
-    def test_open_with_an_app_hands_it_to_gio(self):
+    def app(self, name, types):
+        (self.t / f"data/applications/{name}.desktop").write_text(
+            f"[Desktop Entry]\nType=Application\nName={name}\nExec=true %F\nMimeType={types}\n")
+        # GIO finds a type's apps through mimeinfo.cache, as a package's install writes it
+        subprocess.run(["update-desktop-database", str(self.t / "data/applications")], check=True)
+
+    def zipped(self, name):
+        f = self.t / name
+        with zipfile.ZipFile(f, "w") as z:
+            z.writestr("content.xml", "<x/>")
+        return f
+
+    def test_open_with_an_app_starts_it(self):
         f = self.t / "notes.txt"
         f.write_text("hello\n")
-        (self.t / "data/applications/pad.desktop").write_text(
-            "[Desktop Entry]\nType=Application\nName=Pad\nExec=true %F\nMimeType=text/plain;\n")
+        self.app("pad", "text/plain;")
         (self.t / "config/mimeapps.list").write_text("[Default Applications]\ntext/plain=pad.desktop\n")
         code, out, _ = self.launch("open", str(f))
         self.assertEqual((code, out), (0, ""))
-        self.assertEqual(self.wait_for("opened").split(), ["open", str(f)])
+        self.assertEqual(self.wait_for("opened").split(), ["pad.desktop", str(f)])
+
+    def test_a_document_never_opens_as_its_archive(self):
+        # #3715: an .xlsx is a zip, and the file manager that opens zips (Nautilus) took it when no spreadsheet app was there
+        self.app("org.gnome.Nautilus", "inode/directory;application/zip;")
+        for name, install in (("sheet.xlsx", "libreoffice-calc"), ("text.docx", "libreoffice-writer"),
+                              ("slides.pptx", "libreoffice-impress"), ("book.epub", "foliate"), ("tool.jar", None)):
+            code, out, _ = self.launch("open", str(self.zipped(name)))
+            self.assertEqual(code, 0, name)
+            noapp = json.loads(out)["noapp"]
+            self.assertEqual(noapp["name"], name)
+            self.assertEqual(noapp["install"] and noapp["install"]["id"], install, name)
+        self.assertFalse((self.t / "opened").exists())
+
+    def test_a_real_zip_still_opens_as_an_archive(self):
+        self.app("org.gnome.Nautilus", "inode/directory;application/zip;")
+        f = self.zipped("photos.zip")
+        code, out, _ = self.launch("open", str(f))
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(self.wait_for("opened").split(), ["org.gnome.Nautilus.desktop", str(f)])
+
+    def test_the_documents_own_app_opens_it(self):
+        self.app("org.gnome.Nautilus", "inode/directory;application/zip;")
+        self.app("calc", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;")
+        f = self.zipped("sheet.xlsx")
+        code, out, _ = self.launch("open", str(f))
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(self.wait_for("opened").split(), ["calc.desktop", str(f)])
+
+    def test_the_users_choice_for_the_type_stands(self):
+        # Open with's Set as default: the archive's app for a .jar, chosen on purpose, still opens it
+        self.app("org.gnome.Nautilus", "inode/directory;application/zip;")
+        (self.t / "config/mimeapps.list").write_text(
+            "[Default Applications]\napplication/java-archive=org.gnome.Nautilus.desktop\n")
+        f = self.zipped("tool.jar")
+        code, out, _ = self.launch("open", str(f))
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(self.wait_for("opened").split(), ["org.gnome.Nautilus.desktop", str(f)])
 
     def test_run_in_its_folder_and_session(self):
         code, out, _ = self.launch("run", self.prog)

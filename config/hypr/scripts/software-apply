@@ -261,6 +261,9 @@ def apply(action, source, ident, check, as_json, show=False):
         fail(f"{action.capitalize()} failed ({rc}):\n{tail(out)}")
     else:
         result = {"state": done, "packages": plan["packages"]}
+        # An app that came or went changes which documents no app opens: no-app's defaults follow (#3715)
+        subprocess.run([os.path.join(HERE, "no-app"), "guard"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       check=False)
     result = {"action": action, "source": source, "id": ident, **result}
     print(json.dumps(result, ensure_ascii=False) if as_json else f"{ident}: {result['state']}")
 
