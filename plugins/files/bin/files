@@ -97,7 +97,7 @@ Usage: files [PATH | command]
   open-file FILE a file opened as ⏎ in Files would: in its app, or "No app opens …" with Open with…
   enable         Files among the desktop's apps, as the one that opens folders (the installer)
   disable        take it away again: folders open in Nautilus
-  picker on|off  Files as the apps' Open and Save window, or GTK's again; picker status [--json]
+  picker on|off  Files as the apps' Open and Save window, or GTK's again; picker remove, status [--json]
   restart, quit, log
   help           this text
 USAGE

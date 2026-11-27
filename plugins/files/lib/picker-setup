@@ -1,16 +1,22 @@
 #!/bin/bash
-# picker-setup on|off|status [--json]: Files as the desktop's Open and Save window (`files picker`, README.md › Open and
-# Save), or GTK's again. No root needed and nothing in /usr changes:
+# picker-setup on|off|remove [--yes] | status [--json]: Files as the desktop's Open and Save window (`files picker`,
+# README.md › Open and Save), or GTK's again. No root needed and nothing in /usr changes:
 #
 # xdg-desktop-portal reads its backends (*.portal) from one folder, /usr/share/xdg-desktop-portal/portals, unless
 # XDG_DESKTOP_PORTAL_DIR names another, and then it reads its choice of backends (hyprland-portals.conf) from that folder
-# too, not ~/.config. So `on` makes such a folder of the user's: links to the system's .portal files, Files' own
-# nightdrive.portal, and the choice the desktop had with FileChooser=nightdrive;gtk on top. A drop-in of the user's
+# too, not ~/.config. So the first `on` makes such a folder of the user's: links to the system's .portal files, Files'
+# own nightdrive.portal, and the choice the desktop had with FileChooser=nightdrive;gtk on top. A drop-in of the user's
 # xdg-desktop-portal.service sets the variable, and the portal starts again with it. The backend itself (portal.py)
 # starts on D-Bus activation, from the user's dbus-1/services.
 #
-# A portal that doesn't come back with a FileChooser after `on` is put back as it was at once. `off` takes all of it away
-# and starts the portal again. A portal package installed later needs `on` again for its .portal to be linked.
+# The portal reads that choice only when it starts, and a restart cuts every session open on it (Lan Mouse's input
+# capture, screen sharing: portal-sessions lists them), so it is restarted only to put the backend in or take it out:
+# the first `on`, and `remove`. In between, `off` and `on` are a flag (OFF) that portal.py reads on each request: off, it
+# hands the request to GTK's window as it came. Before a restart the apps whose sessions it cuts are listed and the
+# user asked (in a terminal; elsewhere --yes says go ahead).
+#
+# A portal that doesn't come back with a FileChooser after `on` is put back as it was at once. A portal package
+# installed later needs `remove` and `on` for its .portal to be linked.
 set -euo pipefail
 
 LIB=$(dirname "$(readlink -f "$0")")
@@ -18,12 +24,22 @@ SYSTEM_PORTALS=${PICKER_SYSTEM_PORTALS:-/usr/share/xdg-desktop-portal}   # the t
 data=${XDG_DATA_HOME:-$HOME/.local/share}
 config=${XDG_CONFIG_HOME:-$HOME/.config}
 PORTALS=$data/nightdrive/portals
+OFF=$data/nightdrive/picker-off      # portal.py's OFF_FLAG: the same path
 DROPIN=$config/systemd/user/xdg-desktop-portal.service.d/nightdrive-picker.conf
 NAME=org.freedesktop.impl.portal.desktop.nightdrive
 SERVICE=$data/dbus-1/services/$NAME.service
 UNIT=xdg-desktop-portal.service
+YES=0
 
-is_on() { [[ -f $DROPIN ]]; }
+installed() { [[ -f $DROPIN ]]; }
+is_on() { installed && [[ ! -e $OFF ]]; }
+
+# Whether the portal as it runs has our folder, not only its unit: the drop-in counts once it has started again
+running() {
+  local pid
+  pid=$(systemctl --user show "$UNIT" -p MainPID --value 2>/dev/null || echo 0)
+  [[ ${pid:-0} != 0 ]] && tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -qx "XDG_DESKTOP_PORTAL_DIR=$PORTALS"
+}
 
 # The desktop's own choice of backends, as the portal would read it without our folder: the user's, else the system's
 base_conf() {
@@ -42,6 +58,26 @@ conf() {
     { print }
     /^\[preferred\]/ && !done { print "org.freedesktop.impl.portal.FileChooser=nightdrive;gtk"; done = 1 }
     END { if (!done) { print "[preferred]"; print "org.freedesktop.impl.portal.FileChooser=nightdrive;gtk" } }'
+}
+
+# Before a restart: the sessions it would cut, and the user's go-ahead. No sessions, or --yes, and it goes on
+confirm_restart() {
+  local cut
+  cut=$("$LIB/portal-sessions" 2>/dev/null || true)
+  [[ -z $cut ]] && return 0
+  echo "This starts the desktop's portal again, which cuts the sessions open on it:"
+  while read -r line; do echo "  $line"; done <<<"$cut"
+  echo "Screen sharing stops and has to be started again; Lan Mouse hands the mouse and keyboard back to this computer."
+  (( YES )) && return 0
+  if [[ -t 0 ]]; then
+    local answer
+    read -r -p "Go ahead? [y/N] " answer
+    [[ $answer == [yY]* ]] && return 0
+    echo "Nothing changed."
+  else
+    echo "Nothing changed: files picker $1 --yes goes ahead." >&2
+  fi
+  exit 1
 }
 
 restart_portal() {
@@ -72,10 +108,11 @@ tell_hyprland() {
   fi
 }
 
-remove() { rm -rf "$PORTALS" "$DROPIN" "$SERVICE"; rmdir "$(dirname "$DROPIN")" 2>/dev/null || true; }
+uninstall() { rm -rf "$PORTALS" "$DROPIN" "$SERVICE" "$OFF"; rmdir "$(dirname "$DROPIN")" 2>/dev/null || true; }
 
-on() {
+install() {
   [[ -d $SYSTEM_PORTALS/portals ]] || { echo "files picker: xdg-desktop-portal isn't installed." >&2; exit 1; }
+  confirm_restart on
   rm -rf "$PORTALS"
   mkdir -p "$PORTALS" "$(dirname "$DROPIN")" "$(dirname "$SERVICE")"
   local p
@@ -86,41 +123,56 @@ on() {
   conf > "$PORTALS/hyprland-portals.conf"
   cp "$PORTALS/hyprland-portals.conf" "$PORTALS/portals.conf"      # a desktop named otherwise reads this one
   printf '[D-BUS Service]\nName=%s\nExec=/usr/bin/python3 %s/portal.py\n' "$NAME" "$LIB" > "$SERVICE"
-  printf '# Files as the Open and Save window (files picker on; off takes this away)\n[Service]\nEnvironment=XDG_DESKTOP_PORTAL_DIR=%s\n' \
+  printf '# Files as the Open and Save window (files picker on; remove takes this away)\n[Service]\nEnvironment=XDG_DESKTOP_PORTAL_DIR=%s\n' \
     "$PORTALS" > "$DROPIN"
   restart_portal
   if ! has_chooser; then
     echo "files picker: the portal didn't come back with a FileChooser; put back as it was." >&2
-    remove
+    uninstall
     restart_portal
     exit 1
   fi
+}
+
+on() {
+  # Put in once; after that the portal keeps the backend and only the flag changes. A drop-in the portal hasn't started
+  # with yet (an earlier `on` whose restart was declined, or a portal stopped) is put in again
+  if ! { installed && running; }; then install; fi
+  rm -f "$OFF"
   tell_hyprland on
   echo "Apps' Open and Save windows are Files' now (GTK's when Files can't), in the apps started from now on."
   echo "files picker off: GTK's again."
 }
 
 off() {
-  local was=0
-  is_on && was=1
-  remove
-  (( was )) && restart_portal
+  if installed; then
+    mkdir -p "$(dirname "$OFF")"
+    : > "$OFF"
+  fi
   tell_hyprland off
   echo "Apps' Open and Save windows are GTK's again."
 }
 
-status() {
-  local state=off
-  is_on && state=on
-  # The portal as it runs, not its unit: the drop-in counts only once it has started again
-  local pid running=false
-  pid=$(systemctl --user show "$UNIT" -p MainPID --value 2>/dev/null || echo 0)
-  if [[ ${pid:-0} != 0 ]] && tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -qx "XDG_DESKTOP_PORTAL_DIR=$PORTALS"; then
-    running=true
+remove() {
+  if installed && running; then
+    confirm_restart remove
+    uninstall
+    restart_portal
+  else
+    uninstall
   fi
+  tell_hyprland off
+  echo "Files' backend is gone from the portal: the Open and Save window is GTK's."
+}
+
+status() {
+  local state=off live=false
+  is_on && state=on
+  running && live=true
   if [[ ${1:-} == --json ]]; then
-    printf '{"picker": "%s", "running": %s, "portals": "%s", "backend": "%s"}\n' "$state" "$running" "$PORTALS" "$LIB/portal.py"
-  elif [[ $state == on && $running == false ]]; then
+    printf '{"picker": "%s", "installed": %s, "running": %s, "portals": "%s", "backend": "%s"}\n' \
+      "$state" "$(installed && echo true || echo false)" "$live" "$PORTALS" "$LIB/portal.py"
+  elif [[ $state == on && $live == false ]]; then
     echo "On, but the portal running doesn't have it yet: files picker on starts it again."
   elif [[ $state == on ]]; then
     echo "On: Files is the Open and Save window ($LIB/portal.py)."
@@ -129,9 +181,13 @@ status() {
   fi
 }
 
-case ${1:-status} in
+cmd=${1:-status}
+shift || true
+[[ ${1:-} == --yes || ${1:-} == -y ]] && YES=1
+case $cmd in
   on) on ;;
   off) off ;;
-  status) status "${2:-}" ;;
-  *) echo "Usage: files picker [on|off|status [--json]]" >&2; exit 2 ;;
+  remove) remove ;;
+  status) status "${1:-}" ;;
+  *) echo "Usage: files picker [on|off|remove [--yes]|status [--json]]" >&2; exit 2 ;;
 esac

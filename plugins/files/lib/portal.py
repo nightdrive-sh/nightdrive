@@ -23,6 +23,10 @@ import pickrun  # noqa: E402
 
 BUS_NAME = "org.freedesktop.impl.portal.desktop.nightdrive"
 OBJECT_PATH = "/org/freedesktop/portal/desktop"
+# `files picker off` (picker-setup's OFF): each request goes to GTK's window as it came. A flag and not a change of the
+# portal's backends, which only a restart of the portal takes, and that cuts every session open on it (Lan Mouse, screen
+# sharing). Read on each request, so on and off take effect at once
+OFF_FLAG = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "nightdrive", "picker-off")
 IDLE_EXIT_S = 300            # with no request open for this long, the backend ends; D-Bus starts it again on the next
 
 # The portal's responses: the user picked, cancelled, or something else ended it
@@ -131,9 +135,13 @@ class Backend:
         req = request_of(method, title, options)
         req["app"] = app_id
         r = Request(invocation, method, params, req, register(conn, handle, REQUEST, self._close))
-        r.picker = pickrun.Picker(req, lambda answer: self._picked(handle, answer))
         self.open[handle] = r
         self._arm_idle()
+        if os.path.exists(OFF_FLAG):
+            r.gtk = True
+            pickgtk.forward(self.conn, method, params, lambda out: self._reply(handle, out))
+            return
+        r.picker = pickrun.Picker(req, lambda answer: self._picked(handle, answer))
         r.picker.start()
 
     def _close(self, conn, sender, path, iface, method, params, invocation):

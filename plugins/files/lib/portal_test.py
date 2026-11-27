@@ -3,7 +3,8 @@
 picker (a folder and file as NUL-ended bytes, filters, SaveFiles' names), what its answer becomes for the app (file://
 URIs, the filter it had on), where the window goes over the app that asked, and, on a D-Bus session of the test's own,
 the whole round: SaveFile and OpenFile answered with the picker's paths, a cancel as response 1, and a picker that dies
-without an answer or never comes up handed to GTK's backend, whose answer the app gets (2 when there is none). A
+without an answer or never comes up handed to GTK's backend, whose answer the app gets (2 when there is none), and with
+`files picker off`'s flag every request GTK's at once. A
 stand-in `qs` on PATH plays the picker and a stand-in GTK backend GTK's, so no window opens."""
 import json, os, shutil, subprocess, sys, tempfile, textwrap, unittest
 from pathlib import Path
@@ -109,6 +110,7 @@ class RoundTrip(unittest.TestCase):
         fake = f"{sys.executable} -c \"$FAKE_GTK\" & " if gtk else ""
         script = f"{fake}{sys.executable} {HERE / 'portal.py'} & {sys.executable} -c \"$CLIENT\"; kill $(jobs -p)"
         env = dict(os.environ, PATH=f"{self.tmp / 'bin'}:{os.environ['PATH']}", XDG_RUNTIME_DIR=str(self.tmp),
+                   XDG_DATA_HOME=str(self.tmp / "data"),
                    CLIENT=CLIENT, FAKE_GTK=FAKE_GTK, CALLS=json.dumps(calls), GIO_USE_VFS="local",
                    FILES_PICK_READY_S="0.5")
         env.pop("HYPRLAND_INSTANCE_SIGNATURE", None)
@@ -131,6 +133,12 @@ class RoundTrip(unittest.TestCase):
         died, hung = self.calls(("SaveFile", "die", {"current_name": "x.txt"}), ("OpenFile", "hang", {}), gtk=True)
         self.assertEqual(died, "(0, {'uris': ['file:///gtk/SaveFile/x.txt']})")
         self.assertEqual(hung, "(0, {'uris': ['file:///gtk/OpenFile/']})")
+
+    def test_off_hands_every_request_to_gtk(self):
+        (self.tmp / "data" / "nightdrive").mkdir(parents=True)
+        (self.tmp / "data" / "nightdrive" / "picker-off").touch()
+        ok, = self.calls(("SaveFile", "ok", {"current_name": "y.txt", "current_folder": "/srv"}), gtk=True)
+        self.assertEqual(ok, "(0, {'uris': ['file:///gtk/SaveFile/y.txt']})")
 
 
 BUS_CONF = """<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"

@@ -58,7 +58,7 @@ found by a search for "files" or "nautilus" after Files.
 ## Open and Save
 
 Files can be the apps' Open and Save window, in place of GTK's: `files picker on` (`off` gives GTK's back, `status`
-says which). It is Files as it is, keys, sidebar and preview, with a bar at the foot: Save's name (picked without its
+says which, `remove` takes Files out of the portal). It is Files as it is, keys, sidebar and preview, with a bar at the foot: Save's name (picked without its
 ending; a name that is there asks before replacing it, a folder's name goes into it), the app's file types (⌘T, or the
 button; a new type changes the name's ending), Cancel (Esc) and the app's button (⏎). Open takes the marked files, else
 the picked one, or a folder when the app asks for one. It floats over the app that asked and keeps the keyboard until
@@ -66,7 +66,8 @@ it closes (the launcher and the bar's menus still take it).
 
 - Apps that ask the desktop's portal get it: Brave and Chromium, Flatpak apps. While it is on, apps started from then on ask it too: GTK 4 (zenity: Nightdrive's own pickers, Ferry) through `GDK_DEBUG=portals`, GTK 3 and Firefox through `GTK_USE_PORTAL=1`; apps already open keep GTK's until they start again, the launcher's until a new login. Qt apps and LibreOffice draw their own.
 - When Files' window doesn't come up in 5 s, or closes without an answer, GTK's opens with the same request, so a save never hangs.
-- No root needed: it is a folder of the user's (`~/.local/share/nightdrive/portals`), named to xdg-desktop-portal by a drop-in of its unit, which `on` starts again. Off, they are gone. `lib/portal-try` tries it first on a portal of its own, leaving the desktop's as it is.
+- The first `on`, and `remove`, start the desktop's portal (xdg-desktop-portal) again, which cuts what is open on it: screen sharing stops, and Lan Mouse gives the mouse and keyboard back. They list those apps first and ask (`--yes` to go ahead without a terminal). `off` and `on` after that are instant: when off, Files' backend hands each request to GTK's window.
+- No root needed: it is a folder of the user's (`~/.local/share/nightdrive/portals`), named to xdg-desktop-portal by a drop-in of its unit. `remove` takes them away. `lib/portal-try` tries it first on a portal of its own, leaving the desktop's as it is.
 
 ## In a terminal
 
@@ -74,6 +75,6 @@ it closes (the launcher and the bar's menus still take it).
     files ~/Projects             # a folder in a new window; a file shows in its folder, picked
     files enable                 # Files opens folders for the desktop (the installer runs it)
     files disable                # folders open in Nautilus again, under its own name
-    files picker on              # Files as the apps' Open and Save window (off: GTK's again; status [--json])
+    files picker on              # Files as the apps' Open and Save window (off: GTK's again; remove; status [--json])
 
 Needs: nothing to set up (Python, GObject, GdkPixbuf, wl-clipboard, poppler-utils and fd-find, which its installer adds)

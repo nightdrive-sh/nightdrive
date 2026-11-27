@@ -1,0 +1,31 @@
+#!/bin/bash
+# portal-sessions: the apps that have a session open on xdg-desktop-portal (Lan Mouse's input capture, a browser's
+# screen sharing, remote desktop, an app's global shortcuts), one a line. Restarting the portal cuts every one of them,
+# and the portal can't take a new choice of backends without a restart, so picker-setup lists them and asks first.
+#
+# Read-only: the portal's session objects (/org/freedesktop/portal/desktop/session/<sender>/<token>, the sender's unique
+# name with _ for .) and each sender's process, from the bus. Nothing is listed when the portal isn't running.
+set -uo pipefail
+
+tree=$(gdbus introspect --session -d org.freedesktop.portal.Desktop -o /org/freedesktop/portal/desktop/session -r \
+  2>/dev/null) || exit 0
+
+# A process's name as the user knows the app, and what its session is most likely for
+label() {
+  case $1 in
+    lan-mouse)  echo "Lan Mouse (the mouse and keyboard shared with another computer)" ;;
+    easyeffects) echo "Easy Effects (its shortcuts)" ;;
+    brave*|chrome*|chromium*|firefox*|zen*) echo "the browser, $1 (screen sharing)" ;;
+    obs) echo "OBS (screen capture)" ;;
+    wayvnc|gnome-remote-desktop*|krdp*) echo "$1 (remote desktop)" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+grep -oE 'session/[0-9]+_[0-9]+/' <<<"$tree" | sort -u | while read -r node; do
+  sender=$(sed -E 's|session/([0-9]+)_([0-9]+)/|:\1.\2|' <<<"$node")
+  pid=$(gdbus call --session -d org.freedesktop.DBus -o /org/freedesktop/DBus \
+    -m org.freedesktop.DBus.GetConnectionUnixProcessID "$sender" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
+  comm=$(cat "/proc/${pid:-0}/comm" 2>/dev/null) || comm=$sender
+  label "$comm"
+done | sort -u
