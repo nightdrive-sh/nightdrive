@@ -234,6 +234,9 @@ Usage: nightmail [command]
                  the message as a PDF there; nothing remote is loaded (lib/save.py, pdf.py)
   send ID        send a draft, through the account's SMTP server
   notify         notify of new mail (notmuch's post-new hook runs it)
+  watch add QUERY [--to SESSION] [--timeout WHEN] -- PROMPT
+                 wake a Claude session with PROMPT when new mail matches QUERY (mail_watch; --timeout 2h:
+                 anyway then); watch list, watch cancel ID
   blocked-notifications  which of Mail's notifications (JSON on stdin) are of mail Access › Mail keeps from Claude
   keyring-locked exit 0 if the login keyring is locked (the sync skips its round then)
   push           sync as soon as new mail comes to an inbox (IMAP IDLE; its service runs it)
@@ -299,7 +302,9 @@ case ${1:-open} in
     python3 "$APP_DIR/lib/drafts.py" show "${@:2}" ;;
   draft-card)   # mail_send's card: what goes out that Claude saw hidden
     python3 "$APP_DIR/lib/drafts.py" card "${@:2}" ;;
-  notify)    python3 "$APP_DIR/lib/notify.py" ;;
+  # Claude's mail watches first (lib/watch.py): before anything here tags or files the new mail away
+  notify)    python3 "$APP_DIR/lib/watch.py" check >/dev/null; python3 "$APP_DIR/lib/notify.py" ;;
+  watch)     python3 "$APP_DIR/lib/watch.py" "${@:2}" ;;
   blocked-notifications) python3 "$APP_DIR/lib/blocked.py" notifications ;;   # `nightdrive notifications` for Claude
   fetch)     fetch "${@:2}" ;;
   fetching)  running && ipc fetching ;;     # fetch()'s, for Mail's spinner
