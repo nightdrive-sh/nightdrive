@@ -55,6 +55,26 @@ open_file() {
   fi
 }
 
+# Archives from another app (xdg-open, a browser's Open; archive_default.py makes this their default): each unpacked
+# beside itself in a new window, as ⏎ on it in Files does, with its progress, result and undo there (#3719)
+extract() {
+  local a p
+  for a in "$@"; do
+    p=$(resolve "$a")
+    [[ -f $p ]] || { echo "files: $p isn't a file." >&2; continue; }
+    # Only what unpack.py reads by its name: a document that is a zip underneath (.xlsx) can reach here through GIO's
+    # parent types before no-app's guard names it, and opens as ⏎ would instead
+    shopt -s nocasematch
+    if [[ ! $p =~ \.(zip|tar|tar\.gz|tgz|tar\.bz2|tbz2?|tar\.xz|txz)$ ]]; then
+      shopt -u nocasematch; open_file "$p"; continue
+    fi
+    shopt -u nocasematch
+    if running; then ipc newWindowExtracting "$p"
+    else start && ready && ipc extractHere "$p"
+    fi
+  done
+}
+
 # A folder opens in a new window; a file shows in its folder, picked
 open_path() {
   local p
@@ -73,6 +93,7 @@ enable() {
   sed "s|@FM1@|$APP_DIR/lib/fm1.py|" "$APP_DIR/share/$DBUS_NAME.service" > "$services/$DBUS_NAME.service"
   command -v update-desktop-database >/dev/null && update-desktop-database "$apps" 2>/dev/null
   "$DEFAULT_APPS" set files "$DESKTOP_ID"
+  "$APP_DIR/lib/archive_default.py" on || true          # archives from other apps unpack here, not in Nautilus
   "$SYNC_APPS" >/dev/null 2>&1 || true
   echo "Files opens folders now (Hyper F too), and shows the files other apps point to."
 }
@@ -81,6 +102,7 @@ disable() {
   if [[ $("$DEFAULT_APPS" 2>/dev/null | awk '/^Files /') == *"$DESKTOP_ID"* && -f /usr/share/applications/$FALLBACK ]]; then
     "$DEFAULT_APPS" set files "$FALLBACK"
   fi
+  "$APP_DIR/lib/archive_default.py" off || true
   rm -f "$data/applications/$DESKTOP_ID" "$data/icons/hicolor/scalable/apps/nightdrive-files.svg" \
         "$data/dbus-1/services/$DBUS_NAME.service"
   "$SYNC_APPS" >/dev/null 2>&1 || true   # Nautilus back under its own name, in the Apps list
@@ -95,6 +117,7 @@ Usage: files [PATH | command]
   PATH, URL      a folder in a new window; a file in its folder, picked
   show PATH      the same, for a file
   open-file FILE a file opened as ⏎ in Files would: in its app, or "No app opens …" with Open with…
+  extract FILE…  an archive unpacked beside itself in a new window, as ⏎ on it does (other apps' archives)
   enable         Files among the desktop's apps, as the one that opens folders (the installer)
   disable        take it away again: folders open in Nautilus
   picker on|off  Files as the apps' Open and Save window, or GTK's again; picker remove, status [--json]
@@ -107,6 +130,7 @@ case ${1:-open} in
   open)       if [[ -n ${2:-} ]]; then open_path "$2"; else new_window; fi ;;
   show)       open_path "${2:-}" ;;
   open-file)  open_file "${2:-}" ;;
+  extract)    shift; extract "$@" ;;
   enable)     enable ;;
   disable)    disable ;;
   picker)     shift; exec "$APP_DIR/lib/picker-setup" "$@" ;;

@@ -74,6 +74,9 @@ echo "==> Default apps: images open in Loupe (instead of the browser); Markdown 
 # Documents no installed app opens (an .xlsx with no spreadsheet app, an .epub with no reader): no-app's hidden entry as
 # their default, so xdg-open and GIO's apps say so rather than open them as a zip in the file manager (#3715)
 "$repo/config/hypr/scripts/no-app" guard || true
+# Archives (.zip, .tar.gz) from other apps: with Files installed, unpacked beside themselves in a Files window as its ⏎
+# does, not opened in Nautilus; a default the user chose stays (#3719)
+"$repo/plugins/files/lib/archive_default.py" sync || true
 
 echo "==> Webapps: the window class Chromium gives them (their notifications, the launcher and Share find the window)"
 "$repo/config/hypr/scripts/webapp-add" --fix-classes

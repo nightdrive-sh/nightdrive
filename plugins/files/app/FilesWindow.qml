@@ -19,6 +19,7 @@ FloatingWindow {
     property string startPath: ""         // where it opens (home when empty), and the file picked there
     property string startSelect: ""
     property bool startOpen: false        // and opened as ⏎ would (`files open-file`, no-app's: says no app opens it)
+    property bool startExtract: false     // or unpacked beside itself (`files extract`: an archive from another app)
     // Another app's Open or Save window (picker.qml, lib/portal.py): the request, and PickBar under the window
     property var pick: null
     title: pick ? pick.title : "Files"
@@ -29,8 +30,10 @@ FloatingWindow {
     Component.onCompleted: {
         if (startPath) enter(startPath, startSelect)
         if (startOpen && startSelect) launch.open(startSelect)
+        if (startExtract && startSelect) ops.extract(startSelect)
     }
     function openFile(p) { launch.open(p) }
+    function extractFile(p) { ops.extract(p) }
 
     // The window last active is the one a folder from another app (IPC) goes to
     readonly property bool active: content.Window.active

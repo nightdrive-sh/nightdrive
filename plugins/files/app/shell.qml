@@ -31,9 +31,10 @@ ShellRoot {
         settingsFile.setText(JSON.stringify(s, null, 2) + "\n")
     }
 
-    function open(path, select, launch) {
+    // launch: open the picked file as ⏎ would; unpack: unpack the picked archive (`files extract`, #3719)
+    function open(path, select, launch, unpack) {
         made++
-        windows = windows.concat([{ id: made, path: path || "", select: select || "", launch: !!launch }])
+        windows = windows.concat([{ id: made, path: path || "", select: select || "", launch: !!launch, unpack: !!unpack }])
     }
     function closed(w) {
         if (last === w) last = null
@@ -52,6 +53,12 @@ ShellRoot {
         const w = last || (all.length ? all[all.length - 1] : null)
         if (w) { w.go(Format.parent(path), path); w.openFile(path) } else open(Format.parent(path), path, true)
     }
+    // The same for an archive to unpack beside itself: another app's, through `files extract` (#3719)
+    function goExtracting(path) {
+        const all = instances.instances
+        const w = last || (all.length ? all[all.length - 1] : null)
+        if (w) { w.go(Format.parent(path), path); w.extractFile(path) } else open(Format.parent(path), path, false, true)
+    }
     // A change to the sidebar's folders (a bookmark, one moved) reaches every window's
     function placesChanged() { for (const w of instances.instances) w.places.refresh() }
     // The settings' folder made before the first write could need it (FileView doesn't make it)
@@ -67,6 +74,7 @@ ShellRoot {
             startPath: modelData.path
             startSelect: modelData.select
             startOpen: modelData.launch || false
+            startExtract: modelData.unpack || false
         }
     }
 
@@ -85,6 +93,10 @@ ShellRoot {
         // opens, so the window says so with Open with… and the app to install); openFileHere into the first window
         function newWindowOpening(path: string): void { shell.open(Format.parent(path), path, true) }
         function openFileHere(path: string): void { shell.goOpening(path) }
+        // A new window with the archive picked and unpacked beside it, as ⏎ on it does (`files extract`: an archive
+        // from another app, #3719); extractHere into the first window
+        function newWindowExtracting(path: string): void { shell.open(Format.parent(path), path, false, true) }
+        function extractHere(path: string): void { shell.goExtracting(path) }
         function refresh(): void { for (const w of instances.instances) w.reload() }
         function openSettings(): void {       // the kit's `files settings`
             const all = instances.instances
