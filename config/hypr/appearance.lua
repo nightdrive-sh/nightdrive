@@ -67,7 +67,9 @@ hl.workspace_rule({ workspace = "special:drawer", gaps_out = { top = drawerTop, 
 -- from the hidden line's gap (indicator_gap); 6 px between tabs. The window keeps its rounded corners: Hyprland
 -- rounds all four or none, and square ones at the bottom looked out of place. Colours and font, the UI's, come from
 -- the theme (look.lua above), nearly opaque over a blurred wallpaper and the shown tab's title bold, so a bright
--- wallpaper doesn't wash them out (#3195); ⌘←/→ goes through the tabs first (bindings.lua)
+-- wallpaper doesn't wash them out (#3195); ⌘←/→ goes through the tabs first (bindings.lua). Each tab casts the windows'
+-- shadow (decoration.shadow above), which Hyprland itself doesn't draw: Nightdrive's Hyprland package patches it in
+-- (nightdrive-packages, hyprland-groupbar-tab-shadow.patch, #3731); on an unpatched Hyprland the tabs just have none.
 hl.config({
     group = {
         groupbar = { font_size = 12, height = 32, gradients = true, rounding = 0, text_padding = 12, blur = true,
