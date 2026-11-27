@@ -52,6 +52,18 @@ def rc_socket(d):
     return os.path.join(runtime_dir(), f"{d['name']}.sock")
 
 
+def agent_socket():
+    """The drives' own ssh-agent, holding the key netdrive key made (lib/sshkey.py)"""
+    return os.path.join(runtime_dir(), "agent.sock")
+
+
+def key_options(d):
+    """ssh's options for a drive with a key of its own: only that key, from the drives' agent, never 1Password's"""
+    if not d.get("key"):
+        return []
+    return ["-i", os.path.expanduser(d["key"]), "-o", "IdentitiesOnly=yes", "-o", f"IdentityAgent={agent_socket()}"]
+
+
 def cache_dir(d):
     """One cache per drive: rclone names its cache by the remote, and two ssh drives would both be ":sftp" """
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
@@ -82,7 +94,7 @@ def connection_flags(d, ssh=None):
     ssh argv in place of ssh_command's (the tests' own key and port)."""
     flags = ["--contimeout", f"{CONNECT_TIMEOUT}s", "--timeout", IO_TIMEOUT, "--low-level-retries", "1"]
     if d.get("ssh"):
-        guarded = [BREAKER, breaker_flag(d), *(ssh or ssh_command(d["ssh"]))]
+        guarded = [BREAKER, breaker_flag(d), *(ssh or ssh_command(d["ssh"], key_options(d)))]
         flags += ["--sftp-ssh", space_list(guarded),
                   "--sftp-shell-type", "none", "--sftp-disable-hashcheck", "--sftp-known-hosts-file", "none"]
     return flags

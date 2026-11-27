@@ -6,7 +6,8 @@
 
 A drive is either an ssh host (`ssh`: a Host of ~/.ssh/config, its key and agent as ssh has them, so no password is
 ever written anywhere; `root`: an optional folder there) or any remote of `rclone config` (`remote`: "name:path"; what
-it needs to log in is rclone's). The name is the unit's instance (netdrive@Files.service), so it stays a plain word.
+it needs to log in is rclone's). An ssh drive's `key`, set by netdrive key, is a key of its own (lib/sshkey.py)
+instead of the Host's. The name is the unit's instance (netdrive@Files.service), so it stays a plain word.
 """
 import json
 import os
@@ -103,6 +104,19 @@ def add(name, ssh="", remote="", path="", root="", read_only=False):
     drives.append(d)
     save(drives)
     return d
+
+
+def set_key(name, key):
+    """The drive's own ssh key (lib/sshkey.py), or none again: it logs in as its Host does"""
+    drives = load()
+    for d in drives:
+        if d["name"] == name:
+            d.pop("key", None)
+            if key:
+                d["key"] = key
+            save(drives)
+            return d
+    raise Refused(f"No drive named {name}: netdrive list shows them.")
 
 
 def remove(name):

@@ -1,0 +1,6 @@
+#!/bin/bash
+# Network Drives: ssh-add's SSH_ASKPASS for the drives' own key (lib/sshkey.py), its passphrase from the login keyring.
+# Only the first prompt ("Enter passphrase for …") is answered. A wrong one makes ssh-add ask again ("Bad passphrase,
+# try again …"), and answering that too would loop forever; anything else (a confirmation) gets nothing either.
+[[ $1 == "Enter passphrase"* ]] || exit 1
+exec secret-tool lookup application nightdrive-netdrive key "$NETDRIVE_KEY"

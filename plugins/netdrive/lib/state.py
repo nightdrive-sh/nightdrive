@@ -83,12 +83,13 @@ def rc(d, method, params=None):
 
 
 def describe(d, unit, mounted):
-    """The drive's row: {name, source, path, read_only, enabled, state, detail, uploads, failed_uploads}.
+    """The drive's row: {name, source, key, path, read_only, enabled, state, detail, uploads, failed_uploads}.
     state: mounted, connecting (waiting for the host, or rclone starting), failed, off, or stale (the folder still
     mounted while the service isn't running: `netdrive start NAME` mounts it again)."""
     path = drives.mountpoint(d)
     active = unit.get("ActiveState", "")
-    row = {"name": d["name"], "source": f"ssh {d['ssh']}" if d.get("ssh") else d.get("remote", ""), "path": path,
+    row = {"name": d["name"], "source": f"ssh {d['ssh']}" if d.get("ssh") else d.get("remote", ""),
+           "key": bool(d.get("key")), "path": path,
            "read_only": bool(d.get("read_only")), "enabled": unit.get("UnitFileState") == "enabled",
            "detail": unit.get("StatusText", ""), "uploads": 0, "failed_uploads": 0}
     is_mounted = mounted.get(path, "").startswith("fuse")

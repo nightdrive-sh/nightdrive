@@ -6,6 +6,7 @@
     netdrive start|stop|restart NAME|all   mount (and at every login), unmount (and not at login), connect again
                                            (restart all: the drives that are on)
     netdrive refresh NAME                  read its folders again now, not in a minute
+    netdrive key NAME|all [--off]          log in with Network Drives' own key, not 1Password's (lib/sshkey.py)
     netdrive bar                           the top bar's line (status): ICON CLASS [TEXT], or nothing
     netdrive run NAME | release NAME       the service's own (nightdrive-netdrive@.service)
     netdrive init                          an empty list (the installer)
@@ -19,6 +20,7 @@ import sys
 
 import drives
 import mountcmd
+import sshkey
 import state
 
 UNIT = state.UNIT
@@ -77,6 +79,13 @@ def run(name):
         target = mountcmd.ssh_target(d["ssh"])
         if target:
             mountcmd.wait_for(target, notify)
+    if d.get("key"):
+        notify("Unlocking its key")
+        try:
+            sshkey.load(d["key"])
+        except drives.Refused as e:
+            notify(str(e))
+            raise
     notify("Mounting")
     cmd = mountcmd.argv(d)
     os.execvp(cmd[0], cmd)
@@ -154,6 +163,35 @@ def cmd_switch(a):
     return {a.cmd: done}
 
 
+def cmd_key(a):
+    """The drives' own key for each drive (made the first time), put on its host if it doesn't log in yet, then the
+    drive connected again with it. --off: back to the Host's own key (the key stays on the host until removed there)."""
+    done = []
+    for n in names(a.name):
+        d = drives.get(n)
+        if not d.get("ssh"):
+            raise drives.Refused(f"{n} isn't an ssh drive: its login is rclone's (rclone config).")
+        if a.off:
+            drives.set_key(n, "")
+        else:
+            sshkey.make()
+            keyed = {**d, "key": sshkey.KEY}
+            sshkey.load()
+            try:
+                check(keyed)
+            except drives.Refused:
+                sshkey.copy_id(d["ssh"])
+                try:                           # the failed try left the circuit breaker set (lib/ssh-breaker)
+                    os.unlink(mountcmd.breaker_flag(d))
+                except FileNotFoundError:
+                    pass
+                check(keyed)
+            drives.set_key(n, sshkey.KEY)
+        systemctl("restart", "--no-block", UNIT.format(n))
+        done.append(n)
+    return {"key": "off" if a.off else sshkey.path(), "drives": done}
+
+
 def cmd_refresh(a):
     d = drives.get(a.name)
     if state.rc(d, "vfs/refresh", {"recursive": "false"}) is None:
@@ -178,6 +216,9 @@ def main(argv=None):
     for c in ("start", "stop", "restart"):
         sub.add_parser(c, help=f"{c} a drive (or all)").add_argument("name")
     sub.add_parser("refresh", help="read its folders again now").add_argument("name")
+    s = sub.add_parser("key", help="log in with Network Drives' own key (no 1Password)")
+    s.add_argument("name")
+    s.add_argument("--off", action="store_true", help="back to the Host's own key")
     sub.add_parser("bar", help="the top bar's line")
     sub.add_parser("run", help="the service: mount it (in the foreground)").add_argument("name")
     sub.add_parser("release", help="the service: take a leftover mount away").add_argument("name")
@@ -202,7 +243,7 @@ def main(argv=None):
             unmount(drives.mountpoint(drives.get(a.name)))
             return 0
         out = {"add": cmd_add, "remove": cmd_remove, "start": cmd_switch, "stop": cmd_switch,
-               "restart": cmd_switch, "refresh": cmd_refresh, "init": lambda _: drives.init()}[a.cmd](a)
+               "restart": cmd_switch, "refresh": cmd_refresh, "key": cmd_key, "init": lambda _: drives.init()}[a.cmd](a)
         print(json.dumps(out))
         return 0
     except drives.Refused as e:
