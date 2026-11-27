@@ -41,7 +41,10 @@ FocusScope {
                 text: root.placeholder; color: root.c.faint; font: input.font
             }
             onTextEdited: root.edited()
-            Keys.onPressed: e => { if (root.keyFilter) { e.accepted = false; root.keyFilter(e) } }
+            Keys.onPressed: e => {
+                if (root.keyFilter) { e.accepted = false; root.keyFilter(e); if (e.accepted) return }
+                TextKeys.key(e, input)
+            }
             Keys.onReturnPressed: root.returnPressed()
             Keys.onDownPressed: root.downPressed()
             Keys.onEscapePressed: root.escapePressed()

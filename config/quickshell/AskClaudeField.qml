@@ -1,5 +1,5 @@
 import QtQuick
-import "Words.js" as Words
+import "kit/Words.js" as Words
 
 // Ask Claude's field: one line in the look of the launcher's search field, but it wraps into more lines as the request
 // grows, up to maxLines and then scrolls, and its font gets a little smaller the longer the text is, so a long request

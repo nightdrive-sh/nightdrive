@@ -1,5 +1,6 @@
 import QtQuick
 import qs
+import qs.kit
 
 // A line's label in the editor (mobile, home, work…): a click, or Space, Return or ↓ on it, opens the labels to pick from,
 // and Custom… lets one be typed (Apple's own, "Cottage"). It edits target.label in place, as EditField does.
@@ -72,6 +73,7 @@ FocusScope {
         selectionColor: root.c.sel; clip: true
         onTextEdited: root.target.label = root.label = text
         onActiveFocusChanged: if (!activeFocus) root.typing = false
+        Keys.onPressed: e => TextKeys.key(e, custom)
         Keys.onReturnPressed: root.forceActiveFocus()
         Keys.onEscapePressed: root.forceActiveFocus()
     }

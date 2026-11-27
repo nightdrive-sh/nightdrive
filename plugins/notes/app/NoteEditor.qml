@@ -1,4 +1,5 @@
 import QtQuick
+import qs.kit
 
 // Writing a note in the window: its Markdown as it is in the file, in a text field where the reading view was (the
 // same font, width and margins, so the note doesn't jump). Raw Markdown rather than formatted text: Qt's own Markdown
@@ -165,6 +166,7 @@ Item {
 
             Keys.onPressed: e => {
                 if (help.key(e)) { e.accepted = true; return }
+                if (TextKeys.key(e, area)) return
                 const ctrl = e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
                 if (e.key === Qt.Key_Escape) root.done()
                 // Said in the toast as well: it has mostly saved by itself already, and the bar's "Saved" wouldn't change

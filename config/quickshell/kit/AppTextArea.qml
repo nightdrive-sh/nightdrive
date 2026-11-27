@@ -41,6 +41,7 @@ Column {
                 activeFocusOnTab: true
                 onCursorRectangleChanged: flick.follow(cursorRectangle)
                 Keys.onPressed: e => {
+                    if (TextKeys.key(e, edit)) return
                     const ctrl = e.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
                     if (ctrl && (e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) root.save()
                     else if (e.key === Qt.Key_Escape) root.escaped()

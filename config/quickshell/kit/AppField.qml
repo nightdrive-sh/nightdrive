@@ -45,6 +45,7 @@ Column {
             Keys.onPressed: e => {
                 if (root.keyFilter) { e.accepted = false; root.keyFilter(e); if (e.accepted) return }
                 if (e.key === Qt.Key_Escape) { root.escaped(); e.accepted = true; return }
+                if (TextKeys.key(e, input)) return
                 if (readOnly && (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete || (e.text.length && e.text.charCodeAt(0) >= 32)))
                     root.refused()
                 e.accepted = false

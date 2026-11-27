@@ -57,7 +57,7 @@
   ⌃ ⌘ + click       A link: the window it opens floats in the centre (not a link that opens in a tab)
   ⌘ ⌥ ← / →         Previous / next tab (any app: sends Ctrl+PageUp/PageDown)
   ⌃ ⌘ ← / →         Back / forward (browsers, web apps, Nautilus)
-  ⌥ ← / →           Move by word (⇧ selects)
+  ⌥ ← / →           Move by word (⇧ selects); ⌥⌫ deletes the word before the cursor (in Nightdrive's apps ⌥⌦ the one after)
   ⌥ ↓ / ⌥ ↑          Files: open the selected folder / go to the parent folder
 
 ## Workspaces (like macOS Spaces)

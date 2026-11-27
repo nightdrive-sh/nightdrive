@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
+import qs.kit as Kit
 
 // Claude writes: the preview after ⌘⇧C, in the middle of the window (hypr/scripts/claude-write, which reads the
 // selection and the window; the place: ClaudeWritePlace.qml). Claude's text shows here first, and goes in place of the
@@ -288,6 +289,7 @@ PanelWindow {
                         font: request.font
                     }
                     Keys.onPressed: e => {
+                        if (Kit.TextKeys.key(e, request)) return
                         if (e.key === Qt.Key_Escape) win.cancel()
                         else if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && !(e.modifiers & Qt.ShiftModifier)) win.accept()
                         else return

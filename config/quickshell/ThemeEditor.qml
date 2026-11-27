@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.kit as Kit
 
 // Theme Editor: the look's values (hypr/scripts/theme look / set) with a slider or a colour each, applied as they change.
 // Opened from the launcher (Settings › Theme › Theme Editor…): qs ipc call themeeditor open.
@@ -198,6 +199,7 @@ FloatingWindow {
                         maximumLength: 40
                         font { family: Theme.font; pixelSize: 13 }
                         onAccepted: saveRow.go()
+                        Keys.onPressed: e => Kit.TextKeys.key(e, nameField)
                         Keys.onEscapePressed: win.naming = false
                         Text {
                             visible: parent.text === ""

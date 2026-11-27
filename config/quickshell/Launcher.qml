@@ -5,7 +5,7 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import QtQuick.Effects
 import qs.kit as Kit
-import "Words.js" as Words
+import "kit/Words.js" as Words
 
 // Launcher (⌘Space). A plugin's row above the search field (Deck's player: Ctrl+Space = play/pause). Root level: Apps, Passwords, Clipboard, Screenshot, Keybindings, Settings, Install, Remove, Update, Power. Enter opens an item, Esc/Backspace (with an empty query, not in a form's field) goes back,
 // at the root level Esc closes. Up/down arrows or Ctrl+N/P/J/K move the selection.

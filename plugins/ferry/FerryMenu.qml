@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs
+import qs.kit as Kit
 
 // Ferry (the `ferry` command of Ferry's own install): a mailbox between this computer and the owner's other devices (phones, other computers' Ferry). The
 // menu lists what they sent here on one card: a click copies a text or opens a file, a file drags out into another app,
@@ -323,6 +324,7 @@ Column {
                     font { family: Theme.font; pixelSize: 13 }
                     // Enter sends, Shift+Enter starts a new line; Esc goes back to the list
                     Keys.onPressed: e => {
+                        if (Kit.TextKeys.key(e, textEdit)) return
                         if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && !(e.modifiers & Qt.ShiftModifier)) {
                             m.sendText(); e.accepted = true
                         } else if (e.key === Qt.Key_Escape) {

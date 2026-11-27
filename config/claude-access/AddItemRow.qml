@@ -58,6 +58,7 @@ Rectangle {
                     font: input.font
                 }
                 Keys.onPressed: e => {
+                    if (TextKeys.key(e, input)) return
                     if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
                         if (row.valid) { row.added(input.text.trim()); input.text = "" }
                         else row.tried = !!input.text.trim()

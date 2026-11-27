@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import qs
+import qs.kit
 
 // One open file: its text in a field of its own (so each file keeps its own undo, cursor and scroll while another is
 // shown), saved on ⌘S through lib/textfile.py. Nothing is saved by itself: a config file half written would be read by
@@ -167,6 +168,7 @@ Item {
             cursorDelegate: Rectangle { width: 2; color: root.c.primary; visible: area.cursorVisible }
             onCursorRectangleChanged: flick.follow(cursorRectangle)
             onTextChanged: root.dirty = text !== root.base
+            Keys.onPressed: e => TextKeys.key(e, area)
             FontMetrics { id: fm; font: area.font }
         }
     }

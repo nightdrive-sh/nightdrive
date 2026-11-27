@@ -1,5 +1,6 @@
 import QtQuick
 import qs
+import qs.kit
 
 // A field a step of StepView asks for (steps.md's Ask:): its label, and a line to type in, with the example greyed
 // while it's empty. Keys stay in it while it has them: Enter or Tab goes on to the next field, Shift+Tab to the one
@@ -35,6 +36,7 @@ Column {
             // What the field doesn't use (Esc, Tab, an arrow at its end) stays here, not the step's keys
             Keys.priority: Keys.AfterItem
             Keys.onPressed: e => {
+                if (TextKeys.key(e, input)) return
                 if (e.key === Qt.Key_Tab) root.done()
                 else if (e.key === Qt.Key_Backtab) root.previous()
                 else if (e.key === Qt.Key_Escape) root.leave()

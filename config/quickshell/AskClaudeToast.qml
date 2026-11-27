@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Window
 import Quickshell
 import Quickshell.Io
-import "Words.js" as Words
+import "kit/Words.js" as Words
 
 // Dictation's toast, which grows into Ask Claude's (Dashboard #1895): one card in ToastStack.
 // - While Voxtype records it is the dictation indicator (DictationIndicator.qml), and it never takes a key: what you

@@ -141,6 +141,7 @@ Item {
                             text: root.placeholder; color: root.c.faint; font: field.font
                         }
                         Keys.onPressed: e => {
+                            if (TextKeys.key(e, field)) return
                             const k = e.key
                             if (k === Qt.Key_Down || k === Qt.Key_Tab) root.move(1)
                             else if (k === Qt.Key_Up || k === Qt.Key_Backtab) root.move(-1)

@@ -87,6 +87,7 @@ Rectangle {
                     color: bar.c.text; font.family: bar.c.font; font.pixelSize: 13
                     selectionColor: bar.c.sel; selectByMouse: true
                     Keys.onPressed: e => {
+                        if (TextKeys.key(e, input)) return
                         const k = e.key
                         if (k === Qt.Key_Return || k === Qt.Key_Enter) { bar.accept(); e.accepted = true }
                         else if (k === Qt.Key_Escape) { bar.cancel(); e.accepted = true }

@@ -1,4 +1,5 @@
 import QtQuick
+import qs.kit
 
 // One line of the editor to type in: a quiet line under it, the placeholder in it while it's empty. It edits target[key]
 // in place (the editor's draft), so the draft is always what the fields show.
@@ -31,12 +32,14 @@ FocusScope {
     Component {
         id: line
         TextInput {
+            id: lineInput
             focus: true
             text: root.target ? root.target[root.key] || "" : ""
             color: root.c.text; font.family: root.c.font; font.pixelSize: root.pixelSize
             selectionColor: root.c.sel; selectByMouse: true
             clip: true
             onTextEdited: root.target[root.key] = text
+            Keys.onPressed: e => TextKeys.key(e, lineInput)
             Keys.onReturnPressed: root.returnPressed()
             Keys.onEnterPressed: root.returnPressed()
             Text {
@@ -49,12 +52,14 @@ FocusScope {
     Component {
         id: area
         TextEdit {
+            id: noteInput
             focus: true
             text: root.target ? root.target[root.key] || "" : ""
             color: root.c.text; font.family: root.c.font; font.pixelSize: root.pixelSize
             selectionColor: root.c.sel; selectByMouse: true
             wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText
             onTextChanged: if (activeFocus) root.target[root.key] = text
+            Keys.onPressed: e => TextKeys.key(e, noteInput)
             // Tab leaves the note, as it leaves a line
             Keys.onTabPressed: e => { nextItemInFocusChain(true).forceActiveFocus(); e.accepted = true }
             Keys.onBacktabPressed: e => { nextItemInFocusChain(false).forceActiveFocus(); e.accepted = true }

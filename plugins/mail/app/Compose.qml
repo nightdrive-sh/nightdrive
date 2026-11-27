@@ -210,7 +210,7 @@ Item {
                 // With completions open, Esc closes them instead of the window, and Tab or Enter takes the chosen one.
                 Keys.onShortcutOverride: e => { if (f.matches.length && e.key === Qt.Key_Escape) e.accepted = true }
                 Keys.onPressed: e => {
-                    if (pasteFiles.key(e, inp)) return
+                    if (TextKeys.key(e, inp) || pasteFiles.key(e, inp)) return
                     if (!f.matches.length) return
                     if (e.key === Qt.Key_Down) f.pick = (f.pick + 1) % f.matches.length
                     else if (e.key === Qt.Key_Up) f.pick = (f.pick + f.matches.length - 1) % f.matches.length
@@ -383,7 +383,7 @@ Item {
                 color: root.c.body; font.family: root.c.font; font.pixelSize: 14
                 selectionColor: root.c.sel; selectByMouse: true
                 activeFocusOnTab: true
-                Keys.onPressed: e => pasteFiles.key(e, body)
+                Keys.onPressed: e => TextKeys.key(e, body) || pasteFiles.key(e, body)
                 // Keep the caret in view while typing past the bottom.
                 onCursorRectangleChanged: {
                     const r = cursorRectangle
