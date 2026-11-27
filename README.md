@@ -555,7 +555,7 @@ The same `nightdrive` command reaches the settings from a terminal (`nightdrive`
 | `nightdrive bluetooth` | Bluetooth's devices as JSON; `nightdrive battery` the battery's charge, time left and health |
 | `nightdrive low-power on` | Low Power Mode on a laptop, `off` or `toggle`; `status` (`--json`). `suggest off` stops the 10 % warning offering it |
 | `nightdrive game-mode on` | Game Mode: the CPU at full speed for games, `off` (back to the profile from before) or `toggle`; `status` (`--json`) |
-| `nightdrive games` | The games here, from their `.desktop` files and Steam's library (`--json`); `launch ID` starts one |
+| `nightdrive games` | The games here, from their `.desktop` files and Steam's library (`--json`); `launch ID` starts one, or switches to it when it is running |
 | `nightdrive bar-style opacity 80` | Top bar opacity; also `icons`, `icon-opacity` and `highlight` |
 | `nightdrive nightlight on` | Night light's warm tint, `off` or `toggle` (also Launcher › Settings › Display) |
 | `nightdrive appearance` | The wallpaper, theme, night light and the top bar's look now, as JSON (`wallpaper list --json`, `theme state`, `bar-style show` give each part) |

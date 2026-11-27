@@ -14,7 +14,7 @@ Item {
     property var launcher: null
 
     readonly property string cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/games"
-    property var games: []                  // [{ id, name, source, icon, installed, progress, path }] (games list --json)
+    property var games: []                  // [{ id, name, source, icon, installed, progress, running, path }] (games list --json)
 
     readonly property var levels: ["games"]
     readonly property var titles: ({ games: "Games" })
@@ -25,7 +25,7 @@ Item {
     function gameItem(x) {
         const steam = x.source === "steam"
         return { kind: "game", name: x.name, id: x.id, glyph: x.icon ? undefined : "gamepad-2", iconFile: x.icon || undefined,
-                 summary: !x.installed ? "downloading " + x.progress + " %" : steam ? "Steam" : "" }
+                 summary: !x.installed ? "downloading " + x.progress + " %" : x.running ? "running" : steam ? "Steam" : "" }
     }
     function footer(level, query) {
         if (level !== "games") return ""
@@ -33,6 +33,7 @@ Item {
         if (cur.kind !== "game") return ""
         // The keys show as chips, Enter's as ↵; the controller's A and B as letters
         return cur.summary && cur.summary.indexOf("downloading") === 0 ? "Enter: open in Steam, which goes on downloading  ·  A: the same  ·  B: close"
+             : cur.summary === "running" ? "Enter: switch to it  ·  A: the same  ·  B: close"   // games launch brings it forward
                                                                          : "Enter: play  ·  A: play  ·  B: close"
     }
     function opened() { listProc.running = true }

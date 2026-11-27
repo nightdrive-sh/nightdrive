@@ -96,8 +96,9 @@ Item {
     }
     Text {
         anchors { top: cover.bottom; topMargin: 12 + Math.round(card.coverWidth / 12) + 8; left: parent.left; right: parent.right }
-        text: !card.game.installed ? "Downloading " + card.game.progress + " %" : card.game.source === "steam" ? "Steam" : ""
-        color: card.c.dim
+        text: !card.game.installed ? "Downloading " + card.game.progress + " %" : card.game.running ? "Running"
+              : card.game.source === "steam" ? "Steam" : ""
+        color: card.game.installed && card.game.running ? card.c.primary : card.c.dim   // running: A switches to it
         font { family: card.c.font; pixelSize: Math.round(card.coverWidth / 15) }
         horizontalAlignment: Text.AlignHCenter
     }

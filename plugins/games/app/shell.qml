@@ -22,7 +22,7 @@ ShellRoot {
         readonly property QtObject look: c
         Store {
             id: store
-            onStarted: name => { toast.show("Starting " + name + "…"); closeTimer.restart() }
+            onStarted: (name, running) => { toast.show((running ? "Switching to " : "Starting ") + name + "…"); closeTimer.restart() }
             onErrorChanged: if (error !== "") toast.show(error, { danger: true })
         }
         // A moment for the toast, then away: the game's window comes up in the window's place

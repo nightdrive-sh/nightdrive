@@ -8,10 +8,10 @@ import Quickshell.Io
 Item {
     id: s
     readonly property string cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/games"
-    property var games: []        // [{ id, name, source, icon, installed, progress, cover, hero, path }]
+    property var games: []        // [{ id, name, source, icon, installed, progress, running, cover, hero, path }]
     property bool loaded: false
     property string error: ""
-    signal started(string name)
+    signal started(string name, bool running)   // running: it was open already and came forward (#3632)
 
     function refresh() { if (!listProc.running) listProc.running = true }
     function launch(game) {
@@ -42,7 +42,9 @@ Item {
         stdout: StdioCollector { id: launchOut }
         stderr: StdioCollector { id: launchErr }
         onExited: code => {
-            if (code === 0) s.started(name)
+            let running = false
+            try { running = JSON.parse(launchOut.text).running === true } catch (e) {}
+            if (code === 0) s.started(name, running)
             else s.error = launchErr.text.trim() || "Couldn't start " + name
         }
     }

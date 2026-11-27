@@ -13,6 +13,7 @@ screen and the controller.
 | `Esc` | B, or the Xbox button again | Close |
 
 - **The games** are the apps whose category is Game (one of your own, a Flatpak game) and every game in Steam's library. A game Steam is still downloading shows how far; A opens it in Steam, which goes on downloading.
+- **A game that is running** says so under its cover, and A switches to its window instead of starting it again (from the Launcher and `nightdrive games launch` too). Games knows a window by the class in the game's `.desktop` file (`StartupWMClass`) or by having started it.
 - **Steam games** start through Steam, which may take a while, more so on an ARM Mac, where Steam runs emulated. A notification says it is on its way.
 - **The Xbox button** works with any controller that has one (Xbox, PlayStation), over Bluetooth or a cable, also after it reconnects. While a Steam game runs, the button is Steam's. While Games shows, the controller moves only in it: a game behind it doesn't see the presses.
 - **A cover of your own** for a game that isn't Steam's: in its `.desktop` file (`~/.local/share/applications`), `X-Nightdrive-Cover=/path/cover.png`, a 2:3 picture such as 600×900, and if you like `X-Nightdrive-Hero=/path/backdrop.png`, a wide one shown behind the covers (without it, the cover is). Without them the card shows the game's icon.
