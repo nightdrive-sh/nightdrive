@@ -110,7 +110,7 @@ Item {
             visible: mod.icon !== "" && (!!(mod.st && mod.st.dot) || (mod.claudeAccount >= 0
                      && Claude.wantingIn(mod.claudeAccount) + Claude.askingIn(mod.claudeAccount) > 0))
             width: 7; height: 7; radius: 3.5
-            x: mod.snap(img.x + img.width - 5); y: mod.snap(img.y - 1)   // off the icon's corner, clear of the bot's head
+            x: mod.snap(img.x + img.width - 3); y: mod.snap(img.y - 1)   // off the icon's corner, clear of the bot's head (#3720)
             color: Theme.danger   // red like a critical module (the Dashboard's tasks); no ring around it: the bar's background can be see-through
         }
 
